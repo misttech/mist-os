@@ -12,8 +12,7 @@ use log::warn;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use test_manager::{
-    RunBuilderMarker, RunControllerMarker, RunControllerProxy, RunOptions, SuiteControllerMarker,
-    SuiteControllerProxy,
+    RunSuiteOptions, SuiteControllerMarker, SuiteControllerProxy, SuiteRunnerMarker,
 };
 use url::Url;
 use {fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager};
@@ -28,7 +27,7 @@ pub trait FidlEndpoint<T: DiscoverableProtocolMarker> {
     fn create_proxy(&self) -> Result<T::Proxy, Error>;
 }
 
-pub struct Manager<T: FidlEndpoint<RunBuilderMarker>> {
+pub struct Manager<T: FidlEndpoint<SuiteRunnerMarker>> {
     // Currently active fuzzers.
     fuzzers: RefCell<HashMap<Url, Fuzzer>>,
 
@@ -36,12 +35,12 @@ pub struct Manager<T: FidlEndpoint<RunBuilderMarker>> {
     registry: RegistryProxy,
 
     // Produces connections to the test_manager.
-    run_builder: T,
+    suite_runner: T,
 }
 
-impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
-    pub fn new(registry: RegistryProxy, run_builder: T) -> Self {
-        Self { fuzzers: RefCell::new(HashMap::new()), registry, run_builder }
+impl<T: FidlEndpoint<SuiteRunnerMarker>> Manager<T> {
+    pub fn new(registry: RegistryProxy, suite_runner: T) -> Self {
+        Self { fuzzers: RefCell::new(HashMap::new()), registry, suite_runner }
     }
 
     /// Serves requests from `receiver`.
@@ -85,24 +84,21 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
         Ok(())
     }
 
-    fn build(&self, url: &Url) -> Result<(RunControllerProxy, SuiteControllerProxy)> {
-        let run_builder = self
-            .run_builder
+    fn build(&self, url: &Url) -> Result<SuiteControllerProxy> {
+        let suite_runner = self
+            .suite_runner
             .create_proxy()
-            .context("failed to connect to fuchsia.test_manager.RunBuilder")?;
-        let (run_proxy, run_controller) = create_proxy::<RunControllerMarker>();
+            .context("failed to connect to fuchsia.test_manager.SuiteRunner")?;
         let (suite_proxy, suite_controller) = create_proxy::<SuiteControllerMarker>();
-        let run_options =
-            RunOptions { arguments: Some(vec![fuzz::FUZZ_MODE.to_string()]), ..Default::default() };
-        run_builder
-            .add_suite(url.as_str(), &run_options, suite_controller)
+        let options = RunSuiteOptions {
+            arguments: Some(vec![fuzz::FUZZ_MODE.to_string()]),
+            ..Default::default()
+        };
+        suite_runner
+            .run(url.as_str(), options, suite_controller)
             .map_err(Error::msg)
-            .context("fuchsia.test_manager.RunBuilder/AddSuite")?;
-        run_builder
-            .build(run_controller)
-            .map_err(Error::msg)
-            .context("fuchsia.test_manager.RunBuilder/Build")?;
-        Ok((run_proxy, suite_proxy))
+            .context("fuchsia.test_manager.SuiteRunner/Run")?;
+        Ok(suite_proxy)
     }
 
     // Requests that given |controller| be connected to the fuzzer given by |fuzzer_url|, starting
@@ -118,8 +114,8 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
         let mut fuzzer = self.take_fuzzer(&url).unwrap_or_default();
         match fuzzer.get_state() {
             FuzzerState::Stopped | FuzzerState::Failed(_) => {
-                let (run_proxy, suite_proxy) = self.build(&url).map_err(warn_internal::<()>)?;
-                fuzzer.start(run_proxy, suite_proxy).await;
+                let suite_proxy = self.build(&url).map_err(warn_internal::<()>)?;
+                fuzzer.start(suite_proxy).await;
             }
             _ => {}
         };
@@ -475,7 +471,6 @@ mod tests {
                 .borrow()
                 .send_suite_stopped(FOO_URL)
                 .context("failed to stop suite")?;
-            test_realm_clone.borrow().send_run_stopped(FOO_URL).context("failed to run suite")?;
             let msg = read_async(&stdout).await.context("failed to read stdout")?;
             assert_eq!(msg, "");
             assert!(stdout

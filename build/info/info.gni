@@ -16,7 +16,13 @@ declare_args() {
   # of the most recent update.
   build_info_version = ""
 
-  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
+  # Truncate the date in the build_info to midnight UTC, and replace the commit
+  # hash with one that's synthesized from that date.
+  # This is not meant to be used outside this directory. It is only in this .gni
+  # file so that //build/bazel:gn_build_variables_for_bazel can access it.
+  truncate_build_info_commit_date = false
+
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 }
 
 build_info_files = {

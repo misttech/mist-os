@@ -11,6 +11,7 @@
 
 #include <map>
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace forensics::feedback {
@@ -19,8 +20,8 @@ namespace {
 void InsertUnique(const Annotations& annotations, const std::set<std::string>& allowlist,
                   Annotations* out) {
   for (const auto& [k, v] : annotations) {
-    if (allowlist.count(k) != 0) {
-      FX_CHECK(out->count(k) == 0) << "Attempting to re-insert " << k;
+    if (allowlist.contains(k)) {
+      FX_CHECK(!out->contains(k)) << "Attempting to re-insert " << k;
       out->insert({k, v});
     }
   }
@@ -28,7 +29,7 @@ void InsertUnique(const Annotations& annotations, const std::set<std::string>& a
 
 void InsertUnique(const Annotations& annotations, Annotations* out) {
   for (const auto& [k, v] : annotations) {
-    FX_CHECK(out->count(k) == 0) << "Attempting to re-insert " << k;
+    FX_CHECK(!out->contains(k)) << "Attempting to re-insert " << k;
     out->insert({k, v});
   }
 }
@@ -38,7 +39,7 @@ void InsertUnique(const Annotations& annotations, Annotations* out) {
 void InsertMissing(const std::set<std::string>& keys, const Error error,
                    const std::set<std::string>& allowlist, Annotations* out) {
   for (const auto& key : keys) {
-    if (allowlist.count(key) == 0 || out->count(key) != 0) {
+    if (!allowlist.contains(key) || out->contains(key)) {
       continue;
     }
 
@@ -74,7 +75,8 @@ AnnotationManager::AnnotationManager(
     const std::vector<DynamicSyncAnnotationProvider*> dynamic_sync_providers,
     const std::vector<StaticAsyncAnnotationProvider*> static_async_providers,
     const std::vector<CachedAsyncAnnotationProvider*> cached_async_providers,
-    const std::vector<DynamicAsyncAnnotationProvider*> dynamic_async_providers)
+    const std::vector<DynamicAsyncAnnotationProvider*> dynamic_async_providers,
+    const std::set<std::string>& product_exclude_list)
     : dispatcher_(dispatcher),
       allowlist_(std::move(allowlist)),
       static_annotations_(),
@@ -91,7 +93,7 @@ AnnotationManager::AnnotationManager(
     auto Count = [&k, &seen](const auto& providers) {
       size_t count{0u};
       for (auto* p : providers) {
-        if (seen.count(p) != 0) {
+        if (seen.contains(p)) {
           continue;
         }
         count += p->GetKeys().count(k);
@@ -110,6 +112,11 @@ AnnotationManager::AnnotationManager(
   }
 
   InsertUnique(static_annotations, allowlist_, &static_annotations_);
+
+  for (const std::string& annotation : product_exclude_list) {
+    FX_CHECK(!static_annotations_.contains(annotation)) << "Attempting to re-insert " << annotation;
+    static_annotations_.insert({annotation, ErrorOrString(Error::kNotAvailableInProduct)});
+  }
 
   // Create a weak pointer because |this| isn't guaranteed to outlive providers.
   auto self = ptr_factory_.GetWeakPtr();

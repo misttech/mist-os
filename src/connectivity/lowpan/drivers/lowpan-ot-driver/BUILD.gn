@@ -120,9 +120,12 @@ fuchsia_unittest_package("lowpan-ot-driver-test") {
         dimensions = {
           device_type = "QEMU"
         }
-        tags = [ "flaky" ]  # https://fxbug.dev/42174091
       },
     ]
+
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 

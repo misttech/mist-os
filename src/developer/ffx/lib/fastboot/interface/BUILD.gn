@@ -18,9 +18,11 @@ rustc_library("lib") {
     ":*",
     "//src/developer/ffx/daemon/protocols/target_collection:*",
     "//src/developer/ffx/lib/fastboot:*",
+    "//src/developer/ffx/lib/fastboot/connection_factory:*",
     "//src/developer/ffx/lib/fastboot/transport/factory:*",
     "//src/developer/ffx/lib/manual_targets:*",
     "//src/developer/ffx/plugins/target/bootloader:*",
+    "//src/developer/ffx/plugins/target/fastboot:*",
     "//src/developer/ffx/plugins/target/flash:*",
   ]
 
@@ -30,9 +32,9 @@ rustc_library("lib") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

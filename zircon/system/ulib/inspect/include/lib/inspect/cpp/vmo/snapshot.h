@@ -25,7 +25,7 @@ class BackingBuffer final {
   bool Empty() const;
 
   explicit BackingBuffer(std::vector<uint8_t>&& data) : data_(std::move(data)) {
-    size_ = cpp17::get<DiscriminateData::kVector>(data_).size();
+    size_ = std::get<DiscriminateData::kVector>(data_).size();
   }
   explicit BackingBuffer(const zx::vmo& data);
   ~BackingBuffer();
@@ -35,7 +35,7 @@ class BackingBuffer final {
   BackingBuffer& operator=(const BackingBuffer&) = delete;
 
  private:
-  cpp17::variant<std::vector<uint8_t>, std::pair<uintptr_t, zx::vmar>> data_;
+  std::variant<std::vector<uint8_t>, std::pair<uintptr_t, zx::vmar>> data_;
   // the size of the vector or VMO, depending on discriminant
   size_t size_;
   enum DiscriminateData {

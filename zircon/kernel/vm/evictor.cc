@@ -48,10 +48,10 @@ ktl::optional<Evictor::EvictedPageCounts> ReclaimFromGlobalPageQueues(
                                         : PageQueues::kNumReclaim - PageQueues::kNumOldestQueues;
   // If we're going to include newest pages, ignore eviction hints as well, i.e. also consider
   // evicting pages with always_need set if we encounter them in LRU order.
-  const VmCowPages::EvictionHintAction hint_action =
+  const VmCowPages::EvictionAction hint_action =
       eviction_level == Evictor::EvictionLevel::IncludeNewest
-          ? VmCowPages::EvictionHintAction::Ignore
-          : VmCowPages::EvictionHintAction::Follow;
+          ? VmCowPages::EvictionAction::IgnoreHint
+          : VmCowPages::EvictionAction::FollowHint;
 
   // TODO(rashaeqbal): The sequence of actions in PeekReclaim() and ReclaimPage() implicitly
   // guarantee forward progress if being repeatedly called, so that we're not stuck trying to evict

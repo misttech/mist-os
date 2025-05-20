@@ -41,7 +41,7 @@ async fn pb_show_impl<I>(ui: &I, cmd: &ShowCommand) -> Result<()>
 where
     I: structured_ui::Interface,
 {
-    tracing::debug!("pb_show");
+    log::debug!("pb_show");
     if !cmd.product_bundle_path.exists() {
         let mut note = Notice::builder();
         note.title(format!("File does not exist: {}", cmd.product_bundle_path));

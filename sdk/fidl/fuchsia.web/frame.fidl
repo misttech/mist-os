@@ -92,6 +92,13 @@ type PermissionType = strict enum : uint16 {
 
     /// Permission to use persistent storage.
     PERSISTENT_STORAGE = 4;
+
+    /// Permission to display web notifications and use push messaging.
+    ///
+    /// This API does not currently support displaying web notifications, so while the permission
+    /// may be granted, this functionality should not be expected to work until such an API is
+    /// provided. For now, this permission is only meaningful as it pertains to push messaging.
+    NOTIFICATIONS = 5;
 };
 
 /// Describes a web permission. In the future, it may be extended with type-specific fields.

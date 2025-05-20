@@ -158,8 +158,8 @@
 // an async end event with the same category, name, and id.
 //
 // Asynchronous events describe work which is happening asynchronously and which may span multiple
-// threads. The id serves to correlate the progress of distinct asynchronous operations which share
-// the same category and name within the same process. Asynchronous events within the same process
+// threads.  The id serves to correlate the progress of distinct asynchronous operations which share
+// the same category and name within the same process.  Asynchronous events within the same process
 // with matching categories and ids will nest.
 //
 // 0 to 15 arguments can be associated with the event, each of which is used
@@ -183,8 +183,8 @@
 // Writes an asynchronous instant event with the specified id.
 //
 // Asynchronous events describe work which is happening asynchronously and which may span multiple
-// threads. The id serves to correlate the progress of distinct asynchronous operations which share
-// the same category and name within the same process. Asynchronous events within the same process
+// threads.  The id serves to correlate the progress of distinct asynchronous operations which share
+// the same category and name within the same process.  Asynchronous events within the same process
 // with matching categories and ids will nest.
 //
 // 0 to 15 arguments can be associated with the event, each of which is used
@@ -208,8 +208,8 @@
 // Writes an asynchronous end event with the specified id.
 //
 // Asynchronous events describe work which is happening asynchronously and which may span multiple
-// threads. The id serves to correlate the progress of distinct asynchronous operations which share
-// the same category and name within the same process. Asynchronous events within the same process
+// threads.  The id serves to correlate the progress of distinct asynchronous operations which share
+// the same category and name within the same process.  Asynchronous events within the same process
 // with matching categories and ids will nest.
 //
 // 0 to 15 arguments can be associated with the event, each of which is used
@@ -262,6 +262,17 @@
 #define TRACE_FLOW_BEGIN(category_literal, name_literal, flow_id, args...) \
   TRACE_INTERNAL_FLOW_BEGIN((category_literal), (name_literal), (flow_id), args)
 
+// Convenience macro to begin a flow attached to an instant event.  Each step in the flow can be
+// named distinctly via `step_literal`.  Otherwise, use as you would use TRACE_FLOW_BEGIN.
+//
+// Flows must be attached to a duration event.  This can be awkward when there isn't an obvious
+// duration event to attach to, or the relevant duration is very small, which makes visualizing
+// difficult.  This emits a flow event wrapped in a self contained instant event that is also easy
+// to see in the tracing UI.
+#define TRACE_INSTAFLOW_BEGIN(category_literal, name_literal, step_literal, flow_id, args...) \
+  TRACE_INTERNAL_INSTAFLOW_BEGIN((category_literal), (name_literal),                          \
+                                 (name_literal "/" step_literal), (flow_id), args)
+
 // Writes a flow step event with the specified id.
 //
 // Flow events describe control flow handoffs between threads or across processes.
@@ -291,6 +302,17 @@
 //
 #define TRACE_FLOW_STEP(category_literal, name_literal, flow_id, args...) \
   TRACE_INTERNAL_FLOW_STEP((category_literal), (name_literal), (flow_id), args)
+
+// Convenience macro to emit a step in a flow attached to an instant event.  Each step in the flow
+// can be named distinctly via `step_literal`.  Otherwise, use as you would use TRACE_FLOW_STEP.
+//
+// Flows must be attached to a duration event.  This can be awkward when there isn't an obvious
+// duration event to attach to, or the relevant duration is very small, which makes visualizing
+// difficult.  This emits a flow event wrapped in a self contained instant event that is also easy
+// to see in the tracing UI.
+#define TRACE_INSTAFLOW_STEP(category_literal, name_literal, step_literal, flow_id, args...) \
+  TRACE_INTERNAL_INSTAFLOW_STEP((category_literal), (name_literal),                          \
+                                (name_literal "/" step_literal), (flow_id), args)
 
 // Writes a flow end event with the specified id.
 //
@@ -322,6 +344,17 @@
 #define TRACE_FLOW_END(category_literal, name_literal, flow_id, args...) \
   TRACE_INTERNAL_FLOW_END((category_literal), (name_literal), (flow_id), args)
 
+// Convenience macro to end a flow attached to an instant event.  Each step in the flow can be named
+// distinctly via `step_literal`.  Otherwise, use as you would use TRACE_FLOW_END.
+//
+// Flows must be attached to a duration event.  This can be awkward when there isn't an obvious
+// duration event to attach to, or the relevant duration is very small, which makes visualizing
+// difficult.  This emits a flow event wrapped in a self contained instant event that is also easy
+// to see in the tracing UI.
+#define TRACE_INSTAFLOW_END(category_literal, name_literal, step_literal, flow_id, args...) \
+  TRACE_INTERNAL_INSTAFLOW_END((category_literal), (name_literal),                          \
+                               (name_literal "/" step_literal), (flow_id), args)
+
 // Writes a large blob record with the given blob data and metadata.
 // Here metadata includes timestamp, thread and process information, and arguments,
 // which is what most event records contain.
@@ -338,8 +371,8 @@
   TRACE_INTERNAL_BLOB_EVENT(category_literal, name_literal, blob, blob_size, args)
 
 // Writes a large blob record with the given blob data, with only a
-// category and name associated with the blob. This will not contain much
-// additional metadata. This means timestamp, thread and process information,
+// category and name associated with the blob.  This will not contain much
+// additional metadata.  This means timestamp, thread and process information,
 // and arguments are not included with the record.
 //
 // Blobs which exceed |TRACE_ENCODED_RECORD_MAX_TOTAL_LENGTH| will be silently
@@ -378,11 +411,11 @@
 // |blob| is a pointer to the data.
 // |blob_size| is the size, in bytes, of the data.
 //
-// A size of zero is ok. The maximum size of a blob is defined by
+// A size of zero is ok.  The maximum size of a blob is defined by
 // TRACE_MAX_BLOB_SIZE which is slighly less than 32K.
 // Exercise caution when emitting blob records: space is shared with all
 // trace records and large blobs can eat up space fast.
-// The blob must fit in the remaining space in the buffer. If the blob does
+// The blob must fit in the remaining space in the buffer.  If the blob does
 // not fit the call silently fails, as do all calls that write trace records
 // when the buffer is full.
 //
@@ -394,7 +427,7 @@
 #define TRACE_BLOB(type, name, blob, blob_size) \
   TRACE_INTERNAL_BLOB((type), (name), (blob), (blob_size))
 
-// Sends an alert. Alerts are forwarded directly to trace controller clients
+// Sends an alert.  Alerts are forwarded directly to trace controller clients
 // and are typically used to trigger actions, such as stopping the current
 // trace.
 //

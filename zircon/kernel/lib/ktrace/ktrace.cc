@@ -6,6 +6,7 @@
 
 #include <debug.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/fit/defer.h>
 #include <lib/fxt/fields.h>
 #include <lib/fxt/interned_category.h>
 #include <lib/ktrace.h>
@@ -42,7 +43,7 @@ struct CategoryEntry {
 
 const CategoryEntry kCategories[] = {
     {KTRACE_GRP_META_BIT, "kernel:meta"_category},
-    {KTRACE_GRP_LIFECYCLE_BIT, "kernel:lifecycle"_category},
+    {KTRACE_GRP_MEMORY_BIT, "kernel:memory"_category},
     {KTRACE_GRP_SCHEDULER_BIT, "kernel:sched"_category},
     {KTRACE_GRP_TASKS_BIT, "kernel:tasks"_category},
     {KTRACE_GRP_IPC_BIT, "kernel:ipc"_category},
@@ -577,6 +578,8 @@ uint64_t* KTraceState::ReserveRaw(uint32_t num_words) {
 
 template <>
 void KTraceImpl<BufferMode::kSingle>::Init(uint32_t bufsize, uint32_t initial_grpmask) {
+  KTraceGuard guard{&lock_};
+
   cpu_context_map_.Init();
   internal_state_.Init(bufsize, initial_grpmask);
   set_categories_bitmask(initial_grpmask);
@@ -638,30 +641,324 @@ zx::result<size_t> KTraceImpl<BufferMode::kSingle>::ReadUser(user_out_ptr<void> 
   return zx::ok(ret);
 }
 
+template <>
+ktl::byte* KTraceImpl<BufferMode::kSingle>::KernelAspaceAllocator::Allocate(uint32_t size) {
+  return nullptr;
+}
+
+template <>
+void KTraceImpl<BufferMode::kSingle>::KernelAspaceAllocator::Free(ktl::byte* ptr) {}
+
+template <>
+void KTraceImpl<BufferMode::kSingle>::ReportMetadata() {}
+
 //
 // TODO(https://fxbug.dev/404539312): Implement the per-CPU buffer specializations for KTraceImpl.
 //
 
 template <>
-void KTraceImpl<BufferMode::kPerCpu>::DisableWrites() {
-  // Start off by disabling writes.
-  // It may be possible to do this with relaxed semantics, but we do it with release semantics
-  // out of an abundance of caution.
-  writes_enabled_.store(false, ktl::memory_order_release);
+ktl::byte* KTraceImpl<BufferMode::kPerCpu>::KernelAspaceAllocator::Allocate(uint32_t size) {
+  VmAspace* kaspace = VmAspace::kernel_aspace();
+  char name[32] = "ktrace-percpu-buffer";
+  void* ptr;
+  const zx_status_t status = kaspace->Alloc(name, size, &ptr, 0, VmAspace::VMM_FLAG_COMMIT,
+                                            ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE);
+  if (status != ZX_OK) {
+    return nullptr;
+  }
+  return static_cast<ktl::byte*>(ptr);
+}
 
-  // Wait for any in-progress writes to complete.
-  // We accomplish this by:
-  // 1. Disabling interrupts on this core, thus preventing this thread from being migrated across
-  //    CPUs. We could alternatively just disable preemption, but mp_sync_exec requires interrupts
-  //    to be disabled when using MP_IPI_TARGET_ALL_BUT_LOCAL.
-  // 2. Sending an IPI that runs a no-op to all other cores. Since writes run with interrupts
-  //    disabled, the mere fact that a core is able to process an IPI means that it is not
-  //    currently performing a trace record write. Additionally, mp_sync_exec issues a memory
-  //    barrier that ensures that every other core will see that writes are disabled after
-  //    processing the IPI.
-  InterruptDisableGuard irq_guard;
-  auto wait_for_write_completion = [](void*) {};
-  mp_sync_exec(MP_IPI_TARGET_ALL_BUT_LOCAL, 0, wait_for_write_completion, nullptr);
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::KernelAspaceAllocator::Free(ktl::byte* ptr) {
+  if (ptr != nullptr) {
+    VmAspace* kaspace = VmAspace::kernel_aspace();
+    kaspace->FreeRegion(reinterpret_cast<vaddr_t>(ptr));
+  }
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Allocate() {
+  if (percpu_buffers_) {
+    return ZX_OK;
+  }
+
+  // The number of buffers to initialize and their size should be set before this method is called.
+  DEBUG_ASSERT(num_buffers_ != 0);
+  DEBUG_ASSERT(buffer_size_ != 0);
+
+  // Allocate the per-CPU SPSC buffer data structures.
+  // Initially, store the unique pointer in a local variable. This will ensure that the buffers are
+  // destructed upon initialization below.
+  fbl::AllocChecker ac;
+  ktl::unique_ptr buffers = ktl::make_unique<PerCpuBuffer[]>(&ac, num_buffers_);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Initialize each per-CPU buffer by allocating the storage used to back it.
+  for (uint32_t i = 0; i < num_buffers_; i++) {
+    const zx_status_t status = buffers[i].Init(buffer_size_);
+    if (status != ZX_OK) {
+      // Any allocated buffers will be destructed when we return.
+      DiagsPrintf(INFO, "ktrace: cannot alloc buffer %u: %d\n", i, status);
+      return ZX_ERR_NO_MEMORY;
+    }
+  }
+
+  // Take ownership of the newly created per-CPU buffers.
+  percpu_buffers_ = ktl::move(buffers);
+  return ZX_OK;
+}
+
+template <>
+zx::result<KTraceImpl<BufferMode::kPerCpu>::PendingCommit> KTraceImpl<BufferMode::kPerCpu>::Reserve(
+    uint64_t header) {
+  // Compute the number of bytes we need to reserve from the provided fxt header.
+  const uint32_t num_words = fxt::RecordFields::RecordSize::Get<uint32_t>(header);
+  const uint32_t num_bytes = num_words * sizeof(uint64_t);
+
+  // Disable interrupts.
+  // We have to do this before we check if writes are enabled, otherwise a racing Stop operation
+  // may disable writes and send the IPI it uses to verify that we're done writing before we begin
+  // our write.
+  // We also have to do this before we check which CPU this thread is on, otherwise this thread
+  // could be migrated across CPUs after we check the current CPU number, leading to an invalid,
+  // cross-CPU write.
+  interrupt_saved_state_t saved_state = arch_interrupt_save();
+  auto restore_interrupt_state =
+      fit::defer([&saved_state]() { arch_interrupt_restore(saved_state); });
+
+  // If writes are disabled, then return an error. We return ZX_ERR_BAD_STATE, because this means
+  // that tracing was disabled.
+  //
+  // It is valid for writes to be disabled immediately after this check. This is ok because Stop,
+  // which disables writes, will follow up with an IPI to all cores and wait for those IPIs to
+  // return. Because we disabled interrupts prior to this check, that IPI will not return until
+  // this write operation is complete.
+  if (!WritesEnabled()) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  // Check which CPU we're running on and Reserve a slot in the appropriate SPSC buffer.
+  const cpu_num_t cpu_num = arch_curr_cpu_num();
+  DEBUG_ASSERT(percpu_buffers_ != nullptr);
+  zx::result<PerCpuBuffer::Reservation> result = percpu_buffers_[cpu_num].Reserve(num_bytes);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  PendingCommit res(ktl::move(result.value()), saved_state, header);
+
+  // The PendingWrite is now responsible for restoring interrupt state.
+  restore_interrupt_state.cancel();
+
+  return zx::ok(ktl::move(res));
+}
+
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::ReportMetadata() {
+  // Emit the FXT metadata records. These must be emitted on the boot CPU to ensure that they
+  // are read at the very beginning of the trace.
+  auto emit_starting_records = [](void* arg) {
+    // Emit the magic and initialization records.
+    KTraceImpl<BufferMode::kPerCpu>* ktrace = static_cast<KTraceImpl<BufferMode::kPerCpu>*>(arg);
+    zx_status_t status = fxt::WriteMagicNumberRecord(ktrace);
+    DEBUG_ASSERT(status == ZX_OK);
+    status = fxt::WriteInitializationRecord(ktrace, ticks_per_second());
+    DEBUG_ASSERT(status == ZX_OK);
+
+    // Emit strings needed to improve readability, such as syscall names, to the trace buffer.
+    fxt::InternedString::RegisterStrings();
+
+    // Emit the KOIDs of each CPU to the trace buffer.
+    const uint32_t max_cpus = arch_max_num_cpus();
+    char name[32];
+    for (uint32_t i = 0; i < max_cpus; i++) {
+      snprintf(name, sizeof(name), "cpu-%u", i);
+      fxt::WriteKernelObjectRecord(ktrace, fxt::Koid(ktrace->cpu_context_map_.GetCpuKoid(i)),
+                                   ZX_OBJ_TYPE_THREAD, fxt::StringRef{name},
+                                   fxt::Argument{"process"_intern, kNoProcess});
+    }
+  };
+  const cpu_mask_t target_mask = cpu_num_to_mask(BOOT_CPU_ID);
+  mp_sync_exec(MP_IPI_TARGET_MASK, target_mask, emit_starting_records, &GetInstance());
+
+  // Emit the names of all live processes and threads to the trace buffer. Note that these records
+  // will be inserted into the buffer associated with the CPU we're running on, which may not be
+  // the boot CPU. Fortunately for us, these process and thread names, unlike the other metadata
+  // records, do not need to exist before any records that reference them are emitted.
+  ktrace_report_live_processes();
+  ktrace_report_live_threads();
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Start(uint32_t, uint32_t categories) {
+  // Allocate the buffers. This will be a no-op if the buffers are already initialized.
+  if (zx_status_t status = Allocate(); status != ZX_OK) {
+    return status;
+  }
+
+  // If writes are already enabled, then a trace session is already in progress and all we need to
+  // do is set the categories bitmask and return.
+  if (WritesEnabled()) {
+    set_categories_bitmask(categories);
+    return ZX_OK;
+  }
+
+  // Otherwise, enable writes.
+  EnableWrites();
+
+  // Report static metadata before setting the categories bitmask.
+  // These metadata records must be emitted before we enable arbitrary categories, otherwise generic
+  // trace records may fill up the buffer and cause these metadata records to be dropped, which
+  // could make the trace unreadable.
+  ReportMetadata();
+
+  set_categories_bitmask(categories);
+  DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", categories);
+  DiagsPrintf(INFO, "Trace category states:\n");
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
+                IsCategoryEnabled(category) ? "enabled" : "disabled");
+  }
+
+  return ZX_OK;
+}
+
+template <>
+void KTraceImpl<BufferMode::kPerCpu>::Init(uint32_t bufsize, uint32_t initial_grpmask) {
+  KTraceGuard guard{&lock_};
+
+  ASSERT_MSG(buffer_size_ == 0, "KTrace::Init called twice");
+  // Allocate the KOIDs used to annotate CPU trace records.
+  cpu_context_map_.Init();
+
+  // Compute the per-CPU buffer size, ensuring that the resulting value is a power of two.
+  num_buffers_ = arch_max_num_cpus();
+  const uint32_t raw_percpu_bufsize = bufsize / num_buffers_;
+  DEBUG_ASSERT(raw_percpu_bufsize > 0);
+  const int leading_zeros = __builtin_clz(raw_percpu_bufsize);
+  buffer_size_ = 1u << (31 - leading_zeros);
+
+  // If the initial_grpmask was zero, then we can delay allocation of the KTrace buffer.
+  if (initial_grpmask == 0) {
+    return;
+  }
+  // Otherwise, begin tracing immediately.
+  Start(KTRACE_ACTION_START, initial_grpmask);
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Stop() {
+  // Calling Stop on an uninitialized KTrace buffer is a no-op.
+  if (!percpu_buffers_) {
+    return ZX_OK;
+  }
+
+  // Clear the categories bitmask and disable writes. This prevents any new writes from starting.
+  set_categories_bitmask(0u);
+  DisableWrites();
+
+  // Wait for any in-progress writes to complete and emit any dropped record statistics.
+  // We accomplish this by sending an IPI to all cores that instructs them to EmitDropStats.
+  // Since writes run with interrupts disabled, the mere fact that a core is able to process this
+  // IPI means that it is not performing any other concurrent writes. Additionally, mp_sync_exec
+  // issues a memory barrier that ensures that every other core will see that writes are disabled
+  // after processing the IPI.
+  auto emit_drop_stats = [](void* arg) {
+    const cpu_num_t curr_cpu = arch_curr_cpu_num();
+    PerCpuBuffer* percpu_buffers = static_cast<PerCpuBuffer*>(arg);
+    PerCpuBuffer& curr_cpu_buffer = percpu_buffers[curr_cpu];
+
+    // We do not require that this call succeeds. If the trace buffer still doesn't have enough
+    // space to contain the dropped record statistics, this will fail, but there's not much we can
+    // do about that.
+    curr_cpu_buffer.EmitDropStats();
+  };
+  mp_sync_exec(MP_IPI_TARGET_ALL, 0, emit_drop_stats, percpu_buffers_.get());
+  return ZX_OK;
+}
+
+template <>
+zx_status_t KTraceImpl<BufferMode::kPerCpu>::Rewind() {
+  // Calling Rewind on an uninitialized KTrace buffer is a no-op.
+  if (!percpu_buffers_) {
+    return ZX_OK;
+  }
+  // Rewind calls Drain on each per-CPU buffer. As mentioned in the doc comments of that method,
+  // it is invalid to call Drain concurrently with a Read, and the method is only guaranteed to
+  // fully empty the buffer if there are no concurrent Write operations. We ensure that these
+  // prerequisites are met by:
+  // 1. Holding the lock_, ensuring that there can be no other readers.
+  // 2. Ensuring writes are disabled to prevent any future writes from starting.
+  // 3. Performing the Drain within an IPI on each core, ensuring that this operation does not
+  //    race with any in-progress writes.
+  // Rewind also resets the dropped record statistics on every buffer to prepare for the next
+  // tracing session.
+  DisableWrites();
+
+  auto run_drain = [](void* arg) {
+    const cpu_num_t curr_cpu = arch_curr_cpu_num();
+    PerCpuBuffer* percpu_buffers = static_cast<PerCpuBuffer*>(arg);
+    PerCpuBuffer& curr_cpu_buffer = percpu_buffers[curr_cpu];
+    curr_cpu_buffer.Drain();
+    curr_cpu_buffer.ResetDropStats();
+  };
+  mp_sync_exec(MP_IPI_TARGET_ALL, 0, run_drain, percpu_buffers_.get());
+  return ZX_OK;
+}
+
+template <>
+zx::result<size_t> KTraceImpl<BufferMode::kPerCpu>::ReadUser(user_out_ptr<void> ptr,
+                                                             uint32_t offset, size_t len) {
+  // Reads must be serialized with respect to all other non-write operations.
+  KTraceGuard guard{&lock_};
+
+  // If the passed in ptr is nullptr, then return the buffer size needed to read all of the
+  // per-CPU buffers' contents.
+  if (!ptr) {
+    return zx::ok(buffer_size_ * num_buffers_);
+  }
+
+  // If the per-CPU buffers have not been initialized, there's nothing to do, so return early.
+  if (!percpu_buffers_) {
+    return zx::ok(0);
+  }
+
+  // Eventually, this should support users passing in buffers smaller than the sum of the size of
+  // all per-CPU buffers, but for now we do not allow this.
+  if (len < (buffer_size_ * num_buffers_)) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  // Iterate through each per-CPU buffer and read its contents.
+  size_t bytes_read = 0;
+  user_out_ptr<ktl::byte> byte_ptr = ptr.reinterpret<ktl::byte>();
+  for (uint32_t i = 0; i < num_buffers_; i++) {
+    auto copy_fn = [&](uint32_t offset, ktl::span<ktl::byte> src) {
+      // This is safe to do while holding the lock_ because the KTrace lock is a leaf lock that is
+      // not acquired during the course of a page fault.
+      zx_status_t status = ZX_ERR_BAD_STATE;
+      guard.CallUntracked([&]() {
+        status =
+            byte_ptr.byte_offset(bytes_read + offset).copy_array_to_user(src.data(), src.size());
+      });
+      return status;
+    };
+    const zx::result<size_t> result = percpu_buffers_[i].Read(copy_fn, static_cast<uint32_t>(len));
+    if (result.is_error()) {
+      DiagsPrintf(INFO, "failed to copy out ktrace data: %d\n", result.status_value());
+      // If we copied some data from a previous buffer, we have to return the fact that we did so
+      // here. Otherwise, that data will be lost.
+      if (bytes_read != 0) {
+        return zx::ok(bytes_read);
+      }
+      // Otherwise, return the error.
+      return zx::error(result.status_value());
+    }
+    bytes_read += result.value();
+  }
+  return zx::ok(bytes_read);
 }
 
 // The InitHook is the same for both the single and per-CPU buffer implementation of KTrace.

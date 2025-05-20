@@ -62,7 +62,7 @@ impl FuchsiaFullDiskImageBuilder {
         // TODO(https://fxbug.dev/380065101): When we have a fake make-fuchsia-vol, this should be
         // removed to increase test coverage.
         if context.exe_kind() == ExecutableKind::Test {
-            tracing::debug!(
+            log::debug!(
                 "Building full GPT images as part of a test case is not supported yet, skipping."
             );
             return Ok(());

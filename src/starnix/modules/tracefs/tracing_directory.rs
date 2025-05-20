@@ -80,6 +80,11 @@ impl FileOps for TraceMarkerFile {
                                 .push((name.to_string(), now));
                         }
                         ATraceEvent::End { pid } => {
+                            let pid = if pid != 0 {
+                                pid
+                            } else {
+                                current_task.get_pid().try_into().unwrap_or(pid)
+                            };
                             if let Some(stack) = event_stacks.get_mut(&pid) {
                                 if let Some((name, start_time)) = stack.pop() {
                                     context.write_duration_with_inline_name(&name, start_time, &[]);
@@ -110,6 +115,19 @@ impl FileOps for TraceMarkerFile {
                             // the arg name.
                             let arg = ArgValue::of(name, value);
                             context.write_counter_with_inline_name(name, 0, &[arg]);
+                        }
+                        ATraceEvent::AsyncTrackBegin { .. /*track_name, _name, _cookie*/ } => {
+                            // TODO("https://fxbug.dev/408054205"): propagate track events.
+                            // Currently, these only appear in tracefs.
+
+                        }
+                        ATraceEvent::AsyncTrackEnd { ../* track_name, cookie */} => {
+                            // TODO("https://fxbug.dev/408054205"): propagate track events.
+                            // Currently, these only appear in tracefs.
+                        }
+                        ATraceEvent::Track {..} => {
+                            // TODO("https://fxbug.dev/408054205"): propagate track events.
+                            // Currently, these only appear in tracefs.
                         }
                     }
                 }
@@ -146,6 +164,9 @@ enum ATraceEvent<'a> {
     AsyncBegin { name: &'a str, correlation_id: u64 },
     AsyncEnd { name: &'a str, correlation_id: u64 },
     Counter { name: &'a str, value: i64 },
+    AsyncTrackBegin { track_name: &'a str, name: &'a str, cookie: i32 },
+    AsyncTrackEnd { track_name: &'a str, cookie: i32 },
+    Track { track_name: &'a str, name: &'a str },
 }
 
 impl<'a> ATraceEvent<'a> {
@@ -156,14 +177,19 @@ impl<'a> ATraceEvent<'a> {
     fn parse(s: &'a str) -> Option<Self> {
         let mut chunks = s.split('|');
         let event_type = chunks.next()?;
+
+        // event_type matches the systrace phase. See systrace_parser.h in perfetto.
         match event_type {
             "B" => {
                 let pid = chunks.next()?.parse::<u64>().ok()?;
-                let name = chunks.next()?;
+                // It is ok to have an unnamed begin event, so insert a default name.
+                let name = chunks.next().unwrap_or("[empty name]");
                 Some(ATraceEvent::Begin { pid, name })
             }
             "E" => {
-                let pid = chunks.next()?.parse::<u64>().ok()?;
+                // End thread scoped event. Since it is thread scoped, it is OK to not have the TGID
+                // not present.
+                let pid = chunks.next().unwrap_or("0").parse::<u64>().unwrap_or(0);
                 Some(ATraceEvent::End { pid })
             }
             "I" => {
@@ -189,6 +215,25 @@ impl<'a> ATraceEvent<'a> {
                 let value = chunks.next()?.parse::<i64>().ok()?;
                 Some(ATraceEvent::Counter { name, value })
             }
+            "G" => {
+                let _pid = chunks.next()?;
+                let track_name = chunks.next()?;
+                let name = chunks.next()?;
+                let cookie = chunks.next()?.parse::<i32>().ok()?;
+                Some(ATraceEvent::AsyncTrackBegin { track_name, name, cookie })
+            }
+            "H" => {
+                let _pid = chunks.next()?;
+                let track_name = chunks.next()?;
+                let cookie = chunks.next()?.parse::<i32>().ok()?;
+                Some(ATraceEvent::AsyncTrackEnd { track_name, cookie })
+            }
+            "N" => {
+                let _pid = chunks.next()?;
+                let track_name = chunks.next()?;
+                let name = chunks.next()?;
+                Some(ATraceEvent::Track { track_name, name })
+            }
             _ => None,
         }
     }
@@ -204,11 +249,22 @@ mod tests {
             ATraceEvent::parse("B|1636|slice_name"),
             Some(ATraceEvent::Begin { pid: 1636, name: "slice_name" }),
         );
+
+        let no_name_event = ATraceEvent::parse("B|1166");
+        match no_name_event {
+            Some(ATraceEvent::Begin { pid: 1166, .. }) => (),
+            _ => panic!("Unexpected parsing result: {no_name_event:?} from \"B|1166\""),
+        };
+
         assert_eq!(ATraceEvent::parse("E|1636"), Some(ATraceEvent::End { pid: 1636 }),);
         assert_eq!(
             ATraceEvent::parse("I|1636|instant_name"),
             Some(ATraceEvent::Instant { name: "instant_name" }),
         );
+
+        assert_eq!(ATraceEvent::parse("E|"), Some(ATraceEvent::End { pid: 0 }));
+        assert_eq!(ATraceEvent::parse("E"), Some(ATraceEvent::End { pid: 0 }));
+
         assert_eq!(
             ATraceEvent::parse("S|1636|async_name|123"),
             Some(ATraceEvent::AsyncBegin { name: "async_name", correlation_id: 123 }),
@@ -220,6 +276,22 @@ mod tests {
         assert_eq!(
             ATraceEvent::parse("C|1636|counter_name|123"),
             Some(ATraceEvent::Counter { name: "counter_name", value: 123 }),
+        );
+        assert_eq!(
+            ATraceEvent::parse("G|1636|a track|async_name|123"),
+            Some(ATraceEvent::AsyncTrackBegin {
+                track_name: "a track",
+                name: "async_name",
+                cookie: 123
+            }),
+        );
+        assert_eq!(
+            ATraceEvent::parse("H|1636|a track|123"),
+            Some(ATraceEvent::AsyncTrackEnd { track_name: "a track", cookie: 123 }),
+        );
+        assert_eq!(
+            ATraceEvent::parse("N|1636|a track|instant_name"),
+            Some(ATraceEvent::Track { track_name: "a track", name: "instant_name" }),
         );
     }
 }

@@ -143,7 +143,7 @@ class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice>
   zx::duration total_latency_ = {};
   zx::duration max_latency_ = {};
 
-  fdf_power::WakeLease wake_lease_;
+  fdf_power::TimeoutWakeLease wake_lease_;
 };
 
 }  // namespace buttons

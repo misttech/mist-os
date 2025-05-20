@@ -127,6 +127,24 @@ void trace_internal_write_flow_begin_event_record_and_release_context(
   trace_release_context(context);
 }
 
+void trace_internal_write_instaflow_begin_event_record_and_release_context(
+    trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
+    const char* name_slash_step_literal, trace_flow_id_t flow_id, trace_arg_t* args,
+    size_t num_args) {
+  EventHelper helper(context, name_literal);
+  trace_string_ref_t name_slash_step_ref;
+  trace_context_register_string_literal(context, name_slash_step_literal, &name_slash_step_ref);
+  trace_internal_complete_args(context, args, num_args);
+  trace_context_write_duration_begin_event_record(context, helper.ticks, &helper.thread_ref,
+                                                  category_ref, &name_slash_step_ref, args,
+                                                  num_args);
+  trace_context_write_flow_begin_event_record(context, helper.ticks, &helper.thread_ref,
+                                              category_ref, &helper.name_ref, flow_id, nullptr, 0);
+  trace_context_write_duration_end_event_record(context, helper.ticks, &helper.thread_ref,
+                                                category_ref, &name_slash_step_ref, nullptr, 0);
+  trace_release_context(context);
+}
+
 void trace_internal_write_flow_step_event_record_and_release_context(
     trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
     trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args) {
@@ -138,6 +156,24 @@ void trace_internal_write_flow_step_event_record_and_release_context(
   trace_release_context(context);
 }
 
+void trace_internal_write_instaflow_step_event_record_and_release_context(
+    trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
+    const char* name_slash_step_literal, trace_flow_id_t flow_id, trace_arg_t* args,
+    size_t num_args) {
+  EventHelper helper(context, name_literal);
+  trace_string_ref_t name_slash_step_ref;
+  trace_context_register_string_literal(context, name_slash_step_literal, &name_slash_step_ref);
+  trace_internal_complete_args(context, args, num_args);
+  trace_context_write_duration_begin_event_record(context, helper.ticks, &helper.thread_ref,
+                                                  category_ref, &name_slash_step_ref, args,
+                                                  num_args);
+  trace_context_write_flow_step_event_record(context, helper.ticks, &helper.thread_ref,
+                                             category_ref, &helper.name_ref, flow_id, nullptr, 0);
+  trace_context_write_duration_end_event_record(context, helper.ticks, &helper.thread_ref,
+                                                category_ref, &name_slash_step_ref, nullptr, 0);
+  trace_release_context(context);
+}
+
 void trace_internal_write_flow_end_event_record_and_release_context(
     trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
     trace_flow_id_t flow_id, trace_arg_t* args, size_t num_args) {
@@ -145,6 +181,24 @@ void trace_internal_write_flow_end_event_record_and_release_context(
   trace_internal_complete_args(context, args, num_args);
   trace_context_write_flow_end_event_record(context, helper.ticks, &helper.thread_ref, category_ref,
                                             &helper.name_ref, flow_id, args, num_args);
+  trace_release_context(context);
+}
+
+void trace_internal_write_instaflow_end_event_record_and_release_context(
+    trace_context_t* context, const trace_string_ref_t* category_ref, const char* name_literal,
+    const char* name_slash_step_literal, trace_flow_id_t flow_id, trace_arg_t* args,
+    size_t num_args) {
+  EventHelper helper(context, name_literal);
+  trace_string_ref_t name_slash_step_ref;
+  trace_context_register_string_literal(context, name_slash_step_literal, &name_slash_step_ref);
+  trace_internal_complete_args(context, args, num_args);
+  trace_context_write_duration_begin_event_record(context, helper.ticks, &helper.thread_ref,
+                                                  category_ref, &name_slash_step_ref, args,
+                                                  num_args);
+  trace_context_write_flow_end_event_record(context, helper.ticks, &helper.thread_ref, category_ref,
+                                            &helper.name_ref, flow_id, nullptr, 0);
+  trace_context_write_duration_end_event_record(context, helper.ticks, &helper.thread_ref,
+                                                category_ref, &name_slash_step_ref, nullptr, 0);
   trace_release_context(context);
 }
 

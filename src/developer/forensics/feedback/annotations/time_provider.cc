@@ -51,13 +51,15 @@ TimeProvider::TimeProvider(async_dispatcher_t* dispatcher, zx::unowned_clock clo
   }
 }
 
-std::set<std::string> TimeProvider::GetKeys() const {
+std::set<std::string> TimeProvider::GetAnnotationKeys() {
   return {
       kDeviceRuntimeKey,
       kDeviceUptimeKey,
       kDeviceUtcTimeKey,
   };
 }
+
+std::set<std::string> TimeProvider::GetKeys() const { return TimeProvider::GetAnnotationKeys(); }
 
 Annotations TimeProvider::Get() {
   const auto utc_time = [this]() -> ErrorOrString {
@@ -86,6 +88,7 @@ void TimeProvider::OnClockLoggingQuality(async_dispatcher_t* dispatcher, async::
     return;
   }
 
+  FX_LOGS(INFO) << "Received signal that UTC clock is accurate";
   is_utc_time_accurate_ = true;
 }
 

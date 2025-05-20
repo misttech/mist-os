@@ -26,7 +26,6 @@ namespace internal {
       .boot_ticks = WireNaturalConversionTraits<::fidl::basic_ticks<ZX_CLOCK_BOOT>, ::fidl::basic_ticks<ZX_CLOCK_BOOT>>::ToWire(arena, std::move(src.boot_ticks())),
   };
 }
-
 ::test_time::ComplexInstants WireNaturalConversionTraits<::test_time::wire::ComplexInstants, ::test_time::ComplexInstants>::ToNatural(::test_time::wire::ComplexInstants src) {
   ::test_time::ComplexInstants dst;
   if (src.has_monotonic()) {
@@ -69,9 +68,6 @@ namespace internal {
   return builder.Build();
 }
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

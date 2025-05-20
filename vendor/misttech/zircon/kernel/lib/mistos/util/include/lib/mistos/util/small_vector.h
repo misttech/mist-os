@@ -9,7 +9,7 @@
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
 #include <ktl/array.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/optional.h>
 
 namespace util {

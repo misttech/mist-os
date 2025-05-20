@@ -6,13 +6,14 @@
 use crate::bpf::fs::get_bpf_object;
 #[cfg(not(feature = "starnix_lite"))]
 use crate::mm::MemoryAccessorExt;
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageQueue, MessageReadInfo, OutputBuffer, UnixControlData,
 };
 use crate::vfs::socket::{
-    AcceptQueue, Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
-    SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
+    AcceptQueue, Socket, SocketAddress, SocketDomain, SocketFile, SocketHandle, SocketMessageFlags,
+    SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
 };
 use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
@@ -22,8 +23,8 @@ use ebpf::{
     BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfProgram, Packet, ProgramArgument, Type,
 };
 use ebpf_api::{
-    get_socket_filter_helpers, PinnedMap, ProgramType, SocketFilterContext,
-    SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
+    get_socket_filter_helpers, LoadBytesBase, MapValueRef, MapsContext, PinnedMap, ProgramType,
+    SocketFilterContext, SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -186,20 +187,20 @@ impl UnixSocket {
         downcast_socket_to_unix(&left).lock().credentials = Some(credentials.clone());
         downcast_socket_to_unix(&right).lock().state = UnixSocketState::Connected(left.clone());
         downcast_socket_to_unix(&right).lock().credentials = Some(credentials);
-        let left = Socket::new_file(
+        let left = SocketFile::from_socket(
             locked,
             current_task,
             left,
             open_flags,
             /* kernel_private= */ false,
-        );
-        let right = Socket::new_file(
+        )?;
+        let right = SocketFile::from_socket(
             locked,
             current_task,
             right,
             open_flags,
             /* kernel_private= */ false,
-        );
+        )?;
         Ok((left, right))
     }
 
@@ -238,6 +239,7 @@ impl UnixSocket {
 
         let server =
             Socket::new(current_task, peer.domain, peer.socket_type, SocketProtocol::default())?;
+        security::unix_stream_connect(current_task, socket, peer, &server)?;
         client.state = UnixSocketState::Connected(server.clone());
         client.credentials = Some(current_task.as_ucred());
         {
@@ -566,6 +568,10 @@ impl SocketOps for UnixSocket {
             (None, None, _) => return error!(ENOTCONN),
         };
 
+        if socket.socket_type == SocketType::Datagram {
+            security::unix_may_send(current_task, socket, &peer)?;
+        }
+
         let unix_socket = downcast_socket_to_unix(&peer);
         let mut peer = unix_socket.lock();
         if peer.passcred {
@@ -813,34 +819,36 @@ impl SocketOps for UnixSocket {
         optname: u32,
         _optlen: u32,
     ) -> Result<Vec<u8>, Errno> {
-        let opt_value = match level {
+        match level {
             SOL_SOCKET => match optname {
-                SO_PEERCRED => UcredPtr::into_bytes(
+                SO_PEERCRED => Ok(UcredPtr::into_bytes(
                     current_task,
                     self.peer_cred().unwrap_or(ucred { pid: 0, uid: uid_t::MAX, gid: gid_t::MAX }),
                 )
-                .map_err(|_| errno!(EINVAL))?,
-                SO_PEERSEC => "unconfined".as_bytes().to_vec(),
+                .map_err(|_| errno!(EINVAL))?),
+                SO_PEERSEC => match socket.socket_type {
+                    SocketType::Stream => security::socket_getpeersec_stream(current_task, socket),
+                    _ => error!(ENOPROTOOPT),
+                },
                 SO_ACCEPTCONN =>
                 {
                     #[allow(clippy::bool_to_int_with_if)]
-                    if self.is_listening(socket) { 1u32 } else { 0u32 }.to_ne_bytes().to_vec()
+                    Ok(if self.is_listening(socket) { 1u32 } else { 0u32 }.to_ne_bytes().to_vec())
                 }
-                SO_SNDBUF => (self.get_send_capacity() as socklen_t).to_ne_bytes().to_vec(),
-                SO_RCVBUF => (self.get_receive_capacity() as socklen_t).to_ne_bytes().to_vec(),
-                SO_LINGER => self.get_linger().as_bytes().to_vec(),
-                SO_PASSCRED => (self.get_passcred() as u32).as_bytes().to_vec(),
-                SO_BROADCAST => (self.get_broadcast() as u32).as_bytes().to_vec(),
-                SO_NO_CHECK => (self.get_no_check() as u32).as_bytes().to_vec(),
-                SO_REUSEADDR => (self.get_reuseaddr() as u32).as_bytes().to_vec(),
-                SO_REUSEPORT => (self.get_reuseport() as u32).as_bytes().to_vec(),
-                SO_KEEPALIVE => (self.get_keepalive() as u32).as_bytes().to_vec(),
-                SO_ERROR => (0u32).as_bytes().to_vec(),
-                _ => return error!(ENOPROTOOPT),
+                SO_SNDBUF => Ok((self.get_send_capacity() as socklen_t).to_ne_bytes().to_vec()),
+                SO_RCVBUF => Ok((self.get_receive_capacity() as socklen_t).to_ne_bytes().to_vec()),
+                SO_LINGER => Ok(self.get_linger().as_bytes().to_vec()),
+                SO_PASSCRED => Ok((self.get_passcred() as u32).as_bytes().to_vec()),
+                SO_BROADCAST => Ok((self.get_broadcast() as u32).as_bytes().to_vec()),
+                SO_NO_CHECK => Ok((self.get_no_check() as u32).as_bytes().to_vec()),
+                SO_REUSEADDR => Ok((self.get_reuseaddr() as u32).as_bytes().to_vec()),
+                SO_REUSEPORT => Ok((self.get_reuseport() as u32).as_bytes().to_vec()),
+                SO_KEEPALIVE => Ok((self.get_keepalive() as u32).as_bytes().to_vec()),
+                SO_ERROR => Ok((0u32).as_bytes().to_vec()),
+                _ => error!(ENOPROTOOPT),
             },
-            _ => return error!(ENOPROTOOPT),
-        };
-        Ok(opt_value)
+            _ => error!(ENOPROTOOPT),
+        }
     }
 
     fn ioctl(
@@ -975,11 +983,11 @@ impl UnixSocketInner {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
             };
-            let mut context = UnixSocketEbpfHelpersContext {};
 
             // TODO(https://fxbug.dev/385015056): Fill in SkBuf.
             let mut sk_buf = SkBuf::default();
 
+            let mut context = UnixSocketEbpfHelpersContext::<'_>::default();
             let s = bpf_program.run(&mut context, &mut sk_buf);
             if s == 0 {
                 None
@@ -1055,18 +1063,38 @@ impl Packet for &mut SkBuf {
     }
 }
 
-struct UnixSocketEbpfHelpersContext {}
+#[derive(Default)]
+struct UnixSocketEbpfHelpersContext<'a> {
+    map_refs: Vec<MapValueRef<'a>>,
+}
 
-impl SocketFilterContext for UnixSocketEbpfHelpersContext {
-    type SkBuf = SkBuf;
-    fn get_socket_uid(&self, _sk_buf: &SkBuf) -> uid_t {
-        track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_uid");
+impl<'a> MapsContext<'a> for UnixSocketEbpfHelpersContext<'a> {
+    fn add_value_ref(&mut self, map_ref: MapValueRef<'a>) {
+        self.map_refs.push(map_ref)
+    }
+}
+
+impl<'a> SocketFilterContext for UnixSocketEbpfHelpersContext<'a> {
+    type SkBuf<'b> = SkBuf;
+    fn get_socket_uid(&self, _sk_buf: &Self::SkBuf<'_>) -> Option<uid_t> {
+        track_stub!(TODO("https://fxbug.dev/385015056"), "bpf_get_socket_uid");
+        None
+    }
+
+    fn get_socket_cookie(&self, _sk_buf: &Self::SkBuf<'_>) -> u64 {
+        track_stub!(TODO("https://fxbug.dev/385015056"), "bpf_get_socket_cookie");
         0
     }
 
-    fn get_socket_cookie(&self, _sk_buf: &Self::SkBuf) -> u64 {
-        track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_cookie");
-        0
+    fn load_bytes_relative(
+        &self,
+        _sk_buf: &Self::SkBuf<'_>,
+        _base: LoadBytesBase,
+        _offset: usize,
+        _buf: &mut [u8],
+    ) -> i64 {
+        track_stub!(TODO("https://fxbug.dev/385015056"), "bpf_load_bytes_relative");
+        -1
     }
 }
 
@@ -1078,7 +1106,7 @@ impl ProgramArgument for &'_ mut SkBuf {
 
 struct UnixSocketEbpfContext {}
 impl BpfProgramContext for UnixSocketEbpfContext {
-    type RunContext<'a> = UnixSocketEbpfHelpersContext;
+    type RunContext<'a> = UnixSocketEbpfHelpersContext<'a>;
     type Packet<'a> = &'a mut SkBuf;
     type Map = PinnedMap;
     const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;

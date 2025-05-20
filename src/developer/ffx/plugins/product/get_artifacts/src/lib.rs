@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! FFX plugin for the paths of a group of artifacts inside product bundle.
-use assembly_manifest::Image;
+use assembled_system::Image;
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::EnvironmentContext;
@@ -165,12 +165,12 @@ impl PbGetArtifactsTool {
                         | Image::VBMeta(_)
                         | Image::Dtbo(_)
                         | Image::FVMFastboot(_)
-                        | Image::Fxfs { path: _, contents: _ }
                         | Image::FxfsSparse { path: _, contents: _ } => {
                             artifacts.push(self.compute_path(&image.source())?)
                         }
                         Image::BasePackage(_)
                         | Image::BlobFS { .. }
+                        | Image::Fxfs { path: _, contents: _ }
                         | Image::FVM(_)
                         | Image::FVMSparse(_)
                         | Image::QemuKernel(_) => continue,
@@ -199,15 +199,15 @@ impl PbGetArtifactsTool {
                     match image {
                         Image::ZBI { path: _, signed: _ }
                         | Image::QemuKernel(_)
+                        | Image::VBMeta(_)
                         | Image::FVM(_)
-                        | Image::Fxfs { path: _, contents: _ }
                         | Image::FxfsSparse { path: _, contents: _ } => {
                             artifacts.push(self.compute_path(&image.source())?)
                         }
                         Image::BasePackage(_)
-                        | Image::VBMeta(_)
                         | Image::Dtbo(_)
                         | Image::BlobFS { .. }
+                        | Image::Fxfs { path: _, contents: _ }
                         | Image::FVMSparse(_)
                         | Image::FVMFastboot(_) => continue,
                     }
@@ -246,6 +246,7 @@ impl PbGetArtifactsTool {
 mod tests {
     use super::*;
 
+    use assembly_container::AssemblyContainer;
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
     use ffx_writer::{Format, TestBuffers};
@@ -311,7 +312,7 @@ mod tests {
         create_temp_file("bootloader_path");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -326,6 +327,10 @@ mod tests {
                 )),
                 Image::Fxfs {
                     path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
+                    contents: Default::default(),
+                },
+                Image::FxfsSparse {
+                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
                     contents: Default::default(),
                 },
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
@@ -351,7 +356,7 @@ mod tests {
             tempdir.join("credential.zip").into_string(),
             String::from("zbi/path"),
             String::from("/tmp/product_bundle/system_a/fvm_fastboot.blk"),
-            String::from("/tmp/product_bundle/system_a/fxfs.blk"),
+            String::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
         ];
         assert_eq!(expected_artifacts, artifacts);
     }
@@ -409,7 +414,7 @@ mod tests {
         create_temp_file("bootloader_path");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let virtual_device = tempdir.join("manifest.json");
         let mut vd_file1 = File::create(&virtual_device).unwrap();
@@ -429,6 +434,10 @@ mod tests {
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
                 Image::Fxfs {
                     path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
+                    contents: Default::default(),
+                },
+                Image::FxfsSparse {
+                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
                     contents: Default::default(),
                 },
             ]),
@@ -452,7 +461,7 @@ mod tests {
             String::from("zbi/path"),
             String::from("/tmp/product_bundle/system_a/fvm.blk"),
             String::from("qemu/path"),
-            String::from("/tmp/product_bundle/system_a/fxfs.blk"),
+            String::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
             virtual_device.to_string(),
             tempdir.join("device.json").to_string(),
         ];
@@ -499,7 +508,7 @@ mod tests {
         create_temp_file("bootloader_path2");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -545,13 +554,15 @@ mod tests {
         let zbi_path = pb_path.join("fuchsia.zbi");
         fs::write(&zbi_path, vec![0x20, 0x10]).expect("zbi write");
         let fvm_path = pb_path.join("fvm.blk");
-        fs::write(&fvm_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&fvm_path, vec![0x20, 0x10]).expect("fvm write");
         let fvm_fast_path = pb_path.join("fastboot_fvm.blk");
-        fs::write(&fvm_fast_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&fvm_fast_path, vec![0x20, 0x10]).expect("fvm fast write");
         let qemu_path = pb_path.join("qemu-boot.bin");
-        fs::write(&qemu_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&qemu_path, vec![0x20, 0x10]).expect("qemu write");
         let fxfs_path = pb_path.join("fxfs.blk");
-        fs::write(&fxfs_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&fxfs_path, vec![0x20, 0x10]).expect("fxfs write");
+        let fxfs_sparse_path = pb_path.join("fxfs.sparse.blk");
+        fs::write(&fxfs_sparse_path, vec![0x20, 0x10]).expect("fxfs sparse write");
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -572,6 +583,10 @@ mod tests {
                 ),
                 Image::Fxfs {
                     path: Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path"),
+                    contents: Default::default(),
+                },
+                Image::FxfsSparse {
+                    path: Utf8PathBuf::from_path_buf(fxfs_sparse_path.clone()).expect("utf8 path"),
                     contents: Default::default(),
                 },
             ]),
@@ -616,7 +631,7 @@ mod tests {
                 zbi_path.to_string_lossy().into(),
                 fvm_path.to_string_lossy().into(),
                 qemu_path.to_string_lossy().into(),
-                fxfs_path.to_string_lossy().into(),
+                fxfs_sparse_path.to_string_lossy().into(),
                 virtual_device.to_string_lossy().into(),
                 pb_path.join("device.json").to_string_lossy().into(),
             ],
@@ -655,13 +670,15 @@ mod tests {
         let zbi_path = pb_path.join("fuchsia.zbi");
         fs::write(&zbi_path, vec![0x20, 0x10]).expect("zbi write");
         let fvm_path = pb_path.join("fvm.blk");
-        fs::write(&fvm_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&fvm_path, vec![0x20, 0x10]).expect("fvm write");
         let fvm_fast_path = pb_path.join("fastboot_fvm.blk");
-        fs::write(&fvm_fast_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&fvm_fast_path, vec![0x20, 0x10]).expect("fvm fast write");
         let qemu_path = pb_path.join("qemu-boot.bin");
-        fs::write(&qemu_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&qemu_path, vec![0x20, 0x10]).expect("qemu write");
         let fxfs_path = pb_path.join("fxfs.blk");
-        fs::write(&fxfs_path, vec![0x20, 0x10]).expect("zbi write");
+        fs::write(&fxfs_path, vec![0x20, 0x10]).expect("fxfs write");
+        let fxfs_sparse_path = pb_path.join("fxfs.sparse.blk");
+        fs::write(&fxfs_sparse_path, vec![0x20, 0x10]).expect("fxfs sparse write");
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),
@@ -682,6 +699,10 @@ mod tests {
                 ),
                 Image::Fxfs {
                     path: Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path"),
+                    contents: Default::default(),
+                },
+                Image::FxfsSparse {
+                    path: Utf8PathBuf::from_path_buf(fxfs_sparse_path.clone()).expect("utf8 path"),
                     contents: Default::default(),
                 },
             ]),
@@ -726,7 +747,7 @@ mod tests {
                 zbi_path.to_string_lossy().into(),
                 fvm_path.to_string_lossy().into(),
                 qemu_path.to_string_lossy().into(),
-                fxfs_path.to_string_lossy().into(),
+                fxfs_sparse_path.to_string_lossy().into(),
                 virtual_device.to_string_lossy().into(),
                 pb_path.join("device.json").to_string_lossy().into(),
             ],

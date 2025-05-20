@@ -273,7 +273,7 @@ pub trait DirectoryProxyExt {
     /// Open `path` specified using `flags` and `options`, returning a proxy to the remote resource.
     ///
     /// Waits for [`fio::NodeEvent::OnRepresentation`] if [`fio::Flags::FLAG_SEND_REPRESENTATION`]
-    /// is specified, otherwise calls `fuchsia.io/Node.GetConnectionInfo` to verify the result.
+    /// is specified, otherwise calls `fuchsia.io/Node.GetAttributes` to verify the result.
     async fn open_node<T: ProtocolMarker>(
         &self,
         path: &str,
@@ -331,8 +331,8 @@ async fn open_node_impl<T: ProtocolMarker>(
     let representation = if flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION) {
         Some(get_on_representation_event(&proxy).await?)
     } else {
-        // We use GetConnectionInfo to test that opening the resource succeeded.
-        proxy.get_connection_info().await.map_err(|e| {
+        // We use GetAttributes to test that opening the resource succeeded.
+        let _ = proxy.get_attributes(Default::default()).await.map_err(|e| {
             if let fidl::Error::ClientChannelClosed { status, .. } = e {
                 status
             } else {

@@ -7,8 +7,8 @@
 #include <lib/boot-shim/efi-boot-shim.h>
 #include <lib/zbitl/error-stdio.h>
 
-#include <ktl/move.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/efi/efi-boot-zbi.h>
 #include <phys/efi/file.h>
 #include <phys/efi/main.h>

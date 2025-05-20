@@ -15,7 +15,6 @@ library_headers("headers") {
   ]
 
   public_deps = [
-    "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

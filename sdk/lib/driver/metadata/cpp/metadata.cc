@@ -20,8 +20,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadata
   zx::result result =
       component::ConnectAt<fuchsia_driver_metadata::Metadata>(incoming.svc_dir(), path);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to connect to metadata protocol.", KV("status", result.status_string()),
-             KV("path", path));
+    fdf::error("Failed to connect to metadata protocol at path {}: {}", path, result);
     return result.take_error();
   }
 

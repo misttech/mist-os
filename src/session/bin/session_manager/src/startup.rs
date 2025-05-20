@@ -304,7 +304,7 @@ mod tests {
         let session_url = "session";
 
         let directory_request_handler = move |directory_request| match directory_request {
-            fio::DirectoryRequest::DeprecatedOpen { path: _, .. } => {
+            fio::DirectoryRequest::Open { path: _, .. } => {
                 assert_eq!(NUM_REALM_REQUESTS.get(), 4);
             }
             _ => panic!("Directory handler received an unexpected request"),

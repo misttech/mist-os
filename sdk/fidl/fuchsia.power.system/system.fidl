@@ -163,7 +163,7 @@ type AddExecutionStateDependencyError = flexible enum {
 
 /// Error codes for responses from `RegisterSuspendBlocker` in
 /// [`fuchsia.power.system/ActivityGovernor`].
-@available(added=NEXT)
+@available(added=27)
 type RegisterSuspendBlockerError = flexible enum {
     /// The service encountered an error while attempting to issue a wake lease.
     INTERNAL = 1;
@@ -173,7 +173,7 @@ type RegisterSuspendBlockerError = flexible enum {
 
 /// An entity that blocks suspend until it handles transitions across hardware
 /// platform suspend and resume.
-@available(added=NEXT)
+@available(added=27)
 open protocol SuspendBlocker {
     /// Called after system activity governor begins operations to suspend the
     /// hardware platform.
@@ -353,7 +353,7 @@ open protocol ActivityGovernor {
     ///
     /// If an error occurs while registering `suspend_blocker`, it will be
     /// dropped, closing the channel.
-    @available(added=NEXT)
+    @available(added=27)
     flexible RegisterSuspendBlocker(resource table {
         /// The client end of the SuspendBlocker service.
         ///

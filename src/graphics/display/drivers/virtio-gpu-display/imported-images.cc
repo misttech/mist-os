@@ -91,12 +91,25 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
   fuchsia_sysmem2::wire::VmoBuffer& buffer = collection_info.buffers().at(buffer_index);
 
   ZX_DEBUG_ASSERT_MSG(buffer.has_vmo(), "Sysmem deviated from its contract");
+  ZX_DEBUG_ASSERT_MSG(buffer.vmo().is_valid(), "Sysmem deviated from its contract");
   ZX_DEBUG_ASSERT_MSG(buffer.has_vmo_usable_start(), "Sysmem deviated from its contract");
   ZX_DEBUG_ASSERT_MSG(!buffer.has_close_weak_asap(), "Sysmem deviated from its contract");
 
   ZX_DEBUG_ASSERT_MSG(collection_info.has_settings(), "Sysmem deviated from its contract");
+  ZX_DEBUG_ASSERT_MSG(collection_info.settings().has_buffer_settings(),
+                      "Sysmem deviated from its contract");
+  fuchsia_sysmem2::wire::BufferMemorySettings& buffer_memory_settings =
+      collection_info.settings().buffer_settings();
+
+  ZX_DEBUG_ASSERT_MSG(buffer_memory_settings.has_coherency_domain(),
+                      "Sysmem deviated from its contract");
+  ZX_DEBUG_ASSERT_MSG(buffer_memory_settings.has_is_physically_contiguous(),
+                      "Sysmem deviated from its contract");
+  ZX_DEBUG_ASSERT_MSG(buffer_memory_settings.has_is_secure(), "Sysmem deviated from its contract");
+  ZX_DEBUG_ASSERT_MSG(buffer_memory_settings.has_size_bytes(), "Sysmem deviated from its contract");
+
   if (!collection_info.settings().has_image_format_constraints()) {
-    fdf::warn("Rejecting access BufferCollection without ImageFormatConstraints");
+    fdf::warn("Rejecting access to BufferCollection without ImageFormatConstraints");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   fuchsia_sysmem2::wire::ImageFormatConstraints& image_format_constraints =
@@ -123,6 +136,7 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
       .pixel_format_modifier = image_format_constraints.pixel_format_modifier(),
       .minimum_size = image_format_constraints.min_size(),
       .minimum_bytes_per_row = image_format_constraints.min_bytes_per_row(),
+      .coherency_domain = buffer_memory_settings.coherency_domain(),
   });
 }
 

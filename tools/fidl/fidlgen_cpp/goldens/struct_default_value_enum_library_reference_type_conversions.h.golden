@@ -35,9 +35,6 @@ struct WireTypeForNaturalType<::test_structdefaultvalueenumlibraryreference::Foo
   using type = ::test_structdefaultvalueenumlibraryreference::wire::Foo;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

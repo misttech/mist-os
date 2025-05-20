@@ -114,9 +114,9 @@ zx::result<> AmlSdmmc::Start() {
 
   // Initialize our compat server.
   {
-    zx::result<> result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), name(),
-        compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}), get_banjo_config());
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
+                                  compat::ForwardMetadata::None(), get_banjo_config());
     if (result.is_error()) {
       return result.take_error();
     }

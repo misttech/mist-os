@@ -30,6 +30,7 @@
 #include "src/ui/scenic/lib/display/util.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
+#include "src/ui/scenic/lib/utils/logging.h"
 
 namespace flatland {
 
@@ -552,6 +553,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   if (num_images == 0) {
     // The Coordinator API doesn't allow zero layers.
     // TODO(https://fxbug.dev/399228128): Use a Coordinator color layer instead of Vulkan fallback.
+    TRACE_INSTANT("gfx", "scenic_d2d_failed: zero layers provided.", TRACE_SCOPE_THREAD);
+    FLATLAND_VERBOSE_LOG << "SetRenderDataOnDisplay() failed: zero layers provided.";
     return false;
   }
 
@@ -560,6 +563,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   std::vector<fuchsia_hardware_display::wire::LayerId>& layers =
       display_engine_data_map_.at(data.display_id.value).layers;
   if (layers.size() < num_images) {
+    TRACE_INSTANT("gfx", "scenic_d2d_failed: insufficient layers available", TRACE_SCOPE_THREAD);
+    FLATLAND_VERBOSE_LOG << "SetRenderDataOnDisplay() failed: insufficient layers available.";
     return false;
   }
 
@@ -575,6 +580,10 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
         ApplyLayerImage(layers[i], data.rectangles[i], data.images[i],
                         /*wait_id*/ kInvalidEventId);
       } else {
+        TRACE_INSTANT("gfx", "scenic_d2d_failed: image not imported for direct-display.",
+                      TRACE_SCOPE_THREAD);
+        FLATLAND_VERBOSE_LOG
+            << "SetRenderDataOnDisplay() failed: image not imported for direct-display.";
         return false;
       }
     } else {
@@ -589,6 +598,10 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
           rect.extent.y == static_cast<float>(display_size.y)) {
         ApplyLayerColor(layers[i], rect, data.images[i]);
       } else {
+        TRACE_INSTANT("gfx", "scenic_d2d_failed: violated solid-fill rect restrictions.",
+                      TRACE_SCOPE_THREAD);
+        FLATLAND_VERBOSE_LOG
+            << "SetRenderDataOnDisplay() failed: violated solid-fill rect restrictions.";
         return false;
       }
     }
@@ -727,6 +740,8 @@ fuchsia_hardware_display::wire::ConfigStamp DisplayCompositor::ApplyConfig() {
   fuchsia_hardware_display::wire::ConfigStamp config_stamp = next_config_stamp_;
   next_config_stamp_ = fuchsia_hardware_display::wire::ConfigStamp(next_config_stamp_.value + 1);
 
+  FLATLAND_VERBOSE_LOG << "DisplayCompositor::ApplyConfig() config_stamp=" << config_stamp.value;
+
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
   fidl::Arena arena;
   const fidl::OneWayStatus result = display_coordinator_->ApplyConfig3(
@@ -855,12 +870,20 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::RenderFrame");
   std::scoped_lock lock(lock_);
 
+  if (last_frame_number_) {
+    FX_CHECK(frame_number > *last_frame_number_);
+  }
+  last_frame_number_ = frame_number;
+
+  uint64_t trace_flow_id = TRACE_NONCE();
+  TRACE_FLOW_BEGIN("gfx", "render_frame_to_vsync", trace_flow_id);
+
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display coordinator.
   // Note: TryDirectToDisplay() failing indicates hardware failure to do display composition.
   const bool fallback_to_gpu_composition = !enable_display_composition_ ||
                                            test_args.force_gpu_composition ||
-                                           !TryDirectToDisplay(render_data_list) || !CheckConfig();
+                                           !TryDirectToDisplay(render_data_list);
   if (fallback_to_gpu_composition) {
     // Discard only if we have attempted to TryDirectToDisplay() and have an unapplied config.
     // DiscardConfig call is costly and we should avoid calling when it isn't necessary.
@@ -868,11 +891,26 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
       DiscardConfig();
     }
 
-    if (!PerformGpuComposition(frame_number, presentation_time, render_data_list,
-                               std::move(release_fences), std::move(callback))) {
+    if (PerformGpuComposition(frame_number, presentation_time, render_data_list,
+                              std::move(release_fences), std::move(callback))) {
+      for (const auto& data : render_data_list) {
+        const int32_t num_render_data = static_cast<int32_t>(data.rectangles.size());
+        const uint64_t display_id = data.display_id.value;
+        TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(0));
+        TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(num_render_data));
+      }
+    } else {
       return RenderFrameResult::kFailure;
     }
+
   } else {
+    for (const auto& data : render_data_list) {
+      const int32_t num_render_data = static_cast<int32_t>(data.rectangles.size());
+      const uint64_t display_id = data.display_id.value;
+      TRACE_COUNTER("gfx", "Scenic D2D images", display_id, "count", TA_INT32(num_render_data));
+      TRACE_COUNTER("gfx", "Scenic GPU images", display_id, "count", TA_INT32(0));
+    }
+
     // CC was successfully applied to the config so we update the state machine.
     cc_state_machine_.SetApplyConfigSucceeded();
 
@@ -882,7 +920,8 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   }
 
   const fuchsia_hardware_display::wire::ConfigStamp config_stamp = ApplyConfig();
-  pending_apply_configs_.push_back({.config_stamp = config_stamp, .frame_number = frame_number});
+  pending_apply_configs_.push_back(
+      {.config_stamp = config_stamp, .frame_number = frame_number, .trace_flow_id = trace_flow_id});
 
   return fallback_to_gpu_composition ? RenderFrameResult::kGpuComposition
                                      : RenderFrameResult::kDirectToDisplay;
@@ -899,6 +938,8 @@ bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render
       // due to too many layers), that doesn't mean that all displays need to use GPU-composition.
       // Some day we might want to use GPU-composition for some client images, and direct-scanout
       // for others.
+      FLATLAND_VERBOSE_LOG
+          << "DisplayCompositor::TryDirectToDisplay() failed SetRenderDataOnDisplay()";
       return false;
     }
 
@@ -915,6 +956,10 @@ bool DisplayCompositor::TryDirectToDisplay(const std::vector<RenderData>& render
     }
   }
 
+  if (!CheckConfig()) {
+    TRACE_INSTANT("gfx", "scenic_d2d_failed: check config failed.", TRACE_SCOPE_THREAD);
+    return false;
+  }
   return true;
 }
 
@@ -937,18 +982,21 @@ void DisplayCompositor::OnVsync(zx::time timestamp,
                      return info.config_stamp.value == applied_config_stamp.value;
                    });
 
-  // It is possible that the config stamp doesn't match any config applied by this DisplayCompositor
-  // instance. i.e. it could be from another client. Thus we just ignore these events.
+  // This shouldn't be possible, now that the ancient Gfx code has been expunged from Scenic.
   if (vsync_frame_it == pending_apply_configs_.end()) {
-    FX_LOGS(INFO) << "The config stamp <" << applied_config_stamp.value << "> was not generated "
-                  << "by current DisplayCompositor. Vsync event skipped.";
+    FX_LOGS(ERROR) << "DisplayCompositor::OnVsync() config_stamp=" << applied_config_stamp.value
+                   << "  ... skipping: stamp was not generated by current DisplayCompositor";
     return;
   }
+
+  FLATLAND_VERBOSE_LOG << "DisplayCompositor::OnVsync() config_stamp=" << applied_config_stamp.value
+                       << "  timestamp=" << timestamp.get();
 
   // Handle the presented ApplyConfig() call, as well as the skipped ones.
   auto it = pending_apply_configs_.begin();
   auto end = std::next(vsync_frame_it);
   while (it != end) {
+    TRACE_FLOW_END("gfx", "render_frame_to_vsync", it->trace_flow_id);
     release_fence_manager_.OnVsync(it->frame_number, timestamp);
     it = pending_apply_configs_.erase(it);
   }
@@ -971,16 +1019,21 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
                                    const uint32_t num_render_targets,
                                    fuchsia::sysmem2::BufferCollectionInfo* out_collection_info) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  FX_CHECK(display);
+  TRACE_DURATION("gfx", "Flatland::DisplayCompositor::AddDisplay");
+
+  FLATLAND_VERBOSE_LOG << "DisplayCompositor::AddDisplay(): display_id="
+                       << display->display_id().value << "  size=" << info.dimensions.x << "x"
+                       << info.dimensions.y << "  num_render_targets=" << num_render_targets;
 
   // Grab the best pixel format that the renderer prefers given the list of available formats on
   // the display.
   FX_DCHECK(!info.formats.empty());
   const auto pixel_format = renderer_->ChoosePreferredRenderTargetFormat(info.formats);
 
-  const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
-  // JJOSH: leave these, probably.
-  FX_DCHECK(size.width > 0);
-  FX_DCHECK(size.height > 0);
+  const fuchsia::math::SizeU size = {.width = info.dimensions.x, .height = info.dimensions.y};
+  FX_DCHECK(size.width > 0 && size.height > 0)
+      << "Invalid display size: " << size.width << "x" << size.height;
 
   const fuchsia_hardware_display_types::wire::DisplayId display_id = display->display_id();
   FX_DCHECK(display_engine_data_map_.find(display_id.value) == display_engine_data_map_.end())

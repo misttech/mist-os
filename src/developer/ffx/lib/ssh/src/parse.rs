@@ -50,7 +50,6 @@ pub enum ParseSshConnectionError {
     Timeout,
 }
 
-#[tracing::instrument(skip(lb, rdr))]
 pub async fn read_ssh_line<R: AsyncRead + Unpin>(
     lb: &mut LineBuffer,
     rdr: &mut R,
@@ -82,7 +81,6 @@ pub async fn read_ssh_line<R: AsyncRead + Unpin>(
     }
 }
 
-#[tracing::instrument(skip(rdr))]
 pub async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
     rdr: &mut R,
 ) -> Result<String, ParseSshConnectionError> {
@@ -99,7 +97,7 @@ pub async fn read_ssh_line_with_timeouts<R: AsyncBufRead + Unpin>(
             }
             Err(ParseSshConnectionError::Timeout) => {
                 time += wait_time;
-                tracing::debug!("No line after {time}, line so far: {:?}", lb.line());
+                log::debug!("No line after {time}, line so far: {:?}", lb.line());
             }
             Err(e) => {
                 return Err(e);
@@ -116,7 +114,7 @@ fn parse_ssh_connection_legacy(
     match parts.next() {
         Some("++") => {}
         Some(_) | None => {
-            tracing::error!("Failed to read first anchor: {line}");
+            log::error!("Failed to read first anchor: {line}");
             return Err(ParseSshConnectionError::Parse(line.into()));
         }
     }
@@ -128,7 +126,7 @@ fn parse_ssh_connection_legacy(
     let client_address = if let Some(part) = parts.next() {
         part
     } else {
-        tracing::error!("Failed to read client_address: {line}");
+        log::error!("Failed to read client_address: {line}");
         return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
@@ -136,7 +134,7 @@ fn parse_ssh_connection_legacy(
     let _client_port = if let Some(part) = parts.next() {
         part
     } else {
-        tracing::error!("Failed to read port: {line}");
+        log::error!("Failed to read port: {line}");
         return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
@@ -144,7 +142,7 @@ fn parse_ssh_connection_legacy(
     let _server_address = if let Some(part) = parts.next() {
         part
     } else {
-        tracing::error!("Failed to read port: {line}");
+        log::error!("Failed to read port: {line}");
         return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
@@ -152,7 +150,7 @@ fn parse_ssh_connection_legacy(
     let _server_port = if let Some(part) = parts.next() {
         part
     } else {
-        tracing::error!("Failed to read server_port: {line}");
+        log::error!("Failed to read server_port: {line}");
         return Err(ParseSshConnectionError::Parse(line.into()));
     };
 
@@ -166,14 +164,13 @@ fn parse_ssh_connection_legacy(
 
     // Finally, there should be nothing left.
     if let Some(_) = parts.next() {
-        tracing::error!("Extra data: {line}");
+        log::error!("Extra data: {line}");
         return Err(ParseSshConnectionError::Parse(line.into()));
     }
 
     Ok((client_address.to_string(), None))
 }
 
-#[tracing::instrument(skip(stdout))]
 async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     stdout: &mut R,
     verbose: bool,
@@ -181,7 +178,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
 ) -> std::result::Result<(String, Option<DeviceConnectionInfo>), ParseSshConnectionError> {
     let line = read_ssh_line_with_timeouts(stdout).await?;
     if line.is_empty() {
-        tracing::error!("Failed to read first line from stdout");
+        log::error!("Failed to read first line from stdout");
         return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
     }
     if verbose {
@@ -233,6 +230,8 @@ pub enum PipeError {
     NoAddress(String),
     #[error("running target overnet pipe: {0}")]
     SpawnError(String),
+    #[error("error with address: {0}")]
+    AddressError(#[source] anyhow::Error),
 }
 
 pub async fn parse_ssh_output(
@@ -247,13 +246,13 @@ pub async fn parse_ssh_output(
     {
         Ok((addr, connection_info)) => {
             if connection_info.as_ref().map(|dci| dci.overnet_id).is_none() {
-                tracing::info!("Did not receive overnet_id from remote host, presumably it is an old device. Warning: without the overnet_id we cannot determine whether this connection is to an already-known target");
+                log::info!("Did not receive overnet_id from remote host, presumably it is an old device. Warning: without the overnet_id we cannot determine whether this connection is to an already-known target");
             }
             (Some(HostAddr(addr)), connection_info)
         }
         Err(e) => {
             let error_message = format!("Failed to read ssh client address: {e:?}");
-            tracing::error!("{error_message}");
+            log::error!("{error_message}");
             (None, None)
         }
     };
@@ -266,7 +265,6 @@ pub async fn parse_ssh_output(
     }
 }
 
-#[tracing::instrument(skip(stderr))]
 async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
     stderr: &mut R,
     verbose: bool,
@@ -275,7 +273,7 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
     loop {
         let l = match read_ssh_line_with_timeouts(stderr).await {
             Err(e) => {
-                tracing::error!("reading ssh stderr: {e:?}");
+                log::error!("reading ssh stderr: {e:?}");
                 return PipeError::NoCompatibilityCheck;
             }
             Ok(l) => l,
@@ -305,12 +303,10 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
         }
         // At this point, we just want to look at one line to see if it is the compatibility
         // failure.
-        tracing::debug!("Reading stderr:  {l}");
+        log::debug!("Reading stderr:  {l}");
         return if l.contains("Unrecognized argument: --abi-revision") {
             // It is an older image, so use the legacy command.
-            tracing::info!(
-                "Target does not support abi compatibility check, reverting to legacy connection"
-            );
+            log::info!("Target does not support abi compatibility check");
             PipeError::NoCompatibilityCheck
         } else {
             PipeError::ConnectionFailed(format!("{:?}", l))
@@ -346,14 +342,14 @@ pub async fn write_ssh_log(prefix: &str, line: &String, ctx: &EnvironmentContext
     ) {
         Ok((f, _)) => f,
         Err(e) => {
-            tracing::warn!("Couldn't open ssh log file: {e:?}");
+            log::warn!("Couldn't open ssh log file: {e:?}");
             return;
         }
     };
     const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
     let timestamp = chrono::Local::now().format(TIME_FORMAT);
     write!(&mut f, "{timestamp}: {prefix} {line}")
-        .unwrap_or_else(|e| tracing::warn!("Couldn't write ssh log: {e:?}"));
+        .unwrap_or_else(|e| log::warn!("Couldn't write ssh log: {e:?}"));
 }
 
 #[cfg(test)]

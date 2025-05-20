@@ -116,6 +116,10 @@ static void default_shutdown() {}
 
 static void default_shutdown_cpu() {}
 
+static zx_status_t default_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
+static zx_status_t default_resume_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 static bool default_msi_is_supported() { return false; }
 
 static bool default_msi_supports_masking() { return false; }
@@ -156,6 +160,8 @@ static const struct pdev_interrupt_ops default_ops = {
     .handle_irq = default_handle_irq,
     .shutdown = default_shutdown,
     .shutdown_cpu = default_shutdown_cpu,
+    .suspend_cpu = default_suspend_cpu,
+    .resume_cpu = default_resume_cpu,
     .msi_is_supported = default_msi_is_supported,
     .msi_supports_masking = default_msi_supports_masking,
     .msi_mask_unmask = default_msi_mask_unmask,
@@ -200,6 +206,7 @@ zx_status_t interrupt_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
   return intr_ops->send_ipi(target, ipi);
 }
 
+void interrupt_init_percpu_early() { intr_ops->init_percpu_early(); }
 void interrupt_init_percpu() { intr_ops->init_percpu(); }
 
 void platform_irq(iframe_t* frame) { intr_ops->handle_irq(frame); }
@@ -237,6 +244,10 @@ void shutdown_interrupts() { intr_ops->shutdown(); }
 
 void shutdown_interrupts_curr_cpu() { intr_ops->shutdown_cpu(); }
 
+zx_status_t suspend_interrupts_curr_cpu() { return intr_ops->suspend_cpu(); }
+
+zx_status_t resume_interrupts_curr_cpu() { return intr_ops->resume_cpu(); }
+
 bool msi_is_supported() { return intr_ops->msi_is_supported(); }
 
 bool msi_supports_masking() { return intr_ops->msi_supports_masking(); }
@@ -256,7 +267,7 @@ void msi_register_handler(const msi_block_t* block, uint msi_id, int_handler han
   intr_ops->msi_register_handler(block, msi_id, handler, ctx);
 }
 
-static void interrupt_init_percpu_early(uint level) { intr_ops->init_percpu_early(); }
+static void interrupt_init_percpu_early_hook(uint level) { interrupt_init_percpu_early(); }
 
-LK_INIT_HOOK_FLAGS(interrupt_init_percpu_early, interrupt_init_percpu_early,
+LK_INIT_HOOK_FLAGS(interrupt_init_percpu_early, interrupt_init_percpu_early_hook,
                    LK_INIT_LEVEL_PLATFORM_EARLY, LK_INIT_FLAG_SECONDARY_CPUS)

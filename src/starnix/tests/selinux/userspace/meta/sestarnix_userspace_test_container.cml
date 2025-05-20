@@ -16,5 +16,6 @@
         mounts: [ "/:remotefs::nosuid,nodev,relatime" ],
         name: "sestarnix_userspace_test_container",
         startup_file_path: "",
+        default_seclabel: "#kernel",
     },
 }

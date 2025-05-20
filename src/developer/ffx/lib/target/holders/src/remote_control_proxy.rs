@@ -9,7 +9,8 @@ use crate::init_connection_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_command_error::{bug, FfxContext as _, Result};
-use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+use ffx_target::fho::{target_interface, FhoConnectionBehavior};
+use fho::{FhoEnvironment, TryFromEnv};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 
@@ -33,11 +34,12 @@ impl From<RemoteControlProxy> for RemoteControlProxyHolder {
 #[async_trait(?Send)]
 impl TryFromEnv for RemoteControlProxyHolder {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        let behavior = if let Some(behavior) = env.behavior().await {
+        let target_env = target_interface(env);
+        let behavior = if let Some(behavior) = target_env.behavior() {
             behavior
         } else {
             let b = init_connection_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
+            target_env.set_behavior(b.clone());
             b
         };
         match behavior {
@@ -59,9 +61,9 @@ impl TryFromEnv for RemoteControlProxyHolder {
             },
             FhoConnectionBehavior::DirectConnector(direct) => {
                 let conn = direct.connection().await?;
-                let cc = conn.lock().await;
-                let c = cc.deref();
-                c.as_ref()
+                let cc =
+                    conn.lock().expect("fdomain::remote_control_proxy: connection lock poisoned");
+                cc.as_ref()
                     .ok_or(bug!("Connection not yet initialized"))?
                     .rcs_proxy()
                     .await

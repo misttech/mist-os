@@ -28,6 +28,11 @@ if (is_host && has_board) {
       "script_test.h",
     ]
 
+    package_deps = [
+      "inferiors:zxdb_e2e_inferiors",
+      "//src/developer/debug/debug_agent",
+      "//src/developer/forensics/crasher:crasher",
+    ]
     deps = [
       # In variant builds the variant version of the test executable will be run. However, the test
       # will expect it can still run the host_x64 default variant of ffx, which is still built

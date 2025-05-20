@@ -11,7 +11,7 @@
 #include <trace.h>
 #include <zircon/assert.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #define LOCAL_TRACE 0
 

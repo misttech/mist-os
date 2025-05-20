@@ -94,6 +94,20 @@ func endifFuchsia() string {
 	return s
 }
 
+func ifdefFuchsiaIf(condition bool) string {
+	if condition {
+		return ifdefFuchsia()
+	}
+	return ""
+}
+
+func endifFuchsiaIf(condition bool) string {
+	if condition {
+		return endifFuchsia()
+	}
+	return ""
+}
+
 // A per-file set of coding table definitions that have been imported via `__LOCAL extern "C"`
 // declarations, used to prevent duplicate imports.
 var externedCodingTables = map[string]struct{}{}
@@ -282,6 +296,8 @@ var commonTemplateFuncs = template.FuncMap{
 
 	"IfdefFuchsia":          ifdefFuchsia,
 	"EndifFuchsia":          endifFuchsia,
+	"IfdefFuchsiaIf":        ifdefFuchsiaIf,
+	"EndifFuchsiaIf":        endifFuchsiaIf,
 	"EnsureNamespace":       ensureNamespace,
 	"EnsureCodingTableDecl": ensureCodingTableDecl,
 	"EndOfFile":             endOfFile,

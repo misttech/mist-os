@@ -1,31 +1,25 @@
-// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::attachments::CgroupEbpfProgramSet;
+use crate::bpf::attachments::EbpfAttachments;
 use crate::container_namespace::ContainerNamespace;
-#[cfg(not(feature = "starnix_lite"))]
-use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
-#[cfg(not(feature = "starnix_lite"))]
 use crate::device::binder::BinderDevice;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
 use crate::fs::fuchsia::nmfs::NetworkManagerHandle;
-use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
 use crate::mm::{FutexTable, MappingSummary, MlockPinFlavor, MlockShadowProcess, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
+use crate::task::limits::SystemLimits;
+use crate::task::net::NetstackDevices;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
-    HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads, NetstackDevices,
-    PidTable, PsiProvider, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
-    UtsNamespaceHandle,
+    HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads, PidTable,
+    SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
-
-#[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
 use crate::vfs::socket::{
@@ -33,8 +27,7 @@ use crate::vfs::socket::{
     SocketAddress,
 };
 use crate::vfs::{
-    DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
-    StaticDirectoryBuilder,
+    DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts, StaticDirectoryBuilder,
 };
 use bstr::BString;
 use expando::Expando;
@@ -60,7 +53,6 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
-#[cfg(not(feature = "starnix_lite"))]
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
@@ -193,15 +185,7 @@ pub struct Kernel {
     /// The registry of block devices backed by a remote fuchsia.io file.
     pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
 
-    /// If a remote block device named "misc" is created, keep track of it; this is used by Android
-    /// to pass boot parameters to the bootloader.  Since Starnix is acting as a de-facto bootloader
-    /// for Android, we need to be able to peek into these messages.
-    /// Note that this might never be initialized (if the "misc" device never gets registered).
-    #[cfg(not(feature = "starnix_lite"))]
-    pub bootloader_message_store: OnceLock<AndroidBootloaderMessageStore>,
-
     /// The binder driver registered for this container, indexed by their device type.
-    #[cfg(not(feature = "starnix_lite"))]
     pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
 
     /// The iptables used for filtering network packets.
@@ -217,7 +201,6 @@ pub struct Kernel {
     pub root_uts_ns: UtsNamespaceHandle,
 
     /// A struct containing a VMO with a vDSO implementation, if implemented for a given architecture, and possibly an offset for a sigreturn function.
-    #[cfg(not(feature = "starnix_lite"))]
     pub vdso: Vdso,
 
     /// A struct containing a VMO with a arch32-vDSO implementation, if implemented for a given architecture.
@@ -277,9 +260,6 @@ pub struct Kernel {
 
     pub stats: Arc<KernelStats>,
 
-    // Proxy to the PSI provider we received from the runner, if any.
-    pub psi_provider: PsiProvider,
-
     /// Resource limits that are exposed, for example, via sysctl.
     pub system_limits: SystemLimits,
 
@@ -331,10 +311,8 @@ pub struct Kernel {
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 
-    /// eBPF programs attached to the root cgroup.
-    /// TODO(https://fxbug.dev/388077431) Move this out of `Kernel` once cgroup hierarchy is
-    /// moved to starnix_core.
-    pub root_cgroup_ebpf_programs: CgroupEbpfProgramSet,
+    /// Keeps track of attached eBPF programs.
+    pub ebpf_attachments: EbpfAttachments,
 
     /// Cgroups of the kernel.
     pub cgroups: KernelCgroups,
@@ -353,43 +331,22 @@ pub struct Kernel {
 struct InterfacesHandlerImpl(Weak<Kernel>);
 
 impl InterfacesHandlerImpl {
-    fn with_netstack_devices<
-        F: FnOnce(
-                &CurrentTask,
-                &Arc<NetstackDevices>,
-                Option<&FileSystemHandle>,
-                Option<&FileSystemHandle>,
-            ) + Sync
-            + Send
-            + 'static,
-    >(
-        &mut self,
-        f: F,
-    ) {
-        if let Some(kernel) = self.0.upgrade() {
-            kernel.kthreads.spawner().spawn(move |_, current_task| {
-                let kernel = current_task.kernel();
-                let procfs = crate::fs::proc::get_proc_fs(&kernel);
-                let sysfs = crate::fs::sysfs::get_sys_fs(&kernel);
-                f(current_task, &kernel.netstack_devices, procfs.as_ref(), sysfs.as_ref())
-            });
-        }
+    fn kernel(&self) -> Option<Arc<Kernel>> {
+        self.0.upgrade()
     }
 }
 
 impl InterfacesHandler for InterfacesHandlerImpl {
     fn handle_new_link(&mut self, name: &str) {
-        let name = name.to_owned();
-        self.with_netstack_devices(move |current_task, devs, proc_fs, sys_fs| {
-            devs.add_dev(current_task, &name, proc_fs, sys_fs)
-        })
+        if let Some(kernel) = self.kernel() {
+            kernel.netstack_devices.add_device(&kernel, name.into());
+        }
     }
 
     fn handle_deleted_link(&mut self, name: &str) {
-        let name = name.to_owned();
-        self.with_netstack_devices(move |_current_task, devs, _proc_fs, _sys_fs| {
-            devs.remove_dev(&name)
-        })
+        if let Some(kernel) = self.kernel() {
+            kernel.netstack_devices.remove_device(&kernel, name.into());
+        }
     }
 }
 
@@ -429,13 +386,10 @@ impl Kernel {
             device_registry: Default::default(),
             container_namespace,
             remote_block_device_registry: Default::default(),
-            #[cfg(not(feature = "starnix_lite"))]
-            bootloader_message_store: OnceLock::new(),
             binders: Default::default(),
             iptables,
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
-            #[cfg(not(feature = "starnix_lite"))]
             vdso: Vdso::new(),
             vdso_arch32: Vdso::new_arch32(),
             netstack_devices: Arc::default(),
@@ -457,7 +411,6 @@ impl Kernel {
             disable_unprivileged_bpf: AtomicU8::new(0), // Enable unprivileged BPF by default.
             build_version: OnceCell::new(),
             stats: Arc::new(KernelStats::default()),
-            psi_provider: PsiProvider::default(),
             delayed_releaser: Default::default(),
             scheduler,
             syslog: Default::default(),
@@ -469,8 +422,8 @@ impl Kernel {
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
-            root_cgroup_ebpf_programs: Default::default(),
-            cgroups: KernelCgroups::new(kernel.clone()),
+            ebpf_attachments: Default::default(),
+            cgroups: Default::default(),
             time_adjustment_proxy,
         });
 

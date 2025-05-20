@@ -644,6 +644,12 @@ pub struct TemperatureFilter {
 
     /// TemperatureHandler node that is used to read temperature
     temperature_handler: Rc<dyn Node>,
+
+    /// Name of the raw temperature trace counter
+    raw_temperature_name: String,
+
+    /// Name of the filtered temperature trace counter
+    filtered_temperature_name: String,
 }
 
 impl TemperatureFilter {
@@ -654,6 +660,8 @@ impl TemperatureFilter {
             time_constant,
             prev_temperature: Cell::new(None),
             prev_timestamp: Cell::new(Nanoseconds(0)),
+            raw_temperature_name: format!("{} raw", temperature_handler.name()),
+            filtered_temperature_name: format!("{} filtered", temperature_handler.name()),
             temperature_handler,
         }
     }
@@ -676,6 +684,14 @@ impl TemperatureFilter {
             ),
             None => raw_temperature,
         };
+
+        fuchsia_trace::counter!(
+            c"power_manager",
+            c"temperature",
+            0,
+            self.raw_temperature_name.as_str() => raw_temperature.0,
+            self.filtered_temperature_name.as_str() => filtered_temperature.0
+        );
 
         self.prev_temperature.set(Some(filtered_temperature));
         self.prev_timestamp.set(timestamp);

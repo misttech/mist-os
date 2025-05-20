@@ -39,19 +39,21 @@ workbench_platform_config = {
             },
         },
     },
-    "driver_framework": {
-        "use_rust_driver_host": True,
-    },
     "timekeeper": {
         "first_sampling_delay_sec": 86400,
         "back_off_time_between_pull_samples_sec": 86400,
     },
     "media": {
-        "audio": "partial_stack",
+        "audio": {
+            "device_registry": {},
+        },
     },
     "starnix": {
         "enabled": True,
         "enable_android_support": True,
+    },
+    "storage": {
+        "storage_host_enabled": True,
     },
     "usb": {
         "peripheral": {
@@ -79,9 +81,11 @@ workbench_platform_config = {
         "suspend_enabled": True,
     },
     "kernel": {
-        "oom_behavior": {
-            "reboot": {
-                "timeout": "low",
+        "oom": {
+            "behavior": {
+                "reboot": {
+                    "timeout": "low",
+                },
             },
         },
     },

@@ -10,11 +10,11 @@
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
 #include <cstddef>
+#include <span>
 #include <string_view>
 
 namespace memalloc {
@@ -26,7 +26,7 @@ using RangeCallback = fit::inline_function<bool(const Range&), sizeof(void*) * 8
 class RangeStream {
  public:
   // Assumes that each associated array is already in lexicographic ordered.
-  explicit RangeStream(cpp20::span<internal::RangeIterationContext> state) : state_(state) {
+  explicit RangeStream(std::span<internal::RangeIterationContext> state) : state_(state) {
     ZX_DEBUG_ASSERT(std::all_of(state.begin(), state.end(), [](const auto& ctx) {
       return std::is_sorted(ctx.ranges_.begin(), ctx.ranges_.end());
     }));
@@ -54,7 +54,7 @@ class RangeStream {
   }
 
  private:
-  cpp20::span<internal::RangeIterationContext> state_;
+  std::span<internal::RangeIterationContext> state_;
 };
 
 // Say a range among a set is "normalized" if it does not intersect with any of
@@ -71,7 +71,7 @@ class RangeStream {
 void FindNormalizedRamRanges(RangeStream ranges, RangeCallback cb);
 
 // Used for streamlined testing.
-inline void FindNormalizedRamRanges(cpp20::span<Range> ranges, RangeCallback cb) {
+inline void FindNormalizedRamRanges(std::span<Range> ranges, RangeCallback cb) {
   internal::RangeIterationContext ctx(ranges);
   FindNormalizedRamRanges(RangeStream({&ctx, 1}), std::move(cb));
 }
@@ -87,12 +87,12 @@ constexpr size_t FindNormalizedRangesScratchSize(size_t n) { return 4 * n; }
 //
 // Ranges may overlap only if they are of the same type or one type is
 // kFreeRam; otherwise fit::failed is returned.
-fit::result<fit::failed> FindNormalizedRanges(RangeStream ranges, cpp20::span<void*> scratch,
+fit::result<fit::failed> FindNormalizedRanges(RangeStream ranges, std::span<void*> scratch,
                                               RangeCallback cb);
 
 // Used for streamlined testing.
-inline fit::result<fit::failed> FindNormalizedRanges(cpp20::span<Range> ranges,
-                                                     cpp20::span<void*> scratch, RangeCallback cb) {
+inline fit::result<fit::failed> FindNormalizedRanges(std::span<Range> ranges,
+                                                     std::span<void*> scratch, RangeCallback cb) {
   internal::RangeIterationContext ctx(ranges);
   return FindNormalizedRanges(RangeStream({&ctx, 1}), scratch, std::move(cb));
 }

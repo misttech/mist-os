@@ -135,7 +135,7 @@ impl BatteryManager {
             };
             debug!("::manager:: run watchers [{:?}]", &watchers.len());
             for w in &watchers {
-                if let Err(e) = w.on_change_battery_info(&info.clone().into()).await {
+                if let Err(e) = w.on_change_battery_info(&info.clone().into(), None).await {
                     error!("failed to send battery info to watcher {:?}", e);
                 }
             }
@@ -331,7 +331,7 @@ impl BatteryManager {
                             let info = self.get_battery_info_copy();
 
                             debug!(info:?; "::battery_manager_request:: callback on new watcher");
-                            watcher.on_change_battery_info(&info).await?;
+                            watcher.on_change_battery_info(&info, None).await?;
                         }
                     }
                     Ok(())
@@ -422,6 +422,7 @@ mod tests {
             let request = stream.try_next().await.unwrap();
             if let Some(fpower::BatteryInfoWatcherRequest::OnChangeBatteryInfo {
                 info,
+                wake_lease: None,
                 responder,
             }) = request
             {
@@ -461,6 +462,7 @@ mod tests {
             let request = stream1.try_next().await.unwrap();
             if let Some(fpower::BatteryInfoWatcherRequest::OnChangeBatteryInfo {
                 info,
+                wake_lease: None,
                 responder,
             }) = request
             {
@@ -474,6 +476,7 @@ mod tests {
             let request = stream1.try_next().await.unwrap();
             if let Some(fpower::BatteryInfoWatcherRequest::OnChangeBatteryInfo {
                 info,
+                wake_lease: None,
                 responder,
             }) = request
             {
@@ -491,6 +494,7 @@ mod tests {
             let request = stream2.try_next().await.unwrap();
             if let Some(fpower::BatteryInfoWatcherRequest::OnChangeBatteryInfo {
                 info,
+                wake_lease: None,
                 responder,
             }) = request
             {

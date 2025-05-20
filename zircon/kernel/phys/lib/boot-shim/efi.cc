@@ -7,9 +7,9 @@
 #include "lib/boot-shim/efi.h"
 
 #include <lib/acpi_lite.h>
-#include <lib/stdcompat/span.h>
 #include <string.h>
 
+#include <span>
 #include <string_view>
 
 #include <efi/system-table.h>
@@ -26,7 +26,7 @@ struct VendorTableMatch {
 
 const void* GetVendorTable(const efi_system_table* systab,
                            std::initializer_list<VendorTableMatch> matches) {
-  cpp20::span config(systab->ConfigurationTable, systab->NumberOfTableEntries);
+  std::span config(systab->ConfigurationTable, systab->NumberOfTableEntries);
   for (const efi_configuration_table& table : config) {
     for (const auto& [guid, prefix] : matches) {
       if (!memcmp(&table.VendorGuid, &guid, sizeof(guid)) &&

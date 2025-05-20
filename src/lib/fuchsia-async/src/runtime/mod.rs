@@ -16,7 +16,7 @@ use self::portable as implementation;
 pub use implementation::executor::{
     LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, SpawnableFuture, TestExecutor,
 };
-pub use implementation::task::{unblock, JoinHandle, Task};
+pub use implementation::task::{unblock, yield_now, JoinHandle, Task};
 pub use implementation::timer::Timer;
 
 mod task_group;
@@ -32,12 +32,7 @@ pub use self::fuchsia::{
 /// Structured concurrency API for fuchsia-async.
 ///
 /// See the [`Scope`] documentation for details.
-pub mod scope {
-    pub use super::implementation::scope::{Scope, ScopeHandle};
-
-    #[cfg(target_os = "fuchsia")]
-    pub use super::implementation::scope::{Join, ScopeStream, Spawnable};
-}
+pub mod scope;
 
 pub use scope::{Scope, ScopeHandle};
 
@@ -93,6 +88,7 @@ impl WakeupTime for zx::BootDuration {
 }
 
 impl DurationExt for std::time::Duration {
+    #[allow(clippy::useless_conversion)] // Conversion is optionally needed on Fuchsia.
     fn after_now(self) -> MonotonicInstant {
         MonotonicInstant::now() + self.into()
     }
@@ -281,10 +277,10 @@ mod task_tests {
             let (_tx_start, rx_start) = oneshot::channel::<()>();
             let (tx_done, rx_done) = oneshot::channel();
             // Start and immediately cancel the task (by dropping it).
-            let _ = Task::spawn(async move {
+            drop(Task::spawn(async move {
                 rx_start.await.unwrap();
                 tx_done.send(()).unwrap();
-            });
+            }));
             // we should see an error on receive
             rx_done.await.expect_err("done should not be sent");
         })

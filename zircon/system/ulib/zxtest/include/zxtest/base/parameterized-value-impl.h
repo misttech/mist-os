@@ -115,12 +115,11 @@ class ParameterizedTestCaseInfoImpl : public ParameterizedTestCaseInfo {
 template <typename SuiteClass, typename Type, typename TestClass>
 class AddTestDelegateImpl : public AddTestDelegate {
  public:
-  std::unique_ptr<ParameterizedTestCaseInfo> CreateSuite(
-      const cpp17::string_view& suite_name) final {
+  std::unique_ptr<ParameterizedTestCaseInfo> CreateSuite(const std::string_view& suite_name) final {
     return std::make_unique<ParameterizedTestCaseInfoImpl<SuiteClass, Type>>(suite_name);
   }
 
-  bool AddTest(ParameterizedTestCaseInfo* base, const cpp17::string_view& test_name,
+  bool AddTest(ParameterizedTestCaseInfo* base, const std::string_view& test_name,
                const SourceLocation& location) final {
     ZX_ASSERT_MSG(base->GetFixtureId() == TypeIdProvider<SuiteClass>::Get(),
                   "ParameterizedTestCaseInfo type must match the suite type.");

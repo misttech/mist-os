@@ -92,6 +92,8 @@ void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t 
   timer_set_ticks_to_time_ratio(
       riscv_generic_timer_compute_conversion_factors<true>(config.freq_hz));
 
+  timer_set_initial_ticks_offset(static_cast<uint64_t>(-riscv_sbi_current_ticks()));
+
   // register with pdev layer
   dprintf(INFO, "TIMER: registering SBI timer\n");
   pdev_register_timer(&riscv_sbi_timer_ops);

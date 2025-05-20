@@ -34,7 +34,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::TablePayload> {
   using type = ::test_protocollayoutssamelibrary::wire::TablePayload;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest, ::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest> {
   static ::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest ToNatural(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest src);
@@ -49,7 +48,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest> {
   using type = ::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse> {
   static ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse ToNatural(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse src);
@@ -64,7 +62,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse> {
   using type = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest> {
   static ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest ToNatural(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest src);
@@ -79,7 +76,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest> {
   using type = ::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest, ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest> {
   static ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest src);
@@ -94,7 +90,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest> {
   using type = ::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse, ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse> {
   static ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse src);
@@ -109,7 +104,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse> {
   using type = ::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest, ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest> {
   static ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest ToNatural(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest src);

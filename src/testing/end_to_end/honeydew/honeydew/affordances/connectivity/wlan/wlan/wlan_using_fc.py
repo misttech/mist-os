@@ -5,7 +5,7 @@
 
 import asyncio
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 import fidl_fuchsia_location_namedplace as f_location_namedplace
 import fidl_fuchsia_wlan_common as f_wlan_common
@@ -270,7 +270,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.CreateIface() error"
+                "DeviceMonitor.CreateIface() error"
             ) from e
 
         assert (
@@ -344,7 +344,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.GetCountry() error"
+                "DeviceMonitor.GetCountry() error"
             ) from e
 
         return CountryCode(
@@ -413,7 +413,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"DeviceMonitor.QueryIface() error"
+                "DeviceMonitor.QueryIface() error"
             ) from e
         return QueryIfaceResponse.from_fidl(query_iface_response.resp)
 
@@ -442,7 +442,7 @@ class Wlan(AsyncAdapter, wlan.Wlan):
             ).unwrap()
         except (ZxStatus, AssertionError) as e:
             raise wlan_errors.HoneydewWlanError(
-                f"ClientSme.ScanForController() error"
+                "ClientSme.ScanForController() error"
             ) from e
 
         results: dict[str, list[BssDescription]] = {}
@@ -594,41 +594,47 @@ class ConnectTransactionEventHandler(f_wlan_sme.ConnectTransactionEventHandler):
         self._connect_results = connect_results
 
     async def on_connect_result(
-        self, req: f_wlan_sme.ConnectTransactionOnConnectResultRequest
+        self, request: f_wlan_sme.ConnectTransactionOnConnectResultRequest
     ) -> None:
         """Return the result of the initial connection request or later
         SME-initiated reconnection."""
         _LOGGER.debug(
-            "ConnectTransaction.OnConnectResult() called with %s", req
+            "ConnectTransaction.OnConnectResult() called with %s", request
         )
-        await self._connect_results.put(req.result)
+        await self._connect_results.put(request.result)
 
     def on_disconnect(
-        self, req: f_wlan_sme.ConnectTransactionOnDisconnectRequest
+        self, request: f_wlan_sme.ConnectTransactionOnDisconnectRequest
     ) -> None:
         """Notify that the client has disconnected.
 
-        If req.disconnect_info indicates that SME is attempting to reconnect by
+        If request.disconnect_info indicates that SME is attempting to reconnect by
         itself, there's not need for caller to intervene for now.
         """
-        _LOGGER.debug("ConnectTransaction.OnDisconnect() called with %s", req)
+        _LOGGER.debug(
+            "ConnectTransaction.OnDisconnect() called with %s", request
+        )
 
     def on_roam_result(
-        self, req: f_wlan_sme.ConnectTransactionOnRoamResultRequest
+        self, request: f_wlan_sme.ConnectTransactionOnRoamResultRequest
     ) -> None:
         """Report the result of a roam attempt."""
-        _LOGGER.debug("ConnectTransaction.OnRoamResult() called with %s", req)
+        _LOGGER.debug(
+            "ConnectTransaction.OnRoamResult() called with %s", request
+        )
 
     def on_signal_report(
-        self, req: f_wlan_sme.ConnectTransactionOnSignalReportRequest
+        self, request: f_wlan_sme.ConnectTransactionOnSignalReportRequest
     ) -> None:
         """Give an update of the latest signal report."""
-        _LOGGER.debug("ConnectTransaction.OnSignalReport() called with %s", req)
+        _LOGGER.debug(
+            "ConnectTransaction.OnSignalReport() called with %s", request
+        )
 
     def on_channel_switched(
-        self, req: f_wlan_sme.ConnectTransactionOnChannelSwitchedRequest
+        self, request: f_wlan_sme.ConnectTransactionOnChannelSwitchedRequest
     ) -> None:
         """Give an update of the channel switching."""
         _LOGGER.debug(
-            "ConnectTransaction.OnChannelSwitched() called with %s", req
+            "ConnectTransaction.OnChannelSwitched() called with %s", request
         )

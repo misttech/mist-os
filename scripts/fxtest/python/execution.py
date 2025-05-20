@@ -328,6 +328,10 @@ class TestExecution:
         if not os.path.exists(outdir):
             os.makedirs(outdir)
 
+        # Update the outdir to match the current working directory for the test command (if any).
+        if "CWD" in env:
+            outdir = os.path.relpath(outdir, env["CWD"])
+
         env.update(
             {
                 "FUCHSIA_TEST_OUTDIR": outdir,

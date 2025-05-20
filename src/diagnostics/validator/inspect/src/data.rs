@@ -100,7 +100,7 @@ enum Payload {
 }
 
 fn to_string<T: std::fmt::Display>(v: T) -> String {
-    format!("{}", v)
+    format!("{v}")
 }
 
 fn stringify_list<T: std::fmt::Display>(values: Vec<T>) -> Vec<String> {
@@ -257,7 +257,7 @@ impl Node {
     /// then the name and and prefix of the generated string is omitted.
     /// This is used for lazy nodes wherein we don't what to show the label "root" for lazy nodes.
     fn to_string(&self, prefix: &str, tree: &Data, hide_root: bool) -> String {
-        let sub_prefix = format!("{}> ", prefix);
+        let sub_prefix = format!("{prefix}> ");
         let mut nodes = vec![];
         for node_id in self.children.iter() {
             nodes.push(
@@ -1080,9 +1080,7 @@ impl Data {
                         difference::Difference::Add(val) => ("other", val),
                         difference::Difference::Rem(val) => ("local", val),
                     };
-                    val.split("\n")
-                        .map(|line| format!("{}: {:?}", prefix, line))
-                        .collect::<Vec<_>>()
+                    val.split("\n").map(|line| format!("{prefix}: {line:?}")).collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
 
@@ -2208,21 +2206,21 @@ root ->
         remote.apply(&create_string_property!(parent: 1, id: 2, name: "prop1", value: "bar"))?;
         match local.compare(&remote, DiffType::Diff) {
             Err(error) => {
-                let error_string = format!("{:?}", error);
+                let error_string = format!("{error:?}");
                 assert_eq!("Trees differ:\n".to_string() + DIFF_STRING, error_string);
             }
             _ => return Err(format_err!("Didn't get failure")),
         }
         match local.compare(&remote, DiffType::Full) {
             Err(error) => {
-                let error_string = format!("{:?}", error);
+                let error_string = format!("{error:?}");
                 assert_eq!("Trees differ:\n".to_string() + FULL_STRING, error_string);
             }
             _ => return Err(format_err!("Didn't get failure")),
         }
         match local.compare(&remote, DiffType::Both) {
             Err(error) => {
-                let error_string = format!("{:?}", error);
+                let error_string = format!("{error:?}");
                 assert_eq!(["Trees differ:", FULL_STRING, DIFF_STRING].join("\n"), error_string);
             }
             _ => return Err(format_err!("Didn't get failure")),

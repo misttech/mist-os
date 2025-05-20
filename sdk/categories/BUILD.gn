@@ -67,10 +67,6 @@ if (is_host || is_fidl_toolchain) {
     foreach(target, ffx_subtool_fidl_allowlist) {
       visibility += [
         "${target}_compile_fidlc",
-        "${target}_fdomain.actual",
-        "${target}_fdomain.aux.deps.deps",
-        "${target}_fdomain.aux.deps.transdeps",
-        "${target}_fdomain.rustdoc",
         "${target}_ir_root",
         "${target}_lint",
         "${target}_rust.actual",
@@ -81,6 +77,10 @@ if (is_host || is_fidl_toolchain) {
         "${target}_rust_common.aux.deps.deps",
         "${target}_rust_common.aux.deps.transdeps",
         "${target}_rust_common.rustdoc",
+        "${target}_rust_fdomain.actual",
+        "${target}_rust_fdomain.aux.deps.deps",
+        "${target}_rust_fdomain.aux.deps.transdeps",
+        "${target}_rust_fdomain.rustdoc",
       ]
     }
 

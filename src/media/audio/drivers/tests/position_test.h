@@ -22,10 +22,9 @@ class PositionTest : public AdminTest {
   void EnablePositionNotifications();
   // Clear flag so that any pending position notification will not request yet another.
   void DisablePositionNotifications() { request_next_position_notification_ = false; }
-  void DisallowPositionNotifications() { position_notification_is_expected_ = false; }
 
-  void RequestPositionNotification();
-  void PositionNotificationCallback(fuchsia::hardware::audio::RingBufferPositionInfo position_info);
+  void PositionNotificationCallback(
+      fuchsia::hardware::audio::RingBufferPositionInfo position_info) override;
   void ExpectPositionNotifyCount(uint32_t count);
   void ValidatePositionInfo();
 
@@ -35,7 +34,6 @@ class PositionTest : public AdminTest {
   // Watching for position info is a hanging-get. On receipt, this flag determines whether we
   // register for the next notification.
   bool request_next_position_notification_ = false;
-  bool position_notification_is_expected_ = true;
   bool record_position_info_ = false;
   uint32_t position_notification_count_ = 0;
 

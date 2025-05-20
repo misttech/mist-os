@@ -117,7 +117,7 @@ impl RcsConnection {
                 .connect_to_service(overnet_id, RemoteControlMarker::PROTOCOL_NAME, channel)
                 .await
             {
-                tracing::warn!("Error connecting to Rcs: {}", e)
+                log::warn!("Error connecting to Rcs: {}", e)
             }
         })
         .detach();
@@ -134,7 +134,7 @@ impl RcsConnection {
     }
 
     pub async fn identify_host(&self) -> Result<IdentifyHostResponse, RcsConnectionError> {
-        tracing::debug!("Requesting host identity from overnet id {}", self.overnet_id.id);
+        log::debug!("Requesting host identity from overnet id {}", self.overnet_id.id);
         let identify_result = timeout(
             Duration::from_millis(IDENTIFY_HOST_TIMEOUT_MILLIS),
             self.proxy.identify_host(),
@@ -213,20 +213,20 @@ impl From<Infallible> for KnockRcsError {
 pub async fn knock_rcs(rcs_proxy: &RemoteControlProxy) -> Result<(), ffx::TargetConnectionError> {
     knock_rcs_impl(rcs_proxy).await.map_err(|e| match e {
         KnockRcsError::FidlError(e) => {
-            tracing::warn!("FIDL error: {:?}", e);
+            log::warn!("FIDL error: {:?}", e);
             ffx::TargetConnectionError::FidlCommunicationError
         }
         #[cfg(feature = "fdomain")]
         KnockRcsError::FDomainError(e) => {
-            tracing::warn!("FDomain error: {:?}", e);
+            log::warn!("FDomain error: {:?}", e);
             ffx::TargetConnectionError::FidlCommunicationError
         }
         KnockRcsError::ChannelError(e) => {
-            tracing::warn!("RCS connect channel err: {:?}", e);
+            log::warn!("RCS connect channel err: {:?}", e);
             ffx::TargetConnectionError::FidlCommunicationError
         }
         KnockRcsError::RcsConnectCapabilityError(c) => {
-            tracing::warn!("RCS failed connecting to itself for knocking: {:?}", c);
+            log::warn!("RCS failed connecting to itself for knocking: {:?}", c);
             ffx::TargetConnectionError::RcsConnectionError
         }
         KnockRcsError::FailedToKnock => ffx::TargetConnectionError::FailedToKnockService,

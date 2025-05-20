@@ -68,8 +68,7 @@ class OutgoingDirectory final {
   //
   // ZX_ERR_INVALID_ARGS: |instance| is an empty string or |handler| is empty.
   template <typename TransportHandler, typename Service>
-  zx::result<> AddService(TransportHandler handler,
-                          cpp17::string_view instance = kDefaultInstance) {
+  zx::result<> AddService(TransportHandler handler, std::string_view instance = kDefaultInstance) {
     component::ServiceInstanceHandler component_handler;
 
     if constexpr (std::is_same_v<TransportHandler, fdf::ServiceInstanceHandler>) {
@@ -110,14 +109,14 @@ class OutgoingDirectory final {
   // Same as above but strictly for services using the driver channel transport.
   template <typename Service>
   zx::result<> AddService(fdf::ServiceInstanceHandler handler,
-                          cpp17::string_view instance = kDefaultInstance) {
+                          std::string_view instance = kDefaultInstance) {
     return AddService<fdf::ServiceInstanceHandler, Service>(std::move(handler), instance);
   }
 
   // Same as above but strictly for services using the Zircon channel transport.
   template <typename Service>
   zx::result<> AddService(component::ServiceInstanceHandler handler,
-                          cpp17::string_view instance = kDefaultInstance) {
+                          std::string_view instance = kDefaultInstance) {
     return AddService<component::ServiceInstanceHandler, Service>(std::move(handler), instance);
   }
 
@@ -159,14 +158,14 @@ class OutgoingDirectory final {
   //
   // ZX_ERR_INVALID_ARGS: |directory_name| is an empty string.
   zx::result<> AddDirectory(fidl::ClientEnd<fuchsia_io::Directory> remote_dir,
-                            cpp17::string_view directory_name) {
+                            std::string_view directory_name) {
     return component_outgoing_dir_.AddDirectory(std::move(remote_dir), directory_name);
   }
 
   // Same as |AddDirectory| but allows setting the parent directory
   // in which the directory will be installed.
   zx::result<> AddDirectoryAt(fidl::ClientEnd<fuchsia_io::Directory> remote_dir,
-                              cpp17::string_view path, cpp17::string_view directory_name) {
+                              std::string_view path, std::string_view directory_name) {
     return component_outgoing_dir_.AddDirectoryAt(std::move(remote_dir), path, directory_name);
   }
 
@@ -182,13 +181,13 @@ class OutgoingDirectory final {
   // outgoing.RemoveService<lib_example::MyService>("my-instance");
   // ```
   template <typename Service>
-  zx::result<> RemoveService(cpp17::string_view instance = kDefaultInstance) {
+  zx::result<> RemoveService(std::string_view instance = kDefaultInstance) {
     return RemoveService(Service::Name, instance);
   }
 
   // Same as above but untyped.
-  zx::result<> RemoveService(cpp17::string_view service,
-                             cpp17::string_view instance = kDefaultInstance) {
+  zx::result<> RemoveService(std::string_view service,
+                             std::string_view instance = kDefaultInstance) {
     return component_outgoing_dir_.RemoveService(service, instance);
   }
 
@@ -197,14 +196,14 @@ class OutgoingDirectory final {
   // # Errors
   //
   // ZX_ERR_NOT_FOUND: No entry was found with provided name.
-  zx::result<> RemoveDirectory(cpp17::string_view directory_name) {
+  zx::result<> RemoveDirectory(std::string_view directory_name) {
     return component_outgoing_dir_.RemoveDirectory(directory_name);
   }
 
   // Same as |RemoveDirectory| but allows specifying the parent directory
   // that the directory will be removed from. The parent directory, |path|,
   // will not be removed.
-  zx::result<> RemoveDirectoryAt(cpp17::string_view path, cpp17::string_view directory_name) {
+  zx::result<> RemoveDirectoryAt(std::string_view path, std::string_view directory_name) {
     return component_outgoing_dir_.RemoveDirectoryAt(path, directory_name);
   }
 

@@ -29,7 +29,10 @@
         {
             dictionary: "diagnostics",
             from: "parent",
-            to: [ "#adb, #adb-services" ],
+            to: [
+                "#adb",
+                "#adb-services",
+            ],
         },
         {
             protocol: "fuchsia.component.Realm",

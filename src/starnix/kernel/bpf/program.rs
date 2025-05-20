@@ -12,11 +12,14 @@ use ebpf::{
     BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX,
     BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
-use ebpf_api::{get_common_helpers, AttachType, EbpfApiError, Map, PinnedMap, ProgramType};
+use ebpf_api::{
+    get_common_helpers, AttachType, EbpfApiError, Map, MapsContext, PinnedMap, ProgramType,
+};
+use fidl_fuchsia_ebpf as febpf;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
+use starnix_uapi::{bpf_attr__bindgen_ty_4, errno, error};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
@@ -67,7 +70,7 @@ impl Program {
         current_task: &CurrentTask,
         info: ProgramInfo,
         logger: &mut dyn OutputBuffer,
-        mut code: Vec<bpf_insn>,
+        mut code: Vec<EbpfInstruction>,
     ) -> Result<Program, Errno> {
         Self::check_load_access(current_task, &info)?;
         let maps = link_maps_fds(current_task, &mut code)?;
@@ -87,13 +90,16 @@ impl Program {
         program_type: ProgramType,
         struct_mappings: &[StructMapping],
         local_helpers: &[(u32, EbpfHelperImpl<C>)],
-    ) -> Result<EbpfProgram<C>, Errno> {
+    ) -> Result<EbpfProgram<C>, Errno>
+    where
+        for<'a> C::RunContext<'a>: MapsContext<'a>,
+    {
         if program_type != self.info.program_type {
             return error!(EINVAL);
         }
 
         let mut helpers = HashMap::new();
-        helpers.extend(get_common_helpers::<C>().iter().cloned());
+        helpers.extend(get_common_helpers::<C>().drain(..));
         helpers.extend(local_helpers.iter().cloned());
 
         let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
@@ -156,6 +162,41 @@ impl Program {
     }
 }
 
+impl TryFrom<&Program> for febpf::VerifiedProgram {
+    type Error = Errno;
+
+    fn try_from(program: &Program) -> Result<febpf::VerifiedProgram, Errno> {
+        let mut maps = Vec::with_capacity(program.maps.len());
+        for map in program.maps.iter() {
+            maps.push(map.share().map_err(|_| errno!(EIO))?);
+        }
+
+        // SAFETY: EbpfInstruction is 64-bit, so it's safe to transmute it to u64.
+        let code = program.program.code();
+        let code_u64 =
+            unsafe { std::slice::from_raw_parts(code.as_ptr() as *const u64, code.len()) };
+
+        let struct_access_instructions = program
+            .program
+            .struct_access_instructions()
+            .iter()
+            .map(|v| febpf::StructAccess {
+                pc: v.pc.try_into().unwrap(),
+                struct_memory_id: v.memory_id.id(),
+                field_offset: v.field_offset.try_into().unwrap(),
+                is_32_bit_ptr_load: v.is_32_bit_ptr_load,
+            })
+            .collect();
+
+        Ok(febpf::VerifiedProgram {
+            code: Some(code_u64.to_vec()),
+            struct_access_instructions: Some(struct_access_instructions),
+            maps: Some(maps),
+            ..Default::default()
+        })
+    }
+}
+
 /// Links maps referenced by FD, replacing them with by-index references.
 fn link_maps_fds(
     current_task: &CurrentTask,
@@ -164,7 +205,7 @@ fn link_maps_fds(
     let code_len = code.len();
     let mut maps = Vec::<PinnedMap>::new();
     for (pc, instruction) in code.iter_mut().enumerate() {
-        if instruction.code == BPF_LDDW {
+        if instruction.code() == BPF_LDDW {
             // BPF_LDDW requires 2 instructions.
             if pc >= code_len - 1 {
                 return error!(EINVAL);
@@ -177,7 +218,7 @@ fn link_maps_fds(
                     // and create a reference from this program to that object.
                     instruction.set_src_reg(BPF_PSEUDO_MAP_IDX);
 
-                    let fd = FdNumber::from_raw(instruction.imm);
+                    let fd = FdNumber::from_raw(instruction.imm());
                     let object = get_bpf_object(current_task, fd)?;
                     let map: &PinnedMap = object.as_map()?;
 
@@ -193,7 +234,7 @@ fn link_maps_fds(
                         }
                     };
 
-                    instruction.imm = index.try_into().unwrap();
+                    instruction.set_imm(index.try_into().unwrap());
                 }
                 BPF_PSEUDO_MAP_IDX
                 | BPF_PSEUDO_MAP_VALUE

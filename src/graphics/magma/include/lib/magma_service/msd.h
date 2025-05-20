@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_MAGMA_INCLUDE_LIB_MAGMA_SERVICE_MSD_H_
 
 #include <lib/async/dispatcher.h>
+#include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/magma_service/msd_defs.h>  // IWYU pragma: export
 #include <lib/stdcompat/span.h>
@@ -76,6 +77,12 @@ class Device {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
+  // Sets the power state of the device. The given |completer| will be invoked asynchronously
+  // when a power change is completed.
+  virtual void SetPowerState(int64_t power_state, fit::callback<void(magma_status_t)> completer) {
+    completer(MAGMA_STATUS_UNIMPLEMENTED);
+  }
+
   virtual void DumpStatus(uint32_t dump_flags) {}
 
   // Opens a device for the given client. Returns nullptr on failure
@@ -127,7 +134,9 @@ class Connection {
   // Signals that the given |buffer| is no longer in use on the given |connection|. This must be
   // called for every connection associated with a buffer before the buffer is destroyed, or for
   // every buffer associated with a connection before the connection is destroyed.
-  virtual void ReleaseBuffer(Buffer& buffer) {}
+  // In addition to handling client requests, this may be called when a connection is released,
+  // in which case |shutting_down| is true and the implementation should not block.
+  virtual void ReleaseBuffer(Buffer& buffer, bool shutting_down = false) {}
 
   // Sets the callback to be used by a connection for various notifications.
   // This is called when a connection is created, and also called to unset
@@ -136,6 +145,7 @@ class Connection {
   // collision with possible concurrent destruction.
   virtual void SetNotificationCallback(NotificationHandler* handler) {}
   virtual std::unique_ptr<Context> CreateContext() { return {}; }
+  virtual std::unique_ptr<Context> CreateContext2(uint64_t priority) { return CreateContext(); }
 
   virtual magma_status_t EnablePerformanceCounters(cpp20::span<const uint64_t> counters) {
     return MAGMA_STATUS_UNIMPLEMENTED;

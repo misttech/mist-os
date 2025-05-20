@@ -7,15 +7,12 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_STRING_VIEW_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_STRING_VIEW_H_
 
-#include <lib/stdcompat/string_view.h>
+#include <string_view>
 
 namespace ktl {
 
 using std::basic_string_view;
 using std::string_view;
-
-using cpp20::ends_with;
-using cpp20::starts_with;
 
 }  // namespace ktl
 

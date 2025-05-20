@@ -8,27 +8,29 @@ import("//build/python/python_host_test.gni")
 import("//build/sdk/sdk_documentation.gni")
 
 # This list should only contain schemas that are currently exported outside of
-# the Fuchsia source tree.
+# the Fuchsia source tree. Unless otherwise indicated, each file corresponds
+# to a supported IDK atom type.
 schemas = [
+  # LINT.IfChange(schema_in_idk)
+  "bind_library.json",
   "cc_prebuilt_library.json",
   "cc_source_library.json",
-  "common.json",
+  "companion_host_tool.json",
+  "common.json",  # No associated atom type.
   "dart_library.json",
   "data.json",
   "documentation.json",
   "experimental_python_e2e_test.json",
   "ffx_tool.json",
-  "fhcp_tests.json",
   "fidl_library.json",
-  "hardware.json",
   "host_tool.json",
   "loadable_module.json",
-  "manifest.json",
+  "manifest.json",  # IDK manifest - no associated atom type.
   "package.json",
-  "rust_3p_library.json",
   "sysroot.json",
   "version_history.json",
-  "virtual_device.json",
+
+  # LINT.ThenChange(//build/sdk/sdk_common/__init__.py:idk_atom_types)
 ]
 
 sdk_documentation("meta") {
@@ -61,7 +63,7 @@ if (is_host) {
     edition = "2021"
 
     deps = [
-      "//src/lib/assembly/assembly_manifest",
+      "//src/lib/assembly/assembled_system",
       "//src/lib/assembly/partitions_config",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//src/sys/pkg/lib/fuchsia-repo",

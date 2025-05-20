@@ -119,11 +119,9 @@ pub async fn cache_package<'a>(
         //
         // The race could be prevented entirely by adding a method to NeededBlobs that uses
         // ReadDirents on /blob to check for blob presence.
-        //
-        // fxblob will soon fully support concurrent blob creation, pending
-        // https://fxbug.dev/335870456#comment9.
         let fetch_meta_far = match get.make_open_meta_blob().open().await {
             Ok(Some(pkg::cache::NeededBlob { blob: _, closer })) => {
+                // Dropping `blob` will cancel the creation.
                 let () = closer.close().await;
                 true
             }
@@ -707,6 +705,7 @@ async fn fetch_blob_http(
                         ])
                     }
                     inspect.state(inspect::Http::CloseBlob);
+                    // `blob` is dropped when download_blob returns which cancels the creation.
                     blob_closer.close().await;
                     res?;
                 }

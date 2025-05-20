@@ -130,7 +130,7 @@
   name: Cobalt
   team: Cobalt
   links:
-    Detect documentation: https://fuchsia.googlesource.com/cobalt/+/main/README.md
+    Cobalt - Telemetry with built-in privacy: https://fuchsia.googlesource.com/cobalt/+/main/README.md
   description: |
     Cobalt is a pipeline for collecting metrics data from user-owned devices in
     the field and producing aggregated reports.
@@ -144,7 +144,7 @@
   name: Detect
   team: Diagnostics
   links:
-    Cobalt - Telemetry with built-in privacy: /docs/reference/diagnostics/consumers/detect
+    Detect - Snapshot filing: /docs/development/diagnostics/analytics/detect
   description: |
     Detect scans Inspect data on-device to decide when to file crash reports.
 

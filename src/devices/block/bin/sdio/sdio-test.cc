@@ -106,7 +106,8 @@ class SdioTest : public zxtest::Test,
   }
 
   void RequestCardReset(RequestCardResetCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    reset_ = true;
+    completer.ReplySuccess();
   }
   void PerformTuning(PerformTuningCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -121,6 +122,7 @@ class SdioTest : public zxtest::Test,
   uint8_t get_byte() const { return byte_; }
   uint32_t get_address() const { return address_; }
   const std::vector<wire::SdioRwTxn>& get_txns() { return txns_; }
+  bool reset() const { return reset_; }
 
   static void ExpectTxnsEqual(const wire::SdioRwTxn& lhs, const wire::SdioRwTxn& rhs) {
     EXPECT_EQ(lhs.addr, rhs.addr);
@@ -146,6 +148,7 @@ class SdioTest : public zxtest::Test,
   uint32_t address_ = 0;
   std::vector<wire::SdioRwTxn> txns_;
   fdf::Arena arena_;
+  bool reset_ = false;
 };
 
 TEST_F(SdioTest, NoArguments) {
@@ -249,6 +252,45 @@ TEST_F(SdioTest, GetTxnStats) {
   EXPECT_STREQ(GetTxnStats(zx::usec(-2), 100).c_str(), "-2000 ns (-50000000.000 B/s)");
   EXPECT_STREQ(GetTxnStats(zx::usec(2), 0).c_str(), "2.000 us (0.000 B/s)");
   EXPECT_STREQ(GetTxnStats(zx::nsec(0), 100).c_str(), "0 ns");
+}
+
+TEST_F(SdioTest, Read) {
+  const char* argv[] = {"read", "0x10000", "256"};
+  EXPECT_EQ(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 3, argv));
+  ASSERT_EQ(get_txns().size(), 1);
+
+  const wire::SdioRwTxn kExpectedTxn = {
+      .addr = 0x10000,
+      .incr = true,
+      .write = false,
+      .buffers = fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>::FromExternal(
+          &kExpectedBuffer, 1),
+  };
+
+  ASSERT_NO_FATAL_FAILURE(ExpectTxnsEqual(get_txns()[0], kExpectedTxn));
+}
+
+TEST_F(SdioTest, ReadFifo) {
+  const char* argv[] = {"read", "0x10000", "256", "--fifo"};
+  EXPECT_EQ(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 4, argv));
+  ASSERT_EQ(get_txns().size(), 1);
+
+  const wire::SdioRwTxn kExpectedTxn = {
+      .addr = 0x10000,
+      .incr = false,
+      .write = false,
+      .buffers = fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>::FromExternal(
+          &kExpectedBuffer, 1),
+  };
+
+  ASSERT_NO_FATAL_FAILURE(ExpectTxnsEqual(get_txns()[0], kExpectedTxn));
+}
+
+TEST_F(SdioTest, Reset) {
+  EXPECT_FALSE(reset());
+  const char* argv[] = {"reset"};
+  EXPECT_EQ(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 1, argv));
+  EXPECT_TRUE(reset());
 }
 
 }  // namespace

@@ -28,9 +28,7 @@ const BLOBFS_FVM_PATH: &'static str = "/part-000/block/fvm/blobfs-p-1/block";
 const DATA_FVM_PATH: &'static str = "/part-000/block/fvm/data-p-2/block";
 
 // Ensure fuchsia.fshost.Admin/WipeStorage fails if we cannot identify a storage device to wipe.
-// TODO(https://fxbug.dev/42065222): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(feature = "f2fs", ignore)]
 async fn no_fvm_device() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -53,9 +51,7 @@ async fn no_fvm_device() {
 }
 
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method.
-// TODO(https://fxbug.dev/42065222): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(feature = "f2fs", ignore)]
 async fn write_blob() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -206,9 +202,7 @@ async fn wipe_storage_deletes_starnix_volume() {
 
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method when a data
 // data partition does not already exist.
-// TODO(https://fxbug.dev/42065222): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(feature = "f2fs", ignore)]
 async fn write_blob_no_existing_data_partition() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -263,9 +257,7 @@ async fn write_blob_no_existing_data_partition() {
 }
 
 // Verify that all existing blobs are purged after running fuchsia.fshost.Admin/WipeStorage.
-// TODO(https://fxbug.dev/42065222): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(feature = "f2fs", ignore)]
 async fn blobfs_formatted() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
@@ -333,7 +325,7 @@ async fn blobfs_formatted() {
 }
 
 // Verify that the data partition is wiped and remains unformatted.
-// TODO(https://fxbug.dev/42065222): this test doesn't work on f2fs.
+// TODO(https://fxbug.dev/416145492): this test doesn't work on f2fs.
 // This test is very specific to fvm, so we don't run it against fxblob. Since both volumes are in
 // fxfs anyway with fxblob, this test is somewhat redundant with the basic tests.
 #[fuchsia::test]

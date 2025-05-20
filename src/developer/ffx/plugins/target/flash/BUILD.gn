@@ -13,7 +13,7 @@ ffx_plugin("ffx_flash") {
   args_deps = [
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
-    "//src/developer/ffx/lib/fastboot:lib",
+    "//src/developer/ffx/lib/fastboot/flash_manifest:lib",
     "//third_party/rust_crates:argh",
   ]
 
@@ -26,6 +26,8 @@ ffx_plugin("ffx_flash") {
     "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot:lib",
+    "//src/developer/ffx/lib/fastboot/connection_factory:lib",
+    "//src/developer/ffx/lib/fastboot/flash_manifest:lib",
     "//src/developer/ffx/lib/fastboot/interface:lib",
     "//src/developer/ffx/lib/fastboot_file_discovery:lib",
     "//src/developer/ffx/lib/fho:lib",
@@ -41,11 +43,11 @@ ffx_plugin("ffx_flash") {
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:futures-lite",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:termion",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

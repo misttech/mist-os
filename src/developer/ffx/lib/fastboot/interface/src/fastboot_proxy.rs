@@ -14,7 +14,7 @@ use fastboot::command::{ClientVariable, Command};
 use fastboot::reply::Reply;
 use fastboot::{
     download, send, send_with_listener, send_with_timeout, upload, upload_with_read_timeout,
-    SendError, UploadError,
+    FastbootContext, SendError, UploadError,
 };
 use futures::io::{AsyncRead, AsyncWrite};
 use std::fmt::Debug;
@@ -31,17 +31,13 @@ pub struct FastbootProxy<T: AsyncRead + AsyncWrite + Unpin> {
     target_id: String,
     interface: Option<T>,
     interface_factory: Box<dyn InterfaceFactory<T>>,
+    ctx: FastbootContext,
 }
-
-/// The timeout rate in mb/s when communicating with the target device
-// const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
-/// The minimum flash timeout (in seconds) for flashing to a target device
-// const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
 
 fn handle_timeout_as_okay(r: Result<Reply>) -> Result<Reply> {
     match r {
         Err(e) if matches!(e.downcast_ref::<SendError>(), Some(SendError::Timeout)) => {
-            tracing::debug!("Timed out waiting for bootloader response; assuming it's okay");
+            log::debug!("Timed out waiting for bootloader response; assuming it's okay");
             Ok(Reply::Okay("".to_string()))
         }
         _ => r,
@@ -61,13 +57,12 @@ impl VariableListener {
 
 #[async_trait]
 impl fastboot::InfoListener for VariableListener {
-    #[tracing::instrument]
     async fn on_info(&self, info: String) -> Result<()> {
         if let Some((name, val)) = info.split_once(':') {
-            tracing::debug!("Got a variable string: {}", info);
+            log::debug!("Got a variable string: {}", info);
             self.0.send(Variable { name: name.to_string(), value: val.to_string() }).await?;
         } else {
-            tracing::warn!("Expected to get a variable string. Got: {}", info);
+            log::warn!("Expected to get a variable string. Got: {}", info);
         }
         Ok(())
     }
@@ -84,22 +79,18 @@ impl ProgressListener {
 
 #[async_trait]
 impl fastboot::UploadProgressListener for ProgressListener {
-    #[tracing::instrument]
     async fn on_started(&self, size: usize) -> Result<()> {
         self.0.send(UploadProgress::OnStarted { size: size.try_into()? }).await?;
         Ok(())
     }
-    #[tracing::instrument]
     async fn on_progress(&self, bytes_written: u64) -> Result<()> {
         self.0.send(UploadProgress::OnProgress { bytes_written }).await?;
         Ok(())
     }
-    #[tracing::instrument]
     async fn on_error(&self, error: &UploadError) -> Result<()> {
         self.0.send(UploadProgress::OnError { error: anyhow!(error.to_string()) }).await?;
         Ok(())
     }
-    #[tracing::instrument]
     async fn on_finished(&self) -> Result<()> {
         self.0.send(UploadProgress::OnFinished).await?;
         Ok(())
@@ -116,6 +107,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
             target_id,
             interface: Some(interface),
             interface_factory: Box::new(interface_factory),
+            ctx: FastbootContext::new(),
         }
     }
 
@@ -124,12 +116,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
         self.interface = None;
 
         // Wait for it to show up again
-        tracing::debug!("About to rediscover target");
+        log::debug!("About to rediscover target");
         self.interface_factory.rediscover().await?;
 
         //Reconnect
         self.interface.replace(self.interface_factory.open().await?);
-        tracing::warn!("Reconnected");
+        log::warn!("Reconnected");
         Ok(())
     }
 
@@ -143,10 +135,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> FastbootProxy<T> {
 
 #[async_trait(?Send)]
 impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
-    #[tracing::instrument]
     async fn get_var(&mut self, name: &str) -> core::result::Result<String, FastbootError> {
         let command = Command::GetVar(ClientVariable::Oem(name.to_string()));
-        match send(command.clone(), self.interface().await?).await {
+        match send(self.ctx.clone(), command.clone(), self.interface().await?).await {
             Ok(r) => match r {
                 Reply::Okay(v) => Ok(v),
                 Reply::Fail(message) => {
@@ -161,12 +152,16 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn get_all_vars(&mut self, listener: Sender<Variable>) -> Result<(), FastbootError> {
         let variable_listener = VariableListener::new(listener)?;
         let command = Command::GetVar(ClientVariable::All);
-        match send_with_listener(command.clone(), self.interface().await?, &variable_listener)
-            .await?
+        match send_with_listener(
+            self.ctx.clone(),
+            command.clone(),
+            self.interface().await?,
+            &variable_listener,
+        )
+        .await?
         {
             Reply::Okay(_) => Ok(()),
             Reply::Fail(s) => Err(FastbootError::GetAllVarsFailed(s)),
@@ -177,7 +172,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn flash(
         &mut self,
         partition_name: &str,
@@ -194,8 +188,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let size = file_to_flash.metadata().map_err(FlashError::from)?.len();
         let size = u32::try_from(size).map_err(|e| FlashError::InvalidFileSize(e))?;
         let progress_listener = ProgressListener::new(listener)?;
-        let span = tracing::span!(tracing::Level::INFO, "device_flash_upload").entered();
         let upload_reply = upload_with_read_timeout(
+            self.ctx.clone(),
             size,
             &mut file_to_flash,
             self.interface().await?,
@@ -204,9 +198,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         )
         .await
         .context(format!("uploading {}", path))?;
-        drop(span);
         match upload_reply {
-            Reply::Okay(s) => tracing::debug!("Received response from download command: {}", s),
+            Reply::Okay(s) => log::debug!("Received response from download command: {}", s),
             Reply::Fail(s) => {
                 return Err(FastbootError::StageError(StageError::UploadFailed {
                     path: path.to_string(),
@@ -222,12 +215,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         };
 
         // Flash the uploaded file
-        let span = tracing::span!(tracing::Level::INFO, "device_flash").entered();
         let command = Command::Flash(partition_name.to_string());
-        let send_reply = send_with_timeout(command.clone(), self.interface().await?, timeout)
-            .await
-            .context("sending flash");
-        drop(span);
+        let send_reply =
+            send_with_timeout(self.ctx.clone(), command.clone(), self.interface().await?, timeout)
+                .await
+                .context("sending flash");
         match send_reply {
             Ok(reply) => match reply {
                 Reply::Okay(_) => Ok(()),
@@ -261,14 +253,14 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn erase(&mut self, partition_name: &str) -> Result<(), FastbootError> {
         let command = Command::Erase(partition_name.to_string());
-        let reply =
-            send(command.clone(), self.interface().await?).await.context("sending erase")?;
+        let reply = send(self.ctx.clone(), command.clone(), self.interface().await?)
+            .await
+            .context("sending erase")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully erased parition: {}", partition_name);
+                log::debug!("Successfully erased parition: {}", partition_name);
                 Ok(())
             }
             Reply::Fail(s) => {
@@ -284,17 +276,22 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn boot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to boot,
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
-            send_with_timeout(Command::Boot, self.interface().await?, Duration::seconds(3)).await,
+            send_with_timeout(
+                self.ctx.clone(),
+                Command::Boot,
+                self.interface().await?,
+                Duration::seconds(3),
+            )
+            .await,
         )
         .context("sending boot")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent boot");
+                log::debug!("Successfully sent boot");
                 Ok(())
             }
 
@@ -306,17 +303,22 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn reboot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to reboot,
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
-            send_with_timeout(Command::Reboot, self.interface().await?, Duration::seconds(3)).await,
+            send_with_timeout(
+                self.ctx.clone(),
+                Command::Reboot,
+                self.interface().await?,
+                Duration::seconds(3),
+            )
+            .await,
         )
         .context("sending reboot")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent reboot");
+                log::debug!("Successfully sent reboot");
                 Ok(())
             }
             Reply::Fail(s) => return Err(FastbootError::RebootFailed(s)),
@@ -327,7 +329,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn reboot_bootloader(
         &mut self,
         listener: Sender<RebootEvent>,
@@ -336,6 +337,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
             send_with_timeout(
+                self.ctx.clone(),
                 Command::RebootBootLoader,
                 self.interface().await?,
                 Duration::seconds(3),
@@ -345,10 +347,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         .context("sending reboot bootloader")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent reboot bootloader");
+                log::debug!("Successfully sent reboot bootloader");
                 let send_res = listener.send(RebootEvent::OnReboot).await;
                 if send_res.is_err() {
-                    tracing::debug!(
+                    log::debug!(
                         "reboot_bootloader hit error sending the reboot event to caller: {:#?}",
                         send_res
                     );
@@ -367,18 +369,22 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         Ok(())
     }
 
-    #[tracing::instrument]
     async fn continue_boot(&mut self) -> Result<(), FastbootError> {
         // Note: the target may not successfully send a response when asked to continue,
         // so let's use a short time-out, and treat a timeout error as a success.
         let reply = handle_timeout_as_okay(
-            send_with_timeout(Command::Continue, self.interface().await?, Duration::seconds(3))
-                .await,
+            send_with_timeout(
+                self.ctx.clone(),
+                Command::Continue,
+                self.interface().await?,
+                Duration::seconds(3),
+            )
+            .await,
         )
         .context("sending continue")?;
         match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent continue");
+                log::debug!("Successfully sent continue");
                 Ok(())
             }
             Reply::Fail(s) => return Err(FastbootError::ContinueBootFailed(s)),
@@ -389,14 +395,13 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn get_staged(&mut self, path: &str) -> Result<(), FastbootError> {
-        match download(&path.to_string(), self.interface().await?)
+        match download(self.ctx.clone(), &path.to_string(), self.interface().await?)
             .await
             .context(format!("downloading to {}", path))?
         {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully downloaded to \"{}\"", path);
+                log::debug!("Successfully downloaded to \"{}\"", path);
                 Ok(())
             }
             Reply::Fail(message) => {
@@ -409,7 +414,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn stage(
         &mut self,
         path: &str,
@@ -419,13 +423,19 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let mut file_to_stage = File::open(path).map_err(StageError::from)?;
         let size = file_to_stage.metadata().map_err(StageError::from)?.len();
         let size = u32::try_from(size).map_err(|e| StageError::InvalidFileSize(e))?;
-        tracing::debug!("uploading file size: {}", size);
-        match upload(size, &mut file_to_stage, self.interface().await?, &progress_listener)
-            .await
-            .context(format!("uploading {}", path))?
+        log::debug!("uploading file size: {}", size);
+        match upload(
+            self.ctx.clone(),
+            size,
+            &mut file_to_stage,
+            self.interface().await?,
+            &progress_listener,
+        )
+        .await
+        .context(format!("uploading {}", path))?
         {
             Reply::Okay(s) => {
-                tracing::debug!("Received response from download command: {}", s);
+                log::debug!("Received response from download command: {}", s);
                 Ok(())
             }
             Reply::Fail(s) => {
@@ -441,12 +451,24 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn set_active(&mut self, slot: &str) -> Result<(), FastbootError> {
+        // Note: the target may not successfully send a response when asked to set active,
+        // so let's use a short time-out, and treat a timeout error as a success.
+        // See b/405436515 for more information.
         let command = Command::SetActive(slot.to_string());
-        match send(command.clone(), self.interface().await?).await.context("sending set_active")? {
+        let reply = handle_timeout_as_okay(
+            send_with_timeout(
+                self.ctx.clone(),
+                command.clone(),
+                self.interface().await?,
+                Duration::seconds(3),
+            )
+            .await,
+        )
+        .context("set active")?;
+        match reply {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent set_active");
+                log::debug!("Successfully sent set_active");
                 Ok(())
             }
             Reply::Fail(message) => {
@@ -459,12 +481,14 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         }
     }
 
-    #[tracing::instrument]
     async fn oem(&mut self, command: &str) -> Result<(), FastbootError> {
         let command = Command::Oem(command.to_string());
-        match send(command.clone(), self.interface().await?).await.context("sending oem")? {
+        match send(self.ctx.clone(), command.clone(), self.interface().await?)
+            .await
+            .context("sending oem")?
+        {
             Reply::Okay(_) => {
-                tracing::debug!("Successfully sent oem command \"{}\"", command);
+                log::debug!("Successfully sent oem command \"{}\"", command);
                 Ok(())
             }
             Reply::Fail(message) => {
@@ -528,6 +552,7 @@ mod test {
                 target_id: "foo".to_string(),
                 interface: Some(test_transport),
                 interface_factory: Box::new(TestTransportFactory {}),
+                ctx: FastbootContext::new(),
             };
 
             assert_eq!(fastboot_client.get_var(&"version").await?, "0.4");
@@ -539,6 +564,7 @@ mod test {
                 target_id: "foo".to_string(),
                 interface: Some(test_transport),
                 interface_factory: Box::new(TestTransportFactory {}),
+                ctx: FastbootContext::new(),
             };
 
             assert_eq!(fastboot_client.target_id, "foo");
@@ -551,6 +577,7 @@ mod test {
                 target_id: "foo".to_string(),
                 interface: Some(test_transport),
                 interface_factory: Box::new(TestTransportFactory {}),
+                ctx: FastbootContext::new(),
             };
 
             assert_eq!(fastboot_client.target_id, "foo");
@@ -575,6 +602,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let _ = fastboot_client.get_all_vars(var_client).await?;
@@ -605,6 +633,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
         assert!(fastboot_client.get_all_vars(var_client).await.is_err());
         assert_eq!(
@@ -627,6 +656,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert_eq!(fastboot_client.target_id, "foo");
@@ -641,6 +671,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert_eq!(fastboot_client.target_id, "foo");
@@ -656,6 +687,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert_eq!(fastboot_client.target_id, "foo");
@@ -676,6 +708,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert_eq!(fastboot_client.target_id, "foo");
@@ -691,6 +724,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.erase("slotB").await.is_err());
@@ -705,6 +739,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.erase("slotC").await.is_err());
@@ -724,6 +759,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert_eq!(fastboot_client.target_id, "foo");
@@ -739,6 +775,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.boot().await.is_err());
@@ -754,6 +791,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.boot().await.is_err());
@@ -773,6 +811,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert_eq!(fastboot_client.target_id, "foo");
@@ -788,6 +827,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.reboot().await.is_err());
@@ -802,6 +842,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.reboot().await.is_err());
@@ -821,6 +862,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let (var_client, mut var_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
@@ -841,6 +883,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let (var_client, mut var_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
@@ -859,6 +902,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let (var_client, mut var_server): (Sender<RebootEvent>, Receiver<RebootEvent>) =
@@ -882,6 +926,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         fastboot_client.continue_boot().await?;
@@ -896,6 +941,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.continue_boot().await.is_err());
@@ -910,6 +956,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.continue_boot().await.is_err());
@@ -929,6 +976,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert_eq!(fastboot_client.target_id, "foo");
@@ -944,6 +992,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.set_active("slotB").await.is_err());
@@ -958,6 +1007,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.set_active("slotC").await.is_err());
@@ -985,6 +1035,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         fastboot_client.get_staged(temp_path.to_str().unwrap()).await?;
@@ -1004,6 +1055,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         assert!(fastboot_client.get_staged("slotB").await.is_err());
@@ -1034,6 +1086,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let (var_client, mut var_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
@@ -1073,6 +1126,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let (var_client, mut var_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
@@ -1111,6 +1165,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let (var_client, mut var_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
@@ -1151,6 +1206,7 @@ mod test {
             target_id: "foo".to_string(),
             interface: Some(test_transport),
             interface_factory: Box::new(TestTransportFactory {}),
+            ctx: FastbootContext::new(),
         };
 
         let (var_client, mut var_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =

@@ -6,8 +6,5 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [
-    "device-protocol-pdev:tests",
-    "virtio:tests",
-  ]
+  deps = [ "virtio:tests" ]
 }

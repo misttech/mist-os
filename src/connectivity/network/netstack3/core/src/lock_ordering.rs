@@ -137,15 +137,13 @@ pub struct IpDeviceGmp<I>(PhantomData<I>, Never);
 pub struct IpDeviceAddresses<I>(PhantomData<I>, Never);
 pub struct IpDeviceFlags<I>(PhantomData<I>, Never);
 pub struct IpDeviceDefaultHopLimit<I>(PhantomData<I>, Never);
-
-pub enum Ipv4DeviceAddressState {}
+pub struct IpDeviceAddressDad<I>(PhantomData<I>, Never);
+pub struct IpDeviceAddressData<I>(PhantomData<I>, Never);
 
 pub enum Ipv6DeviceRouterSolicitations {}
 pub enum Ipv6DeviceRouteDiscovery {}
 pub enum Ipv6DeviceLearnedParams {}
 pub enum Ipv6DeviceSlaac {}
-pub enum Ipv6DeviceAddressDad {}
-pub enum Ipv6DeviceAddressState {}
 pub struct NudConfig<I>(PhantomData<I>, Never);
 
 // This is not a real lock level, but it is useful for writing bounds that
@@ -256,8 +254,9 @@ impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
 impl_lock_after!(IpDeviceConfiguration<Ipv6> => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => Ipv6DeviceRouteDiscovery);
 impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceSlaac);
-impl_lock_after!(Ipv6DeviceSlaac => Ipv6DeviceAddressDad);
-impl_lock_after!(Ipv6DeviceAddressDad => IpDeviceGmp<Ipv4>);
+impl_lock_after!(Ipv6DeviceSlaac => IpDeviceAddressDad<Ipv4>);
+impl_lock_after!(IpDeviceAddressDad<Ipv4> => IpDeviceAddressDad<Ipv6>);
+impl_lock_after!(IpDeviceAddressDad<Ipv6> => IpDeviceGmp<Ipv4>);
 
 impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceGmp<Ipv6>);
 impl_lock_after!(IpDeviceGmp<Ipv6> => FilterState<Ipv4>);
@@ -283,9 +282,9 @@ impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceAddresses<Ipv4>);
 impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceAddresses<Ipv6>);
 impl_lock_after!(IpDeviceAddresses<Ipv6> => IpDeviceFlags<Ipv4>);
 impl_lock_after!(IpDeviceFlags<Ipv4> => IpDeviceFlags<Ipv6>);
-impl_lock_after!(IpDeviceFlags<Ipv6> => Ipv4DeviceAddressState);
-impl_lock_after!(Ipv4DeviceAddressState => Ipv6DeviceAddressState);
-impl_lock_after!(Ipv6DeviceAddressState => IpDeviceDefaultHopLimit<Ipv4>);
+impl_lock_after!(IpDeviceFlags<Ipv6> => IpDeviceAddressData<Ipv4>);
+impl_lock_after!(IpDeviceAddressData<Ipv4> => IpDeviceAddressData<Ipv6>);
+impl_lock_after!(IpDeviceAddressData<Ipv6> => IpDeviceDefaultHopLimit<Ipv4>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
 impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);
 impl_lock_after!(IpDeviceDefaultHopLimit<Ipv6> => Ipv6DeviceRouterSolicitations);

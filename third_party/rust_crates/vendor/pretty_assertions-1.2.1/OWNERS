@@ -6,7 +6,6 @@ include /src/connectivity/network/net-cli/OWNERS
 include /src/connectivity/network/netlink/OWNERS
 include /src/connectivity/policy/OWNERS
 include /src/developer/ffx/OWNERS
-include /src/developer/ffx/daemon/protocols/repo/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
 include /src/developer/ffx/plugins/assembly/OWNERS
 include /src/developer/ffx/plugins/audio/OWNERS
@@ -20,7 +19,6 @@ include /src/developer/ffx/tools/triage/OWNERS
 include /src/devices/tools/fidlgen_banjo/OWNERS
 include /src/diagnostics/OWNERS
 include /src/diagnostics/iquery/OWNERS
-include /src/diagnostics/lib/triage/OWNERS
 include /src/fonts/OWNERS
 include /src/lib/diagnostics/OWNERS
 include /src/lib/icu/OWNERS
@@ -40,7 +38,7 @@ include /src/sys/test_runners/OWNERS
 include /src/ui/lib/input_pipeline/OWNERS
 include /src/ui/testing/input_helper/OWNERS
 include /src/virtualization/OWNERS
-include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.2/OWNERS
 include /tools/auto_owners/OWNERS
 include /tools/cargo-gnaw/OWNERS
 include /tools/component_id_index/OWNERS

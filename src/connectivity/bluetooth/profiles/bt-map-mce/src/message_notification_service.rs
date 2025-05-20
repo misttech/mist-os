@@ -538,8 +538,7 @@ pub(crate) mod tests {
     #[fuchsia::test]
     fn new_event_report() {
         let mut exec = fasync::TestExecutor::new();
-        let (mut remote, mut relayer_stream, _session, mut session_fut) =
-            run_mns_session(&mut exec);
+        let (mut remote, mut relayer_stream, _session, session_fut) = run_mns_session(&mut exec);
         let mut session_fut = pin!(session_fut);
 
         // Mimic incoming event report from remote MNS client.
@@ -604,7 +603,7 @@ pub(crate) mod tests {
     fn session_run() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _notifier_stream, _session, mut session_fut) = run_mns_session(&mut exec);
+        let (remote, _notifier_stream, _session, session_fut) = run_mns_session(&mut exec);
         let mut session_fut = pin!(session_fut);
         exec.run_until_stalled(&mut session_fut).expect_pending("should be pending");
 
@@ -614,7 +613,7 @@ pub(crate) mod tests {
         let res = exec.run_until_stalled(&mut session_fut).expect("should have terminated");
         let _ = res.expect_err("should contain an error");
 
-        let (_remote, notifier_stream, _session, mut session_fut) = run_mns_session(&mut exec);
+        let (_remote, notifier_stream, _session, session_fut) = run_mns_session(&mut exec);
         let mut session_fut = pin!(session_fut);
         exec.run_until_stalled(&mut session_fut).expect_pending("should be pending");
 

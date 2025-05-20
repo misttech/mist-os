@@ -18,13 +18,13 @@ alias DriverName = string:MAX;
 @available(added=HEAD)
 const MAX_SOFTWARE_DEVICES uint32 = 20;
 
-@available(replaced=NEXT)
+@available(replaced=27)
 type DriverLog = struct {
     name DriverName;
     log_level fuchsia.diagnostics.Severity;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type DriverLog = struct {
     name DriverName;
     log_level fuchsia.diagnostics.types.Severity;
@@ -181,15 +181,15 @@ type RealmArgs = resource table {
     19: boot_driver_components vector<string:MAX>:MAX;
 
     /// Devicetree blob that should be handed to the board driver.
-    @available(added=NEXT)
+    @available(added=27)
     20: devicetree zx.Handle:VMO;
 
     /// Platform Vendor ID which should be specified to the platform bus driver.
-    @available(added=NEXT)
+    @available(added=27)
     21: platform_vid uint32;
 
     /// Platform ID which should be specified to the platform bus driver.
-    @available(added=NEXT)
+    @available(added=27)
     22: platform_pid uint32;
 };
 

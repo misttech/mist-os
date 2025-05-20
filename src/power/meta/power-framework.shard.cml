@@ -55,7 +55,6 @@
             directory: "dev-topological",
             from: "#devfs-with-pkg",
             to: [ "#power_manager" ],
-            dependency: "weak",
         },
         {
             protocol: [ "fuchsia.sys2.SystemController" ],

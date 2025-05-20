@@ -98,7 +98,7 @@ fuchsia_structured_config_values("sc-values") {
   }
 }
 
-fuchsia_driver_package("pkg") {
+fuchsia_driver_package("package") {
   package_name = "ufs"
   driver_components = [ ":ufs" ]
   deps = [ ":sc-values" ]

@@ -1,0 +1,116 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_build_group.gni")
+import("//build/bazel/bazel_root_targets_list.gni")
+import("//build/host.gni")
+
+# Generate a single bazel_build_group() to build all root bazel targets
+# at once. Also install all required host tools.
+#
+# This template does not take any arguments, but will
+# generate:
+#
+#  ${target_name}.build: A bazel_build_group() target to build
+#    all root host Bazel artifacts. This also carries GN metadata
+#    to ensure `fx host-tool` will find the corresponding binary
+#    if needed.
+#
+#  ${target_name}.install_tools: An optional copy() target
+#    to copy installable host tools to host-tools/.
+#
+#  ${target_name}: A copy() target to copy host tools to
+#    host_x64/ as this is required by the bazel_tool_action() and
+#    subbuild() templates.
+#
+template("build_bazel_root_host_targets") {
+  if (resolved_bazel_root_targets != []) {
+    _subtargets = []
+    _host_binaries = []
+    _install_tools = []
+
+    foreach(_root_target, resolved_bazel_root_targets) {
+      _subtargets += [
+        {
+          bazel_target = _root_target.bazel_label
+          gn_target_name = get_label_info(_root_target.gn_label, "name")
+
+          copy_outputs = [
+            {
+              bazel = "{{BAZEL_TARGET_OUT_DIR}}/${_root_target.bazel_name}"
+              ninja = _root_target.ninja_name
+            },
+          ]
+
+          if (_root_target.install_host_tool) {
+            metadata = {
+              # Used by //:tool_paths build API module
+              tool_paths = [
+                {
+                  os = host_os
+                  cpu = host_cpu
+                  name = _root_target.ninja_name
+                  label = _root_target.gn_label
+                  path = rebase_path(_root_target.ninja_output, root_build_dir)
+                },
+              ]
+            }
+          }
+        },
+      ]
+
+      _host_binary = "${target_out_dir}/bazel_build_group_outputs/${_root_target.ninja_name}"
+      _host_binaries += [ _host_binary ]
+      if (_root_target.install_host_tool) {
+        _install_tools += [ _host_binary ]
+      }
+    }
+
+    _build_target = "${target_name}.build"
+    _install_tools_target = "${target_name}.install_tools"
+    _copy_host_binaries_target = target_name
+
+    bazel_build_group(_build_target) {
+      no_sdk = true
+      host = true
+      subtargets = _subtargets
+    }
+
+    if (_host_binaries != []) {
+      if (_install_tools != []) {
+        # Copy to host-tools/ to mimic host_install_tools().
+        copy(_install_tools_target) {
+          outputs = [ "$host_tools_dir/{{source_file_part}}" ]
+          sources = _install_tools
+          deps = [ ":${_build_target}" ]
+        }
+      }
+
+      # Copy to host_x64/ as this is expected by bazel_tool_action()
+      # (too keep it consistent with compiled_action()) and also because
+      # Ninja sub-builds rely on this location exclusively.
+      copy(_copy_host_binaries_target) {
+        outputs = [ "$host_out_dir/{{source_file_part}}" ]
+        sources = _host_binaries
+        deps = [ ":${_build_target}" ]
+        if (_install_tools != []) {
+          deps += [ ":${_install_tools_target}" ]
+        }
+      }
+    } else {
+      group(target_name) {
+        deps = [ ":${_build_target}" ]
+      }
+      not_needed([ "_install_tools_target" ])
+    }
+  } else {
+    group(target_name) {
+      # Nothing to generate.
+    }
+  }
+
+  # This template doesn't take any arguments, ensure GN doesn't
+  # complain about the unused invoker scope.
+  not_needed([ "invoker" ])
+}

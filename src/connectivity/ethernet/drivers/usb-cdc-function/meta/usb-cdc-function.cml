@@ -18,5 +18,6 @@
     use: [
         { service: "fuchsia.hardware.usb.function.UsbFunctionService" },
         { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
     ],
 }

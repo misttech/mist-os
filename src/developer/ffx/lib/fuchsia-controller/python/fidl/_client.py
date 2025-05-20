@@ -90,7 +90,8 @@ class FidlClient(metaclass=FidlMeta):
 
     def _decode(self, txid: TXID_Type, msg: FidlMessage) -> Dict[str, Any]:
         self._clean_staging(txid)
-        return decode_fidl_response(bytes=msg[0], handles=msg[1])
+        handles = [m.take() for m in msg[1]]
+        return decode_fidl_response(bytes=msg[0], handles=handles)
 
     async def next_event(self) -> FidlMessage:
         """Attempts to read the next FIDL event from this client.

@@ -21,10 +21,6 @@ namespace internal {
   };
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 ::test_inheritancewithrecursivedecl::ChildSecondRequest WireNaturalConversionTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, ::test_inheritancewithrecursivedecl::ChildSecondRequest>::ToNatural(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest src) {
   return ::test_inheritancewithrecursivedecl::ChildSecondRequest(WireNaturalConversionTraits<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>, ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>>::ToNatural(std::move(src.request)));
 }
@@ -33,10 +29,6 @@ namespace internal {
       .request = WireNaturalConversionTraits<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>, ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>>::ToWire(arena, std::move(src.request())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

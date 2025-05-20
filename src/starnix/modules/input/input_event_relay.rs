@@ -5,6 +5,7 @@
 use crate::{
     parse_fidl_button_event, parse_fidl_keyboard_event_to_linux_input_event,
     FuchsiaTouchEventToLinuxTouchEventConverter, InputDeviceStatus, InputFile,
+    LinuxEventWithTraceId,
 };
 use fidl::endpoints::{ClientEnd, RequestStream};
 use fidl_fuchsia_ui_input3::{
@@ -19,7 +20,7 @@ use futures::StreamExt as _;
 use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
 use starnix_core::task::Kernel;
 use starnix_logging::{
-    log_warn, trace_duration, trace_duration_begin, trace_duration_end, trace_flow_end,
+    log_warn, trace_duration, trace_duration_begin, trace_duration_end, trace_flow_step,
 };
 use starnix_sync::Mutex;
 use starnix_types::time::timeval_from_time;
@@ -206,7 +207,7 @@ impl InputEventsRelay {
                     None,
                 ),
             };
-            let mut previous_event_disposition = vec![];
+            let mut previous_event_disposition:Vec<FidlTouchResponse> = vec![];
             loop {
                 // Create the future to watch for the the next input events, but don't execute
                 // it...
@@ -222,7 +223,7 @@ impl InputEventsRelay {
                         for e in &touch_events {
                             match e.trace_flow_id {
                                 Some(trace_flow_id)=>{
-                                    trace_flow_end!(
+                                    trace_flow_step!(
                                         c"input",
                                         c"dispatch_event_to_client",
                                         trace_flow_id.into());
@@ -312,7 +313,7 @@ impl InputEventsRelay {
                                         );
                                     }
                                     let mut inner = file.inner.lock();
-                                    inner.events.extend(new_events.clone());
+                                    inner.events.extend(new_events.clone().into_iter().map(LinuxEventWithTraceId::new));
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
@@ -382,7 +383,12 @@ impl InputEventsRelay {
                                 let mut inner = file.inner.lock();
 
                                 if !new_events.is_empty() {
-                                    inner.events.extend(new_events.clone());
+                                    inner.events.extend(
+                                        new_events
+                                            .clone()
+                                            .into_iter()
+                                            .map(LinuxEventWithTraceId::new),
+                                    );
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
@@ -534,7 +540,9 @@ impl InputEventsRelay {
                                 );
                             }
                             let mut inner = file.inner.lock();
-                            inner.events.extend(batch.events.clone());
+                            inner.events.extend(
+                                batch.events.clone().into_iter().map(LinuxEventWithTraceId::new),
+                            );
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
 
@@ -704,7 +712,9 @@ impl InputEventsRelay {
                                 );
                             }
                             let mut inner = file.inner.lock();
-                            inner.events.extend(new_events.clone());
+                            inner.events.extend(
+                                new_events.clone().into_iter().map(LinuxEventWithTraceId::new),
+                            );
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
                         true

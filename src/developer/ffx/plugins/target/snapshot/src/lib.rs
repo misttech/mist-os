@@ -104,12 +104,13 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
 
     let mut out = Vec::new();
 
-    let (status, attrs) =
-        file.get_attr().await.map_err(|e| bug!("Failed to get attributes of file: {e}"))?;
-
-    if status != 0 {
-        return_bug!("Error: Failed to get attributes, status: {}", status);
-    }
+    let (_mutable_attributes, immutable_attributes) = file
+        .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+        .await
+        .map_err(|e| bug!("Failed get_attributes wire call: {e}"))?
+        .map_err(|e| bug!("Failed get_attributes of file: {e}"))?;
+    let content_size =
+        immutable_attributes.content_size.ok_or(bug!("Failed to get content size of file"))?;
 
     let mut queue = FuturesOrdered::new();
 
@@ -134,12 +135,8 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
         }
     }
 
-    if out.len() != usize::try_from(attrs.content_size).map_err(|e| bug!("{e}"))? {
-        return_bug!(
-            "Error: Expected {} bytes, but instead read {} bytes",
-            attrs.content_size,
-            out.len()
-        );
+    if out.len() != usize::try_from(content_size).map_err(|e| bug!("{e}"))? {
+        return_bug!("Error: Expected {} bytes, but instead read {} bytes", content_size, out.len());
     }
 
     Ok(out)
@@ -300,17 +297,38 @@ mod test {
                             responder.send(Ok(&[])).expect("writing file test response");
                         }
                     }
-                    fio::FileRequest::GetAttr { responder } => {
-                        let attrs = fio::NodeAttributes {
-                            mode: 0,
-                            id: 0,
-                            content_size: data.len() as u64,
-                            storage_size: data.len() as u64,
-                            link_count: 1,
-                            creation_time: 0,
-                            modification_time: 0,
+                    fio::FileRequest::GetAttributes { query, responder } => {
+                        let attrs = fio::NodeAttributes2 {
+                            mutable_attributes: fio::MutableNodeAttributes {
+                                creation_time: query
+                                    .contains(fio::NodeAttributesQuery::CREATION_TIME)
+                                    .then_some(0),
+                                modification_time: query
+                                    .contains(fio::NodeAttributesQuery::MODIFICATION_TIME)
+                                    .then_some(0),
+                                mode: query.contains(fio::NodeAttributesQuery::MODE).then_some(0),
+                                ..Default::default()
+                            },
+                            immutable_attributes: fio::ImmutableNodeAttributes {
+                                protocols: query
+                                    .contains(fio::NodeAttributesQuery::PROTOCOLS)
+                                    .then_some(fio::NodeProtocolKinds::FILE),
+                                content_size: query
+                                    .contains(fio::NodeAttributesQuery::CONTENT_SIZE)
+                                    .then_some(data.len() as u64),
+                                storage_size: query
+                                    .contains(fio::NodeAttributesQuery::STORAGE_SIZE)
+                                    .then_some(data.len() as u64),
+                                link_count: query
+                                    .contains(fio::NodeAttributesQuery::LINK_COUNT)
+                                    .then_some(0),
+                                id: query.contains(fio::NodeAttributesQuery::ID).then_some(0),
+                                ..Default::default()
+                            },
                         };
-                        responder.send(0, &attrs).expect("sending attributes");
+                        responder
+                            .send(Ok((&attrs.mutable_attributes, &attrs.immutable_attributes)))
+                            .expect("sending attributes");
                     }
                     e => panic!("not supported {:?}", e),
                 }

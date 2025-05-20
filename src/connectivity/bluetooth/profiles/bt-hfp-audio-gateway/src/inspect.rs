@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use bt_hfp::call::{Direction, Number};
+use bt_hfp::codec_id::{codecs_to_string, CodecId};
 use fidl_fuchsia_bluetooth_hfp::{CallState, NetworkInformation};
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
@@ -11,7 +12,7 @@ use fuchsia_inspect_contrib::nodes::{MonotonicTimeProperty, NodeTimeExt};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use std::collections::VecDeque;
 
-use crate::features::{codecs_to_string, CodecId, HfFeatures};
+use crate::features::HfFeatures;
 use crate::peer::service_level_connection::SlcState;
 
 #[derive(Default, Debug)]

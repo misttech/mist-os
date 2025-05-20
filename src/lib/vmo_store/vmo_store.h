@@ -40,9 +40,9 @@ struct MapOptions {
 // `VmoStore` options controlling mapping and pinning behavior.
 struct Options {
   // If provided, `VmoStore` will attempt to map stored VMOs.
-  cpp17::optional<MapOptions> map;
+  std::optional<MapOptions> map;
   // If provided, `VmoStore` will attempt to pin stored VMOs.
-  cpp17::optional<PinOptions> pin;
+  std::optional<PinOptions> pin;
 };
 
 // A base class used to compose `VmoStore`s.

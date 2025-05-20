@@ -135,7 +135,7 @@ mod tests {
         let mock_runner = Arc::new(MockRunner::new());
         mock_runner.add_failing_url("xxx://failing");
         let policy = Arc::new(SecurityPolicy::default());
-        let moniker = Moniker::try_from(vec!["foo"]).unwrap();
+        let moniker = Moniker::try_from(["foo"]).unwrap();
         let checker = ScopedPolicyChecker::new(policy, moniker);
         let provider = Box::new(RunnerCapabilityProvider { factory: mock_runner, checker });
 
@@ -247,7 +247,7 @@ mod tests {
             .await;
 
         // Bind the child component.
-        universe.start_instance(&vec!["b"].try_into().unwrap()).await.expect("bind failed");
+        universe.start_instance(&["b"].try_into().unwrap()).await.expect("bind failed");
 
         // Ensure the instances started up.
         mock_runner.wait_for_urls(&["test:///b_resolved"]).await;

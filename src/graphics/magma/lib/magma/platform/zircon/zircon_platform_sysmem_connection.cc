@@ -232,9 +232,9 @@ class ZirconPlatformBufferConstraints : public PlatformBufferConstraints {
         MAGMA_FORMAT_YUY2, MAGMA_FORMAT_MJPEG, MAGMA_FORMAT_P010,
     };
     static const magma_format_t rgb_formats[] = {
-        MAGMA_FORMAT_R8G8B8A8, MAGMA_FORMAT_BGRA32, MAGMA_FORMAT_RGB565,  MAGMA_FORMAT_BGR24,
-        MAGMA_FORMAT_RGB565,   MAGMA_FORMAT_RGB332, MAGMA_FORMAT_RGB2220, MAGMA_FORMAT_L8,
-        MAGMA_FORMAT_R8,       MAGMA_FORMAT_R8G8};
+        MAGMA_FORMAT_R8G8B8A8, MAGMA_FORMAT_BGRA32, MAGMA_FORMAT_RGB565,     MAGMA_FORMAT_BGR24,
+        MAGMA_FORMAT_RGB565,   MAGMA_FORMAT_RGB332, MAGMA_FORMAT_RGB2220,    MAGMA_FORMAT_L8,
+        MAGMA_FORMAT_R8,       MAGMA_FORMAT_R8G8,   MAGMA_FORMAT_A2B10G10R10};
     if (std::find(std::begin(yuv_formats), std::end(yuv_formats),
                   format_constraints->image_format) != std::end(yuv_formats)) {
       constraints.pixel_format.type =

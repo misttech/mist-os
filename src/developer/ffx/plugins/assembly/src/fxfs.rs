@@ -5,10 +5,10 @@
 use crate::base_package::BasePackage;
 
 use anyhow::{Context, Result};
+use assembled_system::BlobfsContents;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fxfs::FxfsBuilder;
 use assembly_images_config::Fxfs;
-use assembly_manifest::BlobfsContents;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashMap;
 
@@ -24,7 +24,6 @@ pub struct ConstructedFxfs {
 
 /// Constructs an Fxfs image containing all requested base packages.
 pub async fn construct_fxfs(
-    outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
     image_config: &ImageAssemblyConfig,
     base_package: &BasePackage,
@@ -52,8 +51,8 @@ pub async fn construct_fxfs(
     fxfs_builder.add_package_from_path(&base_package.manifest_path)?;
 
     // Build the fxfs and store the merkle to size map.
-    let image_path = outdir.as_ref().join("fxfs.blk");
-    let sparse_image_path = outdir.as_ref().join("fxfs.sparse.blk");
+    let image_path = gendir.as_ref().join("fxfs.blk");
+    let sparse_image_path = gendir.as_ref().join("fxfs.sparse.blk");
     let blobs_json_path = fxfs_builder
         .build(gendir, &image_path, Some(&sparse_image_path))
         .await
@@ -80,9 +79,9 @@ pub async fn construct_fxfs(
 mod tests {
     use super::{construct_fxfs, ConstructedFxfs};
     use crate::base_package::construct_base_package;
+    use assembled_system::AssembledSystem;
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_images_config::Fxfs;
-    use assembly_manifest::AssemblyManifest;
     use camino::{Utf8Path, Utf8PathBuf};
     use serde_json::json;
     use std::fs::File;
@@ -155,22 +154,16 @@ mod tests {
         product_config.cache.push(cache_manifest);
 
         // Construct the base package.
-        let mut assembly_manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        let base_package = construct_base_package(
-            &mut assembly_manifest,
-            dir,
-            dir,
-            "system_image",
-            &product_config,
-        )
-        .unwrap();
+        let mut assembled_system =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let base_package =
+            construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
+                .unwrap();
 
         let size_byteses = vec![None, Some(32 * 1024 * 1024)];
         for size_bytes in size_byteses {
             let ConstructedFxfs { image_path, sparse_image_path, contents: blobs } =
                 construct_fxfs(
-                    dir,
                     dir,
                     &image_config,
                     &base_package,

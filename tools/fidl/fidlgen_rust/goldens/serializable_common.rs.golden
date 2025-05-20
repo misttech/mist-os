@@ -35,12 +35,6 @@ impl SerializableUnion {
             Self::Unused(_) => 1,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for SerializableUnion {}

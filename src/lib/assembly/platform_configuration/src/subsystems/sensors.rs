@@ -16,7 +16,7 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for SensorsSubsystemCon
         // TODO(https://fxbug.dev/397439065): Consider adding a separate platform configuration to
         // enable sensors.
         if starnix_config.enable_android_support
-            && *context.feature_set_level == FeatureSupportLevel::Standard
+            && *context.feature_set_level == FeatureSetLevel::Standard
         {
             // TODO(https://fxbug.dev/370576398): Remove sensors playback from UserDebug.
             if *context.build_type == BuildType::Eng || *context.build_type == BuildType::UserDebug

@@ -64,9 +64,6 @@ use {
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;
 
-// Service name to persist Inspect data across boots
-const PERSISTENCE_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.persist.DataPersistence-wlan";
-
 async fn serve_fidl(
     ap: AccessPoint,
     configurator: legacy::deprecated_configuration::DeprecatedConfigurator,
@@ -246,9 +243,9 @@ async fn run_all_futures() -> Result<(), Error> {
     let cfg = wlancfg_config::Config::take_from_startup_handle();
     let monitor_svc = fuchsia_component::client::connect_to_protocol::<DeviceMonitorMarker>()
         .context("failed to connect to device monitor")?;
-    let persistence_proxy = fuchsia_component::client::connect_to_protocol_at_path::<
+    let persistence_proxy = fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
-    >(PERSISTENCE_SERVICE_PATH);
+    >();
     let (persistence_req_sender, persistence_req_forwarder_fut) = match persistence_proxy {
         Ok(persistence_proxy) => {
             let (s, f) = auto_persist::create_persistence_req_sender(persistence_proxy);
@@ -267,9 +264,8 @@ async fn run_all_futures() -> Result<(), Error> {
         }
     };
 
-    // Cobalt 1.1
-    let cobalt_1dot1_svc = connect_to_metrics_logger_factory().await?;
-    let cobalt_1dot1_proxy = match create_metrics_logger(&cobalt_1dot1_svc).await {
+    let cobalt_svc = connect_to_metrics_logger_factory().await?;
+    let cobalt_proxy = match create_metrics_logger(&cobalt_svc).await {
         Ok(proxy) => proxy,
         Err(e) => {
             warn!("Metrics logging is unavailable: {}", e);
@@ -286,7 +282,7 @@ async fn run_all_futures() -> Result<(), Error> {
     let (defect_sender, defect_receiver) = mpsc::channel(DEFECT_CHANNEL_SIZE);
     let (telemetry_sender, telemetry_fut) = serve_telemetry(
         monitor_svc.clone(),
-        cobalt_1dot1_proxy,
+        cobalt_proxy,
         component::inspector().root().create_child("client_stats"),
         external_inspect_node.create_child("client_stats"),
         persistence_req_sender.clone(),

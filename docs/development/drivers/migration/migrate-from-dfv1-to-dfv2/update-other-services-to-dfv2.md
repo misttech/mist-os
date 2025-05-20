@@ -459,7 +459,7 @@ test cases:
 
 - [`//sdk/lib/driver/component/cpp/tests/driver_fidl_test.cc`][driver-fidl-test-cc] -
   This file demonstrates how to work with incoming and outgoing FIDL
-  services fo both driver transport and Zircon transport as well as `devfs`.
+  services for both driver transport and Zircon transport.
 
 ## Additional resources {:#additional-resources}
 
@@ -539,11 +539,8 @@ All the **documentation pages** mentioned in this section:
 [nodeaddargs]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.driver.framework/topology.fidl;l=81
 [root-driver-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/tests/v2/compat-runtime/root-driver.cc
 [compat-shard-cml]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/compat.shard.cml
-[devfs]: /docs/concepts/drivers/driver_communication.md#service_discovery_using_devfs
-[connector]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/devfs/cpp/connector.h;l=16
 [v2-parent-driver-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/transport/zircon/v2/parent-driver.cc;l=93
 [codelab-driver-service]: /docs/development/drivers/tutorials/sdk_build_driver/driver-service.md
-[export-to-devfs]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/qemu_edu/drivers/qemu_edu.cc#74
 [use-non-default-dispatchers]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/convert-banjo-protocols-to-fidl-protocols.md#update-the-dfv1-driver-to-use-non-default-dispatchers
 [aml-ethernet]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/ethernet/drivers/aml-ethernet/aml-ethernet.cc;l=181
 [driver-inspect]: /docs/development/drivers/diagnostics/inspect.md
@@ -576,4 +573,3 @@ All the **documentation pages** mentioned in this section:
 [banjo-server-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_server.h
 [banjo-client-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/compat/cpp/banjo_client.h
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
-[set-up-devfs]: /docs/development/drivers/migration/set-up-devfs.md

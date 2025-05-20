@@ -18,3 +18,4 @@ include /third_party/rust_crates/vendor/pulldown-cmark-0.9.3/OWNERS
 include /third_party/rust_crates/vendor/regex-1.7.3/OWNERS
 include /third_party/rust_crates/vendor/serde_json-1.0.128/OWNERS
 include /third_party/rust_crates/vendor/tokio-1.38.1/OWNERS
+include /third_party/rust_crates/vendor/vte-0.15.0/OWNERS

@@ -26,6 +26,7 @@ class PrimaryWrapper : public fidl::WireAsyncEventHandler<fuchsia_gpu_magma::Pri
                               magma::PlatformObject::Type object_type, uint64_t object_id);
   magma_status_t ReleaseObject(uint64_t object_id, magma::PlatformObject::Type object_type);
   magma_status_t CreateContext(uint32_t context_id);
+  magma_status_t CreateContext2(uint32_t context_id, uint64_t priority);
   magma_status_t DestroyContext(uint32_t context_id);
   magma_status_t ExecuteCommand(
       uint32_t context_id, ::fidl::VectorView<fuchsia_gpu_magma::wire::BufferRange> resources,

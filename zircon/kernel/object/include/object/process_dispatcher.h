@@ -183,6 +183,9 @@ class ProcessDispatcher final
   [[nodiscard]] zx_status_t get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const final;
   [[nodiscard]] zx_status_t set_name(const char* name, size_t len) final;
 
+  zx_status_t Start(fbl::RefPtr<ThreadDispatcher> thread, zx_vaddr_t pc, zx_vaddr_t sp,
+                    HandleOwner arg_handle, uintptr_t arg2);
+
   void Kill(int64_t retcode);
 
   // Suspends the process.

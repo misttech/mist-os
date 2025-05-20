@@ -84,13 +84,16 @@ impl<DirectoryType: Directory> RequestHandler for ImmutableConnection<DirectoryT
 
     async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
         let this = self.get_mut();
-        let _guard = this.base.scope.active_guard();
-        match request {
-            Ok(request) => match this.base.handle_request(request).await {
-                Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
-                Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
-            },
-            Err(_) => ControlFlow::Break(()),
+        if let Some(_guard) = this.base.scope.try_active_guard() {
+            match request {
+                Ok(request) => match this.base.handle_request(request).await {
+                    Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                    Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+                },
+                Err(_) => ControlFlow::Break(()),
+            }
+        } else {
+            ControlFlow::Break(())
         }
     }
 }

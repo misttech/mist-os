@@ -53,8 +53,4 @@ std::ostream& operator<<(std::ostream& os, const ::test_arrays::UnionLargeArray&
 
 }  // namespace test_arrays
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop

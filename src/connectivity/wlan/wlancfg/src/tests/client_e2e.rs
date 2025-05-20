@@ -1362,7 +1362,7 @@ fn test_autoconnect_to_saved_network() {
         [1] => {
             debug!("Probabilistic active scan not selected. Proceeding with connection.");
         }
-        _ => panic!("Unexpected channel set for active scan: {:?}", active_scan_channels),
+        _ => panic!("Unexpected channel set for active scan: {active_scan_channels:?}"),
     }
 
     // Expect to get an SME request for state machine creation.
@@ -2005,7 +2005,7 @@ fn reject_connect_requests(
                     assert!(responder.send(Ok(())).is_ok());
                     *state_machine_sme_stream = Some(sme_server.into_stream());
                 }
-                other => panic!("Unexpected DeviceMonitor operation: {:?}", other),
+                other => panic!("Unexpected DeviceMonitor operation: {other:?}"),
             }
             continue;
         }
@@ -2018,7 +2018,7 @@ fn reject_connect_requests(
                     let vmo = write_vmo(scan_results.clone()).expect("failed to write VMO");
                     responder.send(Ok(vmo)).expect("failed to send scan data");
                 }
-                other => panic!("Only scans were expected from the IfaceManager SME: {:?}", other),
+                other => panic!("Only scans were expected from the IfaceManager SME: {other:?}"),
             }
 
             continue;
@@ -2050,7 +2050,7 @@ fn reject_connect_requests(
                     Some(Ok(fidl_sme::ClientSmeRequest::Disconnect { responder, .. })) => {
                         responder.send().expect("failed to send disconnect response");
                     }
-                    other => panic!("Unexpected SME operation: {:?}", other),
+                    other => panic!("Unexpected SME operation: {other:?}"),
                 }
                 *state_machine_sme_stream = Some(sme_stream);
                 continue;
@@ -2516,20 +2516,6 @@ fn solicit_roam_scan_weak_rssi(
     )
 }
 
-// Roam scan solicit function for SNR threshold roaming.
-fn solicit_roam_scan_poor_snr(
-    exec: &mut fasync::TestExecutor,
-    test_values: &mut TestValues,
-    existing_connection: &mut ExistingConnectionSmeObjects,
-) -> Option<fidl_sme::ClientSmeScanResponder> {
-    solicit_roam_scan_with_signal_reports(
-        exec,
-        test_values,
-        existing_connection,
-        SignalReportIndication { rssi_dbm: -20, snr_db: 0 },
-    )
-}
-
 #[test_case(
     RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam },
     solicit_roam_scan_weak_rssi,
@@ -2543,28 +2529,10 @@ fn solicit_roam_scan_poor_snr(
     "enabled stationary metrics only weak rssi should roam scan"
 )]
 #[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_poor_snr,
-    true;
-    "enabled stationary poor snr should roam scan"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
-    solicit_roam_scan_poor_snr,
-    true;
-    "enabled stationary metrics only poor snr should roam scan"
-)]
-#[test_case(
     RoamingPolicy::Disabled,
     solicit_roam_scan_weak_rssi,
     false;
     "disabled weak rssi should not roam scan"
-)]
-#[test_case(
-    RoamingPolicy::Disabled,
-    solicit_roam_scan_poor_snr,
-    false;
-    "disabled poor snr should not roam scan"
 )]
 #[fuchsia::test(add_test_attr = false)]
 // Tests if roaming policies trigger roam scans in different scenarios.
@@ -2599,7 +2567,6 @@ fn test_roam_policy_triggers_scan<F>(
 }
 
 #[test_case(RoamingProfile::Stationary, solicit_roam_scan_weak_rssi; "stationary weak rssi")]
-#[test_case(RoamingProfile::Stationary, solicit_roam_scan_poor_snr; "stationary poor snr")]
 #[fuchsia::test(add_test_attr = false)]
 // Tests if enabled roam profiles obey the minimum wait times between roam scans.
 fn test_roam_profile_scans_obey_wait_time<F>(
@@ -2633,7 +2600,7 @@ fn test_roam_profile_scans_obey_wait_time<F>(
     // Advance past the minimum wait time between roam scans. This should never use a catch-all
     // branch, to ensure it is updated for future profiles.
     let wait_time = match roaming_profile {
-        RoamingProfile::Stationary => stationary_monitor::MIN_BACKOFF_BETWEEN_ROAM_SCANS_ABSOLUTE,
+        RoamingProfile::Stationary => stationary_monitor::MIN_BACKOFF_BETWEEN_ROAM_SCANS,
     };
     exec.set_fake_time(
         fasync::MonotonicInstant::after(wait_time) + fasync::MonotonicDuration::from_seconds(1),
@@ -2652,9 +2619,7 @@ fn test_roam_profile_scans_obey_wait_time<F>(
     // Advance past the maximum backoff time between roam scans. This should never use a catch-all
     // branch, to ensure it is updated for future profiles.
     let wait_time = match roaming_profile {
-        RoamingProfile::Stationary => {
-            stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
-        }
+        RoamingProfile::Stationary => stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS,
     };
     exec.set_fake_time(
         fasync::MonotonicInstant::after(wait_time) + fasync::MonotonicDuration::from_seconds(1),
@@ -2671,34 +2636,16 @@ fn test_roam_profile_scans_obey_wait_time<F>(
     "enabled stationary weak rssi should roam"
 )]
 #[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_poor_snr,
-    true;
-    "enabled stationary poor snr should roam"
-)]
-#[test_case(
     RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
     solicit_roam_scan_weak_rssi,
     false;
     "enabled stationary metrics only weak rssi should not roam"
 )]
 #[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
-    solicit_roam_scan_poor_snr,
-    false;
-    "enabled stationary metrics only poor snr should not roam"
-)]
-#[test_case(
     RoamingPolicy::Disabled,
     solicit_roam_scan_weak_rssi,
     false;
     "disabled weak rssi should not roam"
-)]
-#[test_case(
-    RoamingPolicy::Disabled,
-    solicit_roam_scan_poor_snr,
-    false;
-    "disabled poor snr should not roam"
 )]
 #[fuchsia::test(add_test_attr = false)]
 // Tests if roaming policies trigger roam requests in different scenarios.
@@ -2772,7 +2719,6 @@ fn test_roam_policy_sends_roam_request<F>(
 }
 
 #[test_case(RoamingProfile::Stationary, solicit_roam_scan_weak_rssi; "stationary weak rssi")]
-#[test_case(RoamingProfile::Stationary, solicit_roam_scan_poor_snr; "stationary poor snr")]
 #[fuchsia::test(add_test_attr = false)]
 // Tests if enabled roaming profiles trigger roam requests up to a max per day threshold.
 fn test_roam_profile_obeys_max_roams_per_day<F>(
@@ -2808,9 +2754,7 @@ fn test_roam_profile_obeys_max_roams_per_day<F>(
     // Get max backoff time between roam scans constant. This should never use a catch-all branch, to
     // ensure it is updated for future profiles.
     let max_roam_scan_backoff_time = match roaming_profile {
-        RoamingProfile::Stationary => {
-            stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
-        }
+        RoamingProfile::Stationary => stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS,
     };
 
     // Create a mock scan result with a very strong BSS roam candidate.
@@ -2929,7 +2873,7 @@ fn test_autconnect_starts_after_roam_error() {
 
     // Advance fake time past max roam scan backoff time.
     exec.set_fake_time(fasync::MonotonicInstant::after(
-        stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS_IF_NO_CHANGE
+        stationary_monitor::MAX_BACKOFF_BETWEEN_ROAM_SCANS
             + fasync::MonotonicDuration::from_seconds(1),
     ));
 

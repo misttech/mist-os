@@ -19,7 +19,8 @@
 # This script assumes that vars.sh has already been sourced, since it
 # depends on FUCHSIA_DIR being defined correctly.
 
-_METRICS_GA_PROPERTY_ID="UA-127897021-6"
+# Increase the metrics version by 1 when analytics is updated
+_METRICS_VERSION="1"
 _METRICS_ALLOWS_CUSTOM_REPORTING=( "test" )
 # If args match the below, then track capture group 1
 _METRICS_TRACK_REGEX=(
@@ -175,7 +176,7 @@ _METRICS_TRACK_UNKNOWN_OPS=( "shell" )
 # old versions of Bash, particularly in the one in MacOS. The alternative is to
 # make them global first via the assignments above and marking they readonly
 # later.
-readonly _METRICS_GA_PROPERTY_ID _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
+readonly _METRICS_VERSION _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
 
 # To properly enable unit testing, METRICS_CONFIG is not read-only
 METRICS_CONFIG="${FUCHSIA_DIR}/.fx/config/metrics"
@@ -768,7 +769,7 @@ function track-build-event {
   local switches="$5"
   local fuchsia_targets="$6"
   local build_dir="$7"
-  local target_count="$8"
+  local is_no_op="$8"
   local is_clean_build="$9"
 
   local args_gn=""
@@ -825,6 +826,10 @@ function track-build-event {
   fi
 
   local -i args_json_size=$(wc -c < "${build_dir}"/args.json)
+  local -i target_count=0
+  if [[ "${is_no_op}" -eq 0 ]]; then
+    target_count=$("${PREBUILT_PYTHON3}" "$FUCHSIA_DIR/tools/devshell/contrib/lib/count-ninja-actions.py")
+  fi
 
   event_params=$(fx-command-run jq -c -n \
     --arg args_gn1 "${args_gn1}" \
@@ -921,7 +926,8 @@ function __send-analytics-batch {
   \"ninja_persistent\":{\"value\":\"$(_get_ninja_persistent_mode)\"},\
   \"other_uuid\":{\"value\":\"${OTHER_TOOLS_ANALYTICS_UUID}\"},\
   \"internal\":{\"value\":${internal}},\
-  \"metrics_level\":{\"value\":${METRICS_LEVEL}}\
+  \"metrics_level\":{\"value\":${METRICS_LEVEL}},\
+  \"metrics_version\":{\"value\":${_METRICS_VERSION}}\
   }"
   local events_json=$(fx-command-run jq -n -c '$ARGS.positional' \
     --jsonargs "${events[@]}")

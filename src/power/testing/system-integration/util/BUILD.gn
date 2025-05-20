@@ -12,7 +12,7 @@ source_set("util") {
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_cpp",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_cpp",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_cpp",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/diagnostics/reader/cpp:archive_reader",

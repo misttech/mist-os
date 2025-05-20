@@ -26,9 +26,9 @@ type WlanPhyCountry = flexible union {
 
 @discoverable
 @transport("Driver")
-closed protocol WlanPhyImpl {
+open protocol WlanPhyImpl {
     /// MAC roles supported for ifaces on the physical device.
-    strict GetSupportedMacRoles() -> (table {
+    flexible GetSupportedMacRoles() -> (table {
         1: supported_mac_roles
                 vector<fuchsia.wlan.common.WlanMacRole>:fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES;
     }) error zx.Status;
@@ -37,7 +37,7 @@ closed protocol WlanPhyImpl {
     /// Some common error codes are: \
     /// ZX_ERR_NO_RESOURCES: maximum number of interfaces have already been created. \
     /// ZX_ERR_NOT_SUPPORTED: device does not support the specified role.
-    strict CreateIface(resource table {
+    flexible CreateIface(resource table {
         /// The station role for this interface. A device may support multiple roles,
         /// but an interface is instantiated with a single role. This field is required.
         1: role fuchsia.wlan.common.WlanMacRole;
@@ -56,7 +56,7 @@ closed protocol WlanPhyImpl {
     /// Some common error codes are: \
     /// ZX_ERR_NOT_FOUND: Specified iface does not exist or has already been removed. \
     /// ZX_ERR_SHOULD_WAIT: Device is busy and cannot be removed, try again later.
-    strict DestroyIface(table {
+    flexible DestroyIface(table {
         /// This field is required.
         1: iface_id uint16;
     }) -> () error zx.Status;
@@ -64,32 +64,67 @@ closed protocol WlanPhyImpl {
     /// Set country with a WlanPhyCountry. \
     /// Some common error codes are: \
     /// ZX_ERR_NOT_FOUND: Specified country code not supported. PHY state is left unchanged.
-    strict SetCountry(WlanPhyCountry) -> () error zx.Status;
+    flexible SetCountry(WlanPhyCountry) -> () error zx.Status;
 
     /// Set device to a world-safe country, i.e. a mode that conforms to all
     /// regulatory constraints globally. \
     /// Generally expected to succeed if the device is in a functional state.
-    strict ClearCountry() -> () error zx.Status;
+    flexible ClearCountry() -> () error zx.Status;
 
     /// Read currently configured country. Implementations are advised to read the
     /// country directly from the firmware, where possible. \
     /// Generally expected to succeed if the device is in a functional state.
-    strict GetCountry() -> (WlanPhyCountry) error zx.Status;
+    flexible GetCountry() -> (WlanPhyCountry) error zx.Status;
 
     /// Set Power Save mode on device. In most implementations this
     /// likely to be set in Firmware. \
     /// Some common error codes are: \
     /// ZX_ERR_NOT_SUPPORTED: Specified Power Save mode not supported.
-    strict SetPowerSaveMode(table {
+    flexible SetPowerSaveMode(table {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
     }) -> () error zx.Status;
 
     /// Get current Power Save mode from device. In most implementation this
     /// likely to be retrieved from Firmware.
-    strict GetPowerSaveMode() -> (table {
+    flexible GetPowerSaveMode() -> (table {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
+    }) error zx.Status;
+
+    /// Power up/down/reset the wlan chip.
+    /// If supported, PowerDown will power down the wlan chip if it is currently powered on.
+    /// Any existing interfaces should have already been deleted before making this call or else the
+    /// driver will fail the call with error code ZX_ERR_INTERNAL.
+    /// Other possible error codes are: \
+    /// ZX_ERR_NOT_SUPPORTED: the feature is not supported by the driver.
+    /// ZX_ERR_BAD_STATE: the wlan chip is already powered down.
+    @available(added=HEAD)
+    flexible PowerDown() -> () error zx.Status;
+
+    /// If supported, PowerUp will power up the wlan chip if it is currently powered down.
+    /// Possible error codes are: \
+    /// ZX_ERR_NOT_SUPPORTED: the feature is not supported by the driver.
+    /// ZX_ERR_BAD_STATE: the wlan chip is already powered up.
+    @available(added=HEAD)
+    flexible PowerUp() -> () error zx.Status;
+
+    /// If supported, Reset functionality implements PowerDown then PowerUp in an attempt to
+    /// recover from an error state. For example, if an interface gets into a bad state or if
+    /// firmware crashes, the firmware/chip may be unable to perform some actions and Reset
+    /// may be able to clear the bad state.
+    /// Possible error codes are: \
+    /// ZX_ERR_NOT_SUPPORTED: the feature is not supported by the driver.
+    @available(added=HEAD)
+    flexible Reset() -> () error zx.Status;
+
+    /// Returns the current power state of the wlan chip. After successful initialization
+    /// of the wlan driver, the state is set to true (power on) by default. power_on set to
+    /// true indicates that the wlan chip is powered on and false indicates the wlan chip
+    /// is powered off.
+    @available(added=HEAD)
+    flexible GetPowerState() -> (table {
+        1: power_on bool;
     }) error zx.Status;
 };
 

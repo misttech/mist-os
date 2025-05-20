@@ -95,7 +95,7 @@ const (
 	DefaultSSHPort     string = "22"
 	defaultPackagePort string = "8083"
 	helpfulTipMsg      string = `Try running 'ffx target list' and then 'ffx config set device_config.<device-name>.image <image_name>'.
-	If you have more than one device listed, use 'ffx target default set <device-name>' to set a default device.`
+	If you have more than one device listed, use 'fx set-device <device-name>' or 'export FUCHSIA_NODENAME=<device-name>' to set a default device.`
 )
 
 var validPropertyNames = [...]string{
@@ -468,6 +468,21 @@ func (sdk SDKProperties) getDefaultFFXDevice() (string, error) {
 	}
 	log.Debugf("FFX default device is: %v", output)
 	return strings.TrimSpace(output), nil
+}
+
+// SetFFXDefaultDevice sets the default device in ffx for this process and its
+// children.
+func SetFFXDefaultDevice(deviceName string) error {
+	if err := os.Setenv("FUCHSIA_NODENAME", deviceName); err != nil {
+		return fmt.Errorf("unable to set $FUCHSIA_NODENAME=%s: %w", deviceName, err)
+	}
+
+	// $FUCHSIA_DEVICE_ADDR can shadow $FUCHSIA_NODENAME.
+	if err := os.Unsetenv("FUCHSIA_DEVICE_ADDR"); err != nil {
+		return fmt.Errorf("unable to unset $FUCHSIA_DEVICE_ADDR: %w", err)
+	}
+
+	return nil
 }
 
 func (sdk SDKProperties) getDeviceSSHAddress(device *deviceInfo) (string, error) {
@@ -1097,7 +1112,7 @@ func (sdk SDKProperties) SaveDeviceConfiguration(newConfig DeviceConfig) error {
 		dataMap[getDeviceDataKey([]string{newConfig.DeviceName, PackageRepoKey}, false)] = newConfig.PackageRepo
 	}
 	if newConfig.IsDefault {
-		if err := sdk.setFFXDefaultDevice(newConfig.DeviceName); err != nil {
+		if err := SetFFXDefaultDevice(newConfig.DeviceName); err != nil {
 			return fmt.Errorf("unable to set default device via ffx: %v", err)
 		}
 	}
@@ -1108,22 +1123,6 @@ func (sdk SDKProperties) SaveDeviceConfiguration(newConfig DeviceConfig) error {
 		}
 	}
 	return nil
-}
-
-// setFFXDefaultDevice sets the default device in ffx.
-func (sdk SDKProperties) setFFXDefaultDevice(deviceName string) error {
-	args := []string{"target", "default", "set", deviceName}
-	log.Debugf("Setting default device via ffx: %v\n", args)
-	_, err := sdk.RunFFX(args, false)
-	return err
-}
-
-// unsetFFXDefaultDevice unsets the default device in ffx.
-func (sdk SDKProperties) unsetFFXDefaultDevice() error {
-	args := []string{"target", "default", "unset"}
-	log.Debugf("Unsetting default device via ffx: %v\n", args)
-	_, err := sdk.RunFFX(args, false)
-	return err
 }
 
 // ResolveTargetAddress evaluates the deviceIP and deviceName passed in

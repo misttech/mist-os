@@ -73,8 +73,8 @@ rust_library(
     }),
     version = "1.12.1",
     deps = [
-        "//third_party/rust_crates/vendor/crossbeam-deque-0.8.1:crossbeam_deque",
-        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.14:crossbeam_utils",
+        "//third_party/rust_crates/vendor/crossbeam-deque-0.8.6:crossbeam_deque",
+        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.21:crossbeam_utils",
         "//third_party/rust_crates/vendor/rayon-core-1.12.1:build_script_build",
     ],
 )

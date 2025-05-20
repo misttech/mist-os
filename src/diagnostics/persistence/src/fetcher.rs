@@ -211,7 +211,7 @@ async fn fetch_and_save(
             record_service_error(
                 &service_name,
                 &tags,
-                format!("Empty selectors from service {} and tags {:?}", service_name, tags),
+                format!("Empty selectors from service {service_name} and tags {tags:?}"),
             );
             return;
         }
@@ -237,7 +237,7 @@ async fn fetch_and_save(
                 &service_name,
                 &tags,
                 timestamps,
-                format!("Failed to fetch Inspect data: {:?}", e),
+                format!("Failed to fetch Inspect data: {e:?}"),
             );
             return;
         }

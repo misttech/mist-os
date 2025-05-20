@@ -9,8 +9,9 @@ use fidl_fuchsia_developer_ffx::{
 };
 
 /// The default target name if no target spec is given (for debugging, reporting to the user, etc).
-/// TODO(b/371222096): Use this everywhere (will require a bit of digging).
 pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
+/// The default target name if we fail to query the target's name.
+pub const UNKNOWN_TARGET_NAME: &str = "<unknown>";
 pub const BUG_REPORT_URL: &str =
     "https://issues.fuchsia.dev/issues/new?component=1378294&template=1838957";
 
@@ -27,8 +28,9 @@ pub enum FfxTargetError {
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
             DaemonError::Timeout => format!("Timeout attempting to reach target {}", target_string(.target)),
+            DaemonError::ShutdownTimeout => format!("Timeout waiting for device to shutdown. Device {} is still responsive.", target_string(.target)),
             DaemonError::TargetCacheEmpty => format!("No devices found."),
-            DaemonError::TargetAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target_string(.target)),
+            DaemonError::TargetAmbiguous => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific target query.", target_string(.target)),
             DaemonError::TargetNotFound => format!("Target {} was not found.", target_string(.target)),
             DaemonError::ProtocolNotFound => "The requested ffx service was not found. Run `ffx doctor --restart-daemon`.".to_string(),
             DaemonError::ProtocolOpenError => "The requested ffx service failed to open. Run `ffx doctor --restart-daemon`.".to_string(),
@@ -41,14 +43,14 @@ pub enum FfxTargetError {
             OpenTargetError::FailedDiscovery => format!("Could not resolve specification {} due to discovery failure", target_string(.target)),
             OpenTargetError::QueryAmbiguous => {
                 match target_string(.target) {
-                    target if target == UNSPECIFIED_TARGET_NAME => format!("More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`."),
-                    target => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific matcher.", target),
+                    target if target == UNSPECIFIED_TARGET_NAME => format!("More than one device/emulator found. Use `ffx target list` to list known targets and specify one with the `-t` or `--target` flag."),
+                    target => format!("Target specification {} matched multiple targets. Use `ffx target list` to list known targets, and use a more specific target query.", target),
                 }
             },
             OpenTargetError::TargetNotFound => {
                 match target_string(.target) {
                     target if target == UNSPECIFIED_TARGET_NAME => format!("No devices/emulators found. Please ensure the device you want to use is connected and reachable, or an emulator is started."),
-                    target => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different matcher.", .target),
+                    target => format!("Target specification {} was not found. Use `ffx target list` to list known targets, and use a different target query.", .target),
                 }
             }
         })]

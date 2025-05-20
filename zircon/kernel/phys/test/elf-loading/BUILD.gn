@@ -19,6 +19,8 @@ template("get_int") {
   loadable_module(target_name) {
     visibility = [ ":*" ]
     testonly = true
+
+    configs += [ "//zircon/kernel/phys:phys-elf-module.config" ]
     ldflags = [ "-Wl,-e,GetInt" ]
 
     deps = [ ":get-int.source" ]

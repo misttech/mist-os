@@ -108,7 +108,7 @@ impl FakeArchiveAccessor {
         {
             if let Some(s) = self.event_signaler.as_ref() {
                 s.signal_done().await;
-                s.signal_error(&format!("{}", problem)).await;
+                s.signal_error(&format!("{problem}")).await;
             }
             error!("Problem in request: {}", problem);
             return Err(problem);

@@ -29,6 +29,7 @@ func NewGenerator(rustfmtPath, rustfmtConfigPath string, fdomain bool, common bo
 
 	return &Generator{
 		fdomain: fdomain,
+		common:  common,
 		Generator: fidlgen.NewGenerator("RustTemplates", templates, formatter, template.FuncMap{
 			"ResourceDialect": func() string {
 				if fdomain {
@@ -66,6 +67,6 @@ func NewGenerator(rustfmtPath, rustfmtConfigPath string, fdomain bool, common bo
 }
 
 func (gen *Generator) GenerateFidl(ir fidlgen.Root, outputFilename string, includeDrivers bool) error {
-	tree := Compile(ir, includeDrivers, gen.fdomain)
+	tree := Compile(ir, includeDrivers, gen.fdomain, gen.common)
 	return gen.GenerateFile(outputFilename, "GenerateSourceFile", tree)
 }

@@ -170,7 +170,7 @@ zx_status_t fdio_ns_export_root(fdio_flat_namespace_t** out) ZX_AVAILABLE_SINCE(
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in `ns`.
 // TODO(https://fxbug.dev/400787296): Mark this as removed at NEXT when we ship API level 27.
 zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_handle_t request)
-    ZX_REMOVED_SINCE(8, NEXT, HEAD, "Use fdio_ns_open3 instead.");
+    ZX_REMOVED_SINCE(8, 27, HEAD, "Use fdio_ns_open3 instead.");
 
 // Opens an object at `path` relative to the root of `ns` with `flags` asynchronously.
 //

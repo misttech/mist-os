@@ -124,6 +124,31 @@ closed protocol DeviceMonitor {
         resp GetPowerSaveModeResponse;
     }) error int32;
 
+    /// All interfaces should be deleted before calling this method. If supported, the
+    /// wlan driver will power down the wlan chip. Refer to wlan.phyimpl fidl for more details.
+    strict PowerDown(struct {
+        phy_id uint16;
+    }) -> () error zx.Status;
+
+    /// If supported, the wlan driver will power up the wlan chip. Refer to wlan.phyimpl fidl
+    /// for more details.
+    strict PowerUp(struct {
+        phy_id uint16;
+    }) -> () error zx.Status;
+
+    /// If supported, the wlan driver will reset the wlan chip. An attempt is made to delete
+    /// any existing interfaces. Refer to wlan.phyimpl fidl for more details.
+    strict Reset(struct {
+        phy_id uint16;
+    }) -> () error zx.Status;
+
+    /// This will return the current power state of the wlan chip.
+    strict GetPowerState(struct {
+        phy_id uint16;
+    }) -> (struct {
+        power_on bool;
+    }) error zx.Status;
+
     // Iface methods
     strict CreateIface(table {
         1: phy_id uint16;

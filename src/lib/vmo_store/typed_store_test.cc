@@ -94,7 +94,7 @@ class UnorderedMapStorage : public AbstractStorage<std::string, int32_t> {
     return ZX_OK;
   }
 
-  cpp17::optional<std::string> Push(StoredVmo<int32_t>&& vmo) override {
+  std::optional<std::string> Push(StoredVmo<int32_t>&& vmo) override {
     while (map_.find(auto_keys_) != map_.end()) {
       auto_keys_ += "a";
     }
@@ -110,10 +110,10 @@ class UnorderedMapStorage : public AbstractStorage<std::string, int32_t> {
     return &srch->second;
   }
 
-  cpp17::optional<StoredVmo<int32_t>> Extract(std::string key) override {
+  std::optional<StoredVmo<int32_t>> Extract(std::string key) override {
     auto result = map_.extract(key);
     if (!result) {
-      return cpp17::optional<StoredVmo<int32_t>>();
+      return std::optional<StoredVmo<int32_t>>();
     }
 
     return std::move(result.mapped());

@@ -124,9 +124,14 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
         let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
         let args = vec!["echo", "$SSH_CONNECTION"];
         let mut ssh = tokio::process::Command::from(
-            build_ssh_command_with_env(&self.ssh_path, addr, &ctx, args)
-                .await
-                .map_err(|e| PipeError::Error(e.to_string()))?,
+            build_ssh_command_with_env(
+                &self.ssh_path,
+                netext::ScopedSocketAddr::from_socket_addr(addr)
+                    .map_err(PipeError::AddressError)?,
+                &ctx,
+                args,
+            )
+            .map_err(|e| PipeError::Error(e.to_string()))?,
         );
 
         let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::null()).stderr(Stdio::null());
@@ -167,7 +172,7 @@ pub(crate) struct HostPipeChild {
 fn setup_watchdogs() {
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    tracing::debug!("Setting up executor watchdog");
+    log::debug!("Setting up executor watchdog");
     let flag = Arc::new(AtomicBool::new(false));
 
     fuchsia_async::Task::spawn({
@@ -175,7 +180,7 @@ fn setup_watchdogs() {
         async move {
             fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
             flag.store(true, Ordering::Relaxed);
-            tracing::debug!("Executor watchdog fired");
+            log::debug!("Executor watchdog fired");
         }
     })
     .detach();
@@ -183,7 +188,7 @@ fn setup_watchdogs() {
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(2));
         if !flag.load(Ordering::Relaxed) {
-            tracing::error!("Aborting due to watchdog timeout!");
+            log::error!("Aborting due to watchdog timeout!");
             std::process::abort();
         }
     });
@@ -194,45 +199,6 @@ impl HostPipeChild {
         self.compatibility_status.clone()
     }
 
-    #[tracing::instrument(skip(stderr_buf, event_queue))]
-    async fn new_inner_legacy(
-        ssh_path: &str,
-        addr: SocketAddr,
-        id: u64,
-        stderr_buf: Rc<LogBuffer>,
-        event_queue: events::Queue<TargetEvent>,
-        watchdogs: bool,
-        ssh_timeout: u16,
-        verbose_ssh: bool,
-        node: Arc<overnet_core::Router>,
-        ctx: EnvironmentContext,
-    ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
-        let id_string = format!("{}", id);
-        let args = vec![
-            "echo",
-            "++ $SSH_CONNECTION ++",
-            "&&",
-            "remote_control_runner",
-            "--circuit",
-            &id_string,
-        ];
-
-        Self::start_ssh_connection(
-            ssh_path,
-            addr,
-            args,
-            stderr_buf,
-            event_queue,
-            watchdogs,
-            ssh_timeout,
-            verbose_ssh,
-            node,
-            ctx,
-        )
-        .await
-    }
-
-    #[tracing::instrument(skip(stderr_buf, event_queue))]
     async fn new_inner(
         ssh_path: &str,
         addr: SocketAddr,
@@ -254,7 +220,7 @@ impl HostPipeChild {
         let args =
             vec!["remote_control_runner", "--circuit", &id_string, "--abi-revision", &abi_revision];
 
-        match Self::start_ssh_connection(
+        Self::start_ssh_connection(
             ssh_path,
             addr,
             args,
@@ -267,25 +233,6 @@ impl HostPipeChild {
             ctx.clone(),
         )
         .await
-        {
-            Ok((addr, pipe)) => Ok((addr, pipe)),
-            Err(PipeError::NoCompatibilityCheck) => {
-                Self::new_inner_legacy(
-                    ssh_path,
-                    addr,
-                    id,
-                    stderr_buf,
-                    event_queue,
-                    watchdogs,
-                    ssh_timeout,
-                    verbose_ssh,
-                    node,
-                    ctx,
-                )
-                .await
-            }
-            Err(e) => Err(e),
-        }
     }
 
     async fn start_ssh_connection(
@@ -305,12 +252,17 @@ impl HostPipeChild {
         }
 
         let mut ssh = tokio::process::Command::from(
-            build_ssh_command_with_env(ssh_path, addr, &ctx, args)
-                .await
-                .map_err(|e| PipeError::Error(e.to_string()))?,
+            build_ssh_command_with_env(
+                ssh_path,
+                netext::ScopedSocketAddr::from_socket_addr(addr)
+                    .map_err(PipeError::AddressError)?,
+                &ctx,
+                args,
+            )
+            .map_err(|e| PipeError::Error(e.to_string()))?,
         );
 
-        tracing::debug!("Spawning new ssh instance: {:?}", ssh);
+        log::debug!("Spawning new ssh instance: {:?}", ssh);
 
         if watchdogs {
             setup_watchdogs();
@@ -351,7 +303,7 @@ impl HostPipeChild {
         // doesn't support the `--abi-revision` argument.
         let mut stderr = BufReader::with_capacity(BUFFER_SIZE, stderr);
 
-        tracing::debug!("Awaiting client address from ssh connection");
+        log::debug!("Awaiting client address from ssh connection");
         let ssh_timeout = Duration::from_secs(ssh_timeout as u64);
         let (ssh_host_address, device_connection_info) =
             match parse_ssh_output(&mut stdout, &mut stderr, verbose_ssh, &ctx)
@@ -370,34 +322,34 @@ impl HostPipeChild {
                         match status.code() {
                             // Possible to catch more error codes here, hence the use of a match.
                             Some(255) => {
-                                tracing::warn!("SSH ret code: 255. Unexpected session termination.")
+                                log::warn!("SSH ret code: 255. Unexpected session termination.")
                             }
-                            _ => tracing::error!("SSH exited with error code: {status}. "),
+                            _ => log::error!("SSH exited with error code: {status}. "),
                         }
                     } else {
-                        tracing::error!(
+                        log::error!(
                             "ssh child has not ended, trying one more time then ignoring it."
                         );
                         fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
-                        tracing::error!("ssh child status is {:?}", ssh.try_wait());
+                        log::error!("ssh child status is {:?}", ssh.try_wait());
                     }
-                    event_queue.push(TargetEvent::SshHostPipeErr(ssh_err)).unwrap_or_else(|e| {
-                        tracing::warn!("queueing host pipe err event: {:?}", e)
-                    });
+                    event_queue
+                        .push(TargetEvent::SshHostPipeErr(ssh_err))
+                        .unwrap_or_else(|e| log::warn!("queueing host pipe err event: {:?}", e));
                     return Err(e);
                 }
             };
 
         let copy_in = async move {
             if let Err(e) = copy_buf(&mut stdout, &mut pipe_tx).await {
-                tracing::error!("SSH stdout read failure: {:?}", e);
+                log::error!("SSH stdout read failure: {:?}", e);
             }
         };
         let copy_out = async move {
             if let Err(e) =
                 copy_buf(&mut BufReader::with_capacity(BUFFER_SIZE, pipe_rx), &mut stdin).await
             {
-                tracing::error!("SSH stdin write failure: {:?}", e);
+                log::error!("SSH stdin write failure: {:?}", e);
             }
         };
 
@@ -416,27 +368,27 @@ impl HostPipeChild {
                         } else {
                             // Sometimes the SSH message that comes from openssh has a carriage
                             // return at the end which messes up the flow of the info log.
-                            tracing::info!("SSH stderr: {:?}", line.trim());
+                            log::info!("SSH stderr: {:?}", line.trim());
                             stderr_buf.push_line(line.clone());
                             event_queue
                                 .push(TargetEvent::SshHostPipeErr(SshError::from(line)))
                                 .unwrap_or_else(|e| {
-                                    tracing::warn!("queueing host pipe err event: {:?}", e)
+                                    log::warn!("queueing host pipe err event: {:?}", e)
                                 });
                         }
                     }
                     Err(ParseSshConnectionError::UnexpectedEOF(s)) => {
                         if !s.is_empty() {
-                            tracing::error!("Got unexpected EOF -- buffer so far: {s:?}");
+                            log::error!("Got unexpected EOF -- buffer so far: {s:?}");
                         }
                         break;
                     }
-                    Err(e) => tracing::error!("SSH stderr read failure: {:?}", e),
+                    Err(e) => log::error!("SSH stderr read failure: {:?}", e),
                 }
             }
         };
 
-        tracing::debug!("Establishing host-pipe process to target");
+        log::debug!("Establishing host-pipe process to target");
         let overnet_id = device_connection_info.as_ref().and_then(|dci| dci.overnet_id);
         Ok((
             Some(ssh_host_address),
@@ -458,24 +410,24 @@ impl Drop for HostPipeChild {
         let pid = Pid::from_raw(self.inner.id().unwrap() as i32);
         match self.inner.try_wait() {
             Ok(Some(result)) => {
-                tracing::info!("HostPipeChild exited with {}", result);
+                log::info!("HostPipeChild exited with {}", result);
             }
             Ok(None) => {
                 let _ = kill(pid, SIGKILL)
-                    .map_err(|e| tracing::debug!("failed to kill HostPipeChild: {:?}", e));
+                    .map_err(|e| log::debug!("failed to kill HostPipeChild: {:?}", e));
                 let _ = waitpid(pid, None)
-                    .map_err(|e| tracing::debug!("failed to clean up HostPipeChild: {:?}", e));
+                    .map_err(|e| log::debug!("failed to clean up HostPipeChild: {:?}", e));
             }
             Err(e) => {
                 // Let the user know if error returned from try_wait() is ESRCH
                 if e.kind() == io::Error::from(Errno::ESRCH).kind() {
-                    tracing::warn!("Failed to wait. No process found with the given PID: {pid}");
+                    log::warn!("Failed to wait. No process found with the given PID: {pid}");
                 } else {
-                    tracing::debug!("failed to soft-wait HostPipeChild: {:?}", e);
+                    log::debug!("failed to soft-wait HostPipeChild: {:?}", e);
                     let _ = kill(pid, SIGKILL)
-                        .map_err(|e| tracing::debug!("failed to kill HostPipeChild: {:?}", e));
+                        .map_err(|e| log::debug!("failed to kill HostPipeChild: {:?}", e));
                     let _ = waitpid(pid, None)
-                        .map_err(|e| tracing::debug!("failed to clean up HostPipeChild: {:?}", e));
+                        .map_err(|e| log::debug!("failed to clean up HostPipeChild: {:?}", e));
                 }
             }
         };
@@ -506,17 +458,16 @@ where
         let res = kill(pid, SIGKILL);
         match res {
             Err(Errno::ESRCH) => {
-                tracing::warn!("Failed to kill. No process found with the given PID: {pid}");
+                log::warn!("Failed to kill. No process found with the given PID: {pid}");
             }
             Err(e) => {
-                tracing::debug!("Failed to kill. Got {e:?}");
+                log::debug!("Failed to kill. Got {e:?}");
             }
             _ => (),
         };
     }
 }
 
-#[tracing::instrument(skip(host_pipe_child_builder))]
 pub(crate) async fn spawn<T>(
     target: Weak<Target>,
     watchdogs: bool,
@@ -552,7 +503,7 @@ where
     ) -> Result<Arc<HostPipeChild>, PipeError> {
         let target = target.upgrade().ok_or(PipeError::TargetGone)?;
         let target_nodename: String = target.nodename_str();
-        tracing::debug!("Spawning new host-pipe instance to target {target_nodename}");
+        log::debug!("Spawning new host-pipe instance to target {target_nodename}");
         let log_buf = target.host_pipe_log_buffer();
         log_buf.clear();
 
@@ -573,7 +524,7 @@ where
             .map_err(|e| PipeError::PipeCreationFailed(e.to_string(), target_nodename.clone()))?;
 
         *target.ssh_host_address.borrow_mut() = host_addr;
-        tracing::debug!(
+        log::debug!(
             "Set ssh_host_address to {:?} for {}@{}",
             target.ssh_host_address,
             target.nodename_str(),
@@ -624,11 +575,11 @@ where
             let target_nodename = self.target.nodename();
             let res = unblock(move || waitpid(pid, None)).await;
 
-            tracing::debug!("host-pipe command res: {:?}", res);
+            log::debug!("host-pipe command res: {:?}", res);
 
             // Keep the ssh_host address in the target. This is the address of the host as seen from
             // the target. It is primarily used when configuring the package server address.
-            tracing::debug!(
+            log::debug!(
                 "Skipped clearing ssh_host_address for {}@{}",
                 self.target.nodename_str(),
                 self.target.id()
@@ -638,13 +589,13 @@ where
                 Ok(_) => {
                     return Ok(());
                 }
-                Err(e) => tracing::debug!("running cmd on {:?}: {:#?}", target_nodename, e),
+                Err(e) => log::debug!("running cmd on {:?}: {:#?}", target_nodename, e),
             }
 
             // TODO(https://fxbug.dev/42129296): Want an exponential backoff that
             // is sync'd with an explicit "try to start this again
             // anyway" channel using a select! between the two of them.
-            tracing::debug!(
+            log::debug!(
                 "waiting {} before restarting child_pipe",
                 self.relaunch_command_delay.as_secs()
             );
@@ -1035,39 +986,6 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_start_legacy_ok() {
-        let env = ffx_config::test_init().await.unwrap();
-        const SUPPORTED_HOST_PIPE_SH: &str = include_str!("../../test_data/legacy_host_pipe.sh");
-
-        let ssh_path = env.isolate_root.path().join("legacy_host_pipe.sh");
-        fs::write(&ssh_path, SUPPORTED_HOST_PIPE_SH).expect("writing test script");
-        fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
-            .expect("setting permissions");
-
-        write_test_ssh_keys(&env).await;
-
-        let target = crate::target::Target::new_with_addrs(
-            Some("test_target"),
-            [TargetIpAddr::from_str("192.168.1.1:22").unwrap()].into(),
-        );
-        let ssh_path_str: String = ssh_path.to_string_lossy().to_string();
-        let node = overnet_core::Router::new(None).unwrap();
-        let _res = HostPipeConnection::<FakeHostPipeChildBuilder<'_>>::spawn_with_builder(
-            Rc::downgrade(&target),
-            FakeHostPipeChildBuilder {
-                operation_type: ChildOperationType::DefaultBuilder,
-                ssh_path: &ssh_path_str,
-            },
-            30,
-            Duration::default(),
-            false,
-            node,
-        )
-        .await
-        .expect("host connection");
-    }
-
-    #[fuchsia::test]
     async fn test_ssh_command_includes_keepalive_timeout() {
         let env = ffx_config::test_init().await.unwrap();
         write_test_ssh_keys(&env).await;
@@ -1081,7 +999,13 @@ mod test {
 
         let addr = SocketAddr::new(Ipv4Addr::new(192, 0, 2, 0).into(), 2345);
         let cmd = tokio::process::Command::from(
-            build_ssh_command_with_env("path-to-ssh", addr, &env.context, vec![]).await.unwrap(),
+            build_ssh_command_with_env(
+                "path-to-ssh",
+                netext::ScopedSocketAddr::from_socket_addr(addr).unwrap(),
+                &env.context,
+                vec![],
+            )
+            .unwrap(),
         );
         // Kind of a hack, but there's no non-debug method that returns a string corresponding to the command.
         assert!(format!("{cmd:?}").contains("ServerAliveCountMax=30"));

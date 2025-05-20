@@ -174,7 +174,7 @@ class UnownedClientEnd final
 template <typename Protocol>
 class ServerEnd final
     : public fidl::internal::ServerEndBase<Protocol, fidl::internal::DriverTransport> {
-  static_assert(cpp17::is_same_v<typename Protocol::Transport, fidl::internal::DriverTransport>);
+  static_assert(std::is_same_v<typename Protocol::Transport, fidl::internal::DriverTransport>);
   using ServerEndBase = fidl::internal::ServerEndBase<Protocol, fidl::internal::DriverTransport>;
 
  public:

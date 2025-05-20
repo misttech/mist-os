@@ -108,7 +108,14 @@ void gic_redistributor_sleep(bool sleep) {
   cpu_num_t cpu = arch_curr_cpu_num();
   DEBUG_ASSERT(arch_ints_disabled());
 
-  // TODO(drewry): we may need to check GICD_CTRL_DS to ensure we can access.
+  // GICR_WAKER could be RW or RAZ/WI.  When GICD_CTLR.DS is 1, GICR_WAKER is
+  // RW.  However, when GICD_CTLR.DS is 0, GICR_WAKER could be RW or RAZ/WI
+  // depending on whether the access is Secure/Non-secure and FEAT_RME.
+  //
+  // Instead of checking those things we're going to take a shortcut.  In the
+  // case we're writing a 1 to WAKER_PROCESSOR_SLEEP we'll read back GICR_WAKER
+  // to determine if it's RW or RAZ/WI.  If the former, we'll
+  // gic_wait_for_mask.  If the latter, we'll bail out.
   uint waker = arm_gicv3_read32(GICR_WAKER(cpu));
   if (sleep) {
     waker |= WAKER_PROCESSOR_SLEEP;
@@ -116,6 +123,14 @@ void gic_redistributor_sleep(bool sleep) {
     waker &= ~WAKER_PROCESSOR_SLEEP;
   }
   arm_gicv3_write32(GICR_WAKER(cpu), waker);
+  if (sleep) {
+    const uint read_back = arm_gicv3_read32(GICR_WAKER(cpu));
+    if ((read_back & WAKER_PROCESSOR_SLEEP) == 0) {
+      // Our write didn't take.  Must be RAZ/WI.  Don't bother waiting.
+      return;
+    }
+  }
+
   uint64_t val = sleep ? WAKER_CHILDREN_ASLEEP : 0;
   gic_wait_for_mask(GICR_WAKER(cpu), WAKER_CHILDREN_ASLEEP, val);
 }
@@ -460,6 +475,20 @@ void gic_shutdown() {
   return false;
 }
 
+zx_status_t gic_suspend_cpu() {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  // Disable group 1 interrupts at the CPU interface.
+  gic_write_igrpen(0);
+
+  // Mark the PE as offline. This will keep the redistributor from routing
+  // interrupts and for any interrupts targeting it, trigger a wake-request to
+  // the power controller.
+  gic_redistributor_sleep(true);
+
+  return ZX_OK;
+}
+
 void gic_shutdown_cpu() {
   DEBUG_ASSERT(arch_ints_disabled());
 
@@ -475,13 +504,14 @@ void gic_shutdown_cpu() {
   DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID || !is_spi_enabled());
   // TODO(maniscalco): If/when we start using LPIs, make sure none are targeted at this CPU.
 
-  // Disable group 1 interrupts at the CPU interface.
-  gic_write_igrpen(0);
+  const zx_status_t status = gic_suspend_cpu();
+  DEBUG_ASSERT_MSG(status == ZX_OK, "%d\n", status);
+}
 
-  // Mark the PE as offline. This will keep the redistributor from routing
-  // interrupts and for any interrupts targeting it, trigger a wake-request to
-  // the power controller.
-  gic_redistributor_sleep(true);
+zx_status_t gic_resume_cpu() {
+  gic_init_percpu_early();
+  gic_init_percpu();
+  return ZX_OK;
 }
 
 bool gic_msi_is_supported() { return false; }
@@ -519,6 +549,8 @@ const struct pdev_interrupt_ops gic_ops = {
     .handle_irq = gic_handle_irq,
     .shutdown = gic_shutdown,
     .shutdown_cpu = gic_shutdown_cpu,
+    .suspend_cpu = gic_suspend_cpu,
+    .resume_cpu = gic_resume_cpu,
     .msi_is_supported = gic_msi_is_supported,
     .msi_supports_masking = gic_msi_supports_masking,
     .msi_mask_unmask = gic_msi_mask_unmask,

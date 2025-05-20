@@ -77,11 +77,15 @@ void UIStateProvider::OnDisconnect() {
   reconnect_task_.PostDelayed(dispatcher_, backoff_->GetNext());
 }
 
-std::set<std::string> UIStateProvider::GetKeys() const {
+std::set<std::string> UIStateProvider::GetAnnotationKeys() {
   return {
       kSystemUserActivityCurrentStateKey,
       kSystemUserActivityCurrentDurationKey,
   };
+}
+
+std::set<std::string> UIStateProvider::GetKeys() const {
+  return UIStateProvider::GetAnnotationKeys();
 }
 
 void UIStateProvider::OnStateChanged(fuchsia::ui::activity::State state, int64_t transition_time,

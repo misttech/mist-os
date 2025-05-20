@@ -121,7 +121,7 @@ impl TargetCollection {
             let Some(lhs) = lhs else { return };
             let Some(rhs) = rhs else { return };
             if lhs != rhs {
-                tracing::warn!("Identical target with mismatching {name}: {lhs:?} vs {rhs:?}");
+                log::warn!("Identical target with mismatching {name}: {lhs:?} vs {rhs:?}");
             }
         }
 
@@ -160,7 +160,7 @@ impl TargetCollection {
 
                     // Previously this was an info message, moving to debug as this is internal
                     // state of target collection.
-                    tracing::debug!("Merging {prev:?} + {info:?}");
+                    log::debug!("Merging {prev:?} + {info:?}");
 
                     let ffx::TargetInfo {
                         nodename: _,
@@ -175,6 +175,7 @@ impl TargetCollection {
                         fastboot_interface,
                         ssh_host_address,
                         compatibility,
+                        is_manual,
                         // Intentionally opt-in to compilation failures when new fields are added.
                         __source_breaking: _,
                     } = info;
@@ -229,7 +230,7 @@ impl TargetCollection {
                                     if *old == ffx::TargetState::Disconnected {
                                         *old = new;
                                     } else {
-                                        tracing::warn!("Conflicting state: {old:?} vs {new:?}");
+                                        log::warn!("Conflicting state: {old:?} vs {new:?}");
                                     }
                                 });
                             }
@@ -248,6 +249,8 @@ impl TargetCollection {
                             *old = new;
                         }
                     });
+                    // Err on the side of calling something manual
+                    merge(&mut prev.is_manual, is_manual, |old, new| *old = *old || new);
                 }
                 Entry::Vacant(vacant) => {
                     let addrs =
@@ -323,57 +326,27 @@ impl TargetCollection {
     pub fn remove_target(&self, target_id: String) -> bool {
         if let Ok(Some(t)) = self.query_any_single_target(&target_id.clone().into(), |_| true) {
             self.remove_target_from_list(t.id());
-            tracing::debug!("TargetCollection: removed target {}", target_id);
+            log::debug!("TargetCollection: removed target {}", target_id);
             true
         } else {
-            tracing::debug!("TargetCollection: Requested to remove target {}, but was not found in our collection", target_id);
+            log::debug!("TargetCollection: Requested to remove target {}, but was not found in our collection", target_id);
             false
         }
-    }
-
-    pub fn remove_ephemeral_target(&self, target: Rc<Target>) -> bool {
-        let Some(target) = self.targets.borrow_mut().remove(&target.id()) else { return false };
-        target.disable();
-        true
     }
 
     /// Checks and expires stale targets.
     ///
     /// Returns the list of expired manual addresses.
-    pub fn expire_targets(&self, overnet_node: &Arc<overnet_core::Router>) -> Vec<SocketAddr> {
-        let mut expired_manual_addrs = Vec::new();
-        let mut expired = Vec::new();
+    pub fn expire_targets(&self, overnet_node: &Arc<overnet_core::Router>) {
         for target in Vec::from_iter(self.targets.borrow().values()) {
             target.expire_state();
-            if target.is_manual() && !target.is_connected() {
-                // If a manual target has been allowed to transition to the
-                // "disconnected" state, it should be removed from the collection.
-                let ssh_port = target.ssh_port();
-                for addr in target.manual_addrs() {
-                    let Ok(mut sockaddr) = TargetIpAddr::try_from(addr).map(SocketAddr::from)
-                    else {
-                        continue;
-                    };
-                    ssh_port.map(|p| sockaddr.set_port(p));
-                    expired_manual_addrs.push(sockaddr);
-                }
-                expired.push(target.clone());
-            } else if target.is_manual() {
+            if target.is_manual() {
                 // Manually-added remote targets will not be discovered by mDNS,
                 // and as a result will not have host-pipe triggered automatically
                 // by the mDNS event handler.
                 target.run_host_pipe(overnet_node);
             }
         }
-
-        for target in expired {
-            self.remove_ephemeral_target(target);
-        }
-
-        if !expired_manual_addrs.is_empty() {
-            tracing::debug!("Expired manual addresses: {expired_manual_addrs:?}");
-        }
-        expired_manual_addrs
     }
 
     // Merge intersecting identities.
@@ -397,7 +370,7 @@ impl TargetCollection {
 
                 // Previously this was an info message, moving to debug as this is internal state
                 // of target collection.
-                tracing::debug!("Merge identity {:?} with {:?}", identity, id);
+                log::debug!("Merge identity {:?} with {:?}", identity, id);
                 identity.join((*id).clone());
                 merge = true;
             } else {
@@ -428,7 +401,7 @@ impl TargetCollection {
                 if is_ptr_eq {
                     // This was previously info, moving to debug as this is the internal state of
                     // ffx target collection.
-                    tracing::debug!("Updating identity of {:?}", target);
+                    log::debug!("Updating identity of {:?}", target);
                     target.replace_shared_identity(Rc::clone(&identity));
                     targets_changed |= true;
                 }
@@ -456,7 +429,7 @@ impl TargetCollection {
 
         // If we haven't yet found a target, try to find one by all IDs, nodename, serial, or address.
         if let Some(to_update) = &to_update {
-            tracing::debug!("Matched target by id: {to_update:?}");
+            log::debug!("Matched target by id: {to_update:?}");
             network_changed = has_vsock_or_usb && !to_update.has_vsock_or_usb_addr();
         } else {
             let new_ips = new_target
@@ -506,7 +479,7 @@ impl TargetCollection {
                 // for example, a match on ip and port might be more authoritative
                 // than matching on nodename, more analysis is needed.
                 if target.has_id(new_ids.iter()) || identity_match() || address_match() {
-                    tracing::debug!(
+                    log::debug!(
                         "Matched target has_id: {id} identity:\
                      {identity} address: {addr}\
                      for {new_nodename:?} {new_ips:?}\
@@ -563,7 +536,7 @@ impl TargetCollection {
             if let Some(event_queue) = self.events.borrow().as_ref() {
                 event_queue
                     .push(DaemonEvent::NewTarget(target.target_info()))
-                    .unwrap_or_else(|e| tracing::warn!("unable to push new target event: {}", e));
+                    .unwrap_or_else(|e| log::warn!("unable to push new target event: {}", e));
             }
         }
     }
@@ -584,7 +557,7 @@ impl TargetCollection {
             }
             drop(guard);
 
-            tracing::debug!("Waiting for next change...");
+            log::debug!("Waiting for next change...");
 
             // TODO(b/297896647): Move synchronous polled discovery here. Make sure to clone the
             // event before doing sync polling.
@@ -602,7 +575,7 @@ impl TargetCollection {
         target.enable();
 
         if was_disabled {
-            tracing::info!(
+            log::info!(
                 "Enabling ['Discovered'] target:['{}']@[{}]",
                 target.nodename_str(),
                 target.id()
@@ -622,7 +595,6 @@ impl TargetCollection {
     // TODO(b/304312166): Test-only now.
     // Will be removed once "targets" are associated with a single address.
     #[doc(hidden)]
-    #[tracing::instrument(skip(self))]
     pub fn merge_insert(&self, new_target: Rc<Target>) -> Rc<Target> {
         // Drop non-manual loopback address entries, as matching against
         // them could otherwise match every target in the collection.
@@ -646,7 +618,7 @@ impl TargetCollection {
 
         let (to_update, network_changed) = self.find_matching_target(&new_target);
 
-        tracing::trace!("Merging target {:?} into {:?}", new_target, to_update);
+        log::trace!("Merging target {:?} into {:?}", new_target, to_update);
 
         // Do not merge unscoped link-local addresses into the target
         // collection, as they are not routable and therefore not safe
@@ -657,12 +629,12 @@ impl TargetCollection {
         let Some(to_update) = to_update else {
             // The target was not matched in the collection, so insert it and return.
 
-            tracing::info!(
+            log::info!(
                 "Adding new ['{:?}'] target: [{}]",
                 new_target.get_connection_state(),
                 new_target.id()
             );
-            tracing::debug!("{:#?}", new_target);
+            log::debug!("{:#?}", new_target);
             self.targets.borrow_mut().insert(new_target.id(), new_target.clone());
 
             self.try_push_new_target_event(&*new_target);
@@ -678,7 +650,7 @@ impl TargetCollection {
             to_update.replace_shared_identity(new_target.identity().unwrap());
         } else if new_target.has_identity() && !new_target.identity_matches(&to_update) {
             let identity = new_target.identity().unwrap();
-            tracing::info!("Changing identity of {:?} to {:?}", to_update, identity);
+            log::info!("Changing identity of {:?} to {:?}", to_update, identity);
             to_update.replace_shared_identity(identity);
         }
 
@@ -705,7 +677,7 @@ impl TargetCollection {
         // When this happens, clean up the host_pipe and reconnect, and clear
         // the ssh host_address.
         if network_changed {
-            tracing::warn!("Network address changed for {to_update:?}");
+            log::warn!("Network address changed for {to_update:?}");
             if to_update.is_connected() {
                 to_update.disconnect();
                 to_update.maybe_reconnect(None);
@@ -714,7 +686,7 @@ impl TargetCollection {
         } else {
             if to_update.ssh_host_address.borrow().is_none() {
                 if new_target.ssh_host_address.borrow().is_some() {
-                    tracing::debug!(
+                    log::debug!(
                         "Setting ssh_host_address to {:?} for {}@{}",
                         new_target.ssh_host_address,
                         to_update.nodename_str(),
@@ -747,19 +719,18 @@ impl TargetCollection {
         self.signal_targets_changed();
 
         // Misnomer. Event should be renamed to `Updated`
-        to_update.events.push(TargetEvent::Rediscovered).unwrap_or_else(|err| {
-            tracing::warn!("unable to enqueue rediscovered event: {:#}", err)
-        });
+        to_update
+            .events
+            .push(TargetEvent::Rediscovered)
+            .unwrap_or_else(|err| log::warn!("unable to enqueue rediscovered event: {:#}", err));
 
         if to_update.is_enabled() {
             if let Some(event_queue) = self.events.borrow().as_ref() {
                 event_queue
                     .push(DaemonEvent::UpdatedTarget(to_update.target_info()))
-                    .unwrap_or_else(|e| {
-                        tracing::warn!("unable to push target update event: {}", e)
-                    });
+                    .unwrap_or_else(|e| log::warn!("unable to push target update event: {}", e));
             } else {
-                tracing::debug!("No event queue for this target collection.");
+                log::debug!("No event queue for this target collection.");
             }
         }
 
@@ -780,7 +751,7 @@ impl TargetCollection {
         F: Borrow<TargetUpdateFilter<'a>> + Debug,
     {
         // For all matching targets, create a temporary target by id and update it.
-        tracing::debug!("Updating targets matching {filters:?} with {update:?}");
+        log::debug!("Updating targets matching {filters:?} with {update:?}");
 
         // Merge identities early so filters match on _merged_ identities.
         if let Some(identity) = update.identity.take() {
@@ -806,7 +777,7 @@ impl TargetCollection {
         if create_new && merge_targets.is_empty() {
             // Insert a fresh & empty target to apply an update against.
             let target = self.merge_insert(Target::new());
-            tracing::debug!("No existing targets; creating new target with id {}", target.id());
+            log::debug!("No existing targets; creating new target with id {}", target.id());
 
             let target = Target::new_with_id(target.id());
             target.apply_update(update.clone());
@@ -851,7 +822,7 @@ impl TargetCollection {
         match ret {
             Some(target) if target.is_enabled() => {
                 if !target.is_host_pipe_running() {
-                    tracing::debug!("Reconnecting to {:?}", &target.addrs());
+                    log::debug!("Reconnecting to {:?}", &target.addrs());
                     target.run_host_pipe(overnet_node);
                 }
                 true
@@ -868,7 +839,7 @@ impl TargetCollection {
         let mut found = false;
         for target in self.targets.borrow().values() {
             if target.is_waiting_for_rcs_identity() {
-                tracing::info!(
+                log::info!(
                     "Unidentified Target waiting for RCS: {:?}@{}",
                     target.addrs(),
                     target.id()
@@ -897,12 +868,10 @@ impl TargetCollection {
                 // a long period of time.
                 // We simply close the target and return it. It is already invalid and should not be
                 // used.
-                tracing::warn!(
-                    "Internal Inconsistency: Attempted to enable target not in collection"
-                );
+                log::warn!("Internal Inconsistency: Attempted to enable target not in collection");
 
                 if target.is_enabled() {
-                    tracing::warn!("Disabling inconsistent target");
+                    log::warn!("Disabling inconsistent target");
 
                     target.disable();
                 }
@@ -912,7 +881,7 @@ impl TargetCollection {
         }
 
         if !target.is_enabled() {
-            tracing::info!(
+            log::info!(
                 "Using discovered target: {} (USER REASON: {user_reason})",
                 target.nodename_str()
             );
@@ -943,19 +912,19 @@ impl TargetCollection {
     fn select_preferred_target(new: &Rc<Target>, current: &mut Rc<Target>) {
         'preferred: {
             if new.is_host_pipe_running() && !current.is_host_pipe_running() {
-                tracing::debug!("Prioritizing duplicate with established connection");
+                log::debug!("Prioritizing duplicate with established connection");
                 break 'preferred;
             } else if new.rcs().is_some() && !current.rcs().is_some() {
-                tracing::debug!("Prioritizing duplicate with RCS connection");
+                log::debug!("Prioritizing duplicate with RCS connection");
                 break 'preferred;
             }
 
             if new.is_connected() {
                 if !current.is_connected() {
-                    tracing::debug!("Prioritizing duplicate, other one has expired");
+                    log::debug!("Prioritizing duplicate, other one has expired");
                     break 'preferred;
                 } else if new.last_response() > current.last_response() {
-                    tracing::debug!("Prioritizing recently seen duplicate");
+                    log::debug!("Prioritizing recently seen duplicate");
                     break 'preferred;
                 }
             }
@@ -984,18 +953,18 @@ impl TargetCollection {
                 if (query.is_query_on_identity() && selected.identity_matches(target))
                     || query.is_query_on_address()
                 {
-                    tracing::debug!("Found duplicate target with matching identity: {target:?}");
+                    log::debug!("Found duplicate target with matching identity: {target:?}");
                     Self::select_preferred_target(target, selected);
                 } else {
                     if !found_multiple {
                         // Print out the header with the first selected target, then
                         // subsequent log lines print the rest of the matching targets.
-                        tracing::error!("Target query {query:?} matched multiple targets:");
-                        tracing::error!("{:?}", selected);
+                        log::error!("Target query {query:?} matched multiple targets:");
+                        log::error!("{:?}", selected);
                         found_multiple = true;
                     }
 
-                    tracing::error!("& {:?}", target);
+                    log::error!("& {:?}", target);
                 }
             } else {
                 selected = Some(target.clone());
@@ -1019,7 +988,7 @@ impl TargetCollection {
     ) -> Option<B> {
         self.query_any_target(query, move |target| {
             if !target.is_enabled() {
-                tracing::debug!("Skipping inactive target {target:?}");
+                log::debug!("Skipping inactive target {target:?}");
                 ControlFlow::Continue(())
             } else {
                 f(target)
@@ -1033,7 +1002,7 @@ impl TargetCollection {
     ) -> Result<Option<Rc<Target>>, ()> {
         self.query_any_single_target(query, |target| {
             if !target.is_enabled() {
-                tracing::debug!("Skipping inactive target {target:?}");
+                log::debug!("Skipping inactive target {target:?}");
                 false
             } else {
                 true
@@ -1047,10 +1016,10 @@ impl TargetCollection {
     ) -> Result<Option<Rc<Target>>, ()> {
         self.query_any_single_target(query, |target| {
             if !target.is_enabled() {
-                tracing::debug!("Skipping inactive target {target:?}");
+                log::debug!("Skipping inactive target {target:?}");
                 false
             } else if !target.is_connected() {
-                tracing::debug!("Skipping disconnected target {target:?}");
+                log::debug!("Skipping disconnected target {target:?}");
                 false
             } else {
                 true
@@ -1064,9 +1033,8 @@ impl TargetCollection {
     ///
     /// Returns an error if multiple targets match. In an environment where targets are discovered
     /// asynchronously this error will not consistently fire.
-    #[tracing::instrument(skip(self))]
     pub async fn discover_target(&self, query: &TargetInfoQuery) -> Result<DiscoveredTarget, ()> {
-        tracing::debug!("Using query: {:?}", query);
+        log::debug!("Using query: {:?}", query);
 
         // A timeout is not needed here as timeouts are handled downstream and may be
         // undesired. Futures can be dropped before completion, so the loop will always exit.
@@ -1087,13 +1055,13 @@ impl TargetCollection {
                     Ok(Some(found)) => Ok(found),
                     Ok(None) => return ControlFlow::Continue(()),
                     Err(_) => {
-                        tracing::warn!("Too many targets matched query");
+                        log::warn!("Too many targets matched query");
 
                         // Manual targets may not have a nodename yet. The nodename is fetched
                         // once the RCS connection is established.
                         // NOTE: Only applies if the query is a wildcard matcher.
                         if self.has_unidentified_target() {
-                            tracing::info!(
+                            log::info!(
                                 "Waiting for unidentified manual target(s) to finish identification"
                             );
                             return ControlFlow::Continue(());
@@ -1105,7 +1073,7 @@ impl TargetCollection {
             })
             .await?;
 
-        tracing::debug!("Matched {target:?}");
+        log::debug!("Matched {target:?}");
         Ok(DiscoveredTarget(target))
     }
 
@@ -1120,7 +1088,7 @@ impl TargetCollection {
         });
         if let Some(id) = with_id_iter.next() {
             if let Some(_) = with_id_iter.next() {
-                tracing::warn!("Found multiple targets with the same overnet id: {overnet_id}!");
+                log::warn!("Found multiple targets with the same overnet id: {overnet_id}!");
             }
             Some(id.clone())
         } else {
@@ -1169,14 +1137,14 @@ impl<'a> TargetUpdateFilter<'a> {
                     // address filtering requires special logic to match addresses correctly.
                     // XXX Removed special handling since I don't understand what was special
                     // about that logic
-                    tracing::debug!("In NetAddrs match, comparing addr {addr:?} to target_addrs {target_addrs:?}");
+                    log::debug!("In NetAddrs match, comparing addr {addr:?} to target_addrs {target_addrs:?}");
                     let addr_match =  target_addrs.iter().any(|entry| {
                         let Ok(entry): Result<TargetIpAddr, _> = entry.addr.try_into() else {
                             return false;
                         };
                         match_addr(*addr, entry)
                     });
-                    tracing::debug!("Is there a match? {addr_match}");
+                    log::debug!("Is there a match? {addr_match}");
                     addr_match
                 })
             }
@@ -1235,12 +1203,7 @@ mod tests {
         assert!(opt.is_none(), "Target found")
     }
 
-    #[track_caller]
-    fn expect_ambiguous_target(tc: &TargetCollection, query: &TargetInfoQuery) {
-        tc.query_single_enabled_target(query).expect_err("Query not ambiguous");
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_insert_new_disabled() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("what");
@@ -1256,7 +1219,7 @@ mod tests {
         assert_eq!(expect_enabled_target(&tc, &query), t);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_insert_new() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("what");
@@ -1270,7 +1233,7 @@ mod tests {
         expect_no_target(&tc, &"oihaoih".into())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_merge_evict_old_addresses() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("schplew");
@@ -1313,7 +1276,7 @@ mod tests {
         assert!(merged_target.addrs().contains(&TargetAddr::new(a3, 1, 0)));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_merge() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("bananas");
@@ -1365,7 +1328,7 @@ mod tests {
         assert!(merged_target.addrs().contains(&TargetAddr::new(a2, 3, 0)));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_merge_disjointed() {
         let tc = TargetCollection::new_with_queue();
 
@@ -1429,7 +1392,41 @@ mod tests {
         assert_eq!(target_info.fastboot_interface, Some(ffx::FastbootInterface::Tcp));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
+    async fn test_target_collection_merge_manual() {
+        let tc = TargetCollection::new_with_queue();
+
+        const NODENAME1: &str = "discovered";
+        const NODENAME2: &str = "manual";
+
+        let _ = tc.merge_insert(Target::new_with_addr_entries(
+            Some(NODENAME1),
+            std::iter::once(TargetAddrEntry::new(
+                SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22).into(),
+                chrono::DateTime::<Utc>::MIN_UTC,
+                TargetAddrStatus::ssh(),
+            )),
+        ));
+
+        let _ = tc.merge_insert(Target::new_with_addr_entries(
+            Some(NODENAME2),
+            std::iter::once(TargetAddrEntry::new(
+                SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22).into(),
+                chrono::DateTime::<Utc>::MIN_UTC,
+                TargetAddrStatus::ssh().manually_added(),
+            )),
+        ));
+
+        let targets = tc.targets(None);
+        let [target_info] = &targets[..] else {
+            panic!("Too many target info structs: {targets:?}");
+        };
+
+        // If either is manual, the description is manual
+        assert_eq!(target_info.is_manual, Some(true));
+    }
+
+    #[fuchsia::test]
     async fn test_target_collection_no_scopeless_ipv6() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("bananas");
@@ -1456,7 +1453,7 @@ mod tests {
         assert!(!merged_target.addrs().contains(&TargetAddr::new(a2, 0, 0)));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_query_target_by_addr() {
         let ipv4_addr: TargetIpAddr = TargetIpAddr::new(IpAddr::from([192, 168, 0, 1]), 0, 0);
 
@@ -1485,7 +1482,7 @@ mod tests {
         assert_ne!(expect_target(&tc, &ipv4_query), t);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_new_target_event_synthesis() {
         let t = Target::new_named("clopperdoop");
         let tc = TargetCollection::new_with_queue();
@@ -1504,7 +1501,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_event_synthesis_all_connected() {
         let t = Target::new_autoconnected("clam-chowder-is-tasty");
         let t2 = Target::new_autoconnected("this-is-a-crunchy-falafel");
@@ -1535,7 +1532,7 @@ mod tests {
             })));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_event_synthesis_none_connected() {
         let t = Target::new_named("clam-chowder-is-tasty");
         let t2 = Target::new_named("this-is-a-crunchy-falafel");
@@ -1575,7 +1572,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_collection_events() {
         let t = Target::new_autoconnected("clam-chowder-is-tasty");
         let t2 = Target::new_autoconnected("this-is-a-crunchy-falafel");
@@ -1595,7 +1592,7 @@ mod tests {
         assert!(results.iter().any(|e| e == &"i-should-probably-eat-lunch".to_owned()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_discover_target() {
         let default = "clam-chowder-is-tasty";
         let t = Target::new_autoconnected(default);
@@ -1617,7 +1614,12 @@ mod tests {
         assert_eq!(tc.discover_target(&TargetInfoQuery::First).await.unwrap(), t);
 
         // Find by partial match
-        assert_eq!(tc.discover_target(&TargetInfoQuery::from("clam".to_owned())).await.unwrap(), t);
+        assert_eq!(
+            tc.discover_target(&TargetInfoQuery::from("clam-chowder-is-tasty".to_owned()))
+                .await
+                .unwrap(),
+            t
+        );
 
         tc.merge_insert(Target::new_autoconnected("this-is-a-crunchy-falafel"));
         tc.discover_target(&TargetInfoQuery::First).await.unwrap_err(); // Too many targets found
@@ -1691,7 +1693,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_discover_target_updated_target() {
         let address = "f111::1";
         let ip = address.parse().unwrap();
@@ -1719,7 +1721,7 @@ mod tests {
         assert_eq!(fut.await.nodename().unwrap(), target_name);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_merge_no_name() {
         let ip = "f111::3".parse().unwrap();
 
@@ -1756,7 +1758,7 @@ mod tests {
         assert_eq!(addr.scope_id(), 0xbadf00d);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_does_not_merge_different_ports_with_no_name() {
         let ip = "fe80::1".parse().unwrap();
 
@@ -1793,7 +1795,7 @@ mod tests {
         assert_eq!(found2.ssh_port(), Some(8023));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_does_not_merge_different_ports() {
         let ip = "fe80::1".parse().unwrap();
 
@@ -1827,7 +1829,7 @@ mod tests {
         assert_eq!(found2.nodename(), Some("t2".to_string()));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_merge_enabled_and_transient() {
         let tc = TargetCollection::new();
 
@@ -1857,7 +1859,7 @@ mod tests {
         assert!(target.is_transient());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_unnamed_by_addr() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -1896,7 +1898,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_named_by_addr() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -1934,7 +1936,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_address() {
         let ip1 = "f111::3".parse().unwrap();
         let mut addr_set = BTreeSet::new();
@@ -1971,7 +1973,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_address_no_drop() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -2020,7 +2022,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_remove_by_name() {
         let ip1 = "f111::3".parse().unwrap();
         let ip2 = "f111::4".parse().unwrap();
@@ -2059,7 +2061,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_collection_removal_disconnects_target() {
         use crate::target::HostPipeState;
         let local_node = overnet_core::Router::new(None).unwrap();
@@ -2080,7 +2082,7 @@ mod tests {
         assert!(target.host_pipe.borrow().is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_match_serial() {
         let string = "turritopsis-dohrnii-is-an-immortal-jellyfish";
         let t = Target::new_for_usb(string);
@@ -2092,65 +2094,9 @@ mod tests {
         assert!(found_target.nodename().is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_no_ambiguous_target_when_disabled() {
-        let tc = TargetCollection::new_with_queue();
-
-        tc.merge_insert(Target::new_named("this-is-not-connected"));
-        tc.merge_insert(Target::new_autoconnected("this-is-connected"));
-
-        let found_target = expect_enabled_target(&tc, &TargetInfoQuery::First);
-        assert_eq!(
-            "this-is-connected",
-            found_target.nodename().expect("target should have nodename")
-        );
-
-        let found_target =
-            expect_enabled_target(&tc, &TargetInfoQuery::from("connected".to_owned()));
-        assert_eq!(
-            "this-is-connected",
-            found_target.nodename().expect("target should have nodename")
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_no_ambiguous_target_when_matching_identity() {
-        let tc = TargetCollection::new_with_queue();
-
-        let anonymous = tc.merge_insert(Target::new());
-        let connected = tc.merge_insert(Target::new_autoconnected("this-is-connected"));
-        let other = tc.merge_insert(Target::new_named("this-is-not-connected"));
-
-        tc.merge_insert({
-            let updated = Target::new_with_id(anonymous.id());
-            updated.replace_identity(Identity::from_name("this-is-connected"));
-            updated.enable();
-            updated
-        });
-
-        for query in [TargetInfoQuery::from("this-is-connected".to_owned()), TargetInfoQuery::First]
-        {
-            let found_target = expect_enabled_target(&tc, &query);
-            assert!(
-                Rc::ptr_eq(&connected, &found_target),
-                "expected connected target to be preferred, got {found_target:?}"
-            );
-        }
-
-        tc.merge_insert({
-            let updated = Target::new_with_id(other.id());
-            updated.enable();
-            updated
-        });
-
-        for query in [TargetInfoQuery::from("connected".to_owned()), TargetInfoQuery::First] {
-            expect_ambiguous_target(&tc, &query);
-        }
-    }
-
     /* TARGET QUERIES */
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_query_matches_nodename() {
         let query = TargetInfoQuery::from("foo");
         let target = Rc::new(Target::new_named("foo"));

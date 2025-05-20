@@ -28,10 +28,10 @@ where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface,
 {
-    tracing::debug!("fetch_from_gcs {:?}", gcs_url);
+    log::debug!("fetch_from_gcs {:?}", gcs_url);
     let (gcs_bucket, gcs_path) = split_gs_url(gcs_url).context("Splitting gs URL.")?;
     loop {
-        tracing::debug!("gcs_bucket {:?}, gcs_path {:?}", gcs_bucket, gcs_path);
+        log::debug!("gcs_bucket {:?}, gcs_path {:?}", gcs_bucket, gcs_path);
         match client
             .fetch_all(gcs_bucket, gcs_path, &local_dir, progress)
             .await
@@ -40,14 +40,14 @@ where
             Ok(()) => break,
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
-                    tracing::debug!("fetch_from_gcs got NeedNewAccessToken");
+                    log::debug!("fetch_from_gcs got NeedNewAccessToken");
                     let access_token = handle_new_access_token(auth_flow, ui)
                         .await
                         .context("Getting new access token.")?;
                     client.set_access_token(access_token).await;
                 }
                 Some(GcsError::NotFound(b, p)) => {
-                    tracing::warn!("[gs://{}/{} not found]", b, p);
+                    log::warn!("[gs://{}/{} not found]", b, p);
                     break;
                 }
                 Some(_) | None => bail!(
@@ -70,7 +70,7 @@ pub async fn handle_new_access_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> R
 where
     I: structured_ui::Interface,
 {
-    tracing::debug!("handle_new_access_token");
+    log::debug!("handle_new_access_token");
     let access_token = match auth_flow {
         AuthFlowChoice::Default | AuthFlowChoice::Pkce | AuthFlowChoice::Device => {
             let credentials = credentials::Credentials::load_or_new().await;
@@ -92,7 +92,7 @@ where
                 .output()
                 .with_context(|| format!("Executing {:?}", exec))?;
             if !output.status.success() {
-                tracing::error!(
+                log::error!(
                     "The {:?} process to get an access token returned {} with stderr:\n{}",
                     exec,
                     output.status,
@@ -127,27 +127,27 @@ where
     F: Fn(FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface,
 {
-    tracing::debug!("string_from_gcs {:?}", gcs_url);
+    log::debug!("string_from_gcs {:?}", gcs_url);
     let (gcs_bucket, gcs_path) = split_gs_url(gcs_url).context("Splitting gs URL.")?;
     let mut result = Vec::new();
     loop {
-        tracing::debug!("gcs_bucket {:?}, gcs_path {:?}", gcs_bucket, gcs_path);
+        log::debug!("gcs_bucket {:?}, gcs_path {:?}", gcs_bucket, gcs_path);
         match client.write(gcs_bucket, gcs_path, &mut result, progress).await {
             Ok(ProgressResponse::Continue) => break,
             Ok(ProgressResponse::Cancel) => {
-                tracing::info!("ProgressResponse requesting cancel, exiting");
+                log::info!("ProgressResponse requesting cancel, exiting");
                 bail!("ProgressResponse requesting cancel, exiting")
             }
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
-                    tracing::debug!("string_from_gcs got NeedNewAccessToken");
+                    log::debug!("string_from_gcs got NeedNewAccessToken");
                     let access_token = handle_new_access_token(auth_flow, ui)
                         .await
                         .context("Getting new access token.")?;
                     client.set_access_token(access_token).await;
                 }
                 Some(GcsError::NotFound(b, p)) => {
-                    tracing::warn!("[gs://{}/{} not found]", b, p);
+                    log::warn!("[gs://{}/{} not found]", b, p);
                     break;
                 }
                 Some(gcs_err) => bail!(
@@ -180,14 +180,14 @@ where
             Ok(result) => return Ok(result),
             Err(e) => match e.downcast_ref::<GcsError>() {
                 Some(GcsError::NeedNewAccessToken) => {
-                    tracing::debug!("list_from_gcs got NeedNewAccessToken");
+                    log::debug!("list_from_gcs got NeedNewAccessToken");
                     let access_token = handle_new_access_token(auth_flow, ui)
                         .await
                         .context("Getting new access token.")?;
                     client.set_access_token(access_token).await;
                 }
                 Some(GcsError::NotFound(b, p)) => {
-                    tracing::warn!("[gs://{}/{} not found]", b, p);
+                    log::warn!("[gs://{}/{} not found]", b, p);
                     bail!("Data not found from gs://{}/{}, error {:?}", b, p, e,);
                 }
                 Some(gcs_err) => bail!(
@@ -215,7 +215,7 @@ async fn update_refresh_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Result<(
 where
     I: structured_ui::Interface,
 {
-    tracing::debug!("update_refresh_token");
+    log::debug!("update_refresh_token");
     let refresh_token = match auth_flow {
         AuthFlowChoice::Default | AuthFlowChoice::Pkce => {
             auth::pkce::new_refresh_token(ui).await.context("get refresh token")?
@@ -230,7 +230,7 @@ where
             bail!("The refresh token should not be updated when no-auth is used.");
         }
     };
-    tracing::debug!("Writing credentials");
+    log::debug!("Writing credentials");
     let mut credentials = credentials::Credentials::load_or_new().await;
     credentials.oauth2.refresh_token = refresh_token.to_string();
     credentials.save().await.context("writing refresh token")?;

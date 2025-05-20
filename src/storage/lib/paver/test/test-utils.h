@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
-#include <lib/arch/zbi.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -19,6 +18,7 @@
 #include <fbl/array.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/unique_fd.h>
+#include <phys/zbi.h>
 #include <ramdevice-client-test/ramnandctl.h>
 #include <ramdevice-client/ramdisk.h>
 #include <ramdevice-client/ramnand.h>
@@ -246,7 +246,7 @@ class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
 // If "result_header" is non-null, it will point to the beginning of the
 // uint8_t. It must not outlive the returned fbl::Array object.
 fbl::Array<uint8_t> CreateZbiHeader(paver::Arch arch, size_t payload_size,
-                                    arch::ZbiKernelImage** result_header,
+                                    ZbiKernelImage** result_header,
                                     std::span<uint8_t>* span = nullptr);
 
 #endif  // SRC_STORAGE_LIB_PAVER_TEST_TEST_UTILS_H_

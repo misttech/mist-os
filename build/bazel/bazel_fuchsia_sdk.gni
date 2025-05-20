@@ -14,7 +14,7 @@ import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 # Arguments:
 #
 #  idk_export_target (required)
-#      GN Label of target generating the IDK export directory.
+#      GN Label of the idk build rule.
 #
 #  idk_export_dir (required)
 #      Input IDK export directory (GN path string).
@@ -64,6 +64,7 @@ template("generate_fuchsia_bazel_sdk") {
       # Used by //:bazel_sdk_info build API module
       bazel_sdk_info = [
         {
+          name = _output_name
           location = rebase_path(_output_dir, root_build_dir)
         },
       ]

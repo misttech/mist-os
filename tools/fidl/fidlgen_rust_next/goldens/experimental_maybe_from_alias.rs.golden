@@ -20,7 +20,7 @@ pub type WireAliasOfArrayContainingAliasOfArray = [::fidl_next::WireU64; 2];
 pub type AliasOfBytes = Vec<u8>;
 
 /// The wire type corresponding to [`AliasOfBytes`].
-pub type WireAliasOfBytes = ::fidl_next::WireVector<u8>;
+pub type WireAliasOfBytes<'de> = ::fidl_next::WireVector<'de, u8>;
 
 pub type AliasOfRequest =
     ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Channel>, crate::MyProtocol>;
@@ -32,12 +32,13 @@ pub type WireAliasOfRequest =
 pub type AliasOfString = String;
 
 /// The wire type corresponding to [`AliasOfString`].
-pub type WireAliasOfString = ::fidl_next::WireString;
+pub type WireAliasOfString<'de> = ::fidl_next::WireString<'de>;
 
 pub type AliasOfVectorContainingAliasOfVector = Vec<u64>;
 
 /// The wire type corresponding to [`AliasOfVectorContainingAliasOfVector`].
-pub type WireAliasOfVectorContainingAliasOfVector = ::fidl_next::WireVector<::fidl_next::WireU64>;
+pub type WireAliasOfVectorContainingAliasOfVector<'de> =
+    ::fidl_next::WireVector<'de, ::fidl_next::WireU64>;
 
 /// The type corresponding to the MyProtocol protocol.
 #[derive(Debug)]
@@ -141,7 +142,7 @@ where
 pub type Vector = Option<Vec<u64>>;
 
 /// The wire type corresponding to [`Vector`].
-pub type WireVector = ::fidl_next::WireOptionalVector<::fidl_next::WireU64>;
+pub type WireVector<'de> = ::fidl_next::WireOptionalVector<'de, ::fidl_next::WireU64>;
 
 #[derive(Debug)]
 pub struct Testing {
@@ -205,7 +206,7 @@ pub struct Testing {
 }
 
 impl ::fidl_next::Encodable for Testing {
-    type Encoded = WireTesting;
+    type Encoded = WireTesting<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for Testing
@@ -218,7 +219,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -256,78 +257,78 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.u1, encoder, u1)?;
+        ::fidl_next::Encode::encode(self.u1, encoder, u1)?;
 
-        ::fidl_next::Encode::encode(&mut self.u2, encoder, u2)?;
+        ::fidl_next::Encode::encode(self.u2, encoder, u2)?;
 
-        ::fidl_next::Encode::encode(&mut self.u3, encoder, u3)?;
+        ::fidl_next::Encode::encode(self.u3, encoder, u3)?;
 
-        ::fidl_next::Encode::encode(&mut self.u4, encoder, u4)?;
+        ::fidl_next::Encode::encode(self.u4, encoder, u4)?;
 
-        ::fidl_next::Encode::encode(&mut self.u5, encoder, u5)?;
+        ::fidl_next::Encode::encode(self.u5, encoder, u5)?;
 
-        ::fidl_next::Encode::encode(&mut self.u6, encoder, u6)?;
+        ::fidl_next::Encode::encode(self.u6, encoder, u6)?;
 
-        ::fidl_next::Encode::encode(&mut self.u7, encoder, u7)?;
+        ::fidl_next::Encode::encode(self.u7, encoder, u7)?;
 
-        ::fidl_next::Encode::encode(&mut self.v1, encoder, v1)?;
+        ::fidl_next::Encode::encode(self.v1, encoder, v1)?;
 
-        ::fidl_next::Encode::encode(&mut self.v2, encoder, v2)?;
+        ::fidl_next::Encode::encode(self.v2, encoder, v2)?;
 
-        ::fidl_next::Encode::encode(&mut self.v3, encoder, v3)?;
+        ::fidl_next::Encode::encode(self.v3, encoder, v3)?;
 
-        ::fidl_next::Encode::encode(&mut self.a1, encoder, a1)?;
+        ::fidl_next::Encode::encode(self.a1, encoder, a1)?;
 
-        ::fidl_next::Encode::encode(&mut self.a2, encoder, a2)?;
+        ::fidl_next::Encode::encode(self.a2, encoder, a2)?;
 
-        ::fidl_next::Encode::encode(&mut self.a3, encoder, a3)?;
+        ::fidl_next::Encode::encode(self.a3, encoder, a3)?;
 
-        ::fidl_next::Encode::encode(&mut self.r1, encoder, r1)?;
+        ::fidl_next::Encode::encode(self.r1, encoder, r1)?;
 
-        ::fidl_next::Encode::encode(&mut self.r2, encoder, r2)?;
+        ::fidl_next::Encode::encode(self.r2, encoder, r2)?;
 
-        ::fidl_next::Encode::encode(&mut self.r3, encoder, r3)?;
+        ::fidl_next::Encode::encode(self.r3, encoder, r3)?;
 
-        ::fidl_next::Encode::encode(&mut self.b1, encoder, b1)?;
+        ::fidl_next::Encode::encode(self.b1, encoder, b1)?;
 
-        ::fidl_next::Encode::encode(&mut self.b2, encoder, b2)?;
+        ::fidl_next::Encode::encode(self.b2, encoder, b2)?;
 
-        ::fidl_next::Encode::encode(&mut self.b3, encoder, b3)?;
+        ::fidl_next::Encode::encode(self.b3, encoder, b3)?;
 
-        ::fidl_next::Encode::encode(&mut self.s1, encoder, s1)?;
+        ::fidl_next::Encode::encode(self.s1, encoder, s1)?;
 
-        ::fidl_next::Encode::encode(&mut self.s2, encoder, s2)?;
+        ::fidl_next::Encode::encode(self.s2, encoder, s2)?;
 
-        ::fidl_next::Encode::encode(&mut self.s3, encoder, s3)?;
+        ::fidl_next::Encode::encode(self.s3, encoder, s3)?;
 
-        ::fidl_next::Encode::encode(&mut self.vv1, encoder, vv1)?;
+        ::fidl_next::Encode::encode(self.vv1, encoder, vv1)?;
 
-        ::fidl_next::Encode::encode(&mut self.vv2, encoder, vv2)?;
+        ::fidl_next::Encode::encode(self.vv2, encoder, vv2)?;
 
-        ::fidl_next::Encode::encode(&mut self.vv3, encoder, vv3)?;
+        ::fidl_next::Encode::encode(self.vv3, encoder, vv3)?;
 
-        ::fidl_next::Encode::encode(&mut self.aa1, encoder, aa1)?;
+        ::fidl_next::Encode::encode(self.aa1, encoder, aa1)?;
 
-        ::fidl_next::Encode::encode(&mut self.aa2, encoder, aa2)?;
+        ::fidl_next::Encode::encode(self.aa2, encoder, aa2)?;
 
-        ::fidl_next::Encode::encode(&mut self.aa3, encoder, aa3)?;
+        ::fidl_next::Encode::encode(self.aa3, encoder, aa3)?;
 
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<Testing> {
-    type EncodedOption = ::fidl_next::WireBox<WireTesting>;
+impl ::fidl_next::EncodableOption for Testing {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireTesting<'static>>;
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Testing>
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Testing
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Testing: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -342,65 +343,65 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireTesting> for Testing {
+impl<'de> ::fidl_next::FromWire<WireTesting<'de>> for Testing {
     #[inline]
-    fn take_from(from: &WireTesting) -> Self {
+    fn from_wire(wire: WireTesting<'de>) -> Self {
         Self {
-            u1: ::fidl_next::TakeFrom::take_from(&from.u1),
+            u1: ::fidl_next::FromWire::from_wire(wire.u1),
 
-            u2: ::fidl_next::TakeFrom::take_from(&from.u2),
+            u2: ::fidl_next::FromWire::from_wire(wire.u2),
 
-            u3: ::fidl_next::TakeFrom::take_from(&from.u3),
+            u3: ::fidl_next::FromWire::from_wire(wire.u3),
 
-            u4: ::fidl_next::TakeFrom::take_from(&from.u4),
+            u4: ::fidl_next::FromWire::from_wire(wire.u4),
 
-            u5: ::fidl_next::TakeFrom::take_from(&from.u5),
+            u5: ::fidl_next::FromWire::from_wire(wire.u5),
 
-            u6: ::fidl_next::TakeFrom::take_from(&from.u6),
+            u6: ::fidl_next::FromWire::from_wire(wire.u6),
 
-            u7: ::fidl_next::TakeFrom::take_from(&from.u7),
+            u7: ::fidl_next::FromWire::from_wire(wire.u7),
 
-            v1: ::fidl_next::TakeFrom::take_from(&from.v1),
+            v1: ::fidl_next::FromWire::from_wire(wire.v1),
 
-            v2: ::fidl_next::TakeFrom::take_from(&from.v2),
+            v2: ::fidl_next::FromWire::from_wire(wire.v2),
 
-            v3: ::fidl_next::TakeFrom::take_from(&from.v3),
+            v3: ::fidl_next::FromWire::from_wire(wire.v3),
 
-            a1: ::fidl_next::TakeFrom::take_from(&from.a1),
+            a1: ::fidl_next::FromWire::from_wire(wire.a1),
 
-            a2: ::fidl_next::TakeFrom::take_from(&from.a2),
+            a2: ::fidl_next::FromWire::from_wire(wire.a2),
 
-            a3: ::fidl_next::TakeFrom::take_from(&from.a3),
+            a3: ::fidl_next::FromWire::from_wire(wire.a3),
 
-            r1: ::fidl_next::TakeFrom::take_from(&from.r1),
+            r1: ::fidl_next::FromWire::from_wire(wire.r1),
 
-            r2: ::fidl_next::TakeFrom::take_from(&from.r2),
+            r2: ::fidl_next::FromWire::from_wire(wire.r2),
 
-            r3: ::fidl_next::TakeFrom::take_from(&from.r3),
+            r3: ::fidl_next::FromWire::from_wire(wire.r3),
 
-            b1: ::fidl_next::TakeFrom::take_from(&from.b1),
+            b1: ::fidl_next::FromWire::from_wire(wire.b1),
 
-            b2: ::fidl_next::TakeFrom::take_from(&from.b2),
+            b2: ::fidl_next::FromWire::from_wire(wire.b2),
 
-            b3: ::fidl_next::TakeFrom::take_from(&from.b3),
+            b3: ::fidl_next::FromWire::from_wire(wire.b3),
 
-            s1: ::fidl_next::TakeFrom::take_from(&from.s1),
+            s1: ::fidl_next::FromWire::from_wire(wire.s1),
 
-            s2: ::fidl_next::TakeFrom::take_from(&from.s2),
+            s2: ::fidl_next::FromWire::from_wire(wire.s2),
 
-            s3: ::fidl_next::TakeFrom::take_from(&from.s3),
+            s3: ::fidl_next::FromWire::from_wire(wire.s3),
 
-            vv1: ::fidl_next::TakeFrom::take_from(&from.vv1),
+            vv1: ::fidl_next::FromWire::from_wire(wire.vv1),
 
-            vv2: ::fidl_next::TakeFrom::take_from(&from.vv2),
+            vv2: ::fidl_next::FromWire::from_wire(wire.vv2),
 
-            vv3: ::fidl_next::TakeFrom::take_from(&from.vv3),
+            vv3: ::fidl_next::FromWire::from_wire(wire.vv3),
 
-            aa1: ::fidl_next::TakeFrom::take_from(&from.aa1),
+            aa1: ::fidl_next::FromWire::from_wire(wire.aa1),
 
-            aa2: ::fidl_next::TakeFrom::take_from(&from.aa2),
+            aa2: ::fidl_next::FromWire::from_wire(wire.aa2),
 
-            aa3: ::fidl_next::TakeFrom::take_from(&from.aa3),
+            aa3: ::fidl_next::FromWire::from_wire(wire.aa3),
         }
     }
 }
@@ -408,68 +409,72 @@ impl ::fidl_next::TakeFrom<WireTesting> for Testing {
 /// The wire type corresponding to [`Testing`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireTesting {
+pub struct WireTesting<'de> {
     pub u1: ::fidl_next::WireU64,
 
-    pub u2: ::fidl_next::WireVector<::fidl_next::WireU64>,
+    pub u2: ::fidl_next::WireVector<'de, ::fidl_next::WireU64>,
 
     pub u3: [::fidl_next::WireU64; 1],
 
-    pub u4: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::WireU64>>,
+    pub u4: ::fidl_next::WireVector<'de, ::fidl_next::WireVector<'de, ::fidl_next::WireU64>>,
 
-    pub u5: ::fidl_next::WireVector<[::fidl_next::WireU64; 1]>,
+    pub u5: ::fidl_next::WireVector<'de, [::fidl_next::WireU64; 1]>,
 
-    pub u6: [::fidl_next::WireVector<::fidl_next::WireU64>; 4],
+    pub u6: [::fidl_next::WireVector<'de, ::fidl_next::WireU64>; 4],
 
     pub u7: [[::fidl_next::WireU64; 1]; 4],
 
-    pub v1: ::fidl_next::WireOptionalVector<::fidl_next::WireU64>,
+    pub v1: ::fidl_next::WireOptionalVector<'de, ::fidl_next::WireU64>,
 
-    pub v2: ::fidl_next::WireVector<::fidl_next::WireOptionalVector<::fidl_next::WireU64>>,
+    pub v2:
+        ::fidl_next::WireVector<'de, ::fidl_next::WireOptionalVector<'de, ::fidl_next::WireU64>>,
 
-    pub v3: [::fidl_next::WireOptionalVector<::fidl_next::WireU64>; 4],
+    pub v3: [::fidl_next::WireOptionalVector<'de, ::fidl_next::WireU64>; 4],
 
     pub a1: [::fidl_next::WireU64; 1],
 
-    pub a2: ::fidl_next::WireVector<[::fidl_next::WireU64; 1]>,
+    pub a2: ::fidl_next::WireVector<'de, [::fidl_next::WireU64; 1]>,
 
     pub a3: [[::fidl_next::WireU64; 1]; 4],
 
     pub r1: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::MyProtocol>,
 
     pub r2: ::fidl_next::WireVector<
+        'de,
         ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::MyProtocol>,
     >,
 
     pub r3:
         [::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalChannel, crate::MyProtocol>; 4],
 
-    pub b1: ::fidl_next::WireVector<u8>,
+    pub b1: ::fidl_next::WireVector<'de, u8>,
 
-    pub b2: ::fidl_next::WireVector<::fidl_next::WireVector<u8>>,
+    pub b2: ::fidl_next::WireVector<'de, ::fidl_next::WireVector<'de, u8>>,
 
-    pub b3: [::fidl_next::WireVector<u8>; 4],
+    pub b3: [::fidl_next::WireVector<'de, u8>; 4],
 
-    pub s1: ::fidl_next::WireString,
+    pub s1: ::fidl_next::WireString<'de>,
 
-    pub s2: ::fidl_next::WireVector<::fidl_next::WireString>,
+    pub s2: ::fidl_next::WireVector<'de, ::fidl_next::WireString<'de>>,
 
-    pub s3: [::fidl_next::WireString; 4],
+    pub s3: [::fidl_next::WireString<'de>; 4],
 
-    pub vv1: ::fidl_next::WireVector<::fidl_next::WireU64>,
+    pub vv1: ::fidl_next::WireVector<'de, ::fidl_next::WireU64>,
 
-    pub vv2: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::WireU64>>,
+    pub vv2: ::fidl_next::WireVector<'de, ::fidl_next::WireVector<'de, ::fidl_next::WireU64>>,
 
-    pub vv3: [::fidl_next::WireVector<::fidl_next::WireU64>; 3],
+    pub vv3: [::fidl_next::WireVector<'de, ::fidl_next::WireU64>; 3],
 
     pub aa1: [::fidl_next::WireU64; 2],
 
-    pub aa2: ::fidl_next::WireVector<[::fidl_next::WireU64; 2]>,
+    pub aa2: ::fidl_next::WireVector<'de, [::fidl_next::WireU64; 2]>,
 
     pub aa3: [[::fidl_next::WireU64; 2]; 3],
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireTesting {
+unsafe impl ::fidl_next::Wire for WireTesting<'static> {
+    type Decoded<'de> = WireTesting<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
@@ -478,7 +483,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireTesting {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireTesting
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTesting<'static>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -629,75 +634,12 @@ pub mod compat {
     pub type MyProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::MyProtocol>;
 
-    impl ::fidl_next::TakeFrom<crate::MyProtocol>
+    impl ::core::convert::From<crate::MyProtocol>
         for ::fidl_test_experimentalmaybefromalias::MyProtocolMarker
     {
         #[inline]
-        fn take_from(from: &crate::MyProtocol) -> Self {
+        fn from(_: crate::MyProtocol) -> Self {
             Self
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireTesting> for ::fidl_test_experimentalmaybefromalias::Testing {
-        #[inline]
-        fn take_from(from: &crate::WireTesting) -> Self {
-            Self {
-                u1: ::fidl_next::TakeFrom::take_from(&from.u1),
-
-                u2: ::fidl_next::TakeFrom::take_from(&from.u2),
-
-                u3: ::fidl_next::TakeFrom::take_from(&from.u3),
-
-                u4: ::fidl_next::TakeFrom::take_from(&from.u4),
-
-                u5: ::fidl_next::TakeFrom::take_from(&from.u5),
-
-                u6: ::fidl_next::TakeFrom::take_from(&from.u6),
-
-                u7: ::fidl_next::TakeFrom::take_from(&from.u7),
-
-                v1: ::fidl_next::TakeFrom::take_from(&from.v1),
-
-                v2: ::fidl_next::TakeFrom::take_from(&from.v2),
-
-                v3: ::fidl_next::TakeFrom::take_from(&from.v3),
-
-                a1: ::fidl_next::TakeFrom::take_from(&from.a1),
-
-                a2: ::fidl_next::TakeFrom::take_from(&from.a2),
-
-                a3: ::fidl_next::TakeFrom::take_from(&from.a3),
-
-                r1: ::fidl_next::TakeFrom::take_from(&from.r1),
-
-                r2: ::fidl_next::TakeFrom::take_from(&from.r2),
-
-                r3: ::fidl_next::TakeFrom::take_from(&from.r3),
-
-                b1: ::fidl_next::TakeFrom::take_from(&from.b1),
-
-                b2: ::fidl_next::TakeFrom::take_from(&from.b2),
-
-                b3: ::fidl_next::TakeFrom::take_from(&from.b3),
-
-                s1: ::fidl_next::TakeFrom::take_from(&from.s1),
-
-                s2: ::fidl_next::TakeFrom::take_from(&from.s2),
-
-                s3: ::fidl_next::TakeFrom::take_from(&from.s3),
-
-                vv1: ::fidl_next::TakeFrom::take_from(&from.vv1),
-
-                vv2: ::fidl_next::TakeFrom::take_from(&from.vv2),
-
-                vv3: ::fidl_next::TakeFrom::take_from(&from.vv3),
-
-                aa1: ::fidl_next::TakeFrom::take_from(&from.aa1),
-
-                aa2: ::fidl_next::TakeFrom::take_from(&from.aa2),
-
-                aa3: ::fidl_next::TakeFrom::take_from(&from.aa3),
-            }
         }
     }
 }

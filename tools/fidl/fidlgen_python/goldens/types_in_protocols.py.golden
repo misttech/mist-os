@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -1967,31 +1965,31 @@ class ProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_one_way_basic: typing.TypeAlias = None
+    OneWayBasicResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_basic(
         self,
         request: Basic,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_basic]
-        | _MethodResponse_one_way_basic
+        typing.Coroutine[typing.Any, typing.Any, OneWayBasicResponse]
+        | OneWayBasicResponse
     ):
         ...
 
-    _MethodResponse_two_way_basic: typing.TypeAlias = Basic
+    TwoWayBasicResponse: typing.TypeAlias = Basic
 
     @abstractmethod
     def two_way_basic(
         self,
         request: Basic,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_basic]
-        | _MethodResponse_two_way_basic
+        typing.Coroutine[typing.Any, typing.Any, TwoWayBasicResponse]
+        | TwoWayBasicResponse
     ):
         ...
 
-    _MethodResponse_error_basic: typing.TypeAlias = typing.Union[
+    ErrorBasicResponse: typing.TypeAlias = typing.Union[
         DomainError,
         Basic,
     ]
@@ -2000,8 +1998,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_basic(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_basic]
-        | _MethodResponse_error_basic
+        typing.Coroutine[typing.Any, typing.Any, ErrorBasicResponse]
+        | ErrorBasicResponse
     ):
         ...
 
@@ -2037,35 +2035,31 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(5892309624949902400, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_compound: typing.TypeAlias = None
+    OneWayCompoundResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_compound(
         self,
         request: Compound,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_compound
-        ]
-        | _MethodResponse_one_way_compound
+        typing.Coroutine[typing.Any, typing.Any, OneWayCompoundResponse]
+        | OneWayCompoundResponse
     ):
         ...
 
-    _MethodResponse_two_way_compound: typing.TypeAlias = Compound
+    TwoWayCompoundResponse: typing.TypeAlias = Compound
 
     @abstractmethod
     def two_way_compound(
         self,
         request: Compound,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_compound
-        ]
-        | _MethodResponse_two_way_compound
+        typing.Coroutine[typing.Any, typing.Any, TwoWayCompoundResponse]
+        | TwoWayCompoundResponse
     ):
         ...
 
-    _MethodResponse_error_compound: typing.TypeAlias = typing.Union[
+    ErrorCompoundResponse: typing.TypeAlias = typing.Union[
         DomainError,
         Compound,
     ]
@@ -2074,8 +2068,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_compound(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_compound]
-        | _MethodResponse_error_compound
+        typing.Coroutine[typing.Any, typing.Any, ErrorCompoundResponse]
+        | ErrorCompoundResponse
     ):
         ...
 
@@ -2101,35 +2095,31 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(7024581948727571669, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_array_basic: typing.TypeAlias = None
+    OneWayArrayBasicResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_array_basic(
         self,
         request: ArrayBasic,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_array_basic
-        ]
-        | _MethodResponse_one_way_array_basic
+        typing.Coroutine[typing.Any, typing.Any, OneWayArrayBasicResponse]
+        | OneWayArrayBasicResponse
     ):
         ...
 
-    _MethodResponse_two_way_array_basic: typing.TypeAlias = ArrayBasic
+    TwoWayArrayBasicResponse: typing.TypeAlias = ArrayBasic
 
     @abstractmethod
     def two_way_array_basic(
         self,
         request: ArrayBasic,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_array_basic
-        ]
-        | _MethodResponse_two_way_array_basic
+        typing.Coroutine[typing.Any, typing.Any, TwoWayArrayBasicResponse]
+        | TwoWayArrayBasicResponse
     ):
         ...
 
-    _MethodResponse_error_array_basic: typing.TypeAlias = typing.Union[
+    ErrorArrayBasicResponse: typing.TypeAlias = typing.Union[
         DomainError,
         ArrayBasic,
     ]
@@ -2138,10 +2128,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_array_basic(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_error_array_basic
-        ]
-        | _MethodResponse_error_array_basic
+        typing.Coroutine[typing.Any, typing.Any, ErrorArrayBasicResponse]
+        | ErrorArrayBasicResponse
     ):
         ...
 
@@ -2177,35 +2165,31 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(5888282827283820590, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_array_compound: typing.TypeAlias = None
+    OneWayArrayCompoundResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_array_compound(
         self,
         request: ArrayCompound,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_array_compound
-        ]
-        | _MethodResponse_one_way_array_compound
+        typing.Coroutine[typing.Any, typing.Any, OneWayArrayCompoundResponse]
+        | OneWayArrayCompoundResponse
     ):
         ...
 
-    _MethodResponse_two_way_array_compound: typing.TypeAlias = ArrayCompound
+    TwoWayArrayCompoundResponse: typing.TypeAlias = ArrayCompound
 
     @abstractmethod
     def two_way_array_compound(
         self,
         request: ArrayCompound,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_array_compound
-        ]
-        | _MethodResponse_two_way_array_compound
+        typing.Coroutine[typing.Any, typing.Any, TwoWayArrayCompoundResponse]
+        | TwoWayArrayCompoundResponse
     ):
         ...
 
-    _MethodResponse_error_array_compound: typing.TypeAlias = typing.Union[
+    ErrorArrayCompoundResponse: typing.TypeAlias = typing.Union[
         DomainError,
         ArrayCompound,
     ]
@@ -2214,10 +2198,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_array_compound(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_error_array_compound
-        ]
-        | _MethodResponse_error_array_compound
+        typing.Coroutine[typing.Any, typing.Any, ErrorArrayCompoundResponse]
+        | ErrorArrayCompoundResponse
     ):
         ...
 
@@ -2243,35 +2225,31 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(2189769767733851157, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_vector_basic: typing.TypeAlias = None
+    OneWayVectorBasicResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_vector_basic(
         self,
         request: VectorBasic,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_vector_basic
-        ]
-        | _MethodResponse_one_way_vector_basic
+        typing.Coroutine[typing.Any, typing.Any, OneWayVectorBasicResponse]
+        | OneWayVectorBasicResponse
     ):
         ...
 
-    _MethodResponse_two_way_vector_basic: typing.TypeAlias = VectorBasic
+    TwoWayVectorBasicResponse: typing.TypeAlias = VectorBasic
 
     @abstractmethod
     def two_way_vector_basic(
         self,
         request: VectorBasic,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_vector_basic
-        ]
-        | _MethodResponse_two_way_vector_basic
+        typing.Coroutine[typing.Any, typing.Any, TwoWayVectorBasicResponse]
+        | TwoWayVectorBasicResponse
     ):
         ...
 
-    _MethodResponse_error_vector_basic: typing.TypeAlias = typing.Union[
+    ErrorVectorBasicResponse: typing.TypeAlias = typing.Union[
         DomainError,
         VectorBasic,
     ]
@@ -2280,10 +2258,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_vector_basic(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_error_vector_basic
-        ]
-        | _MethodResponse_error_vector_basic
+        typing.Coroutine[typing.Any, typing.Any, ErrorVectorBasicResponse]
+        | ErrorVectorBasicResponse
     ):
         ...
 
@@ -2319,35 +2295,31 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(4583890770109526006, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_vector_compound: typing.TypeAlias = None
+    OneWayVectorCompoundResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_vector_compound(
         self,
         request: VectorCompound,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_vector_compound
-        ]
-        | _MethodResponse_one_way_vector_compound
+        typing.Coroutine[typing.Any, typing.Any, OneWayVectorCompoundResponse]
+        | OneWayVectorCompoundResponse
     ):
         ...
 
-    _MethodResponse_two_way_vector_compound: typing.TypeAlias = VectorCompound
+    TwoWayVectorCompoundResponse: typing.TypeAlias = VectorCompound
 
     @abstractmethod
     def two_way_vector_compound(
         self,
         request: VectorCompound,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_vector_compound
-        ]
-        | _MethodResponse_two_way_vector_compound
+        typing.Coroutine[typing.Any, typing.Any, TwoWayVectorCompoundResponse]
+        | TwoWayVectorCompoundResponse
     ):
         ...
 
-    _MethodResponse_error_vector_compound: typing.TypeAlias = typing.Union[
+    ErrorVectorCompoundResponse: typing.TypeAlias = typing.Union[
         DomainError,
         VectorCompound,
     ]
@@ -2356,10 +2328,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_vector_compound(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_error_vector_compound
-        ]
-        | _MethodResponse_error_vector_compound
+        typing.Coroutine[typing.Any, typing.Any, ErrorVectorCompoundResponse]
+        | ErrorVectorCompoundResponse
     ):
         ...
 
@@ -2385,35 +2355,31 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(6026375226599919603, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_vector_optional: typing.TypeAlias = None
+    OneWayVectorOptionalResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_vector_optional(
         self,
         request: VectorOptional,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_vector_optional
-        ]
-        | _MethodResponse_one_way_vector_optional
+        typing.Coroutine[typing.Any, typing.Any, OneWayVectorOptionalResponse]
+        | OneWayVectorOptionalResponse
     ):
         ...
 
-    _MethodResponse_two_way_vector_optional: typing.TypeAlias = VectorOptional
+    TwoWayVectorOptionalResponse: typing.TypeAlias = VectorOptional
 
     @abstractmethod
     def two_way_vector_optional(
         self,
         request: VectorOptional,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_vector_optional
-        ]
-        | _MethodResponse_two_way_vector_optional
+        typing.Coroutine[typing.Any, typing.Any, TwoWayVectorOptionalResponse]
+        | TwoWayVectorOptionalResponse
     ):
         ...
 
-    _MethodResponse_error_vector_optional: typing.TypeAlias = typing.Union[
+    ErrorVectorOptionalResponse: typing.TypeAlias = typing.Union[
         DomainError,
         VectorOptional,
     ]
@@ -2422,10 +2388,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_vector_optional(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_error_vector_optional
-        ]
-        | _MethodResponse_error_vector_optional
+        typing.Coroutine[typing.Any, typing.Any, ErrorVectorOptionalResponse]
+        | ErrorVectorOptionalResponse
     ):
         ...
 
@@ -2447,7 +2411,7 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(1684763340073130077, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_array_vector_nested: typing.TypeAlias = None
+    OneWayArrayVectorNestedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_array_vector_nested(
@@ -2455,15 +2419,13 @@ class ProtocolServer(ServerBase, ABC):
         request: ArrayVectorNested,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_array_vector_nested
+            typing.Any, typing.Any, OneWayArrayVectorNestedResponse
         ]
-        | _MethodResponse_one_way_array_vector_nested
+        | OneWayArrayVectorNestedResponse
     ):
         ...
 
-    _MethodResponse_two_way_array_vector_nested: typing.TypeAlias = (
-        ArrayVectorNested
-    )
+    TwoWayArrayVectorNestedResponse: typing.TypeAlias = ArrayVectorNested
 
     @abstractmethod
     def two_way_array_vector_nested(
@@ -2471,13 +2433,13 @@ class ProtocolServer(ServerBase, ABC):
         request: ArrayVectorNested,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_array_vector_nested
+            typing.Any, typing.Any, TwoWayArrayVectorNestedResponse
         ]
-        | _MethodResponse_two_way_array_vector_nested
+        | TwoWayArrayVectorNestedResponse
     ):
         ...
 
-    _MethodResponse_error_array_vector_nested: typing.TypeAlias = typing.Union[
+    ErrorArrayVectorNestedResponse: typing.TypeAlias = typing.Union[
         DomainError,
         ArrayVectorNested,
     ]
@@ -2486,10 +2448,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_array_vector_nested(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_error_array_vector_nested
-        ]
-        | _MethodResponse_error_array_vector_nested
+        typing.Coroutine[typing.Any, typing.Any, ErrorArrayVectorNestedResponse]
+        | ErrorArrayVectorNestedResponse
     ):
         ...
 
@@ -2509,35 +2469,31 @@ class ProtocolServer(ServerBase, ABC):
         )
         self._send_event(1228201560727880574, "test.typesinprotocols", msg)
 
-    _MethodResponse_one_way_resource: typing.TypeAlias = None
+    OneWayResourceResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_resource(
         self,
         request: Resource,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_resource
-        ]
-        | _MethodResponse_one_way_resource
+        typing.Coroutine[typing.Any, typing.Any, OneWayResourceResponse]
+        | OneWayResourceResponse
     ):
         ...
 
-    _MethodResponse_two_way_resource: typing.TypeAlias = Resource
+    TwoWayResourceResponse: typing.TypeAlias = Resource
 
     @abstractmethod
     def two_way_resource(
         self,
         request: Resource,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_resource
-        ]
-        | _MethodResponse_two_way_resource
+        typing.Coroutine[typing.Any, typing.Any, TwoWayResourceResponse]
+        | TwoWayResourceResponse
     ):
         ...
 
-    _MethodResponse_error_resource: typing.TypeAlias = typing.Union[
+    ErrorResourceResponse: typing.TypeAlias = typing.Union[
         DomainError,
         Resource,
     ]
@@ -2546,8 +2502,8 @@ class ProtocolServer(ServerBase, ABC):
     def error_resource(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_error_resource]
-        | _MethodResponse_error_resource
+        typing.Coroutine[typing.Any, typing.Any, ErrorResourceResponse]
+        | ErrorResourceResponse
     ):
         ...
 

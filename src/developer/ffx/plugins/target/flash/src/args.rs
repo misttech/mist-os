@@ -5,7 +5,7 @@
 use argh::{ArgsInfo, FromArgs};
 use ffx_config::FfxConfigBacked;
 use ffx_core::ffx_command;
-use ffx_fastboot::common::cmd::{Command, ManifestParams, OemFile};
+use ffx_flash_manifest::{Command, ManifestParams, OemFile};
 use std::default::Default;
 use std::path::PathBuf;
 

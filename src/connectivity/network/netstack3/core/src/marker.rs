@@ -15,7 +15,7 @@ use netstack3_base::{
 use netstack3_datagram as datagram;
 use netstack3_device::ethernet::{EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId};
 use netstack3_device::{self as device, DeviceId, DeviceLayerTypes, WeakDeviceId};
-use netstack3_filter::{FilterBindingsContext, FilterBindingsTypes};
+use netstack3_filter::{FilterBindingsContext, FilterBindingsTypes, SocketOpsFilterBindingContext};
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoStateContext};
 use netstack3_ip::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceConfigurationHandler,
@@ -165,6 +165,7 @@ pub trait IpBindingsContext<I: IpExt>:
     + UdpBindingsContext<I, DeviceId<Self>>
     + TcpBindingsContext
     + FilterBindingsContext
+    + SocketOpsFilterBindingContext<DeviceId<Self>>
     + IcmpBindingsContext
     + IcmpEchoBindingsContext<I, DeviceId<Self>>
     + MulticastForwardingBindingsContext<I, DeviceId<Self>>
@@ -187,6 +188,7 @@ where
         + UdpBindingsContext<I, DeviceId<Self>>
         + TcpBindingsContext
         + FilterBindingsContext
+        + SocketOpsFilterBindingContext<DeviceId<Self>>
         + IcmpBindingsContext
         + IcmpEchoBindingsContext<I, DeviceId<Self>>
         + MulticastForwardingBindingsContext<I, DeviceId<Self>>

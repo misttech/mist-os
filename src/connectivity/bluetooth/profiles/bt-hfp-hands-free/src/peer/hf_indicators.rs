@@ -40,7 +40,7 @@ impl<T: Clone + Copy + Debug> Default for Indicator<T> {
 /// The supported HF indicators and their enabled/disabled status & values.
 /// The second bool determines whether the AG supports the indicator
 /// Defined in HFP v1.8 Section 4.36
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HfIndicators {
     /// The Enhanced Safety HF indicator. There are only two potential values (enabled, disabled).
     pub enhanced_safety: (Indicator<bool>, bool),

@@ -125,9 +125,9 @@ pub mod tests {
         // Resolve components without starting them.
         let test = ActionsTest::new("root", components, None).await;
         let component_root = test.look_up(Moniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
         assert!(is_resolved(&component_root).await);
         assert!(is_resolved(&component_a).await);
         assert!(is_resolved(&component_b).await);
@@ -144,7 +144,7 @@ pub mod tests {
         assert!(is_shutdown(&component_b).await);
         assert!(is_shutdown(&component_c).await);
         // Component a itself is now unresolved, and thus does not have children anymore.
-        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b"].try_into().unwrap()).await, None);
 
         // Unresolve again, which is ok because UnresolveAction is idempotent.
         assert_matches!(
@@ -186,10 +186,10 @@ pub mod tests {
 
         // Resolve each component.
         test.look_up(Moniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
 
         // Unresolve, recursively.
         ActionsManager::register(component_a.clone(), UnresolveAction::new())
@@ -203,7 +203,7 @@ pub mod tests {
         assert!(is_shutdown(&component_c).await);
         assert!(is_shutdown(&component_d).await);
         // Component a itself is now unresolved, and thus does not have children anymore.
-        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b"].try_into().unwrap()).await, None);
     }
 
     async fn setup_unresolve_test_event_stream(
@@ -245,8 +245,8 @@ pub mod tests {
         ];
         let test = ActionsTest::new("root", components, None).await;
         test.start(Moniker::root()).await;
-        let component_a = test.start(vec!["a"].try_into().unwrap()).await;
-        test.start(vec!["a", "b"].try_into().unwrap()).await;
+        let component_a = test.start(["a"].try_into().unwrap()).await;
+        test.start(["a", "b"].try_into().unwrap()).await;
 
         let mut event_stream =
             setup_unresolve_test_event_stream(&test, vec![EventType::Unresolved]).await;
@@ -255,10 +255,7 @@ pub mod tests {
         let nf = component_a.actions().register_no_wait(UnresolveAction::new()).await;
 
         // Component a is then unresolved.
-        event_stream
-            .wait_until(EventType::Unresolved, vec!["a"].try_into().unwrap())
-            .await
-            .unwrap();
+        event_stream.wait_until(EventType::Unresolved, ["a"].try_into().unwrap()).await.unwrap();
         nf.await.unwrap();
 
         // Now attempt to unresolve again with another UnresolveAction.
@@ -289,7 +286,7 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
         let test =
-            ActionsTest::new("root", components, Some(vec!["container"].try_into().unwrap())).await;
+            ActionsTest::new("root", components, Some(["container"].try_into().unwrap())).await;
         let root = test.model.root();
 
         // Create dynamic instances in "coll".
@@ -297,9 +294,9 @@ pub mod tests {
         test.create_dynamic_child("coll", "b").await;
 
         // Start the components. This should cause them to have an `Execution`.
-        let component_container = test.look_up(vec!["container"].try_into().unwrap()).await;
-        let component_a = test.look_up(vec!["container", "coll:a"].try_into().unwrap()).await;
-        let component_b = test.look_up(vec!["container", "coll:b"].try_into().unwrap()).await;
+        let component_container = test.look_up(["container"].try_into().unwrap()).await;
+        let component_a = test.look_up(["container", "coll:a"].try_into().unwrap()).await;
+        let component_b = test.look_up(["container", "coll:b"].try_into().unwrap()).await;
         root.start_instance(&component_container.moniker, &StartReason::Eager)
             .await
             .expect("could not start container");

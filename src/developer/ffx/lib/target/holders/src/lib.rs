@@ -8,13 +8,13 @@ use std::time::Duration;
 use ffx_command_error::Result;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
-use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv as _};
+use ffx_target::fho::FhoConnectionBehavior;
+use fho::{FhoEnvironment, TryFromEnv as _};
 use fidl::encoding::DefaultFuchsiaResourceDialect;
 use fidl::endpoints::Proxy;
 use target_network_connector::NetworkConnector;
 
 mod daemon_proxy;
-mod device_lookup;
 mod fake_injector;
 pub mod fdomain;
 mod from_toolbox;
@@ -24,7 +24,6 @@ mod target_proxy;
 mod with_moniker;
 
 pub use daemon_proxy::{daemon_protocol, DaemonProxyHolder};
-pub use device_lookup::DeviceLookupDefaultImpl;
 pub use fake_injector::FakeInjector;
 use from_toolbox::WithToolbox;
 pub use from_toolbox::{toolbox, toolbox_or};
@@ -38,7 +37,7 @@ pub async fn init_connection_behavior(
     context: &EnvironmentContext,
 ) -> Result<FhoConnectionBehavior> {
     if context.is_strict() {
-        tracing::info!("Initializing FhoConnectionBehavior::DirectConnector");
+        log::info!("Initializing FhoConnectionBehavior::DirectConnector");
         let connector =
             NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(context).await?;
         Ok(FhoConnectionBehavior::DirectConnector(Arc::new(connector)))
@@ -50,7 +49,7 @@ pub async fn init_connection_behavior(
             DaemonVersionCheck::SameVersionInfo(build_info),
         )
         .await?;
-        tracing::info!("Initializing FhoConnectionBehavior::DaemonConnector");
+        log::info!("Initializing FhoConnectionBehavior::DaemonConnector");
         Ok(FhoConnectionBehavior::DaemonConnector(Arc::new(overnet_injector)))
     }
 }

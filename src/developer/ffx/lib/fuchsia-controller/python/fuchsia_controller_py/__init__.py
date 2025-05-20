@@ -107,21 +107,21 @@ class Socket(BaseHandle):
         else:
             self._socket = handle
 
-    def write(self, buffer: bytes) -> int:
+    def write(self, buffer: bytes) -> None:
         """Writes data to the socket.
 
         Args:
             data: The buffer to write to the socket.
+                  Will write all data to the socket at once.
 
-        Returns:
-            The number of bytes written.
+        Returns: None
 
         Raises:
             TypeError: If data is not the correct type.
         """
         if self._socket is None:
             raise ValueError("Socket is already closed")
-        return fuchsia_controller_internal.socket_write(self._socket, buffer)
+        fuchsia_controller_internal.socket_write(self._socket, buffer)
 
     def read(self) -> bytes:
         """Reads data from the socket."""

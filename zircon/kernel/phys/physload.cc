@@ -17,9 +17,9 @@
 
 #include <ktl/array.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/address-space.h>
 #include <phys/elf-image.h>
 #include <phys/handoff.h>
@@ -44,7 +44,7 @@ void LogSerial(FILE* out = stdout) {
 
 }  // namespace
 
-[[noreturn]] void ZbiMain(void* zbi_ptr, arch::EarlyTicks ticks) {
+[[noreturn]] void ZbiMain(void* zbi_ptr, EarlyBootZbi zbi, arch::EarlyTicks ticks) {
   PhysBootTimes times;
   times.Set(PhysBootTimes::kZbiEntry, ticks);
 
@@ -57,7 +57,7 @@ void LogSerial(FILE* out = stdout) {
   ArchPhysloadBeforeInitMemory();
 
   AddressSpace aspace;
-  InitMemory(zbi_ptr, &aspace);
+  InitMemory(zbi_ptr, ktl::move(zbi), &aspace);
 
   // This marks the interval between handoff from the boot loader (kZbiEntry)
   // and phys environment setup with identity-mapped memory management et al.
@@ -81,12 +81,12 @@ void LogSerial(FILE* out = stdout) {
   gLog = &log;
   log.SetStdout();
 
-  auto zbi_header = static_cast<zbi_header_t*>(zbi_ptr);
-  auto zbi = zbitl::StorageFromRawHeader<ktl::span<ktl::byte>>(zbi_header);
+  auto zbi_storage =
+      zbitl::StorageFromRawHeader<ktl::span<ktl::byte>>(reinterpret_cast<zbi_header_t*>(zbi_ptr));
 
   // Unpack the compressed KERNEL_STORAGE payload.
   KernelStorage kernel_storage;
-  kernel_storage.Init(zbitl::View{zbi});
+  kernel_storage.Init(zbitl::View{zbi_storage});
   kernel_storage.GetTimes(times);
 
   // TODO: add some time samples around bootfs decoding, loading, etc.

@@ -60,6 +60,8 @@ std::string LastRebootReasonAnnotation(const RebootLog& reboot_log) {
       return "factory data reset";
     case FuchsiaRebootReason::ROOT_JOB_TERMINATION:
       return "root job termination";
+    case FuchsiaRebootReason::NETSTACK_MIGRATION:
+      return "netstack migration";
     default:
       return generic_value;
   }

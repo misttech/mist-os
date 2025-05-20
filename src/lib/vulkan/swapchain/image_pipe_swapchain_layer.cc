@@ -194,8 +194,7 @@ struct PendingImageInfo {
 
 class ImagePipeSwapchain {
  public:
-  ImagePipeSwapchain(ImagePipeSurface* surface)
-      : surface_(surface), is_protected_(false), device_(VK_NULL_HANDLE) {}
+  explicit ImagePipeSwapchain(ImagePipeSurface* surface) : surface_(surface) {}
 
   VkResult Initialize(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
                       const VkAllocationCallbacks* pAllocator);
@@ -224,8 +223,9 @@ class ImagePipeSwapchain {
   std::vector<PerImageData> per_image_data_;
   std::vector<uint32_t> acquired_ids_;
   std::vector<PendingImageInfo> pending_images_;
-  bool is_protected_;
-  VkDevice device_;
+  bool is_protected_ = false;
+  bool is_immediate_ = false;
+  VkDevice device_ = VK_NULL_HANDLE;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -254,6 +254,8 @@ VkResult ImagePipeSwapchain::Initialize(VkDevice device,
                                         const VkSwapchainCreateInfoKHR* pCreateInfo,
                                         const VkAllocationCallbacks* pAllocator) {
   is_protected_ = pCreateInfo->flags & VK_SWAPCHAIN_CREATE_PROTECTED_BIT_KHR;
+  is_immediate_ = pCreateInfo->presentMode == VK_PRESENT_MODE_IMMEDIATE_KHR;
+
   VkResult result;
   VkLayerDispatchTable* pDisp =
       GetOrCreateLayerData(get_dispatch_key(device), layer_data_map)->device_dispatch_table.get();
@@ -400,6 +402,7 @@ VkResult ImagePipeSwapchain::AcquireNextImage(uint64_t timeout_ns, VkSemaphore s
                                               uint32_t* pImageIndex) {
   if (surface_->IsLost())
     return VK_ERROR_SURFACE_LOST_KHR;
+
   if (pending_images_.empty()) {
     // All images acquired and none presented.  We will never acquire anything.
     if (timeout_ns == 0)
@@ -429,7 +432,8 @@ VkResult ImagePipeSwapchain::AcquireNextImage(uint64_t timeout_ns, VkSemaphore s
   } else {
     std::unique_ptr<PlatformEvent> event;
 
-    if (surface()->CanPresentPendingImage()) {
+    // For immediate mode we can't do unsynchronized presents so instead we just ignore fences.
+    if (surface()->CanPresentPendingImage() && !is_immediate_) {
       event = std::move(pending_images_[0].release_fence);
     } else {
       event = PlatformEvent::Create(device_, layer_data->device_dispatch_table.get(),
@@ -439,7 +443,7 @@ VkResult ImagePipeSwapchain::AcquireNextImage(uint64_t timeout_ns, VkSemaphore s
         fprintf(stderr, "PlatformEvent::Create failed");
         return VK_SUCCESS;
       }
-      wait_for_release_fence = true;
+      wait_for_release_fence = !is_immediate_;
     }
 
     VkResult result =
@@ -513,19 +517,19 @@ VkResult ImagePipeSwapchain::Present(VkQueue queue, uint32_t index, uint32_t wai
     return VK_ERROR_DEVICE_LOST;
   }
 
-  auto acquire_fence = PlatformEvent::Create(device_, pDisp, false);
-  if (!acquire_fence) {
+  auto completion_event = PlatformEvent::Create(device_, pDisp, false);
+  if (!completion_event) {
     fprintf(stderr, "PlatformEvent::Create failed\n");
     return VK_ERROR_DEVICE_LOST;
   }
 
-  auto image_acquire_fence = acquire_fence->Duplicate(device_, pDisp);
-  if (!image_acquire_fence) {
-    fprintf(stderr, "failed to duplicate acquire fence");
+  auto completion_event_dupe = completion_event->Duplicate(device_, pDisp);
+  if (!completion_event_dupe) {
+    fprintf(stderr, "failed to duplicate completion fence");
     return VK_ERROR_DEVICE_LOST;
   }
 
-  result = image_acquire_fence->ImportToSemaphore(device_, pDisp, per_image_data.semaphore);
+  result = completion_event_dupe->ImportToSemaphore(device_, pDisp, per_image_data.semaphore);
   if (result != VK_SUCCESS) {
     fprintf(stderr, "ImportToSemaphore failed: %d\n", result);
     return VK_ERROR_SURFACE_LOST_KHR;
@@ -555,6 +559,10 @@ VkResult ImagePipeSwapchain::Present(VkQueue queue, uint32_t index, uint32_t wai
   assert(iter != acquired_ids_.end());
   acquired_ids_.erase(iter);
 
+  // For immediate mode we can't do unsynchronized presents so instead we just ignore fences.
+  auto acquire_fence =
+      is_immediate_ ? PlatformEvent::Create(device_, pDisp, true) : std::move(completion_event);
+
   if (kSkipPresent) {
     pending_images_.push_back({std::move(acquire_fence), index});
   } else {
@@ -582,8 +590,8 @@ VkResult ImagePipeSwapchain::Present(VkQueue queue, uint32_t index, uint32_t wai
     TRACE_DURATION("gfx", "ImagePipeSwapchain::Present", "swapchain_image_index", index, "image_id",
                    per_image_data_[index].image.id);
 #endif
-    surface()->PresentImage(per_image_data_[index].image.id, std::move(acquire_fences),
-                            std::move(release_fences), queue);
+    surface()->PresentImage(is_immediate_, per_image_data_[index].image.id,
+                            std::move(acquire_fences), std::move(release_fences), queue);
   }
 
   return VK_SUCCESS;
@@ -629,7 +637,7 @@ CreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR
 #if USE_IMAGEPIPE_SURFACE_FB
   auto out_surface = std::make_unique<ImagePipeSurfaceDisplay>();
 #else
-auto out_surface = std::make_unique<ImagePipeSurfaceAsync>(pCreateInfo->imagePipeHandle);
+  auto out_surface = std::make_unique<ImagePipeSurfaceAsync>(pCreateInfo->imagePipeHandle);
 #endif
 
   if (!out_surface->Init()) {

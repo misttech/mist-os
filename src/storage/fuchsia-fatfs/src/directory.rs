@@ -6,7 +6,9 @@ use crate::filesystem::{FatFilesystem, FatFilesystemInner};
 use crate::node::{Closer, FatNode, Node, WeakFatNode};
 use crate::refs::{FatfsDirRef, FatfsFileRef};
 use crate::types::{Dir, DirEntry, File};
-use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
+use crate::util::{
+    dos_date_to_unix_time, dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time,
+};
 use fatfs::validate_filename;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
@@ -180,7 +182,10 @@ impl FatDirectory {
     }
 
     /// Borrow the underlying fatfs `Dir` that corresponds to this directory.
+    // TODO(https://fxbug.dev/414761492): document or remove this `#[allow]`
+    #[allow(clippy::mut_from_ref)]
     pub(crate) fn borrow_dir_mut<'a>(&self, fs: &'a FatFilesystemInner) -> Option<&mut Dir<'a>> {
+        // TODO(https://fxbug.dev/414760817): document unsafe usage
         unsafe { self.dir.get().as_mut() }.unwrap().borrow_mut(fs)
     }
 
@@ -840,7 +845,6 @@ impl GetEntryInfo for FatDirectory {
 }
 
 impl vfs::node::Node for FatDirectory {
-    // TODO(https://fxbug.dev/324112547): add new io2 attributes, e.g. change time, access time.
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -850,10 +854,15 @@ impl vfs::node::Node for FatDirectory {
 
         let creation_time = dos_to_unix_time(dir.created());
         let modification_time = dos_to_unix_time(dir.modified());
+        let access_time = dos_date_to_unix_time(dir.accessed());
 
         Ok(attributes!(
             requested_attributes,
-            Mutable { creation_time: creation_time, modification_time: modification_time },
+            Mutable {
+                creation_time: creation_time,
+                modification_time: modification_time,
+                access_time: access_time
+            },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -880,7 +889,7 @@ impl vfs::node::Node for FatDirectory {
 }
 
 impl Directory for FatDirectory {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -911,7 +920,7 @@ impl Directory for FatDirectory {
         });
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -1244,7 +1253,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_reopen_root() {
+    async fn test_deprecated_reopen_root() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1252,24 +1261,15 @@ mod tests {
         let fs = disk.into_fatfs();
         let dir = fs.get_root().expect("get_root OK");
 
-        let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        dir.clone().open(scope.clone(), fio::OpenFlags::RIGHT_READABLE, Path::dot(), server_end);
-        let scope_clone = scope.clone();
-
+        let proxy = vfs::directory::serve_read_only(dir.clone());
         proxy
             .close()
             .await
             .expect("Send request OK")
             .map_err(Status::from_raw)
             .expect("First close OK");
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        dir.clone().open(
-            scope_clone,
-            fio::OpenFlags::RIGHT_READABLE,
-            Path::validate_and_split("test").unwrap(),
-            server_end,
-        );
+
+        let proxy = vfs::directory::serve_read_only(dir.clone());
         proxy
             .close()
             .await
@@ -1280,7 +1280,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_reopen3_root() {
+    async fn test_reopen_root() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1288,13 +1288,8 @@ mod tests {
         let fs = disk.into_fatfs();
         let root = fs.get_root().expect("get_root failed");
 
-        let scope = ExecutionScope::new();
-
         // Open and close root.
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        let flags = fio::Flags::PERM_READ;
-        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
-            .handle(|request| root.clone().open3(scope.clone(), Path::dot(), flags, request));
+        let proxy = vfs::directory::serve_read_only(root.clone());
         proxy
             .close()
             .await
@@ -1303,15 +1298,11 @@ mod tests {
             .expect("First close failed");
 
         // Re-open and close root at "test".
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open3(
-                scope.clone(),
-                Path::validate_and_split("test").unwrap(),
-                flags,
-                request,
-            )
-        });
+        let proxy = vfs::serve_directory(
+            root.clone(),
+            Path::validate_and_split("test").unwrap(),
+            fio::PERM_READABLE,
+        );
         proxy
             .close()
             .await
@@ -1323,7 +1314,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_open3_already_exists() {
+    async fn test_open_already_exists() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1333,11 +1324,11 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        let flags = fio::Flags::PERM_READ
+        let flags = fio::PERM_READABLE
             | fio::Flags::FLAG_MUST_CREATE
             | fio::Flags::FLAG_SEND_REPRESENTATION;
         ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open3(
+            root.clone().open(
                 scope.clone(),
                 Path::validate_and_split("test").unwrap(),
                 flags,
@@ -1346,7 +1337,7 @@ mod tests {
         });
 
         let event =
-            proxy.take_event_stream().try_next().await.expect_err("open2 passed unexpectedly");
+            proxy.take_event_stream().try_next().await.expect_err("open passed unexpectedly");
 
         assert_matches!(
             event,
@@ -1364,18 +1355,7 @@ mod tests {
 
         let fs = disk.into_fatfs();
         let root = fs.get_root().expect("get_root failed");
-
-        let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags = fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES;
-        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open3(
-                scope.clone(),
-                Path::validate_and_split(".").unwrap(),
-                flags,
-                request,
-            )
-        });
+        let proxy = vfs::directory::serve(root.clone(), fio::PERM_READABLE | fio::PERM_WRITABLE);
 
         let mut new_attrs = fio::MutableNodeAttributes {
             creation_time: Some(
@@ -1414,19 +1394,11 @@ mod tests {
 
         let fs = disk.into_fatfs();
         let root = fs.get_root().expect("get_root failed");
-
-        let scope = ExecutionScope::new();
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-        let flags =
-            fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES | fio::Flags::PROTOCOL_FILE;
-        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
-            root.clone().open3(
-                scope.clone(),
-                Path::validate_and_split("test_file").unwrap(),
-                flags,
-                request,
-            )
-        });
+        let proxy = vfs::serve_file(
+            root.clone(),
+            Path::validate_and_split("test_file").unwrap(),
+            fio::PERM_WRITABLE,
+        );
 
         let mut new_attrs = fio::MutableNodeAttributes {
             creation_time: Some(

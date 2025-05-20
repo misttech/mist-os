@@ -36,7 +36,7 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailRequest final {
   static inline ::std::unique_ptr<ExampleUseOfErrorSyntaxCallWhichMayFailRequest> New() { return ::std::make_unique<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ExampleUseOfErrorSyntaxCallWhichMayFailRequest* value, size_t _offset);
   zx_status_t Clone(ExampleUseOfErrorSyntaxCallWhichMayFailRequest* result) const;
 };
@@ -66,7 +66,7 @@ class ExampleUseOfErrorSyntax_CallWhichMayFail_Response final {
   static inline ::std::unique_ptr<ExampleUseOfErrorSyntax_CallWhichMayFail_Response> New() { return ::std::make_unique<ExampleUseOfErrorSyntax_CallWhichMayFail_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ExampleUseOfErrorSyntax_CallWhichMayFail_Response* value, size_t _offset);
   zx_status_t Clone(ExampleUseOfErrorSyntax_CallWhichMayFail_Response* result) const;
 };
@@ -101,7 +101,7 @@ class ExampleUseOfErrorSyntax_CallWhichMayFail_Result final {
   static inline ::std::unique_ptr<ExampleUseOfErrorSyntax_CallWhichMayFail_Result> New() { return ::std::make_unique<ExampleUseOfErrorSyntax_CallWhichMayFail_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ExampleUseOfErrorSyntax_CallWhichMayFail_Result* value, size_t offset);
   zx_status_t Clone(ExampleUseOfErrorSyntax_CallWhichMayFail_Result* result) const;
 
@@ -298,7 +298,7 @@ struct CodingTraits<std::unique_ptr<::test::errorsyntax::ExampleUseOfErrorSyntax
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -371,10 +371,6 @@ constexpr uint64_t kExampleUseOfErrorSyntax_CallWhichMayFail_Ordinal = 0x3424ff8
 
 constexpr ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_CallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class ExampleUseOfErrorSyntax {
  public:

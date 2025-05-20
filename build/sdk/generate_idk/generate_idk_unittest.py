@@ -9,16 +9,18 @@ import unittest
 import generate_idk
 
 UNMERGABLE_TYPES = [
-    "cc_source_library",
-    "dart_library",
-    "fidl_library",
-    "documentation",
-    "config",
-    "license",
-    "component_manifest",
+    # LINT.IfChange
     "bind_library",
-    "version_history",
+    "cc_source_library",
+    "component_manifest",
+    "config",
+    "dart_library",
+    "documentation",
     "experimental_python_e2e_test",
+    "fidl_library",
+    "license",
+    "version_history",
+    # LINT.ThenChange(//build/sdk/generate_idk/__init__.py)
 ]
 
 

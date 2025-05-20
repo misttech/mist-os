@@ -74,7 +74,7 @@ async fn test_open_node_on_file() {
 }
 
 #[fuchsia::test]
-async fn test_set_attr_and_deprecated_set_flags_on_node() {
+async fn test_deprecated_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
@@ -85,7 +85,7 @@ async fn test_set_attr_and_deprecated_set_flags_on_node() {
     assert_eq!(
         zx::Status::ok(
             proxy
-                .set_attr(
+                .deprecated_set_attr(
                     fio::NodeAttributeFlags::MODIFICATION_TIME,
                     &fio::NodeAttributes {
                         mode: 0,
@@ -130,23 +130,12 @@ async fn test_node_clone() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-    let proxy = dir
-        .open_node::<fio::NodeMarker>(
-            "file",
-            fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
-            None,
-        )
-        .await
-        .unwrap();
+    let flags = fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES;
+    let proxy = dir.open_node::<fio::NodeMarker>("file", flags, None).await.unwrap();
 
     let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     proxy.deprecated_clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).expect("clone failed");
-
-    assert_matches!(
-        cloned.get_connection_info().await.expect("get_connection_info failed"),
-        fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), .. }
-    );
+    assert_eq!(cloned.get_flags().await.unwrap().unwrap(), flags);
 }
 
 #[fuchsia::test]

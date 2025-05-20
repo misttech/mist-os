@@ -12,14 +12,14 @@
 #include <phys/stack.h>
 #include <phys/symbolize.h>
 
-namespace {
-
 #ifdef __ELF__
 
 // These are defined by the phys.ld linker script.
 extern "C" ktl::byte __executable_start[], _edata[], _end[];
 extern "C" const ktl::byte __start_note_gnu_build_id[];
 extern "C" const ktl::byte __stop_note_gnu_build_id[];
+
+namespace {
 
 void InitSelf(MainSymbolize& main) {
   using Phdr = elfldltl::Elf<>::Phdr;
@@ -55,13 +55,15 @@ void InitSelf(MainSymbolize& main) {
 #endif  // __has_feature(shadow_call_stack)
 }
 
+}  // namespace
+
 #else  // !__ELF__
 
+namespace {
 void InitSelf(MainSymbolize& main) {}
+}  // namespace
 
 #endif  // __ELF__
-
-}  // namespace
 
 void MainSymbolize::set_self(const ElfImage* self) {
   ReplaceModulesStorage(ModuleList{cpp20::span{&self_, 1}});

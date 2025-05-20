@@ -43,6 +43,9 @@ struct MsdDriverCallbacks {
                                  const char* vthread, uint64_t vthread_id, uint64_t timestamp);
 };
 
+typedef void (*msd_device_set_power_state_callback_t)(uintptr_t callback_context,
+                                                      magma_status_t status);
+
 void msd_driver_register_callbacks(struct MsdDriverCallbacks* callbacks);
 
 struct MsdDevice* msd_driver_create_device(struct MsdPlatformDevice* platform_device);
@@ -52,6 +55,12 @@ void msd_device_release(struct MsdDevice* device);
 magma_status_t msd_device_query(struct MsdDevice* device, uint64_t id,
                                 magma_handle_t* result_buffer_out, uint64_t* result_out);
 
+// `callback` can be called from any thread context, so it is up to the client
+// to provide thread safety.
+void msd_device_set_power_state(struct MsdDevice* device, int64_t power_state,
+                                msd_device_set_power_state_callback_t callback,
+                                uintptr_t callback_context);
+
 struct MsdConnection* msd_device_create_connection(struct MsdDevice* device, uint64_t client_id);
 
 void msd_connection_release(struct MsdConnection* connection);
@@ -60,10 +69,14 @@ magma_status_t msd_connection_map_buffer(struct MsdConnection* msd_connection,
                                          struct MsdBuffer* msd_buffer, uint64_t gpu_va,
                                          uint64_t offset, uint64_t length, uint64_t flags);
 
-void msd_connection_release_buffer(struct MsdConnection* msd_connection,
-                                   struct MsdBuffer* msd_buffer);
+void msd_connection_release_buffer2(struct MsdConnection* msd_connection,
+                                    struct MsdBuffer* msd_buffer, int32_t shutting_down);
 
+// TODO(b/402461734) - remove after transition to msd_connection_create_context2
 struct MsdContext* msd_connection_create_context(struct MsdConnection* msd_connection);
+
+struct MsdContext* msd_connection_create_context2(struct MsdConnection* msd_connection,
+                                                  magma_priority_t priority);
 
 struct MsdContext* msd_context_release(struct MsdContext* msd_context);
 

@@ -26,6 +26,10 @@ pub struct Payload {
 
 impl fidl::Persistable for Payload {}
 
+pub mod one_way_ordinals {
+    pub const SEND_: u64 = 0x6e3b1578a847a9ff;
+}
+
 mod internal {
     use super::*;
 

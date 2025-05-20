@@ -17,12 +17,14 @@ struct Sink {
   std::string& value;
 };
 
-std::string profiler::symbolizer_markup::FormatModule(const profiler::Module& mod) {
+std::string profiler::symbolizer_markup::FormatModule(uint32_t module_id,
+                                                      const std::vector<std::byte>& build_id,
+                                                      const profiler::Module& mod) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   const size_t kPageSize = zx_system_get_page_size();
   std::string markup;
   ::symbolizer_markup::Writer writer(Sink{markup});
-  writer.ElfModule(mod.module_id, mod.module_name, mod.build_id).Newline();
+  writer.ElfModule(module_id, mod.module_name, build_id).Newline();
   for (const profiler::Segment& segment : mod.loads) {
     uintptr_t start = segment.p_vaddr & -kPageSize;
     uintptr_t end = (segment.p_vaddr + segment.p_memsz + kPageSize - 1) & -kPageSize;
@@ -32,7 +34,7 @@ std::string profiler::symbolizer_markup::FormatModule(const profiler::Module& mo
         .write = (segment.p_flags & PF_W) != 0,
         .execute = (segment.p_flags & PF_X) != 0,
     };
-    writer.LoadImageMmap(mod.vaddr + start, end - start, mod.module_id, perms, start).Newline();
+    writer.LoadImageMmap(mod.vaddr + start, end - start, module_id, perms, start).Newline();
   }
   return markup;
 }

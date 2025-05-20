@@ -72,7 +72,7 @@ template("sdk_host_tool") {
 
     meta = {
       dest = "$file_base-meta.json"
-      schema = "host_tool"
+      type = "host_tool"
       value = {
         type = "host_tool"
         name = output_name

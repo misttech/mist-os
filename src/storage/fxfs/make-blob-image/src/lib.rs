@@ -11,6 +11,7 @@ use fxfs::errors::FxfsError;
 use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder};
 use fxfs::object_handle::WriteBytes;
 use fxfs::object_store::directory::Directory;
+use fxfs::object_store::journal::super_block::SuperBlockInstance;
 use fxfs::object_store::journal::RESERVED_SPACE;
 use fxfs::object_store::transaction::{lock_keys, LockKey};
 use fxfs::object_store::volume::root_volume;
@@ -98,7 +99,7 @@ pub async fn make_blob_image(
     let filesystem = FxFilesystemBuilder::new()
         .format(true)
         .trim_config(None)
-        .image_builder_mode(true)
+        .image_builder_mode(Some(SuperBlockInstance::A))
         .open(device)
         .await
         .context("Failed to format filesystem")?;
@@ -114,7 +115,9 @@ pub async fn make_blob_image(
                 e
             }
         })?;
-    let (_device, actual_size) = filesystem.finalize().await?;
+    filesystem.finalize().await?;
+    let actual_size = filesystem.allocator().maximum_offset();
+    filesystem.close().await?;
 
     if target_size == 0 {
         // Apply a default heuristic of 2x the actual image size.  This is necessary to use the

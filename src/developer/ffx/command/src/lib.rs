@@ -52,17 +52,16 @@ fn write_exit_code<W: Write>(res: &Result<ExitStatus>, out: &mut W) {
 }
 
 /// Tries to report the given unexpected error to analytics if appropriate
-#[tracing::instrument(skip(err))]
 pub async fn report_bug(err: &impl std::fmt::Display) {
     // TODO(66918): make configurable, and evaluate chosen time value.
     if let Err(e) = analytics::add_crash_event(&format!("{}", err), None)
         .on_timeout(Duration::from_secs(2), || {
-            tracing::error!("analytics timed out reporting crash event");
+            log::error!("analytics timed out reporting crash event");
             Ok(())
         })
         .await
     {
-        tracing::error!("analytics failed to submit crash event: {}", e);
+        log::error!("analytics failed to submit crash event: {}", e);
     }
 }
 
@@ -106,7 +105,6 @@ impl std::str::FromStr for MachineFormat {
     }
 }
 
-#[tracing::instrument]
 pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     let mut return_args_info = false;
     let mut return_help: Option<Error> = None;
@@ -163,7 +161,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     };
     ffx_config::logging::init(&context, app.verbose, &log_dest)?;
 
-    let tools = T::from_env(&context).await?;
+    let tools = T::from_env(&context)?;
 
     if return_args_info {
         // This handles the top level ffx command information and prints the information
@@ -195,10 +193,10 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     // commands to have positional arguments and they are present if the schema is
     // requested.
     let tool = if app.schema && app.machine.is_some() {
-        tracing::info!("Schema requested - calling try from name: {cmd:?}");
+        log::info!("Schema requested - calling try from name: {cmd:?}");
         tools.try_runner_from_name(&cmd).await?
     } else {
-        tracing::info!("No schema requested - calling try from args: {cmd:?}");
+        log::info!("No schema requested - calling try from args: {cmd:?}");
         match tools.try_from_args(&cmd).await {
             Ok(t) => t,
             Err(Error::Help { command, output, code }) => {
@@ -240,11 +238,11 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         }
     };
 
-    tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
-    tracing::info!("with context: {kind:#?}", kind = context.env_kind());
+    log::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
+    log::info!("with context: {kind:#?}", kind = context.env_kind());
 
     let metrics = MetricsSession::start(&context).await?;
-    tracing::debug!("metrics session started");
+    log::debug!("metrics session started");
 
     let stamp = stamp_file(&app.stamp)?;
     let res = match tool {
@@ -307,7 +305,7 @@ pub async fn exit(res: Result<ExitStatus>, should_format: bool) -> ! {
         .await
         .is_err()
     {
-        tracing::warn!("Timed out shutting down handles");
+        log::warn!("Timed out shutting down handles");
     };
 
     std::process::exit(exit_code);

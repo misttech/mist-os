@@ -52,9 +52,9 @@ follows:
 
 * `--set-initial-profile`: this flag *must* be set to instruct the server to
   serve a nonempty initial locale.
-* `--locale_ids=...`: a comma-separated list of BCP-47 compatible locale
+* `--locale-ids=...`: a comma-separated list of BCP-47 compatible locale
   identifiers to be served, in the order of preference.
-* `--locale_ids=...`: a comma-separated list of BCP-47 compatible time zone
+* `--locale-ids=...`: a comma-separated list of BCP-47 compatible time zone
   identifiers to be served, in the order of preference.
 
 The above flags can be set in the `"args"` section of the file

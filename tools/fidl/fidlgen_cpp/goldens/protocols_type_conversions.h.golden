@@ -260,10 +260,6 @@ struct WireTypeForNaturalType<::test_protocols::ChannelProtocolTakeHandleRequest
   using type = ::test_protocols::wire::ChannelProtocolTakeHandleRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::ChannelProtocolMutateSocketRequest, ::test_protocols::ChannelProtocolMutateSocketRequest> {
   static ::test_protocols::ChannelProtocolMutateSocketRequest ToNatural(::test_protocols::wire::ChannelProtocolMutateSocketRequest src);
@@ -278,10 +274,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocols::ChannelProtocolMutateSocketRequest> {
   using type = ::test_protocols::wire::ChannelProtocolMutateSocketRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::ChannelProtocolMutateSocketResponse, ::test_protocols::ChannelProtocolMutateSocketResponse> {
@@ -332,10 +324,6 @@ struct WireTypeForNaturalType<::test_protocols::HandleRightsProtocolNoResponseMe
   using type = ::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::HandleRightsProtocolResponseMethodRequest, ::test_protocols::HandleRightsProtocolResponseMethodRequest> {
   static ::test_protocols::HandleRightsProtocolResponseMethodRequest ToNatural(::test_protocols::wire::HandleRightsProtocolResponseMethodRequest src);
@@ -350,10 +338,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocols::HandleRightsProtocolResponseMethodRequest> {
   using type = ::test_protocols::wire::HandleRightsProtocolResponseMethodRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::HandleRightsProtocolResponseMethodResponse, ::test_protocols::HandleRightsProtocolResponseMethodResponse> {
@@ -370,10 +354,6 @@ struct WireTypeForNaturalType<::test_protocols::HandleRightsProtocolResponseMeth
   using type = ::test_protocols::wire::HandleRightsProtocolResponseMethodResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::HandleRightsProtocolAnEventRequest, ::test_protocols::HandleRightsProtocolAnEventRequest> {
   static ::test_protocols::HandleRightsProtocolAnEventRequest ToNatural(::test_protocols::wire::HandleRightsProtocolAnEventRequest src);
@@ -388,10 +368,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocols::HandleRightsProtocolAnEventRequest> {
   using type = ::test_protocols::wire::HandleRightsProtocolAnEventRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::ProtocolEnds, ::test_protocols::ProtocolEnds> {
@@ -408,10 +384,6 @@ struct WireTypeForNaturalType<::test_protocols::ProtocolEnds> {
   using type = ::test_protocols::wire::ProtocolEnds;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsClientEndsRequest, ::test_protocols::WithProtocolEndsClientEndsRequest> {
   static ::test_protocols::WithProtocolEndsClientEndsRequest ToNatural(::test_protocols::wire::WithProtocolEndsClientEndsRequest src);
@@ -426,10 +398,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocols::WithProtocolEndsClientEndsRequest> {
   using type = ::test_protocols::wire::WithProtocolEndsClientEndsRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsClientEndsResponse, ::test_protocols::WithProtocolEndsClientEndsResponse> {
@@ -446,10 +414,6 @@ struct WireTypeForNaturalType<::test_protocols::WithProtocolEndsClientEndsRespon
   using type = ::test_protocols::wire::WithProtocolEndsClientEndsResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsServerEndsRequest, ::test_protocols::WithProtocolEndsServerEndsRequest> {
   static ::test_protocols::WithProtocolEndsServerEndsRequest ToNatural(::test_protocols::wire::WithProtocolEndsServerEndsRequest src);
@@ -464,10 +428,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocols::WithProtocolEndsServerEndsRequest> {
   using type = ::test_protocols::wire::WithProtocolEndsServerEndsRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsServerEndsResponse, ::test_protocols::WithProtocolEndsServerEndsResponse> {
@@ -484,10 +444,6 @@ struct WireTypeForNaturalType<::test_protocols::WithProtocolEndsServerEndsRespon
   using type = ::test_protocols::wire::WithProtocolEndsServerEndsResponse;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest, ::test_protocols::WithProtocolEndsStructContainingEndsRequest> {
   static ::test_protocols::WithProtocolEndsStructContainingEndsRequest ToNatural(::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest src);
@@ -502,10 +458,6 @@ template <>
 struct WireTypeForNaturalType<::test_protocols::WithProtocolEndsStructContainingEndsRequest> {
   using type = ::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse, ::test_protocols::WithProtocolEndsStructContainingEndsResponse> {

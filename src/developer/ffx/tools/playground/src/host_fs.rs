@@ -185,10 +185,6 @@ impl File for HostFile {
         file.sync_all()?;
         Ok(())
     }
-
-    fn event(&self) -> Result<Option<fidl::Event>, Status> {
-        Ok(None)
-    }
 }
 
 impl FileIo for HostFile {
@@ -325,7 +321,7 @@ impl Node for HostDirectory {
 }
 
 impl Directory for HostDirectory {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -337,7 +333,7 @@ impl Directory for HostDirectory {
             .handle(|object_request| self.do_open(scope, path, flags, object_request));
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: VfsPath,

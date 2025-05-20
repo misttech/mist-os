@@ -206,17 +206,17 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('I2C_');
-  const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  const std::vector<fdf::BindRule2> kGpioInitRules = std::vector{
+      fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
-  const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
-      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  const std::vector<fdf::NodeProperty2> kGpioInitProps = std::vector{
+      fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
-  const std::vector<fdf::ParentSpec> kI2cParents = std::vector{
-      fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+  const std::vector<fdf::ParentSpec2> kI2cParents = std::vector{
+      fdf::ParentSpec2{{kGpioInitRules, kGpioInitProps}},
   };
 
-  const fdf::CompositeNodeSpec i2c_spec{{name, kI2cParents}};
+  const fdf::CompositeNodeSpec i2c_spec{{.name = name, .parents2 = kI2cParents}};
   const auto result = pbus.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, i2c_dev),
                                                                fidl::ToWire(fidl_arena, i2c_spec));
   if (!result.ok()) {

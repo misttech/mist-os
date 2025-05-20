@@ -10,6 +10,14 @@ use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
 
+pub mod first_protocol_ordinals {
+    pub const METHOD_ON_FIRST: u64 = 0x5828c91b57492931;
+}
+
+pub mod second_protocol_ordinals {
+    pub const METHOD_ON_SECOND: u64 = 0x70b439758de25c44;
+}
+
 mod internal {
     use super::*;
 }

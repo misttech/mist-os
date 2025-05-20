@@ -18,12 +18,12 @@ use fidl_next_codec::{Chunk, DecodeError, Decoder, EncodeError, Encoder, CHUNK_S
 use fuchsia_async::{RWHandle, ReadableHandle as _};
 use futures::task::AtomicWaker;
 use zx::sys::{
-    zx_channel_read, zx_channel_write, ZX_ERR_BUFFER_TOO_SMALL, ZX_ERR_PEER_CLOSED,
+    zx_channel_read, zx_channel_write, zx_handle_t, ZX_ERR_BUFFER_TOO_SMALL, ZX_ERR_PEER_CLOSED,
     ZX_ERR_SHOULD_WAIT, ZX_OK,
 };
-use zx::{AsHandleRef as _, Channel, Handle, Status};
+use zx::{AsHandleRef as _, Channel, Handle, HandleBased, Status};
 
-use crate::Transport;
+use crate::{NonBlockingTransport, Transport};
 
 struct Shared {
     is_closed: AtomicBool,
@@ -83,14 +83,14 @@ impl Buffer {
         Self::default()
     }
 
-    /// Retrieve the handles for conformance testing.
-    pub fn handles_for_conformance_test(&self) -> &[Handle] {
+    /// Retrieve the handles.
+    pub fn handles(&self) -> &[Handle] {
         &self.handles
     }
 
-    /// Retrieve the chunks for conformance testing.
-    pub fn chunks_for_conformance_test(&self) -> &[Chunk] {
-        &self.chunks
+    /// Retrieve the bytes.
+    pub fn bytes(&self) -> Vec<u8> {
+        self.chunks.iter().flat_map(|chunk| chunk.to_le_bytes()).collect()
     }
 }
 
@@ -168,7 +168,14 @@ unsafe impl Decoder for RecvBuffer {
         unsafe { Ok(NonNull::new_unchecked(chunks)) }
     }
 
-    fn finish(&mut self) -> Result<(), DecodeError> {
+    fn commit(&mut self) {
+        for handle in &mut self.buffer.handles[0..self.handles_taken] {
+            // This handle was taken. To commit the current changes, we need to forget it.
+            let _ = replace(handle, Handle::invalid()).into_raw();
+        }
+    }
+
+    fn finish(&self) -> Result<(), DecodeError> {
         if self.chunks_taken != self.buffer.chunks.len() {
             return Err(DecodeError::ExtraBytes {
                 num_extra: (self.buffer.chunks.len() - self.chunks_taken) * CHUNK_SIZE,
@@ -206,12 +213,12 @@ impl InternalHandleDecoder for RecvBuffer {
 }
 
 impl HandleDecoder for RecvBuffer {
-    fn take_handle(&mut self) -> Result<Handle, DecodeError> {
+    fn take_raw_handle(&mut self) -> Result<zx_handle_t, DecodeError> {
         if self.handles_taken >= self.buffer.handles.len() {
             return Err(DecodeError::InsufficientHandles);
         }
 
-        let handle = replace(&mut self.buffer.handles[self.handles_taken], Handle::invalid());
+        let handle = self.buffer.handles[self.handles_taken].raw_handle();
         self.handles_taken += 1;
 
         Ok(handle)
@@ -243,30 +250,11 @@ impl Transport for Channel {
     }
 
     fn poll_send(
-        mut future_state: Pin<&mut Self::SendFutureState>,
+        future_state: Pin<&mut Self::SendFutureState>,
         _: &mut Context<'_>,
         sender: &Self::Sender,
     ) -> Poll<Result<(), Self::Error>> {
-        let result = unsafe {
-            zx_channel_write(
-                sender.shared.channel.get_ref().raw_handle(),
-                0,
-                future_state.buffer.chunks.as_ptr().cast::<u8>(),
-                (future_state.buffer.chunks.len() * CHUNK_SIZE) as u32,
-                future_state.buffer.handles.as_ptr().cast(),
-                future_state.buffer.handles.len() as u32,
-            )
-        };
-
-        if result == ZX_OK {
-            // Handles were written to the channel, so we must not drop them.
-            unsafe {
-                future_state.buffer.handles.set_len(0);
-            }
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Ready(Err(Status::from_raw(result)))
-        }
+        Poll::Ready(Self::send_immediately(future_state.get_mut(), sender))
     }
 
     fn close(sender: &Self::Sender) {
@@ -338,12 +326,51 @@ impl Transport for Channel {
     }
 }
 
+impl NonBlockingTransport for Channel {
+    fn send_immediately(
+        future_state: &mut Self::SendFutureState,
+        sender: &Self::Sender,
+    ) -> Result<(), Self::Error> {
+        let result = unsafe {
+            zx_channel_write(
+                sender.shared.channel.get_ref().raw_handle(),
+                0,
+                future_state.buffer.chunks.as_ptr().cast::<u8>(),
+                (future_state.buffer.chunks.len() * CHUNK_SIZE) as u32,
+                future_state.buffer.handles.as_ptr().cast(),
+                future_state.buffer.handles.len() as u32,
+            )
+        };
+
+        if result == ZX_OK {
+            // Handles were written to the channel, so we must not drop them.
+            unsafe {
+                future_state.buffer.handles.set_len(0);
+            }
+            Ok(())
+        } else {
+            Err(Status::from_raw(result))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use fuchsia_async as fasync;
-    use zx::Channel;
+    use core::mem::MaybeUninit;
 
-    use crate::testing::transport::*;
+    use fidl_next_codec::fuchsia::{HandleDecoder, HandleEncoder, WireHandle};
+    use fidl_next_codec::{
+        munge, Decode, DecodeError, DecoderExt as _, Encodable, Encode, EncodeError,
+        EncoderExt as _, FromWire, Slot, Wire, WireString,
+    };
+    use fuchsia_async as fasync;
+    use zx::{AsHandleRef, Channel, Handle, HandleBased as _, Instant, Signals, WaitResult};
+
+    use crate::fuchsia::channel::{Buffer, RecvBuffer};
+    use crate::testing::{
+        test_close_on_drop, test_event, test_multiple_two_way, test_one_way, test_two_way,
+    };
+    use crate::{Client, Responder, Server, ServerHandler, ServerSender, Transport};
 
     #[fasync::run_singlethreaded(test)]
     async fn close_on_drop() {
@@ -373,5 +400,153 @@ mod tests {
     async fn event() {
         let (client_end, server_end) = Channel::create();
         test_event(client_end, server_end).await;
+    }
+
+    struct HandleAndBoolean {
+        handle: Handle,
+        boolean: bool,
+    }
+
+    #[derive(Debug)]
+    #[repr(C)]
+    struct WireHandleAndBoolean {
+        handle: WireHandle,
+        boolean: bool,
+    }
+
+    unsafe impl Wire for WireHandleAndBoolean {
+        type Decoded<'de> = Self;
+
+        fn zero_padding(out: &mut MaybeUninit<Self>) {
+            unsafe {
+                out.as_mut_ptr().write_bytes(0, 1);
+            }
+        }
+    }
+
+    impl Encodable for HandleAndBoolean {
+        type Encoded = WireHandleAndBoolean;
+    }
+
+    unsafe impl<E: HandleEncoder + ?Sized> Encode<E> for HandleAndBoolean {
+        fn encode(
+            self,
+            encoder: &mut E,
+            out: &mut MaybeUninit<Self::Encoded>,
+        ) -> Result<(), EncodeError> {
+            munge!(let Self::Encoded { handle, boolean } = out);
+            self.handle.encode(encoder, handle)?;
+            self.boolean.encode(encoder, boolean)?;
+            Ok(())
+        }
+    }
+
+    unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandleAndBoolean {
+        fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
+            munge!(let Self { handle, boolean } = slot);
+            Decode::decode(handle, decoder)?;
+            Decode::decode(boolean, decoder)?;
+            Ok(())
+        }
+    }
+
+    impl FromWire<WireHandleAndBoolean> for HandleAndBoolean {
+        fn from_wire(wire: WireHandleAndBoolean) -> Self {
+            Self { handle: Handle::from_wire(wire.handle), boolean: wire.boolean }
+        }
+    }
+
+    #[test]
+    fn partial_decode_drops_handles() {
+        let (encode_end, check_end) = Channel::create();
+
+        let mut buffer = Buffer::new();
+        buffer
+            .encode_next(HandleAndBoolean { handle: encode_end.into_handle(), boolean: false })
+            .expect("encoding should succeed");
+        // Modify the buffer so that the boolean value is invalid
+        *buffer.chunks[0] |= 0x00000002_00000000;
+
+        let mut recv_buffer = RecvBuffer { buffer, chunks_taken: 0, handles_taken: 0 };
+        (&mut recv_buffer)
+            .decode_owned::<WireHandleAndBoolean>()
+            .expect_err("decoding an invalid boolean should fail");
+
+        // Decoding failed, so the handle should still be in the buffer.
+        assert_eq!(
+            check_end.wait_handle(Signals::CHANNEL_PEER_CLOSED, Instant::INFINITE_PAST),
+            WaitResult::TimedOut(Signals::CHANNEL_WRITABLE),
+        );
+
+        drop(recv_buffer);
+
+        // The handle should have been dropped with the buffer.
+        assert_eq!(
+            check_end.wait_handle(Signals::CHANNEL_PEER_CLOSED, Instant::INFINITE_PAST),
+            WaitResult::Ok(Signals::CHANNEL_PEER_CLOSED),
+        );
+    }
+
+    #[test]
+    fn complete_decode_moves_handles() {
+        let (encode_end, check_end) = Channel::create();
+
+        let mut buffer = Buffer::new();
+        buffer
+            .encode_next(HandleAndBoolean { handle: encode_end.into_handle(), boolean: false })
+            .expect("encoding should succeed");
+
+        let recv_buffer = RecvBuffer { buffer, chunks_taken: 0, handles_taken: 0 };
+        let decoded =
+            recv_buffer.decode::<WireHandleAndBoolean>().expect("decoding should succeed");
+
+        // The handle should remain un-signaled after successful decoding.
+        assert_eq!(
+            check_end.wait_handle(Signals::CHANNEL_PEER_CLOSED, Instant::INFINITE_PAST),
+            WaitResult::TimedOut(Signals::CHANNEL_WRITABLE),
+        );
+
+        drop(decoded);
+
+        // Now the handle should be signaled.
+        assert_eq!(
+            check_end.wait_handle(Signals::CHANNEL_PEER_CLOSED, Instant::INFINITE_PAST),
+            WaitResult::Ok(Signals::CHANNEL_PEER_CLOSED),
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn one_way_nonblocking() {
+        let (client_end, server_end) = Channel::create();
+        struct TestServer;
+
+        impl<T: Transport> ServerHandler<T> for TestServer {
+            fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
+                assert_eq!(ordinal, 42);
+                let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
+                assert_eq!(&**message, "Hello world");
+            }
+
+            fn on_two_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer, _: Responder) {
+                panic!("unexpected two-way message");
+            }
+        }
+
+        let mut client = Client::new(client_end);
+        let client_sender = client.sender().clone();
+        let client_task = fasync::Task::spawn(async move { client.run_sender().await });
+        let mut server = Server::new(server_end);
+        let server_task = fasync::Task::spawn(async move { server.run(TestServer).await });
+
+        client_sender
+            .send_one_way(42, "Hello world")
+            .expect("client failed to encode request")
+            .send_immediately()
+            .expect("client failed to send request");
+        client_sender.close();
+        drop(client_sender);
+
+        client_task.await.expect("client encountered an error");
+        server_task.await.expect("server encountered an error");
     }
 }

@@ -26,8 +26,8 @@ platform_version = exec_script(python_exe_src,
                                _file_dependencies)
 
 declare_args() {
-  # Overrides the set of API levels for which this build will provide build-time
-  # support in the IDK/SDK. The default (`false`) set is all `supported` and
+  # The set of API levels for which this build will provide build-time
+  # support in the IDK/SDK. The default set is all `supported` and
   # `in development` non-special API levels in //sdk/version_history.json.
   # Other valid values are a list containing a subset of the default set. If
   # empty, only targets for which the IDK contains artifacts built at "PLATFORM"
@@ -37,11 +37,18 @@ declare_args() {
   # includes the IDK/SDK in exchange for reduced coverage of API level support.
   # For example, `fx build //sdk:final_fuchsia_idk`.
   #
-  # To override the set of target CPUs, see `override_idk_target_cpus`.
-  override_idk_buildable_api_levels = false
-}
+  # To override the set of CPU architectures, see `idk_buildable_cpus`.
+  #
+  # Do not use the `platform_version` member directly.
+  # LINT.IfChange
+  idk_buildable_api_levels = platform_version.default_idk_buildable_api_levels
 
-if (override_idk_buildable_api_levels != false) {
-  platform_version.idk_buildable_api_levels = []
-  platform_version.idk_buildable_api_levels = override_idk_buildable_api_levels
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
+
+  # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
+  # are too slow to enable this setting, and therefore the mac IDK won't have
+  # per-api-level prebuilts.
+  if (host_os == "mac") {
+    idk_buildable_api_levels = []
+  }
 }

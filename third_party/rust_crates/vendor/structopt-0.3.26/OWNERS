@@ -25,5 +25,4 @@ include /tools/cmc/OWNERS
 include /tools/component_id_index/OWNERS
 include /tools/jq5/OWNERS
 include /tools/test_list_tool/OWNERS
-include /tools/test_pilot/OWNERS
 include /tools/validate_test_type/OWNERS

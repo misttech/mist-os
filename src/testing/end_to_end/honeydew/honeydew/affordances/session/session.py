@@ -18,6 +18,17 @@ class Session(abc.ABC):
         """
 
     @abc.abstractmethod
+    def is_started(self) -> bool:
+        """Check if session is started.
+
+        Returns:
+            True if session is started.
+
+        Raises:
+            honeydew.errors.SessionError: failed to check the session state.
+        """
+
+    @abc.abstractmethod
     def add_component(self, url: str) -> None:
         """Instantiates a component by its URL and adds to the session.
 
@@ -27,6 +38,14 @@ class Session(abc.ABC):
         Raises:
             honeydew.errors.SessionError: Session failed to launch component
                 with given url. Session is not started.
+        """
+
+    @abc.abstractmethod
+    def restart(self) -> None:
+        """Restarts the session.
+
+        Raises:
+            honeydew.errors.SessionError: Session failed to restart the session.
         """
 
     @abc.abstractmethod

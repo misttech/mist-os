@@ -14,6 +14,7 @@ rustc_library(
         "src/lib.rs",
         "src/net/mod.rs",
         "src/runtime/mod.rs",
+        "src/runtime/scope.rs",
         "src/runtime/task_group.rs",
         "src/test_support.rs",
     ] + select({
@@ -55,10 +56,10 @@ rustc_library(
         "//src/lib/fuchsia-async-macro",
     ],
     test_deps = [
+        "//third_party/rust_crates/vendor:assert_matches",
         "//third_party/rust_crates/vendor:futures-test",
     ] + select({
         "@platforms//os:fuchsia": [
-            "//third_party/rust_crates/vendor:assert_matches",
             "//third_party/rust_crates/vendor:rand",
         ],
         "//conditions:default": [],

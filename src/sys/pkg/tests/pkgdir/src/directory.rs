@@ -574,6 +574,7 @@ async fn verify_content_file_opened(node: fio::NodeProxy, flag: fio::Flags) -> R
         if let Some(observer) = observer {
             let _: zx::Signals = observer
                 .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+                .to_result()
                 .context("FILE_SIGNAL_READABLE not set")?;
         }
     }
@@ -589,6 +590,7 @@ async fn verify_content_file_opened(node: fio::NodeProxy, flag: fio::Flags) -> R
                 if let Some(event) = file_info.observer {
                     let _: zx::Signals = event
                         .wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST)
+                        .to_result()
                         .context("FILE_SIGNAL_READABLE not set")?;
                 }
             }

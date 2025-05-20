@@ -638,19 +638,23 @@ TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
   EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id->freq, expected_antenna_freq);
   EXPECT_EQ(stats.snr_histograms().data()[0].antenna_id->index, expected_antenna_index);
   uint64_t snr_samples_count = 0;
+  uint64_t empty_snr_samples_count = 0;
   uint64_t snr_bucket_index = 0;
   uint64_t snr_bucket_num_samples = 0;
-  for (uint64_t i = 0; i < stats.snr_histograms().data()[0].snr_samples.count(); i++) {
-    if (stats.snr_histograms().data()[0].snr_samples.data()[i].num_samples != 0) {
-      snr_samples_count++;
+  for (uint64_t i = 0; i < stats.snr_histograms().data()[0].snr_samples.count(); ++i) {
+    if (stats.snr_histograms().data()[0].snr_samples.data()[i].num_samples > 0) {
+      ++snr_samples_count;
       snr_bucket_index = stats.snr_histograms().data()[0].snr_samples.data()[i].bucket_index;
       snr_bucket_num_samples = stats.snr_histograms().data()[0].snr_samples.data()[i].num_samples;
+    } else {
+      ++empty_snr_samples_count;
     }
   }
 
   EXPECT_EQ(snr_samples_count, 1U);
   EXPECT_EQ(snr_bucket_index, expected_snr_index);
   EXPECT_EQ(snr_bucket_num_samples, expected_snr_num_frames);
+  EXPECT_EQ(empty_snr_samples_count, 0U);
 }
 
 TEST_F(ConnectTest, GetIfaceHistogramStatsNotSupportedTest) {

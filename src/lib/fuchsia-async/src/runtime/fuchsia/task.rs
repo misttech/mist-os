@@ -5,6 +5,7 @@
 use crate::scope::ScopeHandle;
 use crate::EHandle;
 use futures::prelude::*;
+use std::future::poll_fn;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
@@ -35,19 +36,20 @@ impl<T> JoinHandle<T> {
         Self { scope, task_id, phantom: PhantomData }
     }
 
-    /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
-    /// future can be ignored in which case the task will still be cancelled.
-    pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
+    /// Aborts a task and returns a future that resolves once the task is
+    /// aborted. The future can be ignored in which case the task will still be
+    /// aborted.
+    pub fn abort(mut self) -> impl Future<Output = Option<T>> {
         // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.scope.cancel_task(self.task_id) };
+        let result = unsafe { self.scope.abort_task(self.task_id) };
         async move {
             match result {
                 Some(output) => Some(output),
                 None => {
-                    // If we are dropped from here, we'll end up calling `cancel_and_detach`.
+                    // If we are dropped from here, we'll end up calling `abort_and_detach`.
                     let result = std::future::poll_fn(|cx| {
                         // SAFETY: We spawned the task so the return type should be correct.
-                        unsafe { self.scope.poll_cancelled(self.task_id, cx) }
+                        unsafe { self.scope.poll_aborted(self.task_id, cx) }
                     })
                     .await;
                     self.task_id = 0;
@@ -78,7 +80,7 @@ impl<T: 'static> Future for JoinHandle<T> {
     }
 }
 
-/// This is the same as a JoinHandle, except that the future will be cancelled when the task is
+/// This is the same as a JoinHandle, except that the future will be aborted when the task is
 /// dropped.
 #[must_use]
 #[repr(transparent)]
@@ -175,10 +177,11 @@ impl<T: 'static> Task<T> {
 }
 
 impl<T: 'static> Task<T> {
-    /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
-    /// future can be ignored in which case the task will still be cancelled.
-    pub fn cancel(self) -> impl Future<Output = Option<T>> {
-        self.detach_on_drop().cancel()
+    /// Aborts a task and returns a future that resolves once the task is
+    /// aborted. The future can be ignored in which case the task will still be
+    /// aborted.
+    pub fn abort(self) -> impl Future<Output = Option<T>> {
+        self.detach_on_drop().abort()
     }
 }
 
@@ -197,7 +200,7 @@ impl<T: 'static> Future for Task<T> {
 impl<T> Drop for Task<T> {
     fn drop(&mut self) {
         if self.0.task_id != 0 {
-            self.0.scope.cancel_and_detach(self.0.task_id);
+            self.0.scope.abort_and_detach(self.0.task_id);
             self.0.task_id = 0;
         }
     }
@@ -249,6 +252,21 @@ pub fn unblock<T: 'static + Send>(
     rx.map(|r| r.unwrap())
 }
 
+/// Yields execution back to the runtime.
+pub async fn yield_now() {
+    let mut done = false;
+    poll_fn(|cx| {
+        if done {
+            Poll::Ready(())
+        } else {
+            done = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await;
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::executor::{LocalExecutor, SendExecutor};
@@ -283,6 +301,7 @@ mod tests {
         // no executor in the off-thread, so spawning fails
         SendExecutor::new(2).run(async move {
             unblock(|| {
+                #[allow(clippy::let_underscore_future)]
                 let _ = Task::spawn(async {});
             })
             .await;
@@ -298,14 +317,14 @@ mod tests {
             // Once we return from this await, that switch should have been dropped.
             unblock(move || {
                 let lock = sets_bool_true_on_drop.value.lock().unwrap();
-                assert_eq!(*lock, false);
+                assert!(!*lock);
             })
             .await;
 
             // Switch moved into the future should have been dropped at this point.
             // The value of the boolean should now be true.
             let lock = value.lock().unwrap();
-            assert_eq!(*lock, true);
+            assert!(*lock);
         });
     }
 }

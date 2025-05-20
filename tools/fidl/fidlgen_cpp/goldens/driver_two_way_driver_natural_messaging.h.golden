@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.drivertwoway/cpp/driver/wire_messaging.h>
 #include <fidl/test.drivertwoway/cpp/markers.h>
 #include <fidl/test.drivertwoway/cpp/natural_types.h>
@@ -11,10 +13,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_drivertwoway::TwoWay::Add> {
@@ -26,13 +24,12 @@ struct ::fidl::internal::NaturalMethodTypes<::test_drivertwoway::TwoWay::Add> {
   using ResultCallback =
       ::fit::callback<void(::fdf::Result<::test_drivertwoway::TwoWay::Add>&)>;
 };
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::Response<::test_drivertwoway::TwoWay::Add> final : public ::test_drivertwoway::TwoWayAddResponse {
  public:
   using ::test_drivertwoway::TwoWayAddResponse::TwoWayAddResponse;
-  Response(::test_drivertwoway::TwoWayAddResponse v) : TwoWayAddResponse(std::move(v)) {}
+  Response(::test_drivertwoway::TwoWayAddResponse v);
 };
 
 template <>
@@ -51,10 +48,6 @@ class ::fidl::internal::NaturalClientImpl<::test_drivertwoway::TwoWay> final : p
   ::fidl::internal::NaturalThenable<::test_drivertwoway::TwoWay::Add> Add(const ::fidl::Request<::test_drivertwoway::TwoWay::Add>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay> : public ::fidl::internal::BaseEventHandlerInterface {
  public:
@@ -72,11 +65,8 @@ class ::fdf::AsyncEventHandler<::test_drivertwoway::TwoWay>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_drivertwoway::TwoWay> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_drivertwoway::TwoWay>* event_handler);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_drivertwoway::TwoWay::Add> : public ::fidl::CompleterBase {
@@ -111,18 +101,13 @@ class ::fdf::Server<::test_drivertwoway::TwoWay> : public ::fidl::internal::Inco
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_drivertwoway::TwoWay> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_drivertwoway::TwoWay> final {
@@ -138,6 +123,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_drivertwoway::TwoWay> fi
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

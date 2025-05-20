@@ -5,13 +5,16 @@
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_command_error::{return_bug, Error, Result};
+use ffx_target::fho::{
+    target_interface, DirectConnector, FhoConnectionBehavior, FhoTargetEnvironment,
+};
 use ffx_target::ssh_connector::SshConnector;
-use fho::{DirectConnector, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+use fho::{FhoEnvironment, TryFromEnv};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::sync::Arc;
 use std::time::Duration;
-use target_holders::{init_connection_behavior, DaemonProxyHolder, DeviceLookupDefaultImpl};
+use target_holders::{init_connection_behavior, DaemonProxyHolder};
 use target_network_connector::NetworkConnector;
 
 /// A connector lets a tool make multiple attempts to connect to an object. It
@@ -19,6 +22,7 @@ use target_network_connector::NetworkConnector;
 #[derive(Clone)]
 pub struct Connector<T: TryFromEnv> {
     env: FhoEnvironment,
+    target_env: FhoTargetEnvironment,
     _connects_to: std::marker::PhantomData<T>,
 }
 
@@ -33,7 +37,7 @@ impl<T: TryFromEnv> Connector<T> {
         &self,
         mut log_target_wait: impl FnMut(&Option<String>, &Option<Error>) -> Result<()>,
     ) -> Result<T> {
-        if let Some(behavior) = self.env.behavior().await {
+        if let Some(behavior) = self.target_env.behavior() {
             match behavior {
                 FhoConnectionBehavior::DaemonConnector(_) => {
                     daemon_try_connect(
@@ -57,14 +61,16 @@ impl<T: TryFromEnv> Connector<T> {
 #[async_trait(?Send)]
 impl<T: TryFromEnv> TryFromEnv for Connector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
+        let target_env = target_interface(env);
+        if target_env.behavior().is_none() {
             let b = init_connection_behavior(env.environment_context()).await?;
-            env.set_behavior(b).await;
+            target_env.set_behavior(b);
         }
-        if env.lookup().await.is_none() {
-            env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
-        }
-        Ok(Connector { env: env.clone(), _connects_to: Default::default() })
+        Ok(Connector {
+            env: env.clone(),
+            target_env: target_env.clone(),
+            _connects_to: Default::default(),
+        })
     }
 }
 
@@ -84,14 +90,11 @@ impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
             .await?,
         );
 
-        let direct_env = env.clone();
-        direct_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone())).await;
-        if direct_env.lookup().await.is_none() {
-            direct_env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
-        }
+        let target_env = target_interface(env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone()));
         Ok(DirectTargetConnector {
             connector,
-            inner: Connector { env: direct_env, _connects_to: Default::default() },
+            inner: Connector { env: env.clone(), target_env, _connects_to: Default::default() },
         })
     }
 }
@@ -211,7 +214,7 @@ async fn direct_connector_try_connect<T: TryFromEnv>(
             Ok(()) => {}
             Err(err) => {
                 let e = err.downcast_non_fatal()?;
-                tracing::debug!("error when attempting to connect with connector: {e}");
+                log::debug!("error when attempting to connect with connector: {e}");
                 log_target_wait(&dc.target_spec(), &Some(Error::User(e)))?;
                 // This is just a small wait to prevent busy-looping. The delay is arbitrary.
                 fuchsia_async::Timer::new(Duration::from_millis(50)).await;
@@ -221,7 +224,7 @@ async fn direct_connector_try_connect<T: TryFromEnv>(
         return match T::try_from_env(env).await {
             Err(conn_error) => {
                 let e = conn_error.downcast_non_fatal()?;
-                tracing::debug!("error when trying to connect using TryFromEnv: {e}");
+                log::debug!("error when trying to connect using TryFromEnv: {e}");
                 log_target_wait(&dc.target_spec(), &Some(Error::User(e)))?;
                 continue;
             }
@@ -235,13 +238,13 @@ mod tests {
     use std::marker::PhantomData;
 
     use super::*;
-    use async_lock::Mutex;
     use ffx_command_error::{bug, NonFatalError};
     use ffx_config::{EnvironmentContext, TryFromEnvContext};
     use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
+    use ffx_target::fho::connector::MockDirectConnector;
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
-    use fho::MockDirectConnector;
     use futures::future::LocalBoxFuture;
+    use std::sync::Mutex;
     use target_holders::RemoteControlProxyHolder;
 
     #[fuchsia::test]
@@ -254,9 +257,8 @@ mod tests {
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
-        fho_env
-            .set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)))
-            .await;
+        let target_env = target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)));
 
         let connector =
             Connector::<RemoteControlProxyHolder>::try_from_env(&fho_env).await.unwrap();
@@ -281,9 +283,8 @@ mod tests {
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
-        fho_env
-            .set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)))
-            .await;
+        let target_env = target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)));
 
         let connector = Connector::<PhantomData<String>>::try_from_env(&fho_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
@@ -309,9 +310,8 @@ mod tests {
 
         let fho_env =
             FhoEnvironment::new_with_args(&config_env.context, &["some", "connector", "test"]);
-        fho_env
-            .set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)))
-            .await;
+        let target_env = target_interface(&fho_env);
+        target_env.set_behavior(FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)));
 
         let connector =
             Connector::<RemoteControlProxyHolder>::try_from_env(&fho_env).await.unwrap();
@@ -327,7 +327,7 @@ mod tests {
         assert!(connector.connect().await.is_err());
         assert!(connector.connect().await.is_err());
         let err = bug!("foo");
-        assert_eq!(err.to_string(), connector.wrap_connection_errors(err).await.to_string());
+        assert_eq!(err.to_string(), connector.wrap_connection_errors(err).to_string());
     }
 
     // This is a bit of a hack, but there needs to be a way to set the behavior that also doesn't

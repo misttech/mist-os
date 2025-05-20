@@ -17,7 +17,7 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
         builder: &mut dyn ConfigurationBuilder,
     ) -> Result<()> {
         // setui is always added to Standard feature set level system.
-        if *context.feature_set_level == FeatureSupportLevel::Standard {
+        if *context.feature_set_level == FeatureSetLevel::Standard {
             let bundle_name = if config.with_camera { "setui_with_camera" } else { "setui" };
             match config.use_icu {
                 ICUType::Flavored => {
@@ -64,10 +64,10 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
                     .context("getting gen dir for setui service_flags.json config")?
                     .join("service_flags.json");
                 let config_file = File::create(&service_flags_config).with_context(|| {
-                    format!("Creating service_flags.json file: {}", service_flags_config)
+                    format!("Creating service_flags.json file: {service_flags_config}")
                 })?;
                 serde_json::to_writer_pretty(config_file, &service_flags_json).with_context(
-                    || format!("Writing service_flags.json file: {}", service_flags_config),
+                    || format!("Writing service_flags.json file: {service_flags_config}"),
                 )?;
 
                 builder

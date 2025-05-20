@@ -44,10 +44,6 @@ struct fidl::ostream::Formatter<::test_nullable::StructWithNullableProtocol> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::StructWithNullableProtocol& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_nullable::StructWithNullableRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::StructWithNullableRequest& value);
@@ -92,10 +88,6 @@ std::ostream& operator<<(std::ostream& os, const ::test_nullable::SimpleProtocol
 
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNullableProtocol& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNullableRequest& value);
 
 #endif  // __Fuchsia__
@@ -114,28 +106,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNull
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_nullable::SimpleProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_nullable::SimpleProtocol>& value) {
-    return os << "ClientEnd<" << "test_nullable::SimpleProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_nullable::SimpleProtocol>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_nullable::SimpleProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_nullable::SimpleProtocol>& value) {
-    return os << "ServerEnd<" << "test_nullable::SimpleProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_nullable::SimpleProtocol>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_nullable::SimpleProtocol>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_nullable::SimpleProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_nullable::SimpleProtocol>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_nullable::SimpleProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_nullable::SimpleProtocol>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_nullable::SimpleProtocol>& value);
 
 #endif  // __Fuchsia__
 

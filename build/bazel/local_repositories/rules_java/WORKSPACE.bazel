@@ -1,3 +1,0 @@
-"""Fake rules_java workspace for the Fuchsia platform build."""
-
-workspace(name = "rules_java")

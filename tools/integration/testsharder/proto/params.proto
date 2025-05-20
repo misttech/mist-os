@@ -75,4 +75,9 @@ message Params {
   // How long to wait until timing out on tests. If set, testsharder will
   // override its computed shard timeout with this value.
   google.protobuf.Duration shard_timeout = 14;
+
+  // A list of device types to NOT run tests on.
+  // This should only be used to avoid running on physical devices where
+  // there are capacity concerns.
+  repeated string disabled_device_types = 15;
 }

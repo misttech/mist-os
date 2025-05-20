@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/efi/testing/fake_network_protocol.h>
-#include <lib/stdcompat/span.h>
+
+#include <algorithm>
+#include <iterator>
+#include <span>
 
 #include <efi/protocol/managed-network.h>
 
@@ -46,8 +49,8 @@ efi_status FakeManagedNetworkProtocol::Transmit(efi_managed_network_sync_complet
   most_recent_tx_.push_back(type_ptr[1]);
   most_recent_tx_.push_back(type_ptr[0]);
 
-  cpp20::span<efi_managed_network_fragment_data> fragment_span(tx_data.FragmentTable,
-                                                               tx_data.FragmentCount);
+  std::span<efi_managed_network_fragment_data> fragment_span(tx_data.FragmentTable,
+                                                             tx_data.FragmentCount);
   for (const efi_managed_network_fragment_data& f : fragment_span) {
     const uint8_t* frag_ptr = reinterpret_cast<const uint8_t*>(f.FragmentBuffer);
     std::copy(frag_ptr, frag_ptr + f.FragmentLength, std::back_inserter(most_recent_tx_));

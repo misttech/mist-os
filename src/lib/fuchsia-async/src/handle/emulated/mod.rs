@@ -22,7 +22,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use zx_status::Status;
-use {zx_status, zx_types};
 
 /// Invalid handle value
 const INVALID_HANDLE: u32 = 0;
@@ -485,11 +484,7 @@ impl Channel {
     /// If [`is_closed`] returns true, this may return a string explaining why the handle was closed.
     pub fn closed_reason(&self) -> Option<String> {
         assert!(!self.is_invalid());
-        let Some(object) = HANDLE_TABLE.lock().unwrap().get(&self.0).map(|x| Arc::clone(&x.object))
-        else {
-            return None;
-        };
-
+        let object = HANDLE_TABLE.lock().unwrap().get(&self.0).map(|x| Arc::clone(&x.object))?;
         let object = object.lock().unwrap();
 
         let KObjectEntry::Channel(c) = &*object else {
@@ -577,6 +572,7 @@ impl Channel {
     ///
     /// It is important to remember to check the `Ok(_)` result for potential errors, like
     /// `PEER_CLOSED`, for example.
+    #[allow(clippy::type_complexity)]
     pub fn read_raw(
         &self,
         buf: &mut [u8],
@@ -588,6 +584,7 @@ impl Channel {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn poll_read_raw(
         &self,
         cx: &mut Context<'_>,
@@ -610,14 +607,11 @@ impl Channel {
                         .enumerate()
                         .for_each(|(i, hdl)| handles[i] = MaybeUninit::new(hdl));
                     if read_side.is_empty() {
-                        match obj
+                        if let Err(e) = obj
                             .signal(side, Signals::OBJECT_READABLE, Signals::NONE)
                             .status_for_self()
                         {
-                            Err(e) => {
-                                return Poll::Ready(Ok((Err(e), msg_bytes_len, msg_handles_len)))
-                            }
-                            Ok(_) => {}
+                            return Poll::Ready(Ok((Err(e), msg_bytes_len, msg_handles_len)));
                         }
                     }
                     Poll::Ready(Ok((Ok(()), msg_bytes_len, msg_handles_len)))
@@ -670,8 +664,8 @@ impl Channel {
     pub fn write(&self, bytes: &[u8], handles: &mut [Handle]) -> Result<(), zx_status::Status> {
         let bytes_vec = bytes.to_vec();
         let mut handles_vec = Vec::with_capacity(handles.len());
-        for i in 0..handles.len() {
-            handles_vec.push(std::mem::replace(&mut handles[i], Handle::invalid()));
+        for handle in handles {
+            handles_vec.push(std::mem::replace(handle, Handle::invalid()));
         }
         with_handle(self.0, |h, side| {
             if let HdlRef::Channel(obj) = h {
@@ -1827,7 +1821,7 @@ impl<Q> KObject<Q> {
             return false;
         }
 
-        return true;
+        true
     }
 
     fn poll_drained(&mut self, ctx: &mut Context<'_>) -> Poll<()> {
@@ -2042,7 +2036,7 @@ enum HdlRef<'a> {
 }
 
 impl<'a> HdlRef<'a> {
-    fn as_hdl_data<'b>(&'b mut self) -> &'b mut dyn HdlData {
+    fn as_hdl_data(&mut self) -> &mut dyn HdlData {
         match self {
             HdlRef::Channel(hdl) => *hdl,
             HdlRef::StreamSocket(hdl) => *hdl,
@@ -2060,7 +2054,7 @@ std::thread_local! {
 
 fn with_handle<R>(handle: u32, f: impl FnOnce(HdlRef<'_>, Side) -> R) -> R {
     #[cfg(debug_assertions)]
-    IN_WITH_HANDLE.with(|iwh| assert_eq!(iwh.replace(true), false));
+    IN_WITH_HANDLE.with(|iwh| assert!(!iwh.replace(true)));
     let (side, object) = {
         let handle_table = HANDLE_TABLE.lock().unwrap();
         let entry = handle_table.get(&handle).expect("Tried to use dangling handle");
@@ -2076,7 +2070,7 @@ fn with_handle<R>(handle: u32, f: impl FnOnce(HdlRef<'_>, Side) -> R) -> R {
         KObjectEntry::Event(o) => f(HdlRef::Event(&mut *o), side),
     };
     #[cfg(debug_assertions)]
-    IN_WITH_HANDLE.with(|iwh| assert_eq!(iwh.replace(false), true));
+    IN_WITH_HANDLE.with(|iwh| assert!(iwh.replace(false)));
     r
 }
 
@@ -2169,7 +2163,6 @@ mod test {
     use super::*;
     use futures::FutureExt;
     use std::mem::ManuallyDrop;
-    use zx_status;
 
     /// Returns a "handle" which mimics a closed handle.
     ///
@@ -2189,9 +2182,9 @@ mod test {
     #[test]
     fn channel_create_not_closed() {
         let (a, b) = Channel::create();
-        assert_eq!(a.is_closed(), false);
+        assert!(!a.is_closed());
         assert!(a.closed_reason().is_none());
-        assert_eq!(b.is_closed(), false);
+        assert!(!b.is_closed());
         assert!(b.closed_reason().is_none());
     }
 
@@ -2199,7 +2192,7 @@ mod test {
     fn channel_drop_left_closes_right() {
         let (a, b) = Channel::create();
         drop(a);
-        assert_eq!(b.is_closed(), true);
+        assert!(b.is_closed());
         assert!(b.closed_reason().is_none());
     }
 
@@ -2207,17 +2200,17 @@ mod test {
     fn channel_drop_right_closes_left() {
         let (a, b) = Channel::create();
         drop(b);
-        assert_eq!(a.is_closed(), true);
+        assert!(a.is_closed());
         assert!(a.closed_reason().is_none());
     }
 
     #[test]
     fn channel_close_message() {
         let (a, b) = Channel::create();
-        assert_eq!(a.is_closed(), false);
+        assert!(!a.is_closed());
         assert!(a.closed_reason().is_none());
         b.close_with_reason("Testing reason!!".to_owned());
-        assert_eq!(a.is_closed(), true);
+        assert!(a.is_closed());
         assert_eq!(a.closed_reason().unwrap().as_str(), "Testing reason!!");
     }
 
@@ -2232,8 +2225,8 @@ mod test {
             b.read_raw(&mut buf, &mut handles).ok().unwrap(),
             (Err(Status::SHOULD_WAIT), 0, 0)
         );
-        d.write(&[4, 5, 6], &mut vec![]).unwrap();
-        a.write(&[1, 2, 3], &mut vec![c.into(), d.into()]).unwrap();
+        d.write(&[4, 5, 6], &mut []).unwrap();
+        a.write(&[1, 2, 3], &mut [c.into(), d.into()]).unwrap();
 
         // Should err even though handle length is the same.
         let (b_len, h_len) = b.read_raw(&mut buf[..], &mut handles[..]).err().unwrap();
@@ -2250,7 +2243,7 @@ mod test {
         let mut handles = [UNINIT; 0];
         assert_eq!(c.read_raw(&mut buf, &mut handles).ok().unwrap(), (Ok(()), 3, 0));
         assert_eq!(buf, [4, 5, 6]);
-        b.write(&[1, 2], &mut vec![c.into(), d.into()]).unwrap();
+        b.write(&[1, 2], &mut [c.into(), d.into()]).unwrap();
 
         // Checks that having an incorrect handle buffer size also fails.
         assert_eq!(a.read_raw(&mut buf, &mut handles).err().unwrap(), (2, 2));
@@ -2266,7 +2259,7 @@ mod test {
         let d: Channel = unsafe { handles_iter.next().unwrap().assume_init() }.into();
 
         // Verifies that the passed channels weren't closed after being moved.
-        c.write(&[6, 7, 8], &mut vec![]).unwrap();
+        c.write(&[6, 7, 8], &mut []).unwrap();
         let mut handles = [UNINIT; 0];
         assert_eq!(d.read_raw(&mut buf, &mut handles).unwrap(), (Ok(()), 3, 0));
         assert_eq!(buf, [6, 7, 8]);
@@ -2279,8 +2272,8 @@ mod test {
         let mut incoming = MessageBuf::new();
 
         assert_eq!(b.read(&mut incoming).err().unwrap(), Status::SHOULD_WAIT);
-        d.write(&[4, 5, 6], &mut vec![]).unwrap();
-        a.write(&[1, 2, 3], &mut vec![c.into(), d.into()]).unwrap();
+        d.write(&[4, 5, 6], &mut []).unwrap();
+        a.write(&[1, 2, 3], &mut [c.into(), d.into()]).unwrap();
 
         b.read(&mut incoming).unwrap();
         assert_eq!(incoming.bytes(), &[1, 2, 3]);
@@ -2300,7 +2293,7 @@ mod test {
         let mut incoming = MessageBufEtc::new();
 
         assert_eq!(b.read_etc(&mut incoming).err().unwrap(), Status::SHOULD_WAIT);
-        d.write(&[4, 5, 6], &mut vec![]).unwrap();
+        d.write(&[4, 5, 6], &mut []).unwrap();
         let mut hds = vec![
             HandleDisposition {
                 handle_op: HandleOp::Move(c.into()),

@@ -28,6 +28,7 @@ class IntlProvider : public CachedAsyncAnnotationProvider {
   IntlProvider(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
                std::unique_ptr<backoff::Backoff> backoff);
 
+  static std::set<std::string> GetAnnotationKeys();
   std::set<std::string> GetKeys() const override;
 
   void GetOnUpdate(::fit::function<void(Annotations)> callback) override;

@@ -8,6 +8,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
+#include "src/ui/scenic/lib/utils/logging.h"
+
 namespace {
 
 void SignalAll(const std::vector<zx::event>& events) {
@@ -28,6 +30,9 @@ void ReleaseFenceManager::OnGpuCompositedFrame(
     uint64_t frame_number, zx::event render_finished_fence, std::vector<zx::event> release_fences,
     scheduling::FramePresentedCallback frame_presented_callback) {
   TRACE_DURATION("gfx", "ReleaseFenceManager::OnGpuCompositedFrame", "frame number", frame_number);
+  FLATLAND_VERBOSE_LOG << "ReleaseFenceManager::OnGpuCompositedFrame() frame_number="
+                       << frame_number;
+
   auto record = NewGpuCompositionFrameRecord(frame_number, std::move(render_finished_fence),
                                              std::move(frame_presented_callback));
   SignalOrScheduleSignalForReleaseFences(frame_number, *record, std::move(release_fences));
@@ -38,12 +43,16 @@ void ReleaseFenceManager::OnDirectScanoutFrame(
     uint64_t frame_number, std::vector<zx::event> release_fences,
     scheduling::FramePresentedCallback frame_presented_callback) {
   TRACE_DURATION("gfx", "ReleaseFenceManager::OnDirectScanoutFrame", "frame number", frame_number);
+  FLATLAND_VERBOSE_LOG << "ReleaseFenceManager::OnDirectScanoutFrame() frame_number="
+                       << frame_number;
   auto record = NewDirectScanoutFrameRecord(std::move(frame_presented_callback));
   SignalOrScheduleSignalForReleaseFences(frame_number, *record, std::move(release_fences));
   StashFrameRecord(frame_number, std::move(record));
 }
 
 void ReleaseFenceManager::OnVsync(uint64_t frame_number, zx::time timestamp) {
+  FLATLAND_VERBOSE_LOG << "ReleaseFenceManager::OnVsync() frame_number=" << frame_number
+                       << "  timestamp=" << timestamp.get();
 #ifndef NDEBUG
   FX_DCHECK(frame_number >= last_vsync_frame_number_);
   last_vsync_frame_number_ = frame_number;
@@ -208,8 +217,8 @@ std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewDirect
   record->frame_type = FrameType::kDirectScanout;
   record->frame_presented_callback = std::move(frame_presented_callback);
 
-  // TODO(https://fxbug.dev/42154139): might want to add an offset to the time, so we don't screw up the
-  // FrameScheduler. Another idea would be to use zero, and have the FrameScheduler ignore such
+  // TODO(https://fxbug.dev/42154139): might want to add an offset to the time, so we don't screw up
+  // the FrameScheduler. Another idea would be to use zero, and have the FrameScheduler ignore such
   // values.
   record->render_finished = true;
   record->timestamps.render_done_time = async::Now(dispatcher_);

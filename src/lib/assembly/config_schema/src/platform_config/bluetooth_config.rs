@@ -267,12 +267,21 @@ pub struct BluetoothProfilesConfig {
 }
 
 /// Platform configuration for Bluetooth core features.
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct BluetoothCoreConfig {
     /// Enable BR/EDR legacy pairing.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub legacy_pairing_enabled: bool,
+    /// Which index should be used when we ask SCO traffic to be offloaded.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub sco_offload_path_index: u8,
+}
+
+impl Default for BluetoothCoreConfig {
+    fn default() -> Self {
+        Self { legacy_pairing_enabled: Default::default(), sco_offload_path_index: 6 }
+    }
 }
 
 /// Platform configuration options for Bluetooth.
@@ -400,6 +409,7 @@ mod tests {
             },
             "core": {
                 "legacy_pairing_enabled": true,
+                "sco_offload_path_index": 1,
             },
         });
 
@@ -441,7 +451,8 @@ mod tests {
             },
             map: MapConfig { mce_enabled: false },
         };
-        let expected_core = BluetoothCoreConfig { legacy_pairing_enabled: true };
+        let expected_core =
+            BluetoothCoreConfig { legacy_pairing_enabled: true, sco_offload_path_index: 1 };
         let expected = BluetoothConfig::Standard {
             profiles: expected_profiles,
             core: expected_core,
@@ -492,7 +503,7 @@ mod tests {
         };
         let expected = BluetoothConfig::Standard {
             profiles: expected_profiles,
-            core: BluetoothCoreConfig::default(),
+            core: BluetoothCoreConfig { legacy_pairing_enabled: false, sco_offload_path_index: 6 },
             snoop: Snoop::None,
         };
 

@@ -25,6 +25,7 @@ const BLOCK_EXTENSION: &str = "block";
 pub struct RamdiskClientBuilder {
     ramdisk_source: RamdiskSource,
     block_size: u64,
+    max_transfer_blocks: Option<u32>,
     dev_root: Option<fio::DirectoryProxy>,
     guid: Option<[u8; GUID_LEN]>,
     use_v2: bool,
@@ -46,6 +47,7 @@ impl RamdiskClientBuilder {
         Self {
             ramdisk_source: RamdiskSource::Size { block_count },
             block_size,
+            max_transfer_blocks: None,
             guid: None,
             dev_root: None,
             use_v2: false,
@@ -59,6 +61,7 @@ impl RamdiskClientBuilder {
         Self {
             ramdisk_source: RamdiskSource::Vmo { vmo },
             block_size: block_size.unwrap_or(0),
+            max_transfer_blocks: None,
             guid: None,
             dev_root: None,
             use_v2: false,
@@ -76,6 +79,12 @@ impl RamdiskClientBuilder {
     /// Initialize the ramdisk with the given GUID, which can be queried from the ramdisk instance.
     pub fn guid(mut self, guid: [u8; GUID_LEN]) -> Self {
         self.guid = Some(guid);
+        self
+    }
+
+    /// Sets the maximum transfer size.
+    pub fn max_transfer_blocks(mut self, value: u32) -> Self {
+        self.max_transfer_blocks = Some(value);
         self
     }
 
@@ -99,8 +108,16 @@ impl RamdiskClientBuilder {
 
     /// Create the ramdisk.
     pub async fn build(self) -> Result<RamdiskClient, Error> {
-        let Self { ramdisk_source, block_size, guid, dev_root, use_v2, ramdisk_service, publish } =
-            self;
+        let Self {
+            ramdisk_source,
+            block_size,
+            max_transfer_blocks,
+            guid,
+            dev_root,
+            use_v2,
+            ramdisk_service,
+            publish,
+        } = self;
 
         if use_v2 {
             // Pick the first service instance we find.
@@ -124,6 +141,7 @@ impl RamdiskClientBuilder {
                     },
                     type_guid,
                     publish: Some(publish),
+                    max_transfer_blocks,
                     ..Default::default()
                 },
                 RamdiskSource::Size { block_count } => framdisk::Options {
@@ -131,6 +149,7 @@ impl RamdiskClientBuilder {
                     block_size: Some(block_size.try_into().unwrap()),
                     type_guid,
                     publish: Some(publish),
+                    max_transfer_blocks,
                     ..Default::default()
                 },
             };

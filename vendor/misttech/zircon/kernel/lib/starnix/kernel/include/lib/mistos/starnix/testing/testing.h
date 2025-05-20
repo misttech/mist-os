@@ -15,7 +15,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
-#include <ktl/pair.h>
+#include <ktl/utility.h>
 #include <ktl/string_view.h>
 
 namespace starnix {

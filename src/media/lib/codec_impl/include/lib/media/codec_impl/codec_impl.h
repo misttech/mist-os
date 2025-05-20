@@ -14,8 +14,6 @@
 #include <lib/closure-queue/closure_queue.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fit/function.h>
-#include <lib/stdcompat/optional.h>
-#include <lib/stdcompat/variant.h>
 #include <lib/thread-safe-deleter/thread_safe_deleter.h>
 #include <zircon/compiler.h>
 
@@ -76,9 +74,9 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
                   public CodecAdapterEvents,
                   private CodecAdapter {
  public:
-  using StreamProcessorParams = cpp17::variant<fuchsia::mediacodec::CreateDecoder_Params,
-                                               fuchsia::mediacodec::CreateEncoder_Params,
-                                               fuchsia::media::drm::DecryptorParams>;
+  using StreamProcessorParams =
+      std::variant<fuchsia::mediacodec::CreateDecoder_Params,
+                   fuchsia::mediacodec::CreateEncoder_Params, fuchsia::media::drm::DecryptorParams>;
 
   // The CodecImpl will take care of doing set_error_handler() on the sysmem
   // connection.  The sysmem connection should be set up to use the
@@ -895,7 +893,7 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
   // constantly calling CoreCodecBti().
   zx::unowned_bti core_codec_bti_;
 
-  cpp17::optional<FakeMapRange> fake_map_range_[kPortCount];
+  std::optional<FakeMapRange> fake_map_range_[kPortCount];
 
   // These are 1:1 with logical CodecBuffer(s).
   std::vector<std::unique_ptr<CodecBuffer>> all_buffers_[kPortCount];

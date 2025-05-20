@@ -7,7 +7,7 @@
 //! to a minimum, while improving our ability to fully test the conversion code.
 
 use anyhow::{anyhow, bail, Result};
-use assembly_manifest::Image;
+use assembled_system::Image;
 use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
@@ -21,7 +21,7 @@ pub async fn convert_bundle_to_configs(
     uefi: bool,
 ) -> Result<EmulatorConfiguration> {
     let virtual_device = product_bundle.get_device(&device_name)?;
-    tracing::debug!("Found PBM: {:#?}\nVirtual Device: {:#?}", &product_bundle, &virtual_device);
+    log::debug!("Found PBM: {:#?}\nVirtual Device: {:#?}", &product_bundle, &virtual_device);
     match &product_bundle {
         ProductBundle::V2(product_bundle) => {
             convert_v2_bundle_to_configs(&product_bundle, &virtual_device, uefi)
@@ -74,8 +74,8 @@ fn convert_v2_bundle_to_configs(
 
     let mut disk_image: Option<DiskImage> = system.iter().find_map(|i| match (uefi, i) {
         (false, Image::FVM(path)) => Some(DiskImage::Fvm(path.clone().into())),
-        (false, Image::Fxfs { path, .. }) => Some(DiskImage::Fxfs(path.clone().into())),
-        (true, Image::Fxfs { path, .. }) => Some(DiskImage::Gpt(path.clone().into())),
+        (false, Image::FxfsSparse { path, .. }) => Some(DiskImage::Fxfs(path.clone().into())),
+        (true, Image::FxfsSparse { path, .. }) => Some(DiskImage::Gpt(path.clone().into())),
         _ => None,
     });
 
@@ -103,7 +103,7 @@ fn convert_v2_bundle_to_configs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::BlobfsContents;
+    use assembled_system::BlobfsContents;
     use assembly_partitions_config::{BootloaderPartition, PartitionsConfig};
     use camino::Utf8PathBuf;
     use sdk_metadata::virtual_device::{Cpu, Hardware};
@@ -186,8 +186,8 @@ mod tests {
         // Adjust all of the values that affect the config, then run it again.
         let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("some/new_kernel"))
             .expect("couldn't convert kernel to utf8");
-        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs"))
-            .expect("couldn't convert fxfs to utf8");
+        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.sparse.blk"))
+            .expect("couldn't convert fxfs sparse to utf8");
         let expected_zbi = Utf8PathBuf::from_path_buf(sdk_root.join("path/to/new_zbi"))
             .expect("couldn't convert zbi to utf8");
 
@@ -195,6 +195,11 @@ mod tests {
             Image::ZBI { path: expected_zbi.clone(), signed: false },
             Image::QemuKernel(expected_kernel.clone()),
             Image::Fxfs {
+                path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+                    .expect("couldn't convert fxfs to utf8"),
+                contents: BlobfsContents::default(),
+            },
+            Image::FxfsSparse {
                 path: expected_disk_image_path.clone(),
                 contents: BlobfsContents::default(),
             },
@@ -257,8 +262,8 @@ mod tests {
 
         let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("some/new_kernel"))
             .expect("couldn't convert kernel to utf8");
-        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs"))
-            .expect("couldn't convert fxfs to utf8");
+        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.sparse"))
+            .expect("couldn't convert fxfs sprase to utf8");
         let expected_zbi = Utf8PathBuf::from_path_buf(sdk_root.join("path/to/new_zbi"))
             .expect("couldn't convert zbi to utf8");
 
@@ -271,6 +276,11 @@ mod tests {
                 Image::ZBI { path: expected_zbi.clone(), signed: false },
                 Image::QemuKernel(expected_kernel.clone()),
                 Image::Fxfs {
+                    path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+                        .expect("couldn't convert fxfs to utf8"),
+                    contents: BlobfsContents::default(),
+                },
+                Image::FxfsSparse {
                     path: expected_disk_image_path.clone(),
                     contents: BlobfsContents::default(),
                 },

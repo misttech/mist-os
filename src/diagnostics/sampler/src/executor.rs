@@ -2114,11 +2114,10 @@ mod tests {
             if let fidl_fuchsia_metrics::MetricEventPayload::Count(payload) = payload {
                 assert_eq!(
                     payload, &value,
-                    "Wrong payload, expected {} got {} at {}",
-                    value, payload, context
+                    "Wrong payload, expected {value} got {payload} at {context}"
                 );
             } else {
-                panic!("Expected MetricEventPayload::Count at {}, got {:?}", context, payload);
+                panic!("Expected MetricEventPayload::Count at {context}, got {payload:?}");
             }
         }
 

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import fidl_fuchsia_developer_ffx as ffx
 from fidl._ipc import _QueueWrapper
-from fidl_codec import encode_fidl_message, method_ordinal  # type: ignore
+from fidl_codec import encode_fidl_message, method_ordinal
 from fuchsia_controller_py import Channel, ZxStatus
 
 

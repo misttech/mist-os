@@ -117,9 +117,14 @@ enum KernelServices {
 }
 
 #[fuchsia::main(
-    logging_tags = ["starnix"],
+    // Don't add any statically declared tags to reduce right-ward drift in log output. In practice
+    // all logs get tagged with task info that makes it clear from context the log comes from
+    // Starnix.
+    logging_tags = [],
     logging_blocking,
+    // LINT.IfChange(starnix_panic_tefmo)
     logging_panic_prefix="\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n",
+    // LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go:starnix_panic_tefmo)
 )]
 async fn main() -> Result<(), Error> {
     // Make sure that if this process panics in normal mode that the whole kernel's job is killed.

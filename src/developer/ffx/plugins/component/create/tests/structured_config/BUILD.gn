@@ -23,7 +23,7 @@ if (is_host) {
       sources = [ source_root ]
       deps = [
         "//src/lib/fuchsia",
-        "//third_party/rust_crates:tracing",
+        "//third_party/rust_crates:log",
 
         # This dependency won't get the package into the system image, but it is necessary to
         # ensure the binary is rebuilt when needed by `fx test` invocations.
@@ -58,7 +58,7 @@ if (is_fuchsia) {
     deps = [
       ":echo_config_lib",
       "//src/lib/fuchsia",
-      "//third_party/rust_crates:tracing",
+      "//third_party/rust_crates:log",
     ]
   }
 

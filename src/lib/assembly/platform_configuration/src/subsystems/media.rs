@@ -14,7 +14,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
         media_config: &PlatformMediaConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if *context.feature_set_level == FeatureSupportLevel::Standard
+        if *context.feature_set_level == FeatureSetLevel::Standard
             && *context.build_type == BuildType::Eng
         {
             builder.platform_bundle("audio_development_support");
@@ -38,8 +38,13 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
                 }
                 builder.platform_bundle("soundplayer");
             }
-            Some(AudioConfig::PartialStack) => {
+            Some(AudioConfig::DeviceRegistry(adr_config)) => {
                 builder.platform_bundle("audio_device_registry");
+                if adr_config.eager_start {
+                    builder.platform_bundle("audio_device_registry_eager");
+                } else {
+                    builder.platform_bundle("audio_device_registry_demand");
+                }
             }
             None => {}
         }
@@ -67,7 +72,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
 
         if media_config.enable_codecs {
             ensure!(
-                *context.feature_set_level == FeatureSupportLevel::Standard,
+                *context.feature_set_level == FeatureSetLevel::Standard,
                 "Codecs can only be enabled in the 'standard' feature set level."
             );
             builder.platform_bundle("media_codecs");
@@ -75,7 +80,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
 
         if media_config.enable_sessions {
             ensure!(
-                *context.feature_set_level == FeatureSupportLevel::Standard,
+                *context.feature_set_level == FeatureSetLevel::Standard,
                 "Media sessions can only be enabled in the 'standard' feature set level."
             );
             let Some(AudioConfig::FullStack(_)) = media_config.audio else {

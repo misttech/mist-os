@@ -91,7 +91,8 @@ test("fbl") {
     ]
   }
 
-  if (is_lto_variant || optimize == "size_lto" || is_coverage) {
+  if (is_lto_variant || optimize == "size_lto" || optimize == "size_thinlto" ||
+      is_coverage) {
     # LTO OOMs and coverage mode times out on RBE default workers,
     # so use bigger workers (e.g. n2-standard-8).
     _concurrent_jobs = concurrent_jobs.link_highmem

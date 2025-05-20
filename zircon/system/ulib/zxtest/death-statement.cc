@@ -217,7 +217,7 @@ void DeathStatement::Execute() {
 
   thrd_t death_thread;
   if (thrd_create(&death_thread, &RoutineThread, &routine_args) != thrd_success) {
-    SET_ERROR(error_message_, "Failed to create death_thred");
+    SET_ERROR(error_message_, "Failed to create death_thread");
     return;
   }
   Listen(routine_args.event_port, routine_args.exception_channel);

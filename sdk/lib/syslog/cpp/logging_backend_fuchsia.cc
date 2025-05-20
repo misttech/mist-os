@@ -14,7 +14,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/stdcompat/variant.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/log_level.h>
 #include <lib/syslog/cpp/log_settings.h>
@@ -27,6 +26,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <variant>
 
 #include "lib/component/incoming/cpp/protocol.h"
 #include "lib/syslog/cpp/macros.h"
@@ -35,7 +35,7 @@ namespace syslog_runtime {
 
 namespace {
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 using FidlInterest = fuchsia_diagnostics_types::wire::Interest;
 #else
 using FidlInterest = fuchsia_diagnostics::wire::Interest;
@@ -54,7 +54,7 @@ class LogState {
   const std::vector<std::string>& tags() const { return tags_; }
 
   // Allowed to be const because descriptor_ is mutable
-  cpp17::variant<zx::socket, std::ofstream>& descriptor() const { return logsink_socket_; }
+  std::variant<zx::socket, std::ofstream>& descriptor() const { return logsink_socket_; }
 
  private:
   explicit LogState(const fuchsia_logging::LogSettings& settings);
@@ -72,12 +72,12 @@ class LogState {
   async::Loop unused_loop_;
   std::atomic<fuchsia_logging::RawLogSeverity> min_severity_;
   const fuchsia_logging::RawLogSeverity default_severity_;
-  mutable cpp17::variant<zx::socket, std::ofstream> logsink_socket_ = zx::socket();
+  mutable std::variant<zx::socket, std::ofstream> logsink_socket_ = zx::socket();
   std::vector<std::string> tags_;
   async_dispatcher_t* interest_listener_dispatcher_;
   fuchsia_logging::InterestListenerBehavior interest_listener_config_;
   // Handle to a fuchsia.logger.LogSink instance.
-  cpp17::optional<fidl::ClientEnd<fuchsia_logger::LogSink>> provided_log_sink_;
+  std::optional<fidl::ClientEnd<fuchsia_logger::LogSink>> provided_log_sink_;
 };
 }  // namespace internal
 
@@ -123,9 +123,9 @@ zx_koid_t globalPid = ProcessSelfKoid();
 const char kTagFieldName[] = "tag";
 
 void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::RawLogSeverity severity,
-                         cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                         cpp17::optional<cpp17::string_view> msg,
-                         cpp17::optional<cpp17::string_view> condition, zx_handle_t socket) {
+                         std::optional<std::string_view> file_name, unsigned int line,
+                         std::optional<std::string_view> msg,
+                         std::optional<std::string_view> condition, zx_handle_t socket) {
   // Ensure we have log state
   GlobalStateLock log_state;
   // Optional so no allocation overhead
@@ -264,30 +264,30 @@ void internal::LogState::Connect() {
 }
 
 void LogBuffer::BeginRecord(fuchsia_logging::RawLogSeverity severity,
-                            cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                            cpp17::optional<cpp17::string_view> message, zx_handle_t socket,
+                            std::optional<std::string_view> file_name, unsigned int line,
+                            std::optional<std::string_view> message, zx_handle_t socket,
                             uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
   inner_.BeginRecord(severity, file_name, line, message, zx::unowned_socket(socket), dropped_count,
                      pid, tid);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
+void LogBuffer::WriteKeyValue(std::string_view key, std::string_view value) {
   inner_.WriteKeyValue(key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
+void LogBuffer::WriteKeyValue(std::string_view key, int64_t value) {
   inner_.WriteKeyValue(key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
+void LogBuffer::WriteKeyValue(std::string_view key, uint64_t value) {
   inner_.WriteKeyValue(key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
+void LogBuffer::WriteKeyValue(std::string_view key, double value) {
   inner_.WriteKeyValue(key, value);
 }
 
-void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
+void LogBuffer::WriteKeyValue(std::string_view key, bool value) {
   inner_.WriteKeyValue(key, value);
 }
 

@@ -9,7 +9,10 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.test.audio.recording.AudioRecordingControl" ],
+            protocol: [ "fuchsia.test.audio.Injection" ],
+        },
+        {
+            protocol: [ "fuchsia.test.audio.Capture" ],
         },
     ],
     use: [
@@ -21,7 +24,11 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.test.audio.recording.AudioRecordingControl",
+            protocol: "fuchsia.test.audio.Injection",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.test.audio.Capture",
             from: "self",
         },
     ],

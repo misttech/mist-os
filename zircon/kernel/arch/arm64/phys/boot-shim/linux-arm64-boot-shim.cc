@@ -54,8 +54,10 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   InitStdout();
   ApplyRelocations();
 
-  // Explicitly provide `nullptr` address space, so the MMU is not set up.
-  InitMemory(flat_devicetree_blob, nullptr);
+  AddressSpace aspace;
+  // Set up the address space early, since on ARM this is necessary to enable
+  // caches and affects performance significantly.
+  InitMemory(flat_devicetree_blob, {}, &aspace);
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
@@ -111,7 +113,7 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   // Fill DevicetreeItems.
   ZX_ASSERT(shim.Init());
 
-  ArchSetUp(nullptr);
+  ArchSetUp({});
 
   // Finally we can boot into the kernel image.
   BootZbi::InputZbi zbi_view(gDevicetreeBoot.ramdisk);

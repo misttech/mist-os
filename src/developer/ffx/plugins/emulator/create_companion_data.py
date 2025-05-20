@@ -9,7 +9,7 @@ import os
 import sys
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--binary",
@@ -69,6 +69,9 @@ def main():
                         dest_files += [filepath]
                         print(f"{filepath}={sourcepath}", file=f)
 
+    # Sort all files except the first one, which must be the binary.
+    dest_files = [dest_files[0]] + sorted(dest_files[1:])
+
     metadata = {
         "files": dest_files,
         "name": args.name,
@@ -77,7 +80,9 @@ def main():
     }
 
     with open(args.meta_out, "w") as f:
-        print(json.dumps(metadata, sort_keys=True, indent=2), file=f)
+        print(json.dumps(metadata, indent=2), file=f)
+
+    return 0
 
 
 if __name__ == "__main__":

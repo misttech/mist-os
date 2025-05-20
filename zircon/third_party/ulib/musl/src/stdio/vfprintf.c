@@ -270,6 +270,9 @@ LIBC_NO_SAFESTACK static void pad(FILE* f, char c, int w, int l, int fl) {
   out(f, pad, l);
 }
 
+#if __has_attribute(nonstring)
+__attribute__((nonstring))
+#endif
 static const char xdigits[16] = {"0123456789ABCDEF"};
 
 LIBC_NO_SAFESTACK static char* fmt_x(uintmax_t x, char* s, int lower) {

@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use errors::ffx_error;
 use ffx_config::EnvironmentContext;
 use glob::glob as _glob;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
@@ -38,33 +39,33 @@ pub fn ensure_symbol_index_registered(context: &EnvironmentContext) -> Result<()
     return Ok(());
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct BuildIdDir {
     pub path: String,
     pub build_dir: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct IdsTxt {
     pub path: String,
     pub build_dir: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct GcsFlat {
     pub url: String,
     #[serde(default)]
     pub require_authentication: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct DebugInfoD {
     pub url: String,
     #[serde(default)]
     pub require_authentication: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
 pub struct SymbolIndex {
     #[serde(default)]
     pub includes: Vec<String>,

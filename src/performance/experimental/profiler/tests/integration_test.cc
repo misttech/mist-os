@@ -196,7 +196,7 @@ TEST(ProfilerIntegrationTest, EndToEnd) {
                   .is_ok());
 
   ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -249,7 +249,7 @@ TEST(ProfilerIntegrationTest, NewThreads) {
   t1.detach();
   t2.detach();
   t3.detach();
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -307,7 +307,7 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
   t1.detach();
   t2.detach();
   t3.detach();
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -386,7 +386,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
 
   self->get_info(ZX_INFO_JOB_PROCESSES, nullptr, 0, nullptr, &num_processes);
   ASSERT_EQ(num_processes, size_t{3});
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -457,7 +457,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
 
   ASSERT_EQ(ZX_OK, fdio_spawn(self->get(), FDIO_SPAWN_CLONE_ALL, "/pkg/bin/thread_spawner", kArgs,
                               process.reset_and_get_address()));
-  // Get Some samples
+  // Get some samples
   sleep(2);
 
   auto stop_response = client->Stop();
@@ -501,7 +501,7 @@ TEST(ProfilerIntegrationTest, ComponentByMoniker) {
                   .is_ok());
   ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -542,7 +542,7 @@ TEST(ProfilerIntegrationTest, LaunchedComponent) {
                   }})
                   .is_ok());
   ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -580,7 +580,7 @@ TEST(ProfilerIntegrationTest, ChildComponents) {
                   .is_ok());
 
   ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -631,7 +631,7 @@ TEST(ProfilerIntegrationTest, ChildComponentsByMoniker) {
                   .is_ok());
 
   ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -684,7 +684,7 @@ TEST(ProfilerIntegrationTest, DelayedConnectByMoniker) {
 
   ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
 
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -737,7 +737,7 @@ TEST(ProfilerIntegrationTest, DelayedConnectByUrl) {
 
   ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
 
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   auto stop_response = client->Stop();
@@ -782,10 +782,10 @@ TEST(ProfilerIntegrationTest, ExitedProcess) {
                                 }}}})
                   .is_ok());
 
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
   ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
-  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
-  // Get Some samples
+  // Get some samples
   sleep(1);
 
   // Destroy the target before the profiler stops
@@ -800,13 +800,70 @@ TEST(ProfilerIntegrationTest, ExitedProcess) {
   EXPECT_GT(stop_response.value().samples_collected().value(), size_t{10});
   auto [pids, tids] = GetOutputKoids(std::move(in_socket));
 
-  // We should see 1 pid and tid from the demo target
+  // We should see 1 pid and tid from the demo target.
   EXPECT_EQ(tids.size(), size_t{1});
   EXPECT_EQ(pids.size(), size_t{1});
 
-  // We'll have failed to get module information for the target, so we should see that reported.
-  EXPECT_EQ(stop_response->missing_process_mappings()->size(), size_t{1});
-  EXPECT_TRUE(pids.contains(stop_response->missing_process_mappings().value()[0]));
+  // We should still see the mapping we eagerly pulled.
+  EXPECT_EQ(stop_response->missing_process_mappings()->size(), size_t{0});
+
+  ASSERT_TRUE(client->Reset().is_ok());
+}
+
+// If a process exits from underneath us, we should still be able to return the samples we got
+//
+// Attaching while a a session is in progress goes down a different path, so test that too here.
+TEST(ProfilerIntegrationTest, ExitedProcessLateAttach) {
+  auto lifecycle_client_end = component::Connect<fuchsia_sys2::LifecycleController>();
+  ASSERT_TRUE(lifecycle_client_end.is_ok());
+  const fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
+
+  zx::result client_end = component::Connect<fprofiler::Session>();
+  ASSERT_TRUE(client_end.is_ok());
+  const fidl::SyncClient client{std::move(*client_end)};
+
+  zx::socket in_socket, outgoing_socket;
+  ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
+
+  const std::string name = "demo_target";
+  const std::string url = "demo_target#meta/demo_target.cm";
+  const std::string moniker = "./launchpad:demo_target";
+
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentMoniker(moniker));
+
+  ASSERT_TRUE(client
+                  ->Configure({{.output = std::move(outgoing_socket),
+                                .config = fprofiler::Config{{
+                                    .configs = default_sample_configs(),
+                                    .target = std::move(target_config),
+                                }}}})
+                  .is_ok());
+
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
+
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
+  // Get some samples
+  sleep(1);
+
+  // Destroy the target before the profiler stops
+  ASSERT_TRUE(TearDownInstance(lifecycle_client, name, moniker).is_ok());
+
+  auto stop_response = client->Stop();
+  if (stop_response.is_error()) {
+    FX_LOGS(INFO) << "Stop response: " << stop_response.error_value();
+  }
+  ASSERT_TRUE(stop_response.is_ok());
+  ASSERT_TRUE(stop_response.value().samples_collected().has_value());
+  EXPECT_GT(stop_response.value().samples_collected().value(), size_t{10});
+  auto [pids, tids] = GetOutputKoids(std::move(in_socket));
+
+  // We should see 1 pid and tid from the demo target.
+  EXPECT_EQ(tids.size(), size_t{1});
+  EXPECT_EQ(pids.size(), size_t{1});
+
+  // We should still see the mapping we eagerly pulled.
+  EXPECT_EQ(stop_response->missing_process_mappings()->size(), size_t{0});
 
   ASSERT_TRUE(client->Reset().is_ok());
 }

@@ -5,8 +5,9 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/riscv64/feature.h>
-#include <lib/stdcompat/string_view.h>
 #include <zircon/assert.h>
+
+#include <string_view>
 
 namespace arch {
 
@@ -24,7 +25,7 @@ RiscvFeatures& RiscvFeatures::SetMany(std::string_view isa_string) {
   };
 
   std::string_view standard_exts = next_token();
-  ZX_ASSERT(cpp20::starts_with(standard_exts, "rv32") || cpp20::starts_with(standard_exts, "rv64"));
+  ZX_ASSERT(standard_exts.starts_with("rv32") || standard_exts.starts_with("rv64"));
   standard_exts.remove_prefix(4);  // Eat "rv{32,64}".
   if (standard_exts.find('v') != std::string_view::npos) {
     Set(RiscvFeature::kVector);

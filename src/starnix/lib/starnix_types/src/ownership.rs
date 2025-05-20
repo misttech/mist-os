@@ -367,6 +367,26 @@ impl<T> PartialEq for WeakRefKey<T> {
         WeakRef::ptr_eq(&self.0, &other.0)
     }
 }
+impl<T> From<WeakRef<T>> for WeakRefKey<T> {
+    fn from(weak_ref: WeakRef<T>) -> Self {
+        Self(weak_ref)
+    }
+}
+impl<'a, T> From<&TempRef<'a, T>> for WeakRefKey<T> {
+    fn from(temp_ref: &TempRef<'a, T>) -> Self {
+        Self(WeakRef::from(temp_ref))
+    }
+}
+impl<'a, T> From<&OwnedRef<T>> for WeakRefKey<T> {
+    fn from(owned_ref: &OwnedRef<T>) -> Self {
+        Self(WeakRef::from(owned_ref))
+    }
+}
+impl<T> Clone for WeakRefKey<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 impl<T> Eq for WeakRefKey<T> {}
 impl<T> Hash for WeakRefKey<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -377,6 +397,11 @@ impl<T> std::ops::Deref for WeakRefKey<T> {
     type Target = WeakRef<T>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+impl<T> std::fmt::Debug for WeakRefKey<T> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        fmt.debug_tuple(std::any::type_name::<Self>()).field(&self.0.as_ptr()).finish()
     }
 }
 

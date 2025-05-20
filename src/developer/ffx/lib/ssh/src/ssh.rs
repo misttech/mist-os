@@ -4,6 +4,7 @@
 use crate::config::SshConfig;
 use anyhow::{anyhow, Context as _, Result};
 use ffx_config::EnvironmentContext;
+use netext::ScopedSocketAddr;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::Command;
@@ -80,72 +81,69 @@ impl From<&str> for SshError {
 }
 
 #[cfg(not(test))]
-pub async fn get_ssh_key_paths() -> Result<Vec<String>> {
+pub fn get_ssh_key_paths() -> Result<Vec<String>> {
     use anyhow::Context;
     ffx_config::query(SSH_PRIV)
         .get_file()
-        .await
         .context("getting path to an ssh private key from ssh.priv")
 }
 
-pub async fn get_ssh_key_paths_from_env(env: &EnvironmentContext) -> Result<Vec<String>> {
+pub fn get_ssh_key_paths_from_env(env: &EnvironmentContext) -> Result<Vec<String>> {
     env.query(SSH_PRIV)
         .get_file()
-        .await
         .context("getting path to an ssh private key from ssh.priv from env context")
 }
 
 #[cfg(test)]
 const TEST_SSH_KEY_PATH: &str = "ssh/ssh_key_in_test";
 #[cfg(test)]
-async fn get_ssh_key_paths() -> Result<Vec<String>> {
+fn get_ssh_key_paths() -> Result<Vec<String>> {
     Ok(vec![TEST_SSH_KEY_PATH.to_string()])
 }
 
-async fn apply_auth_sock(cmd: &mut Command) {
+fn apply_auth_sock(cmd: &mut Command) {
     const SSH_AUTH_SOCK: &str = "ssh.auth-sock";
     if let Ok(path) = ffx_config::get::<String, _>(SSH_AUTH_SOCK) {
-        tracing::debug!("SSH_AUTH_SOCK retrieved via config: {}", path);
+        log::debug!("SSH_AUTH_SOCK retrieved via config: {}", path);
         cmd.env("SSH_AUTH_SOCK", path.as_str());
         if !std::fs::exists(path.as_str()).unwrap() {
-            tracing::warn!("SSH_AUTH_SOCK file does not exist at: {}", path);
+            log::warn!("SSH_AUTH_SOCK file does not exist at: {}", path);
         }
     }
 }
 
-async fn build_ssh_command_with_ssh_path(
+fn build_ssh_command_with_ssh_path(
     ssh_path: &str,
-    addr: SocketAddr,
+    addr: ScopedSocketAddr,
     command: Vec<&str>,
 ) -> Result<Command> {
     let mut config = SshConfig::new()?;
-    build_ssh_command_with_ssh_config(ssh_path, addr, &mut config, command).await
+    build_ssh_command_with_ssh_config(ssh_path, addr, &mut config, command)
 }
 
-pub async fn build_ssh_command_with_env(
+pub fn build_ssh_command_with_env(
     ssh_path: &str,
-    addr: SocketAddr,
+    addr: ScopedSocketAddr,
     env: &EnvironmentContext,
     command: Vec<&str>,
 ) -> Result<Command> {
     let mut ssh_config = SshConfig::new()?;
     build_ssh_command_with_ssh_config_and_env(ssh_path, addr, &mut ssh_config, command, Some(env))
-        .await
 }
 
-pub async fn build_ssh_command_with_ssh_config(
+pub fn build_ssh_command_with_ssh_config(
     ssh_path: &str,
-    addr: SocketAddr,
+    addr: ScopedSocketAddr,
     config: &mut SshConfig,
     command: Vec<&str>,
 ) -> Result<Command> {
-    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, config, command, None).await
+    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, config, command, None)
 }
 
 /// Builds the ssh command using the specified ssh configuration and path to the ssh command.
-async fn build_ssh_command_with_ssh_config_and_env(
+fn build_ssh_command_with_ssh_config_and_env(
     ssh_path: &str,
-    addr: SocketAddr,
+    addr: ScopedSocketAddr,
     config: &mut SshConfig,
     command: Vec<&str>,
     env: Option<&EnvironmentContext>,
@@ -154,11 +152,8 @@ async fn build_ssh_command_with_ssh_config_and_env(
         return Err(anyhow!("missing SSH command"));
     }
 
-    let keys = if let Some(env) = env {
-        get_ssh_key_paths_from_env(env).await?
-    } else {
-        get_ssh_key_paths().await?
-    };
+    let keys =
+        if let Some(env) = env { get_ssh_key_paths_from_env(env)? } else { get_ssh_key_paths()? };
 
     if let Some(env) = env {
         if let Some(keepalive_timeout) = env.query(KEEPALIVE_TIMEOUT_CONFIG).get::<Option<u64>>()? {
@@ -167,7 +162,7 @@ async fn build_ssh_command_with_ssh_config_and_env(
     }
 
     let mut c = Command::new(ssh_path);
-    apply_auth_sock(&mut c).await;
+    apply_auth_sock(&mut c);
     c.args(["-F", "none"]);
     c.args(config.to_args());
 
@@ -175,7 +170,7 @@ async fn build_ssh_command_with_ssh_config_and_env(
         c.arg("-i").arg(key);
     }
 
-    match addr {
+    match addr.addr() {
         SocketAddr::V4(_) => c.arg("-o").arg("AddressFamily=inet"),
         SocketAddr::V6(_) => c.arg("-o").arg("AddressFamily=inet6"),
     };
@@ -197,20 +192,20 @@ async fn build_ssh_command_with_ssh_config_and_env(
 }
 
 /// Build the ssh command using the default ssh command and configuration.
-pub async fn build_ssh_command(addr: SocketAddr, command: Vec<&str>) -> Result<Command> {
-    build_ssh_command_with_ssh_path("ssh", addr, command).await
+pub fn build_ssh_command(addr: ScopedSocketAddr, command: Vec<&str>) -> Result<Command> {
+    build_ssh_command_with_ssh_path("ssh", addr, command)
 }
 
 /// Build the ssh command using a provided sshconfig file.
-pub async fn build_ssh_command_with_config_file(
+pub fn build_ssh_command_with_config_file(
     config_file: &PathBuf,
-    addr: SocketAddr,
+    addr: ScopedSocketAddr,
     command: Vec<&str>,
 ) -> Result<Command> {
-    let keys = get_ssh_key_paths().await?;
+    let keys = get_ssh_key_paths()?;
 
     let mut c = Command::new("ssh");
-    apply_auth_sock(&mut c).await;
+    apply_auth_sock(&mut c);
     c.arg("-F").arg(config_file);
 
     for k in keys {
@@ -243,31 +238,32 @@ mod test {
     #[fuchsia::test]
     async fn test_build_ssh_command_ipv4() {
         let config = SshConfig::new().expect("default ssh config");
-        let addr = "192.168.0.1:22".parse().unwrap();
+        let addr: SocketAddr = "192.168.0.1:22".parse().unwrap();
 
-        let result = build_ssh_command(addr, vec!["ls"]).await.unwrap();
+        let result =
+            build_ssh_command(ScopedSocketAddr::from_socket_addr(addr).unwrap(), vec!["ls"])
+                .unwrap();
         let actual_args: Vec<_> = result.get_args().map(|a| a.to_string_lossy()).collect();
         let mut expected_args: Vec<String> = vec!["-F".into(), "none".into()];
         expected_args.extend(config.to_args());
-
         expected_args.extend(
             ["-i", TEST_SSH_KEY_PATH, "-o", "AddressFamily=inet", "-p", "22", "192.168.0.1", "ls"]
                 .map(String::from),
         );
-
         assert_eq!(actual_args, expected_args);
     }
 
     #[fuchsia::test]
     async fn test_build_ssh_command_ipv6() {
         let config = SshConfig::new().expect("default ssh config");
-        let addr = "[fe80::12%5]:8022".parse().unwrap();
-
-        let result = build_ssh_command(addr, vec!["ls"]).await.unwrap();
+        let addr: SocketAddr = "[fe80::12%1]:8022".parse().unwrap();
+        // This presumes the host device running the test is linux and has a `lo` loopback device.
+        let result =
+            build_ssh_command(ScopedSocketAddr::from_socket_addr(addr).unwrap(), vec!["ls"])
+                .unwrap();
         let actual_args: Vec<_> = result.get_args().map(|a| a.to_string_lossy()).collect();
         let mut expected_args: Vec<String> = vec!["-F".into(), "none".into()];
         expected_args.extend(config.to_args());
-
         expected_args.extend(
             [
                 "-i",
@@ -276,12 +272,11 @@ mod test {
                 "AddressFamily=inet6",
                 "-p",
                 "8022",
-                "fe80::12%5",
+                "fe80::12%lo",
                 "ls",
             ]
             .map(String::from),
         );
-
         assert_eq!(actual_args, expected_args);
     }
 
@@ -298,7 +293,7 @@ mod test {
             .expect("setting auth sock config");
 
         let mut cmd = Command::new("env");
-        apply_auth_sock(&mut cmd).await;
+        apply_auth_sock(&mut cmd);
         let lines =
             cmd.output().unwrap().stdout.lines().filter_map(|res| res.ok()).collect::<Vec<_>>();
 
@@ -314,13 +309,18 @@ mod test {
     #[fuchsia::test]
     async fn test_build_ssh_command_with_ssh_config() {
         let mut config = SshConfig::new().expect("default ssh config");
-        let addr = "[fe80::12%5]:8022".parse().unwrap();
+        let addr: SocketAddr = "[fe80::12]:8022".parse().unwrap();
 
         // Override some options
         config.set("LogLevel", "DEBUG3").expect("setting loglevel");
 
-        let result =
-            build_ssh_command_with_ssh_config("ssh", addr, &mut config, vec!["ls"]).await.unwrap();
+        let result = build_ssh_command_with_ssh_config(
+            "ssh",
+            ScopedSocketAddr::from_socket_addr(addr).unwrap(),
+            &mut config,
+            vec!["ls"],
+        )
+        .unwrap();
         let actual_args: Vec<_> =
             result.get_args().map(|a| a.to_string_lossy().to_string()).collect();
 

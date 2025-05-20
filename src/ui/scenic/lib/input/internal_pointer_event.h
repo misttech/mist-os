@@ -64,7 +64,8 @@ struct Viewport {
 struct InternalTouchEvent {
   zx_time_t timestamp = 0;
   // Id of the injection device.
-  // TODO(https://fxbug.dev/42130756): This is currently only unique per Injector. Make globally unique.
+  // TODO(https://fxbug.dev/42130756): This is currently only unique per Injector. Make globally
+  // unique.
   uint32_t device_id = 0u;
   // Id of the pointer this event belongs to (== a finger on a touchscreen).
   uint32_t pointer_id = 0u;
@@ -81,6 +82,8 @@ struct InternalTouchEvent {
   glm::vec2 position_in_viewport = glm::vec2(0, 0);
   // Integer describing mouse buttons. From gfx SessionListener API.
   uint32_t buttons = 0;
+  // The id used to identify trace flow.
+  std::optional<uint64_t> trace_flow_id = std::nullopt;
 };
 
 // Struct for tracking mouse scroll information.
@@ -108,7 +111,8 @@ struct ButtonInfo {
 struct InternalMouseEvent {
   zx_time_t timestamp = 0;
   // Id of the injection device.
-  // TODO(https://fxbug.dev/42130756): This is currently only unique per Injector. Make globally unique.
+  // TODO(https://fxbug.dev/42130756): This is currently only unique per Injector. Make globally
+  // unique.
   uint32_t device_id = 0u;
   // Reference to the context the event was injected from (a View).
   zx_koid_t context = ZX_KOID_INVALID;

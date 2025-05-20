@@ -31,10 +31,7 @@ zx_library("fit-promise") {
     "single_threaded_executor.cc",
   ]
 
-  public_deps = [
-    "//sdk/lib/fit",
-    "//sdk/lib/stdcompat",
-  ]
+  public_deps = [ "//sdk/lib/fit" ]
 }
 
 group("tests") {

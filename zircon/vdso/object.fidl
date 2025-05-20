@@ -420,6 +420,8 @@ closed protocol Object {
     ///
     /// *Eventpair* objects also allow control over the `ZX_EVENTPAIR_SIGNALED` bit.
     ///
+    /// *Counter* objects also allow control over the `ZX_COUNTER_SIGNALED` bit.
+    ///
     /// The *clear_mask* is first used to clear any bits indicated, and then the
     /// *set_mask* is used to set any bits indicated.
     ///

@@ -110,7 +110,7 @@ func ReadUntilMatch(ctx context.Context, reader io.Reader, toMatch ...[]byte) ([
 	}
 
 	// If we time out, it is helpful to see the last bytes processed.
-	logger.Debugf(ctx, "ReadUntilMatch: last %d bytes read before cancellation: %q", lastReadSize, buf[:lastReadSize])
+	logger.Debugf(ctx, "ReadUntilMatch(%q): last %d bytes read before cancellation: %q", bytes.Join(toMatch, []byte(", ")), lastReadSize, buf[:lastReadSize])
 
 	return nil, ctx.Err()
 }

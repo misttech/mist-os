@@ -5,7 +5,8 @@
 #include "mock_boot_service.h"
 
 #include <lib/cksum.h>
-#include <lib/stdcompat/span.h>
+
+#include <span>
 
 #include "efi/protocol/managed-network.h"
 #include "efi/protocol/simple-network.h"
@@ -22,7 +23,7 @@ namespace gigaboot {
 
 namespace {
 
-void RecalculateGptCrcs(cpp20::span<const gpt_entry_t> entries, gpt_header_t* header) {
+void RecalculateGptCrcs(std::span<const gpt_entry_t> entries, gpt_header_t* header) {
   header->entries_crc =
       crc32(0, reinterpret_cast<uint8_t const*>(entries.data()), entries.size_bytes());
 
@@ -131,7 +132,7 @@ void BlockDevice::AddGptPartition(const gpt_entry_t& new_entry) {
   gpt_entry_t* primary_entries = reinterpret_cast<gpt_entry_t*>(data + 2 * kBlockSize);
   gpt_entry_t* backup_entries =
       reinterpret_cast<gpt_entry_t*>(data + (total_blocks_ - kGptHeaderBlocks) * kBlockSize);
-  cpp20::span<const gpt_entry_t> entries_span(primary_entries, primary_header->entries_count);
+  std::span<const gpt_entry_t> entries_span(primary_entries, primary_header->entries_count);
 
   // Search for an empty entry
   for (size_t i = 0; i < kGptEntries; i++) {
@@ -317,7 +318,7 @@ EfiConfigTable::EfiConfigTable(uint8_t acpi_revision, SmbiosRev smbios_revision)
 
   // The checksum sums all the bytes in the rsdp struct.
   // It is valid if the sum is zero.
-  cpp20::span<const uint8_t> bytes(reinterpret_cast<const uint8_t*>(&rsdp_), kAcpiRsdpV1Size);
+  std::span<const uint8_t> bytes(reinterpret_cast<const uint8_t*>(&rsdp_), kAcpiRsdpV1Size);
   rsdp_.checksum = static_cast<uint8_t>(0x100 - std::reduce(bytes.begin(), bytes.end(), 0));
   bytes = {bytes.begin(), rsdp_.length};
   rsdp_.extended_checksum =

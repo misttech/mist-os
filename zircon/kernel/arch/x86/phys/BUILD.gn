@@ -382,7 +382,11 @@ if (current_toolchain == default_toolchain) {
   }
 
   source_set("arch-boot-zbi") {
-    sources = [ "arch-boot-zbi.cc" ]
+    if (toolchain_environment == "kernel.phys32") {
+      sources = [ "arch-boot-zbi-32.cc" ]
+    } else {
+      sources = [ "arch-boot-zbi-64.cc" ]
+    }
     deps = [
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/phys:boot-zbi.deps",

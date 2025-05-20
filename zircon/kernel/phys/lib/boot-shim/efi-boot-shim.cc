@@ -9,6 +9,7 @@
 #include <zircon/assert.h>
 
 #include <algorithm>
+#include <span>
 
 #include <efi/boot-services.h>
 
@@ -57,7 +58,7 @@ constexpr bool RangeLess(const zbi_mem_range_t& a, const zbi_mem_range_t& b) {
 }  // namespace
 
 EfiBootShimLoader::GetMemoryMapResult EfiBootShimLoader::GetMemoryMap(
-    efi_boot_services* boot_services, cpp20::span<std::byte> buffer) {
+    efi_boot_services* boot_services, std::span<std::byte> buffer) {
   size_t size = buffer.size_bytes(), key = 0, entry_size = 0;
   uint32_t version = 0;
   efi_status status = boot_services->GetMemoryMap(
@@ -78,13 +79,13 @@ EfiBootShimLoader::GetMemoryMapResult EfiBootShimLoader::GetMemoryMap(
   });
 }
 
-cpp20::span<zbi_mem_range_t> EfiBootShimLoader::ConvertMemoryMap(cpp20::span<std::byte> buffer,
-                                                                 size_t entry_size) {
+std::span<zbi_mem_range_t> EfiBootShimLoader::ConvertMemoryMap(std::span<std::byte> buffer,
+                                                               size_t entry_size) {
   // We'll convert the buffer in place from EFI format to ZBI format.
   static_assert(sizeof(efi_memory_descriptor) >= sizeof(zbi_mem_range_t));
   ZX_ASSERT_MSG(entry_size >= sizeof(efi_memory_descriptor), "entry_size %#zx", entry_size);
 
-  cpp20::span<zbi_mem_range_t> ranges{
+  std::span<zbi_mem_range_t> ranges{
       reinterpret_cast<zbi_mem_range_t*>(buffer.data()),
       buffer.size_bytes() / sizeof(zbi_mem_range_t),
   };
@@ -278,7 +279,7 @@ EfiBootShimLoader::Error EfiBootShimLoader::LoadAndBoot(efi_boot_services* boot_
   } while (!get_map(true));
 
   // Convert the memory map in place to ZBI format.
-  cpp20::span payload = ConvertMemoryMap(info.map, info.entry_size);
+  std::span payload = ConvertMemoryMap(info.map, info.entry_size);
 
   // That probably didn't use all the buffer space, so trim the item.
   const uint32_t payload_size = static_cast<uint32_t>(payload.size_bytes());

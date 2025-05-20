@@ -1334,7 +1334,7 @@ mod tests {
         let mut configs = vec![];
         for index in 0..MAX_CONFIGS_PER_RESPONSE + 1 {
             // Create unique network config to be saved.
-            let ssid = format!("some_config{}", index);
+            let ssid = format!("some_config{index}");
             let network_config = generate_random_fidl_network_config_with_ssid(&ssid);
             configs.push(network_config);
         }

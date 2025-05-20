@@ -42,13 +42,13 @@ using DependencyType = fuchsia::component::decl::DependencyType;
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/protocol.
 struct Protocol final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<DependencyType> type = cpp17::nullopt;
-  cpp17::optional<std::string_view> path = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<DependencyType> type = std::nullopt;
+  std::optional<std::string_view> path = std::nullopt;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+  std::optional<std::string_view> from_dictionary = std::nullopt;
 #endif
-  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
+  std::optional<fuchsia::component::decl::Availability> availability = std::nullopt;
 };
 
 // A service capability. The name refers to the name of the FIDL service,
@@ -56,61 +56,61 @@ struct Protocol final {
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/service.
 struct Service final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<std::string_view> path = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<std::string_view> path = std::nullopt;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+  std::optional<std::string_view> from_dictionary = std::nullopt;
 #endif
-  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
+  std::optional<fuchsia::component::decl::Availability> availability = std::nullopt;
 };
 
 // A directory capability.
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/directory.
 struct Directory final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<DependencyType> type = cpp17::nullopt;
-  cpp17::optional<std::string_view> subdir = cpp17::nullopt;
-  cpp17::optional<fuchsia::io::Operations> rights = cpp17::nullopt;
-  cpp17::optional<std::string_view> path = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<DependencyType> type = std::nullopt;
+  std::optional<std::string_view> subdir = std::nullopt;
+  std::optional<fuchsia::io::Operations> rights = std::nullopt;
+  std::optional<std::string_view> path = std::nullopt;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+  std::optional<std::string_view> from_dictionary = std::nullopt;
 #endif
-  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
+  std::optional<fuchsia::component::decl::Availability> availability = std::nullopt;
 };
 
 // A storage capability.
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/storage.
 struct Storage final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<std::string_view> path = cpp17::nullopt;
-  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<std::string_view> path = std::nullopt;
+  std::optional<fuchsia::component::decl::Availability> availability = std::nullopt;
 };
 
 // Routing information for a configuration capability.
 struct Config final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<fuchsia::component::decl::Availability> availability = std::nullopt;
 };
 
 // Routing information for a dictionary capability.
 struct Dictionary final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
-  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<std::string_view> from_dictionary = std::nullopt;
+  std::optional<fuchsia::component::decl::Availability> availability = std::nullopt;
 };
 
 // A resolver capability.
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/resolver.
 struct Resolver final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<std::string_view> path = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<std::string_view> path = std::nullopt;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+  std::optional<std::string_view> from_dictionary = std::nullopt;
 #endif
 };
 
@@ -118,17 +118,17 @@ struct Resolver final {
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/runner.
 struct Runner final {
   std::string_view name;
-  cpp17::optional<std::string_view> as = cpp17::nullopt;
-  cpp17::optional<std::string_view> path = cpp17::nullopt;
+  std::optional<std::string_view> as = std::nullopt;
+  std::optional<std::string_view> path = std::nullopt;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+  std::optional<std::string_view> from_dictionary = std::nullopt;
 #endif
 };
 
 // A capability to be routed from one component to another.
 // See: https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities
 using Capability =
-    cpp17::variant<Protocol, Service, Directory, Storage, Config, Dictionary, Resolver, Runner>;
+    std::variant<Protocol, Service, Directory, Storage, Config, Dictionary, Resolver, Runner>;
 
 // [START mock_handles_cpp]
 // Handles provided to mock component.
@@ -327,10 +327,10 @@ using LocalComponentFactory = fit::function<std::unique_ptr<LocalComponentImplBa
 // implementation that supports the deprecated type.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-using LocalComponentKind = cpp17::variant<LocalComponent*, LocalComponentFactory>;
+using LocalComponentKind = std::variant<LocalComponent*, LocalComponentFactory>;
 #pragma clang diagnostic pop
 #else
-using LocalComponentKind = cpp17::variant<LocalComponentFactory>;
+using LocalComponentKind = std::variant<LocalComponentFactory>;
 #endif
 
 using StartupMode = fuchsia::component::decl::StartupMode;
@@ -383,8 +383,8 @@ struct DictionaryRef {
   std::string_view path;
 };
 
-using Ref = cpp17::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef, SelfRef,
-                           DictionaryRef>;
+using Ref =
+    std::variant<ParentRef, ChildRef, CollectionRef, FrameworkRef, VoidRef, SelfRef, DictionaryRef>;
 
 struct Route {
   std::vector<Capability> capabilities;

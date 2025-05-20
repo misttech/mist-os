@@ -7,7 +7,7 @@
 /// different types of packages when blobfs is in various intermediate states.
 use {
     assert_matches::assert_matches,
-    diagnostics_assertions::assert_data_tree,
+    diagnostics_assertions::{assert_data_tree, tree_assertion},
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
     fuchsia_pkg_testing::{serve::responder, Package, PackageBuilder, RepositoryBuilder},
     futures::{join, prelude::*},
@@ -20,7 +20,6 @@ use {
     std::{
         collections::HashSet,
         io::{self, Read},
-        path::Path,
         sync::Arc,
         time::Duration,
     },
@@ -599,7 +598,7 @@ async fn test_concurrent_blob_writes() {
         [duplicate_blob_path]
         .to_string();
     let unique_blob_merkle =
-        pkg2.meta_contents().expect("extracted contents").contents()[unique_blob_path].to_string();
+        pkg2.meta_contents().expect("extracted contents").contents()[unique_blob_path];
 
     // Create the responder and the channel to communicate with it
     let (blocking_responder, unblocking_closure_receiver) = responder::BlockResponseBodyOnce::new();
@@ -631,15 +630,23 @@ async fn test_concurrent_blob_writes() {
     let send_shared_blob_body =
         unblocking_closure_receiver.await.expect("received unblocking future from hyper server");
 
-    // Wait for duplicate blob to be truncated -- we know it is truncated when we get a
-    // permission denied error when trying to update the blob in blobfs.
-    let blobfs_dir = env.blobfs.root_dir().expect("blobfs has root dir");
-    while blobfs_dir
-        .update_file(Path::new(&delivery_blob::delivery_blob_path(&duplicate_blob_merkle)), 0)
-        .is_ok()
-    {
-        fasync::Timer::new(Duration::from_millis(10)).await;
-    }
+    // Wait to be blocked on http body read for the duplicate blob.
+    env.wait_for_pkg_resolver_inspect_state(tree_assertion!(
+        root: contains {
+            blob_fetcher: contains {
+                queue: contains {
+                    duplicate_blob_merkle => contains {
+                        attempts: {
+                            "1": contains {
+                                state: "read http body"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ))
+    .await;
 
     // At this point, we are confident that the duplicate blob is truncated. So, if we enqueue
     // another package resolve for a package that contains the duplicate blob the package resolver
@@ -648,9 +655,12 @@ async fn test_concurrent_blob_writes() {
         resolve_package(&resolver_proxy_2, &"fuchsia-pkg://test/package2");
 
     // Wait for the unique blob to exist in blobfs.
-    while blobfs_dir
-        .update_file(Path::new(&delivery_blob::delivery_blob_path(&unique_blob_merkle)), 0)
-        .is_ok()
+    let blobfs_reader = env.blobfs.blob_reader_proxy().unwrap().expect("Getting reader proxy");
+    while blobfs_reader
+        .get_vmo(unique_blob_merkle.as_bytes().try_into().unwrap())
+        .await
+        .expect("Getting vmo")
+        .is_err()
     {
         fasync::Timer::new(Duration::from_millis(10)).await;
     }

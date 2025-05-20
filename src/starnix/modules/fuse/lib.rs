@@ -49,6 +49,43 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 const FUSE_ROOT_ID_U64: u64 = uapi::FUSE_ROOT_ID as u64;
 const CONFIGURATION_AVAILABLE_EVENT: u64 = std::u64::MAX;
 
+uapi::check_arch_independent_layout! {
+    fuse_access_in {}
+    fuse_attr {}
+    fuse_attr_out {}
+    fuse_create_in {}
+    fuse_dirent {}
+    fuse_entry_bpf_out {}
+    fuse_entry_out {}
+    fuse_flush_in {}
+    fuse_forget_in {}
+    fuse_getxattr_in {}
+    fuse_getxattr_out {}
+    fuse_in_header {}
+    fuse_init_in {}
+    fuse_init_out {}
+    fuse_interrupt_in {}
+    fuse_link_in {}
+    fuse_lseek_in {}
+    fuse_lseek_out {}
+    fuse_mkdir_in {}
+    fuse_mknod_in {}
+    fuse_opcode {}
+    fuse_open_in {}
+    fuse_open_out {}
+    fuse_out_header {}
+    fuse_poll_in {}
+    fuse_poll_out {}
+    fuse_read_in {}
+    fuse_release_in {}
+    fuse_rename2_in {}
+    fuse_setattr_in {}
+    fuse_setxattr_in {}
+    fuse_statfs_out {}
+    fuse_write_in {}
+    fuse_write_out {}
+}
+
 #[derive(Debug)]
 struct DevFuse {
     connection: Arc<FuseConnection>,
@@ -666,7 +703,6 @@ impl FuseNode {
             return error!(ENOENT);
         }
         let node = node.fs().get_and_validate_or_create_node(
-            current_task,
             Some(entry.nodeid),
             |node| {
                 let fuse_node = FuseNode::from_node(&node);
@@ -2197,6 +2233,7 @@ bitflags::bitflags! {
         const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT as u64;
         const POSIX_ACL = uapi::FUSE_POSIX_ACL as u64;
         const PASSTHROUGH = uapi::FUSE_PASSTHROUGH as u64;
+        const INIT_EXT = uapi::FUSE_INIT_EXT as u64;
     }
 }
 

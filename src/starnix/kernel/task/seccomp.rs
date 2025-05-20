@@ -16,7 +16,7 @@ use bstr::ByteSlice;
 #[cfg(not(feature = "starnix_lite"))]
 use ebpf::{
     bpf_addressing_mode, bpf_class, convert_and_link_cbpf, BpfProgramContext, CbpfConfig,
-    EbpfProgram, MemoryId, NoMap, ProgramArgument, Type,
+    EbpfProgram, MemoryId, NoMap, ProgramArgument, Type, BPF_ABS, BPF_LD, BPF_ST,
 };
 #[cfg(not(feature = "starnix_lite"))]
 use ebpf_api::SECCOMP_CBPF_CONFIG;
@@ -31,15 +31,17 @@ use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SIGKILL, SIGSYS};
+#[cfg(target_arch = "aarch64")]
+use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data, seccomp_notif,
-    seccomp_notif_resp, sock_filter, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
-    SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
-    SECCOMP_MODE_DISABLED, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_RET_ACTION_FULL,
-    SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+    seccomp_notif_resp, sock_filter, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
+    SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_MODE_DISABLED, SECCOMP_MODE_FILTER,
+    SECCOMP_MODE_STRICT, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA,
+    SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
 };
 #[cfg(feature = "starnix_lite")]
 use starnix_uapi::{
@@ -60,7 +62,7 @@ use starnix_uapi::__NR_clock_gettime;
 #[cfg(target_arch = "aarch64")]
 use starnix_uapi::__NR_gettimeofday;
 #[cfg(target_arch = "aarch64")]
-use starnix_uapi::AUDIT_ARCH_AARCH64;
+use starnix_uapi::{AUDIT_ARCH_AARCH64, AUDIT_ARCH_ARM};
 
 #[cfg(target_arch = "x86_64")]
 use starnix_uapi::__NR_clock_gettime;
@@ -207,11 +209,15 @@ impl Drop for SeccompFilterContainer {
     }
 }
 
-fn make_seccomp_data(syscall: &Syscall, ip: u64) -> seccomp_data {
+fn make_seccomp_data(
+    #[allow(unused_variables)] current_task: &CurrentTask,
+    syscall: &Syscall,
+    ip: u64,
+) -> seccomp_data {
     #[cfg(target_arch = "x86_64")]
     let arch_val = AUDIT_ARCH_X86_64;
     #[cfg(target_arch = "aarch64")]
-    let arch_val = AUDIT_ARCH_AARCH64;
+    let arch_val = if current_task.is_arch32() { AUDIT_ARCH_ARM } else { AUDIT_ARCH_AARCH64 };
     #[cfg(target_arch = "riscv64")]
     let arch_val = AUDIT_ARCH_RISCV64;
     seccomp_data {
@@ -286,6 +292,7 @@ impl SeccompFilterContainer {
         }
 
         let data = make_seccomp_data(
+            current_task,
             syscall,
             current_task.thread_state.registers.instruction_pointer_register(),
         );
@@ -518,6 +525,7 @@ impl SeccompState {
                         pid: current_task.id as u32,
                         flags: 0,
                         data: make_seccomp_data(
+                            current_task,
                             syscall,
                             current_task.thread_state.registers.instruction_pointer_register(),
                         ),

@@ -366,10 +366,6 @@ impl_responder!(
 /// Conversion error for rule elements.
 #[derive(Debug, Error, Clone, Copy, PartialEq)]
 pub enum RuleFidlConversionError {
-    /// A required field was unset. The provided string is the human-readable
-    /// name of the unset field.
-    #[error("BaseMatcher is missing from the RuleMatcher")]
-    BaseMatcherMissing,
     /// Destination Subnet conversion failed.
     #[error("failed to convert `destination` to net_types subnet: {0:?}")]
     DestinationSubnet(net_types::ip::SubnetError),
@@ -500,7 +496,7 @@ impl TryFrom<fnet_routes::RuleMatcherV4> for RuleMatcher<Ipv4> {
             mark_1,
             mark_2,
             __source_breaking: fidl::marker::SourceBreaking,
-        } = base.ok_or(RuleFidlConversionError::BaseMatcherMissing)?;
+        } = base.unwrap_or_default();
         Ok(Self {
             from: from
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
@@ -517,18 +513,20 @@ impl From<RuleMatcher<Ipv4>> for fnet_routes::RuleMatcherV4 {
     fn from(
         RuleMatcher { from, locally_generated, bound_device, mark_1, mark_2 }: RuleMatcher<Ipv4>,
     ) -> Self {
+        let base = fnet_routes::BaseMatcher {
+            locally_generated,
+            bound_device: bound_device.map(fnet_routes::InterfaceMatcher::from),
+            mark_1: mark_1.map(Into::into),
+            mark_2: mark_2.map(Into::into),
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+        let base = (base != Default::default()).then_some(base);
         fnet_routes::RuleMatcherV4 {
             from: from.map(|from| fnet::Ipv4AddressWithPrefix {
                 addr: from.network().into_ext(),
                 prefix_len: from.prefix(),
             }),
-            base: Some(fnet_routes::BaseMatcher {
-                locally_generated,
-                bound_device: bound_device.map(fnet_routes::InterfaceMatcher::from),
-                mark_1: mark_1.map(Into::into),
-                mark_2: mark_2.map(Into::into),
-                __source_breaking: fidl::marker::SourceBreaking,
-            }),
+            base,
             __source_breaking: fidl::marker::SourceBreaking,
         }
     }
@@ -549,7 +547,7 @@ impl TryFrom<fnet_routes::RuleMatcherV6> for RuleMatcher<Ipv6> {
             mark_1,
             mark_2,
             __source_breaking: fidl::marker::SourceBreaking,
-        } = base.ok_or(RuleFidlConversionError::BaseMatcherMissing)?;
+        } = base.unwrap_or_default();
         Ok(Self {
             from: from
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
@@ -566,18 +564,20 @@ impl From<RuleMatcher<Ipv6>> for fnet_routes::RuleMatcherV6 {
     fn from(
         RuleMatcher { from, locally_generated, bound_device, mark_1, mark_2 }: RuleMatcher<Ipv6>,
     ) -> Self {
+        let base = fnet_routes::BaseMatcher {
+            locally_generated,
+            bound_device: bound_device.map(fnet_routes::InterfaceMatcher::from),
+            mark_1: mark_1.map(Into::into),
+            mark_2: mark_2.map(Into::into),
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+        let base = (base != Default::default()).then_some(base);
         fnet_routes::RuleMatcherV6 {
             from: from.map(|from| fnet::Ipv6AddressWithPrefix {
                 addr: from.network().into_ext(),
                 prefix_len: from.prefix(),
             }),
-            base: Some(fnet_routes::BaseMatcher {
-                locally_generated,
-                bound_device: bound_device.map(fnet_routes::InterfaceMatcher::from),
-                mark_1: mark_1.map(Into::into),
-                mark_2: mark_2.map(Into::into),
-                __source_breaking: fidl::marker::SourceBreaking,
-            }),
+            base,
             __source_breaking: fidl::marker::SourceBreaking,
         }
     }
@@ -1100,34 +1100,27 @@ pub async fn collect_rules_until_idle<I: FidlRuleIpExt, C: Extend<InstalledRule<
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use fnet_routes::BaseMatcher;
 
     use super::*;
 
     #[test]
-    fn missing_base_matcher_v4() {
+    fn missing_base_matcher_default_v4() {
         let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV4 {
             from: None,
             base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
-        assert_matches!(
-            RuleMatcher::try_from(fidl_matcher),
-            Err(RuleFidlConversionError::BaseMatcherMissing)
-        );
+        assert_eq!(RuleMatcher::try_from(fidl_matcher), Ok(Default::default()));
     }
 
     #[test]
-    fn missing_base_matcher_v6() {
+    fn missing_base_matcher_default_v6() {
         let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV6 {
             from: None,
             base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
-        assert_matches!(
-            RuleMatcher::try_from(fidl_matcher),
-            Err(RuleFidlConversionError::BaseMatcherMissing)
-        );
+        assert_eq!(RuleMatcher::try_from(fidl_matcher), Ok(Default::default()));
     }
 
     #[test]
@@ -1135,7 +1128,7 @@ mod tests {
         let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV4 {
             // Invalid, because subnets should not have the "host bits" set.
             from: Some(net_declare::fidl_ip_v4_with_prefix!("192.168.0.1/24")),
-            base: Some(BaseMatcher::default()),
+            base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
@@ -1149,7 +1142,7 @@ mod tests {
         let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV6 {
             // Invalid, because subnets should not have the "host bits" set.
             from: Some(net_declare::fidl_ip_v6_with_prefix!("fe80::1/64")),
-            base: Some(BaseMatcher::default()),
+            base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
         assert_matches!(
@@ -1162,49 +1155,35 @@ mod tests {
     fn all_unspecified_matcher_v4() {
         let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV4 {
             from: None,
-            base: Some(BaseMatcher {
-                locally_generated: None,
-                bound_device: None,
-                mark_1: None,
-                mark_2: None,
-                __source_breaking: fidl::marker::SourceBreaking,
-            }),
+            base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
-        assert_matches!(
-            RuleMatcher::try_from(fidl_matcher),
-            Ok(RuleMatcher {
-                from: None,
-                locally_generated: None,
-                bound_device: None,
-                mark_1: None,
-                mark_2: None,
-            })
-        );
+        let ext_matcher = RuleMatcher {
+            from: None,
+            locally_generated: None,
+            bound_device: None,
+            mark_1: None,
+            mark_2: None,
+        };
+        assert_eq!(RuleMatcher::try_from(fidl_matcher.clone()), Ok(ext_matcher.clone()));
+        assert_eq!(fidl_fuchsia_net_routes::RuleMatcherV4::from(ext_matcher), fidl_matcher,)
     }
 
     #[test]
     fn all_unspecified_matcher_v6() {
         let fidl_matcher = fidl_fuchsia_net_routes::RuleMatcherV6 {
             from: None,
-            base: Some(BaseMatcher {
-                locally_generated: None,
-                bound_device: None,
-                mark_1: None,
-                mark_2: None,
-                __source_breaking: fidl::marker::SourceBreaking,
-            }),
+            base: None,
             __source_breaking: fidl::marker::SourceBreaking,
         };
-        assert_matches!(
-            RuleMatcher::try_from(fidl_matcher),
-            Ok(RuleMatcher {
-                from: None,
-                locally_generated: None,
-                bound_device: None,
-                mark_1: None,
-                mark_2: None,
-            })
-        );
+        let ext_matcher = RuleMatcher {
+            from: None,
+            locally_generated: None,
+            bound_device: None,
+            mark_1: None,
+            mark_2: None,
+        };
+        assert_eq!(RuleMatcher::try_from(fidl_matcher.clone()), Ok(ext_matcher.clone()));
+        assert_eq!(fidl_fuchsia_net_routes::RuleMatcherV6::from(ext_matcher), fidl_matcher,)
     }
 }

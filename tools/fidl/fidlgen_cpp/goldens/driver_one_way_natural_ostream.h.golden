@@ -34,28 +34,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_driveroneway::OneWaySend
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_driveroneway::OneWay>> {
-  static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_driveroneway::OneWay>& value) {
-    return os << "ClientEnd<" << "test_driveroneway::OneWay" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fdf::ClientEnd<::test_driveroneway::OneWay>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ServerEnd<::test_driveroneway::OneWay>> {
-  static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_driveroneway::OneWay>& value) {
-    return os << "ServerEnd<" << "test_driveroneway::OneWay" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fdf::ServerEnd<::test_driveroneway::OneWay>& value);
 };
 
-namespace fdf {
+std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_driveroneway::OneWay>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_driveroneway::OneWay>& value) {
-  return fidl::ostream::Formatter<::fdf::ClientEnd<::test_driveroneway::OneWay>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_driveroneway::OneWay>& value) {
-  return fidl::ostream::Formatter<::fdf::ServerEnd<::test_driveroneway::OneWay>>::Format(os, value);
-}
-}  // namespace fdf
+std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_driveroneway::OneWay>& value);
 
 #endif  // __Fuchsia__
 

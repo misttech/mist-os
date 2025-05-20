@@ -21,7 +21,7 @@
 #include <arch/x86/interrupts.h>
 #include <arch/x86/mp.h>
 #include <kernel/mp.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/fault.h>
 #include <vm/pmm.h>
 #include <vm/vm_address_region.h>

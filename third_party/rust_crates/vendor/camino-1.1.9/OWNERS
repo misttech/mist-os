@@ -5,7 +5,6 @@
 include /build/assembly/OWNERS
 include /build/sdk/meta/OWNERS
 include /src/developer/ffx/OWNERS
-include /src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext/OWNERS
 include /src/developer/ffx/lib/fuchsia-controller/OWNERS
 include /src/developer/ffx/lib/pbms/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
@@ -38,12 +37,12 @@ include /tools/auto_owners/OWNERS
 include /tools/cargo-gnaw/OWNERS
 include /tools/component_id_index/OWNERS
 include /tools/configc/OWNERS
-include /tools/fuchsia-sdk-run/OWNERS
 include /tools/funnel/OWNERS
 include /tools/gn_desc/OWNERS
 include /tools/lib/OWNERS
 include /tools/lib/cm_fidl_analyzer/OWNERS
 include /tools/make-fuchsia-vol/OWNERS
 include /tools/pbtool/OWNERS
+include /tools/pkgstats/OWNERS
 include /tools/test_list_tool/OWNERS
 include /tools/validate_test_type/OWNERS

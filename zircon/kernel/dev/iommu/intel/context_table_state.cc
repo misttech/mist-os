@@ -8,8 +8,8 @@
 
 #include <new>
 
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 
 #include "device_context.h"
 #include "hw.h"

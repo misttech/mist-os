@@ -66,6 +66,9 @@ package_deps_for_tests = [
   ":netcfg-netemul-configs",
   "//src/connectivity/policy/netcfg:component-advanced",
   "//src/connectivity/policy/netcfg:component-basic",
+
+  # netcfg integration with socket-proxy is tested.
+  "//src/connectivity/policy/socket-proxy:component",
 ]
 
 # RISC-V on Fuchsia does not support Golang.
@@ -127,6 +130,7 @@ resource("netcfg-netemul-configs") {
     "management/config/dhcpv6.json",
     "management/config/duplicate_names.json",
     "management/config/empty.json",
+    "management/config/enable_socket_proxy.json",
     "management/config/forwarding.json",
     "management/config/iface_prefix.json",
     "management/config/packet_filter_ethernet.json",

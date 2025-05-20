@@ -49,23 +49,23 @@ std::shared_ptr<fctest::ChildOptions> CreateFidlChildOptions(
     std::vector<std::pair<std::string, fcdecl::ConfigValue>> config_overrides);
 
 std::shared_ptr<fctest::Capability> CreateFidlProtocolCapability(
-    std::string_view name, cpp17::optional<std::string_view> as = std::nullopt,
-    cpp17::optional<fcdecl::DependencyType> type = std::nullopt,
-    cpp17::optional<std::string_view> path = std::nullopt,
-    cpp17::optional<std::string_view> from_dictionary = std::nullopt);
+    std::string_view name, std::optional<std::string_view> as = std::nullopt,
+    std::optional<fcdecl::DependencyType> type = std::nullopt,
+    std::optional<std::string_view> path = std::nullopt,
+    std::optional<std::string_view> from_dictionary = std::nullopt);
 
 std::shared_ptr<fctest::Capability> CreateFidlServiceCapability(
-    std::string_view name, cpp17::optional<std::string_view> as = std::nullopt,
-    cpp17::optional<std::string_view> path = std::nullopt,
-    cpp17::optional<std::string_view> from_dictionary = std::nullopt);
+    std::string_view name, std::optional<std::string_view> as = std::nullopt,
+    std::optional<std::string_view> path = std::nullopt,
+    std::optional<std::string_view> from_dictionary = std::nullopt);
 
 std::shared_ptr<fctest::Capability> CreateFidlDirectoryCapability(
-    std::string_view name, cpp17::optional<std::string_view> as = std::nullopt,
-    cpp17::optional<fcdecl::DependencyType> type = std::nullopt,
-    cpp17::optional<std::string_view> subdir = std::nullopt,
-    cpp17::optional<fio::Operations> rights = std::nullopt,
-    cpp17::optional<std::string_view> path = std::nullopt,
-    cpp17::optional<std::string_view> from_dictionary = std::nullopt);
+    std::string_view name, std::optional<std::string_view> as = std::nullopt,
+    std::optional<fcdecl::DependencyType> type = std::nullopt,
+    std::optional<std::string_view> subdir = std::nullopt,
+    std::optional<fio::Operations> rights = std::nullopt,
+    std::optional<std::string_view> path = std::nullopt,
+    std::optional<std::string_view> from_dictionary = std::nullopt);
 
 }  // namespace tests
 }  // namespace component

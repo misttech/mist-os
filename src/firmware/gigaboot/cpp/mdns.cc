@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include "mdns.h"
 
 #include <algorithm>
@@ -73,7 +74,7 @@ bool MdnsPacket::WriteU32(uint32_t l) {
   return true;
 }
 
-bool MdnsPacket::WriteBytes(cpp20::span<const uint8_t> bytes) {
+bool MdnsPacket::WriteBytes(std::span<const uint8_t> bytes) {
   if (payload_end_ + bytes.size() > data_.payload.end()) {
     return false;
   }
@@ -146,8 +147,8 @@ bool DnsContext::WriteRecord(zx::duration time_to_live, DnsRecord& record, MdnsP
   // Back-patch the record length
   uint16_t resource_length =
       htons(static_cast<uint16_t>(packet.CurrentEnd() - (size_field + sizeof(uint16_t))));
-  cpp20::span<const uint8_t> length_bytes(reinterpret_cast<const uint8_t*>(&resource_length),
-                                          sizeof(resource_length));
+  std::span<const uint8_t> length_bytes(reinterpret_cast<const uint8_t*>(&resource_length),
+                                        sizeof(resource_length));
   std::copy(length_bytes.begin(), length_bytes.end(), size_field);
   return true;
 }
@@ -167,11 +168,10 @@ bool DnsContext::WriteRecords(zx::duration time_to_live, MdnsPacket& packet) {
   return true;
 }
 
-fit::result<efi_status, cpp20::span<const uint8_t>> MdnsPacket::Serialize(
-    zx::duration time_to_live) {
+fit::result<efi_status, std::span<const uint8_t>> MdnsPacket::Serialize(zx::duration time_to_live) {
   if (time_to_live_.has_value() && *time_to_live_ == time_to_live) {
-    return fit::ok(cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&data_),
-                                              reinterpret_cast<const uint8_t*>(&(*payload_end_))));
+    return fit::ok(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&data_),
+                                            reinterpret_cast<const uint8_t*>(&(*payload_end_))));
   }
 
   ResetPayload();
@@ -183,7 +183,7 @@ fit::result<efi_status, cpp20::span<const uint8_t>> MdnsPacket::Serialize(
   return fit::ok(Finalize());
 }
 
-cpp20::span<const uint8_t> MdnsPacket::Finalize() {
+std::span<const uint8_t> MdnsPacket::Finalize() {
   uint16_t length = htons(static_cast<uint16_t>(reinterpret_cast<uintptr_t>(&(*payload_end_)) -
                                                 reinterpret_cast<uintptr_t>(&data_.udp_header)));
   // IP6 length field does NOT include its header,
@@ -208,13 +208,13 @@ cpp20::span<const uint8_t> MdnsPacket::Finalize() {
   //    UDP length and UDP next header value, then calculate the checksum over the
   //    {ip6 src, ip6 dest, udp header, dns payload} as a contiguous array of bytes.
   //    We don't need to construct the pseudoheader, we just fake it.
-  cpp20::span<const uint8_t> udp_bytes(const_cast<const uint8_t*>(data_.ip6_header.source.data()),
-                                       end_ptr);
+  std::span<const uint8_t> udp_bytes(const_cast<const uint8_t*>(data_.ip6_header.source.data()),
+                                     end_ptr);
   // Add zero-pad bytes to the header, and add the already network-endian length.
   uint64_t start = htons(static_cast<uint16_t>(kUdpHdr)) + length;
   uint16_t checksum = CalculateChecksum(udp_bytes, start);
   data_.udp_header.checksum = (checksum != 0xFFFF) ? static_cast<uint16_t>(~checksum) : checksum;
-  return cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&data_), end_ptr);
+  return std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&data_), end_ptr);
 }
 
 MdnsAgent::MdnsAgent(EthernetAgent& eth_agent, efi_system_table* sys)

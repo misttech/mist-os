@@ -651,7 +651,7 @@ mod tests {
         let model = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Service {
                     path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
@@ -691,7 +691,7 @@ mod tests {
         let model = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Service {
                     path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
@@ -773,7 +773,7 @@ mod tests {
         let model = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::Service {
                     path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
@@ -821,7 +821,7 @@ mod tests {
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let c_component =
-            test.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
+            test.look_up_instance(&["b", "c"].try_into().unwrap()).await.expect("c instance");
 
         assert!(test
             .model
@@ -958,7 +958,7 @@ mod tests {
         let model = builder.build().await;
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -972,7 +972,7 @@ mod tests {
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -986,7 +986,7 @@ mod tests {
             .await;
         model
             .check_use(
-                vec!["c", "d"].try_into().unwrap(), // Should get e's event from parent
+                ["c", "d"].try_into().unwrap(), // Should get e's event from parent
                 CheckUse::EventStream {
                     expected_res: ExpectedResult::Ok,
                     path: "/event/stream".parse().unwrap(),
@@ -1033,7 +1033,7 @@ mod tests {
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let check_result = test
             .model
             .check_program_runner(
@@ -1088,7 +1088,7 @@ mod tests {
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
 
         let result = test.model.check_resolver(&b_component);
         assert!(result.error.is_none());
@@ -1143,7 +1143,7 @@ mod tests {
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let c_component =
-            test.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
+            test.look_up_instance(&["b", "c"].try_into().unwrap()).await.expect("c instance");
 
         let result = test.model.check_resolver(&c_component);
 
@@ -1183,7 +1183,7 @@ mod tests {
         builder.set_builtin_boot_resolver(component_internal::BuiltinBootResolver::Boot);
         let test = builder.build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
 
         let result = test.model.check_resolver(&b_component);
 
@@ -1227,7 +1227,7 @@ mod tests {
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let root_component = test.look_up_instance(&Moniker::root()).await.expect("root instance");
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = test.model.check_use_capability(&use_decl, &b_component).await;
         assert_eq!(route_result.len(), 1);
         let route_result = &route_result[0];
@@ -1273,7 +1273,7 @@ mod tests {
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_results = test.model.check_use_capability(&use_decl, &a_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
@@ -1379,7 +1379,7 @@ mod tests {
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let c_component =
-            test.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
+            test.look_up_instance(&["c"].try_into().unwrap()).await.expect("c instance");
         let route_results = test.model.check_use_capability(&use_decl, &c_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
@@ -1388,21 +1388,18 @@ mod tests {
         assert_eq!(
             route_result.route,
             vec![
-                RouteSegment::UseBy {
-                    moniker: vec!["c"].try_into().unwrap(),
-                    capability: use_decl
-                },
+                RouteSegment::UseBy { moniker: ["c"].try_into().unwrap(), capability: use_decl },
                 RouteSegment::OfferBy { moniker: Moniker::root(), capability: a_offer_decl },
                 RouteSegment::ExposeBy {
-                    moniker: vec!["b"].try_into().unwrap(),
+                    moniker: ["b"].try_into().unwrap(),
                     capability: b_expose_decl
                 },
                 RouteSegment::ExposeBy {
-                    moniker: vec!["b", "d"].try_into().unwrap(),
+                    moniker: ["b", "d"].try_into().unwrap(),
                     capability: d_expose_decl
                 },
                 RouteSegment::DeclareBy {
-                    moniker: vec!["b", "d"].try_into().unwrap(),
+                    moniker: ["b", "d"].try_into().unwrap(),
                     capability: directory_decl,
                 }
             ]
@@ -1438,7 +1435,7 @@ mod tests {
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = test
             .model
             .check_program_runner(
@@ -1508,7 +1505,7 @@ mod tests {
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_results = test.model.check_use_capability(&use_storage_decl, &b_component).await;
         assert_eq!(route_results.len(), 2);
 
@@ -1522,7 +1519,7 @@ mod tests {
             storage_route_result.route,
             vec![
                 RouteSegment::UseBy {
-                    moniker: vec!["b"].try_into().unwrap(),
+                    moniker: ["b"].try_into().unwrap(),
                     capability: use_storage_decl
                 },
                 RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_storage_decl },
@@ -1578,7 +1575,7 @@ mod tests {
 
         let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let realm_route_results =
             test.model.check_use_capability(&use_realm_decl, &b_component).await;
         assert_eq!(realm_route_results.len(), 1);
@@ -1628,7 +1625,7 @@ mod tests {
         test.install_namespace_directory("/offer_from_cm_namespace");
 
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_results = test.model.check_use_capability(&use_decl, &b_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
@@ -1669,7 +1666,7 @@ mod tests {
         let test = builder.build().await;
 
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let route_results = test.model.check_use_capability(&use_decl, &b_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
@@ -1727,7 +1724,7 @@ mod tests {
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
 
         let route_result = test.model.check_resolver(&b_component);
 
@@ -1738,7 +1735,7 @@ mod tests {
             route_result.source,
             Some(CapabilitySource::Component(ComponentSource {
                 capability: resolver_decl.into(),
-                moniker: vec!["c"].try_into().unwrap(),
+                moniker: ["c"].try_into().unwrap(),
             })),
         );
     }
@@ -1787,7 +1784,7 @@ mod tests {
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let c_component =
-            test.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
+            test.look_up_instance(&["b", "c"].try_into().unwrap()).await.expect("c instance");
 
         let route_result = test.model.check_resolver(&c_component);
 
@@ -1834,7 +1831,7 @@ mod tests {
         builder.set_builtin_capabilities(vec![boot_resolver_decl.clone()]);
         let test = builder.build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
 
         let route_map = test.model.check_resolver(&b_component);
 
@@ -1884,7 +1881,7 @@ mod tests {
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
 
         let route_result = test.model.check_resolver(&b_component);
 
@@ -2019,7 +2016,7 @@ mod tests {
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
         let root_component = test.look_up_instance(&Moniker::root()).await.expect("root instance");
 
         let route_maps = test
@@ -2050,7 +2047,7 @@ mod tests {
                 error: None,
                 route: vec![
                     RouteSegment::UseBy {
-                        moniker: vec!["b"].try_into().unwrap(),
+                        moniker: ["b"].try_into().unwrap(),
                         capability: use_directory_decl,
                     },
                     RouteSegment::OfferBy {
@@ -2178,7 +2175,7 @@ mod tests {
         let test =
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let b_component =
-            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+            test.look_up_instance(&["b"].try_into().unwrap()).await.expect("b instance");
 
         let route_maps = test
             .model
@@ -2426,7 +2423,7 @@ mod tests {
             ),
         ];
         let mut builder = RoutingTestBuilderForAnalyzer::new("a", components.clone());
-        let b_moniker: Moniker = vec!["b"].try_into().unwrap();
+        let b_moniker: Moniker = ["b"].try_into().unwrap();
         builder.set_dynamic_config(DynamicConfig {
             dictionaries: hashmap! {
                 b_moniker => hashmap! {
@@ -2440,7 +2437,7 @@ mod tests {
         let model = builder.build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: format!("/svc/{PROTOCOL_NAME}").parse().unwrap(),
                     expected_res: ExpectedResult::Ok,
@@ -2449,7 +2446,7 @@ mod tests {
             .await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: format!("/svc/{PROTOCOL_NOT_IN_CONFIG}").parse().unwrap(),
                     expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),

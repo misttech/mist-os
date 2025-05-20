@@ -41,23 +41,23 @@ TEST(StructuredLogging, NoSideEffectsIfLoggingIsDisabled) {
 }
 
 template <typename T>
-static cpp17::optional<cpp17::string_view> ToStringView(T input) {
+static std::optional<std::string_view> ToStringView(T input) {
   return input;
 }
 
 TEST(StructuredLogging, NullSafeStringView) {
   // Construct from nullptr directly.
-  ASSERT_EQ(ToStringView(syslog_runtime::internal::NullSafeStringView(nullptr)), cpp17::nullopt);
+  ASSERT_EQ(ToStringView(syslog_runtime::internal::NullSafeStringView(nullptr)), std::nullopt);
   // Construct from nullptr via const char*.
   ASSERT_EQ(
       ToStringView(syslog_runtime::internal::NullSafeStringView(static_cast<const char*>(nullptr))),
-      cpp17::nullopt);
+      std::nullopt);
   // Construct from std::string
   ASSERT_EQ(ToStringView(syslog_runtime::internal::NullSafeStringView(std::string("test"))),
-            cpp17::string_view("test"));
+            std::string_view("test"));
   // Construct from non-null const char*
   ASSERT_EQ(ToStringView(syslog_runtime::internal::NullSafeStringView("test")),
-            cpp17::string_view("test"));
+            std::string_view("test"));
 }
 
 // Test to validate that SetLogSettings and log initialization is thread-safe.

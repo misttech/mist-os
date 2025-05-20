@@ -69,7 +69,7 @@ pub(crate) fn write_depfile(
         srcs.map(|x| convert_to_depfile_filepath(x.as_str())).collect::<Vec<_>>().join(" "),
     );
 
-    write!(file_writer, "{}", dep_str)?;
+    write!(file_writer, "{dep_str}")?;
 
     Ok(())
 }

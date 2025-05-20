@@ -128,6 +128,11 @@ std::vector<debug_ipc::AddressRegion> LinuxProcessHandle::GetAddressSpace(uint64
   return result;
 }
 
+std::optional<debug_ipc::AddressRegion> LinuxProcessHandle::GetSharedAddressSpace() const {
+  // Not implemented.
+  return std::nullopt;
+}
+
 std::vector<debug_ipc::Module> LinuxProcessHandle::GetModules() const {
   return GetElfModulesForProcess(*this, linux::GetLdSoDebugAddress(task_->pid()));
 }

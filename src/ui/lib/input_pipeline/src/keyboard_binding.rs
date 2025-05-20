@@ -448,10 +448,7 @@ impl KeyboardBinding {
             fuchsia_trace::flow_end!(c"input", c"input_report", trace_id.into());
         }
 
-        let tracing_id = match report.trace_id {
-            Some(id) => id.into(),
-            None => fuchsia_trace::Id::new(),
-        };
+        let tracing_id = fuchsia_trace::Id::random();
         fuchsia_trace::flow_begin!(c"input", c"key_event_thread", tracing_id);
 
         inspect_status.count_received_report(&report);
@@ -555,7 +552,7 @@ impl KeyboardBinding {
 
                 let mut event_time = event_time;
                 for (key, event_type) in key_events.into_iter() {
-                    let trace_id = fuchsia_trace::Id::new();
+                    let trace_id = fuchsia_trace::Id::random();
                     fuchsia_trace::duration!(c"input", c"keyboard_event_in_binding");
                     fuchsia_trace::flow_begin!(c"input", c"event_in_input_pipeline", trace_id);
 

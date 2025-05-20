@@ -42,7 +42,8 @@ use netstack3_core::testutil::{
 use netstack3_core::{IpExt, TxMetadata, UnlockedCoreCtx};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
-    Ipv6DeviceConfigurationUpdate, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
+    IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, SlaacConfigurationUpdate,
+    StableSlaacAddressConfiguration,
 };
 use netstack3_ip::icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT};
 use netstack3_ip::nud::{
@@ -173,7 +174,10 @@ fn ns_response(target_addr: Ipv6Addr, dad_transmits: Option<NonZeroU16>, expect_
         .update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(dad_transmits),
+                ip_config: IpDeviceConfigurationUpdate {
+                    dad_transmits: Some(dad_transmits),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )

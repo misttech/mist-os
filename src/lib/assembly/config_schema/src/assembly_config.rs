@@ -215,8 +215,10 @@ pub struct CompiledComponentDefinition {
 mod tests {
     use super::*;
     use crate::common::PackageSet;
-    use crate::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
-    use crate::platform_config::{BuildType, FeatureSupportLevel};
+    use crate::platform_config::media_config::{
+        AudioConfig, AudioDeviceRegistryConfig, PlatformMediaConfig,
+    };
+    use crate::platform_config::{BuildType, FeatureSetLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_util as util;
     use fuchsia_pkg::{MetaPackage, PackageManifestBuilder, PackageName};
@@ -238,7 +240,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Standard);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Standard);
     }
 
     #[test]
@@ -257,7 +259,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Bootstrap);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Bootstrap);
     }
 
     #[test]
@@ -275,7 +277,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Standard);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::Standard);
     }
 
     #[test]
@@ -283,7 +285,7 @@ mod tests {
         let json5 = r#"
         {
           platform: {
-            feature_set_level: "empty",
+            feature_set_level: "test_no_platform",
             build_type: "eng",
           },
           product: {},
@@ -294,7 +296,7 @@ mod tests {
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let platform = config.platform;
         assert_eq!(platform.build_type, BuildType::Eng);
-        assert_eq!(platform.feature_set_level, FeatureSupportLevel::Empty);
+        assert_eq!(platform.feature_set_level, FeatureSetLevel::TestNoPlatform);
     }
 
     #[test]
@@ -563,7 +565,9 @@ mod tests {
         let overrides = serde_json::json!({
             "platform": {
                 "media": {
-                    "audio": "partial_stack",
+                    "audio": {
+                      "device_registry": {},
+                    },
                 },
             },
         });
@@ -572,7 +576,12 @@ mod tests {
 
         assert_eq!(
             config.platform.media,
-            PlatformMediaConfig { audio: Some(AudioConfig::PartialStack), ..Default::default() },
+            PlatformMediaConfig {
+                audio: Some(AudioConfig::DeviceRegistry(AudioDeviceRegistryConfig {
+                    eager_start: false
+                })),
+                ..Default::default()
+            },
         );
     }
 

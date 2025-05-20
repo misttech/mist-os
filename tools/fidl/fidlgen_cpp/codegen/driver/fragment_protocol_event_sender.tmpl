@@ -6,7 +6,6 @@
 
 {{- define "Protocol:EventSender:driver/WireMessagingHeader" }}
 {{- EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 
 template<>
 class {{ .WireWeakBufferEventSender }} : public ::fdf::internal::WeakBufferEventSenderBase {
@@ -37,12 +36,10 @@ class {{ .WireBufferEventSender }}
   {{- end }}
 };
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 {{- define "Protocol:EventSender:driver/WireMessagingSource" }}
 {{ EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
   {{- range .Events }}
 
     {{- /* Weak, caller-allocated */}}
@@ -84,5 +81,4 @@ fidl::OneWayStatus {{ $.WireBufferEventSender.NoLeading }}::{{ .Name }}(
 {{ "" }}
 
   {{- end }}
-{{- EndifFuchsia -}}
 {{- end }}

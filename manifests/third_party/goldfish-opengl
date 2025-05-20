@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <projects>
+    <project name="third_party/android/device/generic/goldfish-opengl"
+             path="third_party/android/device/generic/goldfish-opengl"
+             remote="https://fuchsia.googlesource.com/third_party/android/device/generic/goldfish-opengl"
+             revision="f69ae2d5d0e7eac3ca9f27fb252440d0cec28984"/>
+  </projects>
+</manifest>

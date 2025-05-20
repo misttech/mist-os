@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(fuchsia_api_level_less_than = "NEXT")]
+#[cfg(fuchsia_api_level_less_than = "27")]
 use fidl_fuchsia_diagnostics::Severity;
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "27")]
 use fidl_fuchsia_diagnostics_types::Severity;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
@@ -163,7 +163,7 @@ impl quote::ToTokens for Interest {
                     Severity::Warn => quote!(::fuchsia::Severity::Warn),
                     Severity::Error => quote!(::fuchsia::Severity::Error),
                     Severity::Fatal => quote!(::fuchsia::Severity::Fatal),
-                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    #[cfg(fuchsia_api_level_at_least = "27")]
                     Severity::__SourceBreaking { unknown_ordinal: o } => {
                         panic!("unknown severity type with ordinal: {o:?}")
                     }

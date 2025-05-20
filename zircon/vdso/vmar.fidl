@@ -793,7 +793,7 @@ closed protocol Vmar {
         region_index uint32;
         region_offset uint64;
         region_length usize64;
-    }) -> (resource struct {
+    }) -> (struct {
         mapped_addr Vaddr;
     }) error Status;
 
@@ -894,14 +894,14 @@ closed protocol Vmar {
     /// [`ZX_INFO_CLOCK_MAPPED_SIZE`]: object_get_info.md#zx_info_clock_mapped_size
     /// [`ZX_INFO_VMAR_MAPS`]: object_get_info.md#zx_info_vmar_maps
     /// [`ZX_INFO_PROCESS_MAPS`]: object_get_info.md#zx_info_process_maps
-    // @available(added=NEXT)
+    // @available(added=27)
     strict MapClock(resource struct {
         handle Handle:VMAR;
         options VmOption;
         vmar_offset usize64;
         clock Handle:VMO;
         len usize64;
-    }) -> (resource struct {
+    }) -> (struct {
         mapped_addr Vaddr;
     }) error Status;
 };

@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Typed wrappers for the basic protocol types.
+//! Typed wrappers for FIDL bindings.
+//!
+//! This crate wraps a number of "untyped" items to add more type safety, and provides some basic
+//! [utility methods for use on Fuchsia](fuchsia).
 
 #![deny(
     future_incompatible,
@@ -21,18 +24,20 @@
 )]
 #![forbid(unsafe_op_in_unsafe_fn)]
 
-mod buffer;
 mod client;
+mod decoded;
 mod endpoint;
-#[cfg(target_os = "fuchsia")]
+mod error;
+#[cfg(feature = "fuchsia")]
 pub mod fuchsia;
 mod protocol;
 mod server;
 mod service;
 
-pub use self::buffer::*;
 pub use self::client::*;
+pub use self::decoded::*;
 pub use self::endpoint::*;
+pub use self::error::*;
 pub use self::protocol::*;
 pub use self::server::*;
 pub use self::service::*;

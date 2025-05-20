@@ -22,7 +22,7 @@ ffx_plugin("ffx_debug_fidlcat") {
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   args_sources = [ "src/args.rs" ]

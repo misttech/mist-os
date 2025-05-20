@@ -6,15 +6,18 @@
 
 #include "lib/power-management/energy-model.h"
 
-#include <lib/stdcompat/utility.h>
 #include <zircon/errors.h>
+// TODO(https://fxbug.dev/415033686): Stop using `syscalls-next.h` on host.
+#define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/syscalls-next.h>
+#undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/types.h>
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
@@ -37,8 +40,8 @@ static constexpr bool HasOverlappingCpu(const uint64_t (&a)[N], const uint64_t (
 }  // namespace
 
 zx::result<EnergyModel> EnergyModel::Create(
-    cpp20::span<const zx_processor_power_level_t> levels,
-    cpp20::span<const zx_processor_power_level_transition_t> transitions) {
+    std::span<const zx_processor_power_level_t> levels,
+    std::span<const zx_processor_power_level_transition_t> transitions) {
   // Allocations below would be UB.
   if (levels.size() < 1) {
     return zx::error(ZX_ERR_INVALID_ARGS);

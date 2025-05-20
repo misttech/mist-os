@@ -9,8 +9,6 @@
 #include <lib/fit/function.h>
 #include <lib/fit/nullable.h>
 #include <lib/fit/traits.h>
-#include <lib/stdcompat/optional.h>
-#include <lib/stdcompat/type_traits.h>
 
 #include <tuple>
 #include <type_traits>
@@ -47,11 +45,10 @@ struct continuation_traits {
   using type = Continuation;
   using result_type = decltype(std::declval<Continuation&>()(std::declval<::fpromise::context&>()));
 };
-template <typename Continuation, typename = cpp17::void_t<>>
+template <typename Continuation, typename = std::void_t<>>
 struct is_continuation : std::false_type {};
 template <typename Continuation>
-struct is_continuation<Continuation,
-                       cpp17::void_t<typename continuation_traits<Continuation>::type>>
+struct is_continuation<Continuation, std::void_t<typename continuation_traits<Continuation>::type>>
     : std::true_type {};
 
 // Interposer type that provides uniform move construction/assignment for
@@ -129,7 +126,7 @@ class movable_handler {
   constexpr void reset() { handler_.reset(); }
 
  private:
-  cpp17::optional<Handler> handler_;
+  std::optional<Handler> handler_;
 };
 
 // Wraps a handler function and adapts its return type to a fpromise::result

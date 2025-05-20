@@ -12,7 +12,7 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <phys/handoff.h>
 #include <platform/pc/smbios.h>
 #include <vm/physmap.h>

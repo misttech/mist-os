@@ -53,16 +53,8 @@ void TestBase::SetUp() {
                                 fuchsia::hardware::audio::CodecConnectorPtr>(device_entry()));
       break;
     case DriverType::Composite:
-      // Use DFv1-specific trampoline Connector API for the virtual composite driver (DFv1),
-      // for all other non-virtual composite drivers (DFv2) do not use the trampoline.
-      // TODO(b/301003578): When virtual audio is DFv2, remove DFv1-specific trampoline support.
-      if (entry.device_type == DeviceType::Virtual) {
-        CreateCompositeFromChannel(
-            ConnectWithTrampoline<fuchsia::hardware::audio::Composite,
-                                  fuchsia::hardware::audio::CompositeConnectorPtr>(device_entry()));
-      } else {
-        CreateCompositeFromChannel(Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
-      }
+      // For the driver type `Composite`, we need not connect via intermediate "trampoline".
+      CreateCompositeFromChannel(Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
       break;
     case DriverType::Dai:
       CreateDaiFromChannel(
@@ -79,6 +71,17 @@ void TestBase::SetUp() {
 
       break;
   }
+}
+
+// Audio drivers can have multiple StreamConfig channels open, but only one can be 'privileged':
+// the one that can in turn create a RingBuffer channel. Each test case starts from scratch,
+// opening and closing channels. If we create a StreamConfig channel before the previous one is
+// cleared, a new StreamConfig channel will not be privileged, and Admin tests will fail.
+//
+// When disconnecting a StreamConfig, there's no signal to wait on before proceeding (potentially
+// immediately executing other tests); insert a 10-ms wait (needing >3.5ms was never observed).
+void TestBase::CooldownAfterDriverDisconnect() {
+  zx::nanosleep(zx::deadline_after(kDriverDisconnectCooldownDuration));
 }
 
 void TestBase::TearDown() {
@@ -101,14 +104,7 @@ void TestBase::TearDown() {
     RunLoopUntil([&complete]() { return complete; });
   }
 
-  // Audio drivers can have multiple StreamConfig channels open, but only one can be 'privileged':
-  // the one that can in turn create a RingBuffer channel. Each test case starts from scratch,
-  // opening and closing channels. If we create a StreamConfig channel before the previous one is
-  // cleared, a new StreamConfig channel will not be privileged and Admin tests will fail.
-  //
-  // When disconnecting a StreamConfig, there's no signal to wait on before proceeding (potentially
-  // immediately executing other tests); insert a 10-ms wait (needing >3.5ms was never observed).
-  zx::nanosleep(zx::deadline_after(zx::msec(10)));
+  CooldownAfterDriverDisconnect();
 
   TestFixture::TearDown();
 }
@@ -441,63 +437,7 @@ void TestBase::DisplayBaseProperties() {
                                                       : "NONE");
 }
 
-bool TestBase::ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id) {
-  return std::ranges::any_of(
-      elements_.begin(), elements_.end(),
-      [element_id](const fuchsia::hardware::audio::signalprocessing::Element& element) {
-        return element.has_id() && element.id() == element_id && element.has_type() &&
-               element.type() ==
-                   fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER;
-      });
-}
-
-bool TestBase::RingBufferElementIsIncoming(fuchsia::hardware::audio::ElementId element_id) {
-  if (!topology_id_.has_value()) {
-    ADD_FAILURE() << "topology_id_ has no value";
-    return true;
-  }
-
-  std::vector<fuchsia::hardware::audio::signalprocessing::EdgePair> edge_pairs;
-  for (const auto& t : topologies_) {
-    if (t.has_id() && t.id() == *topology_id_) {
-      edge_pairs = t.processing_elements_edge_pairs();
-      break;
-    }
-  }
-  if (edge_pairs.empty()) {
-    ADD_FAILURE() << "could not find edge_pairs for topology_id " << *topology_id_;
-    return true;
-  }
-  bool has_outgoing = std::ranges::any_of(
-      edge_pairs.begin(), edge_pairs.end(),
-      [element_id](const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
-        return (edge_pair.processing_element_id_from == element_id);
-      });
-  bool has_incoming = std::ranges::any_of(
-      edge_pairs.begin(), edge_pairs.end(),
-      [element_id](const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
-        return (edge_pair.processing_element_id_to == element_id);
-      });
-  if (has_outgoing && !has_incoming) {
-    return false;
-  }
-  if (!has_outgoing && has_incoming) {
-    return true;
-  }
-  if (has_outgoing && has_incoming) {
-    ADD_FAILURE() << "RingBuffer element " << element_id << " has both outgoing and incoming edges";
-  }
-  return true;
-}
-
-std::optional<bool> TestBase::IsIncoming(
-    std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id) {
-  if (device_entry().isDai()) {
-    if (properties_.has_value()) {
-      return properties_->is_input;
-    }
-    ADD_FAILURE() << "Null properties_";
-  }
+std::optional<bool> TestBase::IsIncoming() {
   if (device_entry().isStreamConfigInput()) {
     return true;
   }
@@ -505,12 +445,13 @@ std::optional<bool> TestBase::IsIncoming(
     return false;
   }
   if (device_entry().isComposite()) {
-    if (ring_buffer_element_id.has_value()) {
-      if (ElementIsRingBuffer(*ring_buffer_element_id)) {
-        return RingBufferElementIsIncoming(*ring_buffer_element_id);
-      }
-      ADD_FAILURE() << "element_id " << *ring_buffer_element_id << " is not a RingBuffer element";
+    ADD_FAILURE() << "Composite devices should not get to this code path";
+  }
+  if (device_entry().isDai()) {
+    if (properties_.has_value()) {
+      return properties_->is_input;
     }
+    ADD_FAILURE() << "Null properties_";
   }
 
   ADD_FAILURE() << "Unhandled IsIncoming case";
@@ -519,6 +460,8 @@ std::optional<bool> TestBase::IsIncoming(
 
 // Request that the driver return the format ranges that it supports.
 void TestBase::RetrieveDaiFormats() {
+  ASSERT_FALSE(device_entry().isComposite());
+
   if (device_entry().isCodec()) {
     codec()->GetDaiFormats(AddCallback(
         "Codec::GetDaiFormats",
@@ -532,29 +475,6 @@ void TestBase::RetrieveDaiFormats() {
             dai_formats_.push_back(std::move(supported_dai_formats[i]));
           }
         }));
-  } else if (device_entry().isComposite()) {
-    RequestTopologies();
-
-    // If there is a dai id, request the DAI formats for this interconnect.
-    if (dai_id_.has_value()) {
-      composite()->GetDaiFormats(
-          *dai_id_,
-          AddCallback("Composite::GetDaiFormats",
-                      [this](fuchsia::hardware::audio::Composite_GetDaiFormats_Result result) {
-                        ASSERT_FALSE(result.is_err());
-                        auto& supported_formats = result.response().dai_formats;
-                        EXPECT_FALSE(supported_formats.empty());
-
-                        for (size_t i = 0; i < supported_formats.size(); ++i) {
-                          SCOPED_TRACE(testing::Message()
-                                       << "Composite supported_formats[" << i << "]");
-                          dai_formats_.push_back(std::move(supported_formats[i]));
-                        }
-                      }));
-    } else {
-      // "No DAI" is also valid (Composite can replace StreamConfig); do nothing in that case.
-      return;
-    }
   } else if (device_entry().isDai()) {
     dai()->GetDaiFormats(AddCallback(
         "Dai::GetDaiFormats", [this](fuchsia::hardware::audio::Dai_GetDaiFormats_Result result) {
@@ -756,8 +676,9 @@ void TestBase::SetMinMaxDaiFormats() {
 
     // Save, if less than min.
     auto bit_rate = min_number_of_channels * min_bits_per_sample * min_frame_rate;
-    if (i == 0 || bit_rate < min_dai_format_->number_of_channels *
-                                 min_dai_format_->bits_per_sample * min_dai_format_->frame_rate) {
+    if (i == 0 || !min_dai_format_.has_value() ||
+        (bit_rate < min_dai_format_->number_of_channels * min_dai_format_->bits_per_sample *
+                        min_dai_format_->frame_rate)) {
       min_dai_format_ = fuchsia::hardware::audio::DaiFormat{
           .number_of_channels = min_number_of_channels,
           .channels_to_use_bitmask = (1u << min_number_of_channels) - 1u,
@@ -770,8 +691,9 @@ void TestBase::SetMinMaxDaiFormats() {
     }
     // Save, if more than max.
     bit_rate = max_number_of_channels * max_bits_per_sample * max_frame_rate;
-    if (i == 0 || bit_rate > max_dai_format_->number_of_channels *
-                                 max_dai_format_->bits_per_sample * max_dai_format_->frame_rate) {
+    if (i == 0 || !max_dai_format_.has_value() ||
+        (bit_rate > max_dai_format_->number_of_channels * max_dai_format_->bits_per_sample *
+                        max_dai_format_->frame_rate)) {
       max_dai_format_ = fuchsia::hardware::audio::DaiFormat{
           .number_of_channels = max_number_of_channels,
           .channels_to_use_bitmask = (1u << max_number_of_channels) - 1u,
@@ -843,35 +765,11 @@ const std::vector<fuchsia::hardware::audio::DaiSupportedFormats>& TestBase::dai_
 
 // Request that the driver return the format ranges that it supports.
 void TestBase::RetrieveRingBufferFormats() {
+  ASSERT_FALSE(device_entry().isComposite());
   if (device_entry().isCodec()) {
     return;  // Codec, nothing to do
   }
-  if (device_entry().isComposite()) {
-    RequestTopologies();
-
-    // If ring_buffer_id_ is set, then a ring-buffer element exists for this composite device.
-    // Retrieve the supported ring buffer formats for that node.
-    if (!ring_buffer_id_.has_value()) {
-      // "No ring buffer" is valid (Composite can replace Codec); do nothing in that case.
-      return;
-    }
-    composite()->GetRingBufferFormats(
-        *ring_buffer_id_,
-        AddCallback("GetRingBufferFormats",
-                    [this](fuchsia::hardware::audio::Composite_GetRingBufferFormats_Result result) {
-                      ASSERT_FALSE(result.is_err()) << static_cast<int32_t>(result.err());
-                      auto& supported_formats = result.response().ring_buffer_formats;
-                      EXPECT_FALSE(supported_formats.empty());
-
-                      for (size_t i = 0; i < supported_formats.size(); ++i) {
-                        SCOPED_TRACE(testing::Message()
-                                     << "Composite supported_formats[" << i << "]");
-                        ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
-                        auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
-                        ring_buffer_pcm_formats_.push_back(std::move(format_set));
-                      }
-                    }));
-  } else if (device_entry().isDai()) {
+  if (device_entry().isDai()) {
     dai()->GetRingBufferFormats(
         AddCallback("GetRingBufferFormats",
                     [this](fuchsia::hardware::audio::Dai_GetRingBufferFormats_Result result) {
@@ -1130,165 +1028,6 @@ const fuchsia::hardware::audio::PcmFormat& TestBase::min_ring_buffer_format() co
 
 const fuchsia::hardware::audio::PcmFormat& TestBase::max_ring_buffer_format() const {
   return max_ring_buffer_format_;
-}
-
-const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>&
-TestBase::ring_buffer_pcm_formats() const {
-  return ring_buffer_pcm_formats_;
-}
-
-void TestBase::SignalProcessingConnect() {
-  if (sp_.is_bound()) {
-    return;  // Already connected.
-  }
-  fidl::InterfaceHandle<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_client;
-  fidl::InterfaceRequest<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_server =
-      sp_client.NewRequest();
-  composite()->SignalProcessingConnect(std::move(sp_server));
-  sp_ = sp_client.Bind();
-}
-
-// Retrieve the element list. If signalprocessing is not supported, exit early;
-// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
-// We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
-void TestBase::RequestElements() {
-  SignalProcessingConnect();
-
-  // If we've already checked for signalprocessing support, then no need to do it again.
-  if (signalprocessing_is_supported_.has_value()) {
-    return;
-  }
-  if (!elements_.empty()) {
-    return;
-  }
-
-  zx_status_t status = ZX_OK;
-  ring_buffer_id_.reset();
-  dai_id_.reset();
-  sp_->GetElements(AddCallback(
-      "signalprocessing::Reader::GetElements",
-      [this,
-       &status](fuchsia::hardware::audio::signalprocessing::Reader_GetElements_Result result) {
-        status = result.is_err() ? result.err() : ZX_OK;
-        if (status == ZX_OK) {
-          elements_ = std::move(result.response().processing_elements);
-        } else {
-          signalprocessing_is_supported_ = false;
-        }
-      }));
-  ExpectCallbacks();
-
-  // Either we get elements or the API method is not supported.
-  ASSERT_TRUE(status == ZX_OK || status == ZX_ERR_NOT_SUPPORTED);
-  // We don't check for topologies if GetElements is not supported.
-  if (status == ZX_ERR_NOT_SUPPORTED) {
-    signalprocessing_is_supported_ = false;
-    return;
-  }
-
-  // If supported, GetElements must return at least one element.
-  if (elements_.empty()) {
-    signalprocessing_is_supported_ = false;
-    FAIL() << "elements list is empty";
-  }
-
-  signalprocessing_is_supported_ = true;
-
-  std::unordered_set<fuchsia::hardware::audio::signalprocessing::ElementId> element_ids;
-  for (auto& element : elements_) {
-    // All elements must have an id and type
-    ASSERT_TRUE(element.has_id());
-    ASSERT_TRUE(element.has_type());
-    if (element.type() == fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER) {
-      ring_buffer_id_.emplace(element.id());  // Override any previous.
-    } else if (element.type() ==
-               fuchsia::hardware::audio::signalprocessing::ElementType::DAI_INTERCONNECT) {
-      dai_id_.emplace(element.id());  // Override any previous.
-    }
-
-    // No element id may be a duplicate.
-    ASSERT_FALSE(element_ids.contains(element.id())) << "Duplicate element id " << element.id();
-    element_ids.insert(element.id());
-  }
-}
-
-// First retrieve the element list. If signalprocessing is not supported, exit early;
-// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
-// We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
-void TestBase::RequestTopologies() {
-  SignalProcessingConnect();
-  RequestElements();
-
-  if (!signalprocessing_is_supported_.value_or(false)) {
-    return;
-  }
-  if (!topologies_.empty()) {
-    return;
-  }
-
-  sp_->GetTopologies(AddCallback(
-      "signalprocessing::Reader::GetTopologies",
-      [this](fuchsia::hardware::audio::signalprocessing::Reader_GetTopologies_Result result) {
-        if (result.is_err()) {
-          signalprocessing_is_supported_ = false;
-          FAIL() << "GetTopologies returned err " << result.err();
-        }
-
-        topologies_ = std::move(result.response().topologies);
-      }));
-  ExpectCallbacks();
-
-  // We only call GetTopologies if we have elements, so we must have at least one topology.
-  if (topologies_.empty()) {
-    signalprocessing_is_supported_ = false;
-    FAIL() << "topologies list is empty";
-  }
-
-  std::unordered_set<fuchsia::hardware::audio::signalprocessing::TopologyId> topology_ids;
-  for (const auto& topology : topologies_) {
-    // All topologies must have an id and a non-empty list of edges.
-    ASSERT_TRUE(topology.has_id());
-    ASSERT_TRUE(topology.has_processing_elements_edge_pairs())
-        << "Topology " << topology.id() << " processing_elements_edge_pairs is null";
-    ASSERT_FALSE(topology.processing_elements_edge_pairs().empty())
-        << "Topology " << topology.id() << " processing_elements_edge_pairs is empty";
-
-    // No topology id may be a duplicate.
-    ASSERT_FALSE(topology_ids.contains(topology.id())) << "Duplicate topology id " << topology.id();
-    topology_ids.insert(topology.id());
-  }
-}
-
-void TestBase::RequestTopology() {
-  SignalProcessingConnect();
-  RequestElements();
-  RequestTopologies();
-
-  if (!signalprocessing_is_supported_.value_or(false)) {
-    return;
-  }
-
-  if (!topology_id_.has_value()) {
-    sp_->WatchTopology(AddCallback(
-        "signalprocessing::Reader::WatchTopology",
-        [this](fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Result result) {
-          ASSERT_TRUE(result.is_response());
-          topology_id_ = result.response().topology_id;
-        }));
-    ExpectCallbacks();
-  }
-
-  // We only call WatchTopology if we support signalprocessing, so a topology should be set.
-  ASSERT_TRUE(topology_id_.has_value());
-
-  for (const auto& t : topologies_) {
-    if (t.has_id() && t.id() == *topology_id_) {
-      return;
-    }
-  }
-  // This topology_id is not in the list returned earlier.
-  signalprocessing_is_supported_ = false;
-  FAIL() << "WatchTopology returned " << *topology_id_ << " which is not in our topology list";
 }
 
 }  // namespace media::audio::drivers::test

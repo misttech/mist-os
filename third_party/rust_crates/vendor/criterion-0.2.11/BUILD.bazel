@@ -83,7 +83,7 @@ rust_library(
         "//third_party/rust_crates/vendor/itertools-0.8.0:itertools",
         "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
         "//third_party/rust_crates/vendor/libc-0.2.171:libc",
-        "//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits",
+        "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",
         "//third_party/rust_crates/vendor/rand_core-0.3.1:rand_core",
         "//third_party/rust_crates/vendor/rand_os-0.1.3:rand_os",
         "//third_party/rust_crates/vendor/rand_xoshiro-0.1.0:rand_xoshiro",

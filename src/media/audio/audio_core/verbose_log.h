@@ -8,6 +8,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/compiler.h>
 
+#include <vector>
+
 namespace media::audio {
 
 namespace internal {

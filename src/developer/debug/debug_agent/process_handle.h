@@ -125,6 +125,20 @@ class ProcessHandle {
   // that address will be returned. Otherwise all regions will be returned.
   virtual std::vector<debug_ipc::AddressRegion> GetAddressSpace(uint64_t address) const = 0;
 
+  // Returns the address region corresponding to the shared address space if this process has
+  // multiple instances of ZX_INFO_MAPS_TYPE_ASPACE map types. This is only possible today via
+  // processes created with the zx_process_create_shared syscall in conjunction with the
+  // ZX_PROCESS_SHARED option to zx_process_create, which can be controlled by options to the ELF
+  // runner in a component's CML file or via calling the syscall directly. The process created via
+  // zx_process_create with ZX_PROCESS_SHARED is considered the "prototype" process, from which
+  // other shared processes are created.
+  //
+  // This prototype process contains exactly one address space, which is then shared with other
+  // processes created via zx_process_create_shared. The shared process, which contains both a
+  // private address space and the shared one from the prototype. In either case, this function
+  // returns the shared address space from the process, if present.
+  virtual std::optional<debug_ipc::AddressRegion> GetSharedAddressSpace() const = 0;
+
   // Returns the modules (shared libraries and the main binary) for the process. Will be empty on
   // failure.
   //

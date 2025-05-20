@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/developer_overrides.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/kernel_aib.gni")
@@ -80,6 +81,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [string] The image name of the 'kernel_zbi' as seen in images.json. This is used
 #     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
 #     image as the kernel zbi.
+#
+#   qemu_kernel (optional; default: null)
+#     [label] Label of a custom boot shim for kernel tests
 #
 # Image Assembly parameters:
 #
@@ -305,12 +309,17 @@ template("assembled_system") {
     if (defined(invoker.kernel_zbi)) {
       custom_kernel_aib = "${_namespace}.custom_kernel_aib"
     }
+
+    if (defined(invoker.qemu_kernel)) {
+      custom_boot_shim_aib = "${_namespace}.custom_boot_shim_aib"
+    }
   }
 
   # Intermediate files produced for Image Assembly.
 
   files = {
-    outdir = "$target_out_dir/$_namespace"
+    outdir = "${target_out_dir}/${_namespace}"
+    gendir = "${outdir}_gen"
 
     product_assembly_config_dir =
         get_label_info(invoker.product_assembly_config_label,
@@ -334,45 +343,43 @@ template("assembled_system") {
       board_config = "${board_config_dir}/board_configuration.json"
     }
 
-    gendir = "$outdir/gen"
-
     # This file is created implicitly by ffx assembly product, so this is the
     # path that it's expected to be found at, not the path that it's to be
     # written to.
-    regenerated_image_assembly_config = "${outdir}/image_assembly.json"
+    regenerated_image_assembly_config = "${gendir}/image_assembly.json"
 
     bootfs_files = "${gendir}/bootfs_files.list"
     additional_boot_args = "${gendir}/additional_boot_args.txt"
-    zbi = "${outdir}/${_image_name}.zbi"
+    zbi = "${gendir}/${_image_name}.zbi"
     zbi_signed = "${zbi}.signed"
     zbi_unsigned = "${zbi}.unsigned"
-    vbmeta = "${outdir}/${_image_name}.vbmeta"
+    vbmeta = "${gendir}/${_image_name}.vbmeta"
 
     if (_generate_fvm || _generate_fvm_fastboot || _generate_fvm_nand) {
-      blobfs = "${outdir}/blob.blk"
+      blobfs = "${gendir}/blob.blk"
     }
     if (_generate_fvm) {
-      fvm = "${outdir}/fvm.blk"
+      fvm = "${gendir}/fvm.blk"
     }
     if (_generate_fvm_sparse) {
-      fvm_sparse = "${outdir}/fvm.sparse.blk"
+      fvm_sparse = "${gendir}/fvm.sparse.blk"
     }
     if (_generate_fvm_fastboot || _generate_fvm_nand) {
-      fvm_fastboot = "${outdir}/fvm.fastboot.blk"
+      fvm_fastboot = "${gendir}/fvm.fastboot.blk"
     }
     if (_generate_fvm_nand) {
-      fvm_fastboot_tmp = "${outdir}/fvm.fastboot.tmp.blk"
+      fvm_fastboot_tmp = "${gendir}/fvm.fastboot.tmp.blk"
     }
     if (_generate_fxfs) {
-      fxfs = "${outdir}/fxfs.blk"
-      fxfs_sparse = "${outdir}/fxfs.sparse.blk"
+      fxfs = "${gendir}/fxfs.blk"
+      fxfs_sparse = "${gendir}/fxfs.sparse.blk"
     }
 
-    base_package = "${outdir}/base/meta.far"
-    base_package_manifest = "${outdir}/base/package_manifest.json"
-    base_package_merkle = "${outdir}/base/base.merkle"
+    base_package = "${gendir}/meta.far"
+    base_package_manifest = "${gendir}/system_image/package_manifest.json"
+    base_package_merkle = "${gendir}/base.merkle"
 
-    packages = "${outdir}/packages.json"
+    packages = "${gendir}/packages.json"
     zbi_manifest = "${gendir}/zbi.json"
     blobfs_manifest = "${gendir}/blob.manifest"
     blobs_json = "${gendir}/blobs.json"
@@ -383,7 +390,7 @@ template("assembled_system") {
     base_pkg_abi_revision =
         "${gendir}/system_image/meta/fuchsia.abi/abi-revision"
     assembly_manifest = "${outdir}/images.json"
-    config_data_manifest = "${outdir}/config_data/package_manifest.json"
+    config_data_manifest = "${gendir}/config_data/package_manifest.json"
     image_command_log = "${gendir}/command_log.json"
 
     # The directory in which all the platform AIBs can be found
@@ -403,8 +410,14 @@ template("assembled_system") {
     }
 
     if (defined(labels.custom_kernel_aib)) {
-      custom_kernel_aib = "${outdir}/custom_kernel_aib"
+      custom_kernel_aib = "${gendir}/custom_kernel_aib"
       custom_kernel_aib_manifest = "${custom_kernel_aib}/assembly_config.json"
+    }
+
+    if (defined(labels.custom_boot_shim_aib)) {
+      custom_boot_shim_aib = "${gendir}/custom_boot_shim_aib"
+      custom_boot_shim_aib_manifest =
+          "${custom_boot_shim_aib}/assembly_config.json"
     }
   }
 
@@ -421,8 +434,21 @@ template("assembled_system") {
                                "kernel_image_name",
                                "testonly",
                              ])
-      bundles_dir = files.outdir
+      bundles_dir = files.gendir
       bundle_name = "custom_kernel_aib"
+    }
+  }
+
+  # Create the AIB for a custom boot shim, if one was provided.
+  if (defined(labels.custom_boot_shim_aib)) {
+    assembly_input_bundle(labels.custom_boot_shim_aib) {
+      forward_variables_from(invoker, [ "testonly" ])
+      deps = [ invoker.qemu_kernel ]
+      qemu_kernel = get_label_info("${deps[0]}", "root_out_dir") + "/" +
+                    get_label_info(deps[0], "name") + ".bin"
+
+      bundles_dir = files.gendir
+      bundle_name = "custom_boot_shim_aib"
     }
   }
 
@@ -464,7 +490,7 @@ template("assembled_system") {
       "--input-bundles-dir",
       rebase_path(files.platform_common_aibs_dir, root_build_dir),
       "--outdir",
-      rebase_path(files.outdir, root_build_dir),
+      rebase_path(files.gendir, root_build_dir),
     ]
 
     deps +=
@@ -490,6 +516,15 @@ template("assembled_system") {
       ]
       deps += [ ":${labels.custom_kernel_aib}" ]
       inputs += [ files.custom_kernel_aib_manifest ]
+    }
+
+    if (defined(labels.custom_boot_shim_aib)) {
+      args += [
+        "--custom-boot-shim-aib",
+        rebase_path(files.custom_boot_shim_aib_manifest, root_build_dir),
+      ]
+      deps += [ ":${labels.custom_boot_shim_aib}" ]
+      inputs += [ files.custom_boot_shim_aib_manifest ]
     }
 
     outputs = [ files.regenerated_image_assembly_config ]
@@ -629,12 +664,10 @@ template("assembled_system") {
       ]
 
       outputs += [
-        # In the outdir.
+        # In the gendir.
         files.base_package,
         files.base_package_manifest,
         files.base_package_merkle,
-
-        # In the gendir.
         files.blobfs_manifest,
         files.blobs_json,
         files.static_packages,

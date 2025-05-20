@@ -11,6 +11,7 @@
 #include <utility>
 
 #include <gtest/gtest.h>
+
 #ifdef __Fuchsia__
 #include <lib/magma/platform/zircon/zircon_platform_buffer.h>
 #endif
@@ -38,6 +39,34 @@ class MsdMockConnection_ContextManagement : public MsdMockConnection {
 
  private:
   uint32_t active_context_count_ = 0;
+};
+
+class MsdMockConnection_BufferManagement : public MsdMockConnection {
+ public:
+  explicit MsdMockConnection_BufferManagement(
+      std::shared_ptr<int> active_context_count,
+      std::shared_ptr<std::vector<bool>> buffer_release_tracker)
+      : active_context_count_(std::move(active_context_count)),
+        buffer_release_tracker_(std::move(buffer_release_tracker)) {}
+
+  std::unique_ptr<msd::Context> CreateContext() override {
+    (*active_context_count_)++;
+    return MsdMockConnection::CreateContext();
+  }
+
+  void DestroyContext(MsdMockContext* ctx) override {
+    (*active_context_count_)--;
+    MsdMockConnection::DestroyContext(ctx);
+  }
+
+  void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override {
+    buffer_release_tracker_->push_back(shutting_down);
+    MsdMockConnection::ReleaseBuffer(buffer, shutting_down);
+  }
+
+ private:
+  std::shared_ptr<int> active_context_count_;
+  std::shared_ptr<std::vector<bool>> buffer_release_tracker_;
 };
 
 class MockPerfCountPool : public msd::PerfCountPoolServer {
@@ -126,6 +155,45 @@ TEST(MagmaSystemConnection, BufferManagement) {
 
   // should not be able to double free it
   EXPECT_FALSE(connection.ReleaseBuffer(id));
+}
+
+TEST(MagmaSystemConnection, Shutdown) {
+  auto buffer_release_tracker = std::make_shared<std::vector<bool>>();
+  auto active_context_count = std::make_shared<int>();
+  auto msd_connection = std::make_unique<MsdMockConnection_BufferManagement>(
+      active_context_count, buffer_release_tracker);
+
+  auto msd_drv = std::make_unique<MsdMockDriver>();
+  auto msd_dev = std::make_unique<MsdMockDevice>();
+  ASSERT_TRUE(msd_connection);
+
+  auto device = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
+  ASSERT_TRUE(device);
+
+  auto connection =
+      std::make_unique<MagmaSystemConnection>(device.get(), std::move(msd_connection));
+
+  constexpr uint64_t kBufferSize = 4096;
+  auto buffer = magma::PlatformBuffer::Create(kBufferSize, "test");
+  ASSERT_TRUE(buffer);
+
+  zx::vmo child_vmo;
+  ASSERT_TRUE(buffer->CreateChild(child_vmo.reset_and_get_address()));
+
+  EXPECT_TRUE(connection->ImportBuffer(std::move(child_vmo), buffer->id()));
+
+  EXPECT_EQ(*active_context_count, 0);
+  uint32_t context_id = 0;
+  ASSERT_TRUE(connection->CreateContext(context_id));
+  EXPECT_EQ(*active_context_count, 1);
+
+  // Connection destructor will release the context and buffer
+  EXPECT_EQ(buffer_release_tracker->size(), 0u);
+  connection.reset();
+
+  EXPECT_EQ(buffer_release_tracker->size(), 1u);
+  EXPECT_EQ((*buffer_release_tracker)[0], true);
+  EXPECT_EQ(*active_context_count, 0);
 }
 
 TEST(MagmaSystemConnection, Semaphores) {

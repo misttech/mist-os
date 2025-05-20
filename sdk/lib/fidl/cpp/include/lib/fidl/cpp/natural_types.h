@@ -135,7 +135,7 @@ template <typename Transport, typename FidlType>
 OwnedEncodeResult EncodeWithTransport(FidlType&& value) {
   static_assert(::fidl::IsFidlType<FidlType>::value, "Only FIDL types are supported");
   return OwnedEncodeResult(
-      cpp17::in_place_type_t<NaturalEncodeResult>{}, &Transport::VTable,
+      std::in_place_type_t<NaturalEncodeResult>{}, &Transport::VTable,
       fidl::internal::WireFormatVersion::kV2,
       [value_ptr = &value](::fidl::internal::NaturalBodyEncoder& encoder) mutable {
         encoder.Alloc(

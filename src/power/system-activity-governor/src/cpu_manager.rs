@@ -15,7 +15,7 @@ use power_broker_client::{run_power_element, PowerElementContext};
 use std::cell::OnceCell;
 use std::rc::Rc;
 use {
-    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
+    fidl_fuchsia_hardware_power_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
     fuchsia_async as fasync,
 };

@@ -31,6 +31,9 @@ fuchsia_test_component("elf_test_runner_integration_test") {
 fuchsia_test_package("elf-test-runner-integration-test") {
   test_components = [ ":elf_test_runner_integration_test" ]
   subpackages = [ "//src/sys/test_manager:pkg" ]
+
+  # TODO(https://fxbug.dev/412436921): Use subpackages instead of package_deps.
+  package_deps = [ "../test_data:elf-test-runner-example-tests" ]
 }
 
 group("tests") {

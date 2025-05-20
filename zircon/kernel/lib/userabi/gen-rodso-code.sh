@@ -196,14 +196,8 @@ find_segments() {
 
 trap 'rm -f "$OUTFILE" ${DEPFILE:+"$DEPFILE"}' ERR HUP INT TERM
 
+> "$OUTFILE"
 while [ $# -gt 0 ]; do
-  if [ "$1" = --writable ]; then
-    WRITABLE=true
-    shift
-  else
-    WRITABLE=false
-  fi
-
   if [ $# -lt 2 ]; then
     usage
   fi
@@ -220,7 +214,6 @@ while [ $# -gt 0 ]; do
     USED_FILES+=("$dso")
   fi
 
-  echo "#define ${name}_FILENAME \"${dso}\"" > $OUTFILE
   find_segments "$name" "$dso"
   find_code_symbols "$name" "$dso"
   if [ $have_dynsym = yes ]; then

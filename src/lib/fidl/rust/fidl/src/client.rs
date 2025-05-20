@@ -1394,7 +1394,7 @@ mod tests {
         let sender = client
             .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
             .map_ok(|x| assert_eq!(x, SEND_DATA))
-            .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
+            .unwrap_or_else(|e| panic!("fidl error: {e:?}"));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
         let sender = sender.on_timeout(zx::MonotonicDuration::from_millis(300).after_now(), || {
@@ -1946,7 +1946,7 @@ mod tests {
         executor
             .run_singlethreaded(&mut checked_fut)
             .map(|x| assert_eq!(x, SEND_DATA))
-            .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
+            .unwrap_or_else(|e| panic!("fidl error: {e:?}"));
 
         // Close the server channel, meaning the next query will fail.
         drop(server);
@@ -2037,7 +2037,7 @@ mod tests {
         let sender = client
             .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
             .map_ok(|x| assert_eq!(x, SEND_DATA))
-            .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
+            .unwrap_or_else(|e| panic!("fidl error: {e:?}"));
 
         // add a timeout to receiver so if test is broken it doesn't take forever
         let sender = sender.on_timeout(zx::MonotonicDuration::from_millis(300).after_now(), || {
@@ -2126,7 +2126,7 @@ mod tests {
                 client
                     .send_query::<u8, u8, SEND_ORDINAL>(SEND_DATA, DynamicFlags::empty())
                     .map_ok(|x| assert_eq!(x, SEND_DATA))
-                    .unwrap_or_else(|e| panic!("fidl error: {:?}", e))
+                    .unwrap_or_else(|e| panic!("fidl error: {e:?}"))
                     .await;
 
                 assert!(client.into_channel().is_ok());

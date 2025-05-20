@@ -9,6 +9,9 @@ use io_conformance_util::flags::Rights;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
 
+const NODE_REFERENCE_FLAGS: fio::Flags =
+    fio::Flags::PROTOCOL_NODE.union(fio::Flags::PERM_GET_ATTRIBUTES);
+
 #[fuchsia::test]
 async fn deprecated_clone_file_with_same_or_fewer_rights() {
     let harness = TestHarness::new().await;
@@ -177,21 +180,19 @@ async fn clone_file() {
     let file = dir
         .open_node::<fio::FileMarker>(
             &TEST_FILE,
-            fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
+            fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
             None,
         )
         .await
         .unwrap();
+    const EXPECTED_FILE_FLAGS: fio::Flags = fio::Flags::PROTOCOL_FILE
+        .union(fio::Flags::PERM_GET_ATTRIBUTES)
+        .union(fio::Flags::PERM_READ_BYTES);
+    assert_eq!(file.get_flags().await.unwrap().unwrap(), EXPECTED_FILE_FLAGS);
 
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
     file.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
-    assert_eq!(
-        clone_proxy.get_connection_info().await.unwrap(),
-        fio::ConnectionInfo {
-            rights: Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES),
-            ..Default::default()
-        }
-    );
+    assert_eq!(clone_proxy.get_flags().await.unwrap().unwrap(), EXPECTED_FILE_FLAGS);
     // Make sure the file protocol was served by invoking some file methods.
     let _data: Vec<u8> = clone_proxy
         .read(0)
@@ -207,22 +208,14 @@ async fn clone_file_node_reference() {
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let node = dir
-        .open_node::<fio::NodeMarker>(
-            &TEST_FILE,
-            fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
-            None,
-        )
-        .await
-        .unwrap();
+    let node =
+        dir.open_node::<fio::NodeMarker>(&TEST_FILE, NODE_REFERENCE_FLAGS, None).await.unwrap();
+    assert_eq!(node.get_flags().await.unwrap().unwrap(), NODE_REFERENCE_FLAGS);
 
-    // fuchsia.unknown/Cloneable.Clone2
+    // fuchsia.unknown/Cloneable.Clone
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     node.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
-    assert_eq!(
-        clone_proxy.get_connection_info().await.unwrap(),
-        fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), ..Default::default() }
-    );
+    assert_eq!(clone_proxy.get_flags().await.unwrap().unwrap(), NODE_REFERENCE_FLAGS);
 
     // We should fail to invoke file methods since this connection doesn't serve the file protocol.
     let wrong_protocol = fio::FileProxy::from_channel(clone_proxy.into_channel().unwrap());
@@ -241,17 +234,21 @@ async fn clone_directory() {
     let dir = dir
         .open_node::<fio::DirectoryMarker>(
             "dir",
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_TRAVERSE,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE,
             None,
         )
         .await
         .unwrap();
+    assert_eq!(
+        dir.get_flags().await.unwrap().unwrap(),
+        fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE
+    );
 
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     dir.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
-        clone_proxy.get_connection_info().await.unwrap(),
-        fio::ConnectionInfo { rights: Some(fio::Rights::TRAVERSE), ..Default::default() }
+        clone_proxy.get_flags().await.unwrap().unwrap(),
+        fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE
     );
     // Make sure the directory protocol was served by invoking a directory method.
     assert_matches!(
@@ -266,22 +263,13 @@ async fn clone_directory_node_reference() {
 
     let entries = vec![directory("dir", vec![])];
     let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let node = dir
-        .open_node::<fio::NodeMarker>(
-            "dir",
-            fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
-            None,
-        )
-        .await
-        .unwrap();
+    let node = dir.open_node::<fio::NodeMarker>("dir", NODE_REFERENCE_FLAGS, None).await.unwrap();
+    assert_eq!(node.get_flags().await.unwrap().unwrap(), NODE_REFERENCE_FLAGS);
 
-    // fuchsia.unknown/Cloneable.Clone2
+    // fuchsia.unknown/Cloneable.Clone
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
     node.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
-    assert_eq!(
-        clone_proxy.get_connection_info().await.unwrap(),
-        fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), ..Default::default() }
-    );
+    assert_eq!(clone_proxy.get_flags().await.unwrap().unwrap(), NODE_REFERENCE_FLAGS);
 
     // We should fail to invoke directory methods since this isn't a directory connection.
     let wrong_protocol = fio::DirectoryProxy::from_channel(clone_proxy.into_channel().unwrap());

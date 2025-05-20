@@ -8,9 +8,9 @@ import os
 import test_data
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.fuchsia_device import fuchsia_device
+from host_driven import run_test_component
 from mobly import asserts, test_runner
 from perf_publish import publish
-from perf_test_utils import utils
 from trace_processing import trace_importing, trace_model, trace_utils
 
 TEST_URL: str = (
@@ -160,12 +160,12 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
             directory=self.test_case_path,
             trace_file="trace.fxt",
         ):
-            results_file: str = utils.single_run_test_component(
+            results_file: str = run_test_component.once(
                 self.device.ffx,
                 TEST_RUST_URL,
                 self.test_case_path,
                 test_component_args=[
-                    utils.DEFAULT_TARGET_RESULTS_PATH,
+                    run_test_component.DEFAULT_TARGET_RESULTS_PATH,
                 ],
             )
 
@@ -179,12 +179,12 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
         )
 
     def test_tracing_rust_tracing_disabled(self) -> None:
-        results_file: str = utils.single_run_test_component(
+        results_file: str = run_test_component.once(
             self.device.ffx,
             TEST_RUST_URL,
             self.test_case_path,
             test_component_args=[
-                utils.DEFAULT_TARGET_RESULTS_PATH,
+                run_test_component.DEFAULT_TARGET_RESULTS_PATH,
             ],
         )
 
@@ -205,7 +205,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
             directory=self.test_case_path,
             trace_file="trace.fxt",
         ):
-            results_file: str = utils.single_run_test_component(
+            results_file: str = run_test_component.once(
                 self.device.ffx,
                 TEST_URL,
                 self.test_case_path,
@@ -214,7 +214,7 @@ class TracingMicrobenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
                     "-p",
                     "--quiet",
                     "--out",
-                    utils.DEFAULT_TARGET_RESULTS_PATH,
+                    run_test_component.DEFAULT_TARGET_RESULTS_PATH,
                     "--runs",
                     str(ITERATIONS_PER_TEST_PER_PROCESS),
                     "--filter",

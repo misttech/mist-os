@@ -37,7 +37,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to the numbered API level currently represented by "NEXT".
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 68;
+constexpr uint32_t kCurrentProtocolVersion = 69;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -285,8 +285,17 @@ struct AttachReply {
   // the process. Order of components is not guaranteed.
   std::vector<ComponentInfo> components;
 
+  // The shared address space if this is either a prototype process (it was created with
+  // zx_process_create(ZX_PROCESS_SHARED)) or if this is a shared process (it was created with
+  // zx_process_create_shared()). Empty if there is no shared address space.
+  std::optional<AddressRegion> shared_address_space = std::nullopt;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | timestamp | koid | status | name | components;
+
+    if (ver >= 69) {
+      ser | shared_address_space;
+    }
   }
 };
 
@@ -692,11 +701,19 @@ struct NotifyProcessStarting {
   // The client filter id that matched this process.
   uint32_t filter_id = kInvalidFilterId;
 
+  // The shared address space if this is either a prototype process (it was created with
+  // zx_process_create(ZX_PROCESS_SHARED)) or if this is a shared process (it was created with
+  // zx_process_create_shared()). Empty if there is no shared address space.
+  std::optional<AddressRegion> shared_address_space = std::nullopt;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | timestamp | type | koid | name | components;
 
     if (ver >= 61) {
       ser | filter_id;
+    }
+    if (ver >= 69) {
+      ser | shared_address_space;
     }
   }
 };

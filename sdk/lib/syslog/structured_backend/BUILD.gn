@@ -14,10 +14,7 @@ sdk_source_set("structured_backend") {
 
   deps = []
 
-  public_deps = [
-    "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/zx",
-  ]
+  public_deps = [ "//zircon/system/ulib/zx" ]
 
   sources = [
     "cpp/fuchsia_syslog.cc",

@@ -8,7 +8,6 @@ group("tests") {
     "fxt:tests",
     "perf_publish:tests",
     "perfmon:tests",
-    "py_test_utils:tests",
     "trace_converters:tests",
     "trace_processing:tests",
   ]

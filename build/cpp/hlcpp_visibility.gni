@@ -250,7 +250,6 @@ hlcpp_visibility = [
   "//src/performance/trace:*",
   "//src/power/fidl/testing:*",
   "//src/power/testing/thermal-test-control:*",
-  "//src/power/thermd:*",
   "//src/security/bin/tee_manager:*",
   "//src/sys/activity:*",
   "//src/sys/component_manager/tests/services/src/fidl:*",

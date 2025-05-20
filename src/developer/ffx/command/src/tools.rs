@@ -61,7 +61,7 @@ pub trait ToolRunner {
 #[async_trait::async_trait(?Send)]
 pub trait ToolSuite: Sized {
     /// Initializes the tool suite from the ffx invocation's environment.
-    async fn from_env(env: &EnvironmentContext) -> Result<Self, Error>;
+    fn from_env(env: &EnvironmentContext) -> Result<Self, Error>;
 
     /// Lists commands that should be available no matter how and where this tool
     /// is invoked.

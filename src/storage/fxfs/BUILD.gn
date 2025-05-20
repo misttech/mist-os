@@ -26,6 +26,7 @@ fxfs_deps = [
   "//src/storage/fxfs/crypto",
   "//src/storage/fxfs/trace",
   "//src/storage/fxfs/unicode",
+  "//src/storage/lib/fscrypt",
   "//src/storage/lib/fsverity-merkle",
   "//src/storage/lib/storage_device",
   "//src/storage/type-fprint:fprint",
@@ -154,6 +155,17 @@ rustc_library("lib") {
   deps = fxfs_deps
   sources = fxfs_sources
   test_deps = fxfs_test_deps
+}
+
+# This target includes additional hooks that are useful when
+# migrating file formats, but that shouldn't otherwise generally be exposed.
+rustc_library("migration") {
+  edition = "2021"
+  name = "fxfs"
+  features = [ "migration" ]
+
+  deps = fxfs_deps
+  sources = fxfs_sources
 }
 
 fuchsia_unittest_component("fxfs-test") {

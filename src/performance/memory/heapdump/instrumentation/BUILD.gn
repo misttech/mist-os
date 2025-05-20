@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/cpp/sdk_shared_library.gni")
+import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_staticlib.gni")
 
 group("tests") {
@@ -87,4 +88,17 @@ config("include") {
 fuchsia_unittest_package("rust-tests") {
   package_name = "heapdump-instrumentation-rust-tests"
   deps = [ ":core_test" ]
+}
+
+rustc_library("rust") {
+  crate_name = "heapdump"
+  edition = "2021"
+
+  source_root = "bindings.rs"
+  sources = [ "bindings.rs" ]
+
+  deps = [
+    ":instrumentation",
+    "//sdk/rust/zx",
+  ]
 }

@@ -38,6 +38,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "unsafe-override-abi-revision"
+        }
+      },
+      "optionality": "optional",
+      "long": "--unsafe-override-abi-revision",
+      "short": null,
+      "description": "if specified, replace the ABI revision in the package. Do not do this unless you're certain you know what you're doing!",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "output"
         }
       },

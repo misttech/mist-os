@@ -8,8 +8,9 @@
 #define ZIRCON_KERNEL_LIB_ACPI_LITE_BINARY_READER_H_
 
 #include <lib/acpi_lite/structures.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
+
+#include <span>
 
 namespace acpi_lite {
 
@@ -31,7 +32,7 @@ class BinaryReader {
   BinaryReader() = default;
 
   // Construct a BinaryReader from the given span.
-  explicit BinaryReader(cpp20::span<const uint8_t> data) : buffer_(data) {}
+  explicit BinaryReader(std::span<const uint8_t> data) : buffer_(data) {}
 
   // Construct a BinaryReader from the given pointer / size pair.
   explicit BinaryReader(const void* data, size_t size)
@@ -107,7 +108,7 @@ class BinaryReader {
   inline bool empty() const { return buffer_.empty(); }
 
  private:
-  cpp20::span<const uint8_t> buffer_;
+  std::span<const uint8_t> buffer_;
 };
 
 // Convert a pointer to type |Src| to a pointer of type |Dest|, ensuring that the size of |Src|

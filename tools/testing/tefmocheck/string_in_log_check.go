@@ -441,6 +441,18 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			Type:   syslogType,
 		},
 		&stringInLogCheck{
+			// LINT.IfChange(starnix_panic_tefmo)
+			String: "STARNIX KERNEL PANIC",
+			// LINT.ThenChange(//src/starnix/kernel/main.rs:starnix_panic_tefmo)
+			Type: syslogType,
+		},
+		&stringInLogCheck{
+			// LINT.IfChange
+			String: "honeydew.errors.HealthCheckError: health check failed on",
+			// LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/fuchsia_device/fuchsia_device_impl.py)
+			Type: swarmingOutputType,
+		},
+		&stringInLogCheck{
 			// LINT.IfChange(blob_write_failure)
 			String: "failed to write blob",
 			// LINT.ThenChange(/src/storage/fxfs/platform/src/fuchsia/fxblob/writer.rs:blob_write_failure)
@@ -545,9 +557,10 @@ func fuchsiaLogChecks() []FailureModeCheck {
 				SkipAllPassedTests: true,
 				AlwaysFlake:        true,
 				ExceptBlocks: []*logBlock{
-					// LINT.IfChange(seriallistener_timed_out)
+					// LINT.IfChange(seriallistener_timed_out_exception)
 					{startString: "seriallistener FATAL: timed out before success string", endString: "was read from serial"},
 					// LINT.ThenChange(/tools/testing/seriallistener/cmd/main.go:timed_out)
+					{startString: "seriallistener DEBUG: ReadUntilMatch(", endString: "bytes read before cancellation"},
 				},
 			},
 			&stringInLogCheck{
@@ -858,6 +871,12 @@ func infraToolLogChecks() []FailureModeCheck {
 			String:      "failed to merge profiles",
 			Type:        swarmingOutputType,
 			AlwaysFlake: true,
+		},
+		&stringInLogCheck{
+			// LINT.IfChange
+			String: "One or more FuchsiaDevice's health check failed in teardown_test. So failing the test case...",
+			// LINT.ThenChange(//src/testing/end_to_end/mobly_base_tests/fuchsia_base_test/fuchsia_base_test.py)
+			Type: swarmingOutputType,
 		},
 	}
 }

@@ -34,14 +34,14 @@ class AbstractStorage {
   // Must return `ZX_ERR_ALREADY_EXISTS` if `key` is already in use.
   virtual zx_status_t Insert(Key key, StoredVmo<Meta>&& vmo) = 0;
   // Allocates an unused key and associates `vmo` with it, returning the new key on success.
-  virtual cpp17::optional<Key> Push(StoredVmo<Meta>&& vmo) = 0;
+  virtual std::optional<Key> Push(StoredVmo<Meta>&& vmo) = 0;
   // Get the `StoredVmo` associated with `key`. Returns `nullptr` if `key` doesn't match a stored
   // VMO.
   virtual StoredVmo<Meta>* Get(const Key& key) = 0;
   // Erases the VMO referenced by `key`.
   // Returns the `StoredVmo` that was previously referenced by `key`, or empty if no VMO was found
   // for `key`.
-  virtual cpp17::optional<StoredVmo<Meta>> Extract(Key key) = 0;
+  virtual std::optional<StoredVmo<Meta>> Extract(Key key) = 0;
   // Returns the number of registered `StoredVmo`s in this store.
   virtual size_t count() const = 0;
 
@@ -72,11 +72,11 @@ class SlabStorage : public AbstractStorage<_Key, _Meta> {
     return slab_.Insert(key, std::move(vmo));
   }
 
-  inline cpp17::optional<Key> Push(Item&& vmo) override { return slab_.Push(std::move(vmo)); }
+  inline std::optional<Key> Push(Item&& vmo) override { return slab_.Push(std::move(vmo)); }
 
   inline Item* Get(const Key& key) override { return slab_.Get(key); }
 
-  cpp17::optional<Item> Extract(Key key) override { return slab_.Erase(key); }
+  std::optional<Item> Extract(Key key) override { return slab_.Erase(key); }
 
   inline size_t count() const override { return slab_.count(); }
 
@@ -155,7 +155,7 @@ class HashTableStorage : public AbstractStorage<_Key, _Meta> {
     return ZX_OK;
   }
 
-  cpp17::optional<Key> Push(Item&& vmo) override {
+  std::optional<Key> Push(Item&& vmo) override {
     Key key = rnd_distro_(rnd_);
     auto search = table_.find(key);
     while (search != table_.end()) {
@@ -163,7 +163,7 @@ class HashTableStorage : public AbstractStorage<_Key, _Meta> {
       search = table_.find(key);
     }
     if (Insert(key, std::move(vmo)) != ZX_OK) {
-      return cpp17::nullopt;
+      return std::nullopt;
     }
     return key;
   }
@@ -176,10 +176,10 @@ class HashTableStorage : public AbstractStorage<_Key, _Meta> {
     return &search->vmo_;
   }
 
-  inline cpp17::optional<Item> Extract(Key key) override {
+  inline std::optional<Item> Extract(Key key) override {
     std::unique_ptr<HashTableVmo> stored_vmo = table_.erase(key);
     if (!stored_vmo) {
-      return cpp17::optional<Item>();
+      return std::optional<Item>();
     }
 
     return std::move(stored_vmo->vmo_);
@@ -242,9 +242,9 @@ class DynamicDispatchStorage : public AbstractStorage<_Key, _Meta> {
   inline zx_status_t Insert(Key key, Item&& vmo) override {
     return impl_->Insert(std::move(key), std::move(vmo));
   }
-  inline cpp17::optional<Key> Push(Item&& vmo) override { return impl_->Push(std::move(vmo)); }
+  inline std::optional<Key> Push(Item&& vmo) override { return impl_->Push(std::move(vmo)); }
   inline Item* Get(const Key& key) override { return impl_->Get(key); }
-  cpp17::optional<Item> Extract(Key key) override { return impl_->Extract(std::move(key)); }
+  std::optional<Item> Extract(Key key) override { return impl_->Extract(std::move(key)); }
   inline size_t count() const override { return impl_->count(); }
   inline bool is_full() const override { return impl_->is_full(); }
 

@@ -12,10 +12,10 @@ group("tests") {
 
   if (host_os == "linux") {
     deps += [
-      ":dm_reboot_bootloader_test($host_toolchain)",
-      ":dm_reboot_recovery_test($host_toolchain)",
-      ":dm_reboot_test($host_toolchain)",
       ":kill_critical_process_test($host_toolchain)",
+      ":power_reboot_bootloader_test($host_toolchain)",
+      ":power_reboot_recovery_test($host_toolchain)",
+      ":power_reboot_test($host_toolchain)",
     ]
   }
 }
@@ -50,14 +50,14 @@ if (is_linux) {
     }
   }
 
-  split_go_test("dm_reboot") {
-    sources = [ "dm_reboot_test.go" ]
+  split_go_test("power_reboot") {
+    sources = [ "power_reboot_test.go" ]
   }
-  split_go_test("dm_reboot_recovery") {
-    sources = [ "dm_reboot_recovery_test.go" ]
+  split_go_test("power_reboot_recovery") {
+    sources = [ "power_reboot_recovery_test.go" ]
   }
-  split_go_test("dm_reboot_bootloader") {
-    sources = [ "dm_reboot_bootloader_test.go" ]
+  split_go_test("power_reboot_bootloader") {
+    sources = [ "power_reboot_bootloader_test.go" ]
   }
   split_go_test("kill_critical_process") {
     sources = [ "kill_critical_process_test.go" ]

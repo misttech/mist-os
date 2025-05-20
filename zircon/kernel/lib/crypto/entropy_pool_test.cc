@@ -8,9 +8,9 @@
 #include <lib/unittest/unittest.h>
 
 #include <ktl/array.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
 #include <ktl/type_traits.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

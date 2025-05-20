@@ -246,6 +246,16 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.sys2/DictionaryEntry.name",
+        "ordinal": "1",
+        "type": "string"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.sys2/DictionaryEntry"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.sys2/ExecutionInfo.start_reason",
         "ordinal": "1",
         "type": "string:5000"
@@ -1084,6 +1094,12 @@
         "name": "fuchsia.sys2/RouteReport.decl_type",
         "ordinal": "2",
         "type": "fuchsia.sys2/DeclType"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sys2/RouteReport.dictionary_entries",
+        "ordinal": "8",
+        "type": "vector<fuchsia.sys2/DictionaryEntry>"
     },
     {
         "kind": "table/member",

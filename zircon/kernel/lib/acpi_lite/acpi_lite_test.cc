@@ -7,12 +7,12 @@
 #include <lib/acpi_lite.h>
 #include <lib/acpi_lite/testing/test_data.h>
 #include <lib/acpi_lite/testing/test_util.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <string.h>
 
 #include <initializer_list>
 #include <memory>
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -125,7 +125,7 @@ TEST(AcpiParser, RsdtInvalidLengths) {
   FakePhysMemReader::Region region[] = {{
       .phys_addr = 0x1000,
       .data =
-          cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&bad_rsdt), sizeof(AcpiRsdt)),
+          std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&bad_rsdt), sizeof(AcpiRsdt)),
   }};
 
   // Attempt to parse the bad RSDT. Ensure we get an error.
@@ -147,7 +147,7 @@ TEST(AcpiParser, DumpTables) {
 // A PhysMemReader that emulates the BIOS read-only area between 0xe'0000 and 0xf'ffff.
 class BiosAreaPhysMemReader : public PhysMemReader {
  public:
-  explicit BiosAreaPhysMemReader(cpp20::span<const FakePhysMemReader::Region> regions)
+  explicit BiosAreaPhysMemReader(std::span<const FakePhysMemReader::Region> regions)
       : fallback_(0, regions) {
     // Create a fake BIOS area.
     bios_area_ = std::make_unique<uint8_t[]>(kBiosReadOnlyAreaLength);

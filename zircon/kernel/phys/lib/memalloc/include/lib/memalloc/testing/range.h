@@ -8,10 +8,10 @@
 #define ZIRCON_KERNEL_PHYS_LIB_MEMALLOC_INCLUDE_LIB_MEMALLOC_TESTING_COMPARE_H_
 
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <stdio.h>
 
 #include <algorithm>
+#include <span>
 #include <sstream>
 #include <string>
 
@@ -54,12 +54,12 @@ inline std::string ToString(Ranges&& ranges) {
   return ToString(ranges.begin(), ranges.end());
 }
 
-inline std::string ToString(const cpp20::span<const memalloc::Range>& ranges) {
+inline std::string ToString(const std::span<const memalloc::Range>& ranges) {
   return ToString(ranges.begin(), ranges.end());
 }
 
-inline void CompareRanges(cpp20::span<const memalloc::Range> expected,
-                          cpp20::span<const memalloc::Range> actual) {
+inline void CompareRanges(std::span<const memalloc::Range> expected,
+                          std::span<const memalloc::Range> actual) {
   EXPECT_EQ(expected.size(), actual.size());
   size_t num_comparable = std::min(expected.size(), actual.size());
   for (size_t i = 0; i < num_comparable; ++i) {

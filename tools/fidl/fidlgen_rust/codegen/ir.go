@@ -174,6 +174,8 @@ type Protocol struct {
 	EventStream string
 	// Name of the protocol's ControlHandle struct.
 	ControlHandle string
+	// Name of the namespace of protocol ordinal constants.
+	Ordinals string
 	// List of methods that are part of this protocol.
 	Methods []Method
 }
@@ -187,6 +189,9 @@ type Method struct {
 	// rust-methods associated with this method, such as proxy methods and
 	// encoder methods.
 	Name string
+	// Name of the method converted to UPPER_SNAKE_CASE. Used to generate the
+	// ordinal constants.
+	UpperSnakeName string
 	// Name of the method converted to CamelCase. Used when generating
 	// rust-types associated with this method, such as responders.
 	CamelName string
@@ -581,7 +586,8 @@ type compiler struct {
 	dialect           string
 	// Raw structs (including ExternalStructs), needed for
 	// flattening parameters and in computeUseFidlStructCopy.
-	structs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	structs  map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
+	isCommon bool
 }
 
 func (c *compiler) inExternalLibrary(eci fidlgen.EncodedCompoundIdentifier) bool {
@@ -667,6 +673,9 @@ func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) 
 	name = changeIfReserved(fidlgen.Identifier(name))
 	if c.inExternalLibrary(val) {
 		crate := c.compileLibraryName(ci.Library)
+		if c.isCommon {
+			crate += "__common"
+		}
 		c.externCrates[crate] = struct{}{}
 		return fmt.Sprintf("%s::%s", crate, name)
 	}
@@ -1437,6 +1446,7 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 		Event:            name + "Event",
 		EventStream:      name + "EventStream",
 		ControlHandle:    name + "ControlHandle",
+		Ordinals:         fidlgen.ToSnakeCase(name) + "_ordinals",
 	}
 	if discoverableName := strings.Trim(val.GetProtocolName(), "\""); discoverableName != "" {
 		r.Discoverable = true
@@ -1452,12 +1462,14 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 	}
 
 	for _, v := range val.Methods {
+		snake_name := compileSnakeIdentifier(v.Name)
 		m := Method{
-			Method:    v,
-			Name:      compileSnakeIdentifier(v.Name),
-			CamelName: compileCamelIdentifier(v.Name),
-			Request:   c.compileRequest(v),
-			Response:  c.compileResponse(v),
+			Method:         v,
+			Name:           snake_name,
+			UpperSnakeName: strings.ToUpper(snake_name),
+			CamelName:      compileCamelIdentifier(v.Name),
+			Request:        c.compileRequest(v),
+			Response:       c.compileResponse(v),
 		}
 		if v.HasRequest && v.HasResponse {
 			m.Responder = name + m.CamelName + "Responder"
@@ -1912,7 +1924,7 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 	}
 }
 
-func Compile(r fidlgen.Root, includeDrivers bool, fdomain bool) Root {
+func Compile(r fidlgen.Root, includeDrivers bool, fdomain bool, isCommon bool) Root {
 	r = r.ForBindings("rust")
 	transports := []string{"Channel"}
 	if includeDrivers {
@@ -1946,6 +1958,7 @@ func Compile(r fidlgen.Root, includeDrivers bool, fdomain bool) Root {
 		handleSubtypes:    handleSubtypes,
 		externCrates:      map[string]struct{}{},
 		structs:           map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
+		isCommon:          isCommon,
 	}
 	for _, s := range r.Structs {
 		c.structs[s.Name] = s

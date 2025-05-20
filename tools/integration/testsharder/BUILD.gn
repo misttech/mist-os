@@ -103,9 +103,11 @@ if (is_host) {
   _golden_tests = [
     "affected nonhermetic tests",
     "affected tests",
+    "allowed_device_types",
     "arbitrary dimensions",
     "boot test with modifiers",
     "deps_file",
+    "disabled_device_types",
     "hermetic deps",
     "max shards per env",
     "mixed device types",

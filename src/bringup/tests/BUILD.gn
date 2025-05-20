@@ -22,7 +22,7 @@ group("bootfs-tests") {
     "//src/devices/tests/devcoordinator-namespace:devcoordinator-namespace-bootfs-test",
     "//src/devices/usb/tests/usb:usb-bootfs-test",  # HW-required.
     "//src/tests/drivers_serial_log:bringup_tests",
-    "//src/tests/reboot/dm_reboot_bringup_test:tests",
+    "//src/tests/reboot/power_reboot_bringup_test:tests",
     "//src/zircon/tests/entropy:entropy-bootfs-test",
     "//src/zircon/tests/exception:exception-bootfs-test",
     "//src/zircon/tests/futex-ownership:futex-ownership-bootfs-test",

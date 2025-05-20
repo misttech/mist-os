@@ -32,7 +32,7 @@
       "optionality": "optional",
       "long": "--image-type",
       "short": null,
-      "description": "the type of image. Supported types are fvm, fxfs, qemu-kernel, vbmeta, zbi.",
+      "description": "the type of image. Supported types are zbi, vbmeta, fvm, fxfs, fxfs.fastboot, qemu-kernel, or dtbo.",
       "hidden": false
     },
     {

@@ -26,6 +26,7 @@
 #include <kernel/thread.h>
 #include <phys/handoff.h>
 #include <pretty/cpp/sizes.h>
+#include <vm/compression.h>
 #include <vm/phys/arena.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -621,8 +622,13 @@ zx_status_t PmmNode::AllocContiguous(const size_t count, uint alloc_flags, uint8
 // during early boot before threading exists.
 zx_status_t PmmNode::InitArena(const PmmArenaSelection& selected) TA_NO_THREAD_SAFETY_ANALYSIS {
   if (used_arena_count_ >= kArenaCount) {
-    return ZX_ERR_NO_MEMORY;
+    return ZX_ERR_NOT_SUPPORTED;
   }
+  if (selected.arena.size > (kMaxPagesPerArena * PAGE_SIZE)) {
+    // We have this limit since we need to compress a page_t pointer to a 24 bit integer.
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   arenas_[used_arena_count_++].Init(selected, this);
   arena_cumulative_size_ += selected.arena.size;
   return ZX_OK;

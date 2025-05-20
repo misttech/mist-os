@@ -10,6 +10,7 @@
 #ifndef __ASSEMBLER__
 
 #include <stdint.h>
+#include <zircon/features.h>
 
 #include <arch/riscv64/feature.h>
 #include <arch/riscv64/mp.h>
@@ -20,7 +21,7 @@ inline uint32_t arch_dcache_line_size() { return riscv_cbom_size; }
 
 constexpr uint32_t arch_icache_line_size() { return 64; }
 
-constexpr uint32_t arch_vm_features() { return 0; }
+constexpr uint32_t arch_vm_features() { return ZX_VM_FEATURE_CAN_MAP_XOM; }
 
 // Log architecture-specific data for process creation.
 // This can only be called after the process has been created and before

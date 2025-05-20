@@ -22,16 +22,13 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
 use vfs::directory::entry::DirectoryEntry;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::Simple as PseudoDir;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::VmoFile;
 use vfs::name::Name;
-use vfs::path::Path;
 use vfs::remote::remote_dir;
 use vfs::service::endpoint;
-use vfs::ObjectRequest;
 use zx::MonotonicDuration;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -483,19 +480,12 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     }
 
     fn serve_connection_impl(&self, chan: fidl::endpoints::ServerEnd<fio::DirectoryMarker>) {
-        self.dir
-            .clone()
-            .open3(
-                self.scope.clone(),
-                Path::dot(),
-                Self::base_connection_flags(),
-                &mut ObjectRequest::new(
-                    Self::base_connection_flags(),
-                    &Default::default(),
-                    chan.into_channel(),
-                ),
-            )
-            .expect("failed to serve root ServiceFs connection");
+        vfs::directory::serve_on(
+            self.dir.clone(),
+            Self::base_connection_flags(),
+            self.scope.clone(),
+            chan,
+        );
     }
 
     /// Creates a protocol connector that can access the capabilities exposed by this ServiceFs.
@@ -625,6 +615,8 @@ impl<ServiceObjTy: ServiceObjTrait> Stream for ServiceFs<ServiceObjTy> {
     type Item = ServiceObjTy::Output;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // NOTE: Normally, it isn't safe to poll a stream after it returns None, but we support this
+        // and StallabkeServiceFs depends on this.
         if let Some(channels) = self.channel_queue.take() {
             for chan in channels {
                 self.serve_connection_impl(chan);

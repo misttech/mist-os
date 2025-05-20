@@ -7,16 +7,16 @@ import("//build/host.gni")
 group("tools") {
   deps = [
     "adb_proxy",
-    "convert_tarball_to_starnix_container",
     "gen_android_starnix_container",
+    "gen_docker_container",
   ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    "convert_tarball_to_starnix_container:tests($host_toolchain)",
     "gen_android_starnix_container:tests($host_toolchain)",
+    "gen_docker_container:tests($host_toolchain)",
     "tar_to_pkg:tests($host_toolchain)",
   ]
 }

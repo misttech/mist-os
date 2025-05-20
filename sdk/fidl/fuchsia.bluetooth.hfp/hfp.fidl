@@ -274,11 +274,11 @@ type CallState = flexible enum {
     INCOMING_RINGING = 3;
     /// There is a callsetup procedure in progress for an incoming call.
     INCOMING_WAITING = 4;
-    /// A call is in progress but another call is active.
+    /// A call is held.  Another call may be active or not.
     ONGOING_HELD = 5;
     /// A call is active.
     ONGOING_ACTIVE = 6;
-    /// The call has been termianted.
+    /// The call has been terminated.
     TERMINATED = 7;
     /// The call has been transferred to the AG, after which the HF is no longer
     /// tracking its state.
@@ -346,7 +346,11 @@ type DtmfCode = strict enum : uint8 {
     D = 68;
 };
 
-/// Controls the lifecycle of a call that has been routed through a headset.
+/// Controls the lifecycle of a call that has been routed through a headset. A
+/// client that wishes to know when a call is terminated should keep this
+/// protocol open until it has received a Terminated state update from the
+/// WatchState call.  However, closing the protocol will also hang up the call
+/// safely.
 closed protocol Call {
     /// A hanging get method for call state. See the `CallState` documentation
     /// for information on possible states.

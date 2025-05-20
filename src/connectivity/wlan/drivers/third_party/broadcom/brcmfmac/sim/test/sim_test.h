@@ -67,6 +67,8 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocConfRequest> disassoc_results;
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDeauthIndRequest> deauth_indications;
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcDisassocIndRequest> disassoc_indications;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcRoamResultIndRequest> roam_result_indications;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcRoamConfRequest> roam_confirmations;
     std::list<wlan_fullmac_wire::WlanFullmacChannelSwitchInfo> csa_indications;
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcStartConfRequest> start_confirmations;
     std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcStopConfRequest> stop_confirmations;
@@ -252,7 +254,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   zx_status_t InterfaceDestroyed(SimInterface* sim_ifc);
 
   uint32_t DeviceCount();
-  uint32_t DeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property);
+  uint32_t DeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty2& property);
 
   // We don't have a good mechanism to synchronize the Remove call from
   // brcmfmac::Device with node_server_, so these functions repeatedly check the device count and
@@ -260,7 +262,7 @@ class SimTest : public ::zxtest::Test, public simulation::StationIfc {
   // The result is a timeout if it doesn't work instead of immediately failing, but the upside is
   // that we're no longer relying on the timing of the Remove call.
   void WaitForDeviceCount(uint32_t expected);
-  void WaitForDeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty& property,
+  void WaitForDeviceCountWithProperty(const fuchsia_driver_framework::NodeProperty2& property,
                                       uint32_t expected);
 
   // Provides synchronous access to the brcmfmac::SimDevice instance via a callback. The callback

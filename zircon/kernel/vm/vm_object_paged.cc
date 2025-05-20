@@ -22,7 +22,7 @@
 #include <fbl/alloc_checker.h>
 #include <ktl/algorithm.h>
 #include <ktl/array.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/fault.h>
 #include <vm/page_source.h>
@@ -494,8 +494,8 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
       // unmap it from the kernel
       // NOTE: this means the image can no longer be referenced from original pointer
       status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-          reinterpret_cast<vaddr_t>(data), size / PAGE_SIZE, ArchVmAspace::EnlargeOperation::No,
-          nullptr);
+          reinterpret_cast<vaddr_t>(data), size / PAGE_SIZE,
+          ArchVmAspaceInterface::ArchUnmapOptions::None, nullptr);
       ASSERT(status == ZX_OK);
     }
     if (!exclusive) {
@@ -787,6 +787,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
   fbl::RefPtr<VmObjectPaged> vmo;
 
   {
+    VmCowPages::DeferredOps deferred(cow_pages_.get());
     Guard<VmoLockType> guard{lock()};
     // check that we're not uncached in some way
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
@@ -796,7 +797,8 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
     // If we are a slice we require a unidirection clone, as performing a bi-directional clone
     // through a slice does not yet have defined semantics.
     const bool require_unidirection = is_slice();
-    auto result = cow_pages_locked()->CreateCloneLocked(type, require_unidirection, *cow_range);
+    auto result =
+        cow_pages_locked()->CreateCloneLocked(type, require_unidirection, *cow_range, deferred);
     if (result.is_error()) {
       return result.error_value();
     }

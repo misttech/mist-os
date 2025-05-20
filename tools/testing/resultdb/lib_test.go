@@ -56,6 +56,19 @@ func checkTagValue(t *testing.T, tags map[string]string, key, want string) {
 func TestSetTestDetailsToResultSink(t *testing.T) {
 	outputRoot := t.TempDir()
 	detail := createTestDetailWithPassedAndFailedTestCase(5, 2, outputRoot)
+	// include 7 owners to test truncation of owner list
+	detail.Metadata = metadata.TestMetadata{
+		Owners: []string{
+			"testgoogler1@google.com",
+			"testgoogler2@google.com",
+			"testgoogler3@google.com",
+			"testgoogler4@google.com",
+			"testgoogler5@google.com",
+			"testgoogler6@google.com",
+			"testgoogler7@google.com",
+		},
+		ComponentID: 1478143,
+	}
 	extraTags := []*resultpb.StringPair{
 		{Key: "key1", Value: "value1"},
 	}
@@ -83,7 +96,8 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	// 3. test_case_count:value
 	// 4. affected:value
 	// 5. is_top_level_test:value
-	if len(tags) != 5 {
+	// 6. owners:value
+	if len(tags) != 6 {
 		t.Errorf("tags(%v) contains unexpected values.", tags)
 	}
 
@@ -92,6 +106,7 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	checkTagValue(t, tags, "test_case_count", "7")
 	checkTagValue(t, tags, "affected", "false")
 	checkTagValue(t, tags, "is_top_level_test", "true")
+	checkTagValue(t, tags, "owners", "testgoogler1@google.com,testgoogler2@google.com,testgoogler3@google.com,testgoogler4@google.com,testgoogler5@google.com")
 
 	if len(result.Artifacts) != 2 {
 		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
@@ -305,10 +320,6 @@ func createTestDetailWithPassedAndFailedTestCase(passedTestCase int, failedTestC
 		DurationMillis:       39797,
 		IsTestingFailureMode: false,
 		Cases:                t,
-		Metadata: metadata.TestMetadata{
-			Owners:      []string{"carverforbes@google.com", "testgoogler@google.com"},
-			ComponentID: 1478143,
-		},
 	}
 }
 

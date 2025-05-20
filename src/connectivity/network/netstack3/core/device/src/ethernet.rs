@@ -1139,10 +1139,6 @@ mod tests {
             cb(arp_state, &mut FakeCoreCtxWithDeviceId { core_ctx: inner, device_id })
         }
 
-        fn addr_on_interface(&mut self, _device_id: &Self::DeviceId, _addr: Ipv4Addr) -> bool {
-            unimplemented!()
-        }
-
         fn get_protocol_addr(&mut self, _device_id: &Self::DeviceId) -> Option<Ipv4Addr> {
             unimplemented!()
         }

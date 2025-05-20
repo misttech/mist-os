@@ -17,6 +17,7 @@ group("profile") {
   deps = [
     "bt-avdtp-tool",
     "bt-avrcp-controller",
+    "bt-hfp-hf-tool",
     "bt-map-mce-tool",
   ]
 }
@@ -58,6 +59,7 @@ group("tests") {
     "bt-bredr-profile:tests",
     "bt-cli:tests",
     "bt-fct-hci:tests",
+    "bt-hfp-hf-tool:tests",
     "bt-le-central:tests",
     "bt-le-peripheral:tests",
     "bt-map-mce-tool:tests",

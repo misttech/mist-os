@@ -13,7 +13,7 @@ from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 _LOGGER: logging.Logger = logging.getLogger("AppRenderLatencyMetricsProcessor")
 _EVENT_CATEGORY: str = "gfx"
 _PRESENT_EVENT_NAME: str = "Flatland::PerAppPresent[{}]"
-_DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
+_DISPLAY_VSYNC_EVENT_NAME: str = "Flatland::DisplayCompositor::OnVsync"
 
 
 class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
@@ -74,7 +74,7 @@ class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
             if present_flow_event.phase != trace_model.FlowEventPhase.START:
                 continue
 
-            vsync = trace_utils.get_nearest_following_event(
+            vsync = trace_utils.get_nearest_following_flow_event(
                 present_flow_event, _EVENT_CATEGORY, _DISPLAY_VSYNC_EVENT_NAME
             )
 

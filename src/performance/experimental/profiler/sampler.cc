@@ -34,6 +34,7 @@
 #include "symbolization_context.h"
 #include "targets.h"
 
+namespace {
 std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_process& process,
                                                          const zx::unowned_thread& thread,
                                                          unwinder::FramePointerUnwinder& unwinder) {
@@ -114,6 +115,7 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
   zx::ticks duration = zx::ticks::now() - before;
   return {duration, pcs};
 }
+}  // namespace
 
 zx::result<> profiler::Sampler::AddTarget(JobTarget&& target) {
   zx::result<> res = WatchTarget(target);
@@ -133,8 +135,8 @@ zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
         // We've intercepted this process before its threads have started, so we don't recursively
         // add them here. We let the watcher handle the thread start exceptions as soon as we
         // acknowledge this process start exception.
-        ProcessTarget process_target =
-            ProcessTarget{std::move(p), pid, std::unordered_map<zx_koid_t, ThreadTarget>()};
+        ProcessTarget process_target{std::move(p), pid,
+                                     std::unordered_map<zx_koid_t, ThreadTarget>()};
         // Furthermore, we need to watch each started process for threads it creates
         auto process_watcher = std::make_unique<ProcessWatcher>(
             process_target.handle.borrow(),
@@ -191,6 +193,9 @@ zx::result<> profiler::Sampler::Start(size_t buffer_size_mb /* unused, we buffer
                                                     const ProcessTarget& p) -> zx::result<> {
     TRACE_DURATION("cpu_profiler", "Sampler::Start/ForEachProcess");
     std::vector<zx_koid_t> saved_path{job_path.begin(), job_path.end()};
+
+    CacheModules(p);
+
     auto process_watcher = std::make_unique<ProcessWatcher>(
         p.handle.borrow(),
         [saved_path, this](zx_koid_t pid, zx_koid_t tid, zx::thread t) {
@@ -247,7 +252,6 @@ zx::result<> profiler::Sampler::Stop() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   sample_task_.Cancel();
   FX_LOGS(INFO) << "Stopped! Collected " << inspecting_durations_.size() << " samples";
-  sample_task_.Cancel();
   return zx::ok();
 }
 
@@ -283,14 +287,14 @@ void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::Ta
 
 zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  std::map<zx_koid_t, std::vector<profiler::Module>> contexts;
   zx::result<> res = targets_.ForEachProcess(
-      [&contexts, this](cpp20::span<const zx_koid_t>,
-                        const ProcessTarget& target) mutable -> zx::result<> {
-        zx::result<std::vector<profiler::Module>> modules =
-            targets_.GetProcessModules(target.handle);
+      [this](cpp20::span<const zx_koid_t>, const ProcessTarget& target) mutable -> zx::result<> {
+        zx::result<std::map<std::vector<std::byte>, profiler::Module>> modules =
+            profiler::GetProcessModules(target.handle, searcher_);
         if (modules.is_ok()) {
-          contexts[target.pid] = *modules;
+          for (auto& [build_id, mod] : *modules) {
+            contexts_[target.pid].try_emplace(build_id, mod);
+          }
         }
         // It's possible that the process we were profiling no longer exists -- it exited before the
         // profile ended. If this happens, we don't want ForEachProcess to short circuit and stop,
@@ -300,13 +304,23 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   if (res.is_error()) {
     return res.take_error();
   }
-  return zx::ok(profiler::SymbolizationContext{contexts});
+  return zx::ok(profiler::SymbolizationContext{contexts_});
 }
 
 void profiler::Sampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
                                   zx::thread t) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  zx::result res = targets_.AddThread(job_path, pid, ThreadTarget{std::move(t), tid});
+  // Before we start sampling the thread, make sure we've recorded information about its process
+  if (!contexts_.contains(pid)) {
+    zx::result<ProcessTarget*> target = targets_.GetProcess(job_path, pid);
+    if (target.is_ok()) {
+      CacheModules(**target);
+    } else {
+      FX_PLOGS(ERROR, target.status_value()) << "Failed to search up process: " << pid;
+    }
+  }
+  zx::result res =
+      targets_.AddThread(job_path, pid, ThreadTarget{.handle = std::move(t), .tid = tid});
   if (res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread to session: " << tid;
   }
@@ -318,5 +332,20 @@ void profiler::Sampler::RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t 
   zx::result res = targets_.RemoveThread(job_path, pid, tid);
   if (res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to remove exited thread: " << tid;
+  }
+}
+
+void profiler::Sampler::CacheModules(const ProcessTarget& p) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  if (!contexts_.contains(p.pid)) {
+    zx::result modules = profiler::GetProcessModules(p.handle, searcher_);
+    if (modules.is_error()) {
+      // Eat the error and log -- We _probably_ shouldn't see this in normal operation, but there
+      // may be some cases where we race with an exiting processes and it's not a huge deal if we're
+      // not able to get the modules.
+      FX_PLOGS(ERROR, modules.status_value()) << "Failed to get modules for process: " << p.pid;
+      return;
+    }
+    contexts_[p.pid] = *modules;
   }
 }

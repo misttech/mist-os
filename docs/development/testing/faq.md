@@ -73,7 +73,7 @@ Note Well! Without networking, the files are loaded into the QEMU instance at
 startup. So after rebuilding a test, you'll need to shutdown and re-start the
 QEMU instance to see the rebuilt test.
 
-To exit QEMU, `dm shutdown`.
+To exit QEMU, `power shutdown`.
 
 ## Q: How do I run this unit test on my development device?
 

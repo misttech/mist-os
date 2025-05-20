@@ -144,31 +144,34 @@ TEST(ConnectionRightsTest, GetBackingMemoryWithServe) {
   TestCase test_data[] = {
       // If the connection has all rights, then everything should work.
       {
-          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite | fio::Flags::kPermExecute,
+          .flags =
+              fio::Flags::kPermReadBytes | fio::Flags::kPermWriteBytes | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead,
           .get_backing_memory_result = ZX_OK,
       },
       {
-          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite | fio::Flags::kPermExecute,
+          .flags =
+              fio::Flags::kPermReadBytes | fio::Flags::kPermWriteBytes | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kWrite,
           .get_backing_memory_result = ZX_OK,
       },
       {
-          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite | fio::Flags::kPermExecute,
+          .flags =
+              fio::Flags::kPermReadBytes | fio::Flags::kPermWriteBytes | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute,
           .get_backing_memory_result = ZX_OK,
       },
       // If the connection is missing the EXECUTABLE right, then requests with
       // fio::wire::VmoFlags::kExecute should fail.
       {
-          .flags = fio::Flags::kPermRead | fio::Flags::kPermWrite,
+          .flags = fio::Flags::kPermReadBytes | fio::Flags::kPermWriteBytes,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kExecute,
           .get_backing_memory_result = ZX_ERR_ACCESS_DENIED,
       },
       // If the connection is missing the WRITABLE right, then requests with
       // fio::wire::VmoFlags::kWrite should fail.
       {
-          .flags = fio::Flags::kPermRead | fio::Flags::kPermExecute,
+          .flags = fio::Flags::kPermReadBytes | fio::Flags::kPermExecute,
           .get_backing_memory_flags = fio::wire::VmoFlags::kRead | fio::wire::VmoFlags::kWrite,
           .get_backing_memory_result = ZX_ERR_ACCESS_DENIED,
       },

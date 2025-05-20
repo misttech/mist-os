@@ -119,6 +119,19 @@ source_set("promise_timeout") {
   ]
 }
 
+source_set("purge_memory") {
+  sources = [
+    "purge_memory.cc",
+    "purge_memory.h",
+  ]
+
+  deps = [
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/performance/memory/scudo",
+  ]
+}
+
 source_set("regexp") {
   sources = [ "regexp.h" ]
   public_deps = [ "//third_party/re2" ]

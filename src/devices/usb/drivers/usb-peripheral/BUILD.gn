@@ -42,12 +42,8 @@ source_set("common") {
     "//sdk/lib/fidl",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.usb:fuchsia.usb_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb:cdc",
     "//src/devices/usb/lib/usb:peripheral",
-    "//src/lib/ddk",
-    "//src/lib/ddk:ddk-metadata-headers",
   ]
   public_deps = [
     ":usb-peripheral-config",
@@ -58,16 +54,19 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
-    "//src/devices/usb/lib/usb",
-    "//src/devices/usb/lib/usb-monitor-util",
-    "//src/lib/ddktl",
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/metadata/cpp",
+    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
+    "//src/devices/usb/lib/usb-monitor-util:usb-monitor-util-dfv2",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
 
 fuchsia_cc_driver("usb-peripheral-driver") {
-  legacy = true
   output_name = "usb-peripheral"
   deps = [
     ":common",
@@ -106,11 +105,7 @@ test("usb-peripheral-unittest-bin") {
     ":common",
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.descriptor:fuchsia.hardware.usb.descriptor_cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/testing/mock-ddk",
-    "//src/devices/usb/lib/usb",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
   ]

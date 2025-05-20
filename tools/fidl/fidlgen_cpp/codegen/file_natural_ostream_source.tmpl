@@ -73,9 +73,7 @@
   {{- end }}
 
   {{- range .Structs }}
-    {{- if .IsResourceType }}
-      {{- IfdefFuchsia }}
-    {{- end }}
+    {{- IfdefFuchsiaIf .IsResourceType }}
     std::ostream& fidl::ostream::Formatter<{{ . }}>::Format(std::ostream& os, const {{ . }}& value) {
       os << "{{ .NoLeading }}";
       os << "{ ";
@@ -86,15 +84,11 @@
       os << "}";
       return os;
     }
-    {{- if .IsResourceType }}
-      {{- EndifFuchsia -}}
-    {{- end }}
+    {{- EndifFuchsiaIf .IsResourceType -}}
   {{- end }}
 
   {{- range .Tables }}
-    {{- if .IsResourceType }}
-      {{- IfdefFuchsia }}
-    {{- end }}
+    {{- IfdefFuchsiaIf .IsResourceType }}
     std::ostream& fidl::ostream::Formatter<{{ . }}>::Format(std::ostream& os, const {{ . }}& value) {
       os << "{{ .NoLeading }}";
       os << "{ ";
@@ -107,15 +101,11 @@
       os << "}";
       return os;
     }
-    {{- if .IsResourceType }}
-      {{- EndifFuchsia -}}
-    {{- end }}
+    {{- EndifFuchsiaIf .IsResourceType -}}
   {{- end }}
 
   {{- range .Unions }}
-    {{- if .IsResourceType }}
-      {{- IfdefFuchsia }}
-    {{- end }}
+    {{- IfdefFuchsiaIf .IsResourceType }}
     std::ostream& fidl::ostream::Formatter<{{ . }}>::Format(std::ostream& os, const {{ . }}& value) {
       os << "{{ .NoLeading }}::";
       switch (value.Which()) {
@@ -129,23 +119,37 @@
       }
       return os;
     }
-    {{- if .IsResourceType }}
-      {{- EndifFuchsia -}}
-    {{- end }}
+    {{- EndifFuchsiaIf .IsResourceType -}}
   {{- end }}
+
+  {{- IfdefFuchsia }}
+  {{- range .Protocols }}
+      std::ostream& fidl::ostream::Formatter<{{ .ClientEnd }}>::Format(std::ostream& os, const {{ .ClientEnd }}& value) {
+        return os << "ClientEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
+      }
+
+      std::ostream& fidl::ostream::Formatter<{{ .ServerEnd }}>::Format(std::ostream& os, const {{ .ServerEnd }}& value) {
+        return os << "ServerEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
+      }
+
+      std::ostream& operator<<(std::ostream& os, const {{ .ClientEnd }}& value) {
+        return fidl::ostream::Formatter<{{ .ClientEnd }}>::Format(os, value);
+      }
+
+      std::ostream& operator<<(std::ostream& os, const {{ .ServerEnd }}& value) {
+          return fidl::ostream::Formatter<{{ .ServerEnd }}>::Format(os, value);
+      }
+  {{- end }}
+  {{- EndifFuchsia -}}
 
   {{ range .Decls }}
     {{- if and (ne .Kind Kinds.Alias) (ne .Kind Kinds.Const) (ne .Kind Kinds.Protocol) (ne .Kind Kinds.Service) }}
       {{- EnsureNamespace . }}
-      {{- if .IsResourceType }}
-        {{- IfdefFuchsia }}
-      {{- end }}
+      {{- IfdefFuchsiaIf .IsResourceType }}
       std::ostream& operator<<(std::ostream& os, const {{ . }}& value) {
         return fidl::ostream::Formatter<{{ . }}>::Format(os, value);
       }
-      {{- if .IsResourceType }}
-        {{- EndifFuchsia -}}
-      {{- end }}
+      {{- EndifFuchsiaIf .IsResourceType -}}
     {{- end }}
   {{- end }}
 

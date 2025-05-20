@@ -197,6 +197,8 @@ class Process : public ClientObject, public unwinder::AsyncMemory::Delegate {
   virtual void LoadInfoHandleTable(
       fit::callback<void(ErrOr<std::vector<debug_ipc::InfoHandle>> handles)> callback) = 0;
 
+  virtual std::optional<debug_ipc::AddressRegion> GetSharedAddressSpace() const = 0;
+
   StartType start_type() const { return start_type_; }
 
   static constexpr size_t kMaxIOBufferSize = 1 * 1024 * 1024;  // In bytes.

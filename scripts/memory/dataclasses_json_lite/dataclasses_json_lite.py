@@ -37,6 +37,11 @@ from typing import (
     get_origin,
 )
 
+_PYTHON_3_12 = sys.version_info >= (
+    3,
+    12,
+)
+
 
 class Undefined(Enum):
     """Missing fields always fails. Added for API compatibility."""
@@ -89,8 +94,14 @@ def _default_decoder(cls: type, field_type: type) -> Callable[[Any], Any]:
             nonlocal resolved_decoder
             if resolved_decoder:
                 return resolved_decoder(x)
+            evaluate_kwargs = dict()
+            if _PYTHON_3_12:
+                evaluate_kwargs["recursive_guard"] = frozenset()
             resolved_decoder = field_type._evaluate(
-                sys.modules.get(cls.__module__).__dict__, vars(cls), set()
+                sys.modules.get(cls.__module__).__dict__,
+                vars(cls),
+                set(),
+                **evaluate_kwargs,
             ).from_dict
             return resolved_decoder(x)
 

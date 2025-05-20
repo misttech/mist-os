@@ -46,7 +46,8 @@ class ImagePipeSurfaceDisplay final
 
   void RemoveImage(uint32_t image_id) override;
 
-  void PresentImage(uint32_t image_id, std::vector<std::unique_ptr<PlatformEvent>> acquire_fences,
+  void PresentImage(bool immediate, uint32_t image_id,
+                    std::vector<std::unique_ptr<PlatformEvent>> acquire_fences,
                     std::vector<std::unique_ptr<PlatformEvent>> release_fences,
                     VkQueue queue) override;
 

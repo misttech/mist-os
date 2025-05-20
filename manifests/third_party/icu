@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <projects>
+    <!-- The ICU library to use for top-of-tree Fuchsia builds -->
+    <project name="chromium/deps/icu@default"
+             path="third_party/icu/default"
+             remote="https://chromium.googlesource.com/chromium/deps/icu"
+             gerrithost="https://chromium-review.googlesource.com"
+             revision="b929596baebf0ab4ac7ec07f38365db4c50a559d"/>
+    <!-- The ICU library to use for "latest" Fuchsia builds -->
+    <project name="chromium/deps/icu@latest"
+             path="third_party/icu/latest"
+             remote="https://chromium.googlesource.com/chromium/deps/icu"
+             gerrithost="https://chromium-review.googlesource.com"
+             revision="c9fb4b3a6fb54aa8c20a03bbcaa0a4a985ffd34b"/>
+  </projects>
+</manifest>

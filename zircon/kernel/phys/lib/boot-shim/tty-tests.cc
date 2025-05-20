@@ -6,9 +6,9 @@
 
 #include <lib/boot-shim/tty.h>
 
-#include <zxtest/zxtest.h>
+#include <array>
 
-#include "lib/stdcompat/array.h"
+#include <zxtest/zxtest.h>
 
 namespace {
 
@@ -157,7 +157,7 @@ TEST(TtyFromCmdlineTest, AmlEntryWithIndexIsTtyMSMN) {
 }
 
 TEST(TtyFromCmdlineTest, InvalidArgumentIsNullOpt) {
-  constexpr auto kInvalidArgs = cpp20::to_array({
+  constexpr auto kInvalidArgs = std::to_array({
       "console=tyS123",
       "console=ty123",
       "console=123",

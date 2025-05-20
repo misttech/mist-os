@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{Data, Logs};
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 use fidl_fuchsia_logger::LogMessage;
+
 use std::collections::HashSet;
 use std::fmt::Write;
 
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 impl From<&Data<Logs>> for LogMessage {
     fn from(data: &Data<Logs>) -> LogMessage {
         let mut msg = data.msg().unwrap_or("").to_string();
@@ -22,7 +21,7 @@ impl From<&Data<Logs>> for LogMessage {
         let file = data.metadata.file.as_ref();
         let line = data.metadata.line.as_ref();
         if let (Some(file), Some(line)) = (file, line) {
-            msg = format!("[{}({})] {}", file, line, msg);
+            msg = format!("[{file}({line})] {msg}");
         }
 
         let tags = match &data.metadata.tags {
@@ -57,7 +56,7 @@ pub fn format_log_message(data: &Data<Logs>) -> String {
     let file = data.metadata.file.as_ref();
     let line = data.metadata.line.as_ref();
     if let (Some(file), Some(line)) = (file, line) {
-        msg = format!("[{}({})] {}", file, line, msg);
+        msg = format!("[{file}({line})] {msg}");
     }
     msg
 }
@@ -94,7 +93,6 @@ pub fn filter_by_tags(log_message: &Data<Logs>, include_tags: &HashSet<String>) 
 }
 
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 impl From<Data<Logs>> for LogMessage {
     fn from(data: Data<Logs>) -> LogMessage {
         LogMessage {

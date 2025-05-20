@@ -10,7 +10,6 @@
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 #include <zircon/assert.h>
@@ -18,6 +17,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 #include <fbl/intrusive_double_list.h>
 
@@ -89,6 +89,11 @@ class Pool {
   using BookkeepingAddressToPointer =
       fit::inline_function<std::byte*(uint64_t addr, uint64_t size)>;
 
+  // A user-prescribed callback to make the address ranges the Pool uses
+  // 'accessible': this includes the memory that the Pool itself uses for
+  // bookkeeping, as well as any allocations.
+  using AccessCallback = fit::inline_function<void(uint64_t addr, uint64_t size)>;
+
   // The size of a chunk of free RAM reserved for internal Pool bookkeeping.
   // The value is ultimately arbitrary, but is chosen with the expectation that
   // it is sufficiently large to avoid fragmentation of the available memory in
@@ -135,7 +140,7 @@ class Pool {
   // Pool's initial bookkeeping.
   //
   template <size_t N>
-  fit::result<fit::failed> Init(std::array<cpp20::span<Range>, N> ranges,
+  fit::result<fit::failed> Init(std::array<std::span<Range>, N> ranges,
                                 uint64_t default_min_addr = kDefaultMinAddr,
                                 uint64_t default_max_addr = kDefaultMaxAddr) {
     return Init(ranges, std::make_index_sequence<N>(), default_min_addr, default_max_addr);
@@ -161,6 +166,13 @@ class Pool {
 
   // Returns the number of tracked, normalized ranges.
   size_t size() const { return num_ranges_; }
+
+  // Sets an allocation callback (see AccessCallback for more details). This
+  // may be called before Init().
+  void set_access_callback(AccessCallback access_callback) {
+    ZX_ASSERT(access_callback);
+    access_callback_ = std::move(access_callback);
+  }
 
   // Returns an iterator pointing to the tracked, normalized range containing
   // the provided address if one exists, or else end().
@@ -259,7 +271,7 @@ class Pool {
   //
   // `alignments` is a collection of power of two alignments, that is the mask for alignment is
   // equivalent to `(1 << alignments[n]) - 1`.
-  fit::result<fit::failed> CoalescePeripherals(cpp20::span<const size_t> alignments);
+  fit::result<fit::failed> CoalescePeripherals(std::span<const size_t> alignments);
 
   // Pretty-prints the memory ranges contained in the pool.
   void PrintMemoryRanges(const char* prefix, FILE* f = stdout) const {
@@ -285,11 +297,11 @@ class Pool {
   };
 
   // Ultimately deferred to as the actual initialization routine.
-  fit::result<fit::failed> Init(cpp20::span<internal::RangeIterationContext> state,
-                                uint64_t min_addr, uint64_t max_addr);
+  fit::result<fit::failed> Init(std::span<internal::RangeIterationContext> state, uint64_t min_addr,
+                                uint64_t max_addr);
 
   template <size_t... I>
-  fit::result<fit::failed> Init(std::array<cpp20::span<Range>, sizeof...(I)> ranges,
+  fit::result<fit::failed> Init(std::array<std::span<Range>, sizeof...(I)> ranges,
                                 std::index_sequence<I...> seq, uint64_t min_addr,
                                 uint64_t max_addr) {
     std::array state{internal::RangeIterationContext(ranges[I])...};
@@ -344,6 +356,8 @@ class Pool {
   BookkeepingAddressToPointer bookkeeping_pointer_ = [](uint64_t addr, uint64_t size) {
     return reinterpret_cast<std::byte*>(addr);
   };
+
+  AccessCallback access_callback_ = [](uint64_t addr, uint64_t size) {};
 
   // The list of unused nodes. We avoid the term "free" to disambiguate from
   // "free memory", which is unrelated to this list. The nodes stored within

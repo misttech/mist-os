@@ -530,6 +530,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                                 output: true,
                             },
                             Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
                         ],
                         return_value: Type::UNKNOWN_SCALAR,
                         invalidate_array_bounds: false,
@@ -612,6 +613,13 @@ fn scalar_u32_field(offset: usize) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::Scalar { size: std::mem::size_of::<u32>() } }
 }
 
+fn scalar_u32_mut_field(offset: usize) -> FieldDescriptor {
+    FieldDescriptor {
+        offset,
+        field_type: FieldType::MutableScalar { size: std::mem::size_of::<u32>() },
+    }
+}
+
 fn scalar_u64_field(offset: usize) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::Scalar { size: std::mem::size_of::<u64>() } }
 }
@@ -663,8 +671,11 @@ pub static SCHED_ARG_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
-            // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
-            scalar_range(0, offset_of!(__sk_buff, cb)),
+            // All fields from the start of `__sk_buff` to `cb` are read-only scalars, except mark
+            // that is read-write.
+            scalar_range(0, offset_of!(__sk_buff, mark)),
+            scalar_u32_mut_field(offset_of!(__sk_buff, mark)),
+            scalar_range(offset_of!(__sk_buff, queue_mapping), offset_of!(__sk_buff, cb)),
             // `cb` is a mutable array.
             scalar_mut_range(offset_of!(__sk_buff, cb), offset_of!(__sk_buff, hash)),
             scalar_u32_field(offset_of!(__sk_buff, hash)),
@@ -685,8 +696,11 @@ pub static CGROUP_SKB_SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
-            // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
-            scalar_range(0, offset_of!(__sk_buff, cb)),
+            // All fields from the start of `__sk_buff` to `cb` are read-only scalars, except mark
+            // that is read-write.
+            scalar_range(0, offset_of!(__sk_buff, mark)),
+            scalar_u32_mut_field(offset_of!(__sk_buff, mark)),
+            scalar_range(offset_of!(__sk_buff, queue_mapping), offset_of!(__sk_buff, cb)),
             // `cb` is a mutable array.
             scalar_mut_range(offset_of!(__sk_buff, cb), offset_of!(__sk_buff, hash)),
             scalar_u32_field(offset_of!(__sk_buff, hash)),
@@ -1222,6 +1236,80 @@ impl From<u32> for AttachType {
             u32::MAX => Self::Unspecified,
             _ => Self::Invalid(attach_type),
         }
+    }
+}
+
+impl From<AttachType> for u32 {
+    fn from(attach_type: AttachType) -> Self {
+        match attach_type {
+            AttachType::CgroupInetIngress => bpf_attach_type_BPF_CGROUP_INET_INGRESS,
+            AttachType::CgroupInetEgress => bpf_attach_type_BPF_CGROUP_INET_EGRESS,
+            AttachType::CgroupInetSockCreate => bpf_attach_type_BPF_CGROUP_INET_SOCK_CREATE,
+            AttachType::CgroupSockOps => bpf_attach_type_BPF_CGROUP_SOCK_OPS,
+            AttachType::SkSkbStreamParser => bpf_attach_type_BPF_SK_SKB_STREAM_PARSER,
+            AttachType::SkSkbStreamVerdict => bpf_attach_type_BPF_SK_SKB_STREAM_VERDICT,
+            AttachType::CgroupDevice => bpf_attach_type_BPF_CGROUP_DEVICE,
+            AttachType::SkMsgVerdict => bpf_attach_type_BPF_SK_MSG_VERDICT,
+            AttachType::CgroupInet4Bind => bpf_attach_type_BPF_CGROUP_INET4_BIND,
+            AttachType::CgroupInet6Bind => bpf_attach_type_BPF_CGROUP_INET6_BIND,
+            AttachType::CgroupInet4Connect => bpf_attach_type_BPF_CGROUP_INET4_CONNECT,
+            AttachType::CgroupInet6Connect => bpf_attach_type_BPF_CGROUP_INET6_CONNECT,
+            AttachType::CgroupInet4PostBind => bpf_attach_type_BPF_CGROUP_INET4_POST_BIND,
+            AttachType::CgroupInet6PostBind => bpf_attach_type_BPF_CGROUP_INET6_POST_BIND,
+            AttachType::CgroupUdp4Sendmsg => bpf_attach_type_BPF_CGROUP_UDP4_SENDMSG,
+            AttachType::CgroupUdp6Sendmsg => bpf_attach_type_BPF_CGROUP_UDP6_SENDMSG,
+            AttachType::LircMode2 => bpf_attach_type_BPF_LIRC_MODE2,
+            AttachType::FlowDissector => bpf_attach_type_BPF_FLOW_DISSECTOR,
+            AttachType::CgroupSysctl => bpf_attach_type_BPF_CGROUP_SYSCTL,
+            AttachType::CgroupUdp4Recvmsg => bpf_attach_type_BPF_CGROUP_UDP4_RECVMSG,
+            AttachType::CgroupUdp6Recvmsg => bpf_attach_type_BPF_CGROUP_UDP6_RECVMSG,
+            AttachType::CgroupGetsockopt => bpf_attach_type_BPF_CGROUP_GETSOCKOPT,
+            AttachType::CgroupSetsockopt => bpf_attach_type_BPF_CGROUP_SETSOCKOPT,
+            AttachType::TraceRawTp => bpf_attach_type_BPF_TRACE_RAW_TP,
+            AttachType::TraceFentry => bpf_attach_type_BPF_TRACE_FENTRY,
+            AttachType::TraceFexit => bpf_attach_type_BPF_TRACE_FEXIT,
+            AttachType::ModifyReturn => bpf_attach_type_BPF_MODIFY_RETURN,
+            AttachType::LsmMac => bpf_attach_type_BPF_LSM_MAC,
+            AttachType::TraceIter => bpf_attach_type_BPF_TRACE_ITER,
+            AttachType::CgroupInet4Getpeername => bpf_attach_type_BPF_CGROUP_INET4_GETPEERNAME,
+            AttachType::CgroupInet6Getpeername => bpf_attach_type_BPF_CGROUP_INET6_GETPEERNAME,
+            AttachType::CgroupInet4Getsockname => bpf_attach_type_BPF_CGROUP_INET4_GETSOCKNAME,
+            AttachType::CgroupInet6Getsockname => bpf_attach_type_BPF_CGROUP_INET6_GETSOCKNAME,
+            AttachType::XdpDevmap => bpf_attach_type_BPF_XDP_DEVMAP,
+            AttachType::CgroupInetSockRelease => bpf_attach_type_BPF_CGROUP_INET_SOCK_RELEASE,
+            AttachType::XdpCpumap => bpf_attach_type_BPF_XDP_CPUMAP,
+            AttachType::SkLookup => bpf_attach_type_BPF_SK_LOOKUP,
+            AttachType::Xdp => bpf_attach_type_BPF_XDP,
+            AttachType::SkSkbVerdict => bpf_attach_type_BPF_SK_SKB_VERDICT,
+            AttachType::SkReuseportSelect => bpf_attach_type_BPF_SK_REUSEPORT_SELECT,
+            AttachType::SkReuseportSelectOrMigrate => {
+                bpf_attach_type_BPF_SK_REUSEPORT_SELECT_OR_MIGRATE
+            }
+            AttachType::PerfEvent => bpf_attach_type_BPF_PERF_EVENT,
+            AttachType::TraceKprobeMulti => bpf_attach_type_BPF_TRACE_KPROBE_MULTI,
+            AttachType::LsmCgroup => bpf_attach_type_BPF_LSM_CGROUP,
+            AttachType::StructOps => bpf_attach_type_BPF_STRUCT_OPS,
+            AttachType::Netfilter => bpf_attach_type_BPF_NETFILTER,
+            AttachType::TcxIngress => bpf_attach_type_BPF_TCX_INGRESS,
+            AttachType::TcxEgress => bpf_attach_type_BPF_TCX_EGRESS,
+            AttachType::TraceUprobeMulti => bpf_attach_type_BPF_TRACE_UPROBE_MULTI,
+            AttachType::CgroupUnixConnect => bpf_attach_type_BPF_CGROUP_UNIX_CONNECT,
+            AttachType::CgroupUnixSendmsg => bpf_attach_type_BPF_CGROUP_UNIX_SENDMSG,
+            AttachType::CgroupUnixRecvmsg => bpf_attach_type_BPF_CGROUP_UNIX_RECVMSG,
+            AttachType::CgroupUnixGetpeername => bpf_attach_type_BPF_CGROUP_UNIX_GETPEERNAME,
+            AttachType::CgroupUnixGetsockname => bpf_attach_type_BPF_CGROUP_UNIX_GETSOCKNAME,
+            AttachType::NetkitPrimary => bpf_attach_type_BPF_NETKIT_PRIMARY,
+            AttachType::NetkitPeer => bpf_attach_type_BPF_NETKIT_PEER,
+            AttachType::TraceKprobeSession => bpf_attach_type_BPF_TRACE_KPROBE_SESSION,
+            AttachType::Unspecified => u32::MAX,
+            AttachType::Invalid(attach_type) => attach_type,
+        }
+    }
+}
+
+impl From<AttachType> for u64 {
+    fn from(attach_type: AttachType) -> Self {
+        (u32::from(attach_type)).into()
     }
 }
 

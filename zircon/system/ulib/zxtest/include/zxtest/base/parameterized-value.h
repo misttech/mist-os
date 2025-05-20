@@ -119,8 +119,8 @@ class AddTestDelegate {
  public:
   virtual ~AddTestDelegate() = default;
   virtual std::unique_ptr<ParameterizedTestCaseInfo> CreateSuite(
-      const cpp17::string_view& suite_name) = 0;
-  virtual bool AddTest(ParameterizedTestCaseInfo* base, const cpp17::string_view& test_name,
+      const std::string_view& suite_name) = 0;
+  virtual bool AddTest(ParameterizedTestCaseInfo* base, const std::string_view& test_name,
                        const SourceLocation& location) = 0;
 };
 

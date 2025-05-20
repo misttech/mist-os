@@ -42,6 +42,16 @@
             ],
         },
     ],
+    use: [
+        {
+            storage: "data",
+            path: "/traces",
+        },
+        {
+            protocol: [ "fuchsia.sysinfo.SysInfo" ],
+            availability: "optional",
+        },
+    ],
     offer: [
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
@@ -72,7 +82,10 @@
             to: "#perfetto-bridge",
         },
         {
-            protocol: [ "fuchsia.boot.ReadOnlyLog" ],
+            protocol: [
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "parent",
             to: [ "#ktrace_provider" ],
         },

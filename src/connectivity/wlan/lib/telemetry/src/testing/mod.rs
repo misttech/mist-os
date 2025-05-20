@@ -76,8 +76,8 @@ pub struct TestHelper {
     pub inspect_metadata_node: InspectNode,
     pub inspect_metadata_path: String,
 
-    pub cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    cobalt_1dot1_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
+    pub cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
     /// As requests to Cobalt are responded to via `self.drain_cobalt_events()`,
     /// their payloads are drained to this HashMap
     cobalt_events: Vec<MetricEvent>,
@@ -116,7 +116,7 @@ impl TestHelper {
                     self.telemetry_svc_stream = Some(telemetry_stream);
                     self.exec.run_until_stalled(test_fut)
                 }
-                _ => panic!("Unexpected device monitor request: {:?}", req),
+                _ => panic!("Unexpected device monitor request: {req:?}"),
             }
         } else {
             result
@@ -135,7 +135,7 @@ impl TestHelper {
             result = self.exec.run_until_stalled(test_fut);
             made_progress = false;
             while let Poll::Ready(Some(Ok(req))) =
-                self.exec.run_until_stalled(&mut self.cobalt_1dot1_stream.next())
+                self.exec.run_until_stalled(&mut self.cobalt_stream.next())
             {
                 self.cobalt_events.append(&mut req.respond_to_metric_req(Ok(())));
                 made_progress = true;
@@ -170,7 +170,7 @@ impl TestHelper {
                     .expect("expect sending QueryTelemetrySupport response to succeed");
             }
             _ => {
-                panic!("unexpected request: {:?}", request);
+                panic!("unexpected request: {request:?}");
             }
         }
         self.exec.run_until_stalled(test_fut)
@@ -202,7 +202,7 @@ impl TestHelper {
                     .expect("expect sending GetIfaceStats response to succeed");
             }
             _ => {
-                panic!("unexpected request: {:?}", request);
+                panic!("unexpected request: {request:?}");
             }
         }
         self.exec.run_until_stalled(test_fut)
@@ -214,8 +214,6 @@ impl TestHelper {
 
     /// Empty the cobalt metrics can be stored so that future checks on cobalt metrics can
     /// ignore previous values.
-    // TODO(339221340): remove these allows once the skeleton has a few uses
-    #[allow(unused)]
     pub fn clear_cobalt_events(&mut self) {
         self.cobalt_events = Vec::new();
     }
@@ -254,7 +252,7 @@ pub fn setup_test() -> TestHelper {
     let exec = fasync::TestExecutor::new_with_fake_time();
     exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
-    let (cobalt_1dot1_proxy, cobalt_1dot1_stream) =
+    let (cobalt_proxy, cobalt_stream) =
         create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let (monitor_svc_proxy, monitor_svc_stream) =
@@ -275,8 +273,8 @@ pub fn setup_test() -> TestHelper {
         inspect_node,
         inspect_metadata_node,
         inspect_metadata_path,
-        cobalt_1dot1_stream,
-        cobalt_1dot1_proxy,
+        cobalt_stream,
+        cobalt_proxy,
         cobalt_events: vec![],
         monitor_svc_proxy,
         monitor_svc_stream,

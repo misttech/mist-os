@@ -109,8 +109,9 @@ fpromise::promise<inspect::Inspector> PlatformDevice::InspectNodeCallback() cons
   inspect::Inspector inspector;
   auto interrupt_vectors =
       inspector.GetRoot().CreateUintArray("interrupt_vectors", interrupt_vectors_.size());
-  for (size_t i = 0; i < interrupt_vectors_.size(); ++i) {
-    interrupt_vectors.Set(i, interrupt_vectors_[i]);
+  size_t i = 0;
+  for (const auto& vector : interrupt_vectors_) {
+    interrupt_vectors.Set(i++, vector);
   }
   inspector.emplace(std::move(interrupt_vectors));
   return fpromise::make_result_promise(fpromise::ok(std::move(inspector)));
@@ -193,7 +194,7 @@ zx::result<zx::interrupt> PlatformDevice::GetInterrupt(uint32_t index, uint32_t 
     fdf::error("zx_interrupt_create failed {}", zx_status_get_string(status));
     return zx::error(status);
   }
-  interrupt_vectors_.emplace_back(vector);
+  interrupt_vectors_.insert(vector);
   return zx::ok(std::move(out_irq));
 }
 
@@ -314,11 +315,7 @@ zx::result<> PlatformDevice::CreateNode() {
       fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id_),
       fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE)};
   if (const auto& node_props = node_.properties(); node_props.has_value()) {
-    std::transform(node_props->cbegin(), node_props->cend(), std::back_inserter(props),
-                   [](const fuchsia_driver_framework::NodeProperty& property) {
-                     return fuchsia_driver_framework::NodeProperty2{
-                         {.key = property.key().string_value().value(), .value = property.value()}};
-                   });
+    std::copy(node_props->cbegin(), node_props->cend(), std::back_inserter(props));
   }
 
   auto add_props = [&props](const auto& resource, const std::string& count_key,
@@ -402,7 +399,7 @@ zx::result<> PlatformDevice::CreateNode() {
                          : ZX_ERR_INTERNAL);
   }
 
-  node_controller_ = std::move(std::move(client));
+  node_controller_.Bind(std::move(client), bus()->dispatcher(), this);
 
   return zx::ok();
 }
@@ -722,6 +719,10 @@ void PlatformDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   fdf::warn("PlatformDevice received unknown method with ordinal: {}", metadata.method_ordinal);
+}
+
+void PlatformDevice::OnBind(fuchsia_driver_framework::NodeControllerOnBindRequest& request) {
+  node_token_ = std::move(request.node_token());
 }
 
 }  // namespace platform_bus

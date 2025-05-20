@@ -28,6 +28,11 @@
                 "#reachability",
             ],
         },
+        {
+            protocol: [ "fuchsia.net.policy.socketproxy.DnsServerWatcher" ],
+            from: "#socket-proxy",
+            to: [ "#netcfg" ],
+        },
     ],
     expose: [
         {

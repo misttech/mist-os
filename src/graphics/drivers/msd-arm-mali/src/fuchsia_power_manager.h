@@ -18,7 +18,7 @@ class FuchsiaPowerManager final : public TimeoutSource {
   class Owner {
    public:
     using PowerStateCallback = fit::callback<void(bool)>;
-    virtual void SetPowerState(bool enabled, PowerStateCallback completer) = 0;
+    virtual void PostPowerStateChange(bool enabled, PowerStateCallback completer) = 0;
     virtual PowerManager* GetPowerManager() = 0;
   };
   struct PowerGoals {

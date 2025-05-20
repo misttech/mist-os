@@ -76,6 +76,6 @@ rust_library(
     }),
     version = "2.5.0",
     deps = [
-        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.14:crossbeam_utils",
+        "//third_party/rust_crates/vendor/crossbeam-utils-0.8.21:crossbeam_utils",
     ],
 )

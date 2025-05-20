@@ -7,6 +7,7 @@
 
 #include <lib/fpromise/result.h>
 
+#include <memory>
 #include <string_view>
 #include <vector>
 

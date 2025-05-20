@@ -7,3 +7,4 @@ include /build/sdk/meta/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/devices/lib/OWNERS
 include /src/sys/run_test_suite/OWNERS
+include /tools/test_pilot/OWNERS

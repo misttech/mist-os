@@ -9,6 +9,7 @@ import("//build/test.gni")
 
 block_server_sources = [
   "src/async_interface.rs",
+  "src/bin.rs",
   "src/c_interface.rs",
   "src/lib.rs",
 ]
@@ -28,6 +29,7 @@ block_server_deps = [
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:log",
   "//third_party/rust_crates:scopeguard",
+  "//third_party/rust_crates:slab",
 ]
 
 rustc_library("block_server") {
@@ -111,5 +113,6 @@ group("tests") {
   deps = [
     ":block_server_cc_tests_package",
     ":block_server_tests",
+    "integration:tests",
   ]
 }

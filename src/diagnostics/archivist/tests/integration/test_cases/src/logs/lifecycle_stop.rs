@@ -7,20 +7,17 @@ use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
 use crate::utils::LogSettingsExt;
 use fidl_fuchsia_diagnostics_types::Severity;
-
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
+use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage};
+use fuchsia_syslog_listener::{run_log_listener_with_proxy, LogProcessor};
+use futures::channel::mpsc;
+use futures::StreamExt;
 use {
-    crate::logs::utils::{run_log_listener_with_proxy, LogProcessor},
-    fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage},
+    fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics,
     fuchsia_async as fasync,
-    futures::channel::mpsc,
-    futures::StreamExt,
 };
-use {fidl_fuchsia_archivist_test as ftest, fidl_fuchsia_diagnostics as fdiagnostics};
 
 const PUPPET_NAME: &str = "puppet";
 
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 #[fuchsia::test]
 async fn embedding_stop_api_for_log_listener() {
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
@@ -134,12 +131,10 @@ async fn embedding_stop_api_works_for_batch_iterator() {
     .await;
 }
 
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 struct Listener {
     send_logs: mpsc::UnboundedSender<LogMessage>,
 }
 
-#[cfg(fuchsia_api_level_at_least = "PLATFORM")]
 impl LogProcessor for Listener {
     fn log(&mut self, message: LogMessage) {
         self.send_logs.unbounded_send(message).unwrap();

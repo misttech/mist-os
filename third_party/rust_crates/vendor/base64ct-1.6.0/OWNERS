@@ -3,4 +3,6 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /third_party/rust_crates/vendor/pem-rfc7468-0.6.0/OWNERS
+include /third_party/rust_crates/vendor/pem-rfc7468-0.7.0/OWNERS
 include /third_party/rust_crates/vendor/spki-0.6.0/OWNERS
+include /third_party/rust_crates/vendor/spki-0.7.3/OWNERS

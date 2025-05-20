@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -277,55 +275,49 @@ class ParentServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_get_child: typing.TypeAlias = ParentGetChildResponse
+    GetChildResponse: typing.TypeAlias = ParentGetChildResponse
 
     @abstractmethod
     def get_child(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_get_child]
-        | _MethodResponse_get_child
+        typing.Coroutine[typing.Any, typing.Any, GetChildResponse]
+        | GetChildResponse
     ):
         ...
 
-    _MethodResponse_get_child_request: typing.TypeAlias = (
-        ParentGetChildRequestResponse
-    )
+    GetChildRequestResponse: typing.TypeAlias = ParentGetChildRequestResponse
 
     @abstractmethod
     def get_child_request(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_get_child_request
-        ]
-        | _MethodResponse_get_child_request
+        typing.Coroutine[typing.Any, typing.Any, GetChildRequestResponse]
+        | GetChildRequestResponse
     ):
         ...
 
-    _MethodResponse_take_child: typing.TypeAlias = None
+    TakeChildResponse: typing.TypeAlias = None
 
     @abstractmethod
     def take_child(
         self,
         request: ParentTakeChildRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_take_child]
-        | _MethodResponse_take_child
+        typing.Coroutine[typing.Any, typing.Any, TakeChildResponse]
+        | TakeChildResponse
     ):
         ...
 
-    _MethodResponse_take_child_request: typing.TypeAlias = None
+    TakeChildRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def take_child_request(
         self,
         request: ParentTakeChildRequestRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_take_child_request
-        ]
-        | _MethodResponse_take_child_request
+        typing.Coroutine[typing.Any, typing.Any, TakeChildRequestResponse]
+        | TakeChildRequestResponse
     ):
         ...
 

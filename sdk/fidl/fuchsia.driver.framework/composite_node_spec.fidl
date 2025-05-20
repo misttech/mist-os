@@ -26,7 +26,7 @@ type BindRule = struct {
 };
 
 /// Represents a bind rule in a parent specification.
-@available(added=NEXT)
+@available(added=27)
 type BindRule2 = struct {
     /// Property key.
     key NodePropertyKeyString;
@@ -54,7 +54,7 @@ type ParentSpec = struct {
 
 /// Specification for a node that parents the composite node created from the
 /// composite node specification.
-@available(added=NEXT)
+@available(added=27)
 type ParentSpec2 = struct {
     /// Parent's bind rules. Property keys must be unique. Must not be empty.
     bind_rules vector<BindRule2>:MAX_PROPERTY_COUNT;
@@ -75,7 +75,7 @@ type CompositeNodeSpec = table {
 
     /// The nodes in the composite node spec. Must not be empty. The first node is
     /// the primary node.
-    @available(added=NEXT)
+    @available(added=27)
     3: parents2 vector<ParentSpec2>:MAX;
 };
 
@@ -92,7 +92,7 @@ type CompositeNodeSpecError = flexible enum {
     @available(added=20)
     DRIVER_INDEX_FAILURE = 4;
     /// The `parents` and `parents2` fields were both specified.
-    @available(added=NEXT)
+    @available(added=27)
     DUPLICATE_PARENTS = 5;
 };
 

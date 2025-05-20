@@ -211,6 +211,11 @@ impl From<u64> for BpfValue {
         Self(v)
     }
 }
+impl From<i64> for BpfValue {
+    fn from(v: i64) -> Self {
+        Self(v as u64)
+    }
+}
 
 impl From<usize> for BpfValue {
     fn from(v: usize) -> Self {
@@ -539,13 +544,14 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
             )
             .unwrap();
 
-            instruction.off = instruction.off.checked_add(offset_diff).ok_or_else(|| {
+            let new_offset = instruction.offset().checked_add(offset_diff).ok_or_else(|| {
                 EbpfError::ProgramLinkError(format!("Struct field offset overflow at PC {}", *pc))
             })?;
+            instruction.set_offset(new_offset);
 
             // 32-bit pointer loads must be updated to 64-bit loads.
             if *is_32_bit_ptr_load {
-                instruction.code = (instruction.code & !BPF_SIZE_MASK) | BPF_DW;
+                instruction.set_code((instruction.code() & !BPF_SIZE_MASK) | BPF_DW);
             }
         } else {
             if *is_32_bit_ptr_load {
@@ -561,8 +567,8 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
         let instruction = &mut code[pc];
 
         // Check that we have implementations for all helper calls.
-        if instruction.code == (BPF_JMP | BPF_CALL) {
-            let helper_id = instruction.imm as u32;
+        if instruction.code() == (BPF_JMP | BPF_CALL) {
+            let helper_id = instruction.imm() as u32;
             if helpers.get(&helper_id).is_none() {
                 return Err(EbpfError::ProgramLinkError(format!(
                     "Missing implementation for helper with id={}",
@@ -572,13 +578,13 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
         }
 
         // Link maps.
-        if instruction.code == BPF_LDDW {
+        if instruction.code() == BPF_LDDW {
             // If the instruction references BPF_PSEUDO_MAP_FD, then we need to look up the map fd
             // and create a reference from this program to that object.
             match instruction.src_reg() {
                 0 => (),
                 BPF_PSEUDO_MAP_IDX => {
-                    let map_index = usize::try_from(instruction.imm)
+                    let map_index = usize::try_from(instruction.imm())
                         .expect("negative map index in a verified program");
                     let map = maps.get(map_index).ok_or_else(|| {
                         EbpfError::ProgramLinkError(format!("Invalid map_index: {}", map_index))
@@ -588,11 +594,11 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
                     let map_ptr = map.as_bpf_value().as_u64();
                     let (high, low) = ((map_ptr >> 32) as i32, map_ptr as i32);
                     instruction.set_src_reg(0);
-                    instruction.imm = low;
+                    instruction.set_imm(low);
 
                     // The code was verified, so this is not expected to overflow.
                     let next_instruction = &mut code[pc + 1];
-                    next_instruction.imm = high;
+                    next_instruction.set_imm(high);
                 }
                 value => {
                     return Err(EbpfError::ProgramLinkError(format!(

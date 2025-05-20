@@ -25,8 +25,17 @@ prefix) or decimal (no prefix).
 
   Writes one byte to the given address.
 
-- `sdio <device> read-stress <address> <size> <loops> [--fifo] [--dma]`
+- `sdio <device> read <address> <size> [--fifo]`
+
+  Reads one or more bytes of data from the given address. The data may be read from a fixed address
+  (`--fifo`).
+
+- `sdio <device> read-stress <address> <size> <loops> [--fifo]`
 
   Reads `loops` chunks of data from the given address, where each chunk is `size` bytes. The data
-  may be read from a fixed address (`--fifo`) and may be done using DMA (`--dma`). At the end,
-  statistics about the transfer (total time and throughput) are printed.
+  may be read from a fixed address (`--fifo`). At the end, statistics about the transfer (total time
+  and throughput) are printed.
+
+- `sdio <device> reset`
+
+  Requests that the card be reset and re-initialized.

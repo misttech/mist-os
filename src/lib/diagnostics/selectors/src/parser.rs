@@ -470,8 +470,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
-                "For '{}', got: {:?}",
-                test_string, selector,
+                "For '{test_string}', got: {selector:?}",
             );
 
             // Component selectors can start with `/`
@@ -483,8 +482,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
-                "For '{}', got: {:?}",
-                test_moniker_string, selector,
+                "For '{test_moniker_string}', got: {selector:?}",
             );
 
             // Component selectors can start with `./`
@@ -496,8 +494,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
-                "For '{}', got: {:?}",
-                test_moniker_string, selector,
+                "For '{test_moniker_string}', got: {selector:?}",
             );
 
             // We can also accept component selectors without escaping
@@ -509,8 +506,7 @@ mod tests {
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
-                "For '{}', got: {:?}",
-                test_moniker_string, selector,
+                "For '{test_moniker_string}', got: {selector:?}",
             );
         }
     }
@@ -548,7 +544,7 @@ mod tests {
         for test_string in test_vector {
             let component_selector_result =
                 consuming_component_selector::<VerboseError>(test_string, RequireEscaped::COLONS);
-            assert!(component_selector_result.is_err(), "expected '{}' to fail", test_string);
+            assert!(component_selector_result.is_err(), "expected '{test_string}' to fail");
         }
     }
 
@@ -726,11 +722,10 @@ mod tests {
         ];
         for string in test_vector {
             // prepend a placeholder component selector so that we exercise the validation code.
-            let test_selector = format!("a:{}", string);
+            let test_selector = format!("a:{string}");
             assert!(
                 selector::<VerboseError>(&test_selector).is_err(),
-                "{} should fail",
-                test_selector
+                "{test_selector} should fail"
             );
         }
     }
@@ -1000,8 +995,7 @@ mod tests {
             let expected_len = expected.len();
             assert_eq!(
                 expected, actual,
-                "failed test case {case_number}: |{input}|\nexpected length: {}\nactual length: {}",
-                expected_len, actual_len,
+                "failed test case {case_number}: |{input}|\nexpected length: {expected_len}\nactual length: {actual_len}",
             );
         }
     }

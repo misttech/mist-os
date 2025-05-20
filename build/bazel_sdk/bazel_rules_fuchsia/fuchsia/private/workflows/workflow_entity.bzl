@@ -88,13 +88,13 @@ def workflow_entity_rule(*, implementation, attrs = {}, **kwargs):
                 default = "//fuchsia/tools:unbuffer",
                 doc = "Pass-through executable that unbuffers command stdout/stderr.",
                 executable = True,
-                cfg = "target",
+                cfg = "exec",
             ),
             "_run_workflow": attr.label(
                 default = "//fuchsia/tools:run_workflow",
                 doc = "The workflow runner tool.",
                 executable = True,
-                cfg = "target",
+                cfg = "exec",
             ),
             "arguments": attr.string_list(
                 doc = "Specify arguments for this workflow entity.",

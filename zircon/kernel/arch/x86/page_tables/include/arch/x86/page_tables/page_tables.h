@@ -145,6 +145,8 @@ struct PendingTlbInvalidation {
 
 }  // namespace internal
 
+using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
 class X86PageTableBase {
  public:
   X86PageTableBase() {}
@@ -165,7 +167,6 @@ class X86PageTableBase {
   using CacheLineFlusher = internal::CacheLineFlusher;
 
   using ExistingEntryAction = ArchVmAspaceInterface::ExistingEntryAction;
-  using EnlargeOperation = ArchVmAspaceInterface::EnlargeOperation;
 
   // Returns whether this page table is restricted.
   // We do so by verifying that it was created with `InitRestricted` and has been linked to a
@@ -182,7 +183,7 @@ class X86PageTableBase {
                                ExistingEntryAction existing_action, size_t* mapped) = 0;
   virtual zx_status_t MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, const size_t count,
                                          uint mmu_flags, size_t* mapped) = 0;
-  virtual zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, EnlargeOperation enlarge,
+  virtual zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, ArchUnmapOptions enlarge,
                                  size_t* unmapped) = 0;
   virtual zx_status_t ProtectPages(vaddr_t vaddr, size_t count, uint mmu_flags) = 0;
   virtual zx_status_t QueryVaddr(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) = 0;
@@ -372,7 +373,7 @@ class X86PageTableImpl : public X86PageTableBase {
         VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
         if (unmap_cursor.size() > 0) {
           auto [unmap_status, unmapped] =
-              RemoveMapping(virt_, static_cast<T*>(this)->top_level(), EnlargeOperation::No,
+              RemoveMapping(virt_, static_cast<T*>(this)->top_level(), ArchUnmapOptions::None,
                             CheckForEmptyPt::Yes, unmap_cursor, &cm);
           DEBUG_ASSERT(unmap_status == ZX_OK);
           page_->mmu.num_mappings -= unmapped;
@@ -418,7 +419,7 @@ class X86PageTableImpl : public X86PageTableBase {
         VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
         if (unmap_cursor.size() > 0) {
           auto [unmap_status, unmapped] =
-              RemoveMapping(virt_, static_cast<T*>(this)->top_level(), EnlargeOperation::No,
+              RemoveMapping(virt_, static_cast<T*>(this)->top_level(), ArchUnmapOptions::None,
                             CheckForEmptyPt::Yes, unmap_cursor, &cm);
           DEBUG_ASSERT(unmap_status == ZX_OK);
           page_->mmu.num_mappings -= unmapped;
@@ -437,7 +438,7 @@ class X86PageTableImpl : public X86PageTableBase {
 
     return ZX_OK;
   }
-  zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, EnlargeOperation enlarge,
+  zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, ArchUnmapOptions enlarge,
                          size_t* unmapped) override final {
     canary_.Assert();
 
@@ -1073,7 +1074,7 @@ class X86PageTableImpl : public X86PageTableBase {
    * must be updated by the caller.
    */
   ktl::pair<zx_status_t, uint> RemoveMapping(volatile pt_entry_t* table, PageTableLevel level,
-                                             EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+                                             ArchUnmapOptions enlarge, CheckForEmptyPt pt_check,
                                              VirtualAddressCursor& cursor, ConsistencyManager* cm)
       TA_REQ(lock_) {
     DEBUG_ASSERT(table);
@@ -1115,7 +1116,7 @@ class X86PageTableImpl : public X86PageTableBase {
         if (status != ZX_OK) {
           // If split fails, just unmap the whole thing, and let a
           // subsequent page fault clean it up.
-          if (enlarge == EnlargeOperation::Yes) {
+          if (!!(enlarge & ArchUnmapOptions::Enlarge)) {
             UnmapEntry(cm, level, cursor.vaddr(), e, /*was_terminal=*/true);
             unmapped++;
 
@@ -1361,9 +1362,10 @@ class X86PageTableImpl : public X86PageTableBase {
         HarvestMapping(next_table, non_terminal_action, terminal_action, lower_level(level), cursor,
                        cm);
       } else if (non_terminal_action == NonTerminalAction::FreeUnaccessed) {
-        auto [result, unmapped] = RemoveMapping(
-            next_table, lower_level(level), EnlargeOperation::No, CheckForEmptyPt::No, cursor, cm);
-        // Although we pass in EnlargeOperation::No, the unmap should never fail since we are
+        auto [result, unmapped] =
+            RemoveMapping(next_table, lower_level(level), ArchUnmapOptions::None,
+                          CheckForEmptyPt::No, cursor, cm);
+        // Although we pass in ArchUnmapOptions::None, the unmap should never fail since we are
         // unmapping an entire block and never a sub part of a page.
         ASSERT(result == ZX_OK);
         lower_page->mmu.num_mappings -= unmapped;

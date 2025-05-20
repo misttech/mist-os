@@ -812,8 +812,10 @@ void DeviceInterface::SessionStarted(Session& session) {
   if (session.IsPrimary()) {
     active_primary_sessions_++;
     if (session.ShouldTakeOverPrimary(primary_session_.get())) {
-      // Push primary session to sessions list.
-      sessions_.push_back(std::move(primary_session_));
+      // Push primary session to sessions list if we have one.
+      if (primary_session_) {
+        sessions_.push_back(std::move(primary_session_));
+      }
       // Find the session in the list and promote it to primary.
       primary_session_ = sessions_.erase(session);
       ZX_ASSERT(primary_session_);

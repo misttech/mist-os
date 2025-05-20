@@ -18,8 +18,8 @@
 #include <string-file.h>
 #include <zircon/assert.h>
 
-#include <ktl/algorithm.h>
 #include <ktl/tuple.h>
+#include <ktl/utility.h>
 #include <phys/allocation.h>
 #include <phys/arch/arch-handoff.h>
 #include <phys/elf-image.h>
@@ -269,26 +269,42 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
 
 void HandoffPrep::UsePackageFiles(KernelStorage::Bootfs kernel_package) {
   auto& pool = Allocation::GetPool();
+  const ktl::string_view userboot = gBootOptions->userboot.data();
   for (auto it = kernel_package.begin(); it != kernel_package.end(); ++it) {
     ktl::span data = it->data;
     uintptr_t start = reinterpret_cast<uintptr_t>(data.data());
     // These are decompressed BOOTFS payloads, so there is only padding up to
     // the next page boundary.
     ktl::span aligned_data{data.data(), (data.size_bytes() + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE};
+    if (it->name == userboot) {
+      ZX_ASSERT(
+          pool.UpdateRamSubranges(memalloc::Type::kUserboot, start, aligned_data.size()).is_ok());
+      handoff_->userboot = MakePhysElfImage(it, it->name);
+    }
     if (it->name == "version-string.txt"sv) {
       ktl::string_view version{reinterpret_cast<const char*>(data.data()), data.size()};
       SetVersionString(version);
     } else if (it->name == "vdso"sv) {
-      ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kVdso, start, data.size()).is_ok());
-      handoff_->vdso = MakePhysVmo(aligned_data, "vdso/next"sv, data.size());
-    } else if (it->name == "userboot"sv) {
-      ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kUserboot, start, data.size()).is_ok());
-      handoff_->userboot = MakePhysVmo(aligned_data, "userboot"sv, data.size());
+      ZX_ASSERT(pool.UpdateRamSubranges(memalloc::Type::kVdso, start, aligned_data.size()).is_ok());
+      handoff_->vdso = MakePhysElfImage(it, "vdso/next"sv);
     }
   }
   if (auto result = kernel_package.take_error(); result.is_error()) {
     zbitl::PrintBootfsError(result.error_value());
   }
+#if 0
+  ZX_ASSERT_MSG(handoff_->vdso.vmar != PhysVmar{},
+                "\n*** No vdso ELF file found "
+                " in kernel package %.*s (VMO size %#zx) ***",
+                static_cast<int>(kernel_package.directory().size()),
+                kernel_package.directory().data(), handoff_->userboot.vmo.content_size);
+  ZX_ASSERT_MSG(handoff_->userboot.vmar != PhysVmar{},
+                "\n*** kernel.select.userboot=%.*s but no such ELF file"
+                " in kernel package %.*s (VMO size %#zx) ***",
+                static_cast<int>(userboot.size()), userboot.data(),
+                static_cast<int>(kernel_package.directory().size()),
+                kernel_package.directory().data(), handoff_->userboot.vmo.content_size);
+#endif
   ZX_ASSERT_MSG(!handoff_->version_string.empty(), "no version.txt file in kernel package");
 }
 
@@ -319,6 +335,53 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
              version.data());
     }
   }
+}
+
+PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
+                                           ktl::string_view name) {
+  ElfImage elf;
+  if (auto result = elf.InitFromFile(file, false); result.is_error()) {
+    elf.Printf(result.error_value());
+    abort();
+  }
+  elf.set_load_address(0);
+
+  if (auto result = elf.SeparateZeroFill(); result.is_error()) {
+    elf.Printf(result.error_value());
+    abort();
+  }
+
+  PhysElfImage handoff_elf = {
+      .vmo = MakePhysVmo(elf.aligned_memory_image(), name, file->data.size()),
+      .vmar = {.size = elf.vaddr_size()},
+      .info = {
+          .relative_entry_point = elf.entry(),
+          .stack_size = elf.stack_size(),
+      }};
+
+  fbl::AllocChecker ac;
+  ktl::span<PhysMapping> mappings =
+      New(handoff_elf.vmar.mappings, ac, elf.load_info().segments().size());
+  if (!ac.check()) {
+    ZX_PANIC("cannot allocate %zu bytes of handoff space for ELF image details",
+             sizeof(PhysMapping) * elf.load_info().segments().size());
+  }
+  elf.load_info().VisitSegments(
+      [load_bias = elf.load_bias(), &mappings](const auto& segment) -> bool {
+        PhysMapping& mapping = mappings.front();
+        mappings = mappings.subspan(1);
+        mapping = PhysMapping{
+            "",
+            segment.vaddr() + load_bias,
+            segment.memsz(),
+            segment.filesz() == 0 ? PhysElfImage::kZeroFill : segment.offset(),
+            PhysMapping::Permissions::FromSegment(segment),
+        };
+        return true;
+      });
+  ZX_DEBUG_ASSERT(mappings.empty());
+
+  return handoff_elf;
 }
 
 [[noreturn]] void HandoffPrep::DoHandoff(const ElfImage& kernel, UartDriver& uart,
@@ -367,16 +430,6 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
 
   debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
          gSymbolize->name(), kernel.physical_load_address(), kernel.entry());
-#ifdef __aarch64__
-  // Make sure all prior stores have been written back to main memory so that
-  // secondary CPUs booting with MMU/caches off will see a coherent view.
-  //
-  // TODO(https://fxbug.dev/42164859): This is expediently done to the whole
-  // cache rather than to the lines possibly holding the precise memory of
-  // interest to the secondaries. Formalize or rethink this hammer in the
-  // context of the physboot's hand-off contract with the kernel.
-  arch::CleanAndInvalidateLocalCaches();
-#endif
   kernel.Handoff<void(PhysHandoff*)>(handoff());
   ZX_PANIC("ElfImage::Handoff returned!");
 }

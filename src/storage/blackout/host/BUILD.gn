@@ -22,10 +22,7 @@ group("blackout_all") {
 
 group("blackout_emulator_stable") {
   testonly = true
-  deps = [
-    "tests:blackout_integration_test_no_reboot($host_toolchain)",
-    "//src/storage/blackout/target/blackout-integration($target_toolchain)",
-  ]
+  deps = [ "tests:blackout_integration_test_no_reboot($host_toolchain)" ]
 }
 
 group("blackout_emulator_unstable") {
@@ -38,21 +35,22 @@ group("blackout_workbench_vim3_stable") {
   deps = [
     # Integration tests
     "tests:blackout_integration_test_reboot($host_toolchain)",
-    "//src/storage/blackout/target/blackout-integration($target_toolchain)",
 
     # Fxfs tests
     "tests:blackout_fxfs_tree_hard_reboot($host_toolchain)",
     "tests:blackout_fxfs_tree_soft_reboot($host_toolchain)",
-    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree($target_toolchain)",
   ]
 }
 
 group("blackout_workbench_vim3_unstable") {
   testonly = true
   deps = [
+    # Fxfs tests
     "tests:blackout_fxfs_allocate_hard_reboot($host_toolchain)",
     "tests:blackout_fxfs_allocate_soft_reboot($host_toolchain)",
-    "//src/storage/blackout/target/fxfs-allocate:blackout-fxfs-allocate($target_toolchain)",
+
+    # Minfs tests
+    "tests:blackout_minfs_tree_soft_reboot($host_toolchain)",
   ]
 }
 
@@ -61,8 +59,5 @@ group("blackout_workbench_vim3_unstable") {
 # for local testing.
 group("blackout_fail") {
   testonly = true
-  deps = [
-    "tests:blackout_integration_test_fail($host_toolchain)",
-    "//src/storage/blackout/target/blackout-integration($target_toolchain)",
-  ]
+  deps = [ "tests:blackout_integration_test_fail($host_toolchain)" ]
 }

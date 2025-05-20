@@ -40,7 +40,6 @@ source_set("cpp-log-tester") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/stdcompat",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/diagnostics/log/message/rust/cpp-log-decoder:lib",
     "//src/lib/fsl",

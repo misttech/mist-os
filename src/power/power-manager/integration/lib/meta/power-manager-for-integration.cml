@@ -9,5 +9,6 @@
     program: {
         runner: "elf",
         binary: "bin/power_manager_fake_time",
+        lifecycle: { stop_event: "notify" },
     },
 }

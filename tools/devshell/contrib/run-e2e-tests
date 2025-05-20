@@ -11,8 +11,8 @@
 ## an end to end test against the current hardware target.
 ##
 ## Hint:
-## Use fx --dir and/or fx -d flags to change the selected build directory or
-## target device.
+## Use fx --dir flag to change the selected build directory and/or fx -t to
+## change the target device.
 
 set -o errexit
 set -o pipefail

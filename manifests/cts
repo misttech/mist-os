@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <packages>
+    <!-- Milestone CTS release. See fuchsia/prebuilts for the canary release -->
+    <package name="fuchsia/cts/${platform}"
+             path="prebuilt/cts/current_milestone/{{.OS}}-{{.Arch}}"
+             platforms="linux-amd64"
+             version="git_revision:110c42e036f04ecc3edc45a2919e4036ef422624" />
+  </packages>
+</manifest>

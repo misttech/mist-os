@@ -22,7 +22,6 @@
 #include <lib/arch/ticks.h>
 #include <lib/crypto/entropy_pool.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/cpu.h>
@@ -84,6 +83,8 @@ class PhysBootTimes {
 struct PhysVmObject {
   using Name = std::array<char, ZX_MAX_NAME_LEN>;
 
+  constexpr auto operator<=>(const PhysVmObject& other) const = default;
+
   constexpr void set_name(std::string_view new_name) {
     ZX_DEBUG_ASSERT(new_name.size() < name.size());
     new_name.copy(name.data(), name.size() - 1);
@@ -118,9 +119,24 @@ static_assert(std::is_default_constructible_v<PhysVmo>);
 struct PhysMapping : public PhysVmObject {
   class Permissions {
    public:
+    static Permissions Ro() { return Permissions{}.set_readable(); }
     static Permissions Rw() { return Permissions{}.set_readable().set_writable(); }
+    static Permissions Rx() { return Permissions{}.set_readable().set_executable(); }
+    static Permissions Xom() { return Permissions{}.set_executable(); }
+
+    // This works on anything with .readable(), .writable(), and .executable()
+    // methods, which includes this class itself as well as elfldltl::LoadInfo
+    // segment types.
+    static Permissions FromSegment(const auto& segment) {
+      return Permissions{}
+          .set_readable(segment.readable())
+          .set_writable(segment.writable())
+          .set_executable(segment.executable());
+    }
 
     constexpr Permissions() = default;
+
+    bool operator==(const Permissions&) const = default;
 
     constexpr bool readable() const { return perms_[kReadable]; }
     constexpr bool writable() const { return perms_[kWritable]; }
@@ -184,6 +200,8 @@ static_assert(std::is_default_constructible_v<PhysMapping>);
 // logical grouping of mappings, to be realized as a proper VMAR during VM
 // initialization.
 struct PhysVmar : public PhysVmObject {
+  constexpr bool operator==(const PhysVmar& other) const = default;
+
   // It's useful to normalize VMAR order on base address for more readable
   // kernel start-up logging.
   constexpr auto operator<=>(const PhysVmar& other) const { return base <=> other.base; }
@@ -206,6 +224,26 @@ struct PhysVmar : public PhysVmObject {
   PhysHandoffTemporarySpan<const PhysMapping> mappings;
 };
 static_assert(std::is_default_constructible_v<PhysVmar>);
+
+// This combines a PhysVmo containing an ELF image with information on how to
+// perform ELF loading for it.  The PhysVmar is repurposed to describe a VMAR
+// that should be created at an arbitrary address (its .base is always 0).  The
+// mappings within use vaddr relative to that base, and each PhysMapping::paddr
+// is in fact an offset into the VMO rather than a physical address.
+struct PhysElfImage {
+  struct Info {
+    uintptr_t relative_entry_point = 0;  // Add to VMAR base address.
+    std::optional<size_t> stack_size;
+  };
+
+  // This value in .vmar.mappings[n].paddr indicates the mapping is for
+  // zero-fill pages rather than pages from the PhysVmo.
+  static constexpr uintptr_t kZeroFill = -1;
+
+  PhysVmo vmo;
+  PhysVmar vmar;
+  Info info;
+};
 
 // This holds (or points to) everything that is handed off from physboot to the
 // kernel proper at boot time.
@@ -253,10 +291,10 @@ struct PhysHandoff {
   PhysVmo zbi;
 
   // The vDSO.
-  PhysVmo vdso;
+  PhysElfImage vdso;
 
   // Userboot.
-  PhysVmo userboot;
+  PhysElfImage userboot;
 
   // Additional VMOs to be published to userland as-is and not otherwise used by
   // the kernel proper.
@@ -314,7 +352,6 @@ struct PhysHandoff {
   // Initialized UART to be used by the kernel, if any.
   uart::all::Driver uart;
 };
-
 static_assert(std::is_default_constructible_v<PhysHandoff>);
 
 // PhysHandoff does not have a standard layout due to some non-standard
@@ -331,52 +368,6 @@ extern PhysHandoff* gPhysHandoff;
 // This is the entry point function for the ELF kernel.
 extern "C" [[noreturn]] void PhysbootHandoff(PhysHandoff* handoff);
 
-#ifdef _KERNEL
-
-// These functions relate to PhysHandoff but exist only in the kernel proper.
-
-#include <stddef.h>
-
-#include <fbl/ref_ptr.h>
-#include <object/handle.h>
-
-// Forward declaration; defined in <vm/vm_object.h>
-class VmObject;
-
-// Called as soon as the physmap is available to set the gPhysHandoff pointer.
-void HandoffFromPhys(paddr_t handoff_paddr);
-
-// Valid to call only after HandoffFromPhys().
-paddr_t KernelPhysicalLoadAddress();
-
-// This can be used after HandoffFromPhys and before the ZBI is handed off to
-// userboot at the very end of kernel initialization code.  Userboot calls it
-// with true to ensure no later calls will succeed.
-
-// The remaining hand-off data to be consumed at the end of the hand-off phase
-// (see EndHandoff()).
-struct HandoffEnd {
-  // The data ZBI.
-  HandleOwner zbi;
-
-  fbl::RefPtr<VmObject> vdso;
-  fbl::RefPtr<VmObject> userboot;
-
-  // The VMOs deriving from the phys environment. As returned by EndHandoff(),
-  // the entirety of the array will be populated by real handles (if only by
-  // stub VMOs) (as is convenient for userboot, its intended caller).
-  std::array<HandleOwner, PhysVmo::kMaxExtraHandoffPhysVmos> extra_phys_vmos;
-};
-
-// Formally ends the hand-off phase, unsetting gPhysHandoff and returning the
-// remaining hand-off data left to be consumed (in a userboot-friendly way), and
-// freeing temporary hand-off memory (see PhysHandoff::temporary_memory).
-//
-// After the end of hand-off, all pointers previously referenced by gPhysHandoff
-// should be regarded as freed and unusable.
-HandoffEnd EndHandoff();
-
-#endif  // _KERNEL
 #endif  // __ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_H_

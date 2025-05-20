@@ -565,12 +565,10 @@ impl<
                     .map(|worker| worker.select_next_message().fuse().left_future())
                     .unwrap_or_else(|| futures::future::pending().right_future()) => {
 
-                if feature_flags.use_ndp_watcher_instead_of_nduseropt_stub {
-                    route_clients.get_ref().send_message_to_group(
-                        nduseropt_message,
-                        ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
-                    );
-                }
+                route_clients.get_ref().send_message_to_group(
+                    nduseropt_message,
+                    ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
+                );
                 Cleanup::None
             }
             async_work = async_work_receiver.select_next_some() => {

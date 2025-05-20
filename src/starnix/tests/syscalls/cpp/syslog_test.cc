@@ -28,11 +28,12 @@ TEST_F(SyslogTest, ReadDevKmsg) {
     fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
     FAIL();
   }
-  dprintf(kmsg_fd, "Hello from the dev/kmsg test\n");
+  const char *message = "Hello from the dev/kmsg test\n";
+  write(kmsg_fd, message, strlen(message));
 
-  char message[4096];
+  char read_buffer[4096];
   do {
-    size_t size_read = read(kmsg_fd, message, sizeof(message));
+    size_t size_read = read(kmsg_fd, read_buffer, sizeof(read_buffer));
     ASSERT_GT(size_read, 0ul);
   } while (strstr(message, "Hello from the dev/kmsg test") == nullptr);
 
@@ -45,7 +46,8 @@ TEST_F(SyslogTest, SyslogReadAll) {
     fprintf(stderr, "Failed to open /dev/kmsg -> %s\n", strerror(errno));
     FAIL();
   }
-  dprintf(kmsg_fd, "Hello from the read-all test\n");
+  const char *message = "Hello from the read-all test\n";
+  write(kmsg_fd, message, strlen(message));
   close(kmsg_fd);
 
   int size = klogctl(10 /* SYSLOG_ACTION_SIZE_BUFFER */, NULL, 0);
@@ -71,7 +73,8 @@ TEST_F(SyslogTest, Read) {
   }
 
   // Write a first log.
-  dprintf(kmsg_fd, "SyslogRead -- first\n");
+  const char *first_message = "SyslogRead -- first\n";
+  write(kmsg_fd, first_message, strlen(first_message));
 
   //// Read that first log we wrote.
   char buf[4096];
@@ -81,7 +84,8 @@ TEST_F(SyslogTest, Read) {
   } while (strstr(buf, "SyslogRead -- first") == nullptr);
 
   // Write a second log.
-  dprintf(kmsg_fd, "SyslogRead -- second\n");
+  const char *second_message = "SyslogRead -- second\n";
+  write(kmsg_fd, second_message, strlen(second_message));
 
   // Check that the first log we syslog(READ) from isn't present anymore.
   do {
@@ -125,7 +129,8 @@ TEST_F(SyslogTest, ReadProcKmsg) {
     fprintf(stderr, "Failed to open /dev/kmsg -> %s\n", strerror(errno));
     FAIL();
   }
-  dprintf(kmsg_fd, "ReadProcKmsg -- log one\n");
+  const char *first_message = "ReadProcKmsg -- log one\n";
+  write(kmsg_fd, first_message, strlen(first_message));
 
   int proc_kmsg_fd = open("/proc/kmsg", O_RDONLY);
   if (proc_kmsg_fd < 0) {
@@ -141,7 +146,8 @@ TEST_F(SyslogTest, ReadProcKmsg) {
   } while (strstr(buf, "ReadProcKmsg -- log one") == nullptr);
 
   // Write a second log.
-  dprintf(kmsg_fd, "ReadProcKmsg -- log two\n");
+  const char *second_message = "ReadProcKmsg -- log two\n";
+  write(kmsg_fd, second_message, strlen(second_message));
   close(kmsg_fd);
 
   // Check that the first log we read isn't present anymore.
@@ -173,7 +179,8 @@ TEST_F(SyslogTest, ProcKmsgPoll) {
     fprintf(stderr, "Failed to open /dev/kmsg -> %s\n", strerror(errno));
     FAIL();
   }
-  dprintf(kmsg_fd, "ProcKmsgPoll -- log one\n");
+  const char *first_message = "ProcKmsgPoll -- log one\n";
+  write(kmsg_fd, first_message, strlen(first_message));
 
   int proc_kmsg_fd = open("/proc/kmsg", O_RDONLY);
 
@@ -197,7 +204,8 @@ TEST_F(SyslogTest, ProcKmsgPoll) {
   EXPECT_EQ(0, klogctl(9 /* SYSLOG_ACTION_SIZE_UNREAD */, NULL, 0));
 
   // Write a log.
-  dprintf(kmsg_fd, "ProcKmsgPoll -- log two\n");
+  const char *second_message = "ProcKmsgPoll -- log two\n";
+  write(kmsg_fd, second_message, strlen(second_message));
 
   // Wait for the log to be ready to read.
   EXPECT_EQ(1, poll(fds, 1, -1));
@@ -216,7 +224,8 @@ TEST_F(SyslogTest, DevKmsgSeekSet) {
     fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
     FAIL();
   }
-  dprintf(fd, "DevKmsgSeekSet: hello\n");
+  const char *message = "DevKmsgSeekSet: hello\n";
+  write(fd, message, strlen(message));
 
   // Advance until we have read the log written above.
   char buf[4096];
@@ -245,7 +254,8 @@ TEST_F(SyslogTest, DevKmsgSeekEnd) {
     fprintf(stderr, "Failed to open /dev/kmsg for writing: %s\n", strerror(errno));
     FAIL();
   }
-  dprintf(fd, "DevKmsgSeekEnd: hello\n");
+  const char *hello_message = "DevKmsgSeekEnd: hello\n";
+  write(fd, hello_message, strlen(hello_message));
 
   // Ensure the log has been written.
   char buf[4096];
@@ -264,7 +274,8 @@ TEST_F(SyslogTest, DevKmsgSeekEnd) {
 
   lseek(fd, 0, SEEK_END);
 
-  dprintf(fd, "DevKmsgSeekEnd: bye\n");
+  const char *bye_message = "DevKmsgSeekEnd: bye\n";
+  write(fd, bye_message, strlen(bye_message));
 
   // We should see the second log but never the first one.
   std::fill_n(buf, 4096, 0);

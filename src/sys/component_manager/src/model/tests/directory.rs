@@ -87,7 +87,8 @@ async fn starting_directory_using_target_component_does_not_start_source() {
         assert_matches!(
             client_end
                 .channel()
-                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST),
+                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE_PAST)
+                .to_result(),
             Err(zx::Status::TIMED_OUT)
         );
     }
@@ -132,7 +133,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
         }
     }
     impl RemoteLike for MockDir {
-        fn open(
+        fn deprecated_open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _flags: fio::OpenFlags,
@@ -142,7 +143,7 @@ async fn open_requests_go_to_the_same_directory_connection() {
             panic!("fuchsia.io/Directory.DeprecatedOpen should never be called in these tests.");
         }
 
-        fn open3(
+        fn open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             relative_path: vfs::path::Path,

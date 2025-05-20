@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_ZIRCON_PROCESS_HANDLE_H_
 
 #include "src/developer/debug/debug_agent/process_handle.h"
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/shared/zircon_exception_watcher.h"
 
@@ -29,6 +30,7 @@ class ZirconProcessHandle final : public ProcessHandle, public debug::ZirconExce
   void Detach() override;
   uint64_t GetLoaderBreakpointAddress() override;
   std::vector<debug_ipc::AddressRegion> GetAddressSpace(uint64_t address) const override;
+  std::optional<debug_ipc::AddressRegion> GetSharedAddressSpace() const override;
   std::vector<debug_ipc::Module> GetModules() const override;
   fit::result<debug::Status, std::vector<debug_ipc::InfoHandle>> GetHandles() const override;
   debug::Status ReadMemory(uintptr_t address, void* buffer, size_t len,

@@ -20,15 +20,13 @@ struct Segment {
 };
 
 struct Module {
-  unsigned module_id;
   std::string module_name;
-  std::vector<std::byte> build_id;
   uintptr_t vaddr;
   std::vector<Segment> loads;
 };
 
 struct SymbolizationContext {
-  std::map<zx_koid_t, std::vector<Module>> process_contexts;
+  std::map<zx_koid_t, std::map<std::vector<std::byte>, Module>> process_contexts;
 };
 }  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SYMBOLIZATION_CONTEXT_H_

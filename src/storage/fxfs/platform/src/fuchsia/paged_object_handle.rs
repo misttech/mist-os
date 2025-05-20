@@ -10,12 +10,12 @@ use anyhow::{anyhow, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use fxfs::errors::FxfsError;
-use fxfs::filesystem::MAX_FILE_SIZE;
+use fxfs::filesystem::{TruncateGuard, MAX_FILE_SIZE};
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle};
 use fxfs::object_store::allocator::{Allocator, Reservation, ReservationOwner};
 use fxfs::object_store::transaction::{
-    lock_keys, LockKey, Options, Transaction, WriteGuard, TRANSACTION_METADATA_MAX_AMOUNT,
+    lock_keys, LockKey, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
 };
 use fxfs::object_store::{DataObjectHandle, ObjectStore, RangeType, StoreObjectHandle, Timestamp};
 use fxfs::range::RangeExt;
@@ -592,7 +592,15 @@ impl PagedObjectHandle {
         Ok(())
     }
 
-    async fn flush_locked<'a>(&self, _truncate_guard: &WriteGuard<'a>) -> Result<(), Error> {
+    // If `last_chance` is true, pages that are dirty beyond the end of the file are unreserved.
+    // This is only safe to do if the file is never going to be flushed again because we will have
+    // surrendered the reservation.  We do this so that `needs_flush` returns false upon successful
+    // completion, so that we don't log error messages saying dirty data was dropped.
+    async fn flush_locked<'a>(
+        &self,
+        truncate_guard: &TruncateGuard<'a>,
+        last_chance: bool,
+    ) -> Result<(), Error> {
         self.handle.owner().pager().page_in_barrier().await;
 
         let pending_shrink = self.inner.lock().pending_shrink;
@@ -607,7 +615,10 @@ impl PagedObjectHandle {
 
         let pending_shrink = self.inner.lock().pending_shrink;
         if let PendingShrink::NeedsTrim = pending_shrink {
-            self.store().trim(self.object_id()).await.context("Failed to trim file")?;
+            self.store()
+                .trim(self.object_id(), truncate_guard)
+                .await
+                .context("Failed to trim file")?;
             self.inner.lock().pending_shrink = PendingShrink::None;
         }
 
@@ -682,13 +693,15 @@ impl PagedObjectHandle {
             .await?
         }
 
-        let mut inner = self.inner.lock();
-        inner.put_back(pages_not_flushed, &reservation);
+        if !last_chance {
+            let mut inner = self.inner.lock();
+            inner.put_back(pages_not_flushed, &reservation);
+        }
 
         Ok(())
     }
 
-    async fn flush_impl(&self) -> Result<(), Error> {
+    async fn flush_impl(&self, last_chance: bool) -> Result<(), Error> {
         if !self.needs_flush() {
             return Ok(());
         }
@@ -696,19 +709,15 @@ impl PagedObjectHandle {
         let store = self.handle.store();
         let fs = store.filesystem();
         // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
-        // reading the cached data then the flush could fail. This lock is held to prevent the file
-        // from shrinking while it's being flushed.
-        // NB: FxFile.open_count_sub_one_and_maybe_flush relies on this lock being taken to make
-        // sure any flushes are done before it adds a file tombstone if the file is going to be
-        // purged. If this lock key changes, it should change there as well.
-        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let truncate_guard = fs.lock_manager().write_lock(keys).await;
-
-        self.flush_locked(&truncate_guard).await
+        // reading the cached data then the flush could fail. The truncate guard lock is held to
+        // prevent the file from shrinking while it's being flushed.
+        let truncate_guard =
+            fs.truncate_guard(store.store_object_id(), self.handle.object_id()).await;
+        self.flush_locked(&truncate_guard, last_chance).await
     }
 
-    pub async fn flush(&self) -> Result<(), Error> {
-        match self.flush_impl().await {
+    pub async fn flush(&self, last_chance: bool) -> Result<(), Error> {
+        match self.flush_impl(last_chance).await {
             Ok(()) => Ok(()),
             Err(error) => {
                 error!(error:?; "Failed to flush");
@@ -933,15 +942,14 @@ impl PagedObjectHandle {
         // so they all grab the same truncate lock.
         let store = self.store();
         let fs = store.filesystem();
-        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let flush_guard = fs.lock_manager().write_lock(keys).await;
+        let truncate_guard = fs.truncate_guard(store.store_object_id(), self.object_id()).await;
 
         // There are potentially pending shrink operations. We don't particularly care about the
         // performance of allocate, just correctness, so we flush while holding the truncate lock
         // the whole time to make sure the ordering of those operations is correct. Clearing most
         // of the pending write reservations that might overlap with allocated range is a nice side
         // effect, but it's not really required.
-        self.flush_locked(&flush_guard)
+        self.flush_locked(&truncate_guard, false)
             .await
             .inspect_err(|error| error!(error:?; "Failed to flush in allocate"))?;
 
@@ -1204,7 +1212,6 @@ mod tests {
     use storage_device::fake_device::FakeDevice;
     use storage_device::{buffer, DeviceHolder};
     use test_util::{assert_geq, assert_lt};
-    use vfs::path::Path;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     const BLOCK_SIZE: u32 = 512;
@@ -1297,18 +1304,12 @@ mod tests {
 
     fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-        let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-        volume
-            .root()
-            .clone()
-            .as_directory()
-            .open3(
-                volume.volume().scope().clone(),
-                Path::dot(),
-                flags,
-                &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
-            )
-            .expect("failed to open volume directory");
+        vfs::directory::serve_on(
+            volume.root().clone().as_directory(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
+            volume.volume().scope().clone(),
+            server_end,
+        );
         root
     }
 
@@ -2368,23 +2369,24 @@ mod tests {
                 transaction.commit().await.unwrap();
                 let (notifications, mut receiver) = unbounded();
 
-                let (vmo, pager_packet_receiver_registration) = file
-                    .owner()
-                    .pager()
-                    .create_vmo(
-                        file.get_size(),
-                        zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY,
-                    )
-                    .unwrap();
-                let file = Arc::new(File {
-                    notifications,
-                    handle: PagedObjectHandle::new(file, vmo),
-                    unblocked_requests: Mutex::new(HashSet::new()),
-                    cvar: Condvar::new(),
-                    pager_packet_receiver_registration,
+                let file = Arc::new_cyclic(|weak| {
+                    let (vmo, pager_packet_receiver_registration) = file
+                        .owner()
+                        .pager()
+                        .create_vmo(
+                            weak.clone(),
+                            file.get_size(),
+                            zx::VmoOptions::RESIZABLE | zx::VmoOptions::TRAP_DIRTY,
+                        )
+                        .unwrap();
+                    File {
+                        notifications,
+                        handle: PagedObjectHandle::new(file, vmo),
+                        unblocked_requests: Mutex::new(HashSet::new()),
+                        cvar: Condvar::new(),
+                        pager_packet_receiver_registration,
+                    }
                 });
-
-                file.handle.owner().pager().register_file(&file);
 
                 // Trigger a pager request.
                 let cloned_file = file.clone();
@@ -2411,7 +2413,7 @@ mod tests {
                     cloned_file.unblock(request1);
                 });
 
-                file.handle.flush().await.expect("flush failed");
+                file.handle.flush(false).await.expect("flush failed");
 
                 // We don't care what the original VMO read request returned, but reading now should
                 // return the new content, i.e. zeroes.  The original page-in request would/will
@@ -2729,12 +2731,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             device,
-            TestFixtureOptions {
-                encrypted: false,
-                as_blob: false,
-                format: false,
-                serve_volume: false,
-            },
+            TestFixtureOptions { encrypted: false, format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();

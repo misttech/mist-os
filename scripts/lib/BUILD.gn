@@ -9,6 +9,7 @@ group("tests") {
     "build_dir:tests",
     "ffx_cmd:tests",
     "fx_cmd:tests",
+    "json_get:tests",
     "statusinfo:tests",
     "termout:tests",
   ]

@@ -1883,7 +1883,7 @@ void H264MultiDecoder::HandleSliceHeadDone() {
       return;
     }
     if (memcmp(
-            cpp17::get<std::unique_ptr<media::H264SliceHeader>>(slice_nalu->preparsed_header).get(),
+            std::get<std::unique_ptr<media::H264SliceHeader>>(slice_nalu->preparsed_header).get(),
             &stashed_latest_slice_header_, sizeof(stashed_latest_slice_header_))) {
       LogEvent(
           media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_FirstMbInSliceError);
@@ -1896,7 +1896,7 @@ void H264MultiDecoder::HandleSliceHeadDone() {
   if (first_mb_in_slice > per_frame_seen_first_mb_in_slice_) {
     DLOG("first_mb_in_slice > per_frame_seen_first_mb_in_slice_");
     memcpy(&stashed_latest_slice_header_,
-           cpp17::get<std::unique_ptr<media::H264SliceHeader>>(slice_nalu->preparsed_header).get(),
+           std::get<std::unique_ptr<media::H264SliceHeader>>(slice_nalu->preparsed_header).get(),
            sizeof(stashed_latest_slice_header_));
     if (sps_nalu) {
       media_decoder_->QueuePreparsedNalu(std::move(sps_nalu));

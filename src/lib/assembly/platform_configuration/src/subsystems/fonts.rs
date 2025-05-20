@@ -16,7 +16,7 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
     ) -> anyhow::Result<()> {
         // Adding the platform bundle conditionally allows us to soft-migrate
         // products that use the packages from the `fonts` bundle.
-        if *context.feature_set_level == FeatureSupportLevel::Standard {
+        if *context.feature_set_level == FeatureSetLevel::Standard {
             if let Some(ref font_collection_name) = fonts_config.font_collection {
                 ensure!(
                     fonts_config.enabled,
@@ -37,8 +37,7 @@ impl DefineSubsystemConfiguration<FontsConfig> for FontsSubsystem {
                 )?;
 
                 let font_manifest = format!(
-                    "/fonts/data/assets/{}_all.hermetic_assets.font_manifest.json",
-                    font_collection_name
+                    "/fonts/data/assets/{font_collection_name}_all.hermetic_assets.font_manifest.json"
                 );
                 builder.set_config_capability(
                     "fuchsia.fonts.FontManifest",

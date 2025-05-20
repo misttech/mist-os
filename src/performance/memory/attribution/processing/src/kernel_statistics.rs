@@ -2,11 +2,62 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use serde::Serialize;
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
-#[derive(Default, Clone)]
+#[derive(Serialize)]
+#[serde(remote = "fkernel::MemoryStats")]
+pub struct MemoryStatsDef {
+    pub total_bytes: Option<u64>,
+    pub free_bytes: Option<u64>,
+    pub wired_bytes: Option<u64>,
+    pub total_heap_bytes: Option<u64>,
+    pub free_heap_bytes: Option<u64>,
+    pub vmo_bytes: Option<u64>,
+    pub mmu_overhead_bytes: Option<u64>,
+    pub ipc_bytes: Option<u64>,
+    pub other_bytes: Option<u64>,
+    pub free_loaned_bytes: Option<u64>,
+    pub cache_bytes: Option<u64>,
+    pub slab_bytes: Option<u64>,
+    pub zram_bytes: Option<u64>,
+    pub vmo_reclaim_total_bytes: Option<u64>,
+    pub vmo_reclaim_newest_bytes: Option<u64>,
+    pub vmo_reclaim_oldest_bytes: Option<u64>,
+    pub vmo_reclaim_disabled_bytes: Option<u64>,
+    pub vmo_discardable_locked_bytes: Option<u64>,
+    pub vmo_discardable_unlocked_bytes: Option<u64>,
+    #[doc(hidden)]
+    #[serde(skip_serializing)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+#[derive(Serialize)]
+#[serde(remote = "fkernel::MemoryStatsCompression")]
+pub struct MemoryStatsCompressionDef {
+    pub uncompressed_storage_bytes: Option<u64>,
+    pub compressed_storage_bytes: Option<u64>,
+    pub compressed_fragmentation_bytes: Option<u64>,
+    pub compression_time: Option<i64>,
+    pub decompression_time: Option<i64>,
+    pub total_page_compression_attempts: Option<u64>,
+    pub failed_page_compression_attempts: Option<u64>,
+    pub total_page_decompressions: Option<u64>,
+    pub compressed_page_evictions: Option<u64>,
+    pub eager_page_compressions: Option<u64>,
+    pub memory_pressure_page_compressions: Option<u64>,
+    pub critical_memory_page_compressions: Option<u64>,
+    pub pages_decompressed_unit_ns: Option<u64>,
+    pub pages_decompressed_within_log_time: Option<[u64; 8]>,
+    #[doc(hidden)]
+    #[serde(skip_serializing)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+
+#[derive(Default, PartialEq, Debug, Clone, Serialize)]
 pub struct KernelStatistics {
+    #[serde(with = "MemoryStatsDef")]
     pub memory_statistics: fkernel::MemoryStats,
+    #[serde(with = "MemoryStatsCompressionDef")]
     pub compression_statistics: fkernel::MemoryStatsCompression,
 }
 

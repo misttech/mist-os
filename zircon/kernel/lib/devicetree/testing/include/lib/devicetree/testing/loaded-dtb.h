@@ -9,11 +9,9 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>

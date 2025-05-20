@@ -44,7 +44,7 @@ TEST(RobustFutexTest, FutexStateCheck) {
 
     std::thread t([&entry, &head]() {
       head.list.next = reinterpret_cast<struct robust_list *>(&entry);
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
       entry.futex = static_cast<int>(syscall(SYS_gettid));
       entry.next = reinterpret_cast<struct robust_list *>(&head);
       // Thread dies without releasing futex, so futex's FUTEX_OWNER_DIED bit is set.
@@ -73,7 +73,7 @@ TEST(RobustFutexTest, OtherTidsAreIgnored) {
     int parent_tid = static_cast<int>(syscall(SYS_gettid));
 
     std::thread t([&entries, &head, parent_tid]() {
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
       int tid = static_cast<int>(syscall(SYS_gettid));
       entries[0].futex = tid;
       entries[1].futex = parent_tid;
@@ -99,7 +99,7 @@ TEST(RobustFutexTest, NullEntryStopsProcessing) {
 
     std::thread t([&entry, &head]() {
       head.list.next = reinterpret_cast<struct robust_list *>(&entry);
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
       entry.futex = static_cast<int>(syscall(SYS_gettid));
       entry.next = nullptr;
     });
@@ -132,7 +132,7 @@ TEST(RobustFutexTest, RobustListLimitIsEnforced) {
         entries[i].futex = tid;
       }
 
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
     });
 
     t.join();
@@ -165,7 +165,7 @@ TEST(RobustFutexTest, RobustListEnforcesAlignment) {
 
     std::thread t([&entry, &head]() {
       head.list.next = reinterpret_cast<struct robust_list *>(&entry);
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
       entry.futex = static_cast<int>(syscall(SYS_gettid));
       entry.next = reinterpret_cast<struct robust_list *>(&head);
     });
@@ -191,17 +191,17 @@ TEST(RobustFutexTest, DoesNotModifyReadOnlyMapping) {
 
     std::thread t([entry, &head, addr, page_size]() {
       head.list.next = reinterpret_cast<struct robust_list *>(entry);
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
       entry->futex = static_cast<int>(syscall(SYS_gettid));
       entry->next = reinterpret_cast<struct robust_list *>(&head);
 
-      EXPECT_EQ(0, mprotect(addr, page_size, PROT_READ));
+      SAFE_SYSCALL(mprotect(addr, page_size, PROT_READ));
     });
     t.join();
     // Memory allocating futex is not writable, so it should not be modified by the kernel.
     EXPECT_EQ(0, entry->futex & FUTEX_OWNER_DIED);
     entry->~robust_list_entry();
-    EXPECT_EQ(0, munmap(addr, page_size));
+    SAFE_SYSCALL(munmap(addr, page_size));
   });
 
   EXPECT_TRUE(helper.WaitForChildren());
@@ -222,7 +222,7 @@ TEST(RobustFutexTest, CyclicRobustListDoesntHang) {
       entry2.next = reinterpret_cast<struct robust_list *>(&entry1);
 
       head.list.next = reinterpret_cast<struct robust_list *>(&entry1);
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
     });
     t.join();
     // Our robust list has a cycle. We should be able to stop correctly.
@@ -257,14 +257,14 @@ TEST(RobustFutexTest, FutexStateAfterExecCheck) {
     // the pipe, the child will wait to terminate until we unlock the file.
     test_helper::ScopedTempFD terminate_child_fd;
     struct flock fl = {.l_type = F_WRLCK, .l_whence = SEEK_SET, .l_start = 0, .l_len = 0};
-    EXPECT_EQ(0, fcntl(terminate_child_fd.fd(), F_SETLK, &fl));
+    SAFE_SYSCALL(fcntl(terminate_child_fd.fd(), F_SETLK, &fl));
 
     test_helper::ForkHelper helper;
 
     helper.RunInForkedProcess([&entry, &head, &terminate_child_fd, &pipefd] {
       // Redirect stdout to one end of the pipe
       EXPECT_NE(-1, dup2(pipefd[1], STDOUT_FILENO));
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, head, sizeof(robust_list_head)));
+      SAFE_SYSCALL(syscall(SYS_set_robust_list, head, sizeof(robust_list_head)));
       entry->futex = static_cast<int>(syscall(SYS_gettid));
 
       std::string test_binary = "/data/tests/syscall_test_exec_child";
@@ -291,7 +291,7 @@ TEST(RobustFutexTest, FutexStateAfterExecCheck) {
 
     // Unlock the file, allowing the child process to continue (and exit).
     struct flock fl2 = {.l_type = F_UNLCK, .l_whence = SEEK_SET, .l_start = 0, .l_len = 0};
-    EXPECT_EQ(0, fcntl(terminate_child_fd.fd(), F_SETLK, &fl2));
+    SAFE_SYSCALL(fcntl(terminate_child_fd.fd(), F_SETLK, &fl2));
     EXPECT_EQ(true, helper.WaitForChildren());
     munmap(shared, sizeof(robust_list_entry) + sizeof(robust_list_head));
   });
@@ -384,7 +384,7 @@ TEST(FutexTest, FutexWaitOnRemappedMemory) {
     for (auto &waiter : waiters) {
       waiter.join();
     }
-    EXPECT_EQ(0, munmap(addr, page_size));
+    SAFE_SYSCALL(munmap(addr, page_size));
   });
   EXPECT_EQ(true, helper.WaitForChildren());
 }

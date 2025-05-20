@@ -38,6 +38,3 @@ discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 use_bazel_images_only = true
 assembly_board_configs = [ "//boards" ]
 assembly_partitions_configs = [ "//boards/partitions" ]
-
-product_bundle_labels = [ "//products/microfuchsia" ]
-additional_default_targets = product_bundle_labels

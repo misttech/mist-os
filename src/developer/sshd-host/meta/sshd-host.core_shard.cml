@@ -410,6 +410,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.bluetooth.hfp.HandsFree",
+            from: "#bt-hfp-hands-free",
+            to: "#sshd-host",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.bluetooth.hfp.Hfp",
             from: "#bt-hfp-audio-gateway",
             to: "#sshd-host",
@@ -579,6 +585,7 @@
         },
         {
             service: [
+                "fuchsia.hardware.backlight.Service",
                 "fuchsia.hardware.nfc.Service",
                 "fuchsia.hardware.usb.peripheral.Service",
             ],
@@ -588,7 +595,7 @@
 
         // Suspend Control
         {
-            service: [ "fuchsia.hardware.suspend.SuspendService" ],
+            service: [ "fuchsia.hardware.power.suspend.SuspendService" ],
             from: "parent",
             to: "#sshd-host",
         },

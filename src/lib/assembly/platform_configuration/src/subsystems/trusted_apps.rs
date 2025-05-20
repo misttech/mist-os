@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn test_convert_component_urls_to_boot_urls() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),
@@ -100,8 +100,7 @@ mod tests {
             .get(&PackageSetDestination::Boot(BootfsPackageDestination::TaManagerConfig))
             .unwrap();
         let directory = domain_config.directories.get("config").unwrap();
-        let entries: Vec<FileOrContents> =
-            directory.entries.iter().map(|(_, e)| e.clone()).collect();
+        let entries: Vec<FileOrContents> = directory.entries.values().cloned().collect();
         let expected_configs = [
             TAConfig::binder_rpc("fuchsia-boot:///pkg2#resource2.txt".into()),
             TAConfig::global_platform("fuchsia-boot:///pkg1#resource1.txt".into()),

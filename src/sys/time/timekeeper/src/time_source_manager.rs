@@ -14,6 +14,7 @@ use fuchsia_runtime::UtcInstant;
 use futures::{FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use std::sync::Arc;
+use time_pretty::format_duration;
 
 /// Sets the maximum rate at which Timekeeper is willing to accept new updates from a time source in
 /// order to limit the Timekeeper resource utilization. This value is also used to apply an upper
@@ -45,7 +46,7 @@ pub struct KernelBootTimeProvider();
 
 impl ReferenceTimeProvider for KernelBootTimeProvider {
     fn now(&mut self) -> zx::BootInstant {
-        zx::BootInstant::get()
+        fasync::BootInstant::now().into()
     }
 }
 
@@ -207,6 +208,10 @@ impl<D: Diagnostics, M: ReferenceTimeProvider> PushSourceManager<D, M> {
                         return Ok(sample);
                     }
                     Err(error) => {
+                        debug!(
+                            "Rejected invalid sample {:?} from {:?}: {:?}",
+                            sample, self.role, error
+                        );
                         error!("Rejected invalid sample from {:?}: {:?}", self.role, error);
                         self.diagnostics.record(Event::SampleRejected { role: self.role, error });
                     }
@@ -232,6 +237,10 @@ impl<D: Diagnostics, M: ReferenceTimeProvider> PushSourceManager<D, M> {
         } else if sample.reference > current_reference {
             Err(SampleValidationError::ReferenceInstantInFuture)
         } else if sample.reference < current_reference - MIN_UPDATE_DELAY {
+            debug!(
+                "too old sample:\n\treference: {:?}\n\tcurrent_reference: {:?}",
+                sample.reference, current_reference
+            );
             Err(SampleValidationError::ReferenceInstantTooOld)
         } else if current_reference < earliest_allowed_arrival {
             Err(SampleValidationError::TooCloseToPrevious)
@@ -406,7 +415,7 @@ impl<D: Diagnostics, M: ReferenceTimeProvider> PullSourceManager<D, M> {
                                 RESTART_DELAY_INITIAL
                             };
                             if self.time_sample_delay_logged_count < 2 {
-                                info!("Time sample delay: {:?}", delay);
+                                info!("Time sample delay: {}", format_duration(delay));
                                 self.time_sample_delay_logged_count += 1;
                             }
                             fasync::Timer::new(fasync::BootInstant::after(delay)).await;

@@ -16,7 +16,7 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>

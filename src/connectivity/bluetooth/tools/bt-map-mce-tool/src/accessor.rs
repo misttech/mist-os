@@ -117,7 +117,7 @@ pub async fn unregister_notifications<'a>(accessor_client: AccessorClient) -> Re
     let mut lock = accessor_client.notification_task.lock();
     match lock.take() {
         Some(previous_task) => {
-            let _ = previous_task.cancel();
+            let _ = previous_task.abort();
             info!("Will no longer receive notifications from peer...",);
         }
         None => info!("No/op since there is no active notification registration",),

@@ -7,11 +7,11 @@
 
 #include <arpa/inet.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <array>
 #include <cstdint>
 #include <numeric>
+#include <span>
 
 #include <efi/protocol/managed-network.h>
 #include <phys/efi/protocol.h>
@@ -56,7 +56,7 @@ constexpr Ip6Addr LocalIp6AddrFromMac(MacAddr mac_addr) {
 }
 
 // Calculate the 1s complement checksum on a payload.
-uint16_t CalculateChecksum(cpp20::span<const uint8_t> data, uint64_t start);
+uint16_t CalculateChecksum(std::span<const uint8_t> data, uint64_t start);
 
 class Ip6Header {
  public:
@@ -144,7 +144,7 @@ class EthernetAgent {
   // The transmission data is copied into a buffer before being sent to the
   // simple network protocol, so it is safe to overwrite that as soon
   // as SendV6Frame returns.
-  fit::result<efi_status> SendV6LocalFrame(MacAddr dst, cpp20::span<const uint8_t> data,
+  fit::result<efi_status> SendV6LocalFrame(MacAddr dst, std::span<const uint8_t> data,
                                            efi_event callback,
                                            efi_managed_network_sync_completion_token* token);
 

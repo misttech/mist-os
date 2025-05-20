@@ -11,7 +11,7 @@ namespace virtual_audio {
 zx::result<> VirtualAudio::Start() {
   zx::result connector = devfs_connector_.Bind(dispatcher());
   if (connector.is_error()) {
-    FDF_LOG(ERROR, "Failed to bind devfs connector: %s", connector.status_string());
+    fdf::error("Failed to bind devfs connector: {}", connector);
     return connector.take_error();
   }
 
@@ -22,7 +22,7 @@ zx::result<> VirtualAudio::Start() {
 
   zx::result child = AddOwnedChild(kChildNodeName, devfs_args);
   if (child.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child: %s", child.status_string());
+    fdf::error("Failed to add child: {}", child);
     return child.take_error();
   }
 
@@ -39,8 +39,8 @@ void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView re
       completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
       return;
     default:
-      FDF_LOG(ERROR, "Failed to get default configuration: Device type %u not supported",
-              static_cast<uint32_t>(request->type));
+      fdf::error("Failed to get default configuration: Device type {} not supported",
+                 static_cast<uint32_t>(request->type));
       completer.ReplyError(fuchsia_virtualaudio::Error::kNotSupported);
       return;
   }
@@ -50,14 +50,14 @@ void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::S
   const auto& config = fidl::ToNatural(request->config);
   const std::optional device_specific = config.device_specific();
   if (!device_specific.has_value()) {
-    FDF_LOG(ERROR, "Missing device_specific field");
+    fdf::error("Missing device_specific field");
     completer.ReplyError(fuchsia_virtualaudio::Error::kInvalidArgs);
     return;
   }
   const auto& device_type = device_specific.value().Which();
   if (device_type != fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite) {
-    FDF_LOG(ERROR, "Unsupported device type %u",
-            static_cast<uint32_t>(device_specific.value().Which()));
+    fdf::error("Unsupported device type {}",
+               static_cast<uint32_t>(device_specific.value().Which()));
     completer.ReplyError(fuchsia_virtualaudio::Error::kInvalidArgs);
     return;
   }
@@ -66,19 +66,17 @@ void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::S
   zx::result device = VirtualAudioComposite::Create(
       device_instance_id, std::move(config), dispatcher(), std::move(request->server),
       [this, device_instance_id](auto _) {
-        FDF_LOG(INFO, "Removing device %lu: Device's binding closed", device_instance_id);
+        fdf::info("Removing device {}: Device's binding closed", device_instance_id);
         devices_.erase(device_instance_id);
       },
-      [this](std::string_view child_node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args) {
-        return AddOwnedChild(child_node_name, devfs_args);
-      });
+      node());
   if (device.is_error()) {
-    FDF_LOG(ERROR, "Failed to create virtual audio composite device: %s", device.status_string());
+    fdf::error("Failed to create virtual audio composite device: {}", device);
     completer.ReplyError(fuchsia_virtualaudio::Error::kInternal);
     return;
   }
   devices_[device_instance_id] = std::move(device.value());
-  FDF_LOG(INFO, "Created virtual audio composite device %lu", device_instance_id);
+  fdf::info("Created virtual audio composite device {}", device_instance_id);
 
   completer.ReplySuccess();
 }

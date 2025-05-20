@@ -13,6 +13,7 @@ pub mod developer_overrides;
 pub mod image_assembly_config;
 pub mod platform_config;
 pub mod product_config;
+pub mod release_info;
 
 pub use assembly_config::AssemblyConfig;
 pub use board_config::{BoardInformation, BoardInputBundle, BoardProvidedConfig};
@@ -24,6 +25,6 @@ pub use image_assembly_config::{BoardDriverArguments, ImageAssemblyConfig};
 pub use platform_config::example_config::ExampleConfig;
 pub use platform_config::icu_config::{ICUConfig, Revision};
 pub use platform_config::intl_config::IntlConfig;
-pub use platform_config::{BuildType, FeatureSupportLevel};
+pub use platform_config::{BuildType, FeatureSetLevel};
 
 use common::{option_path_schema, vec_path_schema};

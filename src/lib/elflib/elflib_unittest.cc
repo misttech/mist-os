@@ -22,7 +22,9 @@ namespace elflib {
 namespace {
 
 constexpr uint64_t kAddrPoison = 0xdeadb33ff00db4b3;
+constexpr uint32_t kAddrPoison32 = 0xdeadb33ff00db4b3;
 constexpr uint64_t kSymbolPoison = 0xb0bab0ba;
+constexpr uint32_t kSymbolPoison32 = 0xb0bab0ba;
 constexpr uint64_t kNoteGnuBuildId = 3;
 constexpr uint64_t kMeaninglessNoteType = 42;
 
@@ -187,6 +189,153 @@ class TestData {
   std::vector<uint8_t> content_;
 };
 
+class TestData32 {
+ public:
+  explicit TestData32(bool with_symbols) {
+    PushData(Elf32_Ehdr{
+        .e_ident = {0, 0, 0, 0, ELFCLASS32, ELFDATA2LSB, EV_CURRENT},
+        .e_version = EV_CURRENT,
+        .e_shoff = sizeof(Elf32_Ehdr),
+        .e_ehsize = sizeof(Elf32_Ehdr),
+        .e_phentsize = sizeof(Elf32_Phdr),
+        .e_phnum = 2,
+        .e_shentsize = sizeof(Elf32_Shdr),
+        .e_shnum = 6,
+        .e_shstrndx = 0,
+    });
+
+    *DataAt<char>(0) = ElfMagic[0];
+    *DataAt<char>(1) = ElfMagic[1];
+    *DataAt<char>(2) = ElfMagic[2];
+    *DataAt<char>(3) = ElfMagic[3];
+
+    size_t shstrtab_hdr = PushData(Elf32_Shdr{
+        .sh_name = 1,
+        .sh_type = SHT_STRTAB,
+        .sh_addr = kAddrPoison32,
+        .sh_size = 34,
+    });
+    size_t stuff_hdr = PushData(Elf32_Shdr{
+        .sh_name = 11,
+        .sh_type = SHT_LOUSER,
+        .sh_addr = kAddrPoison32,
+        .sh_size = 15,
+    });
+    size_t strtab_hdr = PushData(Elf32_Shdr{
+        .sh_name = 18,
+        .sh_type = SHT_STRTAB,
+        .sh_addr = kAddrPoison32,
+        .sh_size = 16,
+    });
+    size_t symtab_hdr = PushData(Elf32_Shdr{
+        .sh_name = 26,
+        .sh_type = SHT_SYMTAB,
+        .sh_addr = kAddrPoison32,
+        .sh_size = sizeof(Elf32_Sym),
+    });
+    PushData(Elf32_Shdr{
+        .sh_name = 34,
+        .sh_type = SHT_NULL,
+        .sh_addr = kAddrPoison32,
+        .sh_size = 0,
+    });
+    PushData(Elf32_Shdr{
+        .sh_name = 40,
+        .sh_type = SHT_NOBITS,
+        .sh_addr = kAddrPoison32,
+        .sh_size = 0,
+    });
+
+    size_t phnote_hdr = PushData(Elf32_Phdr{
+        .p_type = PT_NOTE,
+        .p_vaddr = kAddrPoison32,
+    });
+    DataAt<Elf32_Ehdr>(0)->e_phoff = phnote_hdr;
+
+    if (with_symbols) {
+      DataAt<Elf32_Shdr>(shstrtab_hdr)->sh_offset =
+          PushData("\0.shstrtab\0.stuff\0.strtab\0.symtab\0.null\0.nobits\0", 48);
+    }
+
+    DataAt<Elf32_Shdr>(stuff_hdr)->sh_offset = PushData("This is a test.", 15);
+
+    if (with_symbols) {
+      DataAt<Elf32_Shdr>(strtab_hdr)->sh_offset = PushData("\0zx_frob_handle\0", 16);
+    }
+
+    DataAt<Elf32_Shdr>(symtab_hdr)->sh_offset = PushData(Elf32_Sym{
+        .st_name = 1,
+        .st_value = kSymbolPoison32,
+        .st_size = 0,
+        .st_shndx = SHN_COMMON,
+    });
+
+    size_t buildid_nhdr =
+        PushData(Elf32_Nhdr{.n_namesz = 4, .n_descsz = 32, .n_type = kNoteGnuBuildId});
+
+    DataAt<Elf32_Phdr>(phnote_hdr)->p_offset = buildid_nhdr;
+
+    PushData("GNU\0", 4);
+
+    uint8_t desc_data[32] = {
+        0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7,
+        0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7,
+    };
+
+    PushData(desc_data, 32);
+
+    PushData(Elf32_Nhdr{
+        .n_namesz = 6,
+        .n_descsz = 3,
+        .n_type = kMeaninglessNoteType,
+    });
+
+    PushData("seven\0\0\0", 8);
+    PushData("foo\0", 4);
+
+    DataAt<Elf32_Phdr>(phnote_hdr)->p_filesz = Pos() - buildid_nhdr;
+    DataAt<Elf32_Phdr>(phnote_hdr)->p_memsz = Pos() - buildid_nhdr;
+  }
+
+  template <typename T>
+  T* DataAt(size_t offset) {
+    return reinterpret_cast<T*>(content_.data() + offset);
+  }
+
+  template <typename T>
+  size_t PushData(T data) {
+    return PushData(reinterpret_cast<uint8_t*>(&data), sizeof(data));
+  }
+
+  size_t PushData(const char* bytes, size_t size) {
+    return PushData(reinterpret_cast<const uint8_t*>(bytes), size);
+  }
+
+  size_t PushData(const uint8_t* bytes, size_t size) {
+    size_t offset = Pos();
+    std::copy(bytes, bytes + size, std::back_inserter(content_));
+    return offset;
+  }
+
+  size_t Pos() { return content_.size(); }
+  size_t Size() { return content_.size(); }
+  const uint8_t* Data() { return content_.data(); }
+
+  std::function<bool(uint32_t, std::vector<uint8_t>*)> GetFetcher() {
+    return [this](uint32_t offset, std::vector<uint8_t>* out) {
+      if (offset + out->size() > content_.size()) {
+        return false;
+      }
+
+      std::copy(content_.begin() + offset, content_.begin() + offset + out->size(), out->begin());
+      return true;
+    };
+  }
+
+ private:
+  std::vector<uint8_t> content_;
+};
+
 TEST(ElfLib, Create) {
   TestData t(/*with_symbols=*/true);
   std::unique_ptr<ElfLib> got;
@@ -194,8 +343,32 @@ TEST(ElfLib, Create) {
   EXPECT_NE(ElfLib::Create(t.Data(), t.Size()).get(), nullptr);
 }
 
+TEST(ElfLib, Create32) {
+  TestData32 t(/*with_symbols=*/true);
+  std::unique_ptr<ElfLib> got;
+
+  EXPECT_NE(ElfLib::Create(t.Data(), t.Size()).get(), nullptr);
+}
+
 TEST(ElfLib, GetSection) {
   TestData t(/*with_symbols=*/true);
+  std::unique_ptr<ElfLib> elf = ElfLib::Create(t.Data(), t.Size());
+
+  ASSERT_NE(elf.get(), nullptr);
+
+  auto data = elf->GetSectionData(".stuff");
+  const uint8_t* expected_content = reinterpret_cast<const uint8_t*>("This is a test.");
+
+  ASSERT_NE(data.ptr, nullptr);
+
+  auto expect = std::vector<uint8_t>(expected_content, expected_content + 15);
+  auto got = std::vector<uint8_t>(data.ptr, data.ptr + data.size);
+
+  EXPECT_EQ(expect, got);
+}
+
+TEST(ElfLib, GetSection32) {
+  TestData32 t(/*with_symbols=*/true);
   std::unique_ptr<ElfLib> elf = ElfLib::Create(t.Data(), t.Size());
 
   ASSERT_NE(elf.get(), nullptr);
@@ -260,6 +433,27 @@ TEST(ElfLib, GetAllSymbols) {
 
 TEST(ElfLib, GetNote) {
   TestData t(/*with_symbols=*/true);
+  std::unique_ptr<ElfLib> elf = ElfLib::Create(t.Data(), t.Size());
+
+  ASSERT_NE(elf.get(), nullptr);
+
+  auto got = elf->GetNote("GNU", kNoteGnuBuildId);
+
+  EXPECT_TRUE(got);
+  auto data = *got;
+
+  EXPECT_EQ(32U, data.size());
+
+  for (size_t i = 0; i < 32; i++) {
+    EXPECT_EQ(i % 8, data[i]);
+  }
+
+  EXPECT_EQ("0001020304050607000102030405060700010203040506070001020304050607",
+            elf->GetGNUBuildID());
+}
+
+TEST(ElfLib, GetNote32) {
+  TestData32 t(/*with_symbols=*/true);
   std::unique_ptr<ElfLib> elf = ElfLib::Create(t.Data(), t.Size());
 
   ASSERT_NE(elf.get(), nullptr);

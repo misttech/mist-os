@@ -5,13 +5,13 @@
 use anyhow::{bail, Context, Result};
 use ffx_e2e_emu::IsolatedEmulator;
 use fuchsia_async::Timer;
+use log::info;
 use prost::Message;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 use tempfile::tempdir;
-use tracing::info;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]

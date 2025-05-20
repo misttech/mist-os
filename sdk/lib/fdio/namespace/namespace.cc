@@ -61,7 +61,7 @@ zx_status_t fdio_ns_open3(fdio_ns_t* ns, const char* path, uint64_t flags, zx_ha
 
 __EXPORT
 zx_status_t fdio_ns_service_connect(fdio_ns_t* ns, const char* path, zx_handle_t request) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   // TODO(https://fxbug.dev/324080864): We have some CTF tests built with older versions of the
   // driver framework that incorrectly used this function to open the service directory. They now
   // use `fdio_ns_open3` directly with the correct flags (PERM_READABLE). We can remove this

@@ -738,8 +738,9 @@ void ImagePipeSurfaceDisplay::RemoveImage(uint32_t image_id) {
 }
 
 void ImagePipeSurfaceDisplay::PresentImage(
-    uint32_t image_id, std::vector<std::unique_ptr<PlatformEvent>> acquire_fences,
+    bool immediate, uint32_t image_id, std::vector<std::unique_ptr<PlatformEvent>> acquire_fences,
     std::vector<std::unique_ptr<PlatformEvent>> release_fences, VkQueue queue) {
+  ZX_ASSERT(!immediate);
   ZX_ASSERT(acquire_fences.size() <= 1);
   ZX_ASSERT(release_fences.size() <= 1);
 

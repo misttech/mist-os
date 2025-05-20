@@ -4,15 +4,16 @@
 
 use crate::Scheduler;
 use anyhow::{format_err, Error};
+use fidl::endpoints;
 use fidl_fuchsia_diagnostics_persist::{
-    DataPersistenceRequest, DataPersistenceRequestStream, PersistResult,
+    DataPersistenceMarker, DataPersistenceRequest, DataPersistenceRequestStream, PersistResult,
 };
-use fuchsia_async as fasync;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use log::*;
 use persistence_config::{ServiceName, Tag};
 use std::collections::HashSet;
 use std::sync::Arc;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 pub struct PersistServerData {
     // Service name that this persist server is hosting.
@@ -24,33 +25,48 @@ pub struct PersistServerData {
     scheduler: Scheduler,
 }
 
-pub(crate) struct PersistServer {
-    /// Persist server data.
-    data: Arc<PersistServerData>,
-
-    /// Scope in which we spawn the server task.
-    scope: fasync::Scope,
-}
+/// PersistServer handles all requests for a single persistence service.
+pub(crate) struct PersistServer;
 
 impl PersistServer {
-    pub fn create(
+    /// Spawn a task to handle requests from components through a dynamic dictionary.
+    pub fn spawn(
         service_name: ServiceName,
         tags: Vec<Tag>,
         scheduler: Scheduler,
-        scope: fasync::Scope,
-    ) -> PersistServer {
+        scope: &fasync::Scope,
+        requests: fsandbox::ReceiverRequestStream,
+    ) {
         let tags = HashSet::from_iter(tags);
-        Self { data: Arc::new(PersistServerData { service_name, tags, scheduler }), scope }
+        let data = Arc::new(PersistServerData { service_name, tags, scheduler });
+
+        let scope_handle = scope.to_handle();
+        scope.spawn(Self::accept_connections(data, requests, scope_handle));
     }
 
-    /// Spawn a task to handle requests from components.
-    pub fn spawn(&self, stream: DataPersistenceRequestStream) {
-        let data = self.data.clone();
-        self.scope.spawn(async move {
-            if let Err(e) = Self::handle_requests(data, stream).await {
-                warn!("error handling persistence request: {e}");
+    async fn accept_connections(
+        data: Arc<PersistServerData>,
+        mut stream: fsandbox::ReceiverRequestStream,
+        scope: fasync::ScopeHandle,
+    ) {
+        while let Some(request) = stream.try_next().await.unwrap() {
+            match request {
+                fsandbox::ReceiverRequest::Receive { channel, control_handle: _ } => {
+                    let data = data.clone();
+                    scope.spawn(async move {
+                        let server_end =
+                            endpoints::ServerEnd::<DataPersistenceMarker>::new(channel);
+                        let stream: DataPersistenceRequestStream = server_end.into_stream();
+                        if let Err(e) = Self::handle_requests(data, stream).await {
+                            warn!("error handling persistence request: {e}");
+                        }
+                    });
+                }
+                fsandbox::ReceiverRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(ordinal:%; "Unknown Receiver request");
+                }
             }
-        });
+        }
     }
 
     async fn handle_requests(

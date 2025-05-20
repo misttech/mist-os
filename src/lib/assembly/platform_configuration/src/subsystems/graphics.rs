@@ -22,7 +22,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
                 // If unspecified, virtcon is disabled if it's a user build-type
                 (assembly_config_schema::BuildType::User, _, _) => false,
                 // If neither of those, disable if we're targeting embeddable as well.
-                (_, FeatureSupportLevel::Embeddable, _) => false,
+                (_, FeatureSetLevel::Embeddable, _) => false,
                 // Otherwise, enable virtcon.
                 (_, _, _) => true,
             };
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn test_user_default() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn test_user_disabled() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn test_user_enabled() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };

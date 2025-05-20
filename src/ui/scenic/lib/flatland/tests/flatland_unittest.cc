@@ -1126,7 +1126,7 @@ TEST_F(FlatlandTest, SetDebugNameAddsPrefixToLogs) {
     flatland->CreateTransform(kInvalidId);
     PRESENT(flatland, false);
     ASSERT_TRUE(error_log.has_value());
-    EXPECT_EQ("CreateTransform called with transform_id 0", *error_log);
+    EXPECT_EQ("CreateTransform called with transform_id=0", *error_log);
   }
 
   // SetDebugName() adds a prefix.
@@ -1138,7 +1138,7 @@ TEST_F(FlatlandTest, SetDebugNameAddsPrefixToLogs) {
     flatland->CreateTransform(kInvalidId);
     PRESENT(flatland, false);
     ASSERT_TRUE(error_log.has_value());
-    EXPECT_EQ("Flatland client(test_client): CreateTransform called with transform_id 0",
+    EXPECT_EQ("Flatland client(test_client): CreateTransform called with transform_id=0",
               *error_log);
   }
 
@@ -1165,9 +1165,9 @@ TEST_F(FlatlandTest, SetDebugNameAddsPrefixToLogs) {
     ASSERT_TRUE(error_log_a.has_value());
     ASSERT_TRUE(error_log_b.has_value());
 
-    EXPECT_EQ("Flatland client(test_client): CreateTransform called with transform_id 0",
+    EXPECT_EQ("Flatland client(test_client): CreateTransform called with transform_id=0",
               *error_log_a);
-    EXPECT_EQ("Flatland client(test_client1): CreateTransform called with transform_id 0",
+    EXPECT_EQ("Flatland client(test_client1): CreateTransform called with transform_id=0",
               *error_log_b);
   }
 }

@@ -16,6 +16,7 @@
 #include <mutex>
 #include <set>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <vulkan/vulkan.h>
 
@@ -304,7 +305,7 @@ class TestSwapchain {
   }
 
   VkResult CreateSwapchainHelper(VkSurfaceKHR surface, VkFormat format, VkImageUsageFlags usage,
-                                 VkSwapchainKHR* swapchain_out) {
+                                 VkPresentModeKHR present_mode, VkSwapchainKHR* swapchain_out) {
     VkExtent2D current_extent = {};
     ValidateSurfaceForDevice(surface, &current_extent);
     // TODO(https://fxbug.dev/407570787) - the flatland backed swapchain should query layout info.
@@ -330,7 +331,7 @@ class TestSwapchain {
         .pQueueFamilyIndices = nullptr,
         .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = VK_PRESENT_MODE_FIFO_KHR,
+        .presentMode = present_mode,
         .clipped = VK_TRUE,
         .oldSwapchain = VK_NULL_HANDLE,
     };
@@ -377,7 +378,8 @@ class TestSwapchain {
 
     for (int i = 0; i < num_swapchains; ++i) {
       VkSwapchainKHR swapchain;
-      VkResult result = CreateSwapchainHelper(surface, format, usage, &swapchain);
+      VkResult result =
+          CreateSwapchainHelper(surface, format, usage, VK_PRESENT_MODE_FIFO_KHR, &swapchain);
       EXPECT_EQ(VK_SUCCESS, result);
       if (VK_SUCCESS == result) {
         destroy_swapchain_khr_(vk_device_, swapchain, nullptr);
@@ -387,7 +389,8 @@ class TestSwapchain {
     vkDestroySurfaceKHR(vk_instance_, surface, nullptr);
   }
 
-  void TransitionLayout(VkImage image, VkImageLayout to) {
+  void TransitionLayout(VkImage image, VkImageLayout to,
+                        VkSemaphore wait_semaphore = VK_NULL_HANDLE) {
     VkCommandBuffer command_buffer;
     VkCommandBufferAllocateInfo alloc_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -425,11 +428,14 @@ class TestSwapchain {
     VkProtectedSubmitInfo protected_submit = {.sType = VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO,
                                               .pNext = nullptr,
                                               .protectedSubmit = protected_memory_};
+
+    VkPipelineStageFlags wait_flag = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext = &protected_submit,
-        .waitSemaphoreCount = 0,
-        .pWaitSemaphores = nullptr,
+        .waitSemaphoreCount = wait_semaphore != VK_NULL_HANDLE ? 1u : 0,
+        .pWaitSemaphores = &wait_semaphore,
+        .pWaitDstStageMask = &wait_flag,
         .commandBufferCount = 1,
         .pCommandBuffers = &command_buffer,
         .signalSemaphoreCount = 0,
@@ -604,9 +610,9 @@ TEST_P(TEST_CLASS_NAME, AcquireFence) {
   VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
-  EXPECT_EQ(VK_SUCCESS,
-            test_->CreateSwapchainHelper(surface, VK_FORMAT_R8G8B8A8_UNORM,
-                                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &swapchain));
+  EXPECT_EQ(VK_SUCCESS, test_->CreateSwapchainHelper(surface, VK_FORMAT_R8G8B8A8_UNORM,
+                                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                                     VK_PRESENT_MODE_FIFO_KHR, &swapchain));
 
   VkFence fence;
   VkFenceCreateInfo info{
@@ -634,9 +640,9 @@ TEST_P(TEST_CLASS_NAME, PresentAndAcquireNoSemaphore) {
   VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
-  ASSERT_EQ(VK_SUCCESS,
-            test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
-                                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &swapchain));
+  ASSERT_EQ(VK_SUCCESS, test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
+                                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                                     VK_PRESENT_MODE_FIFO_KHR, &swapchain));
 
   VkQueue queue;
   if (use_protected_memory()) {
@@ -725,6 +731,159 @@ TEST_P(TEST_CLASS_NAME, PresentAndAcquireNoSemaphore) {
 #endif
 }
 
+TEST_P(TEST_CLASS_NAME, FifoAcquireAndPresent) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+
+  test_->InitFakeFlatlandIfRequired(/*should_present=*/true);
+
+  VkSurfaceKHR surface = test_->CreateSurface();
+
+  VkSwapchainKHR swapchain;
+  ASSERT_EQ(VK_SUCCESS, test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
+                                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                                     VK_PRESENT_MODE_FIFO_KHR, &swapchain));
+
+  VkQueue queue;
+  if (use_protected_memory()) {
+    VkDeviceQueueInfo2 queue_info2 = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
+                                      .pNext = nullptr,
+                                      .flags = VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT,
+                                      .queueFamilyIndex = 0,
+                                      .queueIndex = 0};
+    test_->get_device_queue2_(test_->vk_device_, &queue_info2, &queue);
+  } else {
+    vkGetDeviceQueue(test_->vk_device_, 0, 0, &queue);
+  }
+
+  VkSemaphore acquire_semaphore = VK_NULL_HANDLE;
+  VkSemaphoreCreateInfo semaphore_create_info{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+  ASSERT_EQ(VK_SUCCESS, vkCreateSemaphore(test_->vk_device_, &semaphore_create_info, nullptr,
+                                          &acquire_semaphore));
+
+  constexpr uint32_t kFrameCount = 1000;
+  for (uint32_t i = 0; i < kFrameCount; i++) {
+    uint32_t image_index;
+    constexpr uint64_t kTimeoutNs = std::chrono::nanoseconds(std::chrono::seconds(10)).count();
+    ASSERT_EQ(VK_SUCCESS,
+              test_->acquire_next_image_khr_(test_->vk_device_, swapchain, kTimeoutNs,
+                                             acquire_semaphore, VK_NULL_HANDLE, &image_index))
+        << "failed on frame " << i << " of " << kFrameCount;
+
+    auto swapchain_images = test_->GetSwapchainImages(swapchain);
+
+    test_->TransitionLayout(swapchain_images[image_index], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            acquire_semaphore);
+
+    VkResult present_result;
+    VkPresentInfoKHR present_info = {
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = nullptr,
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = nullptr,
+        .swapchainCount = 1,
+        .pSwapchains = &swapchain,
+        .pImageIndices = &image_index,
+        .pResults = &present_result,
+    };
+
+    ASSERT_EQ(VK_SUCCESS, test_->queue_present_khr_(queue, &present_info));
+  }
+
+  test_->destroy_swapchain_khr_(test_->vk_device_, swapchain, nullptr);
+  vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
+  vkDestroySemaphore(test_->vk_device_, acquire_semaphore, nullptr);
+
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+  EXPECT_THAT(test_->fake_flatland_->presented_count(),
+              testing::AllOf(testing::Ge(kFrameCount - TestSwapchain::kSwapchainImageCount),
+                             testing::Le(kFrameCount)));
+  EXPECT_THAT(test_->fake_flatland_->acquire_fences_count(),
+              testing::AllOf(testing::Ge(kFrameCount - TestSwapchain::kSwapchainImageCount),
+                             testing::Le(kFrameCount)));
+  EXPECT_EQ(test_->fake_flatland_->dropped_frame_count(), 0);
+#endif
+}
+
+#if !defined(USE_IMAGEPIPE_DISPLAY)
+TEST_P(TEST_CLASS_NAME, ImmediateAcquireAndPresent) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+
+  test_->InitFakeFlatlandIfRequired(/*should_present=*/true);
+
+  VkSurfaceKHR surface = test_->CreateSurface();
+
+  VkSwapchainKHR swapchain;
+  ASSERT_EQ(VK_SUCCESS, test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
+                                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                                     VK_PRESENT_MODE_IMMEDIATE_KHR, &swapchain));
+
+  VkQueue queue;
+  if (use_protected_memory()) {
+    VkDeviceQueueInfo2 queue_info2 = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,
+                                      .pNext = nullptr,
+                                      .flags = VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT,
+                                      .queueFamilyIndex = 0,
+                                      .queueIndex = 0};
+    test_->get_device_queue2_(test_->vk_device_, &queue_info2, &queue);
+  } else {
+    vkGetDeviceQueue(test_->vk_device_, 0, 0, &queue);
+  }
+
+  VkSemaphore acquire_semaphore = VK_NULL_HANDLE;
+  VkSemaphoreCreateInfo semaphore_create_info{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+  ASSERT_EQ(VK_SUCCESS, vkCreateSemaphore(test_->vk_device_, &semaphore_create_info, nullptr,
+                                          &acquire_semaphore));
+
+  constexpr uint32_t kFrameCount = 1000;
+  for (uint32_t i = 0; i < kFrameCount; i++) {
+    uint32_t image_index;
+    constexpr uint64_t kTimeoutNs = std::chrono::nanoseconds(std::chrono::seconds(10)).count();
+    ASSERT_EQ(VK_SUCCESS,
+              test_->acquire_next_image_khr_(test_->vk_device_, swapchain, kTimeoutNs,
+                                             acquire_semaphore, VK_NULL_HANDLE, &image_index))
+        << "failed on frame " << i << " of " << kFrameCount;
+
+    auto swapchain_images = test_->GetSwapchainImages(swapchain);
+
+    test_->TransitionLayout(swapchain_images[image_index], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            acquire_semaphore);
+
+    // With immediate mode we can send many presents per frame but the flatland simple_present
+    // utility has limits on pending presents so keep the present frequency reasonable.
+    constexpr int kVsyncPeriodUs = 16667;
+    constexpr int kMaxPresentsPerFrame = 10;
+    usleep(kVsyncPeriodUs / kMaxPresentsPerFrame);
+
+    VkResult present_result;
+    VkPresentInfoKHR present_info = {
+        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = nullptr,
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = nullptr,
+        .swapchainCount = 1,
+        .pSwapchains = &swapchain,
+        .pImageIndices = &image_index,
+        .pResults = &present_result,
+    };
+
+    ASSERT_EQ(VK_SUCCESS, test_->queue_present_khr_(queue, &present_info));
+  }
+
+  test_->destroy_swapchain_khr_(test_->vk_device_, swapchain, nullptr);
+  vkDestroySurfaceKHR(test_->vk_instance_, surface, nullptr);
+  vkDestroySemaphore(test_->vk_device_, acquire_semaphore, nullptr);
+
+  EXPECT_GT(test_->fake_flatland_->dropped_frame_count(), 0);
+  EXPECT_THAT(
+      test_->fake_flatland_->presented_count() + test_->fake_flatland_->dropped_frame_count(),
+      testing::AllOf(testing::Ge(kFrameCount - TestSwapchain::kSwapchainImageCount),
+                     testing::Le(kFrameCount)));
+  EXPECT_THAT(test_->fake_flatland_->acquire_fences_count(),
+              testing::AllOf(testing::Ge(kFrameCount - TestSwapchain::kSwapchainImageCount),
+                             testing::Le(kFrameCount)));
+}
+#endif
+
 TEST_P(TEST_CLASS_NAME, ForceQuit) {
   // TODO(https://fxbug.dev/383660387): This test case is flaky and may cause
   // a host crash on emulators with SwiftShader. Thus, we disable it on
@@ -738,9 +897,9 @@ TEST_P(TEST_CLASS_NAME, ForceQuit) {
   VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
-  ASSERT_EQ(VK_SUCCESS,
-            test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
-                                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &swapchain));
+  ASSERT_EQ(VK_SUCCESS, test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
+                                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                                     VK_PRESENT_MODE_FIFO_KHR, &swapchain));
 
   VkQueue queue;
   if (use_protected_memory()) {
@@ -800,9 +959,9 @@ TEST_P(TEST_CLASS_NAME, DeviceLostAvoidSemaphoreHang) {
   VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
-  ASSERT_EQ(VK_SUCCESS,
-            test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
-                                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &swapchain));
+  ASSERT_EQ(VK_SUCCESS, test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
+                                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                                     VK_PRESENT_MODE_FIFO_KHR, &swapchain));
 
   VkQueue queue;
   if (use_protected_memory()) {
@@ -911,9 +1070,9 @@ TEST_P(TEST_CLASS_NAME, AcquireZeroTimeout) {
   VkSurfaceKHR surface = test_->CreateSurface();
 
   VkSwapchainKHR swapchain;
-  ASSERT_EQ(VK_SUCCESS,
-            test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
-                                         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &swapchain));
+  ASSERT_EQ(VK_SUCCESS, test_->CreateSwapchainHelper(surface, VK_FORMAT_B8G8R8A8_UNORM,
+                                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                                     VK_PRESENT_MODE_FIFO_KHR, &swapchain));
 
   VkQueue queue;
   if (use_protected_memory()) {

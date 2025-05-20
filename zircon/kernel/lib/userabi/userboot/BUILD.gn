@@ -4,13 +4,13 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/config/zircon/standard.gni")
 import("//build/testing/boot_tests/boot_test.gni")
-import("//build/toolchain/toolchain_environment.gni")
-import("//build/toolchain/variant.gni")
-import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
+import("//zircon/kernel/phys/kernel_elf_binary.gni")
 
-import("//build/zircon/c_utils.gni")
+user_basic_redirect("userboot") {
+  public_deps = [ ":userboot.executable" ]
+}
 
 source_set("fidl") {
   public = [ "fidl.h" ]
@@ -22,180 +22,39 @@ source_set("fidl") {
   ]
 }
 
-# userboot gets its own toolchain for its special build requirements.
-if (current_toolchain == default_toolchain) {
-  # Define the special toolchain itself only in the default toolchain.
-  foreach(cpu, standard_fuchsia_cpus) {
-    zircon_toolchain_suite("userboot_$cpu") {
-      cpu = cpu
-      if (is_mistos) {
-        os = "mistos"
-      } else {
-        os = "fuchsia"
-      }
-      environment = "userboot"
-      configs = [ "//zircon/kernel/lib/userabi/userboot:userboot_config" ]
-      source_deps = [ "${configs[0]}_deps" ]
+kernel_elf_binary("userboot.executable") {
+  visibility = [ ":*" ]
 
-      with_shared = false
+  output_name = "userboot"
 
-      toolchain_args = {
-        if (optimize == "none" || optimize == "debug") {
-          # userboot doesn't stay sufficiently pure without optimization.
-          optimize = "moderate"
-        }
+  configs += [ "//zircon/kernel/phys:phys-elf-module.config" ]
+  has_patches = false
 
-        # No runtime to print asserts, so can't compile them in.
-        zx_assert_level = 0
-      }
+  sources = [
+    "bootfs.cc",
+    "loader-service.cc",
+    "option.cc",
+    "start.cc",
+    "userboot-elf.cc",
+    "util.cc",
+    "zbi.cc",
+  ]
+  defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
 
-      # userboot can't use any instrumentation runtimes.
-      exclude_variant_tags = [
-        "instrumented",
-        "needs-compiler-abi",
-        "needs-writable-globals",
-        "uses-shadow",
-      ]
-
-      toolchain_tags = [
-        "no-compiler-abi",
-        "no-floating-point",
-        "standalone",
-      ]
-    }
-  }
-}
-
-if (toolchain_environment == "userboot") {
-  # Everything in userboot gets compiled this way.
-  variant("userboot_config") {
-    configs = [
-      "//build/config/zircon:user",
-      "//build/config/zircon:static-libc++",
-      "//build/config/sanitizers:no_sanitizers",
-      "//build/config:symbol_no_undefined",
-    ]
-    deps = [ "//build/config/zircon:user_deps" ]
-
-    cflags = [
-      # -fPIE is the default in Clang, but not in GCC.
-      "-fpie",
-
-      # Everything is statically linked together with no PLT or GOT.
-      # No $inputs needed here since the depfile will list it.
-      "-include",
-      rebase_path("//zircon/kernel/include/hidden.h", root_build_dir),
-    ]
-    defines = [ "HIDDEN" ]
-  }
-
-  # This is the output of target ":gen-vdso-syms-ld", below.
-  vdso_syms_ld = "$target_gen_dir/vdso-syms.ld"
-
-  # userboot is a reentrant DSO (no writable segment) with an entry point.
-  executable("userboot") {
-    sources = [
-      "bootfs.cc",
-      "loader-service.cc",
-      "option.cc",
-      "start.cc",
-      "userboot-elf.cc",
-      "util.cc",
-      "zbi.cc",
-      "zx_panic.cc",
-    ]
-    defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
-
-    configs += [ "//build/config/zircon:rodso" ]
-    ldflags = [
-      "-Wl,-e,_start",
-      "-nostartfiles",
-    ]
-    libs = [ vdso_syms_ld ]
-    deps = [
-      ":fidl",
-      ":gen-vdso-syms-ld",
-      "//src/lib/elfldltl",
-      "//src/lib/zbitl",
-      "//src/zircon/lib/zircon",
-      "//zircon/kernel/lib/boot-options",
-      "//zircon/kernel/lib/userabi:headers",
-      "//zircon/system/ulib/c/stdlib:hermetic",
-      "//zircon/system/ulib/c/string:hermetic",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/ldmsg",
-      "//zircon/system/ulib/processargs",
-      "//zircon/system/ulib/zircon-internal",
-      "//zircon/system/ulib/zx",
-    ]
-
-    outputs = [ "$root_out_dir/userboot" ]
-
-    # This ensures that the userboot binary is never installed into filesystem
-    # images since it's materialized at runtime by the kernel.
-    metadata = {
-      distribution_entries_barrier = []
-      distribution_entries = [
-        {
-          source = rebase_path(outputs[0], root_build_dir)
-          destination = "userboot"
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
-      ]
-    }
-  }
-
-  # This generated header lists all the ABI symbols in the vDSO with their
-  # addresses.  It's used to generate vdso-syms.ld, below.
-  toolchain_utils_action("gen-vdso-syms-header") {
-    visibility = [ ":gen-vdso-syms-ld" ]
-
-    # Use the same link_output_rspfile() that lib/userabi uses to embed it,
-    # so we're sure to be getting the exact same binary.
-    deps = [ "//zircon/kernel/lib/userabi:vdso.rsp" ]
-    vdso_gen_dir = get_label_info(deps[0], "target_gen_dir")
-    sources = [ "$vdso_gen_dir/vdso.rsp" ]
-
-    outputs = [ "$target_gen_dir/vdso-syms.h" ]
-    depfile = "${outputs[0]}.d"
-    utils = [ "nm" ]
-    script = "//zircon/scripts/shlib-symbols"
-    args = [
-      "-a",
-      "@" + rebase_path(sources[0], root_build_dir),
-      rebase_path(outputs[0], root_build_dir),
-      rebase_path(depfile, root_build_dir),
-    ]
-    metadata = {
-      generated_sources = rebase_path(outputs, root_build_dir)
-    }
-  }
-
-  # This generated linker script defines symbols for each vDSO entry point
-  # giving the relative address where it will be found at runtime.  With
-  # this hack, the userboot code doesn't need to do any special work to
-  # find the vDSO and its entry points, keeping the code far simpler.
-  toolchain_utils_action("gen-vdso-syms-ld") {
-    visibility = [ ":*" ]
-    outputs = [ vdso_syms_ld ]
-    deps = [ ":gen-vdso-syms-header" ]
-    sources = get_target_outputs(deps[0])
-    inputs = [ "vdso-syms.ld.h" ]
-    utils = [ "cc" ]
-    args = [
-      "-o",
-      rebase_path(outputs[0], root_build_dir),
-      "-E",
-      "-P",
-      "-include",
-      rebase_path(inputs[0], root_build_dir),
-      rebase_path(sources[0], root_build_dir),
-    ]
-  }
-} else {
-  group("userboot") {
-    public_deps = [
-      ":userboot(//zircon/kernel/lib/userabi/userboot:userboot_${target_cpu})",
-    ]
-  }
+  ldflags = [ "-Wl,-z,stack-size=0x40000" ]
+  deps = [
+    ":fidl",
+    "//sdk/lib/ld:standalone",
+    "//src/lib/elfldltl",
+    "//src/lib/elfldltl/test:static-pie",
+    "//src/lib/zbitl",
+    "//src/zircon/lib/zircon",
+    "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/userabi:headers",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/ldmsg",
+    "//zircon/system/ulib/processargs",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+  ]
 }

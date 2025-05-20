@@ -107,9 +107,9 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
   uint32_t num_ring_buffer_frames_ = 0;
   uint32_t frame_size_ = 4;
   zx::vmo ring_buffer_vmo_;
-  bool watch_delay_replied_ = false;
+  bool should_reply_to_delay_request_ = true;
   std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
-  bool watch_position_replied_ = false;
+  bool should_reply_to_position_request_ = true;
   std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
 
   bool ring_buffer_vmo_fetched_ = false;

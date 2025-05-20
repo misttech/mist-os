@@ -12,11 +12,12 @@
 #include <numeric>
 #include <unordered_set>
 
+#include "src/performance/trace_manager/deferred_buffer_forwarder.h"
 #include "src/performance/trace_manager/util.h"
 
 namespace tracing {
 
-TraceSession::TraceSession(async::Executor& executor, zx::socket destination,
+TraceSession::TraceSession(async::Executor& executor, std::shared_ptr<BufferForwarder> destination,
                            std::vector<std::string> enabled_categories,
                            size_t buffer_size_megabytes,
                            fuchsia::tracing::BufferingMode buffering_mode,
@@ -24,7 +25,7 @@ TraceSession::TraceSession(async::Executor& executor, zx::socket destination,
                            zx::duration stop_timeout, controller::FxtVersion fxt_version,
                            fit::closure abort_handler, AlertCallback alert_callback)
     : executor_(executor),
-      buffer_forwarder_(std::make_shared<BufferForwarder>(std::move(destination))),
+      buffer_forwarder_(std::move(destination)),
       enabled_categories_(std::move(enabled_categories)),
       buffer_size_megabytes_(buffer_size_megabytes),
       buffering_mode_(buffering_mode),
@@ -297,6 +298,9 @@ void TraceSession::CheckAllProvidersStopped() {
 
   if (all_stopped) {
     FX_LOGS(DEBUG) << "All providers reporting stopped";
+    FX_LOGS(INFO) << "Flushing to socket";
+    buffer_forwarder_->Flush();
+
     TransitionToState(State::kStopped);
     NotifyStopped();
   }
@@ -393,6 +397,9 @@ void TraceSession::SessionStopTimeout(async_dispatcher_t* dispatcher, async::Tas
                          << " to stop";
       }
     }
+
+    FX_LOGS(INFO) << "Flushing to socket";
+    buffer_forwarder_->Flush();
     NotifyStopped();
   }
 }

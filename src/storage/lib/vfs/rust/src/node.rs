@@ -184,12 +184,6 @@ impl<N: Node> Connection<N> {
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
-            fio::NodeRequest::GetConnectionInfo { responder } => {
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(self.options.rights),
-                    ..Default::default()
-                })?;
-            }
             fio::NodeRequest::Sync { responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
@@ -198,6 +192,11 @@ impl<N: Node> Connection<N> {
                     crate::common::io2_to_io1_attrs(self.node.as_ref(), self.options.rights).await;
                 responder.send(status.into_raw(), &attrs)?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedSetAttr { flags: _, attributes: _, responder } => {
+                responder.send(Status::BAD_HANDLE.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }
@@ -225,27 +224,27 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::RemoveExtendedAttribute { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::NodeRequest::GetFlags { responder } => {
                 responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::NodeRequest::SetFlags { flags: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::NodeRequest::DeprecatedGetFlags { responder } => {
                 responder.send(Status::OK.into_raw(), fio::OpenFlags::NODE_REFERENCE)?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::NodeRequest::DeprecatedSetFlags { flags: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::NodeRequest::GetFlags { responder } => {
                 responder.send(Status::OK.into_raw(), fio::OpenFlags::NODE_REFERENCE)?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::NodeRequest::SetFlags { flags: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }
@@ -303,13 +302,16 @@ impl<N: Node> RequestHandler for Connection<N> {
 
     async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
         let this = self.get_mut();
-        let _guard = this.scope.active_guard();
-        match request {
-            Ok(request) => match this.handle_request(request).await {
-                Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
-                Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
-            },
-            Err(_) => ControlFlow::Break(()),
+        if let Some(_guard) = this.scope.try_active_guard() {
+            match request {
+                Ok(request) => match this.handle_request(request).await {
+                    Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                    Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+                },
+                Err(_) => ControlFlow::Break(()),
+            }
+        } else {
+            ControlFlow::Break(())
         }
     }
 }
@@ -317,7 +319,7 @@ impl<N: Node> RequestHandler for Connection<N> {
 impl<N: Node> Representation for Connection<N> {
     type Protocol = fio::NodeMarker;
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     async fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -332,7 +334,7 @@ impl<N: Node> Representation for Connection<N> {
         }))
     }
 
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     async fn get_representation(
         &self,
         requested_attributes: fio::NodeAttributesQuery,

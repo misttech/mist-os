@@ -13,9 +13,9 @@
 #include <stdint.h>
 #include <zircon/assert.h>
 
-#include <ktl/algorithm.h>
 #include <ktl/iterator.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/elf-image.h>
 #include <phys/main.h>
 #include <phys/stack.h>

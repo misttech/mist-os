@@ -118,7 +118,7 @@ async fn framework_directory_rights() {
         fuchsia_fs::directory::clone(&test.test_dir_proxy).expect("failed to clone test dir");
     let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
     test.model.context().add_framework_capability(directory_host).await;
-    test.check_use(vec!["b"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
+    test.check_use(["b"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
         .await;
 }
 
@@ -156,7 +156,7 @@ async fn framework_directory_incompatible_rights() {
     let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
     test.model.context().add_framework_capability(directory_host).await;
     test.check_use(
-        vec!["b"].try_into().unwrap(),
+        ["b"].try_into().unwrap(),
         CheckUse::default_directory(ExpectedResult::Err(zx::Status::ACCESS_DENIED)),
     )
     .await;

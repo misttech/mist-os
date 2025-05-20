@@ -12,32 +12,30 @@ sudo docker save tianon/toybox:latest -o local/toybox.tar
 sudo chmod a+r local/toybox.tar
 ```
 
-Then, use `convert_tarball_to_starnix_container` to convert the container into a Fuchsia package. Before
-running this command, make sure to build Fuchsia using an `fx set` command that has
-`--with //src/starnix/tools` and the `workbench_eng` product:
+Then, use the `starnix_docker_container` GN template to convert the container
+into a Fuchsia package:
 
-```posix-terminal
-fx host-tool convert_tarball_to_starnix_container --input-format docker-archive local/toybox.tar local/toybox.far
+```gn
+starnix_docker_container("toybox") {
+  input_path = "//local/toybox.tar"
+  package_name = "toybox"
+  features = [ "rootfs_rw" ]
+}
 ```
 
-## Publish
-
-After you build Fuchsia, you can publish the Fuchsia `toybox` Fuchsia package to your local
-package repository:
+Next, add this target to the build system:
 
 ```posix-terminal
-ffx repository publish "$(fx get-build-dir)/amber-files" --package-archive local/toybox.far
+fx set workbench_eng.x64 --release --with //src/starnix/containers/toybox
+fx build
 ```
-
-You will need to repeat this command each time you rebuild Fuchsia because rebuilding Fuchsia
-recreates your local package repository.
 
 ## Run
 
 You can now run the `toybox` container:
 
 ```posix-terminal
-ffx component run /core/starnix_runner/playground:toybox fuchsia-pkg://fuchsia.com/toybox#meta/container.cm
+ffx component run /core/starnix_runner/playground:toybox fuchsia-pkg://fuchsia.com/toybox#meta/toybox_container.cm
 ```
 
 There is nothing special about running `toybox` in this `playground` collection. You can run

@@ -14,7 +14,7 @@ use power_broker_client::{LeaseDependency, LeaseHelper, PowerElementContext};
 use std::rc::Rc;
 use zx::{HandleBased, Rights};
 use {
-    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
+    fidl_fuchsia_hardware_power_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
     fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync,
 };
 

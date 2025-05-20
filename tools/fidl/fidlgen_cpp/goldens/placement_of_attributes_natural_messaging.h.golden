@@ -5,6 +5,9 @@
 #pragma once
 
 #include <fidl/test.exampleusing/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.placementofattributes/cpp/markers.h>
 #include <fidl/test.placementofattributes/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -17,18 +20,12 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_placementofattributes::ExampleProtocol::Method> {
   using Request = ::test_placementofattributes::ExampleProtocolMethodRequest;
 
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleProtocol> final : public ::fidl::internal::NaturalClientBase {
@@ -37,10 +34,6 @@ class ::fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleP
   ::fit::result<::fidl::OneWayError> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::ExampleProtocol>> {
@@ -48,15 +41,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_placementofattributes::Exam
   ::fit::result<::fidl::OneWayError> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -88,13 +74,9 @@ class ::fidl::SyncEventHandler<::test_placementofattributes::ExampleProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_placementofattributes::ExampleProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_placementofattributes::ExampleProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_placementofattributes::ExampleProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_placementofattributes::ExampleProtocol>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -107,8 +89,6 @@ class ::fidl::internal::NaturalEventSender<::test_placementofattributes::Example
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_placementofattributes::ExampleProtocol> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -134,19 +114,13 @@ class ::fidl::Server<::test_placementofattributes::ExampleProtocol> : public ::f
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_placementofattributes::ExampleProtocol> final {
@@ -162,6 +136,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_placementofattributes::E
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

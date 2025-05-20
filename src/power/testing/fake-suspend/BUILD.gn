@@ -8,7 +8,7 @@ import("//build/fidl/fidl.gni")
 fidl("test.suspendcontrol") {
   sources = [ "fidl/suspendcontrol.test.fidl" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.suspend",
+    "//sdk/fidl/fuchsia.hardware.power.suspend",
     "//zircon/vdso/zx",
   ]
 }
@@ -20,7 +20,7 @@ source_set("cpp") {
   ]
   public_deps = [
     ":test.suspendcontrol_cpp",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
   ]

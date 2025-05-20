@@ -963,7 +963,7 @@ class AsyncMain:
             build_command_line.extend(vals)
 
         if tests.has_e2e_test() and allow_build_updates:
-            build_command_line.extend(["--default", "updates"])
+            build_command_line.extend(["--default", "//build/images/updates"])
             recorder.emit_instruction_message(
                 "E2E test selected, building updates package"
             )
@@ -1218,9 +1218,7 @@ class AsyncMain:
         exec_env = self._exec_env
         assert exec_env is not None
 
-        if tests.has_device_test() and await has_device_connected(
-            exec_env, recorder, parent=build_id
-        ):
+        if tests.has_device_test():
             try:
                 if self._has_tests_in_base(tests):
                     recorder.emit_info_message(

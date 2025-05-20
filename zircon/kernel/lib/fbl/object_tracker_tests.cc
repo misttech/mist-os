@@ -20,7 +20,7 @@
 #include <fbl/int_set.h>
 #include <fbl/object_tracker.h>
 #include <fbl/vector.h>
-#include <ktl/algorithm.h>
+#include <ktl/utility.h>
 
 namespace {
 

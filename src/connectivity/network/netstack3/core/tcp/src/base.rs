@@ -7,6 +7,7 @@
 use core::num::NonZeroU8;
 use core::time::Duration;
 
+use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
@@ -24,7 +25,7 @@ use rand::Rng;
 use crate::internal::buffer::BufferLimits;
 use crate::internal::counters::{TcpCountersWithSocket, TcpCountersWithoutSocket};
 use crate::internal::socket::isn::IsnGenerator;
-use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
+use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes, WeakTcpSocketId};
 use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
 
 /// Default lifetime for a orphaned connection in FIN_WAIT2.
@@ -163,6 +164,30 @@ impl IcmpErrorResult {
                 Some(IcmpErrorResult::PmtuUpdate(mms))
             }
         }
+    }
+}
+
+/// Metadata associated with an outgoing TCP packet.
+#[derive(Derivative, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+#[derivative(Debug(bound = ""))]
+#[cfg_attr(any(test, feature = "testutils"), derivative(PartialEq(bound = "")))]
+pub struct TcpSocketTxMetadata<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> {
+    /// The socket from which the packet originates.
+    socket: WeakTcpSocketId<I, D, BT>,
+}
+
+impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
+    TcpSocketTxMetadata<I, D, BT>
+{
+    /// Creates a new `TcpSocketTxMetadata`.
+    pub(crate) fn new(socket: WeakTcpSocketId<I, D, BT>) -> Self {
+        Self { socket }
+    }
+
+    /// Gets the socket from which the packet originates.
+    pub fn socket(&self) -> &WeakTcpSocketId<I, D, BT> {
+        &self.socket
     }
 }
 

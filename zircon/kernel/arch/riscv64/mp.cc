@@ -3,6 +3,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
+
 #include "arch/riscv64/mp.h"
 
 #include <assert.h>
@@ -21,7 +22,7 @@
 #include <dev/interrupt.h>
 #include <lk/init.h>
 #include <lk/main.h>
-#include <phys/handoff.h>
+#include <vm/handoff-end.h>
 #include <vm/vm.h>
 
 #define LOCAL_TRACE 0

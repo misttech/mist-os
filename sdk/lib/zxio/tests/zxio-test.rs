@@ -94,7 +94,7 @@ async fn test_fsverity_enabled() {
             dir_zxio
                 .open(
                     "foo",
-                    fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
+                    fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_UPDATE_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attrs), None),
                 )
                 .expect("open failed"),
@@ -172,7 +172,7 @@ async fn test_not_fsverity_enabled() {
             dir_zxio
                 .open(
                     "foo",
-                    fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
+                    fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_UPDATE_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attrs), None),
                 )
                 .expect("open failed"),
@@ -220,7 +220,7 @@ async fn test_read_link_error() {
     }
 
     impl RemoteLike for ErrorSymlink {
-        fn open(
+        fn deprecated_open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _flags: fio::OpenFlags,
@@ -230,7 +230,7 @@ async fn test_read_link_error() {
             panic!("fuchsia.io/Directory.DeprecatedOpen should not be used in these tests.")
         }
 
-        fn open3(
+        fn open(
             self: Arc<Self>,
             scope: ExecutionScope,
             path: Path,
@@ -618,7 +618,7 @@ async fn test_get_set_attributes_node() {
                 "test_file",
                 fio::Flags::FLAG_MAYBE_CREATE
                     | fio::Flags::PROTOCOL_FILE
-                    | fio::Flags::PERM_SET_ATTRIBUTES,
+                    | fio::Flags::PERM_UPDATE_ATTRIBUTES,
                 ZxioOpenOptions::default(),
             )
             .expect("open failed");
@@ -681,7 +681,7 @@ async fn test_open() {
         let test_file = test_dir
             .open(
                 "test_file",
-                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
+                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
                 ZxioOpenOptions::default(),
             )
             .expect("open failed");
@@ -803,8 +803,8 @@ async fn test_open_file_protocol_flags() {
                 "test_file",
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_FILE
-                    | fio::Flags::PERM_WRITE
-                    | fio::Flags::PERM_READ
+                    | fio::PERM_WRITABLE
+                    | fio::PERM_READABLE
                     | fio::Flags::FILE_APPEND,
                 ZxioOpenOptions::default(),
             )
@@ -904,7 +904,7 @@ async fn test_open_rights() {
         let test_file = dir_zxio
             .open(
                 "test_file",
-                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
+                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
                 ZxioOpenOptions::default(),
             )
             .expect("open failed");
@@ -915,7 +915,7 @@ async fn test_open_rights() {
 
         // Check rights
         let test_file = dir_zxio
-            .open("test_file", fio::Flags::PERM_READ, ZxioOpenOptions::default())
+            .open("test_file", fio::PERM_READABLE, ZxioOpenOptions::default())
             .expect("open failed");
         let mut buf = [0; 20];
         assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
@@ -936,18 +936,14 @@ async fn test_open_rights() {
         let test_dir = dir_zxio
             .open(
                 ".",
-                fio::Flags::PERM_READ | fio::Flags::PERM_INHERIT_WRITE,
+                fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE,
                 ZxioOpenOptions::default(),
             )
             .expect("open failed");
 
         // Now make sure we can open and write to the test file.
         let test_file = test_dir
-            .open(
-                "test_file",
-                fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
-                ZxioOpenOptions::default(),
-            )
+            .open("test_file", fio::PERM_READABLE | fio::PERM_WRITABLE, ZxioOpenOptions::default())
             .expect("open failed");
         assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
         assert_eq!(&buf[..CONTENT.len()], CONTENT);
@@ -975,7 +971,7 @@ async fn test_open_node() {
         let test_file = dir_zxio
             .open(
                 "test_file",
-                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
+                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::PERM_WRITABLE,
                 ZxioOpenOptions::default(),
             )
             .expect("open failed");
@@ -1070,8 +1066,8 @@ async fn test_casefold() {
                 "foo",
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_FILE
-                    | fio::Flags::PERM_READ
-                    | fio::Flags::PERM_WRITE,
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
                 Default::default(),
             )
             .expect("open failed");
@@ -1079,7 +1075,7 @@ async fn test_casefold() {
         let _file = dir_zxio
             .open(
                 "FOO",
-                fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
+                fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE | fio::PERM_WRITABLE,
                 Default::default(),
             )
             .expect("open failed");
@@ -1117,10 +1113,10 @@ async fn test_open_selinux_context_attr() {
                     TEST_FILE,
                     fio::Flags::FLAG_MUST_CREATE
                         | fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::PERM_GET_ATTRIBUTES
-                        | fio::Flags::PERM_SET_ATTRIBUTES,
+                        | fio::Flags::PERM_UPDATE_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attr), None)
                         .with_selinux_context_read(&mut read_buf)
                         .unwrap()
@@ -1144,10 +1140,10 @@ async fn test_open_selinux_context_attr() {
                 .open(
                     TEST_FILE,
                     fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::PERM_GET_ATTRIBUTES
-                        | fio::Flags::PERM_SET_ATTRIBUTES,
+                        | fio::Flags::PERM_UPDATE_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attr), None)
                         .with_selinux_context_read(&mut read_buf)
                         .unwrap(),
@@ -1178,10 +1174,10 @@ async fn test_open_selinux_context_attr() {
                 .open(
                     TEST_FILE,
                     fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::PERM_GET_ATTRIBUTES
-                        | fio::Flags::PERM_SET_ATTRIBUTES,
+                        | fio::Flags::PERM_UPDATE_ATTRIBUTES,
                     ZxioOpenOptions::new(Some(&mut attr), None)
                         .with_selinux_context_read(&mut read_buf)
                         .unwrap(),

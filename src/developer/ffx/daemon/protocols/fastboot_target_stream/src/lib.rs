@@ -58,7 +58,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         let inner = Rc::downgrade(&inner);
         if let Some(context) = ffx_config::global_env_context() {
             // Probably could avoid creating the entire inner object but that refactoring can wait
-            if is_usb_discovery_disabled(&context).await {
+            if is_usb_discovery_disabled(&context) {
                 return Ok(());
             }
         }
@@ -125,11 +125,11 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
                                     }
                                 },
                                 e @ _ => {
-                                    tracing::debug!("We only support Fastboot events in this module... skipping non fastboot event: {:?}", e);
+                                    log::debug!("We only support Fastboot events in this module... skipping non fastboot event: {:?}", e);
                                 }
                             },
                             TargetEvent::Removed(_) => {
-                                tracing::debug!("Skipping removed event");
+                                log::debug!("Skipping removed event");
                             }
                         }
                     }
@@ -141,7 +141,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
 
     async fn stop(&mut self, _cx: &Context) -> Result<()> {
         if let Some(task) = self.fastboot_task.take() {
-            task.cancel().await;
+            task.abort().await;
         }
         Ok(())
     }

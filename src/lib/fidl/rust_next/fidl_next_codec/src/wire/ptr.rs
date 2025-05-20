@@ -2,20 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use munge::munge;
 
-use crate::{DecodeError, Slot, WireU64};
+use crate::{Chunk, DecodeError, Slot, WireU64};
 
 /// A raw FIDL pointer
 #[repr(C, align(8))]
-pub union WirePointer<T> {
+pub union WirePointer<'de, T> {
     encoded: WireU64,
     decoded: *mut T,
+    _phantom: PhantomData<&'de mut [Chunk]>,
 }
 
-impl<T> WirePointer<T> {
+impl<T> WirePointer<'_, T> {
     /// Returns whether the wire pointer was encoded present.
     pub fn is_encoded_present(slot: Slot<'_, Self>) -> Result<bool, DecodeError> {
         munge!(let Self { encoded } = slot);

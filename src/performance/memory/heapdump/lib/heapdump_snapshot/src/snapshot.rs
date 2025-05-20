@@ -179,15 +179,15 @@ impl Snapshot {
                         }
                         fheapdump_client::SnapshotElement::ExecutableRegion(region) => {
                             let address = read_field!(region => ExecutableRegion, address)?;
-                            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                            #[cfg(fuchsia_api_level_at_least = "27")]
                             let name = region.name.unwrap_or_else(|| String::new());
-                            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+                            #[cfg(not(fuchsia_api_level_at_least = "27"))]
                             let name = String::new();
                             let size = read_field!(region => ExecutableRegion, size)?;
                             let file_offset = read_field!(region => ExecutableRegion, file_offset)?;
-                            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                            #[cfg(fuchsia_api_level_at_least = "27")]
                             let vaddr = region.vaddr;
-                            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+                            #[cfg(not(fuchsia_api_level_at_least = "27"))]
                             let vaddr = None;
                             let build_id = read_field!(region => ExecutableRegion, build_id)?.value;
                             let region =

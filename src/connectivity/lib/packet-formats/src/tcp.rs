@@ -24,7 +24,7 @@ use packet::records::Records;
 use packet::{
     BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FragmentedBytesMut, FromRaw,
     InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
-    ParseMetadata, SerializeTarget, Serializer,
+    ParseMetadata, PartialPacketBuilder, SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::{U16, U32};
 use zerocopy::{
@@ -116,6 +116,24 @@ impl HeaderPrefix {
             // All values are valid.
             window_size: self.window_size.get(),
         }
+    }
+
+    pub fn set_src_port(&mut self, new: NonZeroU16) {
+        let old = self.src_port;
+        let new = U16::from(new.get());
+        self.src_port = new;
+        self.checksum = internet_checksum::update(self.checksum, old.as_bytes(), new.as_bytes());
+    }
+
+    pub fn set_dst_port(&mut self, new: NonZeroU16) {
+        let old = self.dst_port;
+        let new = U16::from(new.get());
+        self.dst_port = new;
+        self.checksum = internet_checksum::update(self.checksum, old.as_bytes(), new.as_bytes());
+    }
+
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        self.checksum = internet_checksum::update(self.checksum, old.bytes(), new.bytes());
     }
 }
 
@@ -475,28 +493,19 @@ impl<B: SplitByteSlice> TcpSegment<B> {
 }
 
 impl<B: SplitByteSliceMut> TcpSegment<B> {
-    /// Set the source port of the UDP packet.
+    /// Set the source port of the TCP packet.
     pub fn set_src_port(&mut self, new: NonZeroU16) {
-        let old = self.hdr_prefix.src_port;
-        let new = U16::from(new.get());
-        self.hdr_prefix.src_port = new;
-        self.hdr_prefix.checksum =
-            internet_checksum::update(self.hdr_prefix.checksum, old.as_bytes(), new.as_bytes());
+        self.hdr_prefix.set_src_port(new)
     }
 
-    /// Set the destination port of the UDP packet.
+    /// Set the destination port of the TCP packet.
     pub fn set_dst_port(&mut self, new: NonZeroU16) {
-        let old = self.hdr_prefix.dst_port;
-        let new = U16::from(new.get());
-        self.hdr_prefix.dst_port = new;
-        self.hdr_prefix.checksum =
-            internet_checksum::update(self.hdr_prefix.checksum, old.as_bytes(), new.as_bytes());
+        self.hdr_prefix.set_dst_port(new)
     }
 
     /// Update the checksum to reflect an updated address in the pseudo header.
     pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
-        self.hdr_prefix.checksum =
-            internet_checksum::update(self.hdr_prefix.checksum, old.bytes(), new.bytes());
+        self.hdr_prefix.update_checksum_pseudo_header_address(old, new)
     }
 }
 
@@ -579,6 +588,44 @@ pub struct TcpSegmentRaw<B: SplitByteSlice> {
     // can store these in an `ArrayVec<u8, MAX_OPTIONS_LEN>` in `builder`.
     options: MaybeParsed<OptionsRaw<B, TcpOptionsImpl>, B>,
     body: B,
+}
+
+impl<B: SplitByteSliceMut> TcpSegmentRaw<B> {
+    /// Set the source port of the TCP packet.
+    pub fn set_src_port(&mut self, new: NonZeroU16) {
+        match &mut self.hdr_prefix {
+            MaybeParsed::Complete(h) => h.set_src_port(new),
+            MaybeParsed::Incomplete(h) => {
+                h.flow.src_port = U16::from(new.get());
+
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
+
+    /// Set the destination port of the TCP packet.
+    pub fn set_dst_port(&mut self, new: NonZeroU16) {
+        match &mut self.hdr_prefix {
+            MaybeParsed::Complete(h) => h.set_dst_port(new),
+            MaybeParsed::Incomplete(h) => {
+                h.flow.dst_port = U16::from(new.get());
+
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
+
+    /// Update the checksum to reflect an updated address in the pseudo header.
+    pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
+        match &mut self.hdr_prefix {
+            MaybeParsed::Complete(h) => {
+                h.update_checksum_pseudo_header_address(old, new);
+            }
+            MaybeParsed::Incomplete(_) => {
+                // We don't have the checksum, so there's nothing to update.
+            }
+        }
+    }
 }
 
 impl<B> ParsablePacket<B, ()> for TcpSegmentRaw<B>
@@ -872,6 +919,18 @@ impl<A: IpAddress, O: InnerPacketBuilder> PacketBuilder for TcpSegmentBuilderWit
     }
 }
 
+impl<A: IpAddress, O: InnerPacketBuilder> PartialPacketBuilder
+    for TcpSegmentBuilderWithOptions<A, O>
+{
+    fn partial_serialize(&self, body_len: usize, mut buffer: &mut [u8]) {
+        self.prefix_builder.partial_serialize(body_len, &mut buffer[..HDR_PREFIX_LEN]);
+
+        let opt_len = self.aligned_options_len();
+        let options = (&mut buffer).take_back_zero(opt_len).expect("too few bytes for TCP options");
+        self.options.serialize(options)
+    }
+}
+
 // NOTE(joshlf): In order to ensure that the checksum is always valid, we don't
 // expose any setters for the fields of the TCP segment; the only way to set
 // them is via TcpSegmentBuilder. This, combined with checksum validation
@@ -1003,16 +1062,9 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
     pub fn set_dst_port(&mut self, port: NonZeroU16) {
         self.dst_port = Some(port);
     }
-}
 
-impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
-    fn constraints(&self) -> PacketConstraints {
-        PacketConstraints::new(HDR_PREFIX_LEN, 0, 0, core::usize::MAX)
-    }
-
-    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
-        let hdr_len = target.header.len();
-        let total_len = hdr_len + body.len() + target.footer.len();
+    fn serialize_header(&self, header: &mut [u8]) {
+        let hdr_len = header.len();
 
         debug_assert_eq!(hdr_len % 4, 0, "header length isn't a multiple of 4: {}", hdr_len);
         let mut data_offset_reserved_flags = self.data_offset_reserved_flags;
@@ -1024,7 +1076,7 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
         // write the checksum back into the header. To avoid this, we re-slice
         // header before calling `write_obj_front`; the re-slice will be
         // consumed, but `target.header` is unaffected.
-        (&mut &mut target.header[..])
+        (&mut &mut header[..])
             .write_obj_front(&HeaderPrefix::new(
                 self.src_port.map_or(0, NonZeroU16::get),
                 self.dst_port.map_or(0, NonZeroU16::get),
@@ -1039,6 +1091,18 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
                 0,
             ))
             .expect("too few bytes for TCP header prefix");
+    }
+}
+
+impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
+    fn constraints(&self) -> PacketConstraints {
+        PacketConstraints::new(HDR_PREFIX_LEN, 0, 0, core::usize::MAX)
+    }
+
+    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+        self.serialize_header(target.header);
+
+        let body_len = body.len();
 
         #[rustfmt::skip]
         let checksum = compute_transport_checksum_serialize(
@@ -1051,10 +1115,16 @@ impl<A: IpAddress> PacketBuilder for TcpSegmentBuilder<A> {
         .unwrap_or_else(|| {
             panic!(
                 "total TCP segment length of {} bytes overflows length field of pseudo-header",
-                total_len
+                target.header.len() + body_len + target.footer.len(),
             )
         });
         target.header[CHECKSUM_RANGE].copy_from_slice(&checksum[..]);
+    }
+}
+
+impl<A: IpAddress> PartialPacketBuilder for TcpSegmentBuilder<A> {
+    fn partial_serialize(&self, _body_len: usize, buffer: &mut [u8]) {
+        self.serialize_header(buffer)
     }
 }
 

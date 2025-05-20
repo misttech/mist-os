@@ -91,21 +91,29 @@ void UsbAdbDevice::ResetOrStopUsb() {
   }
 
   // Purge any requests from internal queues.
+  // TODO(b/417808660): Replace logs with Inspect once the bug is fixed.
+  zxlogf(INFO, "rx_requests: %ld", rx_requests_.size());
   while (!rx_requests_.empty()) {
     rx_requests_.front().Reply(fit::error(ZX_ERR_BAD_STATE));
     rx_requests_.pop();
   }
+  // TODO(b/417808660): Replace logs with Inspect once the bug is fixed.
+  zxlogf(INFO, "pending_replies: %ld", pending_replies_.size());
   while (!pending_replies_.empty()) {
     bulk_out_ep_.PutRequest(
         usb::FidlRequest(std::move(pending_replies_.front().request().value())));
     pending_replies_.pop();
   }
+  // TODO(b/417808660): Replace logs with Inspect once the bug is fixed.
+  zxlogf(INFO, "tx_pending_reqs: %ld", tx_pending_reqs_.size());
   while (!tx_pending_reqs_.empty()) {
     CompleteTxn(tx_pending_reqs_.front().completer, ZX_ERR_CANCELED);
     tx_pending_reqs_.pop();
   }
 
   // Disconnect USB.
+  // TODO(b/417808660): Replace logs with Inspect once the bug is fixed.
+  zxlogf(INFO, "Disconnecting from USB with SetInterface(nullptr, nullptr)");
   zx_status_t status = function_.SetInterface(nullptr, nullptr);
   if (status != ZX_OK) {
     ZX_PANIC("SetInterface failed: %s", zx_status_get_string(status));
@@ -434,6 +442,9 @@ void UsbAdbDevice::CheckUsbStopComplete() {
 
   if (!bulk_in_ep_.RequestsFull() || !bulk_out_ep_.RequestsFull()) {
     // Still waiting for outstanding USB requests to return.
+    // TODO(b/417808660): Replace logs with Inspect once the bug is fixed.
+    zxlogf(INFO, "Not all USB requests complete (in:%d out:%d)", bulk_in_ep_.RequestsFull(),
+           bulk_out_ep_.RequestsFull());
     return;
   }
 
@@ -448,6 +459,8 @@ void UsbAdbDevice::CheckUsbStopComplete() {
 
   adb_binding_.reset();
 
+  // TODO(b/417808660): Replace logs with Inspect once the bug is fixed.
+  zxlogf(INFO, "Calling stop_completers_");
   while (!stop_completers_.empty()) {
     stop_completers_.back().Reply(zx::ok());
     stop_completers_.pop_back();

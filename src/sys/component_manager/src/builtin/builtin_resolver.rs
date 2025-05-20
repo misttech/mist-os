@@ -38,11 +38,11 @@ impl Resolver for BuiltinResolver {
         let Some(resource) = url.resource() else {
             return Err(ResolverError::manifest_not_found(ManifestNotFoundError(url)));
         };
-        let cm = match resource {
-            "elf_runner.cm" => Ok(ELF_RUNNER_CM),
-            _ => Err(ResolverError::manifest_not_found(ManifestNotFoundError(url.clone()))),
-        }?;
-        let decl = resolving::read_and_validate_manifest_bytes(cm)?;
+        let decl = match resource {
+            "elf_runner.cm" => resolving::read_and_validate_manifest_bytes(ELF_RUNNER_CM_BYTES)?,
+            "dispatcher.cm" => resolving::read_and_validate_manifest_bytes(DISPATCHER_CM_BYTES)?,
+            _ => return Err(ResolverError::manifest_not_found(ManifestNotFoundError(url.clone()))),
+        };
 
         // Unpackaged components built into component_manager are assigned the
         // platform abi revision.
@@ -60,10 +60,15 @@ impl Resolver for BuiltinResolver {
 }
 
 /// A compiled `.cm` binary blob corresponding to the ELF runner component declaration.
-static ELF_RUNNER_CM: &'static [u8] = include_bytes_from_working_dir_env!("ELF_RUNNER_CM_PATH");
+static ELF_RUNNER_CM_BYTES: &'static [u8] =
+    include_bytes_from_working_dir_env!("ELF_RUNNER_CM_PATH");
+
+/// A compiled `.cm` binary blob corresponding to the dispatcher component declaration.
+static DISPATCHER_CM_BYTES: &'static [u8] =
+    include_bytes_from_working_dir_env!("DISPATCHER_CM_PATH");
 
 #[derive(Error, Debug, Clone)]
-#[error("{0} does not reference a known manifest. Try fuchsia-builtin://#elf_runner.cm")]
+#[error("{0} does not reference a known manifest. Try fuchsia-builtin://#elf_runner.cm or fuchsia-builtin://#dispatcher.cm")]
 struct ManifestNotFoundError(pub BuiltinUrl);
 
 #[cfg(test)]
@@ -72,7 +77,7 @@ mod tests {
 
     #[fuchsia::test]
     fn elf_runner_cm_smoke_test() {
-        let decl = resolving::read_and_validate_manifest_bytes(ELF_RUNNER_CM).unwrap();
+        let decl = resolving::read_and_validate_manifest_bytes(ELF_RUNNER_CM_BYTES).unwrap();
         let program = decl.program.unwrap();
         assert_eq!(program.runner.unwrap().as_str(), "builtin_elf_runner");
     }

@@ -61,11 +61,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> for
                 format!("TCPFactory connecting via TCP to Fastboot address: {}", self.addr)
             }) {
                 Err(e) => {
-                    tracing::debug!(
-                        "Attempt {}. Got error connecting to fastboot address: {}",
-                        i,
-                        e,
-                    );
+                    log::debug!("Attempt {}. Got error connecting to fastboot address: {}", i, e,);
 
                     Timer::new(wait_duration).await;
                 }
@@ -76,7 +72,7 @@ impl InterfaceFactoryBase<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> for
     }
 
     async fn close(&self) {
-        tracing::debug!("Closing Fastboot TCP Factory for: {}", self.addr);
+        log::debug!("Closing Fastboot TCP Factory for: {}", self.addr);
     }
 
     async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
@@ -115,7 +111,7 @@ pub struct TcpTargetFilter {
 impl TargetFilter for TcpTargetFilter {
     fn filter_target(&mut self, handle: &TargetHandle) -> bool {
         if handle.node_name.as_ref() != Some(&self.node_name) {
-            tracing::debug!(
+            log::debug!(
                 "Discovered target name \"{:#?}\" does not match desired \"{}\"... skipping",
                 handle.node_name,
                 self.node_name
@@ -126,11 +122,11 @@ impl TargetFilter for TcpTargetFilter {
             TargetState::Fastboot(ts)
                 if matches!(ts.connection_state, FastbootConnectionState::Tcp(_)) =>
             {
-                tracing::debug!("Filtered and found target handle: {}", handle);
+                log::debug!("Filtered and found target handle: {}", handle);
                 true
             }
             state @ _ => {
-                tracing::debug!("Target state {} is not  TCP Fastboot... skipping", state);
+                log::debug!("Target state {} is not  TCP Fastboot... skipping", state);
                 false
             }
         }
@@ -161,7 +157,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: wrong name
         assert!(!filter.filter_target(&TargetHandle {
@@ -169,7 +166,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: wrong state
         assert!(!filter.filter_target(&TargetHandle {
@@ -177,7 +175,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Udp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: Bad name
         assert!(!filter.filter_target(&TargetHandle {
@@ -185,7 +184,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         Ok(())
     }

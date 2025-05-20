@@ -8,7 +8,7 @@ use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
 
 #[fuchsia::test]
-async fn set_attr_file_with_sufficient_rights() {
+async fn deprecated_set_attr_file_with_sufficient_rights() {
     let harness = TestHarness::new().await;
     if !harness.supports_mutable_attrs() {
         return;
@@ -26,7 +26,7 @@ async fn set_attr_file_with_sufficient_rights() {
 
         // Set CREATION_TIME flag, but not MODIFICATION_TIME.
         let status = file
-            .set_attr(
+            .deprecated_set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
                 &fio::NodeAttributes {
                     creation_time: 111,
@@ -47,7 +47,7 @@ async fn set_attr_file_with_sufficient_rights() {
 }
 
 #[fuchsia::test]
-async fn set_attr_file_with_insufficient_rights() {
+async fn deprecated_set_attr_file_with_insufficient_rights() {
     let harness = TestHarness::new().await;
     if !harness.supports_mutable_attrs() {
         return;
@@ -60,7 +60,7 @@ async fn set_attr_file_with_insufficient_rights() {
         let file = deprecated_open_file_with_flags(&dir, file_flags, "file").await;
 
         let status = file
-            .set_attr(
+            .deprecated_set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
                 &fio::NodeAttributes {
                     creation_time: 111,
@@ -75,7 +75,7 @@ async fn set_attr_file_with_insufficient_rights() {
 }
 
 #[fuchsia::test]
-async fn set_attr_directory_with_sufficient_rights() {
+async fn deprecated_set_attr_directory_with_sufficient_rights() {
     let harness = TestHarness::new().await;
     if !harness.supports_mutable_attrs() {
         return;
@@ -93,7 +93,7 @@ async fn set_attr_directory_with_sufficient_rights() {
 
         // Set CREATION_TIME flag, but not MODIFICATION_TIME.
         let status = dir
-            .set_attr(
+            .deprecated_set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
                 &fio::NodeAttributes {
                     creation_time: 111,
@@ -114,7 +114,7 @@ async fn set_attr_directory_with_sufficient_rights() {
 }
 
 #[fuchsia::test]
-async fn set_attr_directory_with_insufficient_rights() {
+async fn deprecated_set_attr_directory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
     if !harness.supports_mutable_attrs() {
         return;
@@ -126,7 +126,7 @@ async fn set_attr_directory_with_insufficient_rights() {
         let dir = deprecated_open_dir_with_flags(&dir, dir_flags, "dir").await;
 
         let status = dir
-            .set_attr(
+            .deprecated_set_attr(
                 fio::NodeAttributeFlags::CREATION_TIME,
                 &fio::NodeAttributes {
                     creation_time: 111,

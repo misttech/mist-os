@@ -18,7 +18,6 @@ namespace internal {
       .__reserved = WireNaturalConversionTraits<uint8_t, uint8_t>::ToWire(arena, std::move(src.__reserved())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_typesinprotocols::ResourceStruct WireNaturalConversionTraits<::test_typesinprotocols::wire::ResourceStruct, ::test_typesinprotocols::ResourceStruct>::ToNatural(::test_typesinprotocols::wire::ResourceStruct src) {
@@ -233,7 +232,6 @@ namespace internal {
       .vector_vector_uint8 = WireNaturalConversionTraits<::fidl::VectorView<::fidl::VectorView<uint8_t>>, ::std::vector<::std::vector<uint8_t>>>::ToWire(arena, std::move(src.vector_vector_uint8())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_typesinprotocols::Resource WireNaturalConversionTraits<::test_typesinprotocols::wire::Resource, ::test_typesinprotocols::Resource>::ToNatural(::test_typesinprotocols::wire::Resource src) {
@@ -312,7 +310,6 @@ namespace internal {
 }
 
 #ifdef __Fuchsia__
-
 ::test_typesinprotocols::ResourceTable WireNaturalConversionTraits<::test_typesinprotocols::wire::ResourceTable, ::test_typesinprotocols::ResourceTable>::ToNatural(::test_typesinprotocols::wire::ResourceTable src) {
   ::test_typesinprotocols::ResourceTable dst;
 
@@ -575,10 +572,6 @@ namespace internal {
           WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.err().value())));
   }
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic> WireNaturalConversionTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic>, ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>>::ToNatural(::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic> src) {
   return ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>(

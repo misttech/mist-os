@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::mem::{needs_drop, MaybeUninit};
+use core::marker::PhantomData;
+use core::mem::{forget, needs_drop, MaybeUninit};
 use core::ops::Deref;
 use core::ptr::{copy_nonoverlapping, NonNull};
 use core::{fmt, slice};
@@ -11,17 +12,19 @@ use munge::munge;
 
 use super::raw::RawWireVector;
 use crate::{
-    Decode, DecodeError, Decoder, DecoderExt as _, Encodable, Encode, EncodeError, Encoder,
-    EncoderExt as _, Slot, TakeFrom, WirePointer, ZeroPadding,
+    Chunk, Decode, DecodeError, Decoder, DecoderExt as _, Encodable, Encode, EncodeError,
+    EncodeRef, Encoder, EncoderExt as _, FromWire, FromWireRef, Slot, Wire, WirePointer,
 };
 
 /// A FIDL vector
 #[repr(transparent)]
-pub struct WireVector<T> {
-    raw: RawWireVector<T>,
+pub struct WireVector<'de, T> {
+    pub(crate) raw: RawWireVector<'de, T>,
 }
 
-unsafe impl<T> ZeroPadding for WireVector<T> {
+unsafe impl<T: Wire> Wire for WireVector<'static, T> {
+    type Decoded<'de> = WireVector<'de, T::Decoded<'de>>;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { raw } = out);
@@ -29,7 +32,7 @@ unsafe impl<T> ZeroPadding for WireVector<T> {
     }
 }
 
-impl<T> Drop for WireVector<T> {
+impl<T> Drop for WireVector<'_, T> {
     fn drop(&mut self) {
         if needs_drop::<T>() {
             unsafe {
@@ -39,7 +42,7 @@ impl<T> Drop for WireVector<T> {
     }
 }
 
-impl<T> WireVector<T> {
+impl<T> WireVector<'_, T> {
     /// Encodes that a vector is present in a slot.
     pub fn encode_present(out: &mut MaybeUninit<Self>, len: u64) {
         munge!(let Self { raw } = out);
@@ -70,7 +73,7 @@ impl<T> WireVector<T> {
     ///
     /// # Safety
     ///
-    /// The elements of the wire vecot rmust not need to be individually decoded, and must always be
+    /// The elements of the wire vector must not need to be individually decoded, and must always be
     /// valid.
     pub unsafe fn decode_raw<D>(
         mut slot: Slot<'_, Self>,
@@ -93,7 +96,52 @@ impl<T> WireVector<T> {
     }
 }
 
-impl<T> Deref for WireVector<T> {
+/// An iterator over the items of a `WireVector`.
+pub struct IntoIter<'de, T> {
+    current: *mut T,
+    remaining: usize,
+    _phantom: PhantomData<&'de mut [Chunk]>,
+}
+
+impl<T> Drop for IntoIter<'_, T> {
+    fn drop(&mut self) {
+        for i in 0..self.remaining {
+            unsafe {
+                self.current.add(i).drop_in_place();
+            }
+        }
+    }
+}
+
+impl<T> Iterator for IntoIter<'_, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 {
+            None
+        } else {
+            let result = unsafe { self.current.read() };
+            self.current = unsafe { self.current.add(1) };
+            self.remaining -= 1;
+            Some(result)
+        }
+    }
+}
+
+impl<'de, T> IntoIterator for WireVector<'de, T> {
+    type IntoIter = IntoIter<'de, T>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let current = self.raw.as_ptr();
+        let remaining = self.len();
+        forget(self);
+
+        IntoIter { current, remaining, _phantom: PhantomData }
+    }
+}
+
+impl<T> Deref for WireVector<'_, T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -101,13 +149,13 @@ impl<T> Deref for WireVector<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for WireVector<T> {
+impl<T: fmt::Debug> fmt::Debug for WireVector<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_slice().fmt(f)
     }
 }
 
-unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireVector<T> {
+unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireVector<'static, T> {
     fn decode(mut slot: Slot<'_, Self>, mut decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { raw: RawWireVector { len, mut ptr } } = slot.as_mut());
 
@@ -115,48 +163,127 @@ unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireVector<T> {
             return Err(DecodeError::RequiredValueAbsent);
         }
 
-        let slice = decoder.decode_next_slice::<T>(**len as usize)?;
-        WirePointer::set_decoded(ptr, slice.into_raw().cast());
+        let mut slice = decoder.take_slice_slot::<T>(**len as usize)?;
+        for i in 0..**len as usize {
+            T::decode(slice.index(i), decoder)?;
+        }
+        WirePointer::set_decoded(ptr, slice.as_mut_ptr().cast());
 
         Ok(())
     }
+}
+
+#[inline]
+fn encode_to_vector<V, E, T>(
+    value: V,
+    encoder: &mut E,
+    out: &mut MaybeUninit<WireVector<'_, T::Encoded>>,
+) -> Result<(), EncodeError>
+where
+    V: AsRef<[T]> + IntoIterator,
+    V::IntoIter: ExactSizeIterator,
+    V::Item: Encode<E, Encoded = T::Encoded>,
+    E: Encoder + ?Sized,
+    T: Encode<E>,
+{
+    let len = value.as_ref().len();
+    if T::COPY_OPTIMIZATION.is_enabled() {
+        let slice = value.as_ref();
+        // SAFETY: `T` has copy optimization enabled, which guarantees that it has no uninit bytes
+        // and can be copied directly to the output instead of calling `encode`. This means that we
+        // may cast `&[T]` to `&[u8]` and write those bytes.
+        let bytes = unsafe { slice::from_raw_parts(slice.as_ptr().cast(), size_of_val(slice)) };
+        encoder.write(bytes);
+    } else {
+        encoder.encode_next_iter(value.into_iter())?;
+    }
+    WireVector::encode_present(out, len as u64);
+    Ok(())
 }
 
 impl<T: Encodable> Encodable for Vec<T> {
-    type Encoded = WireVector<T::Encoded>;
+    type Encoded = WireVector<'static, T::Encoded>;
 }
 
-unsafe impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
+unsafe impl<E, T> Encode<E> for Vec<T>
+where
+    E: Encoder + ?Sized,
+    T: Encode<E>,
+{
     fn encode(
-        &mut self,
+        self,
         encoder: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        if T::COPY_OPTIMIZATION.is_enabled() {
-            let bytes =
-                unsafe { slice::from_raw_parts(self.as_ptr().cast(), self.len() * size_of::<T>()) };
-            encoder.write(bytes);
-        } else {
-            encoder.encode_next_slice(self.as_mut_slice())?;
-        }
-        WireVector::encode_present(out, self.len() as u64);
-        Ok(())
+        encode_to_vector(self, encoder, out)
     }
 }
 
-impl<T: TakeFrom<WT>, WT> TakeFrom<WireVector<WT>> for Vec<T> {
-    fn take_from(from: &WireVector<WT>) -> Self {
-        let mut result = Vec::<T>::with_capacity(from.len());
+unsafe impl<E, T> EncodeRef<E> for Vec<T>
+where
+    E: Encoder + ?Sized,
+    T: EncodeRef<E>,
+{
+    fn encode_ref(
+        &self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        encode_to_vector(self, encoder, out)
+    }
+}
+
+impl<T: Encodable> Encodable for &[T] {
+    type Encoded = WireVector<'static, T::Encoded>;
+}
+
+unsafe impl<E, T> Encode<E> for &[T]
+where
+    E: Encoder + ?Sized,
+    T: EncodeRef<E>,
+{
+    fn encode(
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        encode_to_vector(self, encoder, out)
+    }
+}
+
+impl<T: FromWire<W>, W> FromWire<WireVector<'_, W>> for Vec<T> {
+    fn from_wire(wire: WireVector<'_, W>) -> Self {
+        let mut result = Vec::<T>::with_capacity(wire.len());
         if T::COPY_OPTIMIZATION.is_enabled() {
             unsafe {
-                copy_nonoverlapping(from.as_ptr().cast(), result.as_mut_ptr(), from.len());
+                copy_nonoverlapping(wire.as_ptr().cast(), result.as_mut_ptr(), wire.len());
             }
             unsafe {
-                result.set_len(from.len());
+                result.set_len(wire.len());
+            }
+            forget(wire);
+        } else {
+            for item in wire.into_iter() {
+                result.push(T::from_wire(item));
+            }
+        }
+        result
+    }
+}
+
+impl<T: FromWireRef<W>, W> FromWireRef<WireVector<'_, W>> for Vec<T> {
+    fn from_wire_ref(wire: &WireVector<'_, W>) -> Self {
+        let mut result = Vec::<T>::with_capacity(wire.len());
+        if T::COPY_OPTIMIZATION.is_enabled() {
+            unsafe {
+                copy_nonoverlapping(wire.as_ptr().cast(), result.as_mut_ptr(), wire.len());
+            }
+            unsafe {
+                result.set_len(wire.len());
             }
         } else {
-            for item in from.as_slice() {
-                result.push(T::take_from(item));
+            for item in wire.iter() {
+                result.push(T::from_wire_ref(item));
             }
         }
         result

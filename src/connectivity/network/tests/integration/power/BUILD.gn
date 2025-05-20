@@ -9,7 +9,7 @@ rustc_test("power") {
   output_name = "netstack_power_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",

@@ -86,7 +86,7 @@ impl TryFrom<&[u8]> for Reply {
                         reply_len: reply_data_str.len(),
                         reply: reply_data_str.to_string(),
                     };
-                    tracing::warn!("{}", mismatched_err);
+                    log::warn!("{}", mismatched_err);
                 }
                 match u32::from_str_radix(&reply_data_str, 16) {
                     Ok(ds) => Ok(Reply::Data(ds)),

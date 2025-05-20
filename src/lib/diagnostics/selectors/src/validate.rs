@@ -332,8 +332,7 @@ mod tests {
             let tree_selector = create_tree_selector(node_path, property);
             assert!(
                 ValidateTreeSelectorExt::validate(&tree_selector).is_err(),
-                "Failed to validate tree selector: {:?}",
-                tree_selector
+                "Failed to validate tree selector: {tree_selector:?}"
             );
         }
 
@@ -341,8 +340,7 @@ mod tests {
             let tree_selector = create_tree_selector(node_path, property);
             assert!(
                 ValidateTreeSelectorExt::validate(&tree_selector).is_err(),
-                "Failed to validate tree selector: {:?}",
-                tree_selector
+                "Failed to validate tree selector: {tree_selector:?}"
             );
         }
     }
@@ -376,8 +374,7 @@ mod tests {
 
             assert!(
                 component_selector.validate().is_err(),
-                "Failed to validate component selector: {:?}",
-                component_selector
+                "Failed to validate component selector: {component_selector:?}"
             );
         }
     }

@@ -23,8 +23,4 @@ std::ostream& operator<<(std::ostream& os, const ::test_byteandbytes::ByteAndByt
 
 }  // namespace test_byteandbytes
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop

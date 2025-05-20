@@ -291,7 +291,7 @@ def aliases(
 ###############################################################################
 
 _NORMAL_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
         _COMMON_CONDITION: {
             "aes": Label("//third_party/rust_crates/vendor/aes-0.8.4:aes"),
             "aes-gcm": Label("//third_party/rust_crates/vendor/aes-gcm-0.10.2:aes_gcm"),
@@ -334,19 +334,18 @@ _NORMAL_DEPENDENCIES = {
             "cmac": Label("//third_party/rust_crates/vendor/cmac-0.7.2:cmac"),
             "crc": Label("//third_party/rust_crates/vendor/crc-1.8.1:crc"),
             "criterion": Label("//third_party/rust_crates/vendor/criterion-0.2.11:criterion"),
-            "crossbeam": Label("//third_party/rust_crates/vendor/crossbeam-0.8.0:crossbeam"),
-            "crossbeam-channel": Label("//third_party/rust_crates/vendor/crossbeam-channel-0.5.1:crossbeam_channel"),
-            "crossbeam-utils": Label("//third_party/rust_crates/vendor/crossbeam-utils-0.8.14:crossbeam_utils"),
+            "crossbeam": Label("//third_party/rust_crates/vendor/crossbeam-0.8.4:crossbeam"),
+            "crossbeam-channel": Label("//third_party/rust_crates/vendor/crossbeam-channel-0.5.15:crossbeam_channel"),
+            "crossbeam-utils": Label("//third_party/rust_crates/vendor/crossbeam-utils-0.8.21:crossbeam_utils"),
             "crypto-common": Label("//third_party/rust_crates/vendor/crypto-common-0.1.6:crypto_common"),
             "csv": Label("//third_party/rust_crates/vendor/csv-1.3.1:csv"),
-            "darling": Label("//third_party/rust_crates/vendor/darling-0.20.10:darling"),
+            "darling": Label("//third_party/rust_crates/vendor/darling-0.20.11:darling"),
             "data-encoding": Label("//third_party/rust_crates/vendor/data-encoding-2.3.2:data_encoding"),
             "derive_builder": Label("//third_party/rust_crates/vendor/derive_builder-0.11.1:derive_builder"),
-            "derp": Label("//third_party/rust_crates/vendor/derp-0.0.14:derp"),
             "difference": Label("//third_party/rust_crates/vendor/difference-2.0.0:difference"),
             "digest": Label("//third_party/rust_crates/vendor/digest-0.10.7:digest"),
-            "downcast-rs": Label("//third_party/rust_crates/vendor/downcast-rs-1.2.0:downcast_rs"),
-            "dyn-clone": Label("//third_party/rust_crates/vendor/dyn-clone-1.0.5:dyn_clone"),
+            "downcast-rs": Label("//third_party/rust_crates/vendor/downcast-rs-2.0.1:downcast_rs"),
+            "dyn-clone": Label("//third_party/rust_crates/vendor/dyn-clone-1.0.19:dyn_clone"),
             "ecb": Label("//third_party/rust_crates/vendor/ecb-0.1.2:ecb"),
             "ecdsa": Label("//third_party/rust_crates/vendor/ecdsa-0.14.8:ecdsa"),
             "either": Label("//third_party/rust_crates/vendor/either-1.14.0:either"),
@@ -387,28 +386,28 @@ _NORMAL_DEPENDENCIES = {
             "lazy_static": Label("//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static"),
             "libc": Label("//third_party/rust_crates/vendor/libc-0.2.171:libc"),
             "libm": Label("//third_party/rust_crates/vendor/libm-0.2.1:libm"),
-            "linked-hash-map": Label("//third_party/rust_crates/vendor/linked-hash-map-0.5.3:linked_hash_map"),
+            "linked-hash-map": Label("//third_party/rust_crates/vendor/linked-hash-map-0.5.6:linked_hash_map"),
             "lock_api": Label("//third_party/rust_crates/vendor/lock_api-0.4.11:lock_api"),
             "log": Label("//third_party/rust_crates/vendor/log-0.4.22:log"),
             "lru-cache": Label("//third_party/rust_crates/vendor/lru-cache-0.1.2:lru_cache"),
             "macro_rules_attribute": Label("//third_party/rust_crates/vendor/macro_rules_attribute-0.1.3:macro_rules_attribute"),
-            "maplit": Label("//third_party/rust_crates/vendor/maplit-1.0.1:maplit"),
+            "maplit": Label("//third_party/rust_crates/vendor/maplit-1.0.2:maplit"),
             "maybe-owned": Label("//third_party/rust_crates/vendor/maybe-owned-0.3.4:maybe_owned"),
-            "md-5": Label("//third_party/rust_crates/vendor/md-5-0.10.5:md5"),
+            "md-5": Label("//third_party/rust_crates/vendor/md-5-0.10.6:md5"),
             "memchr": Label("//third_party/rust_crates/vendor/memchr-2.7.4:memchr"),
             "memoffset": Label("//third_party/rust_crates/vendor/memoffset-0.9.1:memoffset"),
             "miniz_oxide": Label("//third_party/rust_crates/vendor/miniz_oxide-0.3.6:miniz_oxide"),
-            "mock-omaha-server": Label("//third_party/rust_crates/vendor/mock-omaha-server-0.3.3:mock_omaha_server"),
+            "mock-omaha-server": Label("//third_party/rust_crates/vendor/mock-omaha-server-0.3.4:mock_omaha_server"),
             "mockall": Label("//third_party/rust_crates/vendor/mockall-0.9.0:mockall"),
-            "munge": Label("//third_party/rust_crates/vendor/munge-0.4.3:munge"),
+            "munge": Label("//third_party/rust_crates/vendor/munge-0.4.4:munge"),
             "nix": Label("//third_party/rust_crates/vendor/nix-0.29.0:nix"),
             "nom": Label("//third_party/rust_crates/vendor/nom-8.0.0:nom"),
             "nom-language": Label("//third_party/rust_crates/vendor/nom-language-0.1.0:nom_language"),
             "nom_locate": Label("//third_party/rust_crates/vendor/nom_locate-5.0.0:nom_locate"),
             "nu-ansi-term": Label("//third_party/rust_crates/vendor/nu-ansi-term-0.46.0:nu_ansi_term"),
-            "num": Label("//third_party/rust_crates/vendor/num-0.4.0:num"),
-            "num-traits": Label("//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits"),
-            "omaha_client": Label("//third_party/rust_crates/vendor/omaha_client-0.2.1:omaha_client"),
+            "num": Label("//third_party/rust_crates/vendor/num-0.4.3:num"),
+            "num-traits": Label("//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits"),
+            "omaha_client": Label("//third_party/rust_crates/vendor/omaha_client-0.2.2:omaha_client"),
             "once_cell": Label("//third_party/rust_crates/vendor/once_cell-1.20.2:once_cell"),
             "overload": Label("//third_party/rust_crates/vendor/overload-0.1.1:overload"),
             "p256": Label("//third_party/rust_crates/vendor/p256-0.11.1:p256"),
@@ -418,6 +417,7 @@ _NORMAL_DEPENDENCIES = {
             "pest": Label("//third_party/rust_crates/vendor/pest-2.7.8:pest"),
             "pin-project": Label("//third_party/rust_crates/vendor/pin-project-1.0.11:pin_project"),
             "pin-project-lite": Label("//third_party/rust_crates/vendor/pin-project-lite-0.2.13:pin_project_lite"),
+            "pin-weak": Label("//third_party/rust_crates/vendor/pin-weak-1.1.0:pin_weak"),
             "pkcs8": Label("//third_party/rust_crates/vendor/pkcs8-0.10.2:pkcs8"),
             "png": Label("//third_party/rust_crates/vendor/png-0.14.0:png"),
             "pretty": Label("//third_party/rust_crates/vendor/pretty-0.5.2:pretty"),
@@ -431,7 +431,7 @@ _NORMAL_DEPENDENCIES = {
             "rand_core": Label("//third_party/rust_crates/vendor/rand_core-0.6.4:rand_core"),
             "rand_xorshift": Label("//third_party/rust_crates/vendor/rand_xorshift-0.3.0:rand_xorshift"),
             "rayon": Label("//third_party/rust_crates/vendor/rayon-1.10.0:rayon"),
-            "ref-cast": Label("//third_party/rust_crates/vendor/ref-cast-1.0.23:ref_cast"),
+            "ref-cast": Label("//third_party/rust_crates/vendor/ref-cast-1.0.24:ref_cast"),
             "regex": Label("//third_party/rust_crates/vendor/regex-1.7.3:regex"),
             "regex-syntax": Label("//third_party/rust_crates/vendor/regex-syntax-0.8.3:regex_syntax"),
             "ring": Label("//third_party/rust_crates/vendor/ring-0.17.8:ring"),
@@ -444,12 +444,11 @@ _NORMAL_DEPENDENCIES = {
             "rutabaga_gfx": Label("//third_party/rust_crates/vendor/rutabaga_gfx-0.1.3:rutabaga_gfx"),
             "schemars": Label("//third_party/rust_crates/vendor/schemars-0.8.10:schemars"),
             "scopeguard": Label("//third_party/rust_crates/vendor/scopeguard-1.2.0:scopeguard"),
-            "scrypt": Label("//third_party/rust_crates/vendor/scrypt-0.10.0:scrypt"),
             "serde": Label("//third_party/rust_crates/vendor/serde-1.0.204:serde"),
             "serde_json": Label("//third_party/rust_crates/vendor/serde_json-1.0.128:serde_json"),
             "serde_json5": Label("//third_party/rust_crates/vendor/serde_json5-0.2.1:serde_json5"),
             "sha1": Label("//third_party/rust_crates/vendor/sha1-0.10.6:sha1"),
-            "sha2": Label("//third_party/rust_crates/vendor/sha2-0.10.6:sha2"),
+            "sha2": Label("//third_party/rust_crates/vendor/sha2-0.10.8:sha2"),
             "signature": Label("//third_party/rust_crates/vendor/signature-1.6.4:signature"),
             "simplelog": Label("//third_party/rust_crates/vendor/simplelog-0.10.2:simplelog"),
             "siphasher": Label("//third_party/rust_crates/vendor/siphasher-0.3.10:siphasher"),
@@ -465,7 +464,7 @@ _NORMAL_DEPENDENCIES = {
             "termion": Label("//third_party/rust_crates/vendor/termion-1.5.3:termion"),
             "termtree": Label("//third_party/rust_crates/vendor/termtree-0.5.1:termtree"),
             "test-case": Label("//third_party/rust_crates/vendor/test-case-3.2.1:test_case"),
-            "textwrap": Label("//third_party/rust_crates/vendor/textwrap-0.11.0:textwrap"),
+            "textwrap": Label("//third_party/rust_crates/vendor/textwrap-0.16.2:textwrap"),
             "thiserror": Label("//third_party/rust_crates/vendor/thiserror-2.0.11:thiserror"),
             "tokio-rustls": Label("//third_party/rust_crates/vendor/tokio-rustls-0.24.1:tokio_rustls"),
             "toml": Label("//third_party/rust_crates/vendor/toml-0.5.6:toml"),
@@ -479,10 +478,10 @@ _NORMAL_DEPENDENCIES = {
             "unic-char-range": Label("//third_party/rust_crates/vendor/unic-char-range-0.9.0:unic_char_range"),
             "unic-ucd-block": Label("//third_party/rust_crates/vendor/unic-ucd-block-0.9.0:unic_ucd_block"),
             "unicase": Label("//third_party/rust_crates/vendor/unicase-2.8.1:unicase"),
-            "unicode-segmentation": Label("//third_party/rust_crates/vendor/unicode-segmentation-1.10.1:unicode_segmentation"),
+            "unicode-segmentation": Label("//third_party/rust_crates/vendor/unicode-segmentation-1.12.0:unicode_segmentation"),
             "unicode-width": Label("//third_party/rust_crates/vendor/unicode-width-0.2.0:unicode_width"),
             "unicode-xid": Label("//third_party/rust_crates/vendor/unicode-xid-0.2.0:unicode_xid"),
-            "untrusted": Label("//third_party/rust_crates/vendor/untrusted-0.7.1:untrusted"),
+            "untrusted": Label("//third_party/rust_crates/vendor/untrusted-0.9.0:untrusted"),
             "url": Label("//third_party/rust_crates/vendor/url-2.3.1:url"),
             "utf8parse": Label("//third_party/rust_crates/vendor/utf8parse-0.2.2:utf8parse"),
             "uuid": Label("//third_party/rust_crates/vendor/uuid-1.1.2:uuid"),
@@ -497,11 +496,9 @@ _NORMAL_DEPENDENCIES = {
         },
         "cfg(not(target_os = \"fuchsia\"))": {
             "askama": Label("//third_party/rust_crates/vendor/askama-0.12.1:askama"),
-            "async-executor": Label("//third_party/rust_crates/vendor/async-executor-1.5.0:async_executor"),
             "async-fs": Label("//third_party/rust_crates/vendor/async-fs-1.6.0:async_fs"),
             "cargo_metadata": Label("//third_party/rust_crates/vendor/cargo_metadata-0.18.1:cargo_metadata"),
             "crossterm": Label("//third_party/rust_crates/vendor/crossterm-0.19.0:crossterm"),
-            "easy-parallel": Label("//third_party/rust_crates/vendor/easy-parallel-3.1.0:easy_parallel"),
             "fs_extra": Label("//third_party/rust_crates/vendor/fs_extra-1.2.0:fs_extra"),
             "fuse3": Label("//third_party/rust_crates/vendor/fuse3-0.6.1:fuse3"),
             "home": Label("//third_party/rust_crates/vendor/home-0.5.9:home"),
@@ -514,15 +511,15 @@ _NORMAL_DEPENDENCIES = {
             "petgraph": Label("//third_party/rust_crates/vendor/petgraph-0.6.2:petgraph"),
             "proc-macro2": Label("//third_party/rust_crates/vendor/proc-macro2-1.0.94:proc_macro2"),
             "pulldown-cmark": Label("//third_party/rust_crates/vendor/pulldown-cmark-0.9.3:pulldown_cmark"),
-            "quote": Label("//third_party/rust_crates/vendor/quote-1.0.38:quote"),
+            "quote": Label("//third_party/rust_crates/vendor/quote-1.0.40:quote"),
             "rustfix": Label("//third_party/rust_crates/vendor/rustfix-0.9.0:rustfix"),
             "rustls-native-certs": Label("//third_party/rust_crates/vendor/rustls-native-certs-0.6.3:rustls_native_certs"),
-            "semver": Label("//third_party/rust_crates/vendor/semver-1.0.23:semver"),
+            "semver": Label("//third_party/rust_crates/vendor/semver-1.0.26:semver"),
             "serde_yaml": Label("//third_party/rust_crates/vendor/serde_yaml-0.9.14:serde_yaml"),
             "serial_test": Label("//third_party/rust_crates/vendor/serial_test-0.5.1:serial_test"),
-            "shared_child": Label("//third_party/rust_crates/vendor/shared_child-1.0.0:shared_child"),
+            "shared_child": Label("//third_party/rust_crates/vendor/shared_child-1.0.1:shared_child"),
             "signal-hook": Label("//third_party/rust_crates/vendor/signal-hook-0.3.17:signal_hook"),
-            "syn": Label("//third_party/rust_crates/vendor/syn-2.0.100:syn"),
+            "syn": Label("//third_party/rust_crates/vendor/syn-2.0.101:syn"),
             "synstructure": Label("//third_party/rust_crates/vendor/synstructure-0.13.1:synstructure"),
             "tar": Label("//third_party/rust_crates/vendor/tar-0.4.25:tar"),
             "term_grid": Label("//third_party/rust_crates/vendor/term_grid-0.2.0:term_grid"),
@@ -569,7 +566,7 @@ _NORMAL_DEPENDENCIES = {
 }
 
 _NORMAL_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
         _COMMON_CONDITION: {
         },
         "cfg(not(target_os = \"fuchsia\"))": {
@@ -580,19 +577,19 @@ _NORMAL_ALIASES = {
 }
 
 _NORMAL_DEV_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _NORMAL_DEV_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _PROC_MACRO_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
         _COMMON_CONDITION: {
-            "async-trait": Label("//third_party/rust_crates/vendor/async-trait-0.1.71:async_trait"),
+            "async-trait": Label("//third_party/rust_crates/vendor/async-trait-0.1.88:async_trait"),
             "derivative": Label("//third_party/rust_crates/vendor/derivative-2.2.0:derivative"),
             "enumn": Label("//third_party/rust_crates/vendor/enumn-0.1.14:enumn"),
             "num-derive": Label("//third_party/rust_crates/vendor/num-derive-0.4.2:num_derive"),
@@ -611,37 +608,37 @@ _PROC_MACRO_DEPENDENCIES = {
 }
 
 _PROC_MACRO_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _PROC_MACRO_DEV_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _PROC_MACRO_DEV_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_PROC_MACRO_DEPENDENCIES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 
 _BUILD_PROC_MACRO_ALIASES = {
-    "": {
+    "third_party/rust_crates": {
     },
 }
 

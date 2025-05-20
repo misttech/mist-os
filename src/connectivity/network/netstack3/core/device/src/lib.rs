@@ -103,7 +103,8 @@ pub mod queue {
 
 pub use internal::api::{DeviceAnyApi, DeviceApi};
 pub use internal::arp::{
-    ArpConfigContext, ArpContext, ArpCounters, ArpNudCtx, ArpSenderContext, ArpState,
+    send_arp_request, ArpConfigContext, ArpContext, ArpCounters, ArpIpLayerContext, ArpNudCtx,
+    ArpSenderContext, ArpState,
 };
 pub use internal::base::{
     DeviceClassMatcher, DeviceCollectionContext, DeviceCounters, DeviceIdAndNameMatcher,

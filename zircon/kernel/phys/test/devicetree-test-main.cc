@@ -4,7 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/arch/zbi-boot.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
@@ -55,23 +54,24 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   if (auto uart_config = chosen.uart_config()) {
     boot_options.serial = *uart_config;
   }
-  SetBootOptions(boot_options, chosen.zbi(), chosen.cmdline().value_or(""));
+
+  EarlyBootZbiBytes early_zbi_bytes{chosen.zbi()};
+  SetBootOptions(boot_options, EarlyBootZbi{&early_zbi_bytes}, chosen.cmdline().value_or(""));
   SetUartConsole(boot_options.serial);
 
-  ArchSetUp(nullptr);
+  ArchSetUp({});
 
   // Early boot may have filled the screen with logs. Add a newline to
   // terminate any previous line, and another newline to leave a blank.
   printf("\n\n");
 
   // Run the test.
-  int status = TestMain(flat_devicetree_blob, ticks);
+  int status = TestMain(flat_devicetree_blob, {}, ticks);
   if (status == 0) {
     printf("\n*** Test succeeded ***\n%s\n\n", BOOT_TEST_SUCCESS_STRING);
   } else {
     printf("\n*** Test FAILED: status %d ***\n\n", status);
   }
 
-  // No way to shut down.
-  abort();
+  ArchPanicReset();
 }

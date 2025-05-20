@@ -18,8 +18,7 @@
 #include <kernel/cpu.h>
 #include <kernel/spinlock.h>
 #include <ktl/limits.h>
-#include <ktl/move.h>
-#include <ktl/pair.h>
+#include <ktl/utility.h>
 
 // Forward declarations.
 struct Thread;

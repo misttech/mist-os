@@ -269,6 +269,12 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 			"--vbmeta-key-metadata",
 			t.config.VbmetaMetadata,
 		}
+		// TODO(https://fxbug.dev/369416059): ffx emu --uefi calls mkfs-msdosfs which
+		// looks for the FUCHSIA_BUILD_DIR env var. Remove once this dependency is no
+		// longer needed.
+		if err := os.Setenv("FUCHSIA_BUILD_DIR", cwd); err != nil {
+			return err
+		}
 	}
 	if t.config.KVM {
 		startArgs.Accel = "hyper"

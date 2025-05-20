@@ -82,20 +82,20 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
             None => {
                 match context.feature_set_level {
                     // Standard has an update checker
-                    FeatureSupportLevel::Standard => {
+                    FeatureSetLevel::Standard => {
                         let update_checker =
                             UpdateChecker::default_by_build_type(context.build_type);
                         Self::set_update_checker(&update_checker, context.build_type, builder)?;
                         Self::set_policy_by_build_type(context.build_type, context, builder)?;
                     }
                     // Utility has no update checker
-                    FeatureSupportLevel::Utility => {
+                    FeatureSetLevel::Utility => {
                         builder.platform_bundle("no_update_checker");
                     }
                     // Bootstrap and Embeddable have neither an update checker nor the system-update
                     // realm, so do not include `no_update_checker` AIB that requires the realm.
-                    FeatureSupportLevel::Bootstrap => {}
-                    FeatureSupportLevel::Embeddable => {}
+                    FeatureSetLevel::Bootstrap => {}
+                    FeatureSetLevel::Embeddable => {}
                 };
             }
         }
@@ -107,7 +107,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
             })?;
             builder.package("pkg-resolver").config_data(FileEntry {
                 source: tuf_config.clone(),
-                destination: format!("repositories/{}", filename),
+                destination: format!("repositories/{filename}"),
             })?;
         }
 
@@ -189,9 +189,9 @@ impl SwdSubsystemConfig {
 
         let write_config = |name: &str, value: serde_json::Value| -> Result<Utf8PathBuf> {
             let path = gendir.join(name);
-            let file = File::create(&path).with_context(|| format!("Creating config: {}", name))?;
+            let file = File::create(&path).with_context(|| format!("Creating config: {name}"))?;
             serde_json::to_writer_pretty(file, &value)
-                .with_context(|| format!("Writing config: {}", name))?;
+                .with_context(|| format!("Writing config: {name}"))?;
             Ok(path)
         };
 

@@ -489,7 +489,7 @@ void start_heartbeats() {
 
 }  // namespace
 
-void lockup_primary_init() {
+void lockup_init() {
   // Initialize parameters for the heartbeat checks.
   HeartbeatLockupChecker::InitStaticParams();
 
@@ -530,13 +530,10 @@ void lockup_primary_init() {
   } else {
     dprintf(INFO, "lockup_detector: critical section detection disabled by build\n");
   }
-
-  // Kick off heartbeats on this CPU, if they are enabled.
-  start_heartbeats();
 }
 
-void lockup_secondary_init() { start_heartbeats(); }
-void lockup_secondary_shutdown() { stop_heartbeats(); }
+void lockup_percpu_init() { start_heartbeats(); }
+void lockup_percpu_shutdown() { stop_heartbeats(); }
 
 // TODO(johngro): Make the definition of the various checkers available (perhaps
 // in a "lockup_detector" namespace) so that things like tests outside of this

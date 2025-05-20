@@ -90,7 +90,7 @@ impl ValidatingListener {
             match outcome {
                 Outcome::AllExpectedReceived => all_expected = true,
                 Outcome::LogSentDone => sink_says_done = true,
-                Outcome::UnexpectedMessage(msg) => panic!("unexpected log message {:?}", msg),
+                Outcome::UnexpectedMessage(msg) => panic!("unexpected log message {msg:?}"),
             }
 
             if all_expected && (!dump_logs || sink_says_done) {

@@ -6,7 +6,7 @@
 
 use anyhow::{Context, Result};
 use argh::FromArgs;
-use assembly_manifest::Image;
+use assembled_system::Image;
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
 use sdk_metadata::{ProductBundle, VirtualDeviceManifest};

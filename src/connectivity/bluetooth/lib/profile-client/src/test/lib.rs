@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::ServerEnd;
 use fuchsia_bluetooth::types::{self as bt, PeerId};
 use futures::{Stream, StreamExt};
 use profile_client::ProfileClient;
@@ -85,8 +86,7 @@ impl TestProfileServer {
                 self.search_results_proxy = Some(payload.results.unwrap().into_proxy());
             }
             _ => panic!(
-                "unexpected result on profile request stream while waiting for search: {:?}",
-                request
+                "unexpected result on profile request stream while waiting for search: {request:?}"
             ),
         }
     }
@@ -101,8 +101,7 @@ impl TestProfileServer {
                 }
             }
             _ => panic!(
-                "unexpected result on profile request stream while waiting for advertisement: {:?}",
-                request
+                "unexpected result on profile request stream while waiting for advertisement: {request:?}"
             ),
         }
     }
@@ -131,7 +130,7 @@ impl TestProfileServer {
                         }),
                     ) => assert_eq!(Some(expected_channel), channel_option),
                     (expected_channel, connection) => {
-                        panic!("On connect, expected {:?}, got {:?}", expected_channel, connection)
+                        panic!("On connect, expected {expected_channel:?}, got {connection:?}")
                     }
                 }
 
@@ -141,8 +140,34 @@ impl TestProfileServer {
                 responder.send(Ok(far_bredr_channel)).expect("Send channel");
                 near_bt_channel
             }
-            _ => panic!("unexpected result on profile request stream: {:?}", request),
+            _ => panic!(
+                "Unexpected result on profile request stream expecting connection: {request:?}",
+            ),
         }
+    }
+
+    pub async fn expect_sco_connect(
+        &mut self,
+        expected_initiator: bool,
+    ) -> ServerEnd<bredr::ScoConnectionMarker> {
+        let request = self.profile_request_stream.next().await;
+        let connection = match request {
+            Some(Ok(bredr::ProfileRequest::ConnectSco {
+                payload: bredr::ProfileConnectScoRequest { initiator, connection, .. },
+                ..
+            })) if initiator == Some(expected_initiator) => connection,
+            Some(Ok(bredr::ProfileRequest::ConnectSco {
+                payload: bredr::ProfileConnectScoRequest { initiator, .. },
+                ..
+            })) => {
+                panic!("Got SCO connection request expected initatior: {expected_initiator:}, actual initiator: {initiator:?}");
+            }
+            _ => panic!(
+                "Unexpected result on profile request stream expecting SCO connection: {request:?}",
+            ),
+        };
+
+        connection.expect("Got no connection when expecting SCO connection.")
     }
 
     pub fn send_service_found(

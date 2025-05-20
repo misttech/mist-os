@@ -15,8 +15,8 @@
 #include <cstdint>
 
 #include <kernel/range_check.h>
-#include <ktl/move.h>
 #include <ktl/type_traits.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
@@ -72,6 +72,9 @@ KCOUNTER(vm_vmo_discardable_failed_reclaim, "vm.vmo.discardable_failed_reclaim")
 KCOUNTER(vm_vmo_range_update_from_parent_skipped, "vm.vmo.range_updated_from_parent.skipped")
 KCOUNTER(vm_vmo_range_update_from_parent_performed, "vm.vmo.range_updated_from_parent.performed")
 
+KCOUNTER(vm_vmo_evict_accessed, "vm.vmo.evict_accessed")
+KCOUNTER(vm_vmo_compress_accessed, "vm.vmo.compress_accessed")
+
 template <typename T>
 uint32_t GetShareCount(T p) {
   DEBUG_ASSERT(p->IsPageOrRef());
@@ -117,6 +120,8 @@ void InitializeVmPage(vm_page_t* p) {
   p->object.pin_count = 0;
   p->object.always_need = 0;
   p->object.dirty_state = uint8_t(VmCowPages::DirtyState::Untracked);
+  p->object.set_object(nullptr);
+  p->object.set_page_offset(0);
 }
 
 inline uint64_t CheckedAdd(uint64_t a, uint64_t b) {
@@ -124,6 +129,11 @@ inline uint64_t CheckedAdd(uint64_t a, uint64_t b) {
   bool overflow = add_overflow(a, b, &result);
   DEBUG_ASSERT(!overflow);
   return result;
+}
+
+inline uint64_t CheckedSub(uint64_t a, uint64_t b) {
+  DEBUG_ASSERT(b <= a);
+  return a - b;
 }
 
 inline uint64_t ClampedLimit(uint64_t offset, uint64_t limit, uint64_t max_limit) {
@@ -361,6 +371,396 @@ class BatchPQUpdateBacklink {
   uint64_t offsets_[kMaxPages];
 };
 
+// Helper class for iterating over a subtree while respecting the child->parent lock ordering
+// requirement.
+// Cursor is constructed with a root, i.e. the starting point, and will iterate over at least
+// every node that existed at the point of construction. Nodes that are racily created mid
+// iteration may or may not be visited. Utilizes the cursor lists in the VmCowPages to coordinate
+// with any destruction.
+// A cursor is logically at a 'current' location, which is initially the root the cursor was
+// constructed at. As the current location is always held locked, the cursor can be assumed to be
+// initially valid, and is valid as long as any iteration request (NextChild / NextSibling) returns
+// true. The cursor explicitly performs a pre-order walk, allowing subtrees of a given node to be
+// skipped during the iteration.
+class VmCowPages::TreeWalkCursor
+    : public fbl::ContainableBaseClasses<
+          fbl::TaggedDoublyLinkedListable<TreeWalkCursor*, VmCowPages::RootListTag>,
+          fbl::TaggedDoublyLinkedListable<TreeWalkCursor*, VmCowPages::CurListTag>> {
+ public:
+  explicit TreeWalkCursor(LockedPtr root)
+      : root_(root.get()), cur_(root.get()), cur_locked_(ktl::move(root)) {
+    DEBUG_ASSERT(cur_locked_.locked().life_cycle_ == LifeCycle::Alive);
+    cur_locked_.locked().root_cursor_list_.push_back(this);
+    cur_locked_.locked().cur_cursor_list_.push_back(this);
+  }
+  ~TreeWalkCursor() {
+    if (root_) {
+      reset();
+    }
+  }
+  // These static methods exist to simplify the call sites in VmCowPages in such a way that the lock
+  // annotations are preserved. A generic 'perform arbitrary lambda on all cursors' helper would
+  // reduce the code duplication here, but it would lose the annotations.
+  // See description of the non static methods for these do.
+
+  static void MoveToSibling(fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag>& cursor_list,
+                            VmCowPages* cur, VmCowPages* sibling) TA_REQ(cur->lock())
+      TA_REQ(sibling->lock()) {
+    while (!cursor_list.is_empty()) {
+      cursor_list.front().MoveToSibling(cur, sibling);
+    }
+  }
+  static void MoveToSiblingOfParent(
+      fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag>& cursor_list, VmCowPages* cur,
+      VmCowPages* parent) TA_REQ(cur->lock()) TA_REQ(parent->lock()) {
+    while (!cursor_list.is_empty()) {
+      cursor_list.front().MoveToSiblingOfParent(cur, parent);
+    }
+  }
+  static void Erase(fbl::TaggedDoublyLinkedList<TreeWalkCursor*, RootListTag>& cursor_list,
+                    VmCowPages* leaf) TA_REQ(leaf->lock()) {
+    while (!cursor_list.is_empty()) {
+      cursor_list.front().Erase(leaf);
+    }
+  }
+  static void MergeToChild(fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag>& cur_list,
+                           fbl::TaggedDoublyLinkedList<TreeWalkCursor*, RootListTag>& root_list,
+                           VmCowPages* cur, VmCowPages* child) TA_REQ(cur->lock())
+      TA_REQ(child->lock()) {
+    while (!root_list.is_empty()) {
+      root_list.front().MergeRootToChild(cur, child);
+    }
+    while (!cur_list.is_empty()) {
+      cur_list.front().MergeToChild(cur, child);
+    }
+  }
+
+  // Inform the cursor that its current node is going away, and it should re-home to its sibling.
+  void MoveToSibling(VmCowPages* cur, VmCowPages* sibling) TA_REQ(cur->lock())
+      TA_REQ(sibling->lock()) {
+    Guard<CriticalMutex> guard{&lock_};
+    DEBUG_ASSERT(cur->parent_ && cur->parent_ == sibling->parent_);
+    // If current was the root, then do not move to the sibling, as that would be outside our
+    // iteration tree, erase instead.
+    if (cur == root_) {
+      EraseLocked(cur, cur);
+      return;
+    }
+    MoveCurLocked(
+        cur, sibling,
+        CheckedSub(cumulative_parent_offset_, cur->parent_offset_) + sibling->parent_offset_);
+  }
+
+  // Inform the cursor that the root node is going away. Since a node can only be removed if it has
+  // no children, this implies that the cursor is still at the root, and so the entire cursor should
+  // be removed.
+  void Erase(VmCowPages* root) TA_REQ(root->lock()) {
+    DEBUG_ASSERT(root->children_list_len_ == 0);
+    Guard<CriticalMutex> guard{&lock_};
+    EraseLocked(root, root);
+  }
+
+  // Inform the cursor that the root node is being merged into the child, and the cursor should be
+  // moved.
+  void MergeRootToChild(VmCowPages* root, VmCowPages* child) TA_REQ(root->lock())
+      TA_REQ(child->lock()) {
+    Guard<CriticalMutex> guard{&lock_};
+    DEBUG_ASSERT(root == root_);
+    DEBUG_ASSERT(child->parent_.get() == root);
+    // If the cursor was still pointing at the root then also move it. Although this would get
+    // updated by a separate call to MergeToChild anyway, it's preferable to maintain the invariant.
+    if (cur_ == root) {
+      MoveCurLocked(root, child, cumulative_parent_offset_ + child->parent_offset_);
+    }
+    root->root_cursor_list_.erase(*this);
+    child->root_cursor_list_.push_back(this);
+    root_ = child;
+  }
+
+  // Inform the cursor that the current node is merging with its child.
+  void MergeToChild(VmCowPages* cur, VmCowPages* child) TA_REQ(cur->lock()) TA_REQ(child->lock()) {
+    Guard<CriticalMutex> guard{&lock_};
+    DEBUG_ASSERT(child->parent_.get() == cur);
+    MoveCurLocked(cur, child, cumulative_parent_offset_ + child->parent_offset_);
+  }
+
+  // Inform the cursor that both the current node and its parent are going away and the cursor
+  // should be moved to the next available sibling of the parent, assuming that is still within the
+  // subtree to be walked.
+  // This method will logically end up at the same final node as just MoveToNextSibling, and it is
+  // specialized not for performance, but rather for the scenario where the lock of |parent| is
+  // already held, and hence directly using MoveToNextSibling would cause a double lock acquisition.
+  void MoveToSiblingOfParent(VmCowPages* cur, VmCowPages* parent) TA_REQ(cur->lock())
+      TA_REQ(parent->lock()) {
+    DEBUG_ASSERT(cur->parent_.get() == parent);
+    // Not trying to be efficient, as this method is only used for cleaning up when racing
+    // deletion with a cursor traversal, so just move the cursor to the parent, then move to the
+    // sibling.
+    {
+      Guard<CriticalMutex> guard{&lock_};
+      if (cur == root_) {
+        EraseLocked(cur, cur);
+        return;
+      }
+      if (parent == root_) {
+        EraseLocked(cur, parent);
+        return;
+      }
+      MoveCurLocked(cur, parent, CheckedSub(cumulative_parent_offset_, cur->parent_offset_));
+    }
+    MoveToNextSibling(parent);
+  }
+
+  // Move the cursor to the next un-visited child, or if no children the next sibling. Returns false
+  // if iteration has completed and the cursor is now invalid. This may not be called on an invalid
+  // cursor.
+  bool NextChild() {
+    DEBUG_ASSERT(cur_locked_);
+    do {
+      // If no child then find a sibling instead.
+      if (cur_locked_.locked().children_list_len_ == 0) {
+        return NextSibling();
+      }
+
+      // To acquire the child lock we need to release the current lock, so first take a refptr to
+      // the child.
+      fbl::RefPtr<VmCowPages> child_ref = fbl::MakeRefPtrUpgradeFromRaw(
+          &cur_locked_.locked().children_list_.front(), cur_locked_.locked().lock());
+      cur_locked_.release();
+
+      {
+        LockedPtr child(child_ref.get(), VmLockAcquireMode::First);
+        // While the locks were dropped things could have changed, so check that the child still has
+        // a parent before attempting to acquire the parents lock.
+        if (child.locked().parent_) {
+          LockedPtr parent(child.locked().parent_.get(), VmLockAcquireMode::Reentrant);
+          Guard<CriticalMutex> guard{&lock_};
+          // If nothing raced then the parent of child should still be cur_.
+          if (parent.get() == cur_) {
+            // Both cur_ and child must be in the alive state, otherwise cur_ would have been
+            // updated on a dead transition. The fact that a dead transition has not occurred, and
+            // that child lock must be acquired to perform said transition, is why it is safe for us
+            // to drop child_ref and store a raw LockedPtr of child.
+            DEBUG_ASSERT(parent.locked().life_cycle_ == LifeCycle::Alive &&
+                         child.locked().life_cycle_ == LifeCycle::Alive);
+            MoveCurLocked(&parent.locked(), &child.locked(),
+                          cumulative_parent_offset_ + child.locked().parent_offset_);
+            cur_locked_ = ktl::move(child);
+            // cur_ is updated and cur_locked_ holds a lock acquired with the correct order so we
+            // can directly return and do not need to use UpdateCurLocked to reacquire.
+            return true;
+          }
+        }
+      }
+      // We raced with a modification to the tree. This modification will have set the new value of
+      // cur_ (possibly to nullptr if the cursor has been deleted), and we call UpdateCurLocked to
+      // retrieve this and then go around the loop and check again for a child.
+    } while (UpdateCurLocked());
+    // Only reach here if UpdateCurLocked returns false, which only happens if the cursor was
+    // deleted, in which case we definitely have no child.
+    return false;
+  }
+
+  // Move the cursor to the next un-visited sibling, skipping any children of the current node.
+  // Returns false if iteration has completed and the cursor is now invalid. This may not be called
+  // on an invalid cursor.
+  bool NextSibling() {
+    DEBUG_ASSERT(cur_locked_);
+    {
+      LockedPtr cur = ktl::move(cur_locked_);
+      // Due to the way the sibling lock gets acquired we always need to re-acquire it as a first
+      // acquisition with its normal lock order. For this reason there is no point in attempting to
+      // retain the lock of the updated cur_, and so we use a common helper and then re-read (and
+      // re-lock) cur_.
+      MoveToNextSibling(&cur.locked());
+    }
+    return UpdateCurLocked();
+  }
+
+  // Retrieves the offset that projects an offset from the starting node into an offset in the
+  // current node. This does not imply that the current node can 'see' the content at that offset,
+  // just that if it could that is the offset that would do it.
+  // May only be called while the cursor is valid.
+  uint64_t GetCurrentOffset() const {
+    // As long as we hold cur_locked_ then no one can be altering cur_ and so we own the offset.
+    DEBUG_ASSERT(cur_locked_);
+    return cumulative_parent_offset_;
+  }
+
+  // Retrieve a reference to the current node.
+  const LockedPtr& GetCur() const { return cur_locked_; }
+
+ private:
+  // Helper for moving cur_ to the next sibling. The |start| location, which must be equal to cur_
+  // and held locked externally, must be passed in. This allows |cur_locked_| to be set by this
+  // method without having to release its lock.
+  // Walking the next sibling involves walking both 'up' and 'right' until we either find a node or
+  // we encounter root_ and terminate.
+  void MoveToNextSibling(VmCowPages* start) TA_REQ(start->lock()) {
+    DEBUG_ASSERT(!cur_locked_);
+    uint64_t offset;
+    {
+      Guard<CriticalMutex> guard{&lock_};
+      DEBUG_ASSERT(start == cur_);
+      // The later loop wants to assume that we have a parent (in order to be finding a sibling),
+      // which could be false if we are presently at the root_ and there is otherwise no parent.
+      if (start == root_) {
+        EraseLocked(start, start);
+        return;
+      }
+      // As we hold the lock to cur_, the offset cannot change, so we can cache it outside the lock.
+      offset = cumulative_parent_offset_;
+    }
+    LockedPtr cur;
+    while (true) {
+      // If we aren't at the root then, by definition, we are in a subtree and must have a parent.
+      DEBUG_ASSERT(cur.locked_or(start).parent_.get());
+      fbl::RefPtr<VmCowPages> sibling_ref;
+      {
+        // Acquire the parent lock and check for a sibling.
+        LockedPtr parent(cur.locked_or(start).parent_.get(), VmLockAcquireMode::Reentrant);
+        auto iter = ++parent.locked().children_list_.make_iterator(cur.locked_or(start));
+        if (!iter.IsValid()) {
+          // If no sibling then walk up to the parent, ensuring we do not walk past the root.
+          Guard<CriticalMutex> guard{&lock_};
+          // Although we checked this previously, the root can get moved into its child, and so we
+          // must re-check.
+          if (start == root_) {
+            EraseLocked(start, start);
+            return;
+          }
+          if (parent.get() == root_) {
+            EraseLocked(start, &parent.locked());
+            return;
+          }
+          offset = CheckedSub(offset, cur.locked_or(start).parent_offset_);
+          cur = ktl::move(parent);
+          continue;
+        }
+        // Make a ref to the sibling, we have to drop the parent lock before acquiring the sibling
+        // lock.
+        sibling_ref = fbl::MakeRefPtrUpgradeFromRaw(&*iter, parent.locked().lock());
+      }
+
+      LockedPtr sibling(sibling_ref.get(), cur.locked_or(start).lock_order() + 1,
+                        VmLockAcquireMode::Reentrant);
+      // If the sibling is still from the same parent then no race occurred and sibling must still
+      // be alive.
+      if (sibling.locked().parent_ == cur.locked_or(start).parent_) {
+        Guard<CriticalMutex> guard{&lock_};
+        DEBUG_ASSERT(start == cur_);
+        MoveCurLocked(start, &sibling.locked(),
+                      CheckedSub(offset, cur.locked_or(start).parent_offset_) +
+                          sibling.locked().parent_offset_);
+        return;
+      }
+      // Raced with a modification, need to go around again and see what the state of the tree is
+      // now and try again. The only way our siblings parent could have changed is if it got
+      // deleted, and since new siblings will be placed at the head of the list (where as we are
+      // iterating towards the tail), the number of times we can race is strictly bounded.
+    }
+  }
+
+  // Updates cur_locked_ to be what is in cur_. This is used to resolve scenarios where the lock to
+  // current needs to be dropped, and hence a racing deletion might move it.
+  bool UpdateCurLocked() TA_EXCL(lock_) {
+    // We must do this loop as the lock ordering is vmo->cursor and so in between dropping the
+    // cursor lock to acquire cur_locked_, cur_ could move again.
+    Guard<CriticalMutex> guard{&lock_};
+    fbl::RefPtr<VmCowPages> cur;
+    do {
+      // Clear any previous lock.
+      cur_locked_.release();
+      // Cursor was deleted.
+      if (!cur_) {
+        return false;
+      }
+      cur = fbl::MakeRefPtrUpgradeFromRaw(cur_, lock_);
+      guard.CallUnlocked([&]() { cur_locked_ = LockedPtr(cur.get(), VmLockAcquireMode::First); });
+    } while (cur_locked_.get() != cur_);
+    // We have the lock to cur_ and so we safely drop the RefPtr, knowing that the object cannot be
+    // destroyed without our backlink being updated, which would require someone else to acquire the
+    // lock first. All this is only true if the object is presently in the Alive state.
+    DEBUG_ASSERT(cur_locked_.locked().life_cycle_ == LifeCycle::Alive);
+    return true;
+  }
+
+  // Erase the cursor, removing all the backlinks.
+  void EraseLocked(VmCowPages* cur, VmCowPages* root) TA_REQ(cur->lock()) TA_REQ(root->lock())
+      TA_REQ(lock_) {
+    DEBUG_ASSERT(cur == cur_);
+    DEBUG_ASSERT(root == root_);
+    cur->cur_cursor_list_.erase(*this);
+    root->root_cursor_list_.erase(*this);
+    cur_ = root_ = nullptr;
+  }
+
+  // Helper to update the current location of the cursor.
+  void MoveCurLocked(VmCowPages* old_cur, VmCowPages* new_cur, uint64_t new_offset) TA_REQ(lock_)
+      TA_REQ(old_cur->lock()) TA_REQ(new_cur->lock()) {
+    DEBUG_ASSERT(old_cur == cur_);
+    DEBUG_ASSERT(new_cur != root_);
+    // Validate there is no cur_locked_, and so we can update this without racing with any readers
+    // as hold the lock of cur_.
+    DEBUG_ASSERT(!cur_locked_);
+    cumulative_parent_offset_ = new_offset;
+    old_cur->cur_cursor_list_.erase(*this);
+    new_cur->cur_cursor_list_.push_back(this);
+    cur_ = new_cur;
+  }
+
+  // Reset and invalidate the cursor.
+  void reset() {
+    LockedPtr cur = ktl::move(cur_locked_);
+    Guard<CriticalMutex> guard{&lock_};
+    LockedPtr root_locked;
+    fbl::RefPtr<VmCowPages> root;
+    // We must do this loop as the lock ordering is vmo->cursor and so in between dropping the
+    // cursor lock to acquire root_locked, root_ could move again.
+    do {
+      root_locked.release();
+      if (!root_) {
+        return;
+      }
+      if (root_ == cur_) {
+        EraseLocked(&cur.locked(), &cur.locked());
+        return;
+      }
+      root = fbl::MakeRefPtrUpgradeFromRaw(root_, lock_);
+      guard.CallUnlocked(
+          [&]() { root_locked = LockedPtr(root.get(), VmLockAcquireMode::Reentrant); });
+    } while (root_locked.get() != root_);
+    EraseLocked(&cur.locked(), &root_locked.locked());
+  }
+
+  // Modifying any item, such as root_ or cur_, requires holding the lock of the respective object,
+  // but to support being able to non-racily read the current value we define an additional lock_.
+  // Reading any value can be performed by holding either lock_, or the respective object lock_, but
+  // both must be held to modify.
+  DECLARE_CRITICAL_MUTEX(TreeWalkCursor) lock_;
+  // Tracks the offset that projects offsets from the original root, to the current node. This is
+  // logically locked by cur_->lock(), but this annotation cannot be properly expressed. Although we
+  // can say TA_REQ(cur_->lock()), there are times when we want to read this value know that
+  // cur_locked_ is valid when we do not hold lock_, hence we cannot even write
+  // AssertHeld(cur_->lock()), as we do not hold lock_ to dereference cur_, and hence cannot explain
+  // to the static analysis that cur_locked_ is an alias of cur_.
+  uint64_t cumulative_parent_offset_ = 0;
+  // The invariant that we maintain is that if root_ or cur_ is not null, then the object they point
+  // to must be in the Alive state, and this cursor must be in the respective cursor_list_.
+  // Modifying these can only be done when holding the respective object lock, as well as lock_.
+  // Attempting to annotate these with something like TA_GUARDED(cur_->lock()) is not useful since
+  // the static analysis cannot resolve the pointer aliasing, and since these are pointers that can
+  // change, using AssertHeld is dangerous as it can provide a false sense of correctness.
+  VmCowPages* root_ TA_GUARDED(lock_) = nullptr;
+  VmCowPages* cur_ TA_GUARDED(lock_) = nullptr;
+
+  // Whenever the cursor is valid, then cur_locked_ is a LockedPtr to cur_. This lock is only
+  // dropped internally when walking between nodes. Storing this internally, instead of returning it
+  // to the user on successful calls to NextChild or NextSibling is merely to ensure that they do
+  // not release the lock at all, allowing us to make assumptions when resuming iteration.
+  LockedPtr cur_locked_;
+};
+
 bool VmCowRange::IsBoundedBy(uint64_t max) const { return InRange(offset, len, max); }
 
 // Allocates a new page and populates it with the data at |parent_paddr|.
@@ -429,18 +829,6 @@ zx::result<vm_page_t*> VmCowPages::AllocLoanedPage(F allocated) {
   });
 }
 
-void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page) {
-  if (page->is_loaned()) {
-    FreeLoanedPagesHolder flph;
-    Pmm::Node().BeginFreeLoanedPage(
-        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, flph);
-    Pmm::Node().FinishFreeLoanedPages(flph);
-  } else {
-    pmm_page_queues()->Remove(page);
-    FreePage(page);
-  }
-}
-
 void VmCowPages::RemovePageLocked(vm_page_t* page, DeferredOps& ops) {
   if (page->is_loaned()) {
     Pmm::Node().BeginFreeLoanedPage(
@@ -448,18 +836,6 @@ void VmCowPages::RemovePageLocked(vm_page_t* page, DeferredOps& ops) {
   } else {
     pmm_page_queues()->Remove(page);
     list_add_tail(ops.FreedList(this).List(), &page->queue_node);
-  }
-}
-
-void VmCowPages::RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) {
-  if (page->is_loaned()) {
-    FreeLoanedPagesHolder flph;
-    Pmm::Node().BeginFreeLoanedPage(
-        page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); }, flph);
-    Pmm::Node().FinishFreeLoanedPages(flph);
-  } else {
-    pmm_page_queues()->Remove(page);
-    list_add_tail(free_list, &page->queue_node);
   }
 }
 
@@ -719,6 +1095,11 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent
       // deferred deletion method, i.e. return the parent_ and have the caller call dead transition
       // on it.
       deferred = ktl::move(parent_);
+    } else {
+      // If we had a parent then RemoveChildLocked would have cleaned up any cursors, but otherwise
+      // we must erase from any lists. As we have no parent and cannot have children the root and
+      // current cursor list must be equivalent, and so only need to process one.
+      TreeWalkCursor::Erase(root_cursor_list_, this);
     }
   } else {
     // Most of the hidden vmo's state should have already been cleaned up when it merged
@@ -729,6 +1110,8 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(const LockedPtr& parent
   }
 
   DEBUG_ASSERT(page_list_.IsEmpty());
+  DEBUG_ASSERT(root_cursor_list_.is_empty());
+  DEBUG_ASSERT(cur_cursor_list_.is_empty());
 
   // Due to the potential lock dropping earlier double check our life_cycle_ is what we expect.
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Dying);
@@ -795,10 +1178,27 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
     // We attempt to always inline these lambdas, as its a huge performance benefit and has minimal
     // impact on code size.
     bool stopped_early = false;
-    bool walk_up = false;
-    auto page_callback = [func, &walker, self, cur_to_self = start_in_cur - start_in_self,
-                          &stopped_early](auto p, uint64_t page_offset) __ALWAYS_INLINE {
+    uint64_t parent_content_start = UINT64_MAX;
+    uint64_t parent_content_end = 0;
+    auto page_callback = [&](auto p, uint64_t page_offset) __ALWAYS_INLINE {
       AssertHeld(self->lock_ref());
+      uint64_t cur_to_self = start_in_cur - start_in_self;
+      // If we had started tracking a run of contiguous parent content then we must walk up once it
+      // stops, either due to a gap or a switch to some other entry type.
+      if (parent_content_end != 0 && (page_offset != parent_content_end || !p->IsParentContent())) {
+        return ZX_ERR_STOP;
+      }
+      if (p->IsParentContent()) {
+        // ParentContent markers can exist spuriously (see explanation on
+        // tree_has_parent_content_markers) and so only consider walking up if within the
+        // parent_limit_.
+        if (page_offset < walker.current(self).parent_limit_) {
+          // Either adding to or starting a new contiguous parent content run.
+          parent_content_start = ktl::min(parent_content_start, page_offset);
+          parent_content_end = page_offset + PAGE_SIZE;
+        }
+        return ZX_ERR_NEXT;
+      }
       zx_status_t status = func(p, &walker.current(self), page_offset - cur_to_self, page_offset);
       if (status == ZX_ERR_STOP) {
         stopped_early = true;
@@ -809,26 +1209,23 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
       // The gap is empty, so walk up if the parent is accessible from any part of it.
       // Mark the range immediately preceding the gap as processed.
       AssertHeld(self->lock_ref());
+      // Gaps will never be considered on nodes that have parent content markers, so should never be
+      // in the middle of calculating a parent content run.
+      DEBUG_ASSERT(parent_content_end == 0);
       if (gap_start_offset < walker.current(self).parent_limit_) {
-        start_in_self += gap_start_offset - start_in_cur;
-        start_in_cur = gap_start_offset + walker.current(self).parent_offset_;
-        end_in_cur = ktl::min(gap_end_offset, walker.current(self).parent_limit_) +
-                     walker.current(self).parent_offset_;
-        walker.WalkUp(self);
-        walk_up = true;
+        parent_content_start = gap_start_offset;
+        parent_content_end = gap_end_offset;
         return ZX_ERR_STOP;
       }
-
       return ZX_ERR_NEXT;
     };
 
     zx_status_t status = ZX_OK;
     if (walker.current(self).is_parent_hidden_locked() &&
-        start_in_cur < walker.current(self).parent_limit_) {
-      // We know the parent is hidden here, so we may need to walk up into it if it's accessible
-      // from any empty offset within the range.
-      //
-      // Otherwise process pages within the range directly owned by `cur`.
+        start_in_cur < walker.current(self).parent_limit_ &&
+        !walker.current(self).node_has_parent_content_markers()) {
+      // We can see into a hidden parent, and cannot use content markers to optimize the walk up, so
+      // need to consider any gaps.
       if constexpr (ktl::is_same_v<P, VmPageOrMarker*>) {
         status = walker.current(self).page_list_.RemovePagesAndIterateGaps(
             page_callback, gap_callback, start_in_cur, end_in_cur);
@@ -840,14 +1237,8 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
             page_callback, gap_callback, start_in_cur, end_in_cur);
       }
     } else {
-      // There is either no parent here, or the parent is visible.
-      //
-      // Visible parents represent cases of unidirectional cloning where the parent owns its pages
-      // exclusively, so we don't walk up into them and thus don't need to process any gaps.
-      //
-      // Processing gaps is expensive due to additional per-page overhead involved in tracking the
-      // gaps and intervals, so save time by avoiding that and only processing pages directly owned
-      // by `cur`.
+      // Either we cannot see into a hidden parent, or we are able to utilize parent content
+      // markers, and so do not need to consider gaps and can just directly process the pages.
       if constexpr (ktl::is_same_v<P, VmPageOrMarker*>) {
         status =
             walker.current(self).page_list_.RemovePages(page_callback, start_in_cur, end_in_cur);
@@ -868,9 +1259,17 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
       return ZX_OK;
     }
 
-    // If we didn't walk up, then mark the entire range as processed and begin another walk up from
-    // `self`.
-    if (!walk_up) {
+    if (parent_content_end != 0) {
+      // If we found a run of parent content, either via parent content markers or from a gap, then
+      // need to walk up and look for it.
+      start_in_self += parent_content_start - start_in_cur;
+      start_in_cur = parent_content_start + walker.current(self).parent_offset_;
+      end_in_cur = ktl::min(parent_content_end, walker.current(self).parent_limit_) +
+                   walker.current(self).parent_offset_;
+      walker.WalkUp(self);
+    } else {
+      // If not walk up, then mark the entire range as processed and begin another walk up from
+      // `self`.
       start_in_self += end_in_cur - start_in_cur;
       start_in_cur = start_in_self;
       end_in_cur = end_in_self;
@@ -925,11 +1324,21 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
   // copy-on-write, cannot have a writable mapping.
 
   if (IsZeroPage(page_or_marker->Page())) {
-    // Replace the slot with a marker.
-    __UNINITIALIZED auto result =
-        BeginAddPageWithSlotLocked(offset, page_or_marker, CanOverwriteContent::NonZero);
-    DEBUG_ASSERT(result.is_ok());
-    VmPageOrMarker old_page = CompleteAddPageLocked(*result, VmPageOrMarker::Marker(), &deferred);
+    VmPageOrMarker old_page;
+
+    if (node_has_parent_content_markers()) {
+      // If using parent content markers then we do not need to, and are not permitted to, insert a
+      // regular marker. Instead just clear the slot, which indicates zero content regardless of any
+      // parents above us.
+      RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+      old_page = page_list_.RemoveContent(offset);
+    } else {
+      // Replace the slot with a marker.
+      __UNINITIALIZED auto result =
+          BeginAddPageWithSlotLocked(offset, page_or_marker, CanOverwriteContent::NonZero);
+      DEBUG_ASSERT(result.is_ok());
+      old_page = CompleteAddPageLocked(*result, VmPageOrMarker::Marker(), &deferred);
+    }
     DEBUG_ASSERT(old_page.IsPage());
 
     // Free the old page.
@@ -1055,7 +1464,9 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
     // If `parent` owns any pages in the clone's range then we muse use it as the clone's parent.
     // If we continued iterating, the clone couldn't snapshot all ancestor pages that it would be
     // able to if `this` had been the parent.
-    if (parent_limit > 0 && parent.locked_or(this).page_list_.AnyPagesOrIntervalsInRange(
+    // This will specifically walk through any parent content markers, since they indicate the
+    // presence of content *above* this node, not held specifically by this node.
+    if (parent_limit > 0 && parent.locked_or(this).page_list_.AnyOwnedPagesOrIntervalsInRange(
                                 offset, offset + parent_limit)) {
       break;
     }
@@ -1083,85 +1494,37 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
   return ParentAndRange{ktl::move(parent), ktl::move(grandparent), offset, parent_limit, size};
 }
 
-void VmCowPages::AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit,
-                                                     VmCowPages* child, const LockedPtr& parent,
-                                                     bool update_backlinks) {
-  AddChildLocked(child, offset, limit);
-
-  VmCompression* compression = Pmm::Node().GetPageCompression();
-  __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(this);
-
-  auto page_update_backlink = [this, compression, &page_backlink_updater](
-                                  VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
-    if (p->IsReference()) {
-      // A regular reference we can move, a temporary reference we need to turn back into its
-      // page so we can move it. To determine if we have a temporary reference we can just
-      // attempt to move it, and if it was a temporary reference we will get a page returned.
-      if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
-        // For simplicity, since this is a very uncommon edge case, just update the page in
-        // place in this page list, then move it as a regular page.
-        AssertHeld(lock_ref());
-        SetNotPinnedLocked(*maybe_page, off);
-        VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
-        ASSERT(compression->IsTempReference(ref));
-      }
-    }
-    // Not an else-if to intentionally perform this if the previous block turned a reference
-    // into a page.
-    if (p->IsPage()) {
-      page_backlink_updater.Push(p->Page(), off);
-    }
-    return ZX_ERR_NEXT;
-  };
-
-  // Add references to pages that the COW clone now shares ownership over, and add backlinks if
-  // required.
-  zx_status_t status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
-      [this, compression, update_backlinks, &page_update_backlink](
-          VmPageOrMarkerRef p, VmCowPages* owner, uint64_t cow_clone_offset, uint64_t owner_offset)
-          __ALWAYS_INLINE {
-            if (update_backlinks && (owner == this)) {
-              page_update_backlink(p, owner_offset);
-            }
-
-            if (p->IsPage()) {
-              p->Page()->object.share_count++;
-            } else if (p->IsReference()) {
-              VmPageOrMarker::ReferenceValue ref = p->Reference();
-              compression->SetMetadata(ref, compression->GetMetadata(ref) + 1);
-            } else {
-              // Markers do not have references counts.
-            }
-
-            return ZX_ERR_NEXT;
-          },
-      offset, limit, parent);
-  DEBUG_ASSERT(status == ZX_OK);
-
-  // If this is a new node and the clone doesn't see all of the hidden parent, update the remaining
-  // part of the range.
-  if (update_backlinks && (offset > 0)) {
-    page_list_.ForEveryPageInRangeMutable(page_update_backlink, 0, offset);
-  }
-  if (update_backlinks && (limit < size_)) {
-    page_list_.ForEveryPageInRangeMutable(page_update_backlink, limit, size_);
-  }
-
-  page_backlink_updater.Flush();
-
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(child->DebugValidatePageSharingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
-}
-
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneNewHiddenParentLocked(
+    uint64_t offset, uint64_t limit, uint64_t size, VmPageList&& initial_page_list,
     const LockedPtr& parent) {
   canary_.Assert();
 
+  const VmCowPagesOptions options = inheritable_options();
+
+  fbl::AllocChecker ac;
   fbl::RefPtr<VmHierarchyState> state;
 #if VMO_USE_SHARED_LOCK
   state = hierarchy_state_ptr_;
 #endif
+  LockedRefPtr cow_clone;
+  // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
+  {
+    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+        state, options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
+    if (!ac.check()) {
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    // As this node was just constructed we know the lock is free, use one of the lock order gap
+    // values to acquire without a lockdep violation. If we have a parent, and hence hold its lock,
+    // then we must set the lock order after it.
+    DEBUG_ASSERT(parent_.get() == parent.get());
+    const uint64_t order = (parent ? parent->lock_order() : lock_order()) + 1;
+    cow_clone = LockedRefPtr(ktl::move(cow_clone_ref), order, VmLockAcquireMode::Reentrant);
+  }
+
+  DEBUG_ASSERT(!is_hidden());
+  // If `parent` is to be the new child's parent then it must become hidden first.
+  // That requires creating a new hidden node and rotating `parent` to be its child.
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
   DEBUG_ASSERT(children_list_len_ == 0);
 
@@ -1173,14 +1536,12 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
   // absence here when performing the range update.
   RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite, nullptr);
 
-  VmCowPagesOptions options = inheritable_options();
   LockedRefPtr hidden_parent;
   // Use a sub-scope to limit visibility of hidden_parent_ref as it's just a temporary.
   {
-    fbl::AllocChecker ac;
-    // Lock order for a new hidden parent is either derived from its parent, or if no parent starts
-    // kLockOrderRoot. Cow creation rules state that our parent is either hidden, or a page root
-    // node ensuring that our derived lock order will still be in the hidden range.
+    // Lock order for a new hidden parent is either derived from its parent, or if no parent
+    // starts kLockOrderRoot. Cow creation rules state that our parent is either hidden, or a page
+    // root node ensuring that our derived lock order will still be in the hidden range.
     DEBUG_ASSERT(!parent_ || parent_->is_hidden() || parent_->page_source_);
     const uint64_t hidden_lock_order =
         parent_ ? parent_->lock_order() - kLockOrderDelta : kLockOrderRoot;
@@ -1191,14 +1552,108 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     // If we have a parent (which will become the parent of the new hidden node) then since its
-    // lock is already acquired we cannot acquire the new hidden parent using its normal lock order.
-    // As we just created this node we know that no one else can be acquiring it, so we use the gap
-    // in the regular lock orders, taking into account that the new leaf node was already acquired
-    // into the same gap.
+    // lock is already acquired we cannot acquire the new hidden parent using its normal lock
+    // order. As we just created this node we know that no one else can be acquiring it, so we use
+    // the gap in the regular lock orders, taking into account that the new leaf node was already
+    // acquired into the same gap.
     const uint64_t order = parent ? parent->lock_order() + 2 : hidden_parent_ref->lock_order();
     hidden_parent = LockedRefPtr(ktl::move(hidden_parent_ref), order, VmLockAcquireMode::Reentrant);
   }
-  hidden_parent.locked().page_list_.InitializeSkew(page_list_.GetSkew(), 0);
+
+  // Create a temporary page list collect the parent content markers we might need to make. This
+  // will eventually become our page_list_, but not until we've updated the backlinks and moved it
+  // into the hidden parent.
+  VmPageList temp_list;
+  temp_list.InitializeSkew(page_list_.GetSkew(), 0);
+
+  VmCompression* compression = Pmm::Node().GetPageCompression();
+  zx_status_t status = ZX_OK;
+
+  {
+    __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&hidden_parent.locked());
+    status = page_list_.RemovePages(
+        [&](VmPageOrMarker* p, uint64_t offset) {
+          if (tree_has_parent_content_markers()) {
+            // If a tree is uses parent content markers then, since we are a leaf node, we know that
+            // there can be no markers and no intervals, hence this is either content, or a parent
+            // marker. In either case we need to retain a ParentContent marker in |this|, and since
+            // the page list being iterated will be moved into |hidden_parent|, add a slot to the
+            // |temp_list|.
+            DEBUG_ASSERT(node_has_parent_content_markers());
+            DEBUG_ASSERT(p->IsParentContent() || p->IsPageOrRef());
+            auto [slot, _] =
+                temp_list.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
+            if (!slot) {
+              return ZX_ERR_NO_MEMORY;
+            }
+            *slot = VmPageOrMarker::ParentContent();
+            if (p->IsParentContent()) {
+              // Hidden nodes do not themselves have parent content markers, as we have effectively
+              // moved this to ourselves can clear this slot and continue.
+              *p = VmPageOrMarker::Empty();
+              return ZX_ERR_NEXT;
+            }
+          }
+          if (p->IsReference()) {
+            // A regular reference we can move, a temporary reference we need to turn back into
+            // its page so we can move it. To determine if we have a temporary reference we can
+            // just attempt to move it, and if it was a temporary reference we will get a page
+            // returned.
+            if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
+              // For simplicity, since this is a very uncommon edge case, just update the page in
+              // place in this page list, then move it as a regular page.
+              AssertHeld(lock_ref());
+              SetNotPinnedLocked(*maybe_page, offset);
+              VmPageOrMarker::ReferenceValue ref = p->SwapReferenceForPage(*maybe_page);
+              ASSERT(compression->IsTempReference(ref));
+            }
+          }
+          // Not an else-if to intentionally perform this if the previous block turned a reference
+          // into a page.
+          if (p->IsPage()) {
+            page_backlink_updater.Push(p->Page(), offset);
+          }
+          return ZX_ERR_NEXT;
+        },
+        0, size_);
+
+    page_backlink_updater.Flush();
+  }
+
+  // On error we need to roll-back any partial modifications.
+  if (status != ZX_OK) {
+    DEBUG_ASSERT_MSG(status == ZX_ERR_NO_MEMORY, "status: %d", status);
+    // Re-set all the backlinks back to |this|. Any backlinks that hadn't yet been moved will get a
+    // harmless no-op.
+    __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(this);
+    page_list_.ForEveryPage([&](const VmPageOrMarker* p, uint64_t offset) {
+      if (p->IsPage()) {
+        page_backlink_updater.Push(p->Page(), offset);
+      }
+      return ZX_ERR_NEXT;
+    });
+    // Need to put back any ParentContent markers we had deleted.
+    temp_list.MergeRangeOntoAndClear(
+        [](VmPageOrMarker* src, VmPageOrMarker* dst, uint64_t) {
+          // The only items in temp_list are parent content markers we just put in.
+          DEBUG_ASSERT(src->IsParentContent());
+          // If dst is empty then it use to hold a ParentContent marker, but we deleted it, so put
+          // it back. A non-empty dst we leave alone, as that indicates where we created a
+          // ParentContent marker for content that we did not modify, and hence do not need to roll
+          // back.
+          if (dst->IsEmpty()) {
+            *dst = ktl::move(*src);
+          }
+        },
+        page_list_, 0, size_);
+    // temp_list just contains ParentContent markers, which can be safely dropped.
+    return zx::error(status);
+  }
+
+  // Move our pagelist before adding ourselves as its child, because we cannot be added as a child
+  // unless we have no pages.
+  hidden_parent.locked().page_list_ = ktl::move(page_list_);
+
   hidden_parent.locked().TransitionToAliveLocked();
 
   // If the current object is not the root of the tree, then we need to replace ourselves in our
@@ -1224,65 +1679,13 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::ReplaceWithHiddenNodeLocked(
     parent_offset_ = parent_limit_ = 0;
   }
 
-  // Move our pagelist before adding ourselves as its child, because we cannot be added as a child
-  // unless we have no pages. Backlinks will be incorrect after move, but are updated later in the
-  // clone operation.
-  DEBUG_ASSERT(hidden_parent.locked().page_list_.IsEmpty());
-  hidden_parent.locked().page_list_ = ktl::move(page_list_);
-  DEBUG_ASSERT(page_list_.IsEmpty());
-  DEBUG_ASSERT(page_list_.GetSkew() == 0);
-
+  // Add the children and then populate their initial page lists.
   hidden_parent.locked().AddChildLocked(this, 0, size_);
-
-  // Return the hidden parent as the replacement node.
-  return zx::ok(ktl::move(hidden_parent));
-}
-
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64_t offset,
-                                                                          uint64_t limit,
-                                                                          uint64_t size,
-                                                                          const LockedPtr& parent) {
-  canary_.Assert();
-
-  VmCowPagesOptions options = inheritable_options();
-
-  fbl::AllocChecker ac;
-  fbl::RefPtr<VmHierarchyState> state;
-#if VMO_USE_SHARED_LOCK
-  state = hierarchy_state_ptr_;
-#endif
-  LockedRefPtr cow_clone;
-  // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
-  {
-    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-        ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
-    if (!ac.check()) {
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
-    // As this node was just constructed we know the lock is free, use one of the lock order gap
-    // values to acquire without a lockdep violation. If we have a parent, and hence hold its lock,
-    // then we must set the lock order after it.
-    DEBUG_ASSERT(parent_.get() == parent.get());
-    const uint64_t order = (parent ? parent->lock_order() : lock_order()) + 1;
-    cow_clone = LockedRefPtr(ktl::move(cow_clone_ref), order, VmLockAcquireMode::Reentrant);
-  }
-
-  // If `parent` is to be the new child's parent then it must become hidden first.
-  // That requires creating a new hidden node and rotating `parent` to be its child.
-  if (!is_hidden()) {
-    auto result = ReplaceWithHiddenNodeLocked(parent);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    DEBUG_ASSERT((*result)->is_hidden());
-    (*result).locked().AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(),
-                                                           parent, true);
-  } else {
-    // The COW clone's parent must be hidden because the clone must not see any future parent
-    // writes.
-    DEBUG_ASSERT(is_hidden());
-    AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked(), parent, false);
-  }
+  hidden_parent.locked().AddChildLocked(&cow_clone.locked(), offset, limit);
+  DEBUG_ASSERT(temp_list.GetSkew() == page_list_.GetSkew());
+  page_list_ = ktl::move(temp_list);
+  DEBUG_ASSERT(cow_clone.locked().page_list_.GetSkew() == initial_page_list.GetSkew());
+  cow_clone.locked().page_list_ = ktl::move(initial_page_list);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -1290,8 +1693,10 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64
   return zx::ok(ktl::move(cow_clone));
 }
 
-zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
-    uint64_t offset, uint64_t limit, uint64_t size, const LockedPtr& parent) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneChildLocked(uint64_t offset, uint64_t limit,
+                                                                  uint64_t size,
+                                                                  VmPageList&& initial_page_list,
+                                                                  const LockedPtr& parent) {
   canary_.Assert();
 
   VmCowPagesOptions options = inheritable_options();
@@ -1304,11 +1709,17 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
 #if VMO_USE_SHARED_LOCK
     state = hierarchy_state_ptr_;
 #endif
-    // If we do not have a parent, then we are constructing the first anonymous node (since we must
-    // be pager backed), and so we want to start at kLockOrderFirstAnon. Otherwise if we ourselves
-    // have a parent then this is a long unidirectional chain and we derive the new lock order from
-    // ourselves.
-    const uint64_t clone_order = parent_ ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
+    // We are either constructing the first visible anonymous node in a chain, which gets
+    // kLockOrderFirstAnon, or this is part of a unidirectional clone chain and takes a lock order
+    // derived from ourselves. In full these possibilities are:
+    //  * This is userpager root (we have no parent and are not hidden), we are creating first
+    //    visible anonymous node
+    //  * This is a hidden node, we are creating first visible anonymous node
+    //  * Unidirectional clone chain (we have parent and are not hidden), creating derived visible
+    //    anonymous node.
+    // See comment above lock_order_ definition for more details.
+    const uint64_t clone_order =
+        (parent_ && !is_hidden()) ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
     auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
         ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, clone_order));
     if (!ac.check()) {
@@ -1323,9 +1734,12 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
                      VmLockAcquireMode::Reentrant);
   }
 
-  // The COW clone's parent must not be hidden because the clone may see future parent writes.
-  DEBUG_ASSERT(!is_hidden());
   AddChildLocked(&cow_clone.locked(), offset, limit);
+  // If given a non-empty initial_page_list then place it in the clone.
+  if (!initial_page_list.IsEmpty()) {
+    DEBUG_ASSERT(cow_clone.locked().page_list_.GetSkew() == initial_page_list.GetSkew());
+    cow_clone.locked().page_list_ = ktl::move(initial_page_list);
+  }
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   // It will not check the child's page sharing however, so check that independently.
@@ -1339,8 +1753,14 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(
 
 zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType type,
                                                                    bool require_unidirectional,
-                                                                   VmCowRange range) {
+                                                                   VmCowRange range,
+                                                                   DeferredOps& ops) {
   canary_.Assert();
+
+  // When creating a clone the DeferredOps is not used beyond acting to serialize operations on
+  // pager backed hierarchies via the page_source_lock that it holds. For why this is important see
+  // the comments in ::Resize.
+  DEBUG_ASSERT(ops.self_ == this);
 
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, range.offset, range.len);
 
@@ -1397,29 +1817,6 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
   }
   const bool unidirectional = !require_bidirectional && can_unidirectional_clone_locked();
 
-  // Now that we know whether it will be a unidirectional clone or not, determine where this clone
-  // will hang.
-  ParentAndRange child_range =
-      FindParentAndRangeForCloneLocked(range.offset, range.len, !unidirectional);
-
-  if (!unidirectional) {
-    if (require_unidirectional) {
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-    // The bidirectional clone check requires looking at the parent of where we want to hang the
-    // node, which is represented by |child_range.grandparent|.
-    if (!can_bidirectional_clone_locked(child_range.grandparent)) {
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-
-    // If this is non-zero, that means that there are pages which hardware can
-    // touch, so the vmo can't be safely cloned.
-    // TODO: consider immediately forking these pages.
-    if (pinned_page_count_locked()) {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-  }
-
   // Only contiguous VMOs have a source that handles free, and those may not have cow clones made of
   // them. Once there is a cow hierarchy tracking exactly what node a page was from to free it is
   // not performed, and it is assumed that therefore that we do not need to free owned pages to
@@ -1427,13 +1824,116 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType 
   ASSERT(!is_source_handling_free());
 
   if (unidirectional) {
-    return child_range.parent.locked_or(this).CloneUnidirectionalLocked(
-        child_range.parent_offset, child_range.parent_limit, child_range.size,
+    ParentAndRange child_range = FindParentAndRangeForCloneLocked(range.offset, range.len, false);
+
+    return child_range.parent.locked_or(this).CloneChildLocked(
+        child_range.parent_offset, child_range.parent_limit, child_range.size, VmPageList(),
         child_range.grandparent);
   }
-  return child_range.parent.locked_or(this).CloneBidirectionalLocked(
-      child_range.parent_offset, child_range.parent_limit, child_range.size,
-      child_range.grandparent);
+
+  if (require_unidirectional) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // If this is non-zero, that means that there are pages which hardware can
+  // touch, so the vmo can't be safely cloned.
+  // TODO: consider immediately forking these pages.
+  if (pinned_page_count_locked()) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  VmCompression* compression = Pmm::Node().GetPageCompression();
+
+  // For any content that we have part or full ownership of in the range to be cloned, then the
+  // child, regardless of what actual node it ends up hanging of, will gain part ownership of said
+  // content. Therefore we first want to find all such content, incrementing the share counts, and
+  // populating a new page list with parent content markers if needed.
+  // We explicitly need to do this *before* walking up because, if using parent content markers, the
+  // content we are able to see is possibly determined by content markers in *this* node, even if we
+  // will be able to mechanically hang the new node higher up.
+  VmPageList page_list;
+  page_list.InitializeSkew(page_list_.GetSkew(), range.offset);
+
+  // To account for any errors that result in needing to roll back we remember the range we have
+  // processed the share counts for.
+  uint64_t shared_end = range.offset;
+  auto rollback = fit::defer([this, &range, &shared_end, compression]() {
+    AssertHeld(lock_ref());
+
+    // Decrement the share count on all pages. As every page we can see is also owned by this, and
+    // we have continuously held our lock, no page should need to be freed as a result.
+    zx_status_t status = RemoveOwnedHierarchyPagesInRangeLocked(
+        [&](VmPageOrMarker* p, const VmCowPages* owner, uint64_t this_offset,
+            uint64_t owner_offset) {
+          if (p->IsPage()) {
+            vm_page_t* page = p->Page();
+            DEBUG_ASSERT(page->object.share_count > 0);
+            page->object.share_count--;
+          } else if (p->IsReference()) {
+            const uint32_t share_count = compression->GetMetadata(p->Reference());
+            DEBUG_ASSERT(share_count > 0);
+            compression->SetMetadata(p->Reference(), share_count - 1);
+          }
+          return ZX_ERR_NEXT;
+        },
+        range.offset, shared_end - range.offset, LockedPtr());
+    DEBUG_ASSERT(status == ZX_OK);
+  });
+
+  // Update any share counts for content the clone will be able to see, and populate a temporary
+  // page list with any parent content markers if needed.
+  zx_status_t status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
+      [&](VmPageOrMarkerRef p, VmCowPages* owner, uint64_t cow_clone_offset,
+          uint64_t owner_offset) {
+        if (tree_has_parent_content_markers() && p->IsPageOrRef()) {
+          const uint64_t off = cow_clone_offset - range.offset;
+          auto [slot, _] =
+              page_list.LookupOrAllocate(off, VmPageList::IntervalHandling::NoIntervals);
+          if (!slot) {
+            return ZX_ERR_NO_MEMORY;
+          }
+          *slot = VmPageOrMarker::ParentContent();
+        }
+        if (p->IsPage()) {
+          p->Page()->object.share_count++;
+        } else if (p->IsReference()) {
+          VmPageOrMarker::ReferenceValue ref = p->Reference();
+          compression->SetMetadata(ref, compression->GetMetadata(ref) + 1);
+        }
+        shared_end = owner_offset + PAGE_SIZE;
+
+        return ZX_ERR_NEXT;
+      },
+      range.offset, range.len, LockedPtr());
+
+  if (status != ZX_OK) {
+    // However far we got is recorded in |shared_end|, and |rollback| will clean it up.
+    return zx::error(status);
+  }
+
+  ParentAndRange child_range = FindParentAndRangeForCloneLocked(range.offset, range.len, true);
+
+  // The bidirectional clone check requires looking at the parent of where we want to hang the
+  // node, which is represented by |child_range.grandparent|.
+  if (!can_bidirectional_clone_locked(child_range.grandparent)) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // If we found a hidden node to be our parent, then we can just hang a new node under that,
+  // otherwise we need to also create a new hidden node to place this and the new child under.
+  auto result = child_range.parent.locked_or(this).is_hidden()
+                    ? child_range.parent.locked().CloneChildLocked(
+                          child_range.parent_offset, child_range.parent_limit, child_range.size,
+                          ktl::move(page_list), child_range.grandparent)
+                    : child_range.parent.locked_or(this).CloneNewHiddenParentLocked(
+                          child_range.parent_offset, child_range.parent_limit, child_range.size,
+                          ktl::move(page_list), child_range.grandparent);
+  // If everything went well then we can finally cancel the rollback and let the clone own the
+  // content we added the share counts for.
+  if (result.is_ok()) {
+    rollback.cancel();
+  }
+  return result;
 }
 
 void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling) {
@@ -1442,8 +1942,20 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
+  // If we have a sibling to the right of the removed node then update any cursors to point there,
+  // otherwise find the next valid sibling starting from our parent, which we already hold the lock
+  // for.
+  const bool removed_left = removed == &children_list_.front();
+  if (removed_left && sibling) {
+    TreeWalkCursor::MoveToSibling(removed->cur_cursor_list_, removed, &sibling.locked());
+  } else {
+    TreeWalkCursor::MoveToSiblingOfParent(removed->cur_cursor_list_, removed, this);
+  }
+  // Moving the cursors should have implicitly cleared any root references since cursors can never
+  // be positioned outside their subtree.
+  DEBUG_ASSERT(removed->root_cursor_list_.is_empty());
+
   if (!is_hidden() || children_list_len_ > 2) {
-    // TODO(https://fxbug.dev/338300943): Make use of the |sibling|.
     DropChildLocked(removed);
     // Things should be consistent after dropping the child.
     VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -1454,6 +1966,10 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling
   // Hidden vmos have 0, 2 or more children. If we had more we would have already returned, and we
   // cannot be here with 0 children, therefore we must have 2, including the one we are removing.
   DEBUG_ASSERT(children_list_len_ == 2);
+
+  // Merge any cursors into the remaining child.
+  TreeWalkCursor::MergeToChild(cur_cursor_list_, root_cursor_list_, this, &sibling.locked());
+
   DropChildLocked(removed);
   MergeContentWithChildLocked();
 
@@ -1527,25 +2043,44 @@ void VmCowPages::MergeContentWithChildLocked() {
 
   __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&child);
   page_list_.MergeRangeOntoAndClear(
-      [&](VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
-        if (p->IsReference()) {
+      [&](VmPageOrMarker* src, VmPageOrMarker* dst, uint64_t off) __ALWAYS_INLINE {
+        // Never overwrite any actual content in the destination.
+        if (dst->IsPageOrRef()) {
+          return;
+        }
+        // If using parent content markers then any marker we are moving from src can become an
+        // empty slot in the destination. We already know that dst does not have any page or ref so
+        // clearing dst is guaranteed to not delete content.
+        if (src->IsMarker() && child.node_has_parent_content_markers()) {
+          DEBUG_ASSERT(dst->IsEmpty() || dst->IsParentContent());
+          *dst = VmPageOrMarker::Empty();
+          return;
+        }
+
+        // Either moving some content that the child was referring to in the parent from the parent
+        // into the child, or both parent and child ended up with a marker, in which case the move
+        // is a safe no-op.
+        DEBUG_ASSERT(dst->IsEmpty() || dst->IsParentContent() ||
+                     (dst->IsMarker() && src->IsMarker()));
+        if (src->IsReference()) {
           // A regular reference we can move, a temporary reference we need to turn back into its
           // page so we can move it. To determine if we have a temporary reference we can just
           // attempt to move it, and if it was a temporary reference we will get a page returned.
-          if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
+          if (auto maybe_page = MaybeDecompressReference(compression, src->Reference())) {
             // For simplicity, since this is a very uncommon edge case, just update the page in
             // place in this page list, then move it as a regular page.
             AssertHeld(lock_ref());
             SetNotPinnedLocked(*maybe_page, off);
-            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
+            VmPageOrMarker::ReferenceValue ref = src->SwapReferenceForPage(*maybe_page);
             ASSERT(compression->IsTempReference(ref));
           }
         }
         // Not an else-if to intentionally perform this if the previous block turned a reference
         // into a page.
-        if (p->IsPage()) {
-          page_backlink_updater.Push(p->Page(), off);
+        if (src->IsPage()) {
+          page_backlink_updater.Push(src->Page(), off);
         }
+        *dst = ktl::move(*src);
       },
       child.page_list_, merge_start_offset, merge_end_offset);
 
@@ -1842,6 +2377,10 @@ VmPageOrMarker VmCowPages::CompleteAddPageLocked(AddPageTransaction& transaction
   DEBUG_ASSERT(!p.IsPageOrRef() || !page_source_ ||
                page_source_->DebugIsPageOk(p.Page(), transaction.offset()));
 
+  // Markers should never be placed in a node that uses parent content markers, since doing so is
+  // completely redundant and any attempt to do so represents a logic bug somewhere.
+  DEBUG_ASSERT(!p.IsMarker() || !node_has_parent_content_markers());
+
   // If this is actually a real page, we need to place it into the appropriate queue.
   if (p.IsPage()) {
     vm_page_t* low_level_page = p.Page();
@@ -2048,7 +2587,7 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   [[maybe_unused]] VmPageOrMarker prev_content = CompleteAddPageLocked(
       *page_transaction, VmPageOrMarker::Page(*out_page), do_range_update ? &deferred : nullptr);
   // We should not have been trying to fork at this offset if something already existed.
-  DEBUG_ASSERT(prev_content.IsEmpty());
+  DEBUG_ASSERT(prev_content.IsEmpty() || prev_content.IsParentContent());
   // Transaction completed successfully, so it should no longer be cancelled.
   cancel_transaction.cancel();
 
@@ -2153,6 +2692,18 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, const LockedPtr& parent
       start, size_ - start, parent);
   DEBUG_ASSERT(status == ZX_OK);
 
+  if (node_has_parent_content_markers()) {
+    // Any parent content markers for the pages that we removed the reference counts for need to be
+    // separately removed.
+    page_list_.RemovePages(
+        [&](VmPageOrMarker* slot, uint64_t offset) {
+          DEBUG_ASSERT(slot->IsParentContent());
+          *slot = VmPageOrMarker::Empty();
+          return ZX_ERR_NEXT;
+        },
+        start, size_);
+  }
+
   // This node can no longer see into its parent in the range we just released.
   DEBUG_ASSERT(start < parent_limit_);
   parent_limit_ = start;
@@ -2175,8 +2726,18 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
     __UNINITIALIZED VMPLCursor cursor =
         cur.locked_or(this).page_list_.LookupNearestMutableCursor(offset);
     VmPageOrMarkerRef p = cursor.current();
-    if (p && !p->IsEmpty() && cursor.offset(cur.locked_or(this).page_list_.GetSkew()) == offset) {
-      *out = {cursor, &cur.locked_or(this), offset, max_owner_length + this_offset};
+    const bool cursor_correct_offset =
+        p && cursor.offset(cur.locked_or(this).page_list_.GetSkew()) == offset;
+    // If this slot has any actual content, then can immediately return it.
+    if (cursor_correct_offset && !p->IsEmpty() && !p->IsParentContent()) {
+      *out = {cursor, ktl::move(cur), offset, max_owner_length + this_offset};
+      return;
+    }
+    // If using parent content markers then unless there is a marker we can skip walking up, as we
+    // know there is no content above us.
+    if (cur.locked_or(this).node_has_parent_content_markers() &&
+        (!cursor_correct_offset || !p->IsParentContent())) {
+      *out = {VMPLCursor(), ktl::move(cur), offset, max_owner_length + this_offset};
       return;
     }
 
@@ -2184,33 +2745,64 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
     if (max_owner_length > PAGE_SIZE) {
       // First trim to the parent limit.
       max_owner_length = ktl::min(max_owner_length, cur.locked_or(this).parent_limit_ - offset);
-      if (max_owner_length > PAGE_SIZE && p) {
-        cur.locked_or(this).page_list_.ForEveryPageInCursorRange(
-            [&offset, &max_owner_length](const VmPageOrMarker* slot, uint64_t slot_offset) {
-              DEBUG_ASSERT(!slot->IsEmpty() && slot_offset >= offset);
-              const uint64_t new_owner_length = slot_offset - offset;
-              DEBUG_ASSERT(new_owner_length > 0 && new_owner_length <= max_owner_length);
-              max_owner_length = new_owner_length;
-              return ZX_ERR_STOP;
-            },
-            cursor, offset + max_owner_length);
+      if (max_owner_length > PAGE_SIZE) {
+        // There are three cases to consider for determining the range of the parent that we can
+        // actually see. The cases are considered in order, with each case also assuming the
+        // negation of the condition of all cases above it.
+        //  1. Leaf node using parent content markers - Here the current cursor must be valid and be
+        //     a ParentContent marker, otherwise we would have already returned with content and
+        //     would not be walking up. In this case the visible length is the number of contiguous
+        //     parentContent markers.
+        //  2. The cursor is valid - We know that the current offset does not have content, but
+        //     there is some content later on, and see we must find its offset to determine if it
+        //     limits the visible range or not.
+        //  3. The cursor is invalid - There is no content from here till the end of the page list,
+        //     in which case the visible length extends to the parent limit (i.e. what was just
+        //     calculated in max_owner_length), and we know there is no content to look for to trim
+        //     this length.
+        if (cur.locked_or(this).node_has_parent_content_markers()) {
+          uint64_t new_owner_length = 0;
+          cursor.ForEveryContiguous([&new_owner_length, max_owner_length](VmPageOrMarkerRef p) {
+            if (p->IsParentContent() && new_owner_length < max_owner_length) {
+              new_owner_length += PAGE_SIZE;
+              return ZX_ERR_NEXT;
+            }
+            return ZX_ERR_STOP;
+          });
+          // The first slot in the cursor was parent content, so should always have incremented at
+          // least once.
+          DEBUG_ASSERT(new_owner_length > 0);
+          max_owner_length = ktl::min(new_owner_length, max_owner_length);
+        } else if (p) {
+          cur.locked_or(this).page_list_.ForEveryPageInCursorRange(
+              [&offset, &max_owner_length](const VmPageOrMarker* slot, uint64_t slot_offset) {
+                DEBUG_ASSERT(!slot->IsEmpty() && slot_offset >= offset);
+                const uint64_t new_owner_length = slot_offset - offset;
+                DEBUG_ASSERT(new_owner_length > 0 && new_owner_length <= max_owner_length);
+                max_owner_length = new_owner_length;
+                return ZX_ERR_STOP;
+              },
+              cursor, offset + max_owner_length);
+        }
       }
     }
 
     offset += cur.locked_or(this).parent_offset_;
     cur = LockedPtr(parent, VmLockAcquireMode::Reentrant);
   }
-  *out = {cur.locked_or(this).page_list_.LookupMutableCursor(offset), &cur.locked_or(this), offset,
+  *out = {cur.locked_or(this).page_list_.LookupMutableCursor(offset), ktl::move(cur), offset,
           max_owner_length + this_offset};
 }
 
 void VmCowPages::FindInitialPageContentLocked(uint64_t offset, PageLookup* out) {
   if (parent_ && offset < parent_limit_) {
-    Guard<VmoLockType> parent_guard{AssertOrderedLock, parent_->lock(), parent_->lock_order(),
-                                    VmLockAcquireMode::Reentrant};
-    parent_->FindPageContentLocked(offset + parent_offset_, PAGE_SIZE, out);
+    LockedPtr parent = LockedPtr(parent_.get(), VmLockAcquireMode::Reentrant);
+    parent.locked().FindPageContentLocked(offset + parent_offset_, PAGE_SIZE, out);
+    if (!out->owner) {
+      out->owner = ktl::move(parent);
+    }
   } else {
-    *out = {VMPLCursor(), this, offset, offset + PAGE_SIZE};
+    *out = {VMPLCursor(), LockedPtr(), offset, offset + PAGE_SIZE};
   }
 }
 
@@ -2457,6 +3049,8 @@ zx_status_t VmCowPages::PrepareForWriteLocked(VmCowRange range, LazyPageRequest*
 
         // We don't compress pages in pager-backed VMOs.
         DEBUG_ASSERT(!p->IsReference());
+        // Parent content markers do not appear in pager-backed hierarchies.
+        DEBUG_ASSERT(!p->IsParentContent());
         // This is a either a zero page marker (which represents a clean zero page) or a committed
         // page which is not already Dirty. Try to add it to the range of pages to be dirtied.
         DEBUG_ASSERT(p->IsMarker() || !is_page_dirty(p->Page()));
@@ -2560,14 +3154,17 @@ bool VmCowPages::LookupCursor::CursorIsContentZero() const {
     return true;
   }
 
-  if (owner_info_.owner->page_source_) {
+  if (owner_info_.owner.locked_or(target_).page_source_) {
     // With a page source emptiness implies needing to request content, however we can have zero
     // intervals which do start as zero content.
     return CursorIsInIntervalZero();
   }
   // Without a page source emptiness is filled with zeros and intervals are only permitted if there
   // is a page source.
-  return CursorIsEmpty();
+  // We consider parent content to be empty since a parent content marker can be spurious, and the
+  // only time the cursor would actually point to the parent content marker is if there is no
+  // content to be found in the parent.
+  return CursorIsEmpty() || CursorIsParentContent();
 }
 
 bool VmCowPages::LookupCursor::TargetZeroContentSupplyDirty(bool writing) const {
@@ -2618,7 +3215,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
 
   // For efficiently we would like to use the slot we already have in our cursor if possible,
   // however that can only be done if all of the following hold:
-  //  * owner_ == target_ - If not true then we do not even have a cursor (and hence slot) for where
+  //  * TargetIsOwner() - If not true then we do not even have a cursor (and hence slot) for where
   //    the insertion is happening.
   //  * owner_pl_cursor_.current() != nullptr - Must be an actual node and slot already allocated,
   //    it is just Empty()
@@ -2626,8 +3223,9 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   //    which are zeroes that we could be overwriting here, but the slot itself we have found could
   //    be empty and the interval may need splitting. For simplicity we do not attempt to check for
   //    and handle interval splitting, and just skip reusing our slot in this case.
-  const bool can_reuse_slot = (TargetIsOwner() && owner_info_.cursor.current() &&
-                               !owner_info_.owner->is_source_preserving_page_content());
+  const bool can_reuse_slot =
+      (TargetIsOwner() && owner_info_.cursor.current() &&
+       !owner_info_.owner.locked_or(target_).is_source_preserving_page_content());
   __UNINITIALIZED auto page_transaction =
       can_reuse_slot ? target_->BeginAddPageWithSlotLocked(offset_, owner_info_.cursor.current(),
                                                            CanOverwriteContent::Zero)
@@ -2671,7 +3269,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   // Need to increment the cursor, but we have also potentially modified the page lists in the
   // process of inserting the page.
   if (TargetIsOwner()) {
-    // In the case of owner_ == target_ we may have create a node and need to establish a cursor.
+    // In the case of TargetIsOwner() we may have to create a node and need to establish a cursor.
     // However, if we already had a node, i.e. the cursor was valid, then it would have had the page
     // inserted into it.
     if (!owner_info_.cursor.current()) {
@@ -2683,7 +3281,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
       IncrementCursor();
     }
   } else {
-    // If owner_ != target_ then owner_ page list will not have been modified, so safe to just
+    // If !TargetIsOwner() then the owner's page list will not have been modified, so safe to just
     // increment.
     IncrementCursor();
   }
@@ -2696,14 +3294,14 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
 zx_status_t VmCowPages::LookupCursor::CursorReferenceToPage(AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(CursorIsReference());
 
-  return owner()->ReplaceReferenceWithPageLocked(owner_cursor_, owner_info_.owner_offset,
-                                                 page_request);
+  return owner_info_.owner.locked_or(target_).ReplaceReferenceWithPageLocked(
+      owner_cursor_, owner_info_.owner_offset, page_request);
 }
 
 zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
                                                   PageRequest* page_request) {
   // The owner must have a page_source_ to be doing a read request.
-  DEBUG_ASSERT(owner_info_.owner->page_source_);
+  DEBUG_ASSERT(owner_info_.owner.locked_or(target_).page_source_);
   // The cursor should be explicitly empty as read requests are only for complete content absence.
   DEBUG_ASSERT(CursorIsEmpty());
   DEBUG_ASSERT(!CursorIsInIntervalZero());
@@ -2716,9 +3314,10 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   // could have been destroyed. We could be looking up a page via a lookup in a child after
   // the parent VmObjectPaged has gone away, so paged_ref_ could be null. Let the page source
   // handle any failures requesting the pages.
-  if (owner()->paged_ref_) {
-    vmo_debug_info.vmo_id = owner()->paged_ref_->user_id();
-    owner()->paged_ref_->get_name(vmo_debug_info.vmo_name, sizeof(vmo_debug_info.vmo_name));
+  if (owner_info_.owner.locked_or(target_).paged_ref_) {
+    vmo_debug_info.vmo_id = owner_info_.owner.locked_or(target_).paged_ref_->user_id();
+    owner_info_.owner.locked_or(target_).paged_ref_->get_name(vmo_debug_info.vmo_name,
+                                                              sizeof(vmo_debug_info.vmo_name));
   }
 
   // Try and batch more pages up to |max_request_pages|.
@@ -2726,7 +3325,7 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   if (!TargetIsOwner()) {
     DEBUG_ASSERT(owner_info_.visible_end > offset_);
     // Limit the request by the number of pages that are actually visible from the target_ to
-    // owner_
+    // owner.
     request_size = ktl::min(request_size, owner_info_.visible_end - offset_);
   }
   // Limit |request_size| to the first page visible in the page owner to avoid requesting pages
@@ -2734,8 +3333,9 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   // then it might be preferable to have one big page request, but for now only request absent
   // pages.If already requesting a single page then can avoid the page list operation.
   if (request_size > PAGE_SIZE) {
-    owner()->page_list_.ForEveryPageInRange(
+    owner_info_.owner.locked_or(target_).page_list_.ForEveryPageInRange(
         [&](const VmPageOrMarker* p, uint64_t offset) {
+          DEBUG_ASSERT(!p->IsParentContent());
           // Content should have been empty initially, so should not find anything at the start
           // offset.
           DEBUG_ASSERT(offset > owner_info_.owner_offset);
@@ -2753,7 +3353,7 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   }
   DEBUG_ASSERT(request_size >= PAGE_SIZE);
 
-  zx_status_t status = owner_info_.owner->page_source_->GetPages(
+  zx_status_t status = owner_info_.owner.locked_or(target_).page_source_->GetPages(
       owner_info_.owner_offset, request_size, page_request, vmo_debug_info);
   // Pager page sources will never synchronously return a page.
   DEBUG_ASSERT(status != ZX_OK);
@@ -2763,19 +3363,18 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
 zx_status_t VmCowPages::LookupCursor::DirtyRequest(uint max_request_pages,
                                                    LazyPageRequest* page_request) {
   // Dirty requests, unlike read requests, happen directly against the target, and not the owner.
-  // This is because to make something dirty you must own it, i.e. target_ is already equal to
-  // owner_. Unfortunately we cannot explicitly check for target_ == owner_, since owner_ doubles as
-  // tracking for whether the cursor is valid, and it may have been made invalid just prior to
+  // This is because to make something dirty you must own it. Simply checking for TargetIsOwner() is
+  // insufficient, since the cursor may have been made invalid (clearing the owner) just prior to
   // generating this dirty request, and we do not otherwise need the cursor here.
-  // Instead we validate that we have no parent, and that we have a page source.
-  DEBUG_ASSERT(TargetIsOwner() || !IsCursorValid());
+  // So we also validate that we have no parent, and that we have a page source.
+  DEBUG_ASSERT(TargetIsOwner());
   DEBUG_ASSERT(!target_->parent_);
   DEBUG_ASSERT(target_->page_source_);
   DEBUG_ASSERT(max_request_pages > 0);
   DEBUG_ASSERT(offset_ + PAGE_SIZE * max_request_pages <= end_offset_);
 
-  // As we know target_==owner_ there is no need to trim the requested range to any kind of visible
-  // range, so just attempt to dirty the entire range.
+  // As we know target_ is the owner there is no need to trim the requested range to any kind of
+  // visible range, so just attempt to dirty the entire range.
   uint64_t dirty_len = 0;
   zx_status_t status = target_->PrepareForWriteLocked(
       VmCowRange(offset_, PAGE_SIZE * max_request_pages), page_request, &dirty_len);
@@ -2817,7 +3416,7 @@ uint64_t VmCowPages::LookupCursor::SkipMissingPages() {
   // Limit possibly_empty by the first page visible in the owner which, since our cursor is empty,
   // would also be the root vmo.
   if (possibly_empty > PAGE_SIZE) {
-    owner()->page_list_.ForEveryPageInRange(
+    owner_info_.owner.locked_or(target_).page_list_.ForEveryPageInRange(
         [&](const VmPageOrMarker* p, uint64_t offset) {
           // Content should have been empty initially, so should not find anything at the start
           // offset.
@@ -2856,7 +3455,7 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
   }
 
   // Trim max pages to the visible length of the current owner. This only has an effect when
-  // target_ != owner_ as otherwise the visible_end_ is the same as end_offset_ and we already
+  // target_ is not the owner as otherwise the visible_end is the same as end_offset_ and we already
   // validated that we are within that range.
   if (!TargetIsOwner()) {
     max_pages =
@@ -2951,14 +3550,14 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     // an access regardless of whether the final returned page should be considered accessed, so
     // ignore the mark_accessed_ check here.
     pmm_page_queues()->MarkAccessed(owner_cursor_->Page());
-    if (!owner()->is_hidden()) {
+    if (!owner_info_.owner.locked_or(target_).is_hidden()) {
       // Directly copying the page from the owner into the target.
       return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked, deferred,
                                             page_request->GetAnonymous());
     }
     zx_status_t result = target_->CloneCowPageLocked(
-        offset_, alloc_list_, owner(), owner_cursor_->Page(), owner_info_.owner_offset, deferred,
-        page_request->GetAnonymous(), &res_page);
+        offset_, alloc_list_, &owner_info_.owner.locked_or(target_), owner_cursor_->Page(),
+        owner_info_.owner_offset, deferred, page_request->GetAnonymous(), &res_page);
     if (result != ZX_OK) {
       return zx::error(result);
     }
@@ -3276,6 +3875,15 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(page_offset));
   DEBUG_ASSERT(page_offset < size_);
   const VmPageOrMarker* slot = page_list_.Lookup(page_offset);
+  if (node_has_parent_content_markers()) {
+    if (slot && slot->IsPageOrRef()) {
+      return false;
+    }
+    if (!slot || !slot->IsParentContent()) {
+      return true;
+    }
+  }
+
   if (slot && slot->IsMarker()) {
     // This is already considered zero as there's a marker.
     return true;
@@ -3580,7 +4188,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
   // more than once.
   struct InitialPageContent {
     bool inited = false;
-    VmCowPages* page_owner;
+    LockedPtr page_owner;
     uint64_t owner_offset;
     uint64_t cached_offset;
     VmPageOrMarkerRef page_or_marker;
@@ -3596,8 +4204,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
     if (!initial_content_.inited || offset != initial_content_.cached_offset) {
       DEBUG_ASSERT(can_see_parent(offset));
       PageLookup content;
+      initial_content_.page_owner.release();
       FindInitialPageContentLocked(offset, &content);
-      initial_content_.page_owner = content.owner;
+      initial_content_.page_owner = ktl::move(content.owner);
       initial_content_.owner_offset = content.owner_offset;
       initial_content_.page_or_marker = content.cursor.current();
       // We only care about the parent having a 'true' vm_page for content. If the parent has a
@@ -3611,7 +4220,14 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
   };
 
   // Helper lambda to determine if parent has content at the specified offset.
-  auto parent_has_content = [get_initial_page_content](uint64_t offset) TA_REQ(lock()) {
+  auto parent_has_content = [&](uint64_t offset) TA_REQ(lock()) {
+    if (node_has_parent_content_markers()) {
+      // Unless there is a parent content marker then we know the parent has no content for us.
+      const VmPageOrMarker* slot = page_list_.Lookup(offset);
+      if (!slot || !slot->IsParentContent()) {
+        return false;
+      }
+    }
     const VmPageOrMarkerRef& page_or_marker = get_initial_page_content(offset).page_or_marker;
     return page_or_marker && page_or_marker->IsPageOrRef();
   };
@@ -3701,27 +4317,26 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
       return ZX_ERR_NEXT;
     }
 
-    DEBUG_ASSERT(parent_ && parent_has_content(offset));
+    DEBUG_ASSERT(parent_ && parent_has_content(offset) && (!slot || !slot->IsParentContent()));
     // Validate we can insert our own pages/content.
     DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
 
     // We are able to insert a marker, but if our page content is from a hidden owner we need to
     // perform slightly more complex cow forking.
     const InitialPageContent& content = get_initial_page_content(offset);
-    AssertHeld(content.page_owner->lock_ref());
-    if (!slot && content.page_owner->is_hidden()) {
+    if (!slot && content.page_owner.locked_or(this).is_hidden()) {
       // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow
       // clone, we are not going to actually need to read the target page we are cloning, and hence
       // it does not actually need to get converted.
       if (content.page_or_marker->IsReference()) {
-        zx_status_t result = content.page_owner->ReplaceReferenceWithPageLocked(
+        zx_status_t result = content.page_owner.locked_or(this).ReplaceReferenceWithPageLocked(
             content.page_or_marker, content.owner_offset, page_request->GetAnonymous());
         if (result != ZX_OK) {
           return result;
         }
       }
       zx_status_t result = CloneCowPageAsZeroLocked(
-          offset, deferred.FreedList(this).List(), content.page_owner,
+          offset, deferred.FreedList(this).List(), &content.page_owner.locked_or(this),
           content.page_or_marker->Page(), content.owner_offset, page_request->GetAnonymous());
       if (result != ZX_OK) {
         return result;
@@ -3785,6 +4400,46 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
           *zeroed_len_out += PAGE_SIZE;
           return ZX_ERR_NEXT;
         }
+        if (slot->IsParentContent()) {
+          // If the slot is a parent content marker then we can zero by clearing the slot, but to do
+          // so we must also remove our ref count of said content.
+          DEBUG_ASSERT(can_see_parent(offset) && parent_has_content(offset) &&
+                       !root_has_page_source());
+          const InitialPageContent& content = get_initial_page_content(offset);
+          if (content.page_or_marker->IsPage()) {
+            vm_page_t* page = content.page_or_marker->Page();
+            // Release the reference we held to the forked page.
+            if (page->object.share_count > 0) {
+              // The page is now shared one less time.
+              page->object.share_count--;
+            } else {
+              // Remove the page from the owner.
+              VmPageOrMarker removed =
+                  content.page_owner.locked().page_list_.RemoveContent(content.owner_offset);
+              vm_page* removed_page = removed.ReleasePage();
+              DEBUG_ASSERT(removed_page == page);
+              pmm_page_queues()->Remove(removed_page);
+
+              list_add_tail(deferred.FreedList(this).List(), &page->queue_node);
+            }
+          } else if (content.page_or_marker->IsReference()) {
+            VmCompression* compression = Pmm::Node().GetPageCompression();
+            uint32_t prev = compression->GetMetadata(content.page_or_marker->Reference());
+            if (prev > 0) {
+              compression->SetMetadata(content.page_or_marker->Reference(), prev - 1);
+            } else {
+              VmPageOrMarker removed =
+                  content.page_owner.locked().page_list_.RemoveContent(content.owner_offset);
+              compression->Free(removed.ReleaseReference());
+            }
+          } else {
+            // Markers do not have ref counts and so we just leave it.
+            DEBUG_ASSERT(content.page_or_marker->IsMarker());
+          }
+          *slot = VmPageOrMarker::Empty();
+          *zeroed_len_out += PAGE_SIZE;
+          return ZX_ERR_NEXT;
+        }
 
         // If there's already a marker then we can avoid any second guessing and leave the marker
         // alone.
@@ -3808,6 +4463,11 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
       },
       [&](uint64_t gap_start, uint64_t gap_end) {
         AssertHeld(lock_ref());
+        if (node_has_parent_content_markers()) {
+          // Gaps are already zero when using parent content markers.
+          *zeroed_len_out += (gap_end - gap_start);
+          return ZX_ERR_NEXT;
+        }
         if (direct_source_supplies_zero_pages()) {
           // Already logically zero - don't commit pages to back the zeroes if they're not already
           // committed.  This is important for contiguous VMOs, as we don't use markers for
@@ -4084,8 +4744,14 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
         // eviction, and hinted pages should not be evicted.
         if (page->is_loaned()) {
           DEBUG_ASSERT(is_page_clean(page));
-          AssertHeld(owner->lock_ref());
-          loaned_page_owner = fbl::MakeRefPtrUpgradeFromRaw<VmCowPages>(owner, owner->lock());
+          // The lock of |owner| may or may not be held depending on the current state of the
+          // LookupCursor, however we do not need the owner lock in order to take a RefPtr. Since we
+          // were able to get a reference to the page, the page cannot be removed or changed in
+          // owner without informing us, as we might have a mapping to it. Us holding our lock
+          // blocks that and prevents it from completing, meaning that owner must still be a live
+          // object. The page could already be removed from owner, but we will deal with that race
+          // in the ReplacePage step down below.
+          loaned_page_owner = fbl::MakeRefPtrUpgradeFromRaw<VmCowPages>(owner, lock());
           loaned_page = page;
           loaned_page_offset = page->object.get_page_offset();
           break;
@@ -4394,6 +5060,8 @@ void VmCowPages::InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) {
         // Although a reference is implied to be clean, VMO backed by a page source should never
         // have references.
         DEBUG_ASSERT(!p->IsReference());
+        // Not parent content in pager-backed VMOs.
+        DEBUG_ASSERT(!p->IsParentContent());
 
         vm_page_t* page = p->Page();
         DEBUG_ASSERT(is_page_dirty_tracked(page));
@@ -4443,59 +5111,116 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
   LTRACEF("vmcp %p, size %" PRIu64 "\n", this, s);
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  // In the case where we are shrinking any child limits may need to be updated, but the locking
+  // order requires their locks to be acquired without our lock held, and so we do this after
+  // dropping the main lock, but before any pages are freed from the deferred ops. See the comment
+  // and checks where this is set to true for details on the correctness.
+  bool update_child_limits = false;
+  {
+    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
-  // make sure everything is aligned before we get started
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(s));
+    // make sure everything is aligned before we get started
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(s));
 
-  // see if we're shrinking or expanding the vmo
-  if (s < size_) {
-    // shrinking
-    const uint64_t start = s;
-    const uint64_t end = size_;
-    const uint64_t len = end - start;
+    // see if we're shrinking or expanding the vmo
+    if (s < size_) {
+      // shrinking
+      const uint64_t start = s;
+      const uint64_t end = size_;
+      const uint64_t len = end - start;
 
-    // bail if there are any pinned pages in the range we're trimming
-    if (AnyPagesPinnedLocked(start, len)) {
-      return ZX_ERR_BAD_STATE;
-    }
-
-    // unmap all of the pages in this range on all the mapping regions
-    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
-
-    // Resolve any outstanding page requests tracked by the page source that are now out-of-bounds.
-    if (page_source_) {
-      // Tell the page source that any non-resident pages that are now out-of-bounds
-      // were supplied, to ensure that any reads of those pages get woken up.
-      InvalidateReadRequestsLocked(start, len);
-
-      // If DIRTY requests are supported, also tell the page source that any non-Dirty pages that
-      // are now out-of-bounds were dirtied (without actually dirtying them), to ensure that any
-      // threads blocked on DIRTY requests for those pages get woken up.
-      if (is_source_preserving_page_content() && page_source_->ShouldTrapDirtyTransitions()) {
-        InvalidateDirtyRequestsLocked(start, len);
+      // bail if there are any pinned pages in the range we're trimming
+      if (AnyPagesPinnedLocked(start, len)) {
+        return ZX_ERR_BAD_STATE;
       }
-    }
 
-    // If pager-backed and the new size falls partway in an interval, we will need to clip the
-    // interval.
-    if (is_source_preserving_page_content()) {
-      // Check if the first populated slot we find in the now-invalid range is an interval end.
-      uint64_t interval_end = UINT64_MAX;
-      zx_status_t status = page_list_.ForEveryPageInRange(
-          [&interval_end](const VmPageOrMarker* p, uint64_t off) {
-            if (p->IsIntervalEnd()) {
-              interval_end = off;
-            }
-            // We found the first populated slot. Stop the traversal.
-            return ZX_ERR_STOP;
-          },
-          start, size_);
-      DEBUG_ASSERT(status == ZX_OK);
+      // unmap all of the pages in this range on all the mapping regions
+      RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
 
-      if (interval_end != UINT64_MAX) {
-        status = page_list_.ClipIntervalEnd(interval_end, interval_end - start + PAGE_SIZE);
+      // Resolve any outstanding page requests tracked by the page source that are now
+      // out-of-bounds.
+      if (page_source_) {
+        // Tell the page source that any non-resident pages that are now out-of-bounds
+        // were supplied, to ensure that any reads of those pages get woken up.
+        InvalidateReadRequestsLocked(start, len);
+
+        // If DIRTY requests are supported, also tell the page source that any non-Dirty pages that
+        // are now out-of-bounds were dirtied (without actually dirtying them), to ensure that any
+        // threads blocked on DIRTY requests for those pages get woken up.
+        if (is_source_preserving_page_content() && page_source_->ShouldTrapDirtyTransitions()) {
+          InvalidateDirtyRequestsLocked(start, len);
+        }
+      }
+
+      // If pager-backed and the new size falls partway in an interval, we will need to clip the
+      // interval.
+      if (is_source_preserving_page_content()) {
+        // Check if the first populated slot we find in the now-invalid range is an interval end.
+        uint64_t interval_end = UINT64_MAX;
+        zx_status_t status = page_list_.ForEveryPageInRange(
+            [&interval_end](const VmPageOrMarker* p, uint64_t off) {
+              if (p->IsIntervalEnd()) {
+                interval_end = off;
+              }
+              // We found the first populated slot. Stop the traversal.
+              return ZX_ERR_STOP;
+            },
+            start, size_);
+        DEBUG_ASSERT(status == ZX_OK);
+
+        if (interval_end != UINT64_MAX) {
+          status = page_list_.ClipIntervalEnd(interval_end, interval_end - start + PAGE_SIZE);
+          if (status != ZX_OK) {
+            DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+            return status;
+          }
+        }
+      }
+
+      // Clip the parent limit and release any pages, if any, in this node or the parents.
+      //
+      // It should never exceed this node's size, either the current size (which is `end`) or the
+      // new size (which is `start`).
+      DEBUG_ASSERT(parent_limit_ <= end);
+
+      ReleaseOwnedPagesLocked(start, LockedPtr(), deferred.FreedList(this));
+
+      // If the tail of a parent disappears, the children shouldn't be able to see that region
+      // again, even if the parent is later reenlarged. So update the children's parent limits.
+      if (children_list_len_ != 0) {
+        // The only scenario where we can have children is if this is a pager backed hierarchy, in
+        // which case the DeferredOps constructed at the top of this function holds the pager
+        // hierarchy lock, which is held over all resize operations. Due to this lock being held we
+        // know that, even once the VMO lock is dropped, no resize operation to reenlarge can occur
+        // till after we have completed updating the child limits.
+        // In the present state, with our size_ reduced but child parent_limit_ not updated, the
+        // children will just walk up to us, see that the offset is beyond our size_, and substitute
+        // a zero page. Once the child parent_limit_s are updated they will instead not walk up to
+        // us, and substitute a zero page.
+        ASSERT(root_has_page_source());
+        update_child_limits = true;
+      }
+    } else if (s > size_) {
+      uint64_t temp;
+      // Check that this VMOs new size would not cause it to overflow if projected onto the root.
+      bool overflow = add_overflow(root_parent_offset_, s, &temp);
+      if (overflow) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+      // expanding
+      // figure the starting and ending page offset that is affected
+      const uint64_t start = size_;
+      const uint64_t end = s;
+      const uint64_t len = end - start;
+
+      // inform all our children or mapping that there's new bits
+      RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
+
+      // If pager-backed, need to insert a dirty zero interval beyond the old size.
+      if (is_source_preserving_page_content()) {
+        zx_status_t status =
+            page_list_.AddZeroInterval(start, end, VmPageOrMarker::IntervalDirtyState::Dirty);
         if (status != ZX_OK) {
           DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
           return status;
@@ -4503,61 +5228,42 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
       }
     }
 
-    // Clip the parent limit and release any pages, if any, in this node or the parents.
-    //
-    // It should never exceed this node's size, either the current size (which is `end`) or the new
-    // size (which is `start`).
-    DEBUG_ASSERT(parent_limit_ <= end);
+    // save bytewise size
+    size_ = s;
 
-    ReleaseOwnedPagesLocked(start, LockedPtr(), deferred.FreedList(this));
+    // We were able to successfully resize. Mark as modified.
+    mark_modified_locked();
 
-    // If the tail of a parent disappears, the children shouldn't be able to see that region again,
-    // even if the parent is later reenlarged. So update the children's parent limits.
-    //
+    VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
+    VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
+    VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  }
+  // Now that the lock is dropped, check if we need to update the child limits before the
+  // DeferredOps get finalized. When iterating over our children it is important that we iterate
+  // precisely over *all* of our children and exactly our direct children (i.e. not our children's
+  // children). The TreeWalkCursor is able to provide these guarantees in this case since clone
+  // creation is serialized with the page_source_lock in the DeferredOps, just like here.
+  // Serializing the clone calls with resize ensures that any child we are iterating cannot move
+  // down in the tree and gain a new parent, which happens when a hidden node needs to be inserted.
+  // The deletion path is not an issue since if the node we are iterating at gets deleted then the
+  // cursor will just move to its sibling (or get deleted if no sibling), which is the behavior that
+  // we want anyway.
+  if (update_child_limits) {
+    // Use a TreeWalkCursor to walk all our children.
     // A child's parent limit will also limit that child's descendants' views into this node, so
     // this method only needs to touch the direct children.
-    for (auto& child : children_list_) {
-      AssertHeld(child.lock_ref());
-
-      child.parent_limit_ = ClampedLimit(child.parent_offset_, child.parent_limit_, start);
-    }
-
-  } else if (s > size_) {
-    uint64_t temp;
-    // Check that this VMOs new size would not cause it to overflow if projected onto the root.
-    bool overflow = add_overflow(root_parent_offset_, s, &temp);
-    if (overflow) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    // expanding
-    // figure the starting and ending page offset that is affected
-    const uint64_t start = size_;
-    const uint64_t end = s;
-    const uint64_t len = end - start;
-
-    // inform all our children or mapping that there's new bits
-    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap, &deferred);
-
-    // If pager-backed, need to insert a dirty zero interval beyond the old size.
-    if (is_source_preserving_page_content()) {
-      zx_status_t status =
-          page_list_.AddZeroInterval(start, end, VmPageOrMarker::IntervalDirtyState::Dirty);
-      if (status != ZX_OK) {
-        DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
-        return status;
-      }
+    TreeWalkCursor cursor(LockedPtr(this, VmLockAcquireMode::First));
+    // Go to the first child, if we still have one.
+    if (cursor.NextChild()) {
+      // Update this child and all its siblings.
+      do {
+        // Ensure that we are only modifying direct descendants.
+        DEBUG_ASSERT(cursor.GetCur().locked().parent_.get() == this);
+        cursor.GetCur().locked().parent_limit_ = ClampedLimit(
+            cursor.GetCur().locked().parent_offset_, cursor.GetCur().locked().parent_limit_, s);
+      } while (cursor.NextSibling());
     }
   }
-
-  // save bytewise size
-  size_ = s;
-
-  // We were able to successfully resize. Mark as modified.
-  mark_modified_locked();
-
-  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
-  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
 }
 
@@ -4601,19 +5307,27 @@ zx_status_t VmCowPages::LookupReadableLocked(VmCowRange range, LookupReadableFun
   uint64_t current_page_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
   const uint64_t end_page_offset = ROUNDUP(range.end(), PAGE_SIZE);
 
+  DEBUG_ASSERT(!is_hidden());
+
   while (current_page_offset != end_page_offset) {
     // Attempt to process any pages we have first. Skip over anything that's not a page since the
     // lookup_fn only applies to actual pages.
     zx_status_t status = page_list_.ForEveryPageInRange(
-        [&lookup_fn, &current_page_offset](const VmPageOrMarker* page_or_marker, uint64_t offset) {
+        [&lookup_fn, &current_page_offset, this](const VmPageOrMarker* page_or_marker,
+                                                 uint64_t offset) {
           // The offset can advance ahead if we encounter gaps or sparse intervals.
           if (offset != current_page_offset) {
-            if (!page_or_marker->IsIntervalEnd()) {
-              // There was a gap before this offset. End the traversal.
+            if (!page_or_marker->IsIntervalEnd() && !node_has_parent_content_markers()) {
+              // There was a gap before this offset and the tree does not use parent content markers
+              // so we must walk up to find the content.
               return ZX_ERR_STOP;
             }
-            // Otherwise, we can advance our cursor to the interval end.
+            // Otherwise, we can advance our cursor to the interval/gap end.
             offset = current_page_offset;
+          }
+          // Parent content is like a gap and so we need to exit and find the content.
+          if (page_or_marker->IsParentContent()) {
+            return ZX_ERR_STOP;
           }
           DEBUG_ASSERT(offset == current_page_offset);
           current_page_offset = offset + PAGE_SIZE;
@@ -4640,11 +5354,9 @@ zx_status_t VmCowPages::LookupReadableLocked(VmCowRange range, LookupReadableFun
     // This should always get filled out.
     DEBUG_ASSERT(content.visible_end > current_page_offset);
     const uint64_t owner_length = content.visible_end - current_page_offset;
-    DEBUG_ASSERT(content.owner);
 
     // Iterate over any potential content.
-    AssertHeld(content.owner->lock_ref());
-    status = content.owner->page_list_.ForEveryPageInRange(
+    status = content.owner.locked_or(this).page_list_.ForEveryPageInRange(
         [&lookup_fn, current_page_offset, &content](const VmPageOrMarker* page_or_marker,
                                                     uint64_t offset) {
           if (!page_or_marker->IsPage()) {
@@ -4817,6 +5529,8 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
         found_page = true;
         // Splice lists do not support page intervals.
         ASSERT(!p->IsInterval());
+        // Parent content should have been handled by TakePagesWithParentLocked.
+        DEBUG_ASSERT(!p->IsParentContent());
         if (p->IsPage()) {
           DEBUG_ASSERT(p->Page()->object.pin_count == 0);
           // Cannot be taking pages from a pager backed VMO, hence cannot be taking a loaned page.
@@ -4946,7 +5660,12 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
     // The pager API does not allow the source VMO of supply pages to have a page source, so we can
     // assume that any empty pages are zeroes and insert explicit markers here. We need to insert
     // explicit markers to actually resolve the pager fault.
-    if (src_page.IsEmpty()) {
+    // If we are using parent content markers then we do not want to insert redundant markers
+    // into a node. This would only happen when performing transfer data where this is not
+    // actually pager backed and so we do not actually need to insert anything as there is no
+    // fault to resolve. We will have to make the slot read as zero though, which is handled later
+    // on by clearing the slot.
+    if (src_page.IsEmpty() && !node_has_parent_content_markers()) {
       src_page = VmPageOrMarker::Marker();
     }
 
@@ -4956,85 +5675,97 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
                              /*is_pending_add=*/true);
     }
 
+    VmPageOrMarker old_page;
     // Defer individual range updates so we can do them in blocks.
     const CanOverwriteContent overwrite_policy = options == SupplyOptions::TransferData
                                                      ? CanOverwriteContent::NonZero
                                                      : CanOverwriteContent::None;
-    auto page_transaction = BeginAddPageLocked(offset, overwrite_policy);
-    if (page_transaction.is_error()) {
-      // Unable to insert anything at this slot, cleanup any existing src_page and handle a
-      // completed run.
-      if (src_page.IsPageOrRef()) {
-        DEBUG_ASSERT(src_page.IsPage());
-        vm_page_t* page = src_page.ReleasePage();
-        DEBUG_ASSERT(!list_in_list(&page->queue_node));
-        list_add_tail(deferred.FreedList(this).List(), &page->queue_node);
-      }
-
-      if (likely(page_transaction.status_value() == ZX_ERR_ALREADY_EXISTS)) {
-        // We hit the end of a run of absent pages, so notify the page source
-        // of any new pages that were added and reset the tracking variables.
-        if (new_pages_len) {
-          RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len), RangeChangeOp::Unmap,
-                                  &deferred);
-          if (page_source_) {
-            page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
-          }
+    if (src_page.IsEmpty()) {
+      DEBUG_ASSERT(node_has_parent_content_markers());
+      DEBUG_ASSERT(overwrite_policy == CanOverwriteContent::NonZero);
+      // If the src page is empty this implies we want to the zero content, which can be achieved
+      // when using parent content markers by just clearing the slot.
+      old_page = page_list_.RemoveContent(offset);
+      // If we had a parent, and hence could have any parent content markers, then the
+      // RequireOwnedPage should have transformed them into actual pages and so we should never see
+      // a parent content marker at this point.
+      DEBUG_ASSERT(!old_page.IsParentContent());
+    } else {
+      auto page_transaction = BeginAddPageLocked(offset, overwrite_policy);
+      if (page_transaction.is_error()) {
+        // Unable to insert anything at this slot, cleanup any existing src_page and handle a
+        // completed run.
+        if (src_page.IsPageOrRef()) {
+          DEBUG_ASSERT(src_page.IsPage());
+          vm_page_t* page = src_page.ReleasePage();
+          DEBUG_ASSERT(!list_in_list(&page->queue_node));
+          list_add_tail(deferred.FreedList(this).List(), &page->queue_node);
         }
-        new_pages_start = offset + PAGE_SIZE;
-        new_pages_len = 0;
-        offset += PAGE_SIZE;
-        continue;
-      } else {
-        // Only cause for this should be an out of memory from the kernel heap when attempting to
-        // allocate a page list node.
-        status = page_transaction.status_value();
-        ASSERT(status == ZX_ERR_NO_MEMORY);
-        break;
+
+        if (likely(page_transaction.status_value() == ZX_ERR_ALREADY_EXISTS)) {
+          // We hit the end of a run of absent pages, so notify the page source
+          // of any new pages that were added and reset the tracking variables.
+          if (new_pages_len) {
+            RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len),
+                                    RangeChangeOp::Unmap, &deferred);
+            if (page_source_) {
+              page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
+            }
+          }
+          new_pages_start = offset + PAGE_SIZE;
+          new_pages_len = 0;
+          offset += PAGE_SIZE;
+          continue;
+        } else {
+          // Only cause for this should be an out of memory from the kernel heap when attempting to
+          // allocate a page list node.
+          status = page_transaction.status_value();
+          ASSERT(status == ZX_ERR_NO_MEMORY);
+          break;
+        }
       }
-    }
-    VmPageOrMarker old_page;
-    if (options != SupplyOptions::PhysicalPageProvider && should_borrow_locked() &&
-        src_page.IsPage() &&
-        pmm_physical_page_borrowing_config()->is_borrowing_in_supplypages_enabled()) {
-      // Assert some things we implicitly know are true (currently).  We can avoid explicitly
-      // checking these in the if condition for now.
-      DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
-      DEBUG_ASSERT(!src_page.Page()->is_loaned());
-      // Try to replace src_page with a loaned page.  We allocate the loaned page one page at a time
-      // to avoid failing the allocation due to asking for more loaned pages than there are free
-      // loaned pages.
-      auto result =
-          AllocLoanedPage([this, &src_page, &page_transaction, &old_page](vm_page_t* page) {
-            AssertHeld(lock_ref());
-            CopyPageMetadataForReplacementLocked(page, src_page.Page());
-            old_page =
-                CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Page(page), nullptr);
-          });
-      if (result.is_ok()) {
-        CopyPageContentsForReplacementLocked(*result, src_page.Page());
-        vm_page_t* free_page = src_page.ReleasePage();
-        list_add_tail(deferred.FreedList(this).List(), &free_page->queue_node);
+      if (options != SupplyOptions::PhysicalPageProvider && should_borrow_locked() &&
+          src_page.IsPage() &&
+          pmm_physical_page_borrowing_config()->is_borrowing_in_supplypages_enabled()) {
+        // Assert some things we implicitly know are true (currently).  We can avoid explicitly
+        // checking these in the if condition for now.
+        DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
+        DEBUG_ASSERT(!src_page.Page()->is_loaned());
+        // Try to replace src_page with a loaned page.  We allocate the loaned page one page at a
+        // time to avoid failing the allocation due to asking for more loaned pages than there are
+        // free loaned pages.
+        auto result =
+            AllocLoanedPage([this, &src_page, &page_transaction, &old_page](vm_page_t* page) {
+              AssertHeld(lock_ref());
+              CopyPageMetadataForReplacementLocked(page, src_page.Page());
+              old_page =
+                  CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Page(page), nullptr);
+            });
+        if (result.is_ok()) {
+          CopyPageContentsForReplacementLocked(*result, src_page.Page());
+          vm_page_t* free_page = src_page.ReleasePage();
+          list_add_tail(deferred.FreedList(this).List(), &free_page->queue_node);
+        } else {
+          old_page = CompleteAddPageLocked(*page_transaction, ktl::move(src_page), nullptr);
+        }
+      } else if (options == SupplyOptions::PhysicalPageProvider) {
+        // When being called from the physical page provider, we need to call InitializeVmPage(),
+        // which AddNewPageLocked() will do.
+        // We only want to populate offsets that have true absence of content, so do not overwrite
+        // anything in the page list.
+        old_page = CompleteAddNewPageLocked(*page_transaction, src_page.Page(),
+                                            /*zero=*/false, nullptr);
+        // The page was successfully added, but we still have a copy in the src_page, so we need to
+        // release it, however need to store the result in a temporary as we are required to use the
+        // result of ReleasePage.
+        [[maybe_unused]] vm_page_t* unused = src_page.ReleasePage();
       } else {
+        // When not being called from the physical page provider, we don't need InitializeVmPage(),
+        // so we use AddPageLocked().
+        // We only want to populate offsets that have true absence of content, so do not overwrite
+        // anything in the page list.
         old_page = CompleteAddPageLocked(*page_transaction, ktl::move(src_page), nullptr);
       }
-    } else if (options == SupplyOptions::PhysicalPageProvider) {
-      // When being called from the physical page provider, we need to call InitializeVmPage(),
-      // which AddNewPageLocked() will do.
-      // We only want to populate offsets that have true absence of content, so do not overwrite
-      // anything in the page list.
-      old_page = CompleteAddNewPageLocked(*page_transaction, src_page.Page(),
-                                          /*zero=*/false, nullptr);
-      // The page was successfully added, but we still have a copy in the src_page, so we need to
-      // release it, however need to store the result in a temporary as we are required to use the
-      // result of ReleasePage.
-      [[maybe_unused]] vm_page_t* unused = src_page.ReleasePage();
-    } else {
-      // When not being called from the physical page provider, we don't need InitializeVmPage(),
-      // so we use AddPageLocked().
-      // We only want to populate offsets that have true absence of content, so do not overwrite
-      // anything in the page list.
-      old_page = CompleteAddPageLocked(*page_transaction, ktl::move(src_page), nullptr);
     }
     // If the content overwrite policy was None, the old page should be empty.
     DEBUG_ASSERT(overwrite_policy != CanOverwriteContent::None || old_page.IsEmpty());
@@ -5058,6 +5789,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
       FreeReference(old_page.ReleaseReference());
     } else {
       DEBUG_ASSERT(!old_page.IsInterval());
+      DEBUG_ASSERT(!old_page.IsParentContent());
     }
     new_pages_len += PAGE_SIZE;
     DEBUG_ASSERT(new_pages_start + new_pages_len <= end);
@@ -5813,15 +6545,38 @@ void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op,
   }
 }
 
-void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) {
-  canary_.Assert();
+// static
+void VmCowPages::RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, RangeChangeOp op) {
+  self->canary_.Assert();
 
   // Helper for doing checking and performing a range change on a single candidate node. Although
   // this is used once it is split out here to make the loops that actually walk the tree as easy to
   // read as possible.
   // Returns true if the passed in |candidate| had some overlap with the operation range, and hence
   // its children also need to be walked. If false is returned the children of |candidate| can be
-  // skipped.
+  // skipped. Due to not being able to continuously hold locks while walking the subtree, even
+  // though we are therefore racing with concurrent modifications to the tree, it is still correct
+  // to skip subtrees. To explain why, first consider the following (impossible) scenario:
+  //                       A
+  //                       |
+  //                     |---|
+  //                     B  ...
+  //                     |
+  //                   |---|
+  //                   C   D
+  //  1. Thread 1 performs an unmap on a page in A (offset X), that can be seen by B, C and D
+  //  2. Thread 1 drops the lock of A to prepare to acquire lock of B
+  //  3. Thread 2 inserts a page into B at offset X, and starts its own child range change update/
+  //  4. Thread 2 drops the lock of B to prepare to acquire lock of C
+  //  5. Thread 1 acquires the lock of B, observes that B cannot see X in A and skips the subtree
+  //     of C and D.
+  // At this point neither of the threads have performed an unmap on C or D, so how can thread 1
+  // guarantee that neither can see page A?
+  // The reason this cannot happen, and why this is an impossible scenario, as this would require B
+  // to not be a hidden node, i.e. part of a user pager hierarchy. However, user pager hierarchies
+  // have an additional lock used to serialize all such operations, and so the operation in thread 2
+  // would not actually be able to start until thread 1 completely finished its range update and
+  // released this serialization lock.
   auto check_candidate = [range, op](VmCowPages* candidate, uint64_t cur_accumulative_offset)
                              TA_REQ(candidate->lock()) -> bool {
     uint64_t candidate_offset = 0;
@@ -5844,24 +6599,31 @@ void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChang
     uint64_t first_gap_start = UINT64_MAX;
     uint64_t last_gap_end = 0;
     candidate->page_list_.ForEveryPageAndGapInRange(
-        [](auto page, uint64_t offset) {
-          // For anything in the page list we know we do not see the parent for this offset,
-          // so regardless of what it is just keep looking for a gap. Additionally any
-          // children that we have will see this content instead of our parents, and so we
-          // know it is also safe to skip them as well.
+        [&](auto page, uint64_t offset) {
+          // If we have found a parent content marker then we can specifically see the parent at
+          // this location, and can consider this like a gap. For anything else we know we do not
+          // see the parent for this offset, so regardless of what it is just keep looking for a
+          // gap. Additionally any children that we have will see this content instead of our
+          // parents, and so we know it is also safe to skip them as well.
+          if (page->IsParentContent()) {
+            first_gap_start = ktl::min(first_gap_start, offset);
+            last_gap_end = ktl::max(last_gap_end, offset + PAGE_SIZE);
+          }
           return ZX_ERR_NEXT;
         },
-        [&first_gap_start, &last_gap_end](uint64_t start, uint64_t end) {
-          first_gap_start = ktl::min(first_gap_start, start);
-          last_gap_end = ktl::max(last_gap_end, end);
+        [&](uint64_t start, uint64_t end) {
+          // A gap in the page list indicates a range where the parent can be seen, unless this is a
+          // leaf node using parent content markers, in which case a gap indicates a range where we
+          // do *not* see the parent.
+          if (!candidate->node_has_parent_content_markers()) {
+            first_gap_start = ktl::min(first_gap_start, start);
+            last_gap_end = ktl::max(last_gap_end, end);
+          }
           return ZX_ERR_NEXT;
         },
         candidate_offset, candidate_offset + candidate_len);
 
     if (first_gap_start >= last_gap_end) {
-      // Entire range was traversed and no gaps found. Neither us, nor our children, can see
-      // the parents content for this range and so we can skip the range update and not walk
-      // the subtree.
       vm_vmo_range_update_from_parent_skipped.Add(1);
       return false;
     }
@@ -5887,67 +6649,20 @@ void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChang
     return;
   }
 
-  // Set the initial parent to this so we can start processing the subtree.
-  VmCowPages* cur_parent = this;
-  AssertHeld(cur_parent->lock_ref());
-  // Candidate tracks the child of cur_parent that we are considering for performing a range change
-  // update on and then potentially walking its subtree.
-  using ChildIter = fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag>::iterator;
-  ChildIter candidate = cur_parent->children_list_.begin();
+  if (self.locked().children_list_len_ == 0) {
+    return;
+  }
+  TreeWalkCursor cursor(ktl::move(self));
 
-  // As we walk up and down the tree we track the total parent offset so that we can translate the
-  // original op range into the space of the child.
-  uint64_t cumulative_parent_offset = 0;
+  bool candidate = cursor.NextChild();
 
-  // Keep processing as long as there is some potential subtree to process.
-  while (candidate.IsValid()) {
-    // Check this candidate and keep walking down and to the right as far as possible.
-    do {
-      AssertHeld(candidate->lock_ref());
-      // Add this candidate's parent offset onto the current cumulative total parent offset to
-      // project the original op range down.
-      const uint64_t candidate_offset = cumulative_parent_offset + candidate->parent_offset_;
-      // Potentially perform any range change operation, and if we do and we have children then
-      // walk down.
-      if (check_candidate(&*candidate, candidate_offset) && candidate->children_list_len_ > 0) {
-        cur_parent = &*candidate;
-        candidate = cur_parent->children_list_.begin();
-        cumulative_parent_offset = candidate_offset;
-      } else {
-        // Either no children or do not need to walk this subtree, move to our sibling.
-        candidate++;
-      }
-    } while (candidate.IsValid());
-
-    // Need to walk up and see if there is a sibling in our parent chain that needs checking,
-    // stopping if we would exit our original subtree.
-    // Try the siblings of current, unless this would cause us to leave the subtree
-    while (cur_parent != this && !candidate.IsValid()) {
-      VmCowPages* next_parent = cur_parent->parent_.get();
-      DEBUG_ASSERT(next_parent);
-      AssertHeld(next_parent->lock_ref());
-
-      // Next candidate is the sibling of our current parent.
-      candidate = next_parent->children_list_.make_iterator(*cur_parent);
-      candidate++;
-
-      // Update cur_parent and update our cumulative offset tracking.
-      DEBUG_ASSERT(cumulative_parent_offset >= cur_parent->parent_offset_);
-      cumulative_parent_offset -= cur_parent->parent_offset_;
-      cur_parent = cur_parent->parent_.get();
+  while (candidate) {
+    if (check_candidate(&cursor.GetCur().locked(), cursor.GetCurrentOffset())) {
+      candidate = cursor.NextChild();
+    } else {
+      candidate = cursor.NextSibling();
     }
   }
-  // We only terminate once we arrive back at the start, which should imply no parent offset is
-  // still being applied.
-  DEBUG_ASSERT(cumulative_parent_offset == 0);
-}
-
-// static
-void VmCowPages::RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, RangeChangeOp op) {
-  // TODO(https://fxbug.dev/338300943): Once all other usages of RangeChangeUpdateCowChildrenLocked
-  // have been removed this call can be replaced with an implementation that correctly walks the
-  // tree without relying on a hierarchy lock.
-  self.locked().RangeChangeUpdateCowChildrenLocked(range, op);
 }
 
 template <typename T>
@@ -5959,12 +6674,8 @@ bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
   }
   // Pinned pages could be in use by DMA so we cannot safely reclaim them.
   if (page->object.pin_count != 0) {
-    pmm_page_queues()->MarkAccessed(page);
-    return false;
-  }
-  if (high_priority_count_ != 0) {
-    // Not allowed to reclaim. To avoid this page remaining in a reclamation list we simulate an
-    // access.
+    // Loaned pages should never end up pinned.
+    DEBUG_ASSERT(!page->is_loaned());
     pmm_page_queues()->MarkAccessed(page);
     return false;
   }
@@ -5972,7 +6683,7 @@ bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
 }
 
 VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset,
-                                                             EvictionHintAction hint_action) {
+                                                             EvictionAction eviction_action) {
   canary_.Assert();
   // Without a page source to bring the page back in we cannot even think about eviction.
   if (!can_evict()) {
@@ -5987,6 +6698,11 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
     return ReclaimCounts{};
   }
 
+  // Now allowed to reclaim if high priority, unless being required to do so.
+  if (high_priority_count_ != 0 && (eviction_action != EvictionAction::Require)) {
+    pmm_page_queues()->MarkAccessed(page);
+    return ReclaimCounts{};
+  }
   DEBUG_ASSERT(is_page_dirty_tracked(page));
 
   // We cannot evict the page unless it is clean. If the page is dirty, it will already have been
@@ -5997,7 +6713,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   }
 
   // Do not evict if the |always_need| hint is set, unless we are told to ignore the eviction hint.
-  if (page->object.always_need == 1 && hint_action == EvictionHintAction::Follow) {
+  if (page->object.always_need == 1 && eviction_action == EvictionAction::FollowHint) {
     DEBUG_ASSERT(!page->is_loaned());
     // We still need to move the page from the tail of the LRU page queue(s) so that the eviction
     // loop can make progress. Since this page is always needed, move it out of the way and into the
@@ -6015,7 +6731,17 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   }
 
   // Remove any mappings to this page before we remove it.
-  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+  uint8_t old_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::UnmapAndHarvest, &deferred);
+  const uint8_t new_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+  // If queue has changed, the accessed bit will have been set by the unmap.
+  // Page has been accessed, don't evict.
+  // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking page
+  // queues.
+  if ((old_queue != new_queue) && (eviction_action != EvictionAction::Require)) {
+    vm_vmo_evict_accessed.Add(1);
+    return ReclaimCounts{};
+  }
 
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
@@ -6053,6 +6779,12 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
       return ReclaimCounts{};
     }
 
+    // Not allows to reclaim if high priority.
+    if (high_priority_count_ != 0) {
+      pmm_page_queues()->MarkAccessed(page);
+      return ReclaimCounts{};
+    }
+
     // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
     {
       VmPageOrMarkerRef page_or_marker = page_list_.LookupMutable(offset);
@@ -6066,7 +6798,18 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
       // possible writable mappings, although our children could still have read-only mappings.
       // These read-only mappings will be dealt with later, for now the page will at least be
       // immutable.
-      RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, &deferred);
+      uint8_t old_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+      RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::UnmapAndHarvest,
+                              &deferred);
+      const uint8_t new_queue = page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
+      // If queue has changed, the accessed bit will have been set by the unmap.
+      // Page has been accessed, don't compress.
+      // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking
+      // page queues.
+      if (old_queue != new_queue) {
+        vm_vmo_compress_accessed.Add(1);
+        return ReclaimCounts{};
+      }
 
       // Start compression of the page by swapping the page list to contain the temporary reference.
       // Ensure the compression system is aware of the page's current share_count so it can track
@@ -6136,9 +6879,13 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
         // Check if we can clear the slot, or if we need to insert a marker. Unlike the full zero
         // pages this simply needs to check if there's any visible content above us, and then if
         // there isn't if the root is immutable or not (i.e. if it has a page source).
-        PageLookup content;
-        FindInitialPageContentLocked(offset, &content);
-        if (!content.cursor.current() && !content.owner->page_source_) {
+        auto parent_has_content = [this](uint64_t offset) TA_REQ(lock()) {
+          PageLookup content;
+          FindInitialPageContentLocked(offset, &content);
+          return !!content.cursor.current();
+        };
+        if (node_has_parent_content_markers() ||
+            (!root_has_page_source() && !parent_has_content(offset))) {
           *slot = VmPageOrMarker::Empty();
           page_list_.ReturnEmptySlot(offset);
           vm_vmo_compression_zero_slot.Add(1);
@@ -6178,7 +6925,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
 }
 
 VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset,
-                                                  EvictionHintAction hint_action,
+                                                  EvictionAction hint_action,
                                                   VmCompressor* compressor) {
   canary_.Assert();
 
@@ -6235,7 +6982,7 @@ zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(VmCowRange range, Deferr
                                                                           uint64_t off) {
         found_page_or_gap = true;
         // We only expect committed pages in the specified range.
-        if (p->IsMarker() || p->IsReference() || p->IsInterval()) {
+        if (!p->IsPage()) {
           return ZX_ERR_BAD_STATE;
         }
         vm_page_t* page = p->Page();
@@ -6998,25 +7745,25 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
       source = current.locked_or(self_).page_source_;
     }
     DEBUG_ASSERT(source);
-    page_source_lock_.emplace(source->paged_vmo_lock());
+    page_source_lock_.emplace(source->paged_vmo_lock(), ktl::move(source));
   }
 }
 
 VmCowPages::DeferredOps::~DeferredOps() {
-  if (locked_range_update_) {
-    AssertHeld(self_->lock_ref());
-    if (range_op_.has_value()) {
-      self_->RangeChangeUpdateCowChildrenLocked(range_op_->range, range_op_->op);
-    }
-    freed_list_.FreePages(self_);
-  } else {
-    if (range_op_.has_value()) {
-      LockedPtr self(self_, VmLockAcquireMode::First);
-      VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
-    }
-    // The pages must be freed *after* any range update is performed.
-    freed_list_.FreePages(self_);
+  if (range_op_.has_value()) {
+    LockedPtr self(self_, VmLockAcquireMode::First);
+    VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
   }
+  if (page_source_lock_.has_value()) {
+    // When dropping the page_source_lock as we could be holding the last references to the object
+    // the mutex must be released first, prior to potentially destroying the object by releasing the
+    // refptr.
+    page_source_lock_->first.Release();
+    page_source_lock_->second.reset();
+    page_source_lock_.reset();
+  }
+  // The pages must be freed *after* any range update is performed.
+  freed_list_.FreePages(self_);
 }
 
 void VmCowPages::DeferredOps::AddRange(VmCowPages* self, VmCowRange range, RangeChangeOp op) {

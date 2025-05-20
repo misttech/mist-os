@@ -24,6 +24,8 @@ pub type U64 = u64;
 
 pub type Vector = Option<Vec<u64>>;
 
+pub mod my_protocol_ordinals {}
+
 mod internal {
     use super::*;
 }

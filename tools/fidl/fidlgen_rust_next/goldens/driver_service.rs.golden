@@ -156,11 +156,11 @@ pub mod compat {
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>;
 
     #[cfg(feature = "driver")]
-    impl ::fidl_next::TakeFrom<crate::SomeDriverProtocol>
+    impl ::core::convert::From<crate::SomeDriverProtocol>
         for ::fidl_test_driverservice::SomeDriverProtocolMarker
     {
         #[inline]
-        fn take_from(from: &crate::SomeDriverProtocol) -> Self {
+        fn from(_: crate::SomeDriverProtocol) -> Self {
             Self
         }
     }

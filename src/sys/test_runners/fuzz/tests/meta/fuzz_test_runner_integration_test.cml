@@ -34,7 +34,7 @@
             to: "#test_manager",
         },
         {
-            protocol: "fuchsia.test.manager.RunBuilder",
+            protocol: "fuchsia.test.manager.SuiteRunner",
             from: "#test_manager",
             to: "#fuzz-manager",
         },

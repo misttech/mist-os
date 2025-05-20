@@ -6,11 +6,11 @@
 #define SRC_FIRMWARE_GIGABOOT_CPP_UTILS_H_
 
 #include <lib/abr/ops.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
 #include <xefi.h>
 
 #include <optional>
+#include <span>
 #include <string_view>
 
 #include <efi/boot-services.h>
@@ -79,7 +79,7 @@ inline fit::result<efi_status, EfiProtocolPtr<Protocol>> EfiLocateProtocol() {
 class HandleBuffer {
  public:
   HandleBuffer(efi_handle* handles, size_t count) : handles_(handles), count_(count) {}
-  cpp20::span<efi_handle> AsSpan() { return cpp20::span<efi_handle>{handles_.get(), count_}; }
+  std::span<efi_handle> AsSpan() { return std::span<efi_handle>{handles_.get(), count_}; }
 
  private:
   // The deleter frees the list by calling the FreePool() boot service.

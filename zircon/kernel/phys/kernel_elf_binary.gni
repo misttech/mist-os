@@ -55,6 +55,9 @@ template("kernel_elf_binary") {
                              "testonly",
                              "visibility",
                            ])
+    if (!defined(output_name)) {
+      output_name = image_target
+    }
     deps = [ ":$binary_target" ]
   }
 

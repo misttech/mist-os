@@ -17,7 +17,7 @@ declare_args() {
   # syntax, which is going to be fixed up below.
   # LINT.IfChange
   authorized_ssh_keys_label = false
-  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 }
 
 # Set the default value for the path to the file.

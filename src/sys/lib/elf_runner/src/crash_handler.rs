@@ -87,7 +87,7 @@ mod tests {
     async fn crash_test() -> Result<(), Error> {
         let crash_records = CrashRecords::new();
         let url = "example://component#url".to_string();
-        let moniker = Moniker::try_from(vec!["a"]).unwrap();
+        let moniker = Moniker::try_from(["a"]).unwrap();
 
         let child_job =
             fruntime::job_default().create_child_job().context("failed to create child job")?;

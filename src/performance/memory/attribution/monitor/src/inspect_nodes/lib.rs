@@ -47,15 +47,11 @@ pub fn start_service(
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
             .ok_or_else(|| anyhow!("Failed to serve server handling `fuchsia.inspect.Tree`"))?;
 
-    build_inspect_tree(
-        attribution_data_service.clone(),
-        kernel_stats_proxy.clone(),
-        stall_provider,
-        inspector,
-    );
+    build_inspect_tree(kernel_stats_proxy.clone(), stall_provider.clone(), inspector);
     let digest_service = digest_service(
         memory_monitor2_config,
         attribution_data_service,
+        stall_provider,
         kernel_stats_proxy,
         memorypressure_proxy,
         bucket_definitions,
@@ -65,7 +61,6 @@ pub fn start_service(
 }
 
 fn build_inspect_tree(
-    attribution_data_service: Arc<impl AttributionDataProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
     inspector: &Inspector,
@@ -182,46 +177,12 @@ fn build_inspect_tree(
     }
 
     {
-        inspector.root().record_lazy_child("current", move || {
-            let attribution_data_service = attribution_data_service.clone();
-            async move {
-                let inspector = Inspector::default();
-                let current_attribution_data =
-                    attribution_data_service.get_attribution_data().await?;
-                let summary =
-                    attribution_processing::attribute_vmos(current_attribution_data).summary();
-
-                summary.principals.into_iter().for_each(|p| {
-                    let node = inspector.root().create_child(p.name);
-                    node.record_uint("committed_private", p.committed_private);
-                    node.record_double("committed_scaled", p.committed_scaled);
-                    node.record_uint("committed_total", p.committed_total);
-                    node.record_uint("populated_private", p.populated_private);
-                    node.record_double("populated_scaled", p.populated_scaled);
-                    node.record_uint("populated_total", p.populated_total);
-                    inspector.root().record(node);
-                });
-                Ok(inspector)
-            }
-            .boxed()
-        });
-    }
-
-    {
         inspector.root().record_lazy_child("stalls", move || {
             let stall_info = stall_provider.get_stall_info().unwrap();
-            let stall_rate_opt = stall_provider.get_stall_rate();
             async move {
                 let inspector = Inspector::default();
-                inspector.root().record_int("current_some", stall_info.stall_time_some);
-                inspector.root().record_int("current_full", stall_info.stall_time_full);
-                if let Some(stall_rate) = stall_rate_opt {
-                    inspector
-                        .root()
-                        .record_int("rate_interval_s", stall_rate.interval.into_seconds());
-                    inspector.root().record_int("rate_some", stall_rate.rate_some);
-                    inspector.root().record_int("rate_full", stall_rate.rate_full);
-                }
+                inspector.root().record_int("some", stall_info.stall_time_some);
+                inspector.root().record_int("full", stall_info.stall_time_full);
                 Ok(inspector)
             }
             .boxed()
@@ -232,6 +193,7 @@ fn build_inspect_tree(
 fn digest_service(
     memory_monitor2_config: Config,
     attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
+    stall_provider: Arc<impl StallProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
     memorypressure_proxy: fpressure::ProviderProxy,
     bucket_definitions: Vec<BucketDefinition>,
@@ -291,20 +253,20 @@ fn digest_service(
                 _ = timer => {timer = new_timer(current_level);}
             };
 
+            let timestamp = zx::BootInstant::get();
             // Retrieve (concurrently) the data necessary to perform the aggregation.
-            let (attribution_data, kmem_stats, kmem_stats_compression) = try_join!(
-                attribution_data_service.get_attribution_data(),
+            let (kmem_stats, kmem_stats_compression) = try_join!(
                 kernel_stats_proxy.get_memory_stats().map_err(anyhow::Error::from),
                 kernel_stats_proxy.get_memory_stats_compression().map_err(anyhow::Error::from)
             )?;
 
             // Compute the aggregation.
-            let Digest { buckets } = Digest::new(
-                &attribution_data,
-                kmem_stats,
-                kmem_stats_compression,
+            let Digest { buckets } = Digest::compute(
+                &*attribution_data_service,
+                &kmem_stats,
+                &kmem_stats_compression,
                 &bucket_definitions,
-            );
+            )?;
 
             // Initialize the inspect property containing the buckets names, if necessary.
             let _ = buckets_names.get_or_init(|| {
@@ -318,14 +280,20 @@ fn digest_service(
                 buckets_names
             });
 
+            let stall_values = stall_provider.get_stall_info()?;
+
             // Add an entry for the current aggregation.
             buckets_list_node.add_entry(|n| {
-                n.record_int("timestamp", zx::BootInstant::get().into_nanos());
+                n.record_int("timestamp", timestamp.into_nanos());
                 let ia = n.create_uint_array("bucket_sizes", buckets.len());
                 for (i, b) in buckets.iter().enumerate() {
                     ia.set(i, b.size as u64);
                 }
                 n.record(ia);
+                n.record_child("stalls", |child| {
+                    child.record_int("some", stall_values.stall_time_some);
+                    child.record_int("full", stall_values.stall_time_full);
+                });
             });
         }
     }))
@@ -333,59 +301,52 @@ fn digest_service(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use attribution_processing::testing::FakeAttributionDataProvider;
     use attribution_processing::{
         Attribution, AttributionData, Principal, PrincipalDescription, PrincipalIdentifier,
-        PrincipalType, Resource, ResourceReference,
+        PrincipalType, Resource, ResourceReference, ZXName,
     };
     use diagnostics_assertions::{assert_data_tree, NonZeroIntProperty};
     use fuchsia_async::TestExecutor;
-    use futures::future::BoxFuture;
     use futures::task::Poll;
     use futures::TryStreamExt;
+    use std::time::Duration;
     use {
         fidl_fuchsia_memory_attribution_plugin as fplugin,
         fidl_fuchsia_memorypressure as fpressure, fuchsia_async as fasync,
     };
 
-    use super::*;
-    use std::time::Duration;
-
-    struct FakeAttributionDataProvider {}
-
-    impl AttributionDataProvider for FakeAttributionDataProvider {
-        fn get_attribution_data(&self) -> BoxFuture<'_, Result<AttributionData, anyhow::Error>> {
-            async {
-                Ok(AttributionData {
-                    principals_vec: vec![Principal {
-                        identifier: PrincipalIdentifier(1),
-                        description: PrincipalDescription::Component("principal".to_owned()),
-                        principal_type: PrincipalType::Runnable,
-                        parent: None,
-                    }],
-                    resources_vec: vec![Resource {
-                        koid: 10,
-                        name_index: 0,
-                        resource_type: fplugin::ResourceType::Vmo(fplugin::Vmo {
-                            parent: None,
-                            private_committed_bytes: Some(1024),
-                            private_populated_bytes: Some(2048),
-                            scaled_committed_bytes: Some(1024),
-                            scaled_populated_bytes: Some(2048),
-                            total_committed_bytes: Some(1024),
-                            total_populated_bytes: Some(2048),
-                            ..Default::default()
-                        }),
-                    }],
-                    resource_names: vec!["resource".to_owned()],
-                    attributions: vec![Attribution {
-                        source: PrincipalIdentifier(1),
-                        subject: PrincipalIdentifier(1),
-                        resources: vec![ResourceReference::KernelObject(10)],
-                    }],
-                })
-            }
-            .boxed()
-        }
+    fn get_attribution_data_provider() -> Arc<impl AttributionDataProvider + 'static> {
+        let attribution_data = AttributionData {
+            principals_vec: vec![Principal {
+                identifier: PrincipalIdentifier(1),
+                description: PrincipalDescription::Component("principal".to_owned()),
+                principal_type: PrincipalType::Runnable,
+                parent: None,
+            }],
+            resources_vec: vec![Resource {
+                koid: 10,
+                name_index: 0,
+                resource_type: fplugin::ResourceType::Vmo(fplugin::Vmo {
+                    parent: None,
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
+                    ..Default::default()
+                }),
+            }],
+            resource_names: vec![ZXName::from_string_lossy("resource")],
+            attributions: vec![Attribution {
+                source: PrincipalIdentifier(1),
+                subject: PrincipalIdentifier(1),
+                resources: vec![ResourceReference::KernelObject(10)],
+            }],
+        };
+        Arc::new(FakeAttributionDataProvider { attribution_data })
     }
 
     async fn serve_kernel_stats(
@@ -452,12 +413,24 @@ mod tests {
         Ok(())
     }
 
+    struct FakeStallProvider {}
+    impl StallProvider for FakeStallProvider {
+        fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
+            Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
+        }
+
+        fn get_stall_rate(&self) -> Option<stalls::MemoryStallRate> {
+            Some(stalls::MemoryStallRate {
+                interval: fasync::MonotonicDuration::from_seconds(60),
+                rate_some: 1,
+                rate_full: 2,
+            })
+        }
+    }
+
     #[test]
     fn test_build_inspect_tree() {
         let mut exec = fasync::TestExecutor::new();
-
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
-
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -468,43 +441,13 @@ mod tests {
 
         let inspector = fuchsia_inspect::Inspector::default();
 
-        struct FakeStallProvider {}
-        impl StallProvider for FakeStallProvider {
-            fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
-                Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
-            }
-
-            fn get_stall_rate(&self) -> Option<stalls::MemoryStallRate> {
-                Some(stalls::MemoryStallRate {
-                    interval: fasync::MonotonicDuration::from_seconds(60),
-                    rate_some: 1,
-                    rate_full: 2,
-                })
-            }
-        }
-
-        build_inspect_tree(
-            data_provider,
-            stats_provider,
-            Arc::new(FakeStallProvider {}),
-            &inspector,
-        );
+        build_inspect_tree(stats_provider, Arc::new(FakeStallProvider {}), &inspector);
 
         let output = exec
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
             .expect("got hierarchy");
 
         assert_data_tree!(output, root: {
-            current: {
-                principal: {
-                    committed_private: 1024u64,
-                    committed_scaled: 1024.0,
-                    committed_total: 1024u64,
-                    populated_private: 2048u64,
-                    populated_scaled: 2048.0,
-                    populated_total: 2048u64
-                }
-            },
             kmem_stats: {
                 total_bytes: 1u64,
                 free_bytes: 2u64,
@@ -545,11 +488,8 @@ mod tests {
                 ]
             },
             stalls: {
-                current_some: 10i64,
-                current_full: 20i64,
-                rate_some: 1i64,
-                rate_full: 2i64,
-                rate_interval_s: 60i64
+                some: 10i64,
+                full: 20i64,
             }
         });
     }
@@ -557,7 +497,6 @@ mod tests {
     #[test]
     fn test_digest_service_capture_on_pressure_change_and_wait() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -577,7 +516,8 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -662,6 +602,10 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
                     // Corresponds to the capture after the passage of time
                     "1": {
@@ -678,6 +622,10 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
                 },
             },
@@ -688,7 +636,6 @@ mod tests {
     #[test]
     fn test_digest_service_wait() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -707,7 +654,8 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -787,8 +735,12 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
-                },
+            },
             },
         });
         Ok(())
@@ -797,7 +749,6 @@ mod tests {
     #[test]
     fn test_digest_service_no_capture_on_pressure_change() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -826,7 +777,8 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -851,7 +803,6 @@ mod tests {
     #[test]
     fn test_digest_service_capture_on_pressure_change() -> anyhow::Result<()> {
         let mut exec = fasync::TestExecutor::new();
-        let data_provider = Arc::new(FakeAttributionDataProvider {});
         let (stats_provider, stats_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
 
@@ -880,7 +831,8 @@ mod tests {
                 warning_capture_delay_s: 10,
                 normal_capture_delay_s: 10,
             },
-            data_provider,
+            get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
             vec![],
@@ -923,6 +875,10 @@ mod tests {
                             19u64,   // [Addl]DiscardableUnlocked
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
+                        stalls: {
+                            some: 10i64,
+                            full: 20i64,
+                        },
                     },
                 },
             },

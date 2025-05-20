@@ -32,9 +32,9 @@ impl fmt::Debug for Inspector {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let tree = self.get_diagnostics_hierarchy();
         if fmt.alternate() {
-            write!(fmt, "{:#?}", tree)
+            write!(fmt, "{tree:#?}")
         } else {
-            write!(fmt, "{:?}", tree)
+            write!(fmt, "{tree:?}")
         }
     }
 }
@@ -409,7 +409,7 @@ mod tests {
         let inspector = Inspector::new(InspectorConfig::default().size(4096));
         // Make the VMO full.
         let nodes = (0..84)
-            .map(|i| inspector.root().create_child(format!("test-{}", i)))
+            .map(|i| inspector.root().create_child(format!("test-{i}")))
             .collect::<Vec<Node>>();
 
         assert!(nodes.iter().all(|node| node.is_valid()));

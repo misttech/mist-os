@@ -126,7 +126,7 @@ impl State {
                     if rebooting {
                         println!("[shutdown-shim] Performing collaborative reboot ...");
                         match actuator.perform_reboot(reboot_reasons).await {
-                            Ok(()) => {}
+                            Ok(()) | Err(zx::Status::ALREADY_EXISTS) => {}
                             Err(status) => {
                                 eprintln!("[shutdown-shim] Failed to perform reboot: {status:?}");
                                 // Returning closes the connection.
@@ -289,6 +289,7 @@ mod tests {
 
     use std::cell::RefCell;
 
+    use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use fidl::Peered;
     use fidl_fuchsia_power::CollaborativeRebootInitiatorMarker;
@@ -498,6 +499,64 @@ mod tests {
         assert_eq!(*mock.reasons.borrow(), expected_reasons);
 
         rebooting.expect("rebooting should be present")
+    }
+
+    struct MockRebooterWithError {
+        /// The error status to return for each call to `perform_reboot`.
+        error: zx::Status,
+    }
+
+    impl RebootActuator for MockRebooterWithError {
+        async fn perform_reboot(&self, _reasons: Vec<Reason>) -> Result<(), zx::Status> {
+            Err(self.error)
+        }
+    }
+
+    #[test_case(zx::Status::ALREADY_EXISTS, true; "already_exists")]
+    #[test_case(zx::Status::INTERNAL, false; "internal")]
+    #[fuchsia::test]
+    async fn reboot_error(error: zx::Status, should_succeed: bool) {
+        let inspector =
+            fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
+        let (state, _cancellations) = new(&inspector);
+
+        let (scheduler_client, scheduler_request_stream) =
+            fidl::endpoints::create_request_stream::<CollaborativeRebootSchedulerMarker>();
+        let scheduler = scheduler_client.into_proxy();
+        let (initiator_client, initiator_request_stream) =
+            fidl::endpoints::create_request_stream::<CollaborativeRebootInitiatorMarker>();
+        let initiator = initiator_client.into_proxy();
+
+        // Schedule a reboot with an arbitrary reason (and drive the server
+        // implementation).
+        let schedule_server_fut = state.handle_scheduler_requests(scheduler_request_stream).fuse();
+        futures::pin_mut!(schedule_server_fut);
+        futures::select!(
+            result = scheduler.schedule_reboot(Reason::SystemUpdate, None).fuse() => {
+                result.expect("failed to schedule reboot");
+            },
+            () = schedule_server_fut => {
+                unreachable!("The `Scheduler` protocol worker shouldn't exit");
+            }
+        );
+
+        // Initiate the reboot (and drive the server implementation).
+        let mock = MockRebooterWithError { error };
+        if should_succeed {
+            let result = futures::select!(
+                result = initiator.perform_pending_reboot().fuse() => result,
+                () = state.handle_initiator_requests(initiator_request_stream, &mock).fuse() => {
+                    unreachable!("The `Initiator` protocol worker shouldn't exit.");
+                }
+            );
+            assert_matches!(result, Ok(_))
+        } else {
+            let (result, ()) = futures::join!(
+                initiator.perform_pending_reboot().fuse(),
+                state.handle_initiator_requests(initiator_request_stream, &mock).fuse()
+            );
+            assert_matches!(result, Err(_))
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

@@ -384,8 +384,8 @@ mod tests {
     use std::ffi::CString;
     use std::mem::MaybeUninit;
     use zx::{
-        sys, system_get_page_size, AsHandleRef, Handle, Instant, MapDetails, ProcessInfo,
-        ProcessInfoFlags, ProcessOptions, Signals, Task, TaskStatsInfo, VmarFlags, Vmo,
+        sys, system_get_page_size, AsHandleRef, Instant, MapDetails, ProcessInfo, ProcessInfoFlags,
+        Signals, Task, TaskStatsInfo, VmarFlags, Vmo,
     };
 
     #[test]
@@ -648,19 +648,23 @@ mod tests {
         assert_eq!(thread_handle.get_koid().unwrap(), current_thread_koid);
     }
 
+    // The vdso_next tests don't have permission to create raw processes.
+    #[cfg(not(feature = "vdso_next"))]
     #[test]
     fn new_process_no_threads() {
         let job = fuchsia_runtime::job_default().create_child_job().unwrap();
         let (process, _) =
-            job.create_child_process(ProcessOptions::empty(), b"test-process").unwrap();
+            job.create_child_process(zx::ProcessOptions::empty(), b"test-process").unwrap();
         assert!(process.threads().unwrap().is_empty());
     }
 
+    // The vdso_next tests don't have permission to create raw processes.
+    #[cfg(not(feature = "vdso_next"))]
     #[test]
     fn non_started_threads_dont_show_up() {
         let job = fuchsia_runtime::job_default().create_child_job().unwrap();
         let (process, _) =
-            job.create_child_process(ProcessOptions::empty(), b"test-process").unwrap();
+            job.create_child_process(zx::ProcessOptions::empty(), b"test-process").unwrap();
 
         let thread = process.create_thread(b"test-thread").unwrap();
         let thread_koid = thread.get_koid().unwrap();
@@ -669,11 +673,13 @@ mod tests {
         assert!(process.get_child(&thread_koid, zx::Rights::NONE).is_err());
     }
 
+    // The vdso_next tests don't have permission to create raw processes.
+    #[cfg(not(feature = "vdso_next"))]
     #[test]
     fn started_threads_show_up() {
         let job = fuchsia_runtime::job_default().create_child_job().unwrap();
         let (process, root_vmar) =
-            job.create_child_process(ProcessOptions::empty(), b"test-process").unwrap();
+            job.create_child_process(zx::ProcessOptions::empty(), b"test-process").unwrap();
 
         let valid_addr = root_vmar.info().unwrap().base;
 
@@ -682,7 +688,7 @@ mod tests {
 
         // start with the thread suspended, so we don't care about executing invalid code.
         let thread1_suspended = thread1.suspend().unwrap();
-        process.start(&thread1, valid_addr, valid_addr, Handle::invalid(), 0).unwrap();
+        process.start(&thread1, valid_addr, valid_addr, zx::Handle::invalid(), 0).unwrap();
 
         let threads_koids = process.threads().unwrap();
         assert_eq!(threads_koids.len(), 1);

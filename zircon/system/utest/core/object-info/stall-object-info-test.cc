@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/maybe-standalone-test/maybe-standalone.h>
-#include <zircon/syscalls-next.h>
 #include <zircon/syscalls/object.h>
 
 #include <zxtest/zxtest.h>

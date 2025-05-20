@@ -50,14 +50,15 @@ std::string ToString(const enum feedback::AttachmentValue::State state) {
 }
 
 // Create a complete list set of annotations from the collected annotations and the allowlist.
-feedback::Annotations AllAnnotations(const std::set<std::string>& allowlist,
+feedback::Annotations AllAnnotations(const std::set<std::string>& default_snapshot_annotations,
                                      const feedback::Annotations& annotations) {
   feedback::Annotations all_annotations = annotations;
 
-  for (const auto& key : allowlist) {
+  for (const auto& key : default_snapshot_annotations) {
     if (all_annotations.find(key) == all_annotations.end()) {
-      // There is an annotation in the allowlist that was not produced by any provider. This
-      // indicates a logical error on the Feedback-side.
+      // There is an annotation in the default list that was not produced by any provider.
+      // Annotations that are excluded by a product should be marked as "not available in product,"
+      // so this indicates a logical error on the Feedback-side.
       all_annotations.insert({key, ErrorOrString(Error::kLogicError)});
     }
   }
@@ -151,13 +152,15 @@ void AddAttachments(const feedback::AttachmentKeys& attachment_allowlist,
   }
 }
 
-void AddAnnotationsJson(const std::set<std::string>& annotation_allowlist,
+void AddAnnotationsJson(const std::set<std::string>& default_snapshot_annotations,
                         const feedback::Annotations& annotations,
                         const bool missing_non_platform_annotations, Document* metadata_json) {
-  const feedback::Annotations all_annotations = AllAnnotations(annotation_allowlist, annotations);
+  const feedback::Annotations all_annotations =
+      AllAnnotations(default_snapshot_annotations, annotations);
 
-  bool has_non_platform = all_annotations.size() > annotation_allowlist.size();
-  if (annotation_allowlist.empty() && !(has_non_platform || missing_non_platform_annotations)) {
+  bool has_non_platform = all_annotations.size() > default_snapshot_annotations.size();
+  if (default_snapshot_annotations.empty() &&
+      !(has_non_platform || missing_non_platform_annotations)) {
     return;
   }
 
@@ -170,7 +173,7 @@ void AddAnnotationsJson(const std::set<std::string>& annotation_allowlist,
   size_t num_present_platform = 0u;
   size_t num_missing_platform = 0u;
   for (const auto& [k, v] : all_annotations) {
-    if (annotation_allowlist.find(k) == annotation_allowlist.end()) {
+    if (default_snapshot_annotations.find(k) == default_snapshot_annotations.end()) {
       continue;
     }
 
@@ -194,9 +197,10 @@ void AddAnnotationsJson(const std::set<std::string>& annotation_allowlist,
   }
 
   Value state;
-  if (num_present_platform == annotation_allowlist.size() && !missing_non_platform_annotations) {
+  if (num_present_platform == default_snapshot_annotations.size() &&
+      !missing_non_platform_annotations) {
     state = "complete";
-  } else if (num_missing_platform == annotation_allowlist.size() && !has_non_platform &&
+  } else if (num_missing_platform == default_snapshot_annotations.size() && !has_non_platform &&
              missing_non_platform_annotations) {
     state = "missing";
   } else {
@@ -227,10 +231,11 @@ void AddLogRedactionCanary(const std::string& log_redaction_canary, Document* me
 
 Metadata::Metadata(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
                    UtcClockReadyWatcherBase* utc_clock_ready_watcher, RedactorBase* redactor,
-                   const bool is_first_instance, const std::set<std::string>& annotation_allowlist,
+                   const bool is_first_instance,
+                   const std::set<std::string>& default_snapshot_annotations,
                    const feedback::AttachmentKeys& attachment_allowlist)
     : log_redaction_canary_(redactor->UnredactedCanary()),
-      annotation_allowlist_(annotation_allowlist),
+      default_snapshot_annotations_(default_snapshot_annotations),
       attachment_allowlist_(attachment_allowlist),
       utc_provider_(utc_clock_ready_watcher, clock,
                     PreviousBootFile::FromCache(is_first_instance, kUtcBootDifferenceFile)) {
@@ -261,15 +266,16 @@ std::string Metadata::MakeMetadata(const feedback::Annotations& annotations,
   metadata_json.AddMember("files", Value(kObjectType), allocator);
   AddLogRedactionCanary(log_redaction_canary_, &metadata_json);
 
-  const bool has_non_platform_annotations = annotations.size() > annotation_allowlist_.size();
+  const bool has_non_platform_annotations =
+      annotations.size() > default_snapshot_annotations_.size();
 
-  if (annotation_allowlist_.empty() && attachment_allowlist_.empty() &&
+  if (default_snapshot_annotations_.empty() && attachment_allowlist_.empty() &&
       !has_non_platform_annotations && !missing_non_platform_annotations) {
     return MetadataString();
   }
 
   AddAttachments(attachment_allowlist_, attachments, &metadata_json);
-  AddAnnotationsJson(annotation_allowlist_, annotations, missing_non_platform_annotations,
+  AddAnnotationsJson(default_snapshot_annotations_, annotations, missing_non_platform_annotations,
                      &metadata_json);
   AddUtcBootDifferences(utc_provider_.CurrentUtcBootDifference(),
                         utc_provider_.PreviousBootUtcBootDifference(), &metadata_json);

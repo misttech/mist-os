@@ -66,7 +66,7 @@ pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
     } else if cfg.starts_with("not") {
         let section = &cfg[4..];
         let mut paren_count = 1;
-        for (idx, c) in section.chars().enumerate() {
+        for (idx, c) in section.char_indices() {
             if c == ')' {
                 paren_count -= 1;
                 if paren_count == 0 {
@@ -84,7 +84,7 @@ pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
         let mut accum = vec![];
         let mut paren_count = 1;
         let mut start_idx = 0;
-        for (idx, c) in section.chars().enumerate() {
+        for (idx, c) in section.char_indices() {
             if c == ')' {
                 paren_count -= 1;
                 if paren_count == 0 {
@@ -103,7 +103,7 @@ pub fn cfg_to_gn_conditional(cfg: &str) -> Result<String> {
         let mut accum = vec![];
         let mut paren_count = 1;
         let mut start_idx = 0;
-        for (idx, c) in section.chars().enumerate() {
+        for (idx, c) in section.char_indices() {
             if c == ')' {
                 paren_count -= 1;
                 if paren_count == 0 {

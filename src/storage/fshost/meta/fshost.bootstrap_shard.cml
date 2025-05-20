@@ -101,6 +101,12 @@
             to: "#fshost",
             availability: "optional",
         },
+        {
+            dictionary: "tee_key_management",
+            from: "parent",
+            to: "#fshost",
+            availability: "optional",
+        },
     ],
     expose: [
         {

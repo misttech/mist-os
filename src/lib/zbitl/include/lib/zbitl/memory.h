@@ -5,10 +5,10 @@
 #ifndef SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_MEMORY_H_
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_MEMORY_H_
 
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <cstring>
+#include <span>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
@@ -22,12 +22,12 @@ template <typename T>
 class StorageTraits<fbl::Array<T>> {
  public:
   using Storage = fbl::Array<T>;
-  using SpanTraits = StorageTraits<cpp20::span<T>>;
+  using SpanTraits = StorageTraits<std::span<T>>;
 
   // An instance represents a failure mode of being out of memory.
   struct error_type {};
 
-  using payload_type = cpp20::span<T>;
+  using payload_type = std::span<T>;
 
   static std::string_view error_string(error_type error) { return "out of memory"; }
 
@@ -59,24 +59,25 @@ class StorageTraits<fbl::Array<T>> {
     return SpanTraits::Payload(span, offset, length).take_value();
   }
 
-  template <typename U, bool LowLocality>
-  static std::enable_if_t<(alignof(U) <= kStorageAlignment),
-                          fit::result<error_type, cpp20::span<const U>>>
-  Read(const Storage& storage, payload_type payload, uint32_t length) {
+  template <PayloadCompatibleStorage U, bool LowLocality>
+  static fit::result<error_type, std::span<const U>> Read(const Storage& storage,
+                                                          payload_type payload, uint32_t length) {
     auto span = AsSpan<T>(storage);
     return SpanTraits::template Read<U, LowLocality>(span, payload, length).take_value();
   }
 
-  template <typename S = T, typename = std::enable_if_t<!std::is_const_v<S>>>
-  static fit::result<error_type> Write(Storage& storage, uint32_t offset, ByteView data) {
+  static fit::result<error_type> Write(Storage& storage, uint32_t offset, ByteView data)
+    requires(!std::is_const_v<T>)
+  {
     auto span = AsSpan<T>(storage);
     auto result = SpanTraits::Write(span, offset, data);
     ZX_DEBUG_ASSERT(result.is_ok());
     return fit::ok();
   }
 
-  template <typename S = T, typename = std::enable_if_t<!std::is_const_v<S>>>
-  static fit::result<error_type, void*> Write(Storage& storage, uint32_t offset, uint32_t length) {
+  static fit::result<error_type, void*> Write(Storage& storage, uint32_t offset, uint32_t length)
+    requires(!std::is_const_v<T>)
+  {
     auto span = AsSpan<T>(storage);
     return SpanTraits::Write(span, offset, length).take_value();
   }

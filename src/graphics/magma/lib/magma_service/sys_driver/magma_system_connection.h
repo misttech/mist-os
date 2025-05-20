@@ -43,6 +43,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   magma::Status ReleaseObject(uint64_t object_id,
                               fuchsia_gpu_magma::wire::ObjectType object_type) override;
   magma::Status CreateContext(uint32_t context_id) override;
+  magma::Status CreateContext2(uint32_t context_id, uint64_t priority) override;
   magma::Status DestroyContext(uint32_t context_id) override;
   magma::Status ExecuteCommandBuffers(uint32_t context_id,
                                       std::vector<magma_exec_command_buffer>& command_buffers,

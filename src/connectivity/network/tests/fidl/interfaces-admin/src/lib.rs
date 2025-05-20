@@ -12,12 +12,12 @@ use fidl_fuchsia_net_ext::IntoExt;
 use finterfaces_admin::GrantForInterfaceAuthorization;
 use fnet_interfaces_ext::admin::TerminalError;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
-use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
+use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _, Timer};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
-    fidl_ip, fidl_mac, fidl_subnet, net_subnet_v6, std_ip, std_ip_v6, std_socket_addr,
+    fidl_ip, fidl_mac, fidl_subnet, net_ip, net_subnet_v6, std_ip, std_ip_v6, std_socket_addr,
 };
-use net_types::ip::{Ip, IpAddress as _, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddr, IpAddress as _, IpVersion, Ipv4, Ipv6};
 use netemul::{InterfaceConfig, RealmUdpSocket as _, TestFakeEndpoint};
 use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::devices::{
@@ -29,9 +29,14 @@ use netstack_testing_common::ndp::{send_ra_with_router_lifetime, wait_for_router
 use netstack_testing_common::realms::{
     Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
-use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
+use netstack_testing_common::{
+    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+};
 use netstack_testing_macros::netstack_test;
+use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
+use packet_formats::icmp::ndp::NeighborSolicitation;
+use packet_formats::testutil::ArpPacketInfo;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
@@ -44,7 +49,7 @@ use {
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_posix_socket as fposix_socket, zx_status,
+    fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket, zx_status,
 };
 
 #[netstack_test]
@@ -3638,22 +3643,43 @@ async fn dad_transmits<N: Netstack>(name: &str) {
     let iface = realm.join_network(&network, "client").await.expect("join network");
 
     let transmits_from_config = |config: finterfaces_admin::Configuration| {
-        config.ipv6.and_then(|ipv6| ipv6.ndp).and_then(|ndp| ndp.dad).and_then(|dad| dad.transmits)
+        let ipv4 = config
+            .ipv4
+            .and_then(|ipv4| ipv4.arp)
+            .and_then(|arp| arp.dad)
+            .and_then(|dad| dad.transmits);
+        let ipv6 = config
+            .ipv6
+            .and_then(|ipv6| ipv6.ndp)
+            .and_then(|ndp| ndp.dad)
+            .and_then(|dad| dad.transmits);
+        (ipv4, ipv6)
     };
 
-    let transmits_to_config = |transmits: u16| finterfaces_admin::Configuration {
-        ipv6: Some(finterfaces_admin::Ipv6Configuration {
-            ndp: Some(finterfaces_admin::NdpConfiguration {
-                dad: Some(finterfaces_admin::DadConfiguration {
-                    transmits: Some(transmits),
+    let transmits_to_config =
+        |ipv4_transmits: u16, ipv6_transmits: u16| finterfaces_admin::Configuration {
+            ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                arp: Some(finterfaces_admin::ArpConfiguration {
+                    dad: Some(finterfaces_admin::DadConfiguration {
+                        transmits: Some(ipv4_transmits),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                ndp: Some(finterfaces_admin::NdpConfiguration {
+                    dad: Some(finterfaces_admin::DadConfiguration {
+                        transmits: Some(ipv6_transmits),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }),
                 ..Default::default()
             }),
             ..Default::default()
-        }),
-        ..Default::default()
-    };
+        };
 
     let get_transmits = || async {
         transmits_from_config(
@@ -3677,19 +3703,32 @@ async fn dad_transmits<N: Netstack>(name: &str) {
         }
     };
 
-    // Default number of transmits defined in RFC 4862.
-    const DEFAULT_DAD_TRANSMITS: u16 = 1;
-    assert_eq!(get_transmits().await, get_expectation(DEFAULT_DAD_TRANSMITS));
+    // Default number of DAD transmits. Defined in RFC 5227 for IPv4 and
+    // RFC 4862 for IPv6.
+    const DEFAULT_DAD_TRANSMITS_IPV4: u16 = 3;
+    const DEFAULT_DAD_TRANSMITS_IPV6: u16 = 1;
 
-    const WANT_TRANSMITS: u16 = 3;
+    let (initial_ipv4, initial_ipv6) = get_transmits().await;
+    assert_eq!(initial_ipv4, get_expectation(DEFAULT_DAD_TRANSMITS_IPV4));
+    assert_eq!(initial_ipv6, get_expectation(DEFAULT_DAD_TRANSMITS_IPV6));
+
+    // Arbitrary Values, that are distinguishable from one another.
+    const WANT_TRANSMITS_IPV4: u16 = 4;
+    const WANT_TRANSMITS_IPV6: u16 = 6;
     let update = iface
         .control()
-        .set_configuration(&transmits_to_config(WANT_TRANSMITS))
+        .set_configuration(&transmits_to_config(WANT_TRANSMITS_IPV4, WANT_TRANSMITS_IPV6))
         .await
         .expect("set configuration failed")
         .expect("set configuration error");
-    assert_eq!(transmits_from_config(update), get_expectation(DEFAULT_DAD_TRANSMITS));
-    assert_eq!(get_transmits().await, get_expectation(WANT_TRANSMITS));
+
+    let (ipv4_from_update, ipv6_from_update) = transmits_from_config(update);
+    assert_eq!(ipv4_from_update, get_expectation(DEFAULT_DAD_TRANSMITS_IPV4));
+    assert_eq!(ipv6_from_update, get_expectation(DEFAULT_DAD_TRANSMITS_IPV6));
+
+    let (new_ipv4, new_ipv6) = get_transmits().await;
+    assert_eq!(new_ipv4, get_expectation(WANT_TRANSMITS_IPV4));
+    assert_eq!(new_ipv6, get_expectation(WANT_TRANSMITS_IPV6));
 }
 
 #[netstack_test]
@@ -3946,4 +3985,106 @@ async fn interface_authorization_root_access<N: Netstack>(name: &str) {
         root_control.get_authorization_for_interface().await,
         Err(TerminalError::Terminal(_))
     );
+}
+
+// Verify that the `perform_dad` AddressParameter correctly influences the DAD
+// behavior when installing the address.
+#[netstack_test]
+#[variant(I, Ip)]
+#[test_case(true, 1, true; "enabled")]
+#[test_case(false, 1, false; "disabled")]
+#[test_case(true, 0, false; "interface_disabled")]
+#[test_case(false, 0, false; "both_disabled")]
+async fn perform_dad_parameter<I: Ip>(
+    name: &str,
+    perform_dad: bool,
+    dad_transmits: u16,
+    expect_probe: bool,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    let config = match I::VERSION {
+        IpVersion::V4 => {
+            InterfaceConfig { ipv4_dad_transmits: Some(dad_transmits), ..Default::default() }
+        }
+        IpVersion::V6 => {
+            InterfaceConfig { ipv6_dad_transmits: Some(dad_transmits), ..Default::default() }
+        }
+    };
+    // NB: The `perform_dad` AddressParameter is only supported by Netstack3.
+    let (_network, _realm, interface, endpoint) =
+        netstack_testing_common::setup_network_with::<Netstack3, _>(
+            &sandbox,
+            name,
+            config,
+            std::iter::empty::<fnetemul::ChildDef>(),
+        )
+        .await
+        .expect("error setting up network");
+
+    let (fidl_addr, addr) = match I::VERSION {
+        IpVersion::V4 => (fidl_subnet!("192.0.2.1/24"), net_ip!("192.0.2.1")),
+        IpVersion::V6 => (fidl_subnet!("2001:0db8::1/64"), net_ip!("2001:0db8::1")),
+    };
+    let _addr_state_provider = interfaces::add_address_wait_assigned(
+        interface.control(),
+        fidl_addr,
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            perform_dad: Some(perform_dad),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("failed to add address");
+
+    // Check whether a DAD probe is sent.
+    let timeout = if expect_probe {
+        ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
+    } else {
+        ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
+    };
+
+    /// Returns whether the given data is a correctly formatted DAD probe.
+    fn is_probe(data: Vec<u8>, addr: IpAddr) -> bool {
+        match addr {
+            IpAddr::V4(addr) => {
+                // Try to parse the data as an ARP probe. Ignore errors or ARP
+                // packets with the wrong target address.
+                match packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
+                    &data,
+                    EthernetFrameLengthCheck::NoCheck,
+                ) {
+                    Ok(ArpPacketInfo { target_protocol_address: dst_ip, .. }) => dst_ip == addr,
+                    Err(_) => false,
+                }
+            }
+            IpAddr::V6(addr) => {
+                // Try to parse the data as a neighbor solicitation. Ignore errors
+                // or neighbor solicitations with the wrong target address.
+                match packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                    Ipv6,
+                    _,
+                    NeighborSolicitation,
+                    _,
+                >(&data, EthernetFrameLengthCheck::NoCheck, |_| {})
+                {
+                    Ok((_src_mac, _dst_mac, _src_ip, _dst_ip, _ttl, ns, _code)) => {
+                        *ns.target_address() == addr
+                    }
+                    Err(_) => false,
+                }
+            }
+        }
+    }
+
+    let sent_probe = endpoint
+        .frame_stream()
+        .take_until(Timer::new(timeout.after_now()))
+        .any(|frame| {
+            let (data, _dropped) = frame.expect("error in fake endpoint frame stream");
+            futures::future::ready(is_probe(data, addr))
+        })
+        .await;
+
+    assert_eq!(sent_probe, expect_probe)
 }

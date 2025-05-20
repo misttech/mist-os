@@ -23,8 +23,10 @@ _component_manager_bin = {
   edition = "2021"
 
   configs_to_add = [ "//build/config/rust:bootfs" ]
-  if (!is_debug && !is_lto_variant) {
-    configs_to_add += [ "//build/config/lto:lto-rust" ]
+  if (!is_lto_variant) {
+    if (is_release) {
+      configs_to_add += [ "//build/config/lto:lto-rust" ]
+    }
   }
 
   # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
@@ -34,6 +36,7 @@ _component_manager_bin = {
   forward_variables_from(_concurrent_jobs.vars, "*")
 
   deps = [
+    ":dispatcher_config",
     ":measure_tape_for_events",
     ":measure_tape_for_instance",
     "lib/errors",
@@ -162,6 +165,7 @@ _component_manager_bin = {
     "src/builtin/builtin_resolver.rs",
     "src/builtin/builtin_runner.rs",
     "src/builtin/crash_introspect.rs",
+    "src/builtin/dispatcher.rs",
     "src/builtin/fuchsia_boot_resolver.rs",
     "src/builtin/log.rs",
     "src/builtin/mod.rs",
@@ -176,6 +180,7 @@ _component_manager_bin = {
     "src/constants.rs",
     "src/framework/binder.rs",
     "src/framework/capability_store.rs",
+    "src/framework/component_sandbox_retriever.rs",
     "src/framework/config_override.rs",
     "src/framework/controller.rs",
     "src/framework/introspector.rs",
@@ -269,16 +274,26 @@ _component_manager_bin = {
   deps += [ ":elf_runner_cm($default_toolchain)" ]
   rustenv = [ "ELF_RUNNER_CM_PATH=$elf_runner_cm_path" ]
 
+  dispatcher_cm_out_dir =
+      get_label_info(":dispatcher_cm($default_toolchain)", "target_out_dir")
+  dispatcher_cm = "$dispatcher_cm_out_dir/cml/dispatcher_cm/dispatcher.cm"
+  dispatcher_cm_path = rebase_path(dispatcher_cm, root_build_dir)
+  inputs += [ dispatcher_cm ]
+  deps += [ ":dispatcher_cm($default_toolchain)" ]
+  rustenv += [ "DISPATCHER_CM_PATH=$dispatcher_cm_path" ]
+
   # component_manager should not depend on json5
   assert_no_deps = [
     # regex crate is large
     "//third_party/rust_crates:regex",
 
     # component_manager should not depend on json
+    # Allow build tools to depend on JSON by limiting this restriction to the
+    # current toolchain.
     # TODO(https://fxbug.dev/302204241): Uncomment when component_manager no longer
     # depends on serde_json (it does through version-history, at least)
     # "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:serde_json5",
+    "//third_party/rust_crates:serde_json5($current_toolchain)",
   ]
 }
 
@@ -334,6 +349,16 @@ fuchsia_component("component-manager-realm-builder-debug-cmp") {
 cm("elf_runner_cm") {
   output_name = "cml/elf_runner_cm/elf_runner.cm"
   manifest = "meta/elf_runner.cml"
+}
+
+cm("dispatcher_cm") {
+  output_name = "cml/dispatcher_cm/dispatcher.cm"
+  manifest = "meta/dispatcher.cml"
+  restricted_features = [ "dynamic_dictionaries" ]
+}
+
+fuchsia_structured_config_rust_lib("dispatcher_config") {
+  cm_label = ":dispatcher_cm"
 }
 
 fuchsia_component("elf_runner") {

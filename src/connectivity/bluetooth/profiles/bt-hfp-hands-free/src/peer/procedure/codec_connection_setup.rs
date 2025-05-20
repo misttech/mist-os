@@ -4,9 +4,10 @@
 
 use anyhow::{format_err, Error};
 use at_commands as at;
+use bt_hfp::codec_id::CodecId;
 use log::warn;
 
-use super::{at_cmd, at_ok, at_resp, Procedure, ProcedureInput, ProcedureOutput};
+use super::{at_cmd, at_ok, at_resp, CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
@@ -41,40 +42,47 @@ impl Procedure<ProcedureInput, ProcedureOutput> for CodecConnectionSetupProcedur
         procedure_manipulated_state: &mut ProcedureManipulatedState,
         input: ProcedureInput,
     ) -> Result<Vec<ProcedureOutput>, Error> {
-        let output_option = match (&self.state, input) {
+        let outputs = match (&self.state, input) {
             (State::WaitingForBcs, at_resp!(Bcs { codec })) => {
-                if procedure_manipulated_state.supported_codecs.contains(&(codec as u8)) {
-                    procedure_manipulated_state.selected_codec = Some(codec as u8);
+                let codec_id: CodecId = codec.try_into()?;
+                if procedure_manipulated_state.supported_codecs.contains(&codec_id) {
+                    procedure_manipulated_state.selected_codec = Some(codec_id);
                     self.state = State::WaitingForOk;
-                    Some(at_cmd!(Bcs { codec: codec }))
+                    vec![
+                        // This is the earliest point at which we have selected the codec for a SCO
+                        // connection, so signal the peer task to await an incoming SCO connection
+                        // with that codec.  The earlier we do this, the better, to prevent a race
+                        // where we haven't yet started to listen for the SCO connection with the
+                        // correct codec when it arrives.
+                        ProcedureOutput::CommandToHf(CommandToHf::AwaitRemoteSco),
+                        at_cmd!(Bcs { codec: codec }),
+                    ]
                 } else {
-                    // According to HFP v1.8 Section 4.11.3, if the received codec ID is
-                    // not available, the HF shall respond with AT+BAC with its available
-                    // codecs.
+                    // According to HFP v1.8 Section 4.11.3, if the received codec ID is not
+                    // available, the HF shall respond with AT+BAC with its available codecs.
                     warn!("Codec received is not supported. Sending supported codecs to AG.");
                     self.state = State::Terminated;
                     let supported_codecs = procedure_manipulated_state
                         .supported_codecs
                         .iter()
-                        .map(|&x| x as i64)
+                        .map(|&x| x.into())
                         .collect();
-                    Some(at_cmd!(Bac { codecs: supported_codecs }))
+                    vec![at_cmd!(Bac { codecs: supported_codecs })]
                 }
             }
             (State::WaitingForOk, at_ok!()) => {
                 self.state = State::Terminated;
-                None
+                vec![]
             }
             (_, input) => {
                 return Err(format_err!(
-                        "Received invalid response {:?} during a codec connection setup procedure with state: {:?}",
-                        input,
-                        self.state
-                    ));
+                    "Received invalid response {:?} during a codec connection setup procedure with state: {:?}",
+                    input,
+                    self.state
+                ));
             }
         };
 
-        let outputs = output_option.into_iter().collect();
         Ok(outputs)
     }
 
@@ -90,16 +98,15 @@ mod tests {
     use assert_matches::assert_matches;
 
     use crate::config::HandsFreeFeatureSupport;
-    use crate::features::{CVSD, MSBC};
 
     #[fuchsia::test]
     fn properly_responds_to_supported_codec() {
         let mut procedure = CodecConnectionSetupProcedure::new();
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
-        let agreed_codec = CVSD;
+        let agreed_codec = CodecId::MSBC;
 
-        let response1 = at_resp!(Bcs { codec: agreed_codec as i64 });
+        let response1 = at_resp!(Bcs { codec: agreed_codec.into() });
 
         assert!(!procedure.is_terminated());
 
@@ -117,9 +124,10 @@ mod tests {
         let mut procedure = CodecConnectionSetupProcedure::new();
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
+        state.supported_codecs = Vec::new();
 
-        let unsupported_codec = MSBC;
-        let response = at_resp!(Bcs { codec: unsupported_codec as i64 });
+        let unsupported_codec = CodecId::MSBC;
+        let response = at_resp!(Bcs { codec: unsupported_codec.into() });
 
         assert!(!procedure.is_terminated());
 

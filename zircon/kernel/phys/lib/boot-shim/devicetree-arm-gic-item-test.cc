@@ -7,8 +7,10 @@
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
 #include <lib/boot-shim/testing/devicetree-test-fixture.h>
-#include <lib/stdcompat/array.h>
 #include <lib/zbitl/image.h>
+
+#include <array>
+#include <span>
 
 namespace {
 
@@ -26,14 +28,14 @@ class ArmDevicetreeGicItemTest
     return [this](const boot_shim::DevicetreeMmioRange& r) { ranges_.push_back(r); };
   }
 
-  cpp20::span<const boot_shim::DevicetreeMmioRange> mmio_ranges() const { return ranges_; }
+  std::span<const boot_shim::DevicetreeMmioRange> mmio_ranges() const { return ranges_; }
 
  private:
   std::vector<boot_shim::DevicetreeMmioRange> ranges_;
 };
 
 TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
-  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -57,7 +59,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
   });
 
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_arm_gic2();
@@ -90,7 +92,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
-  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -110,7 +112,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
   });
 
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = arm_gic2_no_msi();
@@ -143,7 +145,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV3Uint64Stride) {
-  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -156,7 +158,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3Uint64Stride) {
   });
 
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = arm_gic3_stride();
@@ -188,7 +190,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3Uint64Stride) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV3FourStride) {
-  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -201,7 +203,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3FourStride) {
   });
 
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = arm_gic3_four_stride();
@@ -233,7 +235,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3FourStride) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV3SubsumedStride) {
-  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -246,7 +248,7 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3SubsumedStride) {
   });
 
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = arm_gic3_subsumed_stride();
@@ -277,11 +279,9 @@ TEST_F(ArmDevicetreeGicItemTest, GicV3SubsumedStride) {
   ASSERT_TRUE(present, "ZBI Driver for GIC V3 missing.");
 }
 
-
-
 // We dont support GicV3 with MSI yet, not reflected in the driver configuration.
 TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
-  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
       {
           .address = 0x8000000,
           .size = 0x10000,
@@ -293,7 +293,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
   });
 
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_arm_gic3();
@@ -325,7 +325,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, ParseCrosvm) {
-  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+  constexpr auto kExpectedMmio = std::to_array<boot_shim::DevicetreeMmioRange>({
       {
           .address = 0x3fff0000,
           .size = 0x10000,
@@ -336,7 +336,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseCrosvm) {
       },
   });
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = crosvm_arm();
@@ -369,7 +369,7 @@ TEST_F(ArmDevicetreeGicItemTest, ParseCrosvm) {
 
 TEST_F(ArmDevicetreeGicItemTest, KhadasVim3) {
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = khadas_vim3();
@@ -402,7 +402,7 @@ TEST_F(ArmDevicetreeGicItemTest, KhadasVim3) {
 
 TEST_F(ArmDevicetreeGicItemTest, MissingNode) {
   std::array<std::byte, 256> image_buffer;
-  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  zbitl::Image<std::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = empty_fdt();

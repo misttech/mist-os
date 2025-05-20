@@ -56,7 +56,7 @@ TEST(Transferable, Clone) {
   const fidl::WireResult response = fidl::WireCall(clone_client)->Close();
   ASSERT_OK(response.status());
 
-  EXPECT_OK(zxio_close(io, true));
+  zxio_destroy(io);
 }
 
 TEST(Transferable, FlagsGetDefault) {
@@ -70,8 +70,8 @@ TEST(Transferable, FlagsGetDefault) {
   uint64_t raw_flags{};
   ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
-  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermRead);
-  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermWrite);
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermReadBytes);
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermWriteBytes);
 }
 
 TEST(Transferable, FlagsSet) {
@@ -82,7 +82,7 @@ TEST(Transferable, FlagsSet) {
                                   device_client.TakeChannel().release(), &storage));
   zxio_t* io = &storage.io;
   fuchsia_io::wire::Flags flags =
-      fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
+      fuchsia_io::wire::Flags::kPermReadBytes | fuchsia_io::wire::Flags::kPermWriteBytes;
   ASSERT_OK(zxio_flags_set(io, uint64_t{flags}));
 }
 

@@ -1106,6 +1106,10 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         // `SetColorLayer()` will be revised to explicitly configure an area for
         // the fill.
         banjo_layer.display_destination = display_area;
+
+        // ApplyConfig() relies on CheckConfig() normalizing the layer. This
+        // workaround can be removed when we revise `SetColorLayer()`.
+        draft_layer_node.layer->draft_layer_config_.display_destination = display_area;
       }
       layer_config_is_invalid =
           layer_config_is_invalid ||

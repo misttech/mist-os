@@ -11,7 +11,7 @@ use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
 use log::{debug, error, warn};
-use net_types::SpecifiedAddr;
+use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::socket::{
     AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
     ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
@@ -21,7 +21,7 @@ use netstack3_base::{
     Marks, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum,
     StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
-use netstack3_filter::TransportPacketSerializer;
+use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
@@ -30,7 +30,7 @@ use netstack3_ip::{
 use netstack3_trace::trace_duration;
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
-use packet_formats::ip::{IpExt, IpProto};
+use packet_formats::ip::IpProto;
 use packet_formats::tcp::{
     TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
     TcpSegmentBuilderWithOptions,
@@ -42,12 +42,12 @@ use crate::internal::counters::{
 };
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
-    self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
-    DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack, HandshakeStatus, Listener,
-    ListenerAddrState, ListenerSharingState, MaybeDualStack, MaybeListener, PrimaryRc, TcpApi,
-    TcpBindingsContext, TcpBindingsTypes, TcpContext, TcpDemuxContext, TcpDualStackContext,
-    TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry, TcpSocketState,
-    TcpSocketStateInner,
+    self, AsThisStack as _, BoundSocketState, Connection, CoreTxMetadataContext, DemuxState,
+    DeviceIpSocketHandler, DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack,
+    HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
+    MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
+    TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
+    TcpSocketSetEntry, TcpSocketState, TcpSocketStateInner, TcpSocketTxMetadata,
 };
 use crate::internal::state::{
     BufferProvider, Closed, DataAcked, Initial, NewlyClosed, State, TimeWait,
@@ -133,7 +133,7 @@ where
             return Ok(());
         }
 
-        let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
+        let remote_ip = match SpecifiedAddr::new(remote_ip.into_addr()) {
             None => {
                 CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
                     .invalid_ip_addrs_received
@@ -629,7 +629,8 @@ where
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<SockI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
+        + CoreTxMetadataContext<TcpSocketTxMetadata<SockI, CC::WeakDeviceId, BC>, BC>,
 {
     let Connection {
         accept_queue,
@@ -903,7 +904,8 @@ where
     DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
-        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>,
+        + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
+        + CoreTxMetadataContext<TcpSocketTxMetadata<SockI, CC::WeakDeviceId, BC>, BC>,
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state,
@@ -1141,7 +1143,7 @@ pub(super) fn tcp_serialize_segment<'a, I, P>(
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
 ) -> impl TransportPacketSerializer<I, Buffer = EmptyBuf> + Debug + 'a
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: InnerPacketBuilder + Debug + Payload + 'a,
 {
     let SegmentHeader { seq, ack, wnd, control, options, push } = header;
@@ -1174,12 +1176,14 @@ where
 #[cfg(test)]
 mod test {
     use ip_test_macro::ip_test;
-    use netstack3_base::testutil::TestIpExt;
     use netstack3_base::{HandshakeOptions, UnscaledWindowSize};
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
     use super::*;
+
+    trait TestIpExt: netstack3_base::testutil::TestIpExt + FilterIpExt {}
+    impl<T> TestIpExt for T where T: netstack3_base::testutil::TestIpExt + FilterIpExt {}
 
     const SEQ: SeqNum = SeqNum::new(12345);
     const ACK: SeqNum = SeqNum::new(67890);

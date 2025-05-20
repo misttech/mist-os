@@ -3,16 +3,18 @@
 // found in the LICENSE file.
 
 use std::collections::VecDeque;
+use std::fmt::Debug;
 use std::task::{ready, Poll};
 
 use derivative::Derivative;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::channel::mpsc;
 use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
+use packet_formats::icmp::ndp::options::option_types as ndp_option_types;
 
 use crate::bindings::devices::BindingId;
-use crate::bindings::util::ResultExt as _;
+use crate::bindings::util::{ErrorLogExt, ResultExt as _};
 
 use fidl_fuchsia_net_ndp::OptionType;
 use {fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_ndp_ext as fnet_ndp_ext};
@@ -25,6 +27,15 @@ pub(crate) enum Error {
     WorkerClosed(#[from] WorkerClosedError),
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
+}
+
+impl ErrorLogExt for Error {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Self::WorkerClosed(WorkerClosedError) => log::Level::Error,
+            Self::Fidl(fidl) => fidl.log_level(),
+        }
+    }
 }
 
 pub(crate) async fn serve(
@@ -42,8 +53,7 @@ pub(crate) async fn serve(
                 Ok(interest) => interest,
                 Err(InterfaceIdMustBeNonZeroError) => {
                     option_watcher.close_with_epitaph(zx::Status::INVALID_ARGS).unwrap_or_log(
-                        "failed to write InvalidArgs epitaph \
-                                         for NDP option watcher",
+                        "failed to write InvalidArgs epitaph for NDP option watcher",
                     );
                     return Ok(sink);
                 }
@@ -156,8 +166,10 @@ use event_queue::EventQueue;
 pub(crate) struct InterfaceIdMustBeNonZeroError;
 
 /// A watcher's interest in NDP options.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub(crate) struct Interest {
+    #[derivative(Debug(format_with = "format_option_types_vec"))]
     types: Option<bit_vec::BitVec>,
     interface_id: Option<BindingId>,
 }
@@ -197,6 +209,34 @@ impl Interest {
         let Self { types: interest_types, interface_id: interest_interface_id } = self;
         interest_interface_id.map(|id| id == interface_id).unwrap_or(true)
             && interest_types.as_ref().map(|types| types[option_type.into()]).unwrap_or(true)
+    }
+}
+
+fn format_option_types_vec(
+    types: &Option<bit_vec::BitVec>,
+    formatter: &mut std::fmt::Formatter<'_>,
+) -> Result<(), std::fmt::Error> {
+    match types {
+        None => {
+            write!(formatter, "All")
+        }
+        Some(types) => {
+            let mut list = &mut formatter.debug_list();
+            for option_type in types
+                .iter()
+                .enumerate()
+                .filter_map(|(option_type, is_set)| is_set.then_some(option_type))
+            {
+                if let Some(debug_name) =
+                    u8::try_from(option_type).ok().and_then(ndp_option_types::debug_name)
+                {
+                    list = list.entry(&format_args!("{option_type} ({debug_name})"));
+                } else {
+                    list = list.entry(&option_type);
+                }
+            }
+            list.finish()
+        }
     }
 }
 
@@ -449,19 +489,9 @@ impl Worker {
             }
         };
 
-        info!("NDP watcher worker shutting down, waiting for watchers to end");
-        current_watchers
-            .map(|res| match res {
-                Ok(()) => (),
-                Err(e) => {
-                    if !e.is_closed() {
-                        error!("error {e:?} collecting watchers");
-                    }
-                }
-            })
-            .collect::<()>()
-            .await;
-        info!("all NDP watchers closed, NDP watcher worker shutdown is complete")
+        if !current_watchers.is_empty() {
+            warn!("NDP watcher shutting down, dropped {} watchers", current_watchers.len());
+        }
     }
 
     fn consume_router_advertisement(
@@ -535,6 +565,7 @@ mod test {
     use futures::{FutureExt, Stream};
     use itertools::Itertools;
     use packet_formats::icmp::ndp::options as packet_formats_ndp;
+    use test_case::test_case;
 
     impl WorkerWatcherSink {
         fn create_watcher(
@@ -896,5 +927,15 @@ mod test {
         // Need to keep the router advertisement sink alive in order for the
         // worker to continue running until the end of the test.
         drop(ra_sink);
+    }
+
+    #[test_case(None => "Interest { types: All, interface_id: None }")]
+    #[test_case(Some(vec![]) => "Interest { types: [], interface_id: None }")]
+    #[test_case(Some(vec![packet_formats_ndp::NdpOptionType::RecursiveDnsServer.into()])
+        => "Interest { types: [25 (RECURSIVE_DNS_SERVER)], interface_id: None }")]
+    #[test_case(Some(vec![1, packet_formats_ndp::NdpOptionType::RecursiveDnsServer.into()])
+        => "Interest { types: [1, 25 (RECURSIVE_DNS_SERVER)], interface_id: None }")]
+    fn format_interest(types: Option<Vec<OptionType>>) -> String {
+        format!("{:?}", Interest::new(types, None))
     }
 }

@@ -15,6 +15,8 @@
 #include "src/lib/files/file.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
 
+extern std::string DoPrePolicyLoadWork() { return "timerslack.pp"; }
+
 namespace {
 
 class ScopedTargetProcess {
@@ -56,7 +58,6 @@ class ScopedTargetProcess {
 };
 
 TEST(TimerslackNsTest, ReadWriteSelfNoPermRequired) {
-  LoadPolicy("timerslack.pp");
   auto enforce = ScopedEnforcement::SetEnforcing();
 
   ASSERT_TRUE(RunSubprocessAs("test_u:test_r:timerslack_no_perms_t:s0", [&] {
@@ -75,7 +76,6 @@ struct TestCase {
 class TimerslackNsTestWithParam : public ::testing::TestWithParam<TestCase> {};
 
 TEST_P(TimerslackNsTestWithParam, Read) {
-  LoadPolicy("timerslack.pp");
   auto enforce = ScopedEnforcement::SetEnforcing();
   ScopedTargetProcess target_process("test_u:test_r:timerslack_target_t:s0");
 
@@ -88,7 +88,6 @@ TEST_P(TimerslackNsTestWithParam, Read) {
 }
 
 TEST_P(TimerslackNsTestWithParam, Write) {
-  LoadPolicy("timerslack.pp");
   auto enforce = ScopedEnforcement::SetEnforcing();
   ScopedTargetProcess target_process("test_u:test_r:timerslack_target_t:s0");
 

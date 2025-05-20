@@ -47,7 +47,7 @@ pub struct CreateSystemArgs {
 
     /// the directory to write generated intermediate files to.
     #[argh(option)]
-    pub gendir: Option<Utf8PathBuf>,
+    pub gendir: Utf8PathBuf,
 
     /// name to give the Base Package. This is useful if you must publish multiple
     /// base packages to the same TUF repository.
@@ -172,11 +172,11 @@ pub struct ProductSizeCheckArgs {
     /// use specific auth mode for oauth2 (see examples; default: pkce).
     #[argh(option, default = "AuthMode::Default")]
     pub auth: AuthMode,
-    /// path to assembly_manifest.json.
+    /// path to the images.json.
     #[argh(option)]
     pub assembly_manifest: Utf8PathBuf,
-    /// path to the bast assembly_manifest.json which will be used to compare with the current
-    /// assembly_manifest.json to produce a diff.
+    /// path to the past images.json which will be used to compare with the current
+    /// images.json to produce a diff.
     #[argh(option)]
     pub base_assembly_manifest: Option<Utf8PathBuf>,
     /// whether to show the verbose output.
@@ -270,6 +270,11 @@ pub struct ProductArgs {
     /// one in the platform AIBs.
     #[argh(option)]
     pub custom_kernel_aib: Option<Utf8PathBuf>,
+
+    /// path to an AIB containing a customized qemu_kernel boot shim to use
+    /// instead of the in the platform AIBs.
+    #[argh(option)]
+    pub custom_boot_shim_aib: Option<Utf8PathBuf>,
 
     /// whether to hide the warning that shows the overrides that are enabled.
     /// This can be helpful to disable for test assemblies.

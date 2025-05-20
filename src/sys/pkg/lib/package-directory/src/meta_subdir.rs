@@ -52,7 +52,7 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
 }
 
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for MetaSubdir<S> {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -114,14 +114,14 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         }
 
         if let Some(subdir) = self.root_dir.get_meta_subdir(file_path + "/") {
-            let () = subdir.open(scope, flags, vfs::Path::dot(), server_end);
+            let () = subdir.deprecated_open(scope, flags, vfs::Path::dot(), server_end);
             return;
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: vfs::Path,
@@ -160,7 +160,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         }
 
         if let Some(subdir) = self.root_dir.get_meta_subdir(file_path + "/") {
-            return subdir.open3(scope, vfs::Path::dot(), flags, object_request);
+            return subdir.open(scope, vfs::Path::dot(), flags, object_request);
         }
 
         Err(zx::Status::NOT_FOUND)
@@ -206,7 +206,6 @@ mod tests {
     use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
     use fuchsia_pkg_testing::PackageBuilder;
     use futures::prelude::*;
-    use vfs::directory::entry_container::Directory as _;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
@@ -245,11 +244,7 @@ mod tests {
         let root_dir = RootDir::new(blobfs_client, metafar_blob.merkle).await.unwrap();
         let sub_dir = MetaSubdir::new(root_dir, "meta/dir/".to_string());
         for flags in [fio::PERM_WRITABLE, fio::PERM_EXECUTABLE] {
-            let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            let request = flags.to_object_request(server);
-            request.handle(|request: &mut vfs::ObjectRequest| {
-                sub_dir.clone().open3(ExecutionScope::new(), vfs::Path::dot(), flags, request)
-            });
+            let proxy = vfs::directory::serve(sub_dir.clone(), flags);
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })

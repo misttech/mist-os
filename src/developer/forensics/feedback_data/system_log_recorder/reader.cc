@@ -12,6 +12,7 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
+#include <functional>
 #include <string>
 #include <vector>
 

@@ -71,7 +71,8 @@ pub struct GetImagePathCommand {
     #[argh(option)]
     pub slot: Option<Slot>,
 
-    /// the type of image. Supported types are fvm, fxfs, qemu-kernel, vbmeta, zbi.
+    /// the type of image. Supported types are zbi, vbmeta, fvm, fxfs, fxfs.fastboot, qemu-kernel,
+    /// or dtbo.
     #[argh(option)]
     pub image_type: Option<ImageType>,
 

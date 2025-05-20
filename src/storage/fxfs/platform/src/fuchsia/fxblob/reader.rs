@@ -8,21 +8,19 @@ use crate::fxblob::directory::BlobDirectory;
 use anyhow::Error;
 use fuchsia_hash::Hash;
 
-use fxfs::errors::FxfsError;
 use std::sync::Arc;
 
 impl BlobDirectory {
     /// Get a pager-backed VMO for the blob identified by `hash` in this [`BlobDirectory`]. The blob
     /// cannot be purged until all VMOs returned by this function are destroyed.
     pub async fn get_blob_vmo(self: &Arc<Self>, hash: Hash) -> Result<zx::Vmo, Error> {
-        let blob = self.open_blob(&hash.into()).await?.ok_or(FxfsError::NotFound)?;
+        let (blob, vmo) = self.open_blob_get_vmo(&hash.into()).await?;
         {
             let mut guard = self.volume().pager().recorder();
             if let Some(recorder) = &mut (*guard) {
-                let _ = recorder.record_open(blob.0.clone());
+                let _ = recorder.record_open(blob);
             }
         }
-        let vmo = blob.create_child_vmo()?;
         Ok(vmo)
     }
 }

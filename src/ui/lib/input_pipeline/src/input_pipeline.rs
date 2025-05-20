@@ -99,7 +99,7 @@ impl InputPipelineAssembly {
                 // between releases.
                 let out_events = {
                     let _async_trace = fuchsia_trace::async_enter!(
-                        fuchsia_trace::Id::new(),
+                        fuchsia_trace::Id::random(),
                         c"input",
                         c"handle_input_event",
                         "name" => handler_name

@@ -378,7 +378,7 @@ size_t iconv(iconv_t cd0, char** restrict in, size_t* restrict inb, char** restr
           if (c >= 93 || d >= 94) {
             c += (0xa1 - 0x81);
             d += 0xa1;
-            if (c >= 93 || (c >= 0xc6 - 0x81 && d > 0x52))
+            if (c > 0xc6 - 0x81 || (c == 0xc6 - 0x81 && d > 0x52))
               goto ilseq;
             if (d - 'A' < 26)
               d = d - 'A';
@@ -437,6 +437,11 @@ size_t iconv(iconv_t cd0, char** restrict in, size_t* restrict inb, char** restr
           memcpy(*out, tmp, k);
         } else
           k = wctomb_utf8(*out, c);
+        /* This failure condition should be unreachable, but
+         * is included to prevent decoder bugs from translating
+         * into advancement outside the output buffer range. */
+        if (k > 4)
+          goto ilseq;
         *out += k;
         *outb -= k;
         break;

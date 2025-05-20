@@ -75,12 +75,12 @@ impl DaemonManager for DefaultDaemonManager {
 
             // TODO(https://fxbug.dev/42145498): Re-evaluate the need for this.
             match std::fs::remove_file(&self.socket_path) {
-                Ok(_) => tracing::info!("removed ascendd socket at {}", self.socket_path.display()),
+                Ok(_) => log::info!("removed ascendd socket at {}", self.socket_path.display()),
                 Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    tracing::info!("no existing ascendd socket at {}", self.socket_path.display());
+                    log::info!("no existing ascendd socket at {}", self.socket_path.display());
                 }
                 Err(e) => {
-                    tracing::info!(
+                    log::info!(
                         "failed to remove ascendd socket at {}: '{}'",
                         self.socket_path.display(),
                         e

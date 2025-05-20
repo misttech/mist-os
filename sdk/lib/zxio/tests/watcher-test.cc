@@ -66,7 +66,8 @@ TEST(WatcherTest, WatchInvalidCallback) {
 
   ASSERT_STATUS(zxio_watch_directory(io, nullptr, ZX_TIME_INFINITE, nullptr), ZX_ERR_INVALID_ARGS);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(io));
+  zxio_destroy(io);
 }
 
 TEST(WatcherTest, Smoke) {
@@ -120,5 +121,6 @@ TEST(WatcherTest, Smoke) {
   decltype(events) expected_events = {{ZXIO_WATCH_EVENT_ADD_FILE, "valid"}};
   ASSERT_EQ(events, expected_events);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(io));
+  zxio_destroy(io);
 }

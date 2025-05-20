@@ -47,9 +47,7 @@ trait Validate {
 }
 
 /// ELF identity header.
-#[derive(
-    KnownLayout, FromBytes, IntoBytes, Immutable, Debug, Eq, PartialEq, Default, Clone, Copy,
-)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct ElfIdent {
     /// e_ident[EI_MAG0:EI_MAG3]
@@ -73,7 +71,7 @@ const EI_NIDENT: usize = 16;
 assert_eq_size!(ElfIdent, [u8; EI_NIDENT]);
 
 /// ELF class, from EI_CLASS.
-#[derive(FromPrimitive, Eq, PartialEq)]
+#[derive(Debug, FromPrimitive, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ElfClass {
     /// ELFCLASSNONE
@@ -85,7 +83,7 @@ pub enum ElfClass {
 }
 
 /// ELF data encoding, from EI_DATA.
-#[derive(FromPrimitive, Eq, PartialEq)]
+#[derive(Debug, FromPrimitive, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ElfDataEncoding {
     /// ELFDATANONE
@@ -97,7 +95,7 @@ pub enum ElfDataEncoding {
 }
 
 /// ELF version, from EI_VERSION.
-#[derive(FromPrimitive, Eq, PartialEq)]
+#[derive(Debug, FromPrimitive, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ElfVersion {
     /// EV_NONE
@@ -130,9 +128,29 @@ impl ElfIdent {
     }
 }
 
-#[derive(
-    KnownLayout, FromBytes, IntoBytes, Immutable, Debug, Eq, PartialEq, Default, Clone, Copy,
-)]
+impl std::fmt::Debug for ElfIdent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("ElfIdent");
+        s.field("magic", &self.magic);
+
+        match self.class() {
+            Ok(c) => s.field("class", &c),
+            Err(unknown) => s.field("class", &unknown),
+        };
+        match self.data() {
+            Ok(d) => s.field("data", &d),
+            Err(unknown) => s.field("data", &unknown),
+        };
+        match self.version() {
+            Ok(v) => s.field("version", &v),
+            Err(unknown) => s.field("version", &unknown),
+        };
+
+        s.field("osabi", &self.osabi).field("abiversion", &self.abiversion).finish()
+    }
+}
+
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct Elf64FileHeader {
     pub ident: ElfIdent,
@@ -151,9 +169,7 @@ pub struct Elf64FileHeader {
     pub shstrndx: u16,
 }
 
-#[derive(
-    KnownLayout, FromBytes, IntoBytes, Immutable, Debug, Eq, PartialEq, Default, Clone, Copy,
-)]
+#[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct Elf32FileHeader {
     pub ident: ElfIdent,
@@ -244,6 +260,35 @@ impl Elf64FileHeader {
     }
 }
 
+impl std::fmt::Debug for Elf64FileHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("Elf64FileHeader");
+        s.field("ident", &self.ident);
+
+        match self.elf_type() {
+            Ok(t) => s.field("elf_type", &t),
+            Err(unknown) => s.field("elf_type", &unknown),
+        };
+        match self.machine() {
+            Ok(m) => s.field("machine", &m),
+            Err(unknown) => s.field("machine", &unknown),
+        };
+
+        s.field("version", &self.version)
+            .field("entry", &format_args!("{:#x}", self.entry))
+            .field("phoff", &format_args!("{:#x}", self.phoff))
+            .field("shoff", &format_args!("{:#x}", self.shoff))
+            .field("flags", &format_args!("{:#x}", self.flags))
+            .field("ehsize", &self.ehsize)
+            .field("phentsize", &self.phentsize)
+            .field("phnum", &self.phnum)
+            .field("shentsize", &self.shentsize)
+            .field("shnum", &self.shnum)
+            .field("shstrndx", &self.shstrndx)
+            .finish()
+    }
+}
+
 impl Elf32FileHeader {
     pub fn elf_type(&self) -> Result<ElfType, u16> {
         ElfType::from_u16(self.elf_type).ok_or(self.elf_type)
@@ -259,6 +304,35 @@ impl Elf32FileHeader {
         vmo.read(header.as_mut_bytes(), 0).map_err(|s| ElfParseError::ReadError(s))?;
         header.validate()?;
         Ok(header)
+    }
+}
+
+impl std::fmt::Debug for Elf32FileHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("Elf32FileHeader");
+        s.field("ident", &self.ident);
+
+        match self.elf_type() {
+            Ok(t) => s.field("elf_type", &t),
+            Err(unknown) => s.field("elf_type", &unknown),
+        };
+        match self.machine() {
+            Ok(m) => s.field("machine", &m),
+            Err(unknown) => s.field("machine", &unknown),
+        };
+
+        s.field("version", &self.version)
+            .field("entry", &format_args!("{:#x}", self.entry))
+            .field("phoff", &format_args!("{:#x}", self.phoff))
+            .field("shoff", &format_args!("{:#x}", self.shoff))
+            .field("flags", &format_args!("{:#x}", self.flags))
+            .field("ehsize", &self.ehsize)
+            .field("phentsize", &self.phentsize)
+            .field("phnum", &self.phnum)
+            .field("shentsize", &self.shentsize)
+            .field("shnum", &self.shnum)
+            .field("shstrndx", &self.shstrndx)
+            .finish()
     }
 }
 
@@ -357,9 +431,7 @@ impl Into<Box<Elf64FileHeader>> for Box<Elf32FileHeader> {
     }
 }
 
-#[derive(
-    KnownLayout, FromBytes, Immutable, IntoBytes, Debug, Eq, PartialEq, Default, Clone, Copy,
-)]
+#[derive(KnownLayout, FromBytes, Immutable, IntoBytes, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct Elf64ProgramHeader {
     pub segment_type: u32,
@@ -372,9 +444,7 @@ pub struct Elf64ProgramHeader {
     pub align: u64,
 }
 
-#[derive(
-    KnownLayout, FromBytes, Immutable, IntoBytes, Debug, Eq, PartialEq, Default, Clone, Copy,
-)]
+#[derive(KnownLayout, FromBytes, Immutable, IntoBytes, Eq, PartialEq, Default, Clone, Copy)]
 #[repr(C)]
 pub struct Elf32ProgramHeader {
     pub segment_type: u32,
@@ -548,6 +618,26 @@ impl Elf64ProgramHeader {
     }
 }
 
+impl std::fmt::Debug for Elf64ProgramHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("Elf64ProgramHeader");
+
+        match self.segment_type() {
+            Ok(t) => s.field("segment_type", &t),
+            Err(unknown) => s.field("segment_type", &unknown),
+        };
+
+        s.field("flags", &self.flags())
+            .field("offset", &format_args!("{:#x}", self.offset))
+            .field("vaddr", &format_args!("{:#x}", self.vaddr))
+            .field("paddr", &format_args!("{:#x}", self.paddr))
+            .field("filesz", &format_args!("{:#x}", self.filesz))
+            .field("memsz", &format_args!("{:#x}", self.memsz))
+            .field("align", &self.align)
+            .finish()
+    }
+}
+
 impl Elf32ProgramHeader {
     pub fn segment_type(&self) -> Result<SegmentType, u32> {
         SegmentType::from_u32(self.segment_type).ok_or(self.segment_type)
@@ -556,6 +646,26 @@ impl Elf32ProgramHeader {
     pub fn flags(&self) -> SegmentFlags {
         // Ignore bits that don't correspond to one of the flags included in SegmentFlags
         SegmentFlags::from_bits_truncate(self.flags)
+    }
+}
+
+impl std::fmt::Debug for Elf32ProgramHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("Elf32ProgramHeader");
+
+        match self.segment_type() {
+            Ok(t) => s.field("segment_type", &t),
+            Err(unknown) => s.field("segment_type", &unknown),
+        };
+
+        s.field("flags", &self.flags())
+            .field("offset", &format_args!("{:#x}", self.offset))
+            .field("vaddr", &format_args!("{:#x}", self.vaddr))
+            .field("paddr", &format_args!("{:#x}", self.paddr))
+            .field("filesz", &format_args!("{:#x}", self.filesz))
+            .field("memsz", &format_args!("{:#x}", self.memsz))
+            .field("align", &self.align)
+            .finish()
     }
 }
 

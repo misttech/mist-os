@@ -542,6 +542,9 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRe
   // ConfigureInterrupt().
 
   uint32_t flags = 0;
+  if (request->options & fuchsia_hardware_gpio::wire::InterruptOptions::kTimestampMono) {
+    flags |= ZX_INTERRUPT_TIMESTAMP_MONO;
+  }
   if (request->options & fuchsia_hardware_gpio::wire::InterruptOptions::kWakeable) {
     // TODO(b/361851116): Use ZX_INTERRUPT_WAKE_VECTOR when syscall-next is available.
     flags |= /* ZX_INTERRUPT_WAKE_VECTOR */ 0x20;

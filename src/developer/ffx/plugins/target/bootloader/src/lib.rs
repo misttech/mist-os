@@ -16,21 +16,18 @@ use ffx_bootloader_args::SubCommand::{Boot, Info, Lock, Unlock};
 use ffx_bootloader_args::{BootCommand, BootloaderCommand, UnlockCommand};
 use ffx_config::EnvironmentContext;
 use ffx_fastboot::boot::boot;
-use ffx_fastboot::common::fastboot::{
-    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
-};
 use ffx_fastboot::common::from_manifest;
 use ffx_fastboot::file_resolver::resolvers::EmptyResolver;
 use ffx_fastboot::info::info;
 use ffx_fastboot::lock::lock;
 use ffx_fastboot::unlock::unlock;
 use ffx_fastboot::util::{Event, UnlockEvent};
+use ffx_fastboot_connection_factory::{
+    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
+};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress, Variable};
 use ffx_writer::VerifiedMachineWriter;
-use fho::{
-    deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool,
-    FhoTargetInfo,
-};
+use fho::{deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
 use fidl::Error;
 use fidl_fuchsia_developer_ffx::TargetState as FidlTargetState;
 use fidl_fuchsia_hardware_power_statecontrol::AdminProxy;
@@ -106,7 +103,7 @@ impl FfxMain for BootloaderTool {
         let target_state = match &self.target_info.target_state {
             Some(FidlTargetState::Fastboot) => {
                 // Nothing to do
-                tracing::debug!("Target already in Fastboot state");
+                log::debug!("Target already in Fastboot state");
 
                 let s: discovery::TargetHandle = (*self.target_info).clone().try_into()?;
                 s.state
@@ -129,7 +126,7 @@ Reboot the Target to the bootloader and re-run this command."
                 let info = device.get_info().await.bug_context("Getting target device info")?;
 
                 // Tell the target to reboot to the bootloader
-                tracing::debug!("Target in Product state. Rebooting to bootloader...",);
+                log::debug!("Target in Product state. Rebooting to bootloader...",);
 
                 let p_proxy = self.power_proxy.await?;
 
@@ -164,7 +161,7 @@ Reboot the Target to the bootloader and re-run this command."
                 let c_clone = criteria.clone();
 
                 let filter_target = move |handle: &TargetHandle| {
-                    tracing::debug!("Considering handle: {:#?}", handle);
+                    log::debug!("Considering handle: {:#?}", handle);
                     match &handle.state {
                         discovery::TargetState::Fastboot(fts)
                             if Some(fts.serial_number.clone()) == c_clone.serial =>
@@ -172,7 +169,7 @@ Reboot the Target to the bootloader and re-run this command."
                             true
                         }
                         _ => {
-                            tracing::debug!("Skipping handle: {:#?}", handle);
+                            log::debug!("Skipping handle: {:#?}", handle);
                             false
                         }
                     }
@@ -199,7 +196,7 @@ Reboot the Target to the bootloader and re-run this command."
                                             discovery::TargetState::Fastboot(fts) => {
                                                 match c_clone.serial {
                                                     Some(c) if c == fts.serial_number => {
-                                                        tracing::debug!(
+                                                        log::debug!(
                                                             "Found the target, firing signal"
                                                         );
                                                         found_ev.signal();
@@ -235,7 +232,7 @@ Reboot the Target to the bootloader and re-run this command."
                 ffx_bail!("Bootloader operations not supported with Zedboot");
             }
             Some(FidlTargetState::Disconnected) => {
-                tracing::info!("Target: {:#?} not connected bailing", self.target_info);
+                log::info!("Target: {:#?} not connected bailing", self.target_info);
                 ffx_bail!("Target is disconnected...");
             }
             None => {
@@ -259,7 +256,7 @@ Reboot the Target to the bootloader and re-run this command."
                             let target_name = if let Some(nodename) = self.target_info.nodename() {
                                 nodename
                             } else {
-                                tracing::debug!(
+                                log::debug!(
                                     r"
             Warning: the target does not have a node name and is in TCP fastboot mode.
             Rediscovering the target after bootloader reboot will be impossible.
@@ -293,7 +290,7 @@ Reboot the Target to the bootloader and re-run this command."
                             let target_name = if let Some(nodename) = self.target_info.nodename() {
                                 nodename.to_string()
                             } else {
-                                tracing::debug!(
+                                log::debug!(
                                     r"
         Warning: the target does not have a node name and is in UDP fastboot mode.
         Rediscovering the target after bootloader reboot will be impossible.
@@ -336,15 +333,15 @@ fn handle_fidl_connection_err(e: Error) -> fho::Result<()> {
             // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
             // then we can be more confident that target reboot/shutdown has succeeded.
             if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
-                tracing::info!("Target reboot succeeded.");
+                log::info!("Target reboot succeeded.");
             } else {
-                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+                log::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
             }
-            tracing::debug!("{:?}", e);
+            log::debug!("{:?}", e);
             Ok(())
         }
         _ => {
-            tracing::error!("Target communication error: {:?}", e);
+            log::error!("Target communication error: {:?}", e);
             return_bug!("Target communication error: {:?}", e)
         }
     }
@@ -359,7 +356,7 @@ async fn handle_upload(
         match prog_server.recv().await {
             Some(UploadProgress::OnStarted { size, .. }) => {
                 start_time.replace(Utc::now());
-                tracing::debug!("Upload started: {}", size);
+                log::debug!("Upload started: {}", size);
                 write!(writer, "Uploading... ")?;
                 if size > (1 << 24) {
                     write!(writer, "Large file")?;
@@ -369,19 +366,19 @@ async fn handle_upload(
             Some(UploadProgress::OnFinished { .. }) => {
                 if let Some(st) = start_time {
                     let d = Utc::now().signed_duration_since(st);
-                    tracing::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
+                    log::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
                 } else {
                     writeln!(writer, "{}Done{}", color::Fg(color::Green), style::Reset)?;
                     writer.flush()?;
                 }
-                tracing::debug!("Upload finished");
+                log::debug!("Upload finished");
             }
             Some(UploadProgress::OnError { error, .. }) => {
-                tracing::error!("{}", error);
+                log::error!("{}", error);
                 ffx_bail!("{}", error)
             }
             Some(UploadProgress::OnProgress { bytes_written, .. }) => {
-                tracing::trace!("Upload progress: {}", bytes_written);
+                log::trace!("Upload progress: {}", bytes_written);
             }
             None => return Ok(()),
         }
@@ -437,7 +434,7 @@ async fn handle_events(
             Some(Event::Upload(upload)) => match upload {
                 UploadProgress::OnStarted { size, .. } => {
                     start_time.replace(Utc::now());
-                    tracing::debug!("Upload started: {}", size);
+                    log::debug!("Upload started: {}", size);
                     write!(writer, "Uploading... ")?;
                     if size > (1 << 24) {
                         write!(writer, "Large file")?;
@@ -447,19 +444,19 @@ async fn handle_events(
                 UploadProgress::OnFinished { .. } => {
                     if let Some(st) = start_time {
                         let d = Utc::now().signed_duration_since(st);
-                        tracing::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
+                        log::debug!("Upload duration: {:.2}s", (d.num_milliseconds() / 1000));
                     } else {
                         writeln!(writer, "{}Done{}", color::Fg(color::Green), style::Reset)?;
                         writer.flush()?;
                     }
-                    tracing::debug!("Upload finished");
+                    log::debug!("Upload finished");
                 }
                 UploadProgress::OnError { error, .. } => {
-                    tracing::error!("{}", error);
+                    log::error!("{}", error);
                     ffx_bail!("{}", error)
                 }
                 UploadProgress::OnProgress { bytes_written, .. } => {
-                    tracing::trace!("Upload progress: {}", bytes_written);
+                    log::trace!("Upload progress: {}", bytes_written);
                 }
             },
             Some(Event::FlashPartition { .. }) | Some(Event::FlashPartitionFinished { .. }) => {
@@ -608,7 +605,7 @@ mod test {
     use super::*;
     use ffx_bootloader_args::LockCommand;
     use ffx_fastboot::common::vars::LOCKED_VAR;
-    use ffx_fastboot::test::setup;
+    use ffx_fastboot_interface::test::setup;
     use ffx_writer::Format;
     use tempfile::NamedTempFile;
 

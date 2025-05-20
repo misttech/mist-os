@@ -56,19 +56,19 @@ pub struct ProcedureManager<I: ProcedureInputT<O>, O: ProcedureOutputT> {
     stream_waker: Option<Waker>,
     /// Collection of shared features and indicators between two
     /// devices that procedures can change.
-    pub procedure_managed_state: ProcedureManipulatedState,
+    pub procedure_manipulated_state: ProcedureManipulatedState,
 }
 
 impl<I: ProcedureInputT<O>, O: ProcedureOutputT> ProcedureManager<I, O> {
-    pub fn new(peer_id: PeerId, config: HandsFreeFeatureSupport) -> Self {
-        let procedure_managed_state = ProcedureManipulatedState::new(config);
+    pub fn new(peer_id: PeerId, hf_features: HandsFreeFeatureSupport) -> Self {
+        let procedure_manipulated_state = ProcedureManipulatedState::new(hf_features);
         Self {
             peer_id,
             current_procedure: None,
             current_procedure_inputs: VecDeque::new(),
             future_procedure_inputs: VecDeque::new(),
             stream_waker: None,
-            procedure_managed_state,
+            procedure_manipulated_state,
         }
     }
 
@@ -125,7 +125,7 @@ impl<I: ProcedureInputT<O>, O: ProcedureOutputT> ProcedureManager<I, O> {
         // The current procedure was already set or is was set by
         // `set_new_procedure_and_get_input` if it returned successfully.
         let procedure = self.current_procedure.as_mut().unwrap();
-        let result = procedure.transition(&mut self.procedure_managed_state, input);
+        let result = procedure.transition(&mut self.procedure_manipulated_state, input);
 
         result
     }

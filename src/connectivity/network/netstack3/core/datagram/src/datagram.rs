@@ -37,7 +37,7 @@ use netstack3_base::{
     RemoteAddressError, RemoveResourceResultWithContext, RngContext, SocketError,
     StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
-use netstack3_filter::TransportPacketSerializer;
+use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
 use netstack3_ip::socket::{
     DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSock, IpSockCreateAndSendError,
     IpSockCreationError, IpSockSendError, IpSocketHandler, RouteResolutionOptions,
@@ -136,8 +136,14 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> DerefMut
 }
 
 /// Marker trait for datagram IP extensions.
-pub trait IpExt: netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt {}
-impl<I: netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt> IpExt for I {}
+pub trait IpExt:
+    netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt + FilterIpExt
+{
+}
+impl<I: netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt + FilterIpExt> IpExt
+    for I
+{
+}
 
 /// A datagram socket's state.
 #[derive(Derivative, GenericOverIp)]
@@ -1123,12 +1129,12 @@ pub trait DatagramSocketMapSpec<I: Ip, D: DeviceIdentifier, A: SocketMapAddrSpec
 /// This trait acts as a marker for [`DualStackBaseIpExt`] for both `Self` and
 /// `Self::OtherVersion`.
 pub trait DualStackIpExt:
-    DualStackBaseIpExt + socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+    DualStackBaseIpExt + socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt + FilterIpExt>
 {
 }
 
 impl<I> DualStackIpExt for I where
-    I: DualStackBaseIpExt + socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt>
+    I: DualStackBaseIpExt + socket::DualStackIpExt<OtherVersion: DualStackBaseIpExt + FilterIpExt>
 {
 }
 
@@ -1138,7 +1144,9 @@ impl<I> DualStackIpExt for I where
 /// useful for implementing dual-stack sockets. The types are intentionally
 /// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
 /// and [`Ipv6`] impls.
-pub trait DualStackBaseIpExt: socket::DualStackIpExt + SocketIpExt + netstack3_base::IpExt {
+pub trait DualStackBaseIpExt:
+    socket::DualStackIpExt + SocketIpExt + netstack3_base::IpExt + FilterIpExt
+{
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just

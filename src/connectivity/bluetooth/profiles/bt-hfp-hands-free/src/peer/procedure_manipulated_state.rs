@@ -5,9 +5,11 @@
 use super::hf_indicators::HfIndicators;
 
 use crate::config::HandsFreeFeatureSupport;
-use crate::features::{AgFeatures, CallHoldAction, HfFeatures, CVSD};
+use crate::features::{AgFeatures, CallHoldAction, HfFeatures};
 
-#[derive(Clone, Default)]
+use bt_hfp::codec_id::CodecId;
+
+#[derive(Clone, Debug)]
 pub struct ProcedureManipulatedState {
     /// Determines whether the SLCI procedure has completed and we
     /// can proceed to do other procedures.
@@ -27,22 +29,24 @@ pub struct ProcedureManipulatedState {
     /// Features supported from the three-way calling or call waiting
     pub three_way_features: Vec<CallHoldAction>,
     /// The negotiated codec for this connection between the AG and HF.
-    pub selected_codec: Option<u8>,
+    pub selected_codec: Option<CodecId>,
     /// The codec(s) supported by the HF.
-    pub supported_codecs: Vec<u8>,
+    pub supported_codecs: Vec<CodecId>,
 }
 
 impl ProcedureManipulatedState {
-    pub fn new(config: HandsFreeFeatureSupport) -> Self {
+    pub fn new(hf_feature_support: HandsFreeFeatureSupport) -> Self {
         Self {
             initialized: false,
-            hf_features: config.into(),
+            hf_features: hf_feature_support.into(),
             ag_features: AgFeatures::default(),
             hf_indicators: HfIndicators::default(),
             indicators_update_enabled: true,
             three_way_features: Vec::new(),
             selected_codec: None,
-            supported_codecs: vec![CVSD],
+            // TODO(https://fxbug.dev/130963) Make this configurable.
+            // By default, we support the CVSD and MSBC codecs.
+            supported_codecs: vec![CodecId::CVSD, CodecId::MSBC],
         }
     }
 
@@ -64,5 +68,12 @@ impl ProcedureManipulatedState {
     #[cfg(test)]
     pub fn load_with_set_features(hf_features: HfFeatures, ag_features: AgFeatures) -> Self {
         Self { hf_features, ag_features, ..ProcedureManipulatedState::default() }
+    }
+}
+
+impl Default for ProcedureManipulatedState {
+    fn default() -> Self {
+        let hf_feature_support = HandsFreeFeatureSupport::default();
+        ProcedureManipulatedState::new(hf_feature_support)
     }
 }

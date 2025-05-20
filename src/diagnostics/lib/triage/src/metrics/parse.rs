@@ -108,7 +108,7 @@ fn simple_name(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
 // Metric-type Expression holding the namespaced name.
 fn name_with_namespace(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     map(separated_pair(simple_name, tag("::"), simple_name), move |(s1, s2)| {
-        ExpressionTree::Variable(VariableName::new(format!("{}::{}", s1, s2)))
+        ExpressionTree::Variable(VariableName::new(format!("{s1}::{s2}")))
     })
     .parse(i)
 }
@@ -450,7 +450,7 @@ mod test {
                     }
                 )
             )),
-            Err(Incomplete(e)) => Res::Err(format!("Incomplete: {:?}", e)),
+            Err(Incomplete(e)) => Res::Err(format!("Incomplete: {e:?}")),
             Ok((unused, result)) => Res::Ok(unused.into_inner(), result),
         }
     }

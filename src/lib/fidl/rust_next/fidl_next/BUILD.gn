@@ -24,6 +24,7 @@ rustc_library("fidl_next") {
     "//sdk/fidl/*",
     "//sdk/lib/driver/*",
     "//src/lib/fidl/rust_next/*",
+    "//src/tests/fidl/conformance_suite:*",
     "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_rust_next/*",
   ]

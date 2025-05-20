@@ -16,17 +16,21 @@
 
 namespace msd {
 
-class FakeTestDriver : public MagmaTestDriverBase {
+class FakeTestDriver : public MagmaDriverBase {
  public:
   FakeTestDriver(fdf::DriverStartArgs start_args,
                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaTestDriverBase("fake_test_driver", std::move(start_args),
-                            std::move(driver_dispatcher)) {}
+      : MagmaDriverBase("fake_test_driver", std::move(start_args), std::move(driver_dispatcher)) {}
   zx::result<> MagmaStart() override {
     std::lock_guard lock(magma_mutex());
 
     set_magma_driver(msd::Driver::Create());
     if (!magma_driver()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    test_server_.set_unit_test_status(ZX_OK);
+    zx::result result = CreateTestService(test_server_);
+    if (result.is_error()) {
       return zx::error(ZX_ERR_INTERNAL);
     }
 
@@ -37,15 +41,17 @@ class FakeTestDriver : public MagmaTestDriverBase {
     }
     return zx::ok();
   }
+
+ private:
+  msd::MagmaTestServer test_server_;
 };
 
 namespace {
 
-class FakeDriver : public MagmaProductionDriverBase {
+class FakeDriver : public MagmaDriverBase {
  public:
   FakeDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaProductionDriverBase("fake_driver", std::move(start_args),
-                                  std::move(driver_dispatcher)) {}
+      : MagmaDriverBase("fake_driver", std::move(start_args), std::move(driver_dispatcher)) {}
   zx::result<> MagmaStart() override {
     std::lock_guard lock(magma_mutex());
 

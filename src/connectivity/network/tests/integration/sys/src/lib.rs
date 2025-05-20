@@ -12,6 +12,8 @@ use netemul::{TestRealm, TestSandbox};
 use netstack_testing_common::realms::{constants, Netstack, NetstackVersion, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use std::borrow::Cow;
+use std::collections::HashSet;
+use std::iter;
 use {fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket};
 
 const MOCK_SERVICES_NAME: &str = "mock";
@@ -20,7 +22,6 @@ const NETSTACK_SERVICE_NAME: &str = "netstack";
 
 fn create_netstack_with_mock_endpoint<'s, RS: RequestStream + 'static, N: Netstack>(
     sandbox: &'s TestSandbox,
-    service_name: String,
     name: &'s str,
 ) -> (TestRealm<'s>, ServiceFs<ServiceObj<'s, RS>>)
 where
@@ -48,14 +49,17 @@ where
             netstack.uses.as_mut().expect("empty uses");
         capabilities.push(fnetemul::Capability::ChildDep(fnetemul::ChildDep {
             name: Some(MOCK_SERVICES_NAME.to_string()),
-            capability: Some(fnetemul::ExposedCapability::Protocol(service_name.clone())),
+            capability: Some(fnetemul::ExposedCapability::Protocol(
+                RS::Protocol::PROTOCOL_NAME.to_string(),
+            )),
             ..Default::default()
         }));
     }
 
     let (mock_dir, server_end) = fidl::endpoints::create_endpoints();
     let mut fs = ServiceFs::new();
-    let _: &mut ServiceFsDir<'_, _> = fs.dir("svc").add_fidl_service_at(service_name, |rs: RS| rs);
+    let _: &mut ServiceFsDir<'_, _> =
+        fs.dir("svc").add_fidl_service_at(RS::Protocol::PROTOCOL_NAME, |rs: RS| rs);
     let _: &mut ServiceFs<_> = fs.serve_connection(server_end).expect("serve connection");
 
     let realm = sandbox
@@ -88,11 +92,7 @@ async fn ns_sets_thread_profiles<N: Netstack>(name: &str) {
     let (_realm, mut fs) = create_netstack_with_mock_endpoint::<
         fidl_fuchsia_scheduler_deprecated::ProfileProviderRequestStream,
         N,
-    >(
-        &sandbox,
-        fidl_fuchsia_scheduler_deprecated::ProfileProviderMarker::PROTOCOL_NAME.to_string(),
-        name,
-    );
+    >(&sandbox, name);
 
     let profile_provider_request_stream = fs.next().await.expect("fs terminated unexpectedly");
 
@@ -150,16 +150,11 @@ async fn ns_sets_thread_profiles<N: Netstack>(name: &str) {
 #[netstack_test]
 #[variant(N, Netstack)]
 async fn ns_requests_inspect_persistence<N: Netstack>(name: &str) {
-    let persist_path = format!(
-        "{}-netstack",
-        fidl_fuchsia_diagnostics_persist::DataPersistenceMarker::PROTOCOL_NAME
-    );
-
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (_realm, fs) = create_netstack_with_mock_endpoint::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream,
         N,
-    >(&sandbox, persist_path, name);
+    >(&sandbox, name);
 
     let config = persistence_config::load_configuration_files_from(CONFIG_PATH)
         .expect("load configuration files failed");
@@ -174,20 +169,38 @@ async fn assert_persist_called_for_tags<N: Netstack>(
     fs: ServiceFs<ServiceObj<'_, fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream>>,
     config: &persistence_config::Config,
 ) {
-    let tags = config.get(NETSTACK_SERVICE_NAME).expect("config missing netstack service");
-    let _: Vec<()> = fs
+    // Read a request from the DataPersistence request stream. Tests should only
+    // send one PersistTags request with all configured tags.
+    let (persist_tags, responder) = fs
         .flatten()
-        .map(|request| {
-            let (tag, responder) =
-                request.expect("fs failure").into_persist().expect("unexpected request");
-            assert!(tags.contains_key(&persistence_config::Tag::new(tag).expect("invalid tag")));
-            responder
-                .send(fidl_fuchsia_diagnostics_persist::PersistResult::Queued)
-                .expect("failed to respond");
-        })
-        .take(tags.len())
-        .collect()
-        .await;
+        .next()
+        .await
+        .expect("fs terminated unexpectedly")
+        .expect("fs failure")
+        .into_persist_tags()
+        .expect("unexpected request");
+
+    let got_tags = persist_tags
+        .into_iter()
+        .map(|t| persistence_config::Tag::new(t).expect("invalid tag"))
+        .collect::<HashSet<persistence_config::Tag>>();
+
+    let want_tags = config
+        .get(NETSTACK_SERVICE_NAME)
+        .expect("config missing netstack service")
+        .keys()
+        .cloned()
+        .collect::<HashSet<persistence_config::Tag>>();
+
+    assert_eq!(got_tags, want_tags);
+
+    responder
+        .send(
+            &iter::repeat(fidl_fuchsia_diagnostics_persist::PersistResult::Queued)
+                .take(got_tags.len())
+                .collect::<Vec<_>>(),
+        )
+        .expect("failed to respond");
 }
 
 #[netstack_test]
@@ -266,16 +279,11 @@ where
         &persistence_config::TagConfig,
     ) -> (),
 {
-    let persist_path = format!(
-        "{}-netstack",
-        fidl_fuchsia_diagnostics_persist::DataPersistenceMarker::PROTOCOL_NAME
-    );
-
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let (realm, fs) = create_netstack_with_mock_endpoint::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceRequestStream,
         N,
-    >(&sandbox, persist_path, name);
+    >(&sandbox, name);
 
     let config = persistence_config::load_configuration_files_from(CONFIG_PATH)
         .expect("load configuration files failed");

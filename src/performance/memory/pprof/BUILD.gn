@@ -19,6 +19,7 @@ rustc_library("pprof") {
 
   deps = [
     ":pprof_proto",
+    "//src/performance/memory/index_table_builder",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:thiserror",
   ]

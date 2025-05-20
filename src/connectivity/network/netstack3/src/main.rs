@@ -11,8 +11,11 @@ mod bindings;
 
 use std::num::NonZeroU8;
 
+use fidl::endpoints::RequestStream as _;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
-use log::info;
+use futures::{Future, FutureExt as _, StreamExt as _};
+use log::{error, info};
+use {fidl_fuchsia_process_lifecycle as fprocess_lifecycle, fuchsia_async as fasync};
 
 use bindings::{GlobalConfig, InspectPublisher, NetstackSeed, Service};
 
@@ -85,7 +88,8 @@ pub fn main() {
         .add_fidl_service(Service::NdpWatcher)
         .add_fidl_service(Service::Neighbor)
         .add_fidl_service(Service::NeighborController)
-        .add_fidl_service(Service::HealthCheck);
+        .add_fidl_service(Service::HealthCheck)
+        .add_fidl_service(Service::SocketControl);
 
     let seed = NetstackSeed::new(GlobalConfig {
         suspend_enabled: *suspend_enabled,
@@ -100,5 +104,61 @@ pub fn main() {
 
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle().expect("directory handle");
 
+    // Short circuit when we receive a lifecycle stop request.
+    let fs = fs.take_until(get_lifecycle_stop_fut());
+
     executor.run(seed.serve(fs, inspect_publisher))
+}
+
+/// Takes the lifecycle handle from startup and returns a future that resolves
+/// whenever the system has requested shutdown.
+fn get_lifecycle_stop_fut() -> impl Future<Output = ()> {
+    // Lifecycle handle takes no args, must be set to zero.
+    // See zircon/processargs.h.
+    const LIFECYCLE_HANDLE_ARG: u16 = 0;
+    let Some(handle) = fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleInfo::new(
+        fuchsia_runtime::HandleType::Lifecycle,
+        LIFECYCLE_HANDLE_ARG,
+    )) else {
+        // If we haven't received a lifecycle handle, don't ever stop the
+        // request streams.
+        return futures::future::pending::<()>().left_future();
+    };
+
+    async move {
+        let mut request_stream = fprocess_lifecycle::LifecycleRequestStream::from_channel(
+            fasync::Channel::from_channel(handle.into()).into(),
+        );
+        loop {
+            match request_stream.next().await {
+                Some(Ok(fprocess_lifecycle::LifecycleRequest::Stop { control_handle })) => {
+                    info!("received shutdown request");
+                    // Shutdown request is acknowledged by the lifecycle
+                    // channel shutting down. Intentionally leak the channel
+                    // so it'll only be closed on process termination,
+                    // allowing clean process termination to always be
+                    // observed.
+
+                    // Must drop the control_handle to unwrap the
+                    // lifecycle channel.
+                    std::mem::drop(control_handle);
+                    let (inner, _terminated): (_, bool) = request_stream.into_inner();
+                    let inner = std::sync::Arc::try_unwrap(inner)
+                        .expect("failed to retrieve lifecycle channel");
+                    let inner: zx::Channel = inner.into_channel().into_zx_channel();
+                    std::mem::forget(inner);
+                    break;
+                }
+                Some(Err(e)) => error!("observed error in lifecycle request stream: {e:?}"),
+                None => {
+                    // Something really bad must've happened here. We chose
+                    // not to panic because the system must be in a bad
+                    // state, log an error and hold forever.
+                    error!("lifecycle channel closed");
+                    futures::future::pending::<()>().await;
+                }
+            }
+        }
+    }
+    .right_future()
 }

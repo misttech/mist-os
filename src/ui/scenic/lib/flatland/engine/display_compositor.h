@@ -323,6 +323,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   struct ApplyConfigInfo {
     fuchsia_hardware_display::wire::ConfigStamp config_stamp;
     uint64_t frame_number;
+    uint64_t trace_flow_id;
   };
 
   // The next ConfigStamp value used in an ApplyConfig() call.
@@ -331,6 +332,10 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // A queue storing all display frame configurations that are applied but not yet shown on the
   // display device.
   std::deque<ApplyConfigInfo> pending_apply_configs_;
+
+  // The last frame number called in RenderFrame(), this number is use assert the frame number is
+  // strictly increasing.
+  std::optional<uint64_t> last_frame_number_;
 
   // Stores the ConfigStamp information of the latest frame shown on the display. If no frame
   // has been presented, its value will be nullopt.
@@ -343,10 +348,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Constant except for in tests.
   bool enable_display_composition_ = true;
 
-  // TODO(https://fxbug.dev/42078234): Display controller currently doesn't allow flipping one image
-  // on one layer, but keeping the image on another layer the same in consecutive configs. As a
-  // result, using multiple layers is broken. This field is used to limit it.
-  uint32_t max_display_layers_ = 1;
+  // The maximum number of layers that can be displayed at once, on a given display.
+  const uint32_t max_display_layers_;
 
   ColorConversionStateMachine cc_state_machine_;
 

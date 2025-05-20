@@ -17,7 +17,7 @@ impl DefineSubsystemConfiguration<(&IntlConfig, &PlatformSessionConfig)> for Int
         let (config, session_config) = *platform_config;
 
         // These settings require a core realm.
-        if *context.feature_set_level != FeatureSupportLevel::Standard {
+        if *context.feature_set_level != FeatureSetLevel::Standard {
             if config.config_type.is_some() {
                 return Err(anyhow!(concat!(
                     "setting config_type for `intl` is only supported",
@@ -33,7 +33,7 @@ impl DefineSubsystemConfiguration<(&IntlConfig, &PlatformSessionConfig)> for Int
         }
 
         // Only perform configuration in the standard feature set level
-        if *context.feature_set_level == FeatureSupportLevel::Standard {
+        if *context.feature_set_level == FeatureSetLevel::Standard {
             match config.config_type.clone().unwrap_or_default() {
                 Type::Default => {
                     builder

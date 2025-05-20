@@ -26,7 +26,7 @@ include /src/sys/lib/cm_types/OWNERS
 include /src/sys/lib/component_debug/OWNERS
 include /src/sys/lib/routing/OWNERS
 include /src/sys/pkg/OWNERS
-include /third_party/rust_crates/vendor/mock-omaha-server-0.3.3/OWNERS
+include /third_party/rust_crates/vendor/mock-omaha-server-0.3.4/OWNERS
 include /third_party/rust_crates/vendor/valico-2.4.2/OWNERS
 include /tools/doc_checker/OWNERS
 include /tools/lib/cm_fidl_analyzer/OWNERS

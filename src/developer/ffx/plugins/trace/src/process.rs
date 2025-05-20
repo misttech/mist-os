@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_trace::SymbolizationMap;
 use fxt::{ArgValue, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef, TraceRecord};
+use log::warn;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use termion::{color, style};
@@ -173,6 +174,9 @@ pub fn process_trace_file(
                 // If this is a flow event...
                 if let Some((flow_id, flow_stage)) = event_flow_info(&event_record) {
                     // If this is a flow event for a flow we care about...
+                    if event_record.category.as_str() != "kernel:ipc" {
+                        return parsed_bytes;
+                    }
                     if let Some(call_state) = flow_state.get_mut(&flow_id) {
                         // Flows with steps should have been excluded above...
                         assert_ne!(flow_stage, FlowStage::Step,);
@@ -296,7 +300,13 @@ impl Symbolizer {
             {
                 let ord = *ord;
                 if let Some(method_name) = self.ordinals.get(ord) {
-                    return Some(symbolize_fidl_call(&parsed_bytes, ord, method_name));
+                    return match symbolize_fidl_call(&parsed_bytes, ord, method_name) {
+                        Ok(bytes) => Some(bytes),
+                        Err(e) => {
+                            warn!("Failed to symbolize fidl call: {:#}", e);
+                            None
+                        }
+                    };
                 }
             }
         }
@@ -304,9 +314,9 @@ impl Symbolizer {
     }
 }
 
-fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Vec<u8> {
+fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> anyhow::Result<Vec<u8>> {
     let (_, mut raw_event_record) =
-        RawEventRecord::parse(bytes).expect("Unable to parse event record");
+        RawEventRecord::parse(bytes).context("Unable to parse event record")?;
     raw_event_record.name = StringRef::Inline(method);
     let mut new_args = vec![];
     for arg in &raw_event_record.args {
@@ -323,7 +333,7 @@ fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> Vec<u
     }
 
     raw_event_record.args = new_args;
-    raw_event_record.serialize().expect("Unable to serialize raw event record")
+    Ok(raw_event_record.serialize()?)
 }
 
 pub struct CategoryCounter {

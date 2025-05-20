@@ -10,7 +10,7 @@
 namespace gigaboot {
 
 std::optional<PartitionMap> PartitionMap::GeneratePartitionMap(
-    cpp20::span<const PartitionEntry> const partitions) {
+    std::span<const PartitionEntry> const partitions) {
   int max_count = 0;
   fbl::Vector<PartitionEntry> p;
 

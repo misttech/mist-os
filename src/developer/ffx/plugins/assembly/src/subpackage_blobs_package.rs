@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use assembly_manifest::{AssemblyManifest, PackagesMetadata};
+use assembled_system::{AssembledSystem, PackagesMetadata};
 use assembly_subpackage_blobs_package::SubpackageBlobsPackageBuilder;
 use camino::Utf8Path;
 use fuchsia_merkle::MerkleTree;
 use fuchsia_pkg::PackageManifest;
+use log::info;
 use std::fs::File;
-use tracing::info;
 
 #[derive(Debug)]
 pub struct SubpackageBlobsPackage {
@@ -17,7 +17,7 @@ pub struct SubpackageBlobsPackage {
 }
 
 pub fn construct_subpackage_blobs_package(
-    assembly_manifest: &AssemblyManifest,
+    assembled_system: &AssembledSystem,
     outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
     name: impl AsRef<str>,
@@ -29,7 +29,7 @@ pub fn construct_subpackage_blobs_package(
 
     let mut subpackage_blobs_pkg_builder = SubpackageBlobsPackageBuilder::default();
 
-    for image in &assembly_manifest.images {
+    for image in &assembled_system.images {
         if let Some(contents) = image.get_blobfs_contents() {
             let PackagesMetadata { base, cache } = &contents.packages;
 
@@ -59,7 +59,7 @@ pub fn construct_subpackage_blobs_package(
 mod tests {
     use super::*;
 
-    use assembly_manifest::{BlobfsContents, Image};
+    use assembled_system::{BlobfsContents, Image};
     use camino::Utf8PathBuf;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageBuilder;
@@ -129,7 +129,7 @@ mod tests {
         blobfs_contents.add_base_package(&base_parent_path, &merkle_size_map).unwrap();
         blobfs_contents.add_cache_package(&cache_parent_path, &merkle_size_map).unwrap();
 
-        let assembly_manifest = AssemblyManifest {
+        let assembled_system = AssembledSystem {
             images: vec![Image::BlobFS {
                 path: "does-not-exist".into(),
                 contents: blobfs_contents,
@@ -138,7 +138,7 @@ mod tests {
         };
 
         // Construct the subpackage blobs package.
-        construct_subpackage_blobs_package(&assembly_manifest, dir, dir, "subpackage_blobs")
+        construct_subpackage_blobs_package(&assembled_system, dir, dir, "subpackage_blobs")
             .unwrap();
 
         let subpackage_blobs_package_path =

@@ -35,7 +35,7 @@ TEST(DebugLog, Create) {
   ASSERT_OK(zxio_create(log->release(), &storage));
   zxio_t* io = &storage.io;
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 class DebugLogTest : public zxtest::Test {
@@ -50,7 +50,7 @@ class DebugLogTest : public zxtest::Test {
     ASSERT_NE(logger_, nullptr);
   }
 
-  void TearDown() final { ASSERT_OK(zxio_close(logger_, /*should_wait=*/true)); }
+  void TearDown() final { zxio_destroy(logger_); }
 
   zx::channel local_;
   zx::channel remote_;

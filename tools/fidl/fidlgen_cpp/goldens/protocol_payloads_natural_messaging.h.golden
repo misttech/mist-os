@@ -5,6 +5,9 @@
 #pragma once
 
 #include <fidl/test.protocolpayloads.imported/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocolpayloads/cpp/markers.h>
 #include <fidl/test.protocolpayloads/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -16,10 +19,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-namespace fidl {
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OneWayComposed> {
@@ -161,13 +160,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtoco
   using Request = ::test_protocolpayloads::MainProtocolOnAnonRequest;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposed> final : public ::test_protocolpayloads_imported::ImportStructPayload {
  public:
   using ::test_protocolpayloads_imported::ImportStructPayload::ImportStructPayload;
-  Response(::test_protocolpayloads_imported::ImportStructPayload v) : ImportStructPayload(std::move(v)) {}
+  Response(::test_protocolpayloads_imported::ImportStructPayload v);
 };
 
 template <>
@@ -183,7 +180,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v);
   Response() = delete;
 };
 template <>
@@ -191,13 +188,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads_imported::ComposedProtocolTwoWayComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>& m);
 };
 
 template <>
@@ -213,7 +204,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocal> final : public ::test_protocolpayloads::LocalStructPayload {
  public:
   using ::test_protocolpayloads::LocalStructPayload::LocalStructPayload;
-  Response(::test_protocolpayloads::LocalStructPayload v) : LocalStructPayload(std::move(v)) {}
+  Response(::test_protocolpayloads::LocalStructPayload v);
 };
 
 template <>
@@ -229,7 +220,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocolpayloads::LocalStructPayload> v);
   Response() = delete;
 };
 template <>
@@ -237,13 +228,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>& m);
 };
 
 template <>
@@ -259,7 +244,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImport> final : public ::test_protocolpayloads_imported::ImportStructPayload {
  public:
   using ::test_protocolpayloads_imported::ImportStructPayload::ImportStructPayload;
-  Response(::test_protocolpayloads_imported::ImportStructPayload v) : ImportStructPayload(std::move(v)) {}
+  Response(::test_protocolpayloads_imported::ImportStructPayload v);
 };
 
 template <>
@@ -275,7 +260,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocolpayloads_imported::ImportStructPayload> v);
   Response() = delete;
 };
 template <>
@@ -283,13 +268,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>& m);
 };
 
 template <>
@@ -305,7 +284,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnon> final : public ::test_protocolpayloads::MainProtocolTwoWayAnonResponse {
  public:
   using ::test_protocolpayloads::MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse;
-  Response(::test_protocolpayloads::MainProtocolTwoWayAnonResponse v) : MainProtocolTwoWayAnonResponse(std::move(v)) {}
+  Response(::test_protocolpayloads::MainProtocolTwoWayAnonResponse v);
 };
 
 template <>
@@ -321,7 +300,7 @@ template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError> final : public ::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> v);
   Response() = delete;
 };
 template <>
@@ -329,13 +308,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocolpayloads::MainPr
   using DomainObject = ::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>& m);
 };
 
 template <>
@@ -376,10 +349,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocolpayloads::MainProtocol::OneWayAnon>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocolpayloads::MainProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocolpayloads::MainProtocol>> {
@@ -409,15 +378,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocolpayloads::MainProto
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocolpayloads::MainProtocol::OneWayAnon>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -435,10 +397,10 @@ class ::fidl::AsyncEventHandler<::test_protocolpayloads::MainProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void OnComposed(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposed>&) override {}
-  void OnLocal(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocal>&) override {}
-  void OnImport(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImport>&) override {}
-  void OnAnon(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnon>&) override {}
+  void OnComposed(::fidl::Event<::test_protocolpayloads::MainProtocol::OnComposed>&) override;
+  void OnLocal(::fidl::Event<::test_protocolpayloads::MainProtocol::OnLocal>&) override;
+  void OnImport(::fidl::Event<::test_protocolpayloads::MainProtocol::OnImport>&) override;
+  void OnAnon(::fidl::Event<::test_protocolpayloads::MainProtocol::OnAnon>&) override;
 };
 
 template <>
@@ -457,16 +419,12 @@ class ::fidl::SyncEventHandler<::test_protocolpayloads::MainProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocolpayloads::MainProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolpayloads::MainProtocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocolpayloads::MainProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -495,8 +453,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocolpayloads::MainProtocol
 
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocolpayloads::MainProtocolOnAnonRequest& payload);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocolpayloads::MainProtocol::TwoWayComposed> : public ::fidl::CompleterBase {
@@ -660,19 +616,13 @@ class ::fidl::Server<::test_protocolpayloads::MainProtocol> : public ::fidl::int
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolpayloads::MainProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocolpayloads::MainProtocol> final {
@@ -688,6 +638,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocolpayloads::MainPr
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

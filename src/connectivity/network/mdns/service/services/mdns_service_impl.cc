@@ -6,6 +6,7 @@
 
 #include <fuchsia/device/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
+#include <fuchsia/sysinfo/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/sys/cpp/component_context.h>
@@ -23,6 +24,7 @@
 #include "src/connectivity/network/mdns/service/services/service_instance_publisher_service_impl.h"
 #include "src/connectivity/network/mdns/service/services/service_instance_resolver_service_impl.h"
 #include "src/connectivity/network/mdns/service/services/service_subscriber_service_impl.h"
+#include "zircon/status.h"
 
 namespace mdns {
 namespace {
@@ -43,6 +45,23 @@ std::string GetLocalHostName() {
   }
 
   return host_name;
+}
+
+std::string GetSerialNumber(sys::ComponentContext* component_context) {
+  fuchsia::sysinfo::SysInfoSyncPtr sysinfo;
+  component_context->svc()->Connect<fuchsia::sysinfo::SysInfo>(sysinfo.NewRequest());
+
+  std::string serial_number;
+  fuchsia::sysinfo::SysInfo_GetSerialNumber_Result serial_number_result;
+  zx_status_t fidl_status = sysinfo->GetSerialNumber(&serial_number_result);
+  if (fidl_status != ZX_OK || serial_number_result.is_err()) {
+    FX_LOGS(WARNING) << "Serial number not ready. FIDL Status: "
+                     << zx_status_get_string(fidl_status) << " GetSerialNumber error code: "
+                     << zx_status_get_string(serial_number_result.err());
+  } else {
+    serial_number = serial_number_result.response().serial;
+  }
+  return serial_number;
 }
 
 }  // namespace
@@ -109,7 +128,9 @@ void MdnsServiceImpl::Start() {
     return;
   }
 
-  config_.ReadConfigFiles(local_host_name);
+  std::string serial_number = GetSerialNumber(component_context_);
+
+  config_.ReadConfigFiles(local_host_name, serial_number);
   if (!config_.valid()) {
     FX_LOGS(FATAL) << "Invalid config file(s), terminating: " << config_.error();
     return;

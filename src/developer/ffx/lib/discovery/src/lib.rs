@@ -222,7 +222,7 @@ where
             if let Some(event) = event {
                 let _ = mdns_sender.unbounded_send(event);
             }
-        })?)
+        }))
     } else {
         None
     };
@@ -232,7 +232,7 @@ where
         let fastboot_sender = sender.clone();
         Some(fastboot_watcher(move |res: Result<FastbootEvent>| {
             // Translate the result to a TargetEvent
-            tracing::debug!("discovery watcher got fastboot event: {:#?}", res);
+            log::debug!("discovery watcher got fastboot event: {:#?}", res);
             let event = match res {
                 Ok(r) => {
                     let event: TargetEvent = r.into();
@@ -241,7 +241,7 @@ where
                 Err(e) => Err(anyhow!(e)),
             };
             let _ = fastboot_sender.unbounded_send(event);
-        })?)
+        }))
     } else {
         None
     };
@@ -251,7 +251,7 @@ where
         let manual_targets_sender = sender.clone();
         Some(manual_recommended_watcher(move |res: Result<ManualTargetEvent>| {
             // Translate the result to a TargetEvent
-            tracing::trace!("discovery watcher got manual target event: {:#?}", res);
+            log::trace!("discovery watcher got manual target event: {:#?}", res);
             let event = match res {
                 Ok(r) => {
                     let event: TargetEvent = r.into();
@@ -260,7 +260,7 @@ where
                 Err(e) => Err(anyhow!(e)),
             };
             let _ = manual_targets_sender.unbounded_send(event);
-        })?)
+        }))
     } else {
         None
     };
@@ -319,7 +319,7 @@ impl Stream for TargetStream {
             };
 
             if !filter.filter_target(handle) {
-                tracing::trace!(
+                log::trace!(
                     "Skipping event for target handle: {} as it did not match our filter",
                     handle
                 );
@@ -404,7 +404,7 @@ pub mod test {
             TargetEvent::Removed(handle) => handle,
         };
 
-        let node_name = handle.node_name.unwrap_or("<unknown>".to_string());
+        let node_name = handle.node_name.unwrap_or(target_errors::UNKNOWN_TARGET_NAME.to_string());
         let state = handle.state;
 
         writeln!(writer, "{symbol}  {node_name}  {state}")?;
@@ -428,14 +428,17 @@ pub mod test {
                 Ok(TargetEvent::Added(TargetHandle {
                     node_name: Some("magnus".to_string()),
                     state: TargetState::Unknown,
+                    manual: false,
                 })),
                 Ok(TargetEvent::Added(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
+                    manual: false,
                 })),
                 Ok(TargetEvent::Removed(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
+                    manual: false,
                 })),
             ]))),
         };
@@ -538,18 +541,21 @@ pub mod test {
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -557,7 +563,8 @@ pub mod test {
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Removed(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -584,18 +591,21 @@ pub mod test {
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Removed(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -622,18 +632,21 @@ pub mod test {
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -662,19 +675,22 @@ pub mod test {
         // This should not come into the queue since the target is not in zedboot
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Kelsier".to_string()),
-            state: TargetState::Product(vec![addr]),
+            state: TargetState::Product { addrs: vec![addr], serial: None },
+            manual: false,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
+            manual: false,
         })))?;
 
         assert_eq!(
             stream.next().await.unwrap().ok().unwrap(),
             TargetEvent::Added(TargetHandle {
                 node_name: Some("Vin".to_string()),
-                state: TargetState::Zedboot
+                state: TargetState::Zedboot,
+                manual: false,
             })
         );
 
@@ -756,7 +772,11 @@ pub mod test {
                 // Name must correspond to "runtime:name" value in config
                 node_name: Some("emu-data-instance".to_string()),
                 // Addr must correspond to "host:port_map:sh:host" value in config
-                state: TargetState::Product(vec![TargetAddr::from_str("127.0.0.1:3322")?]),
+                state: TargetState::Product {
+                    addrs: vec![TargetAddr::from_str("127.0.0.1:3322")?],
+                    serial: None
+                },
+                manual: false,
             })
         );
 
@@ -777,7 +797,11 @@ pub mod test {
                 // Name must correspond to "runtime:name" value in config
                 node_name: Some("emu-data-instance2".to_string()),
                 // Addr must correspond to "host:port_map:sh:host" value in config
-                state: TargetState::Product(vec![TargetAddr::from_str("127.0.0.1:3322")?]),
+                state: TargetState::Product {
+                    addrs: vec![TargetAddr::from_str("127.0.0.1:3322")?],
+                    serial: None
+                },
+                manual: false,
             })
         );
 

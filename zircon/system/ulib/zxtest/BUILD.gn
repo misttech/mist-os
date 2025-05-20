@@ -61,9 +61,6 @@ zxtest_public_deps = [
   # Needed for <zircon/status.h>
   "//src/zircon/lib/zircon",
 
-  # Needed for cpp17::string_view.
-  "//sdk/lib/stdcompat",
-
   # Needed for <fbl/string.h>, <fbl/vector.h> and <fbl/function.h>
   "//zircon/system/ulib/fbl",
 

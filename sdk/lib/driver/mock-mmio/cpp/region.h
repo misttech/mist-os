@@ -13,6 +13,17 @@
 namespace mock_mmio {
 
 // Mocks a region of MMIO registers. Each register is backed by a Register instance.
+// Each Register class ExpectRead() and ExpectWrite() call adds to the Register instance's
+// list of expected transactions in FIFO order.
+//
+// All ExpectRead() and ExpectWrite() calls must be made before the actual read or write
+// transactions. Each Read() or Write() call that the Register receives removes the next expected
+// transaction in the list and verifies that the transactions match.
+//
+// The Region class's VerifyAll() should be called at the end of the test in which the functions
+// verifies that all of the Region's Register objects have no outstanding expected transactions.
+//
+// Region instances are not thread-safe.
 //
 // Example:
 // mock_mmio::Region mock_registers(register_size, number_of_registers);

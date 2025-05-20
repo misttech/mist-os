@@ -12,7 +12,7 @@ use crate::task::{
     CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, ThreadState, Waiter,
 };
 use extended_pstate::ExtendedPstateState;
-use starnix_logging::{log_trace, log_warn};
+use starnix_logging::{log_info, log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_types::arch::ArchWidth;
@@ -49,7 +49,7 @@ pub fn send_standard_signal(task: &Task, siginfo: SignalInfo) {
     debug_assert!(!siginfo.signal.is_real_time());
     let state = task.write();
     send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
-        .expect("send_signal(SignalPriority::First) is not expected to fail for standard signals.")
+        .expect("send_signal(SignalPriority::Last) is not expected to fail for standard signals.")
 }
 
 pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
@@ -258,6 +258,7 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
             siginfo.clone(),
             &mut current_task.thread_state.registers,
             &current_task.thread_state.extended_pstate,
+            None,
         ) {
             current_task.thread_group_exit(locked, status);
         }
@@ -271,6 +272,7 @@ pub fn deliver_signal(
     mut siginfo: SignalInfo,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
+    restricted_exception: Option<zx::sys::zx_restricted_exception_t>,
 ) -> Option<ExitStatus> {
     loop {
         let sigaction = task.thread_group().signal_actions.get(siginfo.signal);
@@ -340,6 +342,13 @@ pub fn deliver_signal(
             DeliveryAction::CoreDump => {
                 task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
                 drop(task_state);
+                if let Some(exception) = restricted_exception {
+                    log_info!(
+                        registers:?=exception.state,
+                        exception:?=exception.exception;
+                        "Restricted mode exception caused core dump",
+                    );
+                }
                 return Some(ExitStatus::CoreDump(siginfo));
             }
             DeliveryAction::Stop => {
@@ -394,9 +403,16 @@ fn dispatch_signal_handler(
     }
     .ok_or_else(|| errno!(EINVAL))?;
 
-    let stack_pointer = align_stack_pointer(
-        stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or_else(|| errno!(EINVAL))?,
-    );
+    let stack_pointer =
+        align_stack_pointer(stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or_else(|| {
+            errno!(
+                EINVAL,
+                format!(
+                    "Subtracting SIG_STACK_SIZE ({}) from stack bottom ({}) overflowed",
+                    SIG_STACK_SIZE, stack_bottom
+                )
+            )
+        })?);
 
     // Check that if the stack pointer is inside altstack, the entire signal stack is inside
     // altstack.
@@ -426,7 +442,9 @@ fn dispatch_signal_handler(
     if action.sa_flags & (SA_NODEFER as u64) == 0 {
         mask = mask | siginfo.signal.into();
     }
-    signal_state.set_mask(mask);
+
+    // Preserve the existing mask when handling a nested signal
+    signal_state.set_mask(mask | signal_state.mask());
 
     registers.set_stack_pointer_register(stack_pointer);
     registers.set_arg0_register(siginfo.signal.number() as u64);
@@ -439,6 +457,7 @@ fn dispatch_signal_handler(
         );
     }
     registers.set_instruction_pointer_register(action.sa_handler.addr);
+    registers.reset_flags(); // TODO(https://fxbug.dev/413070731): Verify and update the logic in resetting the flags.
 
     Ok(())
 }

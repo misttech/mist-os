@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -922,21 +920,19 @@ class MainProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_one_way_anon_composed: typing.TypeAlias = None
+    OneWayAnonComposedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_anon_composed(
         self,
         request: fidl_test_protocollayouts_imported.ComposedProtocolOneWayAnonComposedRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_anon_composed
-        ]
-        | _MethodResponse_one_way_anon_composed
+        typing.Coroutine[typing.Any, typing.Any, OneWayAnonComposedResponse]
+        | OneWayAnonComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_composed: typing.TypeAlias = (
+    TwoWayAnonComposedResponse: typing.TypeAlias = (
         fidl_test_protocollayouts_imported.ComposedProtocolTwoWayAnonComposedResponse
     )
 
@@ -945,14 +941,12 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: fidl_test_protocollayouts_imported.ComposedProtocolTwoWayAnonComposedRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_anon_composed
-        ]
-        | _MethodResponse_two_way_anon_composed
+        typing.Coroutine[typing.Any, typing.Any, TwoWayAnonComposedResponse]
+        | TwoWayAnonComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_composed_with_error: typing.TypeAlias = typing.Union[
+    TwoWayAnonComposedWithErrorResponse: typing.TypeAlias = typing.Union[
         DomainError,
         fidl_test_protocollayouts_imported.ComposedProtocolTwoWayAnonComposedWithErrorResponse,
     ]
@@ -963,11 +957,9 @@ class MainProtocolServer(ServerBase, ABC):
         request: fidl_test_protocollayouts_imported.ComposedProtocolTwoWayAnonComposedWithErrorRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_two_way_anon_composed_with_error,
+            typing.Any, typing.Any, TwoWayAnonComposedWithErrorResponse
         ]
-        | _MethodResponse_two_way_anon_composed_with_error
+        | TwoWayAnonComposedWithErrorResponse
     ):
         ...
 
@@ -979,21 +971,19 @@ class MainProtocolServer(ServerBase, ABC):
         )
         self._send_event(9198778981238868491, "test.protocollayouts", msg)
 
-    _MethodResponse_one_way_named_composed: typing.TypeAlias = None
+    OneWayNamedComposedResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_named_composed(
         self,
         request: fidl_test_protocollayouts_imported.ImportTablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_named_composed
-        ]
-        | _MethodResponse_one_way_named_composed
+        typing.Coroutine[typing.Any, typing.Any, OneWayNamedComposedResponse]
+        | OneWayNamedComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_named_composed: typing.TypeAlias = (
+    TwoWayNamedComposedResponse: typing.TypeAlias = (
         fidl_test_protocollayouts_imported.ImportTablePayload
     )
 
@@ -1002,19 +992,15 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: fidl_test_protocollayouts_imported.ImportUnionPayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_named_composed
-        ]
-        | _MethodResponse_two_way_named_composed
+        typing.Coroutine[typing.Any, typing.Any, TwoWayNamedComposedResponse]
+        | TwoWayNamedComposedResponse
     ):
         ...
 
-    _MethodResponse_two_way_named_composed_with_error: typing.TypeAlias = (
-        typing.Union[
-            DomainError,
-            fidl_test_protocollayouts_imported.ImportUnionPayload,
-        ]
-    )
+    TwoWayNamedComposedWithErrorResponse: typing.TypeAlias = typing.Union[
+        DomainError,
+        fidl_test_protocollayouts_imported.ImportUnionPayload,
+    ]
 
     @abstractmethod
     def two_way_named_composed_with_error(
@@ -1022,11 +1008,9 @@ class MainProtocolServer(ServerBase, ABC):
         request: fidl_test_protocollayouts_imported.ImportTablePayload,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_two_way_named_composed_with_error,
+            typing.Any, typing.Any, TwoWayNamedComposedWithErrorResponse
         ]
-        | _MethodResponse_two_way_named_composed_with_error
+        | TwoWayNamedComposedWithErrorResponse
     ):
         ...
 
@@ -1036,19 +1020,19 @@ class MainProtocolServer(ServerBase, ABC):
         msg = fidl_test_protocollayouts_imported.ImportUnionPayload()
         self._send_event(6802961197456477674, "test.protocollayouts", msg)
 
-    _MethodResponse_one_way_import: typing.TypeAlias = None
+    OneWayImportResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_import(
         self,
         request: fidl_test_protocollayouts_imported.ImportTablePayload,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_import]
-        | _MethodResponse_one_way_import
+        typing.Coroutine[typing.Any, typing.Any, OneWayImportResponse]
+        | OneWayImportResponse
     ):
         ...
 
-    _MethodResponse_two_way_import: typing.TypeAlias = (
+    TwoWayImportResponse: typing.TypeAlias = (
         fidl_test_protocollayouts_imported.ImportTablePayload
     )
 
@@ -1057,12 +1041,12 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: fidl_test_protocollayouts_imported.ImportUnionPayload,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_import]
-        | _MethodResponse_two_way_import
+        typing.Coroutine[typing.Any, typing.Any, TwoWayImportResponse]
+        | TwoWayImportResponse
     ):
         ...
 
-    _MethodResponse_two_way_import_with_error: typing.TypeAlias = typing.Union[
+    TwoWayImportWithErrorResponse: typing.TypeAlias = typing.Union[
         DomainError,
         fidl_test_protocollayouts_imported.ImportUnionPayload,
     ]
@@ -1072,10 +1056,8 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: fidl_test_protocollayouts_imported.ImportTablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_import_with_error
-        ]
-        | _MethodResponse_two_way_import_with_error
+        typing.Coroutine[typing.Any, typing.Any, TwoWayImportWithErrorResponse]
+        | TwoWayImportWithErrorResponse
     ):
         ...
 
@@ -1085,31 +1067,31 @@ class MainProtocolServer(ServerBase, ABC):
         msg = fidl_test_protocollayouts_imported.ImportUnionPayload()
         self._send_event(6584793811321990352, "test.protocollayouts", msg)
 
-    _MethodResponse_one_way_local: typing.TypeAlias = None
+    OneWayLocalResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_local(
         self,
         request: LocalTablePayload,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_local]
-        | _MethodResponse_one_way_local
+        typing.Coroutine[typing.Any, typing.Any, OneWayLocalResponse]
+        | OneWayLocalResponse
     ):
         ...
 
-    _MethodResponse_two_way_local: typing.TypeAlias = LocalTablePayload
+    TwoWayLocalResponse: typing.TypeAlias = LocalTablePayload
 
     @abstractmethod
     def two_way_local(
         self,
         request: LocalUnionPayload,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_local]
-        | _MethodResponse_two_way_local
+        typing.Coroutine[typing.Any, typing.Any, TwoWayLocalResponse]
+        | TwoWayLocalResponse
     ):
         ...
 
-    _MethodResponse_two_way_local_with_error: typing.TypeAlias = typing.Union[
+    TwoWayLocalWithErrorResponse: typing.TypeAlias = typing.Union[
         DomainError,
         LocalUnionPayload,
     ]
@@ -1119,10 +1101,8 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: LocalTablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_local_with_error
-        ]
-        | _MethodResponse_two_way_local_with_error
+        typing.Coroutine[typing.Any, typing.Any, TwoWayLocalWithErrorResponse]
+        | TwoWayLocalWithErrorResponse
     ):
         ...
 
@@ -1136,33 +1116,31 @@ class MainProtocolServer(ServerBase, ABC):
         )
         self._send_event(4199259762307646332, "test.protocollayouts", msg)
 
-    _MethodResponse_one_way_anon: typing.TypeAlias = None
+    OneWayAnonResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_anon(
         self,
         request: MainProtocolOneWayAnonRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_one_way_anon]
-        | _MethodResponse_one_way_anon
+        typing.Coroutine[typing.Any, typing.Any, OneWayAnonResponse]
+        | OneWayAnonResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon: typing.TypeAlias = (
-        MainProtocolTwoWayAnonResponse
-    )
+    TwoWayAnonResponse: typing.TypeAlias = MainProtocolTwoWayAnonResponse
 
     @abstractmethod
     def two_way_anon(
         self,
         request: MainProtocolTwoWayAnonRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_two_way_anon]
-        | _MethodResponse_two_way_anon
+        typing.Coroutine[typing.Any, typing.Any, TwoWayAnonResponse]
+        | TwoWayAnonResponse
     ):
         ...
 
-    _MethodResponse_two_way_anon_with_error: typing.TypeAlias = typing.Union[
+    TwoWayAnonWithErrorResponse: typing.TypeAlias = typing.Union[
         DomainError,
         MainProtocolTwoWayAnonWithErrorResponse,
     ]
@@ -1172,10 +1150,8 @@ class MainProtocolServer(ServerBase, ABC):
         self,
         request: MainProtocolTwoWayAnonWithErrorRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_anon_with_error
-        ]
-        | _MethodResponse_two_way_anon_with_error
+        typing.Coroutine[typing.Any, typing.Any, TwoWayAnonWithErrorResponse]
+        | TwoWayAnonWithErrorResponse
     ):
         ...
 
@@ -1633,21 +1609,19 @@ class OpenProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_flexible_one_way: typing.TypeAlias = None
+    FlexibleOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def flexible_one_way(
         self,
         request: fidl_test_protocollayouts_imported.ComposedOpenProtocolFlexibleOneWayRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_one_way
-        ]
-        | _MethodResponse_flexible_one_way
+        typing.Coroutine[typing.Any, typing.Any, FlexibleOneWayResponse]
+        | FlexibleOneWayResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_no_error: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayNoErrorResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         fidl_test_protocollayouts_imported.ComposedOpenProtocolFlexibleTwoWayNoErrorResponse,
     ]
@@ -1657,14 +1631,12 @@ class OpenProtocolServer(ServerBase, ABC):
         self,
         request: fidl_test_protocollayouts_imported.ComposedOpenProtocolFlexibleTwoWayNoErrorRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_no_error
-        ]
-        | _MethodResponse_flexible_two_way_no_error
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayNoErrorResponse]
+        | FlexibleTwoWayNoErrorResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_with_error: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayWithErrorResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         DomainError,
         fidl_test_protocollayouts_imported.ComposedOpenProtocolFlexibleTwoWayWithErrorResponse,
@@ -1676,9 +1648,9 @@ class OpenProtocolServer(ServerBase, ABC):
         request: fidl_test_protocollayouts_imported.ComposedOpenProtocolFlexibleTwoWayWithErrorRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_with_error
+            typing.Any, typing.Any, FlexibleTwoWayWithErrorResponse
         ]
-        | _MethodResponse_flexible_two_way_with_error
+        | FlexibleTwoWayWithErrorResponse
     ):
         ...
 
@@ -1692,19 +1664,19 @@ class OpenProtocolServer(ServerBase, ABC):
         )
         self._send_event(9152311661656086484, "test.protocollayouts", msg)
 
-    _MethodResponse_strict_one_way: typing.TypeAlias = None
+    StrictOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_one_way(
         self,
         request: fidl_test_protocollayouts_imported.ComposedOpenProtocolStrictOneWayRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_one_way]
-        | _MethodResponse_strict_one_way
+        typing.Coroutine[typing.Any, typing.Any, StrictOneWayResponse]
+        | StrictOneWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_no_error: typing.TypeAlias = (
+    StrictTwoWayNoErrorResponse: typing.TypeAlias = (
         fidl_test_protocollayouts_imported.ComposedOpenProtocolStrictTwoWayNoErrorResponse
     )
 
@@ -1713,14 +1685,12 @@ class OpenProtocolServer(ServerBase, ABC):
         self,
         request: fidl_test_protocollayouts_imported.ComposedOpenProtocolStrictTwoWayNoErrorRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_no_error
-        ]
-        | _MethodResponse_strict_two_way_no_error
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayNoErrorResponse]
+        | StrictTwoWayNoErrorResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_with_error: typing.TypeAlias = typing.Union[
+    StrictTwoWayWithErrorResponse: typing.TypeAlias = typing.Union[
         DomainError,
         fidl_test_protocollayouts_imported.ComposedOpenProtocolStrictTwoWayWithErrorResponse,
     ]
@@ -1730,10 +1700,8 @@ class OpenProtocolServer(ServerBase, ABC):
         self,
         request: fidl_test_protocollayouts_imported.ComposedOpenProtocolStrictTwoWayWithErrorRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_with_error
-        ]
-        | _MethodResponse_strict_two_way_with_error
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayWithErrorResponse]
+        | StrictTwoWayWithErrorResponse
     ):
         ...
 
@@ -1747,7 +1715,7 @@ class OpenProtocolServer(ServerBase, ABC):
         )
         self._send_event(3921073878922106269, "test.protocollayouts", msg)
 
-    _MethodResponse_flexible_one_way_named_payload: typing.TypeAlias = None
+    FlexibleOneWayNamedPayloadResponse: typing.TypeAlias = None
 
     @abstractmethod
     def flexible_one_way_named_payload(
@@ -1755,11 +1723,9 @@ class OpenProtocolServer(ServerBase, ABC):
         request: fidl_test_protocollayouts_imported.ImportStructPayload,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_flexible_one_way_named_payload,
+            typing.Any, typing.Any, FlexibleOneWayNamedPayloadResponse
         ]
-        | _MethodResponse_flexible_one_way_named_payload
+        | FlexibleOneWayNamedPayloadResponse
     ):
         ...
 

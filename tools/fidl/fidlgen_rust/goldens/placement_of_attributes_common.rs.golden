@@ -21,19 +21,7 @@ bitflags! {
     }
 }
 
-impl ExampleBits {
-    #[deprecated = "Strict bits should not use `has_unknown_bits`"]
-    #[inline(always)]
-    pub fn has_unknown_bits(&self) -> bool {
-        false
-    }
-
-    #[deprecated = "Strict bits should not use `get_unknown_bits`"]
-    #[inline(always)]
-    pub fn get_unknown_bits(&self) -> u32 {
-        0
-    }
-}
+impl ExampleBits {}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
@@ -54,17 +42,11 @@ impl ExampleEnum {
     pub const fn into_primitive(self) -> u32 {
         self as u32
     }
-
-    #[deprecated = "Strict enums should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExampleProtocolMethodRequest {
-    pub arg: fidl_test_exampleusing::Empty,
+    pub arg: fidl_test_exampleusing__common::Empty,
 }
 
 impl fidl::Persistable for ExampleProtocolMethodRequest {}
@@ -98,15 +80,13 @@ impl ExampleUnion {
             Self::Variant(_) => 1,
         }
     }
-
-    #[deprecated = "Strict unions should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
 }
 
 impl fidl::Persistable for ExampleUnion {}
+
+pub mod example_protocol_ordinals {
+    pub const METHOD: u64 = 0x53978e6fc7476749;
+}
 
 mod internal {
     use super::*;
@@ -269,18 +249,16 @@ mod internal {
             encoder.debug_check_bounds::<ExampleProtocolMethodRequest>(offset);
             // Delegate to tuple encoding.
             fidl::encoding::Encode::<ExampleProtocolMethodRequest, D>::encode(
-                (<fidl_test_exampleusing::Empty as fidl::encoding::ValueTypeMarker>::borrow(
-                    &self.arg,
-                ),),
-                encoder,
-                offset,
-                _depth,
+                (
+                    <fidl_test_exampleusing__common::Empty as fidl::encoding::ValueTypeMarker>::borrow(&self.arg),
+                ),
+                encoder, offset, _depth
             )
         }
     }
     unsafe impl<
             D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<fidl_test_exampleusing::Empty, D>,
+            T0: fidl::encoding::Encode<fidl_test_exampleusing__common::Empty, D>,
         > fidl::encoding::Encode<ExampleProtocolMethodRequest, D> for (T0,)
     {
         #[inline]
@@ -304,7 +282,7 @@ mod internal {
     {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { arg: fidl::new_empty!(fidl_test_exampleusing::Empty, D) }
+            Self { arg: fidl::new_empty!(fidl_test_exampleusing__common::Empty, D) }
         }
 
         #[inline]
@@ -317,7 +295,7 @@ mod internal {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
             fidl::decode!(
-                fidl_test_exampleusing::Empty,
+                fidl_test_exampleusing__common::Empty,
                 D,
                 &mut self.arg,
                 decoder,

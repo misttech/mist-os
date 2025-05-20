@@ -3,12 +3,20 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_power_observability as fobs;
-use fuchsia_inspect::Node as INode;
+use fuchsia_inspect::{LazyNode as ILazyNode, Node as INode};
 use fuchsia_inspect_contrib::nodes::BoundedListNode as IRingBuffer;
+use fuchsia_sync::Mutex;
+use futures::FutureExt;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::Arc;
 
-const SUSPEND_EVENTS_RING_BUFFER_SIZE: usize = 512;
+const SUSPEND_EVENT_BUFFER_SIZE: usize = 512;
+
+static INSPECT_FIELD_EVENT_CAPACITY: &str = "event_capacity";
+static INSPECT_FIELD_HISTORY_DURATION: &str = "history_duration_seconds";
+static INSPECT_FIELD_HISTORY_DURATION_WHEN_FULL: &str = "at_capacity_history_duration_seconds";
 
 /// An event logged by system-activity-governor.
 pub enum SagEvent {
@@ -53,16 +61,61 @@ pub enum SagEvent {
 #[derive(Clone)]
 pub struct SagEventLogger {
     event_log: Rc<RefCell<IRingBuffer>>,
+    /// Vector of timestamps that mirror `event_log` contents.
+    /// Used to compute history durations in `_event_log_stats`.
+    /// Note: Inspect's lazy node requires Arc+Mutex.
+    event_log_times: Arc<Mutex<VecDeque<i64>>>,
+    /// Inspect node that tracks wall-time history duration.
+    /// Schema follows Power Broker's topology stats:
+    ///   event_capacity: u64
+    ///   history_duration_seconds: i64
+    ///   at_capacity_history_duration_seconds: i64
+    _event_log_stats: Rc<RefCell<ILazyNode>>,
 }
 
 impl SagEventLogger {
-    pub fn new(node: INode) -> Self {
-        let event_log = IRingBuffer::new(node, SUSPEND_EVENTS_RING_BUFFER_SIZE);
-        Self { event_log: Rc::new(RefCell::new(event_log)) }
+    pub fn new(node: &INode) -> Self {
+        let event_log = Rc::new(RefCell::new(IRingBuffer::new(
+            node.create_child(fobs::SUSPEND_EVENTS_NODE),
+            SUSPEND_EVENT_BUFFER_SIZE,
+        )));
+        let event_log_times =
+            Arc::new(Mutex::new(VecDeque::with_capacity(SUSPEND_EVENT_BUFFER_SIZE)));
+        let weak_arc_of_times = Arc::downgrade(&event_log_times);
+        let event_log_stats = node.create_lazy_child("suspend_events_stats", move || {
+            let weak_times = weak_arc_of_times.clone();
+            async move {
+                let inspector = fuchsia_inspect::Inspector::default();
+                let root = inspector.root();
+                root.record_uint(INSPECT_FIELD_EVENT_CAPACITY, SUSPEND_EVENT_BUFFER_SIZE as u64);
+                if let Some(event_log_times) = weak_times.upgrade() {
+                    let timestamps = event_log_times.lock();
+                    if !timestamps.is_empty() {
+                        let head_ns = timestamps.front().unwrap();
+                        let tail_ns = timestamps.back().unwrap();
+                        let duration =
+                            zx::BootDuration::from_nanos(tail_ns - head_ns).into_seconds();
+                        root.record_int(INSPECT_FIELD_HISTORY_DURATION, duration);
+                        if timestamps.len() == SUSPEND_EVENT_BUFFER_SIZE {
+                            root.record_int(INSPECT_FIELD_HISTORY_DURATION_WHEN_FULL, duration);
+                        }
+                    } else {
+                        root.record_int(INSPECT_FIELD_HISTORY_DURATION, 0i64);
+                    }
+                }
+                Ok(inspector)
+            }
+            .boxed()
+        });
+        Self {
+            event_log,
+            event_log_times,
+            _event_log_stats: Rc::new(RefCell::new(event_log_stats)),
+        }
     }
 
     pub fn log(&self, event: SagEvent) {
-        let time = zx::MonotonicInstant::get().into_nanos();
+        let time = zx::BootInstant::get().into_nanos();
 
         self.event_log.borrow_mut().add_entry(|node| {
             match event {
@@ -122,5 +175,13 @@ impl SagEventLogger {
                 }
             };
         });
+        // Record timestamps that are tracked within IRingBuffer.
+        {
+            let mut times = self.event_log_times.lock();
+            if times.len() == SUSPEND_EVENT_BUFFER_SIZE {
+                times.pop_front();
+            }
+            times.push_back(time);
+        }
     }
 }

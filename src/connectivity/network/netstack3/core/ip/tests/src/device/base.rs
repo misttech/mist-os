@@ -4,6 +4,7 @@
 
 use alloc::collections::HashSet;
 use alloc::vec;
+use alloc::vec::Vec;
 use core::num::{NonZeroU16, NonZeroU8};
 use core::time::Duration;
 
@@ -14,28 +15,34 @@ use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness};
 use test_case::test_case;
 
-use netstack3_base::testutil::{assert_empty, FakeInstant, TestIpExt};
+use netstack3_base::testutil::{
+    assert_empty, FakeInstant, FakeTimerCtxExt, TestIpExt, WithFakeFrameContext,
+};
 use netstack3_base::{InstantContext as _, IpAddressId as _};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
     LoopbackDevice, MaxEthernetFrameSize,
 };
 use netstack3_core::testutil::{
-    Ctx, CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
+    CtxPairExt as _, DispatchedEvent, DispatchedFrame, FakeBindingsCtx, FakeCtx,
+    DEFAULT_INTERFACE_METRIC,
 };
 use netstack3_core::{IpExt, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_device::WeakDeviceId;
 use netstack3_ip::device::{
-    AddIpAddrSubnetError, AddressRemovedReason, CommonAddressProperties, DadTimerId,
-    IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
-    IpDeviceFlags, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
-    Ipv6DeviceConfigurationUpdate, Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId,
-    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, RsTimerId,
-    SetIpAddressPropertiesError, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
-    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddressRemovedReason, CommonAddressConfig, CommonAddressProperties,
+    DadTimerId, IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
+    IpDeviceFlags, IpDeviceHandler, IpDeviceStateContext, Ipv4AddrConfig,
+    Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId, Ipv6DeviceConfigurationUpdate,
+    Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6NetworkLearnedParameters,
+    Lifetime, PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
+    StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
+    UpdateIpConfigurationError,
 };
 use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode, MldTimerId};
 use netstack3_ip::nud::{self, LinkResolutionResult};
+use packet_formats::testutil::ArpPacketInfo;
 use packet_formats::utils::NonZeroDuration;
 
 #[test]
@@ -244,9 +251,6 @@ fn enable_disable_ipv6() {
         .update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as we perform DAD and router
-                // solicitation.
-                dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
@@ -257,6 +261,9 @@ fn enable_disable_ipv6() {
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     gmp_enabled: Some(true),
+                    // Doesn't matter as long as we perform DAD and router
+                    // solicitation.
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -555,6 +562,373 @@ fn forget_learned_network_params_on_disable_ipv6() {
 }
 
 #[test]
+fn add_ipv6_address_with_dad_disabled() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    // NB: DAD is disabled on the device by default.
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: Ipv6::TEST_ADDRS.local_mac,
+                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            },
+            DEFAULT_INTERFACE_METRIC,
+        );
+    let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
+    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
+    let weak_device_id = device_id.downgrade();
+
+    // Enable the device
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
+            device: weak_device_id.clone(),
+            ip_enabled: true,
+        })]
+    );
+
+    // Add the address, and expect its assignment state to immediately be
+    // `Assigned` (without traversing through `Tentative`).
+    ctx.core_api()
+        .device_ip::<Ipv6>()
+        .add_ip_addr_subnet(&device_id, ll_addr.replace_witness().unwrap())
+        .expect("add MAC based IPv6 link-local address");
+
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+            device: weak_device_id,
+            addr: ll_addr.to_witness(),
+            state: IpAddressState::Assigned,
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        })]
+    );
+}
+
+#[test]
+fn enable_ipv6_dev_with_dad_disabled() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+    // NB: DAD is disabled on the device by default.
+    let ethernet_device_id =
+        ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: Ipv6::TEST_ADDRS.local_mac,
+                max_frame_size: IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            },
+            DEFAULT_INTERFACE_METRIC,
+        );
+    let ll_addr = Ipv6::TEST_ADDRS.local_mac.to_ipv6_link_local();
+    let device_id: DeviceId<FakeBindingsCtx> = ethernet_device_id.into();
+    let weak_device_id = device_id.downgrade();
+
+    // Add the address. Because the device is disabled, its assignment state
+    // should be `Unavailable`.
+    ctx.core_api()
+        .device_ip::<Ipv6>()
+        .add_ip_addr_subnet(&device_id, ll_addr.replace_witness().unwrap())
+        .expect("add MAC based IPv6 link-local address");
+
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
+            device: weak_device_id.clone(),
+            addr: ll_addr.to_witness(),
+            state: IpAddressState::Unavailable,
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        })]
+    );
+
+    // Enable the device, and expect to see the address's assignment state
+    // change to `Assigned` without traversing through `Tentative`.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv6>(&device_id, true), false);
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressStateChanged {
+                device: weak_device_id.clone(),
+                addr: ll_addr.addr().into(),
+                state: IpAddressState::Assigned,
+            }),
+            DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
+                device: weak_device_id,
+                ip_enabled: true,
+            })
+        ]
+    );
+}
+
+enum Ipv4DadTestOrder {
+    // Enable the device, then add the address.
+    EnableThenAdd,
+    // Add the address, then enable the device.
+    AddThenEnable,
+}
+
+#[test_case(Ipv4DadTestOrder::EnableThenAdd; "enable_then_add")]
+#[test_case(Ipv4DadTestOrder::AddThenEnable; "add_then_enable")]
+fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
+    const DAD_TRANSMITS: u16 = 3;
+
+    // Install a device.
+    let local_mac = Ipv4::TEST_ADDRS.local_mac;
+    let device_id = ctx
+        .core_api()
+        .device::<EthernetLinkDevice>()
+        .add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: local_mac,
+                max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+    let _: Ipv4DeviceConfigurationUpdate = ctx
+        .core_api()
+        .device_ip::<Ipv4>()
+        .update_configuration(
+            &device_id,
+            Ipv4DeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU16::new(DAD_TRANSMITS)),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .expect("should successfully update config");
+
+    // Enable the device and return any extra events that were emitted.
+    fn enable_device(
+        ctx: &mut FakeCtx,
+        device_id: &DeviceId<FakeBindingsCtx>,
+    ) -> Vec<DispatchedEvent> {
+        assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
+        let mut events = ctx.bindings_ctx.take_events();
+        assert_eq!(
+            events.pop(),
+            Some(DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                device: device_id.downgrade(),
+                ip_enabled: true,
+            }))
+        );
+        events
+    }
+
+    // Add the address, and assert that it has the expected state.
+    fn add_address(
+        ctx: &mut FakeCtx,
+        device_id: &DeviceId<FakeBindingsCtx>,
+        addr: &AddrSubnet<Ipv4Addr>,
+        expected_state: IpAddressState,
+    ) {
+        let addr_config = Ipv4AddrConfig {
+            config: CommonAddressConfig { should_perform_dad: Some(true) },
+            ..Default::default()
+        };
+        ctx.core_api()
+            .device_ip::<Ipv4>()
+            .add_ip_addr_subnet_with_config(&device_id, addr.clone(), addr_config)
+            .expect("failed to add IPv4 Address");
+        assert_eq!(
+            ctx.bindings_ctx.take_events()[..],
+            [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
+                device: device_id.downgrade(),
+                addr: addr.clone(),
+                state: expected_state,
+                valid_until: Lifetime::Infinite,
+                preferred_lifetime: PreferredLifetime::preferred_forever(),
+            })]
+        );
+    }
+
+    let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
+
+    match order {
+        Ipv4DadTestOrder::EnableThenAdd => {
+            // Enable the device and then add the address. When the address
+            // is added it should immediately progress to "tentative" and start
+            // DAD.
+            let address_events = enable_device(&mut ctx, &device_id);
+            assert_eq!(&address_events[..], []);
+            ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+            add_address(&mut ctx, &device_id, &ipv4_addr_subnet, IpAddressState::Tentative);
+        }
+        Ipv4DadTestOrder::AddThenEnable => {
+            // Add the address before enabling the device. It should be
+            // "unavailable" without DAD having started. Then, once the device
+            // is enabled, it should become "tentative" and start DAD.
+            add_address(&mut ctx, &device_id, &ipv4_addr_subnet, IpAddressState::Unavailable);
+            ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+            let address_events = enable_device(&mut ctx, &device_id);
+            assert_eq!(
+                &address_events[..],
+                [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
+                    device: device_id.downgrade(),
+                    addr: ipv4_addr_subnet.addr(),
+                    state: IpAddressState::Tentative,
+                })]
+            );
+        }
+    }
+
+    // The stack should have installed a DAD timer for PROBE_WAIT, but not yet
+    // sent an ARP probe.
+    let expected_timer_id = TimerId::from(
+        Ipv4DeviceTimerId::Dad(DadTimerId::new(
+            device_id.downgrade(),
+            IpDeviceStateContext::<Ipv4, _>::get_address_id(
+                &mut ctx.core_ctx(),
+                &device_id,
+                ipv4_addr_subnet.addr(),
+            )
+            .unwrap()
+            .downgrade(),
+        ))
+        .into_common(),
+    );
+    ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(expected_timer_id.clone(), ..)]);
+    ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
+        assert_matches!(&ctx.take_frames()[..], []);
+    });
+
+    // Trigger the DAD Timer. Verify an ARP probe was sent and an additional DAD
+    // timer was scheduled (once for each DAD_TRANSMITS). There should not be
+    // any events emitted yet.
+    for _ in 0..DAD_TRANSMITS {
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id.clone()));
+        ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
+            let frames = ctx.take_frames();
+            let (dev, buf) = assert_matches!(&frames[..], [frame] => frame);
+            let dev = assert_matches!(dev, DispatchedFrame::Ethernet(device_id) => device_id);
+            assert_eq!(WeakDeviceId::Ethernet(dev.clone()), device_id.downgrade());
+            let ArpPacketInfo { target_protocol_address, .. } =
+                packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
+                    buf,
+                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("should successfully parse ARP packet");
+            assert_eq!(target_protocol_address, ipv4_addr_subnet.addr().get());
+        });
+        ctx.bindings_ctx
+            .timer_ctx()
+            .assert_timers_installed_range([(expected_timer_id.clone(), ..)]);
+        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
+    }
+
+    // Trigger the DadTimer and verify the address became assigned.
+    let (mut core_ctx, bindings_ctx) = ctx.contexts();
+    assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id));
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
+            device: device_id.downgrade(),
+            addr: ipv4_addr_subnet.addr(),
+            state: IpAddressState::Assigned,
+        })]
+    );
+
+    // Disable device and take all events to cleanup references.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
+    let _ = ctx.bindings_ctx.take_events();
+}
+
+#[test]
+fn notify_on_dad_failure_ipv4() {
+    let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
+
+    // Install a device.
+    let local_mac = Ipv4::TEST_ADDRS.local_mac;
+    let device_id = ctx
+        .core_api()
+        .device::<EthernetLinkDevice>()
+        .add_device_with_default_state(
+            EthernetCreationProperties {
+                mac: local_mac,
+                max_frame_size: MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+    let _: Ipv4DeviceConfigurationUpdate = ctx
+        .core_api()
+        .device_ip::<Ipv4>()
+        .update_configuration(
+            &device_id,
+            Ipv4DeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU16::new(1)),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        )
+        .expect("should successfully update config");
+
+    // Enable the device.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, true), false);
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+            device: device_id.downgrade(),
+            ip_enabled: true,
+        })]
+    );
+
+    // Add an IPv4 Address, requesting that DAD be performed.
+    let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
+    let config = Ipv4AddrConfig {
+        config: CommonAddressConfig { should_perform_dad: Some(true) },
+        ..Default::default()
+    };
+    ctx.core_api()
+        .device_ip::<Ipv4>()
+        .add_ip_addr_subnet_with_config(&device_id, ipv4_addr_subnet.clone(), config)
+        .expect("failed to add IPv4 Address");
+    assert_eq!(
+        ctx.bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressAdded {
+            device: device_id.downgrade(),
+            addr: ipv4_addr_subnet.clone(),
+            state: IpAddressState::Tentative,
+            valid_until: Lifetime::Infinite,
+            preferred_lifetime: PreferredLifetime::preferred_forever(),
+        })]
+    );
+
+    let (mut core_ctx, bindings_ctx) = ctx.contexts();
+
+    // Simulate a conflicting ARP probe, and expect the address is removed.
+    assert_eq!(
+        IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
+            &mut core_ctx,
+            bindings_ctx,
+            &device_id,
+            ipv4_addr_subnet.addr(),
+            ()
+        ),
+        IpAddressState::Tentative,
+    );
+
+    assert_eq!(
+        bindings_ctx.take_events()[..],
+        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressRemoved {
+            device: device_id.downgrade(),
+            addr: ipv4_addr_subnet.addr(),
+            reason: AddressRemovedReason::DadFailed,
+        })]
+    );
+
+    // Disable device and take all events to cleanup references.
+    assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
+    let _ = ctx.bindings_ctx.take_events();
+}
+
+#[test]
 fn notify_on_dad_failure_ipv6() {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
@@ -577,7 +951,6 @@ fn notify_on_dad_failure_ipv6() {
         .update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
@@ -588,6 +961,7 @@ fn notify_on_dad_failure_ipv6() {
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     gmp_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -621,7 +995,7 @@ fn notify_on_dad_failure_ipv6() {
         .device_ip::<Ipv6>()
         .add_ip_addr_subnet(&device_id, assigned_addr)
         .expect("add succeeds");
-    let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+    let (mut core_ctx, bindings_ctx) = ctx.contexts();
     assert_eq!(
         bindings_ctx.take_events()[..],
         [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
@@ -636,11 +1010,12 @@ fn notify_on_dad_failure_ipv6() {
     // When DAD fails, an event should be emitted and the address should be
     // removed.
     assert_eq!(
-        Ipv6DeviceHandler::handle_received_neighbor_advertisement(
-            &mut core_ctx.context(),
+        IpDeviceHandler::<Ipv6, _>::handle_received_dad_packet(
+            &mut core_ctx,
             bindings_ctx,
             &device_id,
-            assigned_addr.ipv6_unicast_addr(),
+            assigned_addr.addr(),
+            None
         ),
         IpAddressState::Tentative,
     );
@@ -656,7 +1031,7 @@ fn notify_on_dad_failure_ipv6() {
 
     assert_eq!(
         IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut core_ctx.context(),
+            &mut core_ctx,
             &device_id,
             |addrs, _core_ctx| {
                 addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -696,6 +1071,7 @@ fn update_ip_device_configuration_err<I: IpExt>() {
                 ),
                 unicast_forwarding_enabled: Some(true),
                 multicast_forwarding_enabled: None,
+                dad_transmits: None,
             }
             .into(),
         )
@@ -739,6 +1115,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                 },
                 igmp_mode: Some(IgmpConfigMode::V1),
             },
@@ -749,6 +1126,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
+                dad_transmits: Some(None),
             },
             igmp_mode: Some(IgmpConfigMode::V3),
         }),
@@ -764,6 +1142,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: Some(true),
                     multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
+                    dad_transmits: None,
                 },
                 igmp_mode: None,
             },
@@ -774,6 +1153,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
+                dad_transmits: None,
             },
             igmp_mode: None,
         }),
@@ -790,6 +1170,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: None,
                     multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
+                    dad_transmits: None,
                 },
                 igmp_mode: None,
             },
@@ -800,6 +1181,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: None,
                 multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
+                dad_transmits: None,
             },
             igmp_mode: None,
         }),
@@ -815,6 +1197,7 @@ fn update_ipv4_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
+                    dad_transmits: Some(None),
                 },
                 igmp_mode: Some(IgmpConfigMode::V3),
             },
@@ -825,6 +1208,7 @@ fn update_ipv4_configuration_return() {
                 unicast_forwarding_enabled: Some(true),
                 multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
+                dad_transmits: Some(NonZeroU16::new(1)),
             },
             igmp_mode: Some(IgmpConfigMode::V1),
         }),
@@ -861,7 +1245,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU16::new(1)),
                 max_router_solicitations: Some(NonZeroU8::new(2)),
                 slaac_config: SlaacConfigurationUpdate {
                     stable_address_configuration: Some(
@@ -876,12 +1259,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
+                    dad_transmits: Some(NonZeroU16::new(1)),
                 },
                 mld_mode: Some(MldConfigMode::V1),
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: Some(None),
             max_router_solicitations: Some(None),
             slaac_config: SlaacConfigurationUpdate {
                 stable_address_configuration: Some(StableSlaacAddressConfiguration::Disabled),
@@ -892,6 +1275,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
+                dad_transmits: Some(None),
             },
             mld_mode: Some(MldConfigMode::V2),
         }),
@@ -902,7 +1286,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: None,
                 max_router_solicitations: None,
                 slaac_config: SlaacConfigurationUpdate::default(),
                 ip_config: IpDeviceConfigurationUpdate {
@@ -910,12 +1293,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: Some(true),
                     multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
+                    dad_transmits: None,
                 },
                 mld_mode: None,
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: None,
             max_router_solicitations: None,
             slaac_config: SlaacConfigurationUpdate::default(),
             ip_config: IpDeviceConfigurationUpdate {
@@ -923,6 +1306,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: Some(false),
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
+                dad_transmits: None,
             },
             mld_mode: None,
         }),
@@ -934,7 +1318,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: None,
                 max_router_solicitations: None,
                 slaac_config: SlaacConfigurationUpdate::default(),
                 ip_config: IpDeviceConfigurationUpdate {
@@ -942,12 +1325,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: None,
                     multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
+                    dad_transmits: None,
                 },
                 mld_mode: None,
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: None,
             max_router_solicitations: None,
             slaac_config: SlaacConfigurationUpdate::default(),
             ip_config: IpDeviceConfigurationUpdate {
@@ -955,6 +1338,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: None,
                 multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
+                dad_transmits: None,
             },
             mld_mode: None,
         }),
@@ -965,7 +1349,6 @@ fn update_ipv6_configuration_return() {
         api.update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(None),
                 max_router_solicitations: Some(None),
                 slaac_config: SlaacConfigurationUpdate {
                     stable_address_configuration: Some(StableSlaacAddressConfiguration::Disabled),
@@ -978,12 +1361,12 @@ fn update_ipv6_configuration_return() {
                     unicast_forwarding_enabled: Some(false),
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
+                    dad_transmits: Some(None),
                 },
                 mld_mode: Some(MldConfigMode::V2),
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
-            dad_transmits: Some(NonZeroU16::new(1)),
             max_router_solicitations: Some(NonZeroU8::new(2)),
             slaac_config: SlaacConfigurationUpdate {
                 stable_address_configuration: Some(
@@ -998,6 +1381,7 @@ fn update_ipv6_configuration_return() {
                 unicast_forwarding_enabled: Some(true),
                 multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
+                dad_transmits: Some(NonZeroU16::new(1)),
             },
             mld_mode: Some(MldConfigMode::V1),
         }),

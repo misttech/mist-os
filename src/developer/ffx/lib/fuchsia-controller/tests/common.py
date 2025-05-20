@@ -8,7 +8,7 @@ import fidl_codec
 
 
 class FuchsiaControllerTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         fidl_codec.add_ir_path(
             "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.test.fidl.json"
         )

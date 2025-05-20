@@ -18,8 +18,8 @@ use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signa
 use super::parser::ParseStrategy;
 use super::security_context::{Level, SecurityContext};
 use super::symbols::{
-    find_class_by_name, Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean,
-    MlsLevel, Role, Sensitivity, SymbolList, Type, User,
+    Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean, MlsLevel, Role,
+    Sensitivity, SymbolList, Type, User,
 };
 use super::{
     AccessDecision, AccessVector, CategoryId, ClassId, IoctlAccessDecision, Parse, RoleId,
@@ -126,49 +126,6 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         access_decision.allow -=
             self.compute_denied_by_constraints(source_context, target_context, target_class);
         access_decision
-    }
-
-    /// The "custom" form of `compute_access_decision()`, used when the target class
-    /// is specified by name rather than as an object.
-    pub(super) fn compute_access_decision_custom(
-        &self,
-        source_context: &SecurityContext,
-        target_context: &SecurityContext,
-        target_class_name: &str,
-    ) -> AccessDecision {
-        let mut access_decision = self.compute_explicitly_allowed_custom(
-            source_context.type_(),
-            target_context.type_(),
-            target_class_name,
-        );
-        access_decision.allow -= self.compute_denied_by_constraints_custom(
-            source_context,
-            target_context,
-            target_class_name,
-        );
-        access_decision
-    }
-
-    /// Computes the access vector that associates type `source_type_name` and `target_type_name`
-    /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
-    /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`crate::ObjectClass::Custom`]
-    /// value.
-    pub(super) fn compute_explicitly_allowed_custom(
-        &self,
-        source_type_name: TypeId,
-        target_type_name: TypeId,
-        target_class_name: &str,
-    ) -> AccessDecision {
-        if let Some(target_class) = find_class_by_name(self.classes(), target_class_name) {
-            self.compute_explicitly_allowed(source_type_name, target_type_name, target_class)
-        } else {
-            AccessDecision::allow(if self.handle_unknown() == HandleUnknown::Allow {
-                AccessVector::ALL
-            } else {
-                AccessVector::NONE
-            })
-        }
     }
 
     /// Computes the access granted to `source_type` on `target_type`, for the specified
@@ -278,22 +235,6 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         denied
     }
 
-    /// A permission is denied if it matches at least one unsatisfied
-    /// constraint. This is the "custom" version because `target_class_name` is
-    /// associated with a [`crate::ObjectClass::Custom`] value.
-    fn compute_denied_by_constraints_custom(
-        &self,
-        source_context: &SecurityContext,
-        target_context: &SecurityContext,
-        target_class_name: &str,
-    ) -> AccessVector {
-        if let Some(target_class) = find_class_by_name(self.classes(), target_class_name) {
-            self.compute_denied_by_constraints(source_context, target_context, target_class)
-        } else {
-            AccessVector::NONE
-        }
-    }
-
     /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
     /// audited when denied, for a given source context, target context, target class, and ioctl
     /// prefix byte.
@@ -370,29 +311,6 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         }
         let allow = explicit_allow.unwrap_or(XpermsBitmap::ALL);
         IoctlAccessDecision { allow, auditallow, auditdeny }
-    }
-
-    /// Computes the ioctl extended permissions that should be allowed, audited when allowed, and
-    /// audited when denied, for a given source context, target context, target class, and ioctl
-    /// prefix byte. This is the "custom" version because `target_class_name` is associated with a
-    /// [`crate::ObjectClass::Custom`] value.
-    pub(super) fn compute_ioctl_access_decision_custom(
-        &self,
-        source_context: &SecurityContext,
-        target_context: &SecurityContext,
-        target_class_name: &str,
-        ioctl_prefix: u8,
-    ) -> IoctlAccessDecision {
-        if let Some(target_class) = find_class_by_name(self.classes(), target_class_name) {
-            self.compute_ioctl_access_decision(
-                source_context,
-                target_context,
-                target_class,
-                ioctl_prefix,
-            )
-        } else {
-            IoctlAccessDecision::ALLOW_ALL
-        }
     }
 
     /// Returns the policy entry for the specified initial Security Context.

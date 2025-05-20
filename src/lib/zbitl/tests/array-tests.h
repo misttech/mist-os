@@ -17,7 +17,7 @@
 template <typename T>
 struct FblArrayTestTraits {
   using storage_type = fbl::Array<T>;
-  using payload_type = cpp20::span<T>;
+  using payload_type = std::span<T>;
   using creation_traits = FblArrayTestTraits;
   using SpanTraits = SpanTestTraits<T>;
 

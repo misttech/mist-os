@@ -85,7 +85,7 @@ class DataProviderTest : public UnitTestFixture {
 
  protected:
   void SetUpDataProvider(
-      const std::set<std::string>& annotation_allowlist = kDefaultAnnotations,
+      const std::set<std::string>& default_snapshot_annotations = kDefaultAnnotations,
       const feedback::AttachmentKeys& attachment_allowlist = {},
       const std::map<std::string, ErrorOrString>& startup_annotations = {},
       const std::map<std::string, feedback::AttachmentProvider*>& attachment_providers = {}) {
@@ -99,8 +99,8 @@ class DataProviderTest : public UnitTestFixture {
         dispatcher(), attachment_allowlist, attachment_providers);
     data_provider_ = std::make_unique<DataProvider>(
         dispatcher(), services(), &clock_, &redactor_, /*is_first_instance=*/true,
-        annotation_allowlist, attachment_allowlist, cobalt_.get(), annotation_manager_.get(),
-        attachment_manager_.get(), inspect_data_budget_.get());
+        default_snapshot_annotations, attachment_allowlist, cobalt_.get(),
+        annotation_manager_.get(), attachment_manager_.get(), inspect_data_budget_.get());
   }
 
   Snapshot GetSnapshot(std::optional<zx::channel> channel = std::nullopt,

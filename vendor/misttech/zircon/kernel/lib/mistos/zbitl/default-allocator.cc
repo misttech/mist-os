@@ -7,7 +7,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/unique_ptr.h>
 
 #include <ktl/enforce.h>

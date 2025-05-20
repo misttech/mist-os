@@ -10,7 +10,7 @@ def _fuchsia_toolchain_info_impl(ctx):
     return [platform_common.ToolchainInfo(
         name = ctx.label.name,
         aemu_runfiles = ctx.runfiles(ctx.files.aemu_runfiles),
-        assembly_generate_config = ctx.executable.assembly_generate_config,
+        assembly_config = ctx.executable.assembly_config,
         bootserver = ctx.executable.bootserver,
         blobfs = ctx.executable.blobfs,
         blobfs_manifest = ctx.file.blobfs_manifest,
@@ -76,8 +76,8 @@ included in the Fuchsia IDK.
             mandatory = True,
             cfg = "exec",
         ),
-        "assembly_generate_config": attr.label(
-            doc = "assembly_generate_config tool executable.",
+        "assembly_config": attr.label(
+            doc = "assembly_config tool executable.",
             mandatory = True,
             cfg = "exec",
             executable = True,

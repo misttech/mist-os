@@ -38,7 +38,15 @@
 
                 // Provides access to memory pressure level change notifications.
                 "fuchsia.memorypressure.Provider",
+
+                // Provides access to metric event logging.
+                "fuchsia.metrics.MetricEventLoggerFactory",
             ],
+        },
+        {
+            directory: "config-data",
+            rights: [ "r*" ],
+            path: "/config/data",
         },
         {
             config: "fuchsia.memory.CaptureOnPressureChange",

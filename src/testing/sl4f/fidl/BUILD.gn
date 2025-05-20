@@ -8,7 +8,7 @@ fidl("fuchsia.testing.proxy") {
   sources = [ "tcp_proxy.fidl" ]
 }
 
-fidl("fuchsia.test.audio.recording") {
-  sources = [ "audio_recording.fidl" ]
+fidl("fuchsia.test.audio") {
+  sources = [ "test_audio.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

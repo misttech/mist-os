@@ -129,15 +129,26 @@ template("generate_archivist_integration_test_cases") {
     group(target_name) {
     }
   } else {
-    fuchsia_package_with_test(target_name) {
-      # This test needs to override the default CTF realm.
-      device_test_realm = "/core/testing/system-tests"
-      test_component = "//src/diagnostics/archivist/tests/integration:test_root"
-      test_component_name = "test_root.cm"
-      subpackages = [
-        test_info.target_label,
-        "//src/diagnostics/archivist/tests/integration/realm_factory:pkg",
-      ]
+    # TODO(https://fxbug.dev/383560524): This is disabled until we fix an error in the test.
+    if (defined(invoker.api_level) && invoker.api_level == "27") {
+      not_needed([
+                   "test_info",
+                   "fidl_coverage",
+                 ])
+      group(target_name) {
+      }
+    } else {
+      fuchsia_package_with_test(target_name) {
+        # This test needs to override the default CTF realm.
+        device_test_realm = "/core/testing/system-tests"
+        test_component =
+            "//src/diagnostics/archivist/tests/integration:test_root"
+        test_component_name = "test_root.cm"
+        subpackages = [
+          test_info.target_label,
+          "//src/diagnostics/archivist/tests/integration/realm_factory:pkg",
+        ]
+      }
     }
   }
 }
@@ -148,22 +159,14 @@ template("generate_fuchsia-diagnostics-tests") {
                            "test_info",
                            "fidl_coverage",
                          ])
-  if (defined(invoker.api_level) && invoker.api_level == "17") {
-    not_needed([
-                 "test_info",
-                 "fidl_coverage",
-               ])
-    group(target_name) {
-    }
-  } else {
-    fuchsia_package_with_test(target_name) {
-      subpackages = [
-        test_info.target_label,
-        # These tests do not currently use a test realm factory.
-      ]
-      test_component = "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-tests-root"
-      test_component_name = "fuchsia-diagnostics-tests-root.cm"
-    }
+
+  fuchsia_package_with_test(target_name) {
+    subpackages = [
+      test_info.target_label,
+      # These tests do not currently use a test realm factory.
+    ]
+    test_component = "//sdk/ctf/tests/fidl/fuchsia.diagnostics:fuchsia-diagnostics-tests-root"
+    test_component_name = "fuchsia-diagnostics-tests-root.cm"
   }
 }
 
@@ -385,7 +388,7 @@ template("generate_fuchsia-hwinfo-tests") {
   }
 }
 
-# NOTE: Versions 16/17 are disabled as we no longer provide builds for these
+# NOTE: Version 16 is disabled as we no longer provide builds for these
 # versions. These tests were updated in https://fxbug.dev/355034859.
 template("generate_pkgdir-tests") {
   forward_variables_from(invoker,
@@ -393,13 +396,10 @@ template("generate_pkgdir-tests") {
                            "test_info",
                            "fidl_coverage",
                          ])
-  _disabled_versions = [
-    "16",
-    "17",
-  ]
+  disabled_api_levels = [ "16" ]
   if (defined(invoker.api_level) &&
-      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
-      _disabled_versions) {
+      disabled_api_levels + [ invoker.api_level ] - [ invoker.api_level ] !=
+      disabled_api_levels) {
     not_needed([
                  "test_info",
                  "fidl_coverage",
@@ -424,15 +424,10 @@ template("generate_simulate-scan-wlan-hw-sim-tests") {
                            "test_info",
                            "fidl_coverage",
                          ])
-  _disabled_versions = [
-    "15",
-    "16",
-    "17",
-    "18",
-  ]
+  disabled_api_levels = [ "16" ]
   if (defined(invoker.api_level) &&
-      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
-      _disabled_versions) {
+      disabled_api_levels + [ invoker.api_level ] - [ invoker.api_level ] !=
+      disabled_api_levels) {
     not_needed([
                  "test_info",
                  "fidl_coverage",
@@ -463,29 +458,14 @@ template("generate_basic-driver-test") {
                            "test_info",
                            "fidl_coverage",
                          ])
-  _disabled_versions = [
-    "17",
-    "18",
-  ]
-  if (defined(invoker.api_level) &&
-      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
-      _disabled_versions) {
-    not_needed([
-                 "test_info",
-                 "fidl_coverage",
-               ])
-    group(target_name) {
-    }
-  } else {
-    fuchsia_package_with_test(target_name) {
-      test_component =
-          "//src/devices/tests/ctf/basic_driver:basic-driver-test-root"
-      test_component_name = "basic-driver-test-root.cm"
-      subpackages = [
-        test_info.target_label,
-        "//src/devices/testing/realm-factory",
-      ]
-    }
+  fuchsia_package_with_test(target_name) {
+    test_component =
+        "//src/devices/tests/ctf/basic_driver:basic-driver-test-root"
+    test_component_name = "basic-driver-test-root.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/devices/testing/realm-factory",
+    ]
   }
 }
 
@@ -495,25 +475,13 @@ template("generate_nodegroup_test") {
                            "test_info",
                            "fidl_coverage",
                          ])
-  _disabled_versions = [ "18" ]
-  if (defined(invoker.api_level) &&
-      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
-      _disabled_versions) {
-    not_needed([
-                 "test_info",
-                 "fidl_coverage",
-               ])
-    group(target_name) {
-    }
-  } else {
-    fuchsia_package_with_test(target_name) {
-      test_component = "//src/devices/tests/v2/node_group:nodegroup_test_root"
-      test_component_name = "nodegroup_test_root.cm"
-      subpackages = [
-        test_info.target_label,
-        "//src/devices/testing/realm-factory",
-      ]
-    }
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/devices/tests/v2/node_group:nodegroup_test_root"
+    test_component_name = "nodegroup_test_root.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/devices/testing/realm-factory",
+    ]
   }
 }
 
@@ -1121,7 +1089,7 @@ template("generate_ctf_test") {
     # fidl_coverage will be forwarded in each "generate_foo" target defined above.
     # It can be un-forwarded to disable it for a specific test, or set to false
     # here to disable it for all tests.
-    fidl_coverage = true
+    fidl_coverage = api_level == "_in_development"
 
     # If you change these properties, change the docs at the top of this file.
     test_info = {

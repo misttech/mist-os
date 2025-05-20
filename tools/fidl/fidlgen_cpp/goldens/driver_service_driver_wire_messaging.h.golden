@@ -6,7 +6,6 @@
 
 #include <fidl/test.driverservice/cpp/markers.h>
 #include <fidl/test.driverservice/cpp/wire_types.h>
-#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl_driver/cpp/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -28,7 +26,6 @@ class SomeDriverProtocol;
 
 class DriverOnlyService;
 
-#ifdef __Fuchsia__
 }  // namespace test_driverservice
 
 template <>
@@ -47,15 +44,6 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverservice::SomeDriverPr
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_driverservice {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_driverservice
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireEventHandlerInterface<::test_driverservice::SomeDriverProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -74,8 +62,7 @@ class ::fdf::WireAsyncEventHandler<::test_driverservice::SomeDriverProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_driverservice::SomeDriverProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_driverservice::SomeDriverProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverservice::SomeDriverProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverservice::SomeDriverProtocol>* event_handler);
 };
 
 template <>
@@ -109,22 +96,14 @@ class ::fdf::WireServer<::test_driverservice::SomeDriverProtocol> : public ::fid
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
 namespace test_driverservice {
 
 class DriverOnlyService final {
@@ -134,10 +113,8 @@ class DriverOnlyService final {
   static constexpr bool kIsService = true;
   static constexpr char Name[] = "test.driverservice.DriverOnlyService";
   using Transport = ::fidl::internal::DriverTransport;
-#ifdef __Fuchsia__
-  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::DriverTransport>;
 
-#endif  // __Fuchsia__
+  using ServiceInstanceHandler = fidl::ServiceInstanceHandler<::fidl::internal::DriverTransport>;
 
   class Member final {
    public:
@@ -151,7 +128,7 @@ class DriverOnlyService final {
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-#ifdef __Fuchsia__
+
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func)
         : dir_(std::move(dir)), connect_func_(connect_func) {}
@@ -199,10 +176,8 @@ class DriverOnlyService final {
    private:
     ::zx::channel dir_;
     ::fidl::internal::ConnectMemberFunc connect_func_;
-
-#endif  // __Fuchsia__
   };
-#ifdef __Fuchsia__
+
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<::fidl::internal::DriverTransport> {
    public:
@@ -232,15 +207,9 @@ class DriverOnlyService final {
       return this->AddMember<::test_driverservice::SomeDriverProtocol>(std::move(handler), "member");
     }
   };
-
-#endif  // __Fuchsia__
 };
 
 }  // namespace test_driverservice
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driverservice::SomeDriverProtocol> : public ::fdf::internal::BufferClientImplBase {
@@ -269,13 +238,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driverservice::SomeDriverP
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakBufferEventSender<::test_driverservice::SomeDriverProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
  public:
@@ -289,6 +252,6 @@ class ::fidl::internal::WireBufferEventSender<::test_driverservice::SomeDriverPr
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

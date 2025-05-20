@@ -77,8 +77,11 @@ type Configuration = table {
         4: arp @generated_name("ArpConfiguration") table {
             /// Neighbor Unreachabilty Detection over ARP configuration.
             1: nud NudConfiguration;
-            // TODO(https://fxbug.dev/42077260): Add DAD configuration when DAD
-            // over IPv4 is supported.
+            /// Duplicate Address Detection over ARP configuration.
+            ///
+            /// Note that for IPv4, "Duplicate Address Detection" refers to
+            /// Address Conflict Detection, as defined in RFC 5227.
+            2: dad DadConfiguration;
         };
     };
 

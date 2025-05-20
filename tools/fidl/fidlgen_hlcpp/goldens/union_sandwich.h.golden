@@ -52,7 +52,7 @@ class UnionSize8Alignment4 final {
   static inline ::std::unique_ptr<UnionSize8Alignment4> New() { return ::std::make_unique<UnionSize8Alignment4>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnionSize8Alignment4* value, size_t offset);
   zx_status_t Clone(UnionSize8Alignment4* result) const;
 
@@ -115,7 +115,7 @@ class SandwichUnionSize8Alignment4 final {
   static inline ::std::unique_ptr<SandwichUnionSize8Alignment4> New() { return ::std::make_unique<SandwichUnionSize8Alignment4>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SandwichUnionSize8Alignment4* value, size_t _offset);
   zx_status_t Clone(SandwichUnionSize8Alignment4* result) const;
 };
@@ -148,7 +148,7 @@ class UnionSize12Alignment4 final {
   static inline ::std::unique_ptr<UnionSize12Alignment4> New() { return ::std::make_unique<UnionSize12Alignment4>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnionSize12Alignment4* value, size_t offset);
   zx_status_t Clone(UnionSize12Alignment4* result) const;
 
@@ -211,7 +211,7 @@ class SandwichUnionSize12Alignment4 final {
   static inline ::std::unique_ptr<SandwichUnionSize12Alignment4> New() { return ::std::make_unique<SandwichUnionSize12Alignment4>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SandwichUnionSize12Alignment4* value, size_t _offset);
   zx_status_t Clone(SandwichUnionSize12Alignment4* result) const;
 };
@@ -234,7 +234,7 @@ class StructSize16Alignment8 final {
   static inline ::std::unique_ptr<StructSize16Alignment8> New() { return ::std::make_unique<StructSize16Alignment8>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, StructSize16Alignment8* value, size_t _offset);
   zx_status_t Clone(StructSize16Alignment8* result) const;
 };
@@ -267,7 +267,7 @@ class UnionSize24Alignment8 final {
   static inline ::std::unique_ptr<UnionSize24Alignment8> New() { return ::std::make_unique<UnionSize24Alignment8>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnionSize24Alignment8* value, size_t offset);
   zx_status_t Clone(UnionSize24Alignment8* result) const;
 
@@ -330,7 +330,7 @@ class SandwichUnionSize24Alignment8 final {
   static inline ::std::unique_ptr<SandwichUnionSize24Alignment8> New() { return ::std::make_unique<SandwichUnionSize24Alignment8>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SandwichUnionSize24Alignment8* value, size_t _offset);
   zx_status_t Clone(SandwichUnionSize24Alignment8* result) const;
 };
@@ -363,7 +363,7 @@ class UnionSize36Alignment4 final {
   static inline ::std::unique_ptr<UnionSize36Alignment4> New() { return ::std::make_unique<UnionSize36Alignment4>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnionSize36Alignment4* value, size_t offset);
   zx_status_t Clone(UnionSize36Alignment4* result) const;
 
@@ -426,7 +426,7 @@ class SandwichUnionSize36Alignment4 final {
   static inline ::std::unique_ptr<SandwichUnionSize36Alignment4> New() { return ::std::make_unique<SandwichUnionSize36Alignment4>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SandwichUnionSize36Alignment4* value, size_t _offset);
   zx_status_t Clone(SandwichUnionSize36Alignment4* result) const;
 };
@@ -454,7 +454,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize8Alignment4>
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize8Alignment4>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -540,7 +540,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize12Alignment4
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize12Alignment4>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -651,7 +651,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize24Alignment8
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize24Alignment8>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -737,7 +737,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize36Alignment4
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::unionsandwich::UnionSize36Alignment4>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);

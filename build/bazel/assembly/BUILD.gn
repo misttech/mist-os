@@ -111,7 +111,7 @@ verify_assembly_configs("verify_assembly_configs") {
         name = "x64_partitions_config"
         gn_target = "//boards/partitions:x64"
         bazel_target = "//build/bazel/assembly/partitions_configurations:x64"
-        extra_copy_outputs = [ "bootloaders/fuchsia.esp.blk" ]
+        extra_copy_outputs = [ "bootloader_partitions/0/image/fuchsia.esp.blk" ]
         deps = [ "//build/images/flash:esp.bazel_input" ]
       },
     ]
@@ -122,7 +122,7 @@ verify_assembly_configs("verify_assembly_configs") {
         name = "arm64_partitions_config"
         gn_target = "//boards/partitions:arm64"
         bazel_target = "//build/bazel/assembly/partitions_configurations:arm64"
-        extra_copy_outputs = [ "bootloaders/fuchsia.esp.blk" ]
+        extra_copy_outputs = [ "bootloader_partitions/0/image/fuchsia.esp.blk" ]
         deps = [ "//build/images/flash:esp.bazel_input" ]
       },
     ]

@@ -11,95 +11,14 @@ This file will appear as MODULE.bazel in the top-level Bazel workspace
 used by the Fuchsia platform build.
 """
 
+# LINT.IfChange
 module(
     name = "main",
     version = "1",
-    execution_platforms_to_register = [
-        "//build/bazel/platforms:linux_x64",
-    ],
-    toolchains_to_register = [
-        "@prebuilt_clang//:host_clang_linux_x64_cc_toolchain",
-        "@prebuilt_clang//:host_clang_linux_arm64_cc_toolchain",
-        "@fuchsia_sdk://:fuchsia_sdk_toolchain",
-    ],
 )
+# LINT.ThenChange(//build/bazel/scripts/bazel_action.py, //build/bazel/bazel_workspace.gni)
 
-# Use a module extension to generate the @clang_prebuilt// repository
-# used to implement Bazel C++ toolchains, see //build/bazel/toolchains/clang/...
-clang_toolchains = use_extension(
-    "//:build/bazel/module_extensions.bzl",
-    "clang_toolchains_extension",
-)
-clang_toolchains.prebuilt_toolchain(
-    repo_name = "prebuilt_clang",
-)
-use_repo(
-    clang_toolchains,
-    "prebuilt_clang",
-)
-
-bazel_dep(
-    name = "bazel_skylib",
-    version = "",
-)
-local_path_override(
-    module_name = "bazel_skylib",
-    path = "third_party/bazel/_skylib",
-)
-
-bazel_dep(
-    name = "rules_cc",
-    version = "",
-)
-local_path_override(
-    module_name = "rules_cc",
-    path = "third_party/bazel_rules_cc",
-)
-
-bazel_dep(
-    name = "rules_rust",
-    version = "",
-)
-local_path_override(
-    module_name = "rules_rust",
-    path = "third_party/bazel_rules_rust",
-)
-
-bazel_dep(
-    name = "rules_go",
-    version = "",
-)
-local_path_override(
-    module_name = "rules_go",
-    path = "third_party/bazel_rules_go",
-)
-
-bazel_dep(
-    name = "rules_proto",
-    version = "",
-)
-local_path_override(
-    module_name = "rules_proto",
-    path = "third_party/bazel_rules_proto",
-)
-
-# NOTE: The following repository exists only to bootstrap other repositories
-# (eg: cipd, clang, fuchsia sdk).
-# Once @fuchsia_sdk is initialized, it should be used whenever possible.
-bazel_dep(
-    name = "rules_fuchsia",
-    version = "",
-)
-local_path_override(
-    module_name = "rules_fuchsia",
-    path = "build/bazel_sdk/bazel_rules_fuchsia",
-)
-
-fuchsia_sdk_repositories = use_extension(
-    "//:build/bazel/module_extensions.bzl",
-    "fuchsia_sdk_repositories",
-)
-use_repo(
-    fuchsia_sdk_repositories,
-    "fuchsia_sdk",
-)
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "rules_go", version = "0.43.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_license", version = "1.0.0")

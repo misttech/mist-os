@@ -10,7 +10,6 @@ use analytics::{set_new_opt_in_status, show_status_message};
 use anyhow::{anyhow, Context, Result};
 use api::value::TryConvert;
 use core::fmt;
-use ffx_command_error::bug;
 use futures::future::LocalBoxFuture;
 use std::fmt::Debug;
 use std::io::Write;
@@ -38,9 +37,7 @@ pub use api::query::{ConfigQuery, SelectMode};
 pub use api::ConfigError;
 pub use config_macros::FfxConfigBacked;
 
-pub use environment::{
-    test_init, test_init_in_tree, test_init_with_env, Environment, EnvironmentContext, TestEnv,
-};
+pub use environment::{test_env, test_init, Environment, EnvironmentContext, TestEnv};
 pub use sdk::{self, Sdk, SdkRoot};
 pub use storage::{AssertNoEnv, AssertNoEnvError, ConfigMap};
 
@@ -57,25 +54,6 @@ pub trait TryFromEnvContext: Sized + Debug {
     fn try_from_env_context<'a>(
         env: &'a EnvironmentContext,
     ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>>;
-}
-
-// This is an implementation for the "target_spec", which is just an `Option<String>` (it should
-// really just be a newtype, but that requires a lot of existing code to change).
-impl TryFromEnvContext for Option<String> {
-    fn try_from_env_context<'a>(
-        env: &'a EnvironmentContext,
-    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
-        Box::pin(async {
-            // TODO(XXX): Create a TargetSpecifier type vs. Option<String>.
-            // ffx_target::get_target_specifier(env).await.bug().map_err(Into::into) })
-            let target_spec = env.get_optional(keys::TARGET_DEFAULT_KEY).map_err(|e| bug!(e))?;
-            match target_spec {
-                Some(ref target) => tracing::info!("Target specifier: ['{target:?}']"),
-                None => tracing::debug!("No target specified"),
-            }
-            Ok(target_spec)
-        })
-    }
 }
 
 /// The levels of configuration possible
@@ -144,9 +122,9 @@ impl argh::FromArgValue for ConfigLevel {
     }
 }
 
-pub async fn invalidate_global_cache() {
+pub fn invalidate_global_cache() {
     if let Some(env_context) = global_env_context() {
-        crate::cache::invalidate(&env_context.cache).await;
+        crate::cache::invalidate(&env_context.cache);
     }
 }
 
@@ -160,7 +138,7 @@ pub fn global_env() -> Result<Environment> {
 
     match context.load() {
         Err(err) => {
-            tracing::error!("failed to load environment, reverting to default: {}", err);
+            log::error!("failed to load environment, reverting to default: {}", err);
             Ok(Environment::new_empty(context))
         }
         Ok(ctx) => Ok(ctx),
@@ -241,7 +219,7 @@ pub fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
 
     if let Ok(tool_path) = override_result {
         if tool_path.exists() {
-            tracing::info!("Using configured override for {name}: {tool_path:?}");
+            log::info!("Using configured override for {name}: {tool_path:?}");
             return Ok(tool_path);
         } else {
             return Err(anyhow!(
@@ -251,7 +229,7 @@ pub fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     }
     match sdk.get_host_tool(name) {
         Ok(tool_path) if tool_path.exists() => {
-            tracing::info!("SDK returned {tool_path:?} for {name}");
+            log::info!("SDK returned {tool_path:?} for {name}");
             Ok(tool_path)
         }
         Ok(tool_path) => Err(anyhow!("SDK returned {tool_path:?} for {name}, but does not exist")),

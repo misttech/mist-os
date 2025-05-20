@@ -1804,8 +1804,8 @@ void MsdArmDevice::ReportPowerChangeComplete(bool powered_on, bool success) {
   }
 }
 
-void MsdArmDevice::SetPowerState(bool enabled, PowerStateCallback completer) {
-  EnqueueDeviceRequest(std::make_unique<TaskRequest>(
+void MsdArmDevice::PostPowerStateChange(bool enabled, PowerStateCallback completer) {
+  RunTaskOnDeviceThread(
       [this, enabled, completer = std::move(completer)](MsdArmDevice* device) mutable {
         callbacks_on_power_change_complete_.emplace_back(std::move(completer));
         if (!enabled) {
@@ -1815,7 +1815,7 @@ void MsdArmDevice::SetPowerState(bool enabled, PowerStateCallback completer) {
         }
         scheduler_->SetSchedulingEnabled(enabled);
         return MAGMA_STATUS_OK;
-      }));
+      });
 }
 
 void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }

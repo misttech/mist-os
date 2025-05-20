@@ -5,8 +5,6 @@
 #include "src/starnix/tests/selinux/userspace/util.h"
 
 #include <fcntl.h>
-#include <lib/fit/defer.h>
-#include <string.h>
 #include <sys/mman.h>
 #include <sys/xattr.h>
 
@@ -33,21 +31,11 @@ fit::result<int> WriteExistingFile(const std::string& path, std::string_view dat
   return fit::ok();
 }
 
-void LoadPolicy(const std::string& name) {
-  auto fd = fbl::unique_fd(open(("data/policies/" + name).c_str(), O_RDONLY));
-  ASSERT_THAT(fd.get(), SyscallSucceeds()) << "opening policy at: " << name;
-
-  off_t fsize;
-  ASSERT_THAT((fsize = lseek(fd.get(), 0, SEEK_END)), SyscallSucceeds());
-
-  void* address = mmap(NULL, (size_t)fsize, PROT_READ, MAP_PRIVATE, fd.get(), 0);
-  ASSERT_THAT(reinterpret_cast<intptr_t>(address), SyscallSucceeds());
-  auto unmap =
-      fit::defer([address, fsize] { ASSERT_THAT(munmap(address, fsize), SyscallSucceeds()); });
-
-  ASSERT_TRUE(WriteExistingFile("/sys/fs/selinux/load",
-                                std::string(reinterpret_cast<char*>(address), fsize))
-                  .is_ok());
+std::string RemoveTrailingNul(std::string in) {
+  if (in.size() > 0 && in[in.size() - 1] == 0) {
+    in.pop_back();
+  }
+  return in;
 }
 
 fit::result<int, std::string> ReadFile(const std::string& path) {
@@ -56,13 +44,6 @@ fit::result<int, std::string> ReadFile(const std::string& path) {
     return fit::ok(std::move(result));
   }
   return fit::error(errno);
-}
-
-std::string RemoveTrailingNul(std::string in) {
-  if (in.size() > 0 && in[in.size() - 1] == 0) {
-    in.pop_back();
-  }
-  return in;
 }
 
 fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name) {
@@ -81,6 +62,40 @@ fit::result<int> WriteTaskAttr(std::string_view attr_name, std::string_view cont
   attr_path.append(attr_name);
 
   return WriteExistingFile(attr_path, context);
+}
+
+ScopedTaskAttrResetter ScopedTaskAttrResetter::SetTaskAttr(std::string_view attr_name,
+                                                           std::string_view new_value) {
+  auto old_value = ReadTaskAttr(attr_name);
+  if (old_value.is_error()) {
+    ADD_FAILURE() << "Saving task attr " << attr_name
+                  << " error:" << strerror(old_value.error_value());
+    return ScopedTaskAttrResetter("", "");
+  }
+  auto write_result = WriteTaskAttr(attr_name, new_value);
+  if (write_result.is_error()) {
+    ADD_FAILURE() << "Setting attr " << attr_name << " to \"" << new_value
+                  << "\" error:" << strerror(old_value.error_value());
+    return ScopedTaskAttrResetter("", "");
+  }
+  return ScopedTaskAttrResetter(attr_name, old_value.value());
+}
+
+ScopedTaskAttrResetter::ScopedTaskAttrResetter(std::string_view attr_name,
+                                               std::string_view old_value) {
+  attr_name_ = std::string(attr_name);
+  old_value_ = std::string(old_value);
+}
+
+ScopedTaskAttrResetter::~ScopedTaskAttrResetter() {
+  if (attr_name_ == "") {
+    return;
+  }
+  auto to_write = old_value_.empty() ? std::string(1, 0) : old_value_;
+  auto result = WriteTaskAttr(attr_name_, to_write);
+  if (result.is_error()) {
+    ADD_FAILURE() << "Restoring task attr " << attr_name_ << " to \"" << old_value_ << "\"";
+  }
 }
 
 fit::result<int, std::string> GetLabel(int fd) {

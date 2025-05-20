@@ -48,16 +48,16 @@ zx_status_t Sherlock::SecureMemInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SECU');
 
-  std::vector<fdf::ParentSpec> parents = {
+  std::vector<fdf::ParentSpec2> parents = {
       {
           {
               {
-                  fdf::MakeAcceptBindRule(bind_fuchsia_hardware_tee::SERVICE,
-                                          bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
+                  fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_tee::SERVICE,
+                                           bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
               },
               {
-                  fdf::MakeProperty(bind_fuchsia_hardware_tee::SERVICE,
-                                    bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
+                  fdf::MakeProperty2(bind_fuchsia_hardware_tee::SERVICE,
+                                     bind_fuchsia_hardware_tee::SERVICE_ZIRCONTRANSPORT),
               },
           },
       },
@@ -66,7 +66,7 @@ zx_status_t Sherlock::SecureMemInit() {
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, secure_mem_dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml_securemem", .parents = parents}}));
+                                   {.name = "aml_securemem", .parents2 = parents}}));
   if (!result.ok()) {
     zxlogf(ERROR, "AddCompositeNodeSpec SecureMem(secure_mem_dev) request failed: %s",
            result.FormatDescription().data());

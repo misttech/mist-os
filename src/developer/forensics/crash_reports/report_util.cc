@@ -277,7 +277,7 @@ AnnotationMap GetReportAnnotations(const feedback::Annotations& snapshot_annotat
   AnnotationMap added_annotations;
 
   auto Get = [&snapshot_annotations](const std::string& key) -> ErrorOrString {
-    if (snapshot_annotations.count(key) != 0) {
+    if (snapshot_annotations.contains(key)) {
       return snapshot_annotations.at(key);
     }
 

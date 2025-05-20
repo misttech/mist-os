@@ -15,12 +15,27 @@ use fidl_fuchsia_net_filter_ext::{
     Action, AddressMatcher, AddressMatcherType, Change, CommitError, InterfaceMatcher, MarkAction,
     Matchers, NatHook, PortRange, Resource, Rule, RuleId,
 };
-use fidl_fuchsia_net_routes as fnet_routes;
+use futures::{FutureExt as _, StreamExt as _};
 use heck::ToSnakeCase as _;
-use net_types::ip::IpAddress as _;
+use net_declare::fidl_mac;
+use net_types::ip::{IpAddress as _, Ipv4, Ipv6};
 use net_types::Witness as _;
+use netemul::RealmTcpStream;
 use netstack_testing_macros::netstack_test;
+use packet::{ParsablePacket, Serializer};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+    ETHERNET_MIN_BODY_LEN_NO_TAG,
+};
+use packet_formats::icmp::{
+    IcmpDestUnreachable, IcmpMessage, IcmpPacketBuilder, IcmpTimeExceeded,
+    Icmpv4DestUnreachableCode, Icmpv4ParameterProblem, Icmpv4ParameterProblemCode,
+    Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6ParameterProblem,
+    Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
+};
+use packet_formats::ip::{IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto};
 use test_case::test_case;
+use {fidl_fuchsia_net_routes as fnet_routes, fuchsia_async as fasync};
 
 use crate::ip_hooks::{
     Addrs, BoundSockets, ExpectedConnectivity, IcmpSocket, OriginalDestination, Ports, Realms,
@@ -479,6 +494,150 @@ async fn masquerade<I: RouterTestIpExt, S: SocketType>(name: &str, _socket_type:
         None,
     )
     .await;
+}
+
+#[netstack_test]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpDestUnreachable::default(),
+    Icmpv4DestUnreachableCode::DestNetworkUnreachable => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv4>, Icmpv4ParameterProblem::new(0),
+    Icmpv4ParameterProblemCode::PointerIndicatesError => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv4>, IcmpTimeExceeded::default(),
+    Icmpv4TimeExceededCode::TtlExpired => libc::EHOSTUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpDestUnreachable::default(),
+    Icmpv6DestUnreachableCode::NoRoute => libc::ENETUNREACH
+)]
+#[test_case(
+    PhantomData::<Ipv6>, Icmpv6ParameterProblem::new(0),
+    Icmpv6ParameterProblemCode::ErroneousHeaderField => libc::EPROTO
+)]
+#[test_case(
+    PhantomData::<Ipv6>, IcmpTimeExceeded::default(),
+    Icmpv6TimeExceededCode::HopLimitExceeded => libc::EHOSTUNREACH
+)]
+async fn masquerade_icmp_error<
+    I: RouterTestIpExt + packet_formats::ip::IpExt,
+    M: IcmpMessage<I> + std::fmt::Debug,
+>(
+    name: &str,
+    _ip_version: PhantomData<I>,
+    message: M,
+    code: M::Code,
+) -> i32 {
+    use packet_formats::ip::IpPacket as _;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    // Set up a network with two hosts (client and server) and a router. The
+    // client and server are both link-layer neighbors with the router but on
+    // isolated L2 networks.
+    let mut net =
+        TestRouterNet::<I>::new(&sandbox, &name, None /* ip_hook */, Some(NatHook::Egress)).await;
+
+    // By shutting down the server, we ensure the fake endpoint will be the only
+    // thing in the server network that's able to receive or send traffic.
+    net.server.shutdown().await.expect("shut down server realm");
+    let fake_ep =
+        net.router_server_net.create_fake_endpoint().expect("failed to create fake endpoint");
+    let fake_ep = &fake_ep;
+
+    // Add an arbitrary neighbor entry for the server address so the router will
+    // route packets onto the server network for our fake endpoint to snoop on.
+    net.router
+        .add_neighbor_entry(
+            net.router_server_interface.id(),
+            I::SERVER_ADDR_WITH_PREFIX.addr,
+            fidl_mac!("02:00:00:00:00:01"),
+        )
+        .await
+        .expect("add_neighbor_entry");
+
+    // Install a rule on the egress hook of the router that masquerades outgoing
+    // traffic behind its IP address.
+    net.install_nat_rule(
+        Matchers {
+            out_interface: Some(InterfaceMatcher::Id(
+                NonZeroU64::new(net.router_server_interface.id()).unwrap(),
+            )),
+            ..Default::default()
+        },
+        Action::Masquerade { src_port: None },
+    )
+    .await;
+
+    let fake_ep_loop = async move {
+        fake_ep
+            .frame_stream()
+            .map(|r| r.expect("failed to read frame"))
+            .for_each(|(frame, dropped)| async move {
+                assert_eq!(dropped, 0);
+
+                let eth = EthernetFrame::parse(&mut &frame[..], EthernetFrameLengthCheck::NoCheck)
+                    .expect("valid ethernet frame");
+                let Ok(ip) = I::Packet::parse(&mut eth.body(), ()) else {
+                    return;
+                };
+                if ip.proto() != IpProto::Tcp.into() {
+                    return;
+                }
+
+                // Ensure that we're receiving a NATed packet, because otherwise
+                // this test is meaningless.
+                let src_ip: net_types::ip::IpAddr = ip.src_ip().into();
+                let expected: net_types::ip::IpAddr =
+                    I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr.into_ext();
+                assert_eq!(src_ip, expected);
+
+                let icmp_error = packet::Buf::new(&mut eth.body().to_vec(), ..)
+                    .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                        ip.dst_ip(),
+                        ip.src_ip(),
+                        code,
+                        message,
+                    ))
+                    .encapsulate(I::PacketBuilder::new(
+                        ip.dst_ip(),
+                        ip.src_ip(),
+                        u8::MAX,
+                        I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
+                    ))
+                    .encapsulate(EthernetFrameBuilder::new(
+                        eth.dst_mac(),
+                        eth.src_mac(),
+                        EtherType::from_ip_version(I::VERSION),
+                        ETHERNET_MIN_BODY_LEN_NO_TAG,
+                    ))
+                    .serialize_vec_outer()
+                    .expect("failed to serialize ICMP error")
+                    .unwrap_b();
+                fake_ep.write(icmp_error.as_ref()).await.expect("failed to write ICMP error");
+            })
+            .await;
+    };
+
+    let server_addr: net_types::ip::IpAddr = I::SERVER_ADDR_WITH_PREFIX.addr.into_ext();
+    let server_addr = std::net::SocketAddr::new(server_addr.into(), 8080);
+
+    let Realms { client, server: _ } = net.realms();
+
+    let connect = async move {
+        let error = fasync::net::TcpStream::connect_in_realm(client, server_addr)
+            .await
+            .expect_err("connect should fail");
+        let error = error.downcast::<std::io::Error>().expect("failed to cast to std::io::Result");
+        error.raw_os_error()
+    };
+
+    futures::select! {
+        () = fake_ep_loop.fuse() => unreachable!("should never finish"),
+        errno = connect.fuse() => return errno.expect("must have an errno"),
+    }
 }
 
 #[netstack_test]

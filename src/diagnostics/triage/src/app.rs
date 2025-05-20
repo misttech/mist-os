@@ -103,7 +103,7 @@ impl RunResult {
 
         let results_formatter = ActionResultFormatter::new(&self.action_results);
         let output = results_formatter.to_string();
-        dest.write_fmt(format_args!("{}", output)).context("failed to write to destination")?;
+        dest.write_fmt(format_args!("{output}")).context("failed to write to destination")?;
         Ok(())
     }
 }
@@ -119,7 +119,7 @@ impl StructuredRunResult {
     /// This method can be used to output the results to a file or stdout.
     pub fn write_report(&self, dest: &mut dyn std::io::Write) -> Result<(), Error> {
         let output = serde_json::to_string(&self.triage_output)?;
-        dest.write_fmt(format_args!("{}\n", output)).context("failed to write to destination")?;
+        dest.write_fmt(format_args!("{output}\n")).context("failed to write to destination")?;
         Ok(())
     }
 

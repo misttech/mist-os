@@ -158,7 +158,7 @@ pub mod tests {
         // Resolve and start the components.
         let test = ActionsTest::new("root", components, None).await;
         let component_root = test.look_up(Moniker::root()).await;
-        let component_a = test.start(vec!["a"].try_into().unwrap()).await;
+        let component_a = test.start(["a"].try_into().unwrap()).await;
         assert!(component_a.is_started().await);
         assert!(is_resolved(&component_root).await);
         assert!(is_resolved(&component_a).await);
@@ -207,7 +207,7 @@ pub mod tests {
         test.resolver.add_blocker("a", resolved_tx, continue_rx).await;
 
         let component_root = test.look_up(Moniker::root()).await;
-        let component_a = component_root.find(&vec!["a"].try_into().unwrap()).await.unwrap();
+        let component_a = component_root.find(&["a"].try_into().unwrap()).await.unwrap();
         let resolve_action = ResolveAction::new();
         let resolve_abort_handle = resolve_action.abort_handle().unwrap();
         let resolve_fut = component_a.actions().register_no_wait(resolve_action).await;

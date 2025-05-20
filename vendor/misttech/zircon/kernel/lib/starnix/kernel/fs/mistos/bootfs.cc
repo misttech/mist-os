@@ -23,7 +23,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/pinned_vm_object.h>
 #include <vm/vm_object.h>
 

@@ -53,9 +53,6 @@ if (!is_host) {
       # For Python devshell tools
       "//tools/devshell/python:install($host_toolchain)",
 
-      # For `fx power-digest`
-      "//src/power/tools:install($host_toolchain)",
-
       # For `fx bazel2gn`
       "//build/tools/bazel2gn:host($host_toolchain)",
     ]
@@ -91,6 +88,7 @@ test_scripts = [
   "tests/subcommands/fx_cp_test",
   "tests/subcommands/fx_flash_fuchsia_test",
   "tests/subcommands/fx_format_code_test",
+  "tests/subcommands/fx_get_device_test",
   "tests/subcommands/fx_get_flash_source_test",
   "tests/subcommands/fx_helpdoc_test",
   "tests/subcommands/fx_host_tool_test",
@@ -105,6 +103,7 @@ test_scripts = [
   "tests/subcommands/fx_setup_go_test",
   "tests/subcommands/fx_ssh_test",
   "tests/subcommands/fx_unset_device_test",
+  "tests/subcommands/fx_use_test",
 
   # tests that currently can't be included in automation.
   # use 'fx self-test' to run them manually:
@@ -173,6 +172,7 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/flash-remote",
         "//tools/devshell/format-code",
         "//tools/devshell/get-build-dir",
+        "//tools/devshell/get-device",
         "//tools/devshell/get-device-addr",
         "//tools/devshell/get-flash-source",
         "//tools/devshell/go",
@@ -225,6 +225,7 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_multiple_in_package.json",
         "//tools/devshell/tests/subcommands/data/fx_test_test/tests_package_server_integration.json",
         "//tools/devshell/unset-device",
+        "//tools/devshell/use",
         "//tools/devshell/vendor",
       ]
     },

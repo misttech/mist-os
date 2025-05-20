@@ -118,8 +118,13 @@ struct InternedCategoryStorage {
 //     using fxt::operator""_category;
 //     const fxt::InternedCategory& category = "FooBar"_category;
 //
+#pragma GCC diagnostic push
+#ifdef __clang__
+#pragma GCC diagnostic ignored "-Wgnu-string-literal-operator-template"
+#endif
 template <typename T, T... chars>
 constexpr const InternedCategory& operator""_category() {
+#pragma GCC diagnostic pop
   static_assert(std::is_same_v<T, char>);
   return internal::InternedCategoryStorage<chars...>::interned_category;
 }

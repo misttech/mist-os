@@ -142,13 +142,10 @@ template("_cuckoo_product_bundle") {
 
     name = main_target
     system_a = "${target_out_dir}/${assembled_system_namespace}/images.json"
-    partitions = get_label_info(_partition_config_label, "target_out_dir") +
-                 "/" + get_label_info(_partition_config_label, "name") +
-                 "/partitions_config.json"
+    partitions = _partition_config_label
 
     deps = [
       ":$assembled_system_target",
-      _partition_config_label,
 
       # While it is already a transitive dependency of the assembled system,
       # that dependency is subject to package metadata barrier. Accordingly, we

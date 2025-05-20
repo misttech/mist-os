@@ -254,7 +254,7 @@ mod tests {
 
         // Validate size is possible
         if result_sizes.iter().any(|size| size < &minimal_result_size || size % 8 != 0) {
-            panic!("Invalid size. Requested size must be larger than {} minimum bytes and divisible into octets (by 8)", minimal_result_size);
+            panic!("Invalid size. Requested size must be larger than {minimal_result_size} minimum bytes and divisible into octets (by 8)");
         }
 
         let mut fidl_scan_results = vec![];

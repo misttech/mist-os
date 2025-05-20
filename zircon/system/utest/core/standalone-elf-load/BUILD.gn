@@ -48,7 +48,10 @@ loadable_module("standalone-elf-load-test-module") {
 
   sources = [ "test-module.cc" ]
   deps = [ ":test-module-header" ]
-  ldflags = [ "-Wl,-e,TestStart" ]
+  ldflags = [
+    "-Wl,-e,TestStart",
+    "-nodefaultlibs",
+  ]
   configs += [ "//build/config/zircon:nolibc" ]
 
   exclude_toolchain_tags = [ "instrumented" ]

@@ -120,6 +120,7 @@ struct VnodeAttributes {
   std::optional<uint64_t> creation_time;
   std::optional<uint64_t> modification_time;
   std::optional<uint64_t> access_time;
+  std::optional<uint64_t> change_time;
 
   // POSIX Compatibility Attributes
   std::optional<uint32_t> mode;
@@ -132,8 +133,8 @@ struct VnodeAttributes {
     return id == other.id && content_size == other.content_size &&
            storage_size == other.storage_size && link_count == other.link_count &&
            creation_time == other.creation_time && modification_time == other.modification_time &&
-           access_time == other.access_time && mode == other.mode && uid == other.uid &&
-           gid == other.gid && rdev == other.rdev;
+           access_time == other.access_time && change_time == other.change_time &&
+           mode == other.mode && uid == other.uid && gid == other.gid && rdev == other.rdev;
   }
 
   // Converts from |VnodeAttributes| to fuchsia.io v1 |NodeAttributes|.

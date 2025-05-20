@@ -6,6 +6,7 @@ use crate::{
     AnyHandle, AsHandleRef, Channel, ChannelMessageStream, ChannelWriter, Error, Handle,
     HandleInfo, MessageBuf,
 };
+use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_fdomain as proto;
 use futures::{Stream, StreamExt, TryStream};
 use std::cell::RefCell;
@@ -543,6 +544,11 @@ impl<T: ProtocolMarker> ServerEnd<T> {
         let stream = self.into_stream();
         let control_handle = stream.control_handle();
         (stream, control_handle)
+    }
+
+    /// Writes an epitaph into the underlying channel before closing it.
+    pub fn close_with_epitaph(self, status: fidl::Status) -> Result<(), fidl::Error> {
+        self.inner.close_with_epitaph(status)
     }
 }
 

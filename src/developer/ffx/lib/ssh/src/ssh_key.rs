@@ -191,7 +191,7 @@ impl SshKeyFiles {
         if !self.private_key.exists() {
             // There is no private key, so generate a new key pair
             // resulting in a byte array .der encoded.
-            tracing::info!("Creating SSH key pair: {}", self.private_key.display());
+            log::info!("Creating SSH key pair: {}", self.private_key.display());
             let rng = SystemRandom::new();
             let bytes = Ed25519KeyPair::generate_pkcs8(&rng).map_err(|m| SshKeyError {
                 kind: SshKeyErrorKind::GenerationError,
@@ -253,7 +253,7 @@ impl SshKeyFiles {
         match self.analyze_check_keys() {
             // If OK, then return OK.
             Ok(_) => {
-                tracing::info!("SSH Public/Private keys match");
+                log::info!("SSH Public/Private keys match");
                 return Ok("SSH Public/Private keys match".into());
             }
             Err(e) => {
@@ -324,7 +324,7 @@ impl SshKeyFiles {
                 Err(e) => {
                     // If there was an error, print it, delete the keys,
                     // and recreate.
-                    tracing::error!("Error repairing SSH keys {e:?}. Please check configuration and/or delete existing key files and retry.");
+                    log::error!("Error repairing SSH keys {e:?}. Please check configuration and/or delete existing key files and retry.");
 
                     return Err(e);
                 }
@@ -368,7 +368,7 @@ impl SshKeyFiles {
         let (key_type, public_key) = match read_public_key_from_private(&self.private_key) {
             Ok((key_type, public_key)) => (key_type, public_key),
             Err(e) => {
-                tracing::debug!("Internal error for read_public_key_from_private: {e:?}");
+                log::debug!("Internal error for read_public_key_from_private: {e:?}");
                 return Err(SshKeyError {
                     kind: SshKeyErrorKind::BadKeyFormat,
                     message: format!(
@@ -441,7 +441,7 @@ fn build_public_key_entry(key_type: &str, public_key: &[u8]) -> Result<String, s
 
 /// Appends the public key information to the authorized_keys file.
 fn write_public_key(path: &PathBuf, public_key: &[u8]) -> Result<(), SshKeyInternalError> {
-    tracing::info!("Writing authorized_keys file: {}", path.display());
+    log::info!("Writing authorized_keys file: {}", path.display());
 
     let mut w = if !path.exists() {
         if let Some(parent) = path.parent() {

@@ -35,7 +35,7 @@ class TestComponent : public fidl::AsyncEventHandler<fuchsia_test_manager::Suite
       async_dispatcher_t* dispatcher, std::string url,
       std::optional<fuchsia_test_manager::RunSuiteOptions> options);
 
-  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) override;
+  zx::result<> Start(fxl::WeakPtr<Sampler> notify) override;
   zx::result<> Stop() override;
   zx::result<> Destroy() override;
 

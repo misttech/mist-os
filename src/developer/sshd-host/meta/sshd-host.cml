@@ -194,6 +194,7 @@
                 "fuchsia.bluetooth.avrcp.test.PeerManagerExt",
                 "fuchsia.bluetooth.deviceid.DeviceIdentification",
                 "fuchsia.bluetooth.fastpair.Provider",
+                "fuchsia.bluetooth.hfp.HandsFree",
                 "fuchsia.bluetooth.hfp.Hfp",
                 "fuchsia.bluetooth.hfp.test.HfpTest",
                 "fuchsia.bluetooth.internal.a2dp.Controller",
@@ -317,7 +318,7 @@
         {
             service: [
                 "fuchsia.hardware.cpu.ctrl.Service",
-                "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.hardware.power.suspend.SuspendService",
                 "fuchsia.hardware.usb.peripheral.Service",
             ],
             from: "parent",
@@ -330,6 +331,11 @@
         },
         {
             service: "fuchsia.hardware.nfc.Service",
+            from: "parent",
+            to: "#shell",
+        },
+        {
+            service: "fuchsia.hardware.backlight.Service",
             from: "parent",
             to: "#shell",
         },

@@ -17,7 +17,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::de::Error as _;
 use serde::Deserialize;
-use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::execution::{create_init_child_process, execute_task_with_prerun_result};
 use starnix_core::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
 use starnix_core::vfs::fs_args::MountParams;
@@ -215,7 +215,7 @@ pub async fn start_component(
     );
 
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
-    let current_task = CurrentTask::create_init_child_process(
+    let current_task = create_init_child_process(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         system_task.kernel(),
         &program.binary,
@@ -502,11 +502,12 @@ impl MountRecord {
             };
         }
 
-        // TODO(https://fxbug.dev/376509077): Migrate this to GetFlags2 when available.
-        let info = directory
-            .get_connection_info(zx::MonotonicInstant::INFINITE)
-            .context("getting directory connection info")?;
-        let rights = fio::Flags::from_bits(info.rights.unwrap().bits()).unwrap();
+        let flags = directory
+            .get_flags(zx::MonotonicInstant::INFINITE)
+            .context("transport error")?
+            .map_err(zx::Status::from_raw)
+            .context("get_flags")?;
+        let rights = flags.intersection(fio::MASK_KNOWN_PERMISSIONS);
 
         let (client_end, server_end) = zx::Channel::create();
         directory.clone(ServerEnd::new(server_end)).context("cloning directory")?;

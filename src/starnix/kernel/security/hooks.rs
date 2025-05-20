@@ -4,15 +4,18 @@
 
 use super::{
     selinux_hooks, BpfMapState, BpfProgState, FileObjectState, FileSystemState, ResolvedElfState,
-    TaskState,
+    SavedEffectiveState, TaskState,
 };
 use crate::bpf::program::Program;
 use crate::bpf::BpfMap;
-use crate::mm::{MappingOptions, ProtectionFlags};
+use crate::mm::{Mapping, MappingOptions, ProtectionFlags};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::socket::{Socket, SocketAddress};
+use crate::vfs::socket::{
+    Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketShutdownFlags,
+    SocketType,
+};
 use crate::vfs::{
     Anon, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
     FsString, Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
@@ -31,7 +34,7 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::{bpf_cmd, errno, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
+use starnix_uapi::{bpf_cmd, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
 use zerocopy::FromBytes;
@@ -69,6 +72,22 @@ impl From<Access> for PermissionFlags {
             permissions |= PermissionFlags::EXEC;
         }
         permissions
+    }
+}
+
+impl From<ProtectionFlags> for PermissionFlags {
+    fn from(protection_flags: ProtectionFlags) -> Self {
+        let mut flags = PermissionFlags::empty();
+        if protection_flags.contains(ProtectionFlags::READ) {
+            flags |= PermissionFlags::READ;
+        }
+        if protection_flags.contains(ProtectionFlags::WRITE) {
+            flags |= PermissionFlags::WRITE;
+        }
+        if protection_flags.contains(ProtectionFlags::EXEC) {
+            flags |= PermissionFlags::EXEC;
+        }
+        flags
     }
 }
 
@@ -163,9 +182,13 @@ where
 
 /// Returns the security state structure for the kernel, based on the supplied "selinux" argument
 /// contents.
-pub fn kernel_init_security(enabled: bool, exceptions_config: String) -> KernelState {
+pub fn kernel_init_security(
+    enabled: bool,
+    options: String,
+    exceptions: Vec<String>,
+) -> KernelState {
     track_hook_duration!(c"security.hooks.kernel_init_security");
-    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(exceptions_config)) }
+    KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(options, exceptions)) }
 }
 
 /// Consumes the mount options from the supplied `MountParams` and returns the security mount
@@ -246,7 +269,7 @@ pub struct FsNodeSecurityXattr {
 /// Corresponds to the `mmap_file()` LSM hook.
 pub fn mmap_file(
     current_task: &CurrentTask,
-    file: &Option<FileHandle>,
+    file: Option<&FileHandle>,
     protection_flags: ProtectionFlags,
     options: MappingOptions,
 ) -> Result<(), Errno> {
@@ -259,6 +282,20 @@ pub fn mmap_file(
             protection_flags,
             options,
         )
+    })
+}
+
+/// Checks whether `current_task` is allowed to request setting the memory protection of
+/// `mapping` to `prot`.
+/// Corresponds to the `file_mprotect` LSM hook.
+pub fn file_mprotect(
+    current_task: &CurrentTask,
+    mapping: &Mapping,
+    prot: ProtectionFlags,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.file_mprotect");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file::file_mprotect(security_server, current_task, mapping, prot)
     })
 }
 
@@ -657,21 +694,23 @@ pub fn check_file_ioctl_access(
 }
 
 /// Sets the security context of `CurrentTask` to be appropriate for a copy up operation
-/// on `fs_node`.
-///
-/// The task's security context will be reset when the `ScopedFsCreate` is dropped.
-///
-/// Returns `None` if SELinux is not enabled.
+/// on `fs_node`, then call `do_copy_up`.
+/// The task's security context will be reset before returning.
 ///
 /// Corresponds to the `security_inode_copy_up()` LSM hook.
-pub fn fs_node_copy_up<'a>(
-    current_task: &'a CurrentTask,
+pub fn fs_node_copy_up<R>(
+    current_task: &CurrentTask,
     fs_node: &FsNode,
-) -> Result<Option<selinux_hooks::ScopedFsCreate<'a>>, Errno> {
-    track_hook_duration!(c"security.hooks.fs_node_copy_up");
-    if_selinux_else_default_ok(current_task, |_security_server| {
-        Ok(Some(selinux_hooks::fs_node::fs_node_copy_up(current_task, fs_node)))
-    })
+    do_copy_up: impl FnOnce() -> R,
+) -> R {
+    if_selinux_else_with_context(
+        do_copy_up,
+        current_task,
+        |do_copy_up, _security_server| {
+            selinux_hooks::fs_node::fs_node_copy_up(current_task, fs_node, do_copy_up)
+        },
+        |do_copy_up| do_copy_up(),
+    )
 }
 
 /// This hook is called by the `flock` syscall. Returns whether `current_task` can perform
@@ -733,16 +772,12 @@ pub fn task_alloc_for_kernel() -> TaskState {
     TaskState(selinux_hooks::TaskAttrs::for_kernel().into())
 }
 
-/// Returns `TaskState` for a new `Task`, based on that of `task`, and the specified clone flags.
+/// Returns `TaskState` for a new `Task`, based on that of `current_task`, and the specified clone
+/// flags.
 /// Corresponds to the `task_alloc()` LSM hook.
-pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
+pub fn task_alloc(current_task: &CurrentTask, clone_flags: u64) -> TaskState {
     track_hook_duration!(c"security.hooks.task_alloc");
-    let attrs = if task.kernel().security_state.state.is_some() {
-        selinux_hooks::task::task_alloc(&task, clone_flags)
-    } else {
-        selinux_hooks::TaskAttrs::for_selinux_disabled()
-    };
-    TaskState(attrs.into())
+    TaskState(selinux_hooks::task::task_alloc(current_task, clone_flags).into())
 }
 
 /// Labels an [`crate::vfs::FsNode`], by attaching a pseudo-label to the `fs_node`, which allows
@@ -760,25 +795,42 @@ pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of the provided `context`.
-/// Corresponds to a combination of the `task_alloc()` and `setprocattr()` LSM hooks.
-/// The difference from those hooks is that this one bypasses the access-checks that would be
-/// performed by `set_procattr()`.
+/// The effect is similar to combining the `task_alloc()` and `setprocattr()` LSM hooks, with the
+/// difference that no access-checks are performed, and the "#<name>" syntax may be used to
+/// have the `Task` assigned one of the "initial" Security Contexts, to allow components to be run
+/// prior to a policy being loaded.
 pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno> {
     track_hook_duration!(c"security.hooks.task_for_context");
     Ok(TaskState(
-        if_selinux_else(
-            task,
-            |security_server| {
-                Ok(selinux_hooks::TaskAttrs::for_sid(
-                    security_server
-                        .security_context_to_sid(context.into())
-                        .map_err(|e| errno!(EINVAL, format!("{:?}", e)))?,
-                ))
-            },
-            || Ok(selinux_hooks::TaskAttrs::for_selinux_disabled()),
-        )?
+        if let Some(kernel_state) = task.kernel().security_state.state.as_ref() {
+            selinux_hooks::task::task_alloc_from_context(&kernel_state.server, context)
+        } else {
+            Ok(selinux_hooks::TaskAttrs::for_selinux_disabled())
+        }?
         .into(),
     ))
+}
+
+/// Saves the effective SID of `current_task` for later use.
+pub fn task_save_effective_state(current_task: &CurrentTask) -> SavedEffectiveState {
+    track_hook_duration!(c"security.hooks.task_save_effective_state");
+    SavedEffectiveState(current_task.security_state.lock().effective_sid)
+}
+
+/// Temporarily switches to the saved `effective_state`, calls `f`, then restores the previous state.
+pub fn run_with_effective_state<R>(
+    current_task: &CurrentTask,
+    effective_state: &SavedEffectiveState,
+    f: impl FnOnce() -> R,
+) -> R {
+    if_selinux_else_with_context(
+        f,
+        current_task,
+        |f, _security_server| {
+            selinux_hooks::task::run_with_effective_sid(current_task, effective_state.0, f)
+        },
+        |f| f(),
+    )
 }
 
 /// Returns the serialized Security Context associated with the specified task.
@@ -798,17 +850,17 @@ pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
 /// Assesses if a task has all of the given capabilities.
 /// Corresponds to the `capable()` LSM hook.
 pub fn is_task_capable_noaudit(
-    task: &Task,
+    current_task: &CurrentTask,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> bool {
     track_hook_duration!(c"security.hooks.is_task_capable_noaudit");
-    return task.creds().has_capability(capabilities)
+    return current_task.creds().has_capability(capabilities)
         && if_selinux_else(
-            task,
+            current_task,
             |security_server| {
                 selinux_hooks::task::is_task_capable_noaudit(
                     &security_server.as_permission_check(),
-                    &task,
+                    &current_task,
                     capabilities,
                 )
             },
@@ -819,17 +871,17 @@ pub fn is_task_capable_noaudit(
 /// Checks if a task has all of the given capabilities.
 /// Corresponds to the `capable()` LSM hook.
 pub fn check_task_capable(
-    task: &Task,
+    current_task: &CurrentTask,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_task_capable");
-    if !task.creds().has_capability(capabilities) {
+    if !current_task.creds().has_capability(capabilities) {
         return error!(EPERM);
     }
-    if_selinux_else_default_ok(task, |security_server| {
+    if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::check_task_capable(
             &security_server.as_permission_check(),
-            &task,
+            &current_task,
             capabilities,
         )
     })
@@ -866,18 +918,42 @@ pub fn check_exec_access(
     )
 }
 
-/// Computes and updates the socket security class for the `FsNode` associated with a new socket.
-/// Corresponds to the `socket_post_create()` LSM hooks.
-pub fn socket_post_create(socket: &Socket, socket_node: &FsNode) {
-    profile_duration!("security.hooks.socket_post_create");
-    selinux_hooks::socket::socket_post_create(socket, socket_node);
+/// Checks if creating a socket is allowed.
+/// Corresponds to the `socket_create()` LSM hook.
+pub fn check_socket_create_access(
+    current_task: &CurrentTask,
+    domain: SocketDomain,
+    socket_type: SocketType,
+    protocol: SocketProtocol,
+    sockfs: &FileSystemHandle,
+    kernel_private: bool,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.socket_create");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_create_access(
+            &security_server,
+            current_task,
+            domain,
+            socket_type,
+            protocol,
+            sockfs,
+            kernel_private,
+        )
+    })
 }
 
-/// Checks if the `current_task` is allowed to perform a bind operation for this `socket_node`.
+/// Computes and updates the socket security class associated with a new socket.
+/// Corresponds to the `socket_post_create()` LSM hook.
+pub fn socket_post_create(socket: &Socket) {
+    profile_duration!("security.hooks.socket_post_create");
+    selinux_hooks::socket::socket_post_create(socket);
+}
+
+/// Checks if the `current_task` is allowed to perform a bind operation for this `socket`.
 /// Corresponds to the `socket_bind()` LSM hook.
 pub fn check_socket_bind_access(
     current_task: &CurrentTask,
-    socket_node: &FsNode,
+    socket: &Socket,
     socket_address: &SocketAddress,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_socket_bind_access");
@@ -885,26 +961,154 @@ pub fn check_socket_bind_access(
         selinux_hooks::socket::check_socket_bind_access(
             &security_server,
             current_task,
-            socket_node,
+            socket,
             socket_address,
         )
     })
 }
 
-/// Checks if the `current_task` is allowed to initiate a connection with `socket_node`.
+/// Checks if the `current_task` is allowed to initiate a connection with `socket`.
 /// Corresponds to the `socket_connect()` LSM hook.
 pub fn check_socket_connect_access(
     current_task: &CurrentTask,
-    socket_node: &FsNode,
-    socket_address: &SocketAddress,
+    socket: &Socket,
+    socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_socket_connect_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::socket::check_socket_connect_access(
             &security_server,
             current_task,
-            socket_node,
-            socket_address,
+            socket,
+            socket_peer,
+        )
+    })
+}
+
+/// Checks if the `current_task` is allowed to listen on `socket_node`.
+/// Corresponds to the `socket_listen()` LSM hook.
+pub fn check_socket_listen_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+    backlog: i32,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_listen_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_listen_access(
+            &security_server,
+            current_task,
+            socket,
+            backlog,
+        )
+    })
+}
+
+/// Checks if the `current_task` is allowed to get socket options on `socket`.
+/// Corresponds to the `socket_getsockopt()` LSM hook.
+pub fn check_socket_getsockopt_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+    level: u32,
+    optname: u32,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_getsockopt_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_getsockopt_access(
+            &security_server,
+            current_task,
+            socket,
+            level,
+            optname,
+        )
+    })
+}
+
+/// Checks if the `current_task` is allowed to set socket options on `socket`.
+/// Corresponds to the `socket_getsockopt()` LSM hook.
+pub fn check_socket_setsockopt_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+    level: u32,
+    optname: u32,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_setsockopt_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_setsockopt_access(
+            &security_server,
+            current_task,
+            socket,
+            level,
+            optname,
+        )
+    })
+}
+
+/// Checks if the `current_task` is allowed to shutdown `socket`.
+/// Corresponds to the `socket_shutdown()` LSM hook.
+pub fn check_socket_shutdown_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+    how: SocketShutdownFlags,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_shutdown_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_shutdown_access(
+            &security_server,
+            current_task,
+            socket,
+            how,
+        )
+    })
+}
+
+/// Returns the Security Context with which the [`crate::vfs::Socket`]'s peer is labeled.
+/// Corresponds to the `socket_getpeersec_stream()` LSM hook.
+pub fn socket_getpeersec_stream(
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<Vec<u8>, Errno> {
+    track_hook_duration!(c"security.hooks.socket_getpeersec_stream");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::socket_getpeersec_stream(&security_server, current_task, socket)
+    })
+}
+
+/// Checks if the Unix domain `sending_socket` is allowed to send a message to the
+/// `receiving_socket`.
+/// Corresponds to the `unix_may_send()` LSM hook.
+pub fn unix_may_send(
+    current_task: &CurrentTask,
+    sending_socket: &Socket,
+    receiving_socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.unix_may_send");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::unix_may_send(
+            &security_server,
+            current_task,
+            sending_socket,
+            receiving_socket,
+        )
+    })
+}
+
+/// Checks if the Unix domain `client_socket` is allowed to connect to `listening_socket`, and
+/// initialises the peer information in the client and server sockets.
+/// Corresponds to the `unix_stream_connect()` LSM hook.
+pub fn unix_stream_connect(
+    current_task: &CurrentTask,
+    client_socket: &Socket,
+    listening_socket: &Socket,
+    server_socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.unix_stream_connect");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::unix_stream_connect(
+            &security_server,
+            current_task,
+            client_socket,
+            listening_socket,
+            server_socket,
         )
     })
 }
@@ -1514,10 +1718,10 @@ pub fn selinuxfs_check_access(
 }
 
 pub mod testing {
-    use std::sync::OnceLock;
-
     use super::{selinux_hooks, Arc, KernelState, SecurityServer};
     use starnix_sync::Mutex;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::OnceLock;
 
     /// Used by Starnix' `testing.rs` to create `KernelState` wrapping a test-
     /// supplied `SecurityServer`.
@@ -1527,6 +1731,7 @@ pub mod testing {
                 server,
                 pending_file_systems: Mutex::default(),
                 selinuxfs_null: OnceLock::default(),
+                access_denial_count: AtomicU64::new(0u64),
             }),
         }
     }
@@ -1535,6 +1740,7 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::security::selinux_hooks::get_cached_sid;
     use crate::security::selinux_hooks::testing::{
         self, spawn_kernel_with_selinux_hooks_test_policy_and_run,
     };
@@ -1669,11 +1875,12 @@ mod tests {
             let target_sid = SecurityId::initial(InitialSid::Unlabeled);
             let elf_state = ResolvedElfState { sid: Some(target_sid) };
 
-            assert!(current_task.security_state.lock().current_sid != target_sid);
+            assert!(selinux_hooks::task_effective_sid(current_task) != target_sid);
 
-            let before_hook_sid = current_task.security_state.lock().current_sid;
+            let before_hook_sid = selinux_hooks::task_effective_sid(current_task);
             update_state_on_exec(current_task, &elf_state);
-            assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid);
+            assert_eq!(selinux_hooks::task_effective_sid(current_task), before_hook_sid);
+            assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid)
         })
     }
 
@@ -1685,7 +1892,7 @@ mod tests {
             let initial_state = current_task.security_state.lock().clone();
             let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
             let elf_state = ResolvedElfState { sid: Some(elf_sid) };
-            assert_ne!(elf_sid, initial_state.current_sid);
+            assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
             update_state_on_exec(current_task, &elf_state);
             assert_eq!(*current_task.security_state.lock(), initial_state);
         })
@@ -1702,8 +1909,9 @@ mod tests {
                     .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
                     .expect("invalid security context");
                 let elf_state = ResolvedElfState { sid: Some(elf_sid) };
-                assert_ne!(elf_sid, initial_state.current_sid);
+                assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
                 update_state_on_exec(current_task, &elf_state);
+                assert_eq!(selinux_hooks::task_effective_sid(current_task), elf_sid);
                 assert_eq!(current_task.security_state.lock().current_sid, elf_sid);
             },
         )
@@ -2374,5 +2582,73 @@ mod tests {
                 error!(EINVAL)
             );
         })
+    }
+
+    #[fuchsia::test]
+    async fn create_file_with_fscreate_sid() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let sid =
+                    security_server.security_context_to_sid(VALID_SECURITY_CONTEXT.into()).unwrap();
+                let source_node = &testing::create_test_file(locked, current_task).entry.node;
+
+                fs_node_setsecurity(
+                    locked,
+                    current_task,
+                    &source_node,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    VALID_SECURITY_CONTEXT.into(),
+                    XattrOp::Set,
+                )
+                .expect("set_xattr(security.selinux) failed");
+
+                let dir_entry = fs_node_copy_up(current_task, source_node, || {
+                    current_task
+                        .fs()
+                        .root()
+                        .create_node(
+                            locked,
+                            &current_task,
+                            "test_file2".into(),
+                            FileMode::IFREG,
+                            DeviceType::NONE,
+                        )
+                        .unwrap()
+                })
+                .entry;
+
+                assert_eq!(get_cached_sid(&dir_entry.node), Some(sid));
+            },
+        );
+    }
+
+    #[fuchsia::test]
+    async fn save_and_reuse_effective_sid() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |_locked, current_task, security_server| {
+                let sid =
+                    security_server.security_context_to_sid(VALID_SECURITY_CONTEXT.into()).unwrap();
+
+                let saved_state =
+                    selinux_hooks::task::run_with_effective_sid(current_task, sid, || {
+                        task_save_effective_state(current_task)
+                    });
+
+                let current_sid = current_task.security_state.lock().current_sid;
+                assert_ne!(sid, current_sid);
+                // Set an fscreate SID and check that it is overridden.
+                current_task.security_state.lock().fscreate_sid = Some(sid);
+                run_with_effective_state(current_task, &saved_state, || {
+                    assert_eq!(current_task.security_state.lock().current_sid, current_sid);
+                    assert_eq!(current_task.security_state.lock().effective_sid, sid);
+                    assert_eq!(current_task.security_state.lock().fscreate_sid, None);
+                });
+
+                // The modified state is restored.
+                assert_eq!(current_task.security_state.lock().current_sid, current_sid);
+                assert_eq!(current_task.security_state.lock().effective_sid, current_sid);
+                assert_eq!(current_task.security_state.lock().fscreate_sid, Some(sid));
+            },
+        )
     }
 }

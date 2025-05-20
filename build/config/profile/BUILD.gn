@@ -195,6 +195,9 @@ variant("coverage-rust") {
 
   rustflags = [ "-Cinstrument-coverage" ]
 
+  # Enable binary profile correlation.
+  rustflags += [ "-Cllvm-args=-profile-correlate=binary" ]
+
   if (is_fuchsia) {
     # TODO(https://fxbug.dev/42077482): Ensure this works for no_coverage Rust cases.
     libs = [ "./llvm_profile_counter_bias.ld" ]

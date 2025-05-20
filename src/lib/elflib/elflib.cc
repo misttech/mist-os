@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iterator>
 #include <limits>
+#include <span>
 
 namespace elflib {
 namespace {
@@ -119,21 +120,17 @@ std::unique_ptr<ElfLib> ElfLib::Create(std::unique_ptr<MemoryAccessor>&& memory,
                                        uint64_t load_address, ElfLib::AddressMode address_mode) {
   std::unique_ptr<ElfLib> out{new ElfLib(std::move(memory), load_address, address_mode)};
 
-  auto header = reinterpret_cast<const Elf64_Ehdr*>(out->memory_->GetMemory(0, sizeof(Elf64_Ehdr)));
-
-  if (!header) {
+  auto ident = out->memory_->GetMemory(0, EI_NIDENT);
+  if (!ident) {
     return std::unique_ptr<ElfLib>();
   }
-
-  out->header_ = *header;
 
   // Header magic should be correct.
-  if (!std::equal(ElfMagic, ElfMagic + 4, out->header_.e_ident)) {
+  if (!std::equal(ElfMagic, ElfMagic + 4, ident)) {
     return std::unique_ptr<ElfLib>();
   }
 
-  // We only support 64-bit binaries.
-  if (out->header_.e_ident[EI_CLASS] != ELFCLASS64) {
+  if (ident[EI_CLASS] != ELFCLASS64 && ident[EI_CLASS] != ELFCLASS32) {
     return std::unique_ptr<ElfLib>();
   }
 
@@ -142,13 +139,48 @@ std::unique_ptr<ElfLib> ElfLib::Create(std::unique_ptr<MemoryAccessor>&& memory,
   // Endianness of the file has to match the endianness of the host. To do the
   // endianness check, we snip the first byte off of a 4-byte word. If it
   // contains the LSB (a value of 1) we are on a little-endian machine.
-  if (out->header_.e_ident[EI_DATA] == ELFDATA2MSB && *reinterpret_cast<const char*>(&kOne)) {
+  if (ident[EI_DATA] == ELFDATA2MSB && *reinterpret_cast<const char*>(&kOne)) {
     return std::unique_ptr<ElfLib>();
   }
 
   // Version field has only had one correct value for most of the life of the
   // spec.
-  if (out->header_.e_ident[EI_VERSION] != EV_CURRENT) {
+  if (ident[EI_VERSION] != EV_CURRENT) {
+    return std::unique_ptr<ElfLib>();
+  }
+
+  if (ident[EI_CLASS] == ELFCLASS64) {
+    auto header =
+        reinterpret_cast<const Elf64_Ehdr*>(out->memory_->GetMemory(0, sizeof(Elf64_Ehdr)));
+    if (!header) {
+      return std::unique_ptr<ElfLib>();
+    }
+    out->header_ = *header;
+  } else if (ident[EI_CLASS] == ELFCLASS32) {
+    auto header =
+        reinterpret_cast<const Elf32_Ehdr*>(out->memory_->GetMemory(0, sizeof(Elf32_Ehdr)));
+    if (!header) {
+      return std::unique_ptr<ElfLib>();
+    }
+
+    // Convert the 32-bit header to a 64-bit one.
+    out->header_ = {
+        .e_type = header->e_type,
+        .e_machine = header->e_machine,
+        .e_version = header->e_version,
+        .e_entry = header->e_entry,
+        .e_phoff = header->e_phoff,
+        .e_shoff = header->e_shoff,
+        .e_flags = header->e_flags,
+        .e_ehsize = header->e_ehsize,
+        .e_phentsize = header->e_phentsize,
+        .e_phnum = header->e_phnum,
+        .e_shentsize = header->e_shentsize,
+        .e_shnum = header->e_shnum,
+        .e_shstrndx = header->e_shstrndx,
+    };
+    memcpy(out->header_.e_ident, ident, EI_NIDENT);
+  } else {
     return std::unique_ptr<ElfLib>();
   }
 
@@ -163,12 +195,16 @@ std::unique_ptr<ElfLib> ElfLib::Create(std::unique_ptr<MemoryAccessor>&& memory,
   // We don't support non-standard section header sizes. Stripped binaries that
   // don't have sections sometimes zero out the shentsize, so we can ignore it
   // if we have no sections.
-  if (out->header_.e_shnum > 0 && out->header_.e_shentsize != sizeof(Elf64_Shdr)) {
+  auto section_header_size =
+      ident[EI_CLASS] == ELFCLASS64 ? sizeof(Elf64_Shdr) : sizeof(Elf32_Shdr);
+  if (out->header_.e_shnum > 0 && out->header_.e_shentsize != section_header_size) {
     return std::unique_ptr<ElfLib>();
   }
 
   // We don't support non-standard program header sizes.
-  if (out->header_.e_phentsize != sizeof(Elf64_Phdr)) {
+  auto program_header_size =
+      ident[EI_CLASS] == ELFCLASS64 ? sizeof(Elf64_Phdr) : sizeof(Elf32_Phdr);
+  if (out->header_.e_phentsize != program_header_size) {
     return std::unique_ptr<ElfLib>();
   }
 
@@ -362,14 +398,36 @@ bool ElfLib::LoadProgramHeaders() {
     return true;
   }
 
-  auto segments = reinterpret_cast<const Elf64_Phdr*>(
-      memory_->GetMemory(header_.e_phoff, sizeof(Elf64_Phdr) * header_.e_phnum));
+  if (Is64Bit()) {
+    auto segments = reinterpret_cast<const Elf64_Phdr*>(
+        memory_->GetMemory(header_.e_phoff, sizeof(Elf64_Phdr) * header_.e_phnum));
+    if (!segments) {
+      return false;
+    }
 
-  if (!segments) {
-    return false;
+    std::copy(segments, segments + header_.e_phnum, std::back_inserter(segments_));
+  } else {
+    auto segments_start = reinterpret_cast<const Elf32_Phdr*>(
+        memory_->GetMemory(header_.e_phoff, sizeof(Elf32_Phdr) * header_.e_phnum));
+    if (!segments_start) {
+      return false;
+    }
+
+    auto segments = std::span{segments_start, header_.e_phnum};
+    for (const auto& segment : segments) {
+      Elf64_Phdr segment64;
+      segment64.p_type = segment.p_type;
+      segment64.p_flags = segment.p_flags;
+      segment64.p_offset = segment.p_offset;
+      segment64.p_vaddr = segment.p_vaddr;
+      segment64.p_paddr = segment.p_paddr;
+      segment64.p_filesz = segment.p_filesz;
+      segment64.p_memsz = segment.p_memsz;
+      segment64.p_align = segment.p_align;
+      segments_.push_back(segment64);
+    }
   }
 
-  std::copy(segments, segments + header_.e_phnum, std::back_inserter(segments_));
   return true;
 }
 
@@ -382,14 +440,38 @@ bool ElfLib::LoadSectionHeaders() {
   // Processes may not map the section headers at all, so we don't look for
   // section headers unless we're in file mode.
   if (address_mode_ == AddressMode::kFile && sections_.empty()) {
-    auto sections = reinterpret_cast<const Elf64_Shdr*>(
-        memory_->GetMemory(header_.e_shoff, sizeof(Elf64_Shdr) * header_.e_shnum));
+    if (Is64Bit()) {
+      auto sections = reinterpret_cast<const Elf64_Shdr*>(
+          memory_->GetMemory(header_.e_shoff, sizeof(Elf64_Shdr) * header_.e_shnum));
+      if (!sections) {
+        return false;
+      }
 
-    if (!sections) {
-      return false;
+      std::copy(sections, sections + header_.e_shnum, std::back_inserter(sections_));
+    } else {
+      auto sections_start = reinterpret_cast<const Elf32_Shdr*>(
+          memory_->GetMemory(header_.e_shoff, sizeof(Elf32_Shdr) * header_.e_shnum));
+      if (!sections_start) {
+        return false;
+      }
+
+      auto sections = std::span{sections_start, header_.e_shnum};
+      for (const auto& section : sections) {
+        Elf64_Shdr section64;
+        section64.sh_name = section.sh_name;
+        section64.sh_type = section.sh_type;
+        section64.sh_flags = section.sh_flags;
+        section64.sh_addr = section.sh_addr;
+        section64.sh_offset = section.sh_offset;
+        section64.sh_size = section.sh_size;
+        section64.sh_link = section.sh_link;
+        section64.sh_info = section.sh_info;
+        section64.sh_addralign = section.sh_addralign;
+        section64.sh_entsize = section.sh_entsize;
+        sections_.push_back(section64);
+      }
     }
 
-    std::copy(sections, sections + header_.e_shnum, std::back_inserter(sections_));
     return true;
   }
 
@@ -439,6 +521,8 @@ ElfLib::MemoryRegion ElfLib::GetSegmentData(size_t segment) {
 
   return result;
 }
+
+static_assert(sizeof(Elf64_Nhdr) == sizeof(Elf32_Nhdr), "note parsing doesn't vary by abi width");
 
 std::optional<std::vector<uint8_t>> ElfLib::GetNote(const std::string& name, uint64_t type) {
   LoadProgramHeaders();

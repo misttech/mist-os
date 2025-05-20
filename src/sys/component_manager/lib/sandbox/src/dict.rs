@@ -30,7 +30,7 @@ pub(crate) struct DictInner {
     #[derivative(Debug = "ignore")]
     // Currently this is only used on target, but it's compatible with host.
     #[allow(dead_code)]
-    pub(crate) not_found: Arc<dyn Fn(&str) -> () + 'static + Send + Sync>,
+    not_found: Option<Box<dyn Fn(&str) -> () + 'static + Send + Sync>>,
 
     /// Tasks that serve the Dictionary protocol. This is an `Option` because dictionaries are not
     /// necessarily used in async contexts but a TaskGroup will fail construction if there is no
@@ -89,7 +89,7 @@ impl Default for Dict {
         Self {
             inner: Arc::new(Mutex::new(DictInner {
                 entries: BTreeMap::new(),
-                not_found: Arc::new(|_key: &str| {}),
+                not_found: None,
                 #[cfg(target_os = "fuchsia")]
                 task_group: None,
                 update_notifiers: vec![],
@@ -110,7 +110,7 @@ impl Dict {
         Self {
             inner: Arc::new(Mutex::new(DictInner {
                 entries: BTreeMap::new(),
-                not_found: Arc::new(not_found),
+                not_found: Some(Box::new(not_found)),
                 #[cfg(target_os = "fuchsia")]
                 task_group: None,
                 update_notifiers: vec![],
@@ -247,6 +247,15 @@ impl Dict {
             let _ = std::mem::replace(&mut copy.entries, copied_entries);
         }
         Ok(copy)
+    }
+
+    /// Sends the name of an entry to the not found handler.
+    // Currently this is only used on target, but it's compatible with host.
+    #[allow(dead_code)]
+    pub(crate) fn not_found(&self, entry: &str) {
+        if let Some(not_found_handler) = &self.lock().not_found {
+            not_found_handler(entry);
+        }
     }
 }
 

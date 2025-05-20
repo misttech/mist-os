@@ -193,10 +193,13 @@ impl ZbiBuilder {
         out: &mut impl Write,
     ) -> Result<()> {
         let mut bootfs_files = self.bootfs_files.clone();
-        bootfs_files.insert(
-            BootfsDestination::AdditionalBootArgs.to_string(),
-            additional_boot_args_path.into(),
-        );
+
+        if !self.bootargs.is_empty() {
+            bootfs_files.insert(
+                BootfsDestination::AdditionalBootArgs.to_string(),
+                additional_boot_args_path.into(),
+            );
+        }
         for (destination, source) in bootfs_files {
             write!(out, "{}", destination)?;
             write!(out, "=")?;
@@ -305,6 +308,7 @@ mod tests {
         let mut builder = ZbiBuilder::new(zbi_tool);
         let mut output: Vec<u8> = Vec::new();
 
+        builder.add_boot_arg("fakearg");
         builder.write_bootfs_manifest("additional_boot_args.txt", &mut output).unwrap();
         let output_str = String::from_utf8(output).unwrap();
         assert_eq!(
@@ -334,6 +338,7 @@ mod tests {
         builder.add_bootfs_file("path/to/file2", "bin/file2");
         builder.add_bootfs_file("path/to/file1", "lib/file1");
         builder.add_bootfs_blob("path/to/file1", "my_merkle");
+        builder.add_boot_arg("fakearg");
         builder.write_bootfs_manifest("additional_boot_args.txt", &mut output).unwrap();
         assert_eq!(
             output,

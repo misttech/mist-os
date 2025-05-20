@@ -9,7 +9,6 @@
     program: {
         runner: "elf",
         binary: "bin/socket_proxy",
-        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
         {

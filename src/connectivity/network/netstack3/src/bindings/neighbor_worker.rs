@@ -24,7 +24,7 @@ use net_types::{SpecifiedAddr, Witness as _};
 
 use crate::bindings::devices::{BindingId, DeviceIdAndName};
 use crate::bindings::time::StackTime;
-use crate::bindings::util::IntoFidl;
+use crate::bindings::util::{ErrorLogExt, IntoFidl};
 use crate::bindings::{BindingsCtx, Ctx};
 use netstack3_core::device::{
     DeviceId, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
@@ -275,11 +275,16 @@ impl Worker {
             let item = futures::select! {
                 i = stream.next() => Item::SinkItem(i),
                 w = watchers.select_next_some() => Item::WatcherEnded(w),
-                complete => break,
             };
             match item {
                 Item::SinkItem(None) => {
-                    info!("neighbor worker shutting down, waiting for watchers to end")
+                    if !watchers.is_empty() {
+                        warn!(
+                            "neighbor worker shutting down, dropping {} watchers",
+                            watchers.len()
+                        );
+                    }
+                    break;
                 }
                 Item::WatcherEnded(r) => r.unwrap_or_else(|e| {
                     if !e.is_closed() {
@@ -360,7 +365,6 @@ impl Worker {
                 }
             }
         }
-        info!("all neighbor watchers closed, neighbor worker shutdown is complete");
     }
 }
 
@@ -493,6 +497,15 @@ pub(crate) enum Error {
     Send(#[from] WorkerClosedError),
     #[error(transparent)]
     Fidl(#[from] fidl::Error),
+}
+
+impl ErrorLogExt for Error {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Self::Send(WorkerClosedError) => log::Level::Error,
+            Self::Fidl(fidl) => fidl.log_level(),
+        }
+    }
 }
 
 pub(crate) struct NewWatcher {

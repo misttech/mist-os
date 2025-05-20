@@ -17,7 +17,7 @@
 #include <ranges>
 #include <utility>
 
-#include <ktl/pair.h>
+#include <ktl/utility.h>
 #include <object/vm_object_dispatcher.h>
 
 namespace process_builder {

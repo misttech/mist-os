@@ -11,7 +11,7 @@
 
 #include <fbl/intrusive_hash_table.h>
 #include <ktl/array.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>

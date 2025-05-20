@@ -53,4 +53,5 @@ pub struct RecoveryConfig {
 #[serde(rename_all = "snake_case")]
 pub enum SystemRecovery {
     Fdr,
+    Android,
 }

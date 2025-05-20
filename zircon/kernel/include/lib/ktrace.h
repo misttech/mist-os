@@ -7,10 +7,15 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_
 #define ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_
 
+#include <align.h>
 #include <lib/fxt/interned_category.h>
+#include <lib/fxt/interned_string.h>
+#include <lib/fxt/record_types.h>
 #include <lib/fxt/serializer.h>
+#include <lib/fxt/string_ref.h>
 #include <lib/fxt/trace_base.h>
 #include <lib/ktrace/ktrace_internal.h>
+#include <lib/spsc_buffer/spsc_buffer.h>
 #include <lib/user_copy/user_ptr.h>
 #include <lib/zircon-internal/ktrace.h>
 #include <platform.h>
@@ -624,6 +629,9 @@ using fxt::Scope;
 using fxt::operator""_category;
 using fxt::operator""_intern;
 
+void ktrace_report_live_threads();
+void ktrace_report_live_processes();
+
 enum class BufferMode {
   kSingle,
   kPerCpu,
@@ -631,16 +639,265 @@ enum class BufferMode {
 
 template <BufferMode Mode>
 class KTraceImpl {
+ private:
+  // Allocator used by SpscBuffer to allocate and free its underlying storage.
+  class KernelAspaceAllocator {
+   public:
+    static ktl::byte* Allocate(uint32_t size);
+    static void Free(ktl::byte* ptr);
+  };
+  // PerCpuBuffer wraps an SpscBuffer and adds functionality to track dropped trace records.
+  class PerCpuBuffer {
+   public:
+    using Reservation = SpscBuffer<KernelAspaceAllocator>::Reservation;
+
+    // Initializes the underlying SpscBuffer.
+    zx_status_t Init(uint32_t size) { return buffer_.Init(size); }
+
+    // Drains the underlying SpscBuffer.
+    void Drain() { buffer_.Drain(); }
+
+    // Reads from the underlying SpscBuffer.
+    template <CopyOutFunction CopyFunc>
+    zx::result<uint32_t> Read(CopyFunc copy_fn, uint32_t len) {
+      return buffer_.Read(copy_fn, len);
+    }
+
+    // We interpose ourselves in the Reserve path to ensure that we can emit a record containing
+    // the dropped records statistics if we need to.
+    zx::result<Reservation> Reserve(uint32_t size) {
+      // If first_dropped_ is set to a value, then we are currently tracking a run of dropped trace
+      // records, so we need to emit a duration record containing that information. We could emit
+      // this record independently (with its own call to SpscBuffer::Reserve), but this could lead
+      // to situations in which we thrash and emit multiple DroppedRecordDurationEvents in a row.
+      // To avoid this, we attempt to reserve the desired size plus the size needed to store the
+      // DroppedRecordDurationEvent record, and then write the statistics into the first part of
+      // the reservation before returning it.
+      uint32_t total_size = size;
+      if (first_dropped_.has_value()) {
+        DEBUG_ASSERT(last_dropped_.has_value());
+        total_size += sizeof(DroppedRecordDurationEvent);
+      }
+
+      // Pass the Reserve call on to the SpscBuffer.
+      zx::result<Reservation> res = buffer_.Reserve(total_size);
+      if (res.is_error()) {
+        // If the reservation failed, then we did not have enough space in this buffer, and the
+        // record we were attempting to write will be dropped. Add the "size" to the dropped record
+        // statistics. Notably, we do not add the "total_size," because that may include the size
+        // of the DroppedRecordDurationEvent.
+        TrackDroppedRecord(size);
+        return res.take_error();
+      }
+
+      // If we need to write a dropped record duration event, do that here.
+      DEBUG_ASSERT(first_dropped_.has_value() || total_size == size);
+      if (first_dropped_.has_value()) {
+        DroppedRecordDurationEvent record = SerializeDropStats();
+        res->Write(ktl::span<ktl::byte>(reinterpret_cast<ktl::byte*>(&record), sizeof(record)));
+        // We've successfully written out the dropped record stats, so reset them for the next run.
+        ResetDropStats();
+      }
+      return res;
+    }
+
+    // Emit the dropped record stats to the trace buffer.
+    // If we're not tracking a run of dropped records, this is a no-op.
+    zx_status_t EmitDropStats() {
+      if (!first_dropped_.has_value()) {
+        DEBUG_ASSERT(!last_dropped_.has_value());
+        return ZX_OK;
+      }
+
+      // Try to reserve a slot for the duration record. This will fail if there still isn't enough
+      // space in buffer to store the statistics.
+      zx::result<Reservation> res = buffer_.Reserve(sizeof(DroppedRecordDurationEvent));
+      if (res.is_error()) {
+        return res.status_value();
+      }
+      DroppedRecordDurationEvent record = SerializeDropStats();
+
+      ktl::span bytes =
+          ktl::span<const ktl::byte>(reinterpret_cast<const ktl::byte*>(&record), sizeof(record));
+      res->Write(bytes);
+      res->Commit();
+
+      // We've successfully emitted a record containing statistics on the last run of dropped
+      // records. To prepare for the next run, we must reset the stats.
+      ResetDropStats();
+      return ZX_OK;
+    }
+
+    // Resets the dropped records statistics to their initial values.
+    // This is used to clear the stats after they've been emitted to a trace buffer.
+    void ResetDropStats() {
+      first_dropped_ = ktl::nullopt;
+      last_dropped_ = ktl::nullopt;
+      num_dropped_ = 0;
+      bytes_dropped_ = 0;
+    }
+
+   private:
+    friend class KTraceTests;
+
+    // This is the structure of the FXT duration event that will store dropped record metadata in
+    // the trace buffer. Normally, we would use the FXT serialization functions to build this record
+    // dynamically, but we cannot do this in the PerCpuBuffer because those functions invoke
+    // writer->Reserve, which would lead to recursion. To avoid this, we serialize the record
+    // manually using this struct, which in turn is set up to match the structure outlined in the
+    // FXT spec: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#event-record
+    //
+    // Eventually, it would be nice to have the FXT serialization library support in-place
+    // serialization, as that would allow us to remove this bespoke functionality.
+    struct DroppedRecordDurationEvent {
+      uint64_t header;
+      zx_instant_boot_ticks_t start;
+      uint64_t process_id;
+      uint64_t thread_id;
+      uint64_t num_dropped_arg;
+      uint64_t bytes_dropped_arg;
+      zx_instant_boot_ticks_t end;
+    };
+    static_assert(std::is_standard_layout_v<DroppedRecordDurationEvent>);
+
+    // Serializes the dropped record statistics into a DroppedRecordDurationEvent.
+    DroppedRecordDurationEvent SerializeDropStats() {
+      // This method should only be called if we are currently tracking a run of dropped records.
+      DEBUG_ASSERT(first_dropped_.has_value());
+      DEBUG_ASSERT(last_dropped_.has_value());
+
+      constexpr fxt::WordSize record_size =
+          fxt::WordSize::FromBytes(sizeof(DroppedRecordDurationEvent));
+      const fxt::ThreadRef thread_ref = ThreadRefFromContext(Context::Cpu);
+      const fxt::StringRef<fxt::RefType::kId> name_ref = fxt::StringRef{"ktrace_drop_stats"_intern};
+      const fxt::StringRef<fxt::RefType::kId> category_ref = fxt::StringRef{"kernel:meta"_intern};
+      constexpr uint64_t num_args = 2;
+      const fxt::Argument num_dropped_arg = fxt::Argument{"num_records"_intern, num_dropped_};
+      const fxt::Argument bytes_dropped_arg = fxt::Argument{"num_bytes"_intern, bytes_dropped_};
+      const uint64_t header =
+          fxt::MakeHeader(fxt::RecordType::kEvent, record_size) |
+          fxt::EventRecordFields::EventType::Make(
+              ToUnderlyingType(fxt::EventType::kDurationComplete)) |
+          fxt::EventRecordFields::ArgumentCount::Make(num_args) |
+          fxt::EventRecordFields::ThreadRef::Make(thread_ref.HeaderEntry()) |
+          fxt::EventRecordFields::CategoryStringRef::Make(category_ref.HeaderEntry()) |
+          fxt::EventRecordFields::NameStringRef::Make(name_ref.HeaderEntry());
+
+      return {
+          .header = header,
+          .start = first_dropped_.value(),
+          .process_id = thread_ref.process().koid,
+          .thread_id = thread_ref.thread().koid,
+          .num_dropped_arg = num_dropped_arg.Header(),
+          .bytes_dropped_arg = bytes_dropped_arg.Header(),
+          .end = last_dropped_.value(),
+      };
+    }
+
+    // Adds a dropped record of the given size to the tracked statistics.
+    void TrackDroppedRecord(uint32_t size) {
+      if (!first_dropped_.has_value()) {
+        first_dropped_ = ktl::optional(Timestamp());
+      }
+      last_dropped_ = ktl::optional(Timestamp());
+      num_dropped_++;
+      bytes_dropped_ += size;
+    }
+
+    // The underlying SpscBuffer.
+    SpscBuffer<KernelAspaceAllocator> buffer_;
+
+    // This class keeps track of the duration, number, and size of trace records dropped when the
+    // buffer is full. These statistics are emitted to the trace buffer as a duration as soon as
+    // space is available to do so, at which point the values are reset to ktl::nullopt, in the
+    // case of first_dropped_ and last_dropped_, or zero in the case of num_dropped_
+    // and bytes_dropped_.
+    ktl::optional<zx_instant_boot_ticks_t> first_dropped_;
+    ktl::optional<zx_instant_boot_ticks_t> last_dropped_;
+    // By storing num_dropped_ and bytes_dropped_ in 32-bit values, we ensure that they can each
+    // be stored in a single 64-bit word in the FXT record we emit when space is available.
+    uint32_t num_dropped_{0};
+    uint32_t bytes_dropped_{0};
+  };
+
  public:
-  // Initializes the KTrace instance. Calling any other function on KTrace before calling Init
-  // should be a no-op.
-  void Init(uint32_t bufsize, uint32_t initial_grpmask);
+  // PendingCommit encapsulates a pending write to the KTrace buffer.
+  //
+  // This class implements the fxt::Writer::Reservation trait, which is required by the FXT
+  // serializer.
+  //
+  // It is absolutely imperative that interrupts remain disabled for the lifetime of this class.
+  // Enabling interrupts at any point during the lifetime of this class will break the
+  // single-writer invariant of each per-CPU buffer and lead to subtle concurrency bugs that may
+  // manifest as corrupt trace data. Unfortunately, there is no way for us to programmatically
+  // ensure this, so we do our best by asserting that interrupts are disabled in every method of
+  // this class. It is therefore up to the caller to ensure that interrupts are never re-enabled.
+  class PendingCommit {
+   public:
+    ~PendingCommit() {
+      DEBUG_ASSERT(arch_ints_disabled());
+      arch_interrupt_restore(state_);
+    }
+
+    // Disallow copies and move assignment, but allow moves.
+    // Disallowing move assignment allows the saved interrupt state to be const.
+    PendingCommit(const PendingCommit&) = delete;
+    PendingCommit& operator=(const PendingCommit&) = delete;
+    PendingCommit& operator=(PendingCommit&&) = delete;
+    PendingCommit(PendingCommit&& other)
+        : reservation_(ktl::move(other.reservation_)), state_(other.state_) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      other.state_ = kNoopInterruptSavedState;
+    }
+
+    void WriteWord(uint64_t word) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      reservation_.Write(ktl::span<ktl::byte>(reinterpret_cast<ktl::byte*>(&word), sizeof(word)));
+    }
+
+    void WriteBytes(const void* bytes, size_t num_bytes) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      // Write the data provided.
+      reservation_.Write(
+          ktl::span<const ktl::byte>(static_cast<const ktl::byte*>(bytes), num_bytes));
+
+      // Write any padding bytes necessary.
+      constexpr uint8_t kZero[8]{};
+      const size_t aligned_bytes = ALIGN(num_bytes, 8);
+      const size_t num_zeros_to_write = aligned_bytes - num_bytes;
+      if (num_zeros_to_write != 0) {
+        reservation_.Write(ktl::span<const ktl::byte>(reinterpret_cast<const ktl::byte*>(kZero),
+                                                      num_zeros_to_write));
+      }
+    }
+
+    void Commit() {
+      DEBUG_ASSERT(arch_ints_disabled());
+      reservation_.Commit();
+    }
+
+   private:
+    // Only KTraceImpl::Reserve<BufferMode::kPerCpu> should be able to create a PendingCommit.
+    friend class KTraceImpl<BufferMode::kPerCpu>;
+    PendingCommit(PerCpuBuffer::Reservation reservation, interrupt_saved_state_t state,
+                  uint64_t header)
+        : reservation_(ktl::move(reservation)), state_(state) {
+      DEBUG_ASSERT(arch_ints_disabled());
+      WriteWord(header);
+    }
+
+    PerCpuBuffer::Reservation reservation_;
+    interrupt_saved_state_t state_;
+  };
+  using Reservation = ktl::conditional_t<Mode == BufferMode::kSingle,
+                                         internal::KTraceState::PendingCommit, PendingCommit>;
 
   // Control is responsible for starting, stopping, or rewinding the ktrace buffer.
   //
   // The meaning of the options changes based on the action. If the action is to start tracing,
   // then the options field functions as the group mask.
-  zx_status_t Control(uint32_t action, uint32_t options) {
+  zx_status_t Control(uint32_t action, uint32_t options) TA_EXCL(lock_) {
+    KTraceGuard guard{&lock_};
     switch (action) {
       case KTRACE_ACTION_START:
       case KTRACE_ACTION_START_CIRCULAR:
@@ -657,14 +914,15 @@ class KTraceImpl {
   // ReadUser reads len bytes from the ktrace buffer starting at offset off into the given user
   // buffer.
   //
-  // On success, this function returns the number of bytes that were read into the buffer.
-  // On failure, a zx_status_t error code is returned.
+  // The return value is one of the following:
+  // * If ptr is nullptr, the number of bytes needed to read all of the available data is returned.
+  // * Otherwise:
+  //    * On success, this function returns the number of bytes that were read into the buffer.
+  //    * On failure, a zx_status_t error code is returned.
   zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len);
 
   // Reserve reserves a slot in the ring buffer to write a record into.
-  using PendingCommit =
-      std::conditional_t<Mode == BufferMode::kSingle, internal::KTraceState::PendingCommit, void>;
-  zx::result<PendingCommit> Reserve(uint64_t header);
+  zx::result<Reservation> Reserve(uint64_t header);
 
   // Sentinel type for unused arguments.
   struct Unused {};
@@ -857,13 +1115,14 @@ class KTraceImpl {
 
  private:
   friend class KTraceTests;
+  friend class TestKTrace;
 
   // Set this class up as a singleton by:
   // * Making the constructor and destructor private
   // * Preventing copies and moves
   constexpr explicit KTraceImpl(bool disable_diagnostic_logs = false)
       : disable_diagnostic_logs_(disable_diagnostic_logs) {}
-  ~KTraceImpl() = default;
+  virtual ~KTraceImpl() = default;
   KTraceImpl(const KTraceImpl&) = delete;
   KTraceImpl& operator=(const KTraceImpl&) = delete;
   KTraceImpl(KTraceImpl&&) = delete;
@@ -925,17 +1184,24 @@ class KTraceImpl {
     return 0;
   }
 
+  // Initializes the KTrace instance. Calling any other function on KTrace before calling Init
+  // should be a no-op. This should only be called from the InitHook.
+  void Init(uint32_t bufsize, uint32_t initial_grpmask) TA_EXCL(lock_);
+
+  // Allocate our per-CPU buffers. This is only called when BufferMode::kPerCpu is enabled.
+  zx_status_t Allocate() TA_REQ(lock_);
+
   // Start collecting trace data.
   // `action` must be one of KTRACE_ACTION_START or KTRACE_ACTION_START_CIRCULAR.
   // `categories` is the set of categories to trace. Cannot be zero.
   // TODO(https://fxbug.dev/404539312): The `action` argument is unnecessary once we switch to
   // the per-CPU streaming implementation by default.
-  zx_status_t Start(uint32_t action, uint32_t categories);
+  zx_status_t Start(uint32_t action, uint32_t categories) TA_REQ(lock_);
   // Stop collecting trace data.
-  zx_status_t Stop();
+  zx_status_t Stop() TA_REQ(lock_);
   // Rewinds the buffer, meaning that all contained trace data is dropped and the buffer is reset
   // to its initial state.
-  zx_status_t Rewind();
+  zx_status_t Rewind() TA_REQ(lock_);
 
   // Returns true if the given category is enabled for tracing.
   bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
@@ -946,6 +1212,10 @@ class KTraceImpl {
     const uint32_t bitmask = 1u << bit_number;
     return (bitmask & categories_bitmask()) != 0;
   }
+
+  // Emits metadata records into the trace buffer.
+  // This method is declared virtual to facilitate testing.
+  virtual void ReportMetadata();
 
   // Getter and setter for the categories bitmask.
   // These use acquire-release semantics because the order in which we set the bitmask matters.
@@ -964,12 +1234,16 @@ class KTraceImpl {
   // Enables writes to the ktrace buffer.
   // This uses release semantics to synchronize with writers when they check if writes are enabled,
   // which in turn ensures that operations to initialize the buffer during Init are not reordered
-  // after the call to EnableWrites. Without this synchronization, it would be possible for a writer
-  // to begin a write before the backing buffer has been allocated.
+  // after the call to EnableWrites. Without this synchronization, it would be possible for a
+  // writer to begin a write before the backing buffer has been allocated.
   void EnableWrites() { writes_enabled_.store(true, ktl::memory_order_release); }
 
-  // Disables writes to the ktrace buffer and wait for any ongoing writes to complete.
-  void DisableWrites();
+  // Disables writes to the ktrace buffer.
+  // Note: This function does not wait for any ongoing writes to complete. The caller is
+  // responsible for doing this, likely using an IPI to all other cores.
+  // It may be possible to perform this store with relaxed semantics, but we do it with release
+  // semantics out of an abundance of caution.
+  void DisableWrites() { writes_enabled_.store(false, ktl::memory_order_release); }
 
   // Returns true if writes are currently enabled.
   // This uses acquire semantics to ensure that it synchronizes with EnableWrites as described in
@@ -992,6 +1266,25 @@ class KTraceImpl {
 
   // Stores whether writes are currently enabled.
   ktl::atomic<bool> writes_enabled_{false};
+
+  // The buffers used to store data when using per-CPU mode.
+  ktl::unique_ptr<PerCpuBuffer[]> percpu_buffers_{nullptr};
+  // The number of buffers in percpu_buffers_. This is logically equivalent to the number of cores.
+  // This should be set during Init and never modified.
+  uint32_t num_buffers_ TA_GUARDED(lock_){0};
+  // The size of each buffer in the percpu_buffers_.
+  // This should be set during Init and never modified.
+  uint32_t buffer_size_ TA_GUARDED(lock_){0};
+
+  // Lock used to serialize non-write operations.
+  // The internal::KTraceState object already has a lock to synchronize these operations, so this
+  // is a NullLock when using BufferMode::kSingle. Setting up the LockType in this way allows us
+  // to annotate methods with thread safety annotations.
+  using LockType =
+      ktl::conditional_t<Mode == BufferMode::kSingle, fbl::NullLock, DECLARE_MUTEX(KTraceImpl)>;
+  using KTraceGuard =
+      ktl::conditional_t<Mode == BufferMode::kSingle, lockdep::NullGuard, Guard<Mutex>>;
+  LockType lock_;
 };
 
 // Utilize the per-CPU implementation of ktrace if streaming has been enabled.
@@ -1001,8 +1294,5 @@ using KTrace = KTraceImpl<BufferMode::kPerCpu>;
 #else
 using KTrace = KTraceImpl<BufferMode::kSingle>;
 #endif
-
-void ktrace_report_live_threads();
-void ktrace_report_live_processes();
 
 #endif  // ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_

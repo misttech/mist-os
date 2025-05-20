@@ -174,6 +174,11 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     @contextmanager
     def mock_ap_controller(self) -> Iterator[mock.MagicMock]:
+        """Create an iterator for AP controller mocks.
+
+        Yields:
+            Iterator[mock.MagicMock]: Yielded iterator of mocks.
+        """
         ap_controller_client = mock.MagicMock(
             spec=f_wlan_policy.AccessPointControllerClient,
             autospec=True,

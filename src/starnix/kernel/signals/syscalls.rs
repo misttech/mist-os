@@ -29,9 +29,9 @@ use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
     errno, error, pid_t, rusage, sigaltstack, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC,
-    SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER,
-    SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED,
-    WUNTRACED, __WALL, __WCLONE,
+    SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SS_AUTODISARM,
+    SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL,
+    __WCLONE,
 };
 use static_assertions::const_assert_eq;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
@@ -39,6 +39,7 @@ use zerocopy::{FromBytes, Immutable, IntoBytes};
 // Rust will let us do this cast in a const assignment but not in a const generic constraint.
 const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
 
+pub type RUsagePtr = MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>;
 type SigAction64Ptr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction64_t>;
 type SigActionPtr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction_t>;
 
@@ -581,13 +582,13 @@ pub fn sys_pidfd_send_signal(
     }
 
     let file = current_task.files.get(pidfd)?;
-    let target = current_task.get_task(file.as_pid()?);
+    let target = file.as_thread_group_key()?;
     let target = target.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
     if siginfo_ref.is_null() {
-        send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32)
+        target.send_signal_unchecked(current_task, unchecked_signal)
     } else {
-        send_unchecked_signal_info(current_task, &target, unchecked_signal, siginfo_ref)
+        target.send_signal_unchecked_with_info(current_task, unchecked_signal, siginfo_ref)
     }
 }
 
@@ -698,7 +699,7 @@ impl WaitingOptions {
 fn wait_on_pid(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    selector: ProcessSelector,
+    selector: &ProcessSelector,
     options: &WaitingOptions,
 ) -> Result<Option<WaitResult>, Errno> {
     let waiter = Waiter::new();
@@ -774,7 +775,7 @@ pub fn sys_waitid(
     id: i32,
     user_info: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
     options: u32,
-    user_rusage: MultiArchUserRef<uapi::rusage, uapi::arch32::rusage>,
+    user_rusage: RUsagePtr,
 ) -> Result<(), Errno> {
     let mut waiting_options = WaitingOptions::new_for_waitid(options)?;
 
@@ -792,7 +793,7 @@ pub fn sys_waitid(
             if file.flags().contains(OpenFlags::NONBLOCK) {
                 waiting_options.block = false;
             }
-            ProcessSelector::Pid(file.as_pid()?)
+            ProcessSelector::Process(file.as_thread_group_key()?)
         }
         _ => return error!(EINVAL),
     };
@@ -800,7 +801,7 @@ pub fn sys_waitid(
     // wait_on_pid returns None if the task was not waited on. In that case, we don't write out a
     // siginfo. This seems weird but is the correct behavior according to the waitid(2) man page.
     if let Some(waitable_process) =
-        wait_on_pid(locked, current_task, task_selector, &waiting_options)?
+        wait_on_pid(locked, current_task, &task_selector, &waiting_options)?
     {
         if !user_rusage.is_null() {
             let usage = rusage {
@@ -838,7 +839,7 @@ pub fn sys_wait4(
     raw_selector: pid_t,
     user_wstatus: UserRef<i32>,
     options: u32,
-    user_rusage: UserRef<rusage>,
+    user_rusage: RUsagePtr,
 ) -> Result<pid_t, Errno> {
     let waiting_options = WaitingOptions::new_for_wait4(options, current_task.get_pid())?;
 
@@ -859,7 +860,8 @@ pub fn sys_wait4(
         return error!(ENOSYS);
     };
 
-    if let Some(waitable_process) = wait_on_pid(locked, current_task, selector, &waiting_options)? {
+    if let Some(waitable_process) = wait_on_pid(locked, current_task, &selector, &waiting_options)?
+    {
         let status = waitable_process.exit_info.status.wait_status();
 
         if !user_rusage.is_null() {
@@ -869,7 +871,7 @@ pub fn sys_wait4(
                 ru_stime: timeval_from_duration(waitable_process.time_stats.system_time),
                 ..Default::default()
             };
-            current_task.write_object(user_rusage, &usage)?;
+            current_task.write_multi_arch_object(user_rusage, usage)?;
         }
 
         if !user_wstatus.is_null() {
@@ -908,8 +910,11 @@ mod arch32 {
     }
 
     pub use super::{
+        sys_pidfd_send_signal as sys_arch32_pidfd_send_signal,
         sys_rt_sigaction as sys_arch32_rt_sigaction,
+        sys_rt_sigqueueinfo as sys_arch32_rt_sigqueueinfo,
         sys_rt_sigtimedwait as sys_arch32_rt_sigtimedwait,
+        sys_rt_tgsigqueueinfo as sys_arch32_rt_tgsigqueueinfo,
         sys_sigaltstack as sys_arch32_sigaltstack, sys_signalfd4 as sys_arch32_signalfd4,
         sys_waitid as sys_arch32_waitid,
     };
@@ -933,7 +938,7 @@ mod tests {
         SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
         SIGUSR1,
     };
-    use starnix_uapi::{sigaction_t, uaddr, uid_t, SI_QUEUE};
+    use starnix_uapi::{sigaction_t, uaddr, uid_t, SI_QUEUE, SI_USER};
     use zerocopy::IntoBytes;
 
     #[cfg(target_arch = "x86_64")]
@@ -1045,8 +1050,8 @@ mod tests {
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
-        current_task.thread_state.registers.rsp =
-            (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+        let next_addr = (sigaltstack_addr + sigaltstack_addr_size).unwrap();
+        current_task.thread_state.registers.rsp = next_addr.ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(
@@ -1056,8 +1061,12 @@ mod tests {
 
         // However, setting the rsp to a different value outside the alt stack should allow us to
         // disable it.
-        current_task.thread_state.registers.rsp =
-            (sigaltstack_addr + sigaltstack_addr_size + 0x1000usize).ptr() as u64;
+        let next_ss_addr = sigaltstack_addr
+            .checked_add(sigaltstack_addr_size)
+            .unwrap()
+            .checked_add(0x1000usize)
+            .unwrap();
+        current_task.thread_state.registers.rsp = next_ss_addr.ptr() as u64;
         let ss = sigaltstack { ss_flags: SS_DISABLE as i32, ..sigaltstack::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into())
@@ -1097,7 +1106,7 @@ mod tests {
 
         // Changing the sigaltstack while we are there should be an error.
         current_task.thread_state.registers.rsp =
-            (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+            (sigaltstack_addr + sigaltstack_addr_size).unwrap().ptr() as u64;
         ss.ss_flags = SS_DISABLE as i32;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(
@@ -1251,7 +1260,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_SETMASK;
 
         assert_eq!(
@@ -1289,7 +1299,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_BLOCK;
 
         assert_eq!(
@@ -1327,7 +1338,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_UNBLOCK;
 
         assert_eq!(
@@ -1365,7 +1377,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_UNBLOCK;
 
         assert_eq!(
@@ -1403,7 +1416,8 @@ mod tests {
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
-        let old_set = UserRef::<SigSet>::new(addr + std::mem::size_of::<SigSet>());
+        let old_addr_range = (addr + std::mem::size_of::<SigSet>()).unwrap();
+        let old_set = UserRef::<SigSet>::new(old_addr_range);
         let how = SIG_BLOCK;
 
         assert_eq!(
@@ -1771,7 +1785,7 @@ mod tests {
                 id,
                 UserRef::default(),
                 WEXITED,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             error!(EINVAL)
         );
@@ -1782,7 +1796,7 @@ mod tests {
                 id,
                 UserRef::default(),
                 WNOWAIT,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             error!(EINVAL)
         );
@@ -1793,7 +1807,7 @@ mod tests {
                 id,
                 UserRef::default(),
                 0xffff,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             error!(EINVAL)
         );
@@ -1816,7 +1830,7 @@ mod tests {
             wait_on_pid(
                 &mut locked,
                 &current_task,
-                ProcessSelector::Any,
+                &ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             error!(ECHILD)
@@ -1840,7 +1854,7 @@ mod tests {
             wait_on_pid(
                 &mut locked,
                 &current_task,
-                ProcessSelector::Any,
+                &ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             Ok(Some(expected_result))
@@ -1860,7 +1874,7 @@ mod tests {
             wait_on_pid(
                 &mut locked,
                 &task,
-                ProcessSelector::Any,
+                &ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(WNOHANG, 0).expect("WaitingOptions")
             ),
             Ok(None)
@@ -1886,7 +1900,7 @@ mod tests {
         let waited_child = wait_on_pid(
             &mut locked,
             &task,
-            ProcessSelector::Any,
+            &ProcessSelector::Any,
             &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
         )
         .expect("wait_on_pid")
@@ -1917,7 +1931,7 @@ mod tests {
         let errno = wait_on_pid(
             &mut locked,
             &task,
-            ProcessSelector::Any,
+            &ProcessSelector::Any,
             &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
         )
         .expect_err("wait_on_pid");
@@ -1942,7 +1956,7 @@ mod tests {
             std::mem::size_of::<i32>() as u64,
         );
         let address_ref = UserRef::<i32>::new(address);
-        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, UserRef::default())
+        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, RUsagePtr::null(&current_task))
             .expect("wait4");
         let wstatus = current_task.read_object(address_ref).expect("read memory");
         assert_eq!(wstatus, SIGKILL.number() as i32);
@@ -1965,7 +1979,7 @@ mod tests {
             std::mem::size_of::<i32>() as u64,
         );
         let address_ref = UserRef::<i32>::new(address);
-        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, UserRef::default())
+        sys_wait4(&mut locked, &current_task, -1, address_ref, 0, RUsagePtr::null(&current_task))
             .expect("wait4");
         let wstatus = current_task.read_object(address_ref).expect("read memory");
         assert_eq!(wstatus, wait_status);
@@ -1999,12 +2013,19 @@ mod tests {
                 -child2_pid,
                 UserRef::default(),
                 0,
-                UserRef::default()
+                RUsagePtr::null(&current_task)
             ),
             Ok(child2_pid)
         );
         assert_eq!(
-            sys_wait4(&mut locked, &current_task, 0, UserRef::default(), 0, UserRef::default()),
+            sys_wait4(
+                &mut locked,
+                &current_task,
+                0,
+                UserRef::default(),
+                0,
+                RUsagePtr::null(&current_task)
+            ),
             Ok(child1_pid)
         );
     }

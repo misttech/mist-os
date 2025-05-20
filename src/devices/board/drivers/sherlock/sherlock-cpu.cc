@@ -68,26 +68,27 @@ zx_status_t Sherlock::CpuInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SHER');
 
-  auto aml_cpu_legacy_thermal_node = fuchsia_driver_framework::ParentSpec{{
+  auto aml_cpu_legacy_thermal_node = fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_thermal::BIND_PROTOCOL_DEVICE),
-              fdf::MakeAcceptBindRule(
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PROTOCOL,
+                                       bind_fuchsia_thermal::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule2(
                   bind_fuchsia::PLATFORM_DEV_DID,
                   bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_thermal::BIND_PROTOCOL_DEVICE),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
-                                bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL),
+              fdf::MakeProperty2(bind_fuchsia::PROTOCOL,
+                                 bind_fuchsia_thermal::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID,
+                                 bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL),
           },
   }};
 
   auto composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
       .name = "aml_cpu_legacy",
-      .parents = {{aml_cpu_legacy_thermal_node}},
+      .parents2 = {{aml_cpu_legacy_thermal_node}},
   }};
 
   fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(

@@ -54,7 +54,7 @@ TEST_F(GoodSoftmacDriverTest, VerifyChildNode) {
     ASSERT_EQ(node.children().count("wlansoftmac-ethernet"), 1ul);
 
     auto expected_property =
-        fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_ethernet::BIND_PROTOCOL_IMPL);
+        fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_ethernet::BIND_PROTOCOL_IMPL);
     auto properties = node.children().find("wlansoftmac-ethernet")->second.GetProperties();
 
     ASSERT_EQ(properties.size(), 1ul);

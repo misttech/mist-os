@@ -299,7 +299,7 @@ acpi::status<fuchsia_hardware_acpi::wire::Object> EvaluateObjectFidlHelper::Enco
     }
     case ACPI_TYPE_STRING: {
       fidl::StringView sv;
-      sv.Set(alloc, cpp17::string_view(value->String.Pointer, value->String.Length));
+      sv.Set(alloc, std::string_view(value->String.Pointer, value->String.Length));
       result = fuchsia_hardware_acpi::wire::Object::WithStringVal(alloc, sv);
       break;
     }
@@ -358,7 +358,7 @@ acpi::status<fuchsia_hardware_acpi::wire::Object> EvaluateObjectFidlHelper::Enco
       fuchsia_hardware_acpi::wire::Handle hnd;
       hnd.object_type = AcpiTypeToFidlType(value->Reference.ActualType);
       fidl::StringView sv;
-      sv.Set(alloc, cpp17::string_view(handle_path.value()));
+      sv.Set(alloc, std::string_view(handle_path.value()));
       hnd.path = sv;
       result = fuchsia_hardware_acpi::wire::Object::WithReferenceVal(alloc, hnd);
       break;

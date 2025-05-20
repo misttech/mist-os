@@ -11,7 +11,7 @@
 ##    --raw                   do not attempt to symbolize the log
 ##
 ## This command delegates to the Zircon `loglistener` binary.
-## It will listen to the device specified with `fx -d DEVICE klog` or
+## It will listen to the device specified with `fx -t DEVICE klog` or
 ## `fx set-device`, otherwise one of the devices on the link-local network.
 
 set -e

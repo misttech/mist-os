@@ -120,8 +120,7 @@ zx_status_t zxio_default_open(zxio_t* directory, const char* path, size_t path_l
 // ops tables.
 static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .destroy = zxio_default_destroy,
-    // close is for OOT users that haven't migrated yet.
-    .close2 = zxio_default_close,
+    .close = zxio_default_close,
     .release = zxio_default_release,
     .borrow = zxio_default_borrow,
     .clone = zxio_default_clone,
@@ -191,7 +190,7 @@ zx_status_t zxio_default_init(zxio_t* io);
 // you might get from /dev/null) behaves.
 //
 // The null implementation is similar to the default implementation, except the
-// read, write, and destroy operations succeed with null effects.
+// read, write, close operations succeed with null effects.
 
 // Initializes a |zxio_t| object with a null ops table.
 zx_status_t zxio_null_init(zxio_t* io);

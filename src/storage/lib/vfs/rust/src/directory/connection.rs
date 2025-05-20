@@ -105,13 +105,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
-            fio::DirectoryRequest::GetConnectionInfo { responder } => {
-                trace::duration!(c"storage", c"Directory::GetConnectionInfo");
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(self.options.rights),
-                    ..Default::default()
-                })?;
-            }
             fio::DirectoryRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) = crate::common::io2_to_io1_attrs(
@@ -159,37 +152,37 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 trace::duration!(c"storage", c"Directory::RemoveExtendedAttribute");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::GetFlags");
                 responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::DeprecatedGetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::DeprecatedGetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::DeprecatedSetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::DeprecatedSetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"Directory::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::SetFlags { flags: _, responder } => {
                 trace::duration!(c"storage", c"Directory::SetFlags");
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::DeprecatedOpen {
                 flags,
                 mode: _,
@@ -205,7 +198,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::Open { flags, mode: _, path, object, control_handle: _ } => {
                 {
                     trace::duration!(c"storage", c"Directory::Open");
@@ -269,6 +262,11 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::Rename { src: _, dst_parent_token: _, dst: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedSetAttr { flags: _, attributes: _, responder } => {
+                responder.send(Status::NOT_SUPPORTED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw())?;
             }
@@ -278,7 +276,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::DirectoryRequest::Open { path, mut flags, options, object, control_handle: _ } => {
                 {
                     // Remove POSIX flags when the respective rights are not available.
@@ -298,7 +296,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::DirectoryRequest::Open3 {
                 path,
                 mut flags,
@@ -343,14 +341,13 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
         };
 
-        self.directory.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
+        self.directory.clone().deprecated_open(self.scope.clone(), flags, Path::dot(), server_end);
     }
 
     fn handle_clone(&mut self, object: fidl::Channel) {
         let flags = fio::Flags::from(&self.options);
-        ObjectRequest::new(flags, &Default::default(), object).handle(|req| {
-            self.directory.clone().open3(self.scope.clone(), Path::dot(), flags, req)
-        });
+        ObjectRequest::new(flags, &Default::default(), object)
+            .handle(|req| self.directory.clone().open(self.scope.clone(), Path::dot(), flags, req));
     }
 
     fn handle_deprecated_open(
@@ -393,7 +390,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
 
         // It is up to the open method to handle OPEN_FLAG_DESCRIBE from this point on.
         let directory = self.directory.clone();
-        directory.open(self.scope.clone(), flags, path, server_end);
+        directory.deprecated_open(self.scope.clone(), flags, path, server_end);
     }
 
     async fn handle_open(
@@ -467,7 +464,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             return Err(Status::ALREADY_EXISTS);
         }
 
-        self.directory.clone().open3_async(self.scope.clone(), path, flags, object_request).await
+        self.directory.clone().open_async(self.scope.clone(), path, flags, object_request).await
     }
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (Status, Vec<u8>) {
@@ -567,7 +564,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.open(
+        dir.deprecated_open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),
@@ -603,7 +600,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.open(
+        dir.deprecated_open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),
@@ -641,7 +638,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.open(
+        dir.deprecated_open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),
@@ -679,7 +676,7 @@ mod tests {
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
         let dir = Simple::new();
-        dir.open(
+        dir.deprecated_open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
             Path::dot(),

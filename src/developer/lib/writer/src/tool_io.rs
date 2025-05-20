@@ -36,7 +36,7 @@ pub trait ToolIO: Write + Sized {
     fn is_machine(&self) -> bool;
 
     /// Returns an error stream that errors can be written to.
-    fn stderr(&mut self) -> &'_ mut Box<dyn Write>;
+    fn stderr(&mut self) -> &mut dyn Write;
 
     /// Writes the value to standard output without a newline.
     ///

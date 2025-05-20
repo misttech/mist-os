@@ -317,6 +317,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
                 match occupied
                     .get()
                     .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::ZERO)
+                    .to_result()
                 {
                     Ok(_) => {
                         // Okay to replace an eventpair if the other end is already closed.

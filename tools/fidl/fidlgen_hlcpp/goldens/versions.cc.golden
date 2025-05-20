@@ -28,7 +28,7 @@ extern "C" const fidl_type_t test_versions_StructTable;
 const fidl_type_t* Struct::FidlType = &test_versions_StructTable;
 
 void Struct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                    cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                    std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Struct>::value) {
     memcpy(_encoder->template GetPtr<Struct>(_offset), this, sizeof(Struct));
   } else {
@@ -50,10 +50,6 @@ zx_status_t Struct::Clone(Struct* _result) const {
     return _status;
   return ZX_OK;
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_versions_TableTable;
 const fidl_type_t* Table::FidlType = &test_versions_TableTable;
@@ -102,7 +98,7 @@ Table& Table::set_x(uint32_t _value) {
 }
 
 void Table::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                   cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                   std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -188,10 +184,6 @@ zx_status_t Table::Clone(Table* result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_versions_UnionTable;
 const fidl_type_t* Union::FidlType = &test_versions_UnionTable;
 
@@ -241,7 +233,7 @@ Union Union::WithX(uint32_t&& val) {
 }
 
 void Union::Encode(::fidl::Encoder* encoder, size_t offset,
-                   cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                   std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -471,10 +463,6 @@ OtherProtocol_SyncProxy::OtherProtocol_SyncProxy(::zx::channel channel)
     : proxy_(::std::move(channel)) {}
 
 OtherProtocol_SyncProxy::~OtherProtocol_SyncProxy() = default;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 Protocol::~Protocol() = default;
 

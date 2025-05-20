@@ -106,11 +106,11 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddProtoco
   }
 
   fhpb::Service::InstanceHandler handler({
-      .platform_bus = bus->bindings().CreateHandler(bus, fdf::Dispatcher::GetCurrent()->get(),
+      .platform_bus = bus->bindings().CreateHandler(bus, bus->driver_dispatcher()->get(),
                                                     fidl::kIgnoreBindingClosure),
-      .iommu = bus->iommu_bindings().CreateHandler(bus, fdf::Dispatcher::GetCurrent()->get(),
+      .iommu = bus->iommu_bindings().CreateHandler(bus, bus->driver_dispatcher()->get(),
                                                    fidl::kIgnoreBindingClosure),
-      .firmware = bus->fw_bindings().CreateHandler(bus, fdf::Dispatcher::GetCurrent()->get(),
+      .firmware = bus->fw_bindings().CreateHandler(bus, bus->driver_dispatcher()->get(),
                                                    fidl::kIgnoreBindingClosure),
   });
 
@@ -119,17 +119,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddProtoco
     return result.take_error();
   }
 
-  result = bus->outgoing()->AddService<fuchsia_sysinfo::Service>(
-      fuchsia_sysinfo::Service::InstanceHandler({
-          .device = bus->sysinfo_bindings().CreateHandler(
-              bus, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
-      }));
-  if (result.is_error()) {
-    return result.take_error();
-  }
-
   std::array offers = {fdf::MakeOffer2<fhpb::Service>(name),
-                       fdf::MakeOffer2<fuchsia_sysinfo::Service>(name),
                        fdf::MakeOffer2<fuchsia_driver_compat::Service>(name)};
 
   return fdf::AddChild(parent, bus->logger(), name, props, offers);
@@ -392,27 +382,27 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   auto instance_id = request->node.has_instance_id() ? request->node.instance_id() : 0;
 
   fuchsia_driver_framework::CompositeNodeSpec composite_node_spec = fidl::ToNatural(request->spec);
-  if (!composite_node_spec.parents().has_value()) {
-    composite_node_spec.parents().emplace();
+  if (!composite_node_spec.parents2().has_value()) {
+    composite_node_spec.parents2().emplace();
   }
-  composite_node_spec.parents()->push_back(fuchsia_driver_framework::ParentSpec{{
+  composite_node_spec.parents2()->push_back(fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, vid),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID, pid),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, did),
-              fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PROTOCOL,
+                                       bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID, vid),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_PID, pid),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID, did),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID, vid),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID, pid),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID, did),
-              fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
+              fdf::MakeProperty2(bind_fuchsia::PROTOCOL,
+                                 bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID, vid),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_PID, pid),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_DID, did),
+              fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
           },
   }});
   zx::result composite_node_manager =
@@ -503,6 +493,20 @@ void PlatformBus::GetFirmware(GetFirmwareRequestView request, fdf::Arena& arena,
     };
   }
   completer.buffer(arena).ReplySuccess(ret);
+}
+
+void PlatformBus::GetInterruptInfo(GetInterruptInfoRequest& request,
+                                   GetInterruptInfoCompleter::Sync& completer) {
+  auto iter = std::find_if(devices_.begin(), devices_.end(), [&request](auto& device) {
+    return device->HasInterruptVector(request.interrupt_vector());
+  });
+  if (iter != devices_.end()) {
+    auto* device = iter->get();
+    completer.Reply(zx::ok(
+        fhpb::InterruptAttributorGetInterruptInfoResponse(device->name(), device->node_token())));
+  } else {
+    completer.Reply(zx::error(ZX_ERR_NOT_FOUND));
+  }
 }
 
 void PlatformBus::handle_unknown_method(fidl::UnknownMethodMetadata<fhpb::PlatformBus> metadata,
@@ -719,6 +723,20 @@ zx::result<> PlatformBus::Start() {
   }
 
   suspend_enabled_ = config.suspend_enabled();
+
+  zx::result result = outgoing()->AddService<fhpb::ObservabilityService>(
+      fhpb::ObservabilityService::InstanceHandler({
+          .interrupt =
+              interrupt_bindings().CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
+      }));
+  ZX_ASSERT(result.is_ok());
+
+  result =
+      outgoing()->AddService<fuchsia_sysinfo::Service>(fuchsia_sysinfo::Service::InstanceHandler({
+          .device =
+              sysinfo_bindings().CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
+      }));
+  ZX_ASSERT(result.is_ok());
 
   return zx::ok();
 }

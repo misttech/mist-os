@@ -45,7 +45,14 @@ zx::result<fdio_ptr> zxio::create_null() {
 }
 
 zx_status_t zxio::close(const bool should_wait) {
-  return zxio_close(&zxio_storage().io, should_wait);
+  zx_status_t status = ZX_OK;
+  if (should_wait) {
+    status = zxio_close(&zxio_storage().io);
+  }
+  zxio_destroy(&zxio_storage().io);
+  // zxio_close isn't supported by all zxio object types e.g. pipes don't support it, but we don't
+  // want to return an error in that case.
+  return status == ZX_ERR_NOT_SUPPORTED ? ZX_OK : status;
 }
 
 zx_status_t zxio::borrow_channel(zx_handle_t* out_borrowed) {

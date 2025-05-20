@@ -92,5 +92,27 @@ echo -n "test45678abcdef_12345678" > ${MOUNT_PATH}/fscrypt/a/b/inlined
 dd if=/dev/zero bs=4096 count=1 of=${MOUNT_PATH}/fscrypt/a/b/regular
 ln -s "inlined" ${MOUNT_PATH}/fscrypt/a/b/symlink
 
+# Test filenames of different lengths to ensure we use a compatible proxy
+# filename scheme.
+LONG_NAME_16=xxxxxxxxyyyyyyyy
+LONG_NAME_32=${LONG_NAME_16}${LONG_NAME_16}
+LONG_NAME_64=${LONG_NAME_32}${LONG_NAME_32}
+LONG_NAME_128=${LONG_NAME_64}${LONG_NAME_64}
+LONG_NAME_192=${LONG_NAME_128}${LONG_NAME_64}
+touch ${MOUNT_PATH}/fscrypt/1
+touch ${MOUNT_PATH}/fscrypt/12
+touch ${MOUNT_PATH}/fscrypt/123
+touch ${MOUNT_PATH}/fscrypt/1234
+touch ${MOUNT_PATH}/fscrypt/12345
+touch ${MOUNT_PATH}/fscrypt/${LONG_NAME_192}
+
+# The same as above, but using a key policy that would be used in the emmc_optimized case.
+mkdir ${MOUNT_PATH}/fscrypt_lblk32
+fscryptctl set_policy --padding=16 --iv-ino-lblk-32 ${KEY_IDENTIFIER} ${MOUNT_PATH}/fscrypt_lblk32
+echo -n "test45678abcdef_12345678" > ${MOUNT_PATH}/fscrypt_lblk32/file
+ln -s "file" ${MOUNT_PATH}/fscrypt_lblk32/symlink
+
 umount ${MOUNT_PATH}
 zstd /tmp/f2fs.img -o ../testdata/f2fs.img.zst
+
+echo "Done!"

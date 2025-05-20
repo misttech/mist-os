@@ -3,7 +3,7 @@
   "content": {
     "files": {
       "meta/intl_property_manager.cm": {
-        "hash": "4500195b3321348adbb43cc7b097342b2cd0bd6800889c89cc80714390d894e9"
+        "hash": "161c0187d23a6cf53d4f76270e98825adaa5a04a9126d5d8c1e659742a01db11"
       },
       "meta/intl_property_manager_without_flags.cm": {
         "hash": "e5fc46925d0c33cd7441d11f918439400ed6d11c7b57b3a7386cff327f14a74c"

@@ -9,7 +9,7 @@ pub struct Baz {
 }
 
 impl ::fidl_next::Encodable for Baz {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireBaz> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next_test_middle::Bar as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
@@ -25,7 +25,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -36,24 +36,47 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.g, encoder, g)?;
+        ::fidl_next::Encode::encode(self.g, encoder, g)?;
 
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<Baz> {
-    type EncodedOption = ::fidl_next::WireBox<WireBaz>;
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Baz
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                g,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.g, encoder, g)?;
+
+        Ok(())
+    }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Baz>
+impl ::fidl_next::EncodableOption for Baz {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireBaz>;
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Baz
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Baz: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -68,17 +91,48 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireBaz> for Baz {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Baz
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Baz: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+impl ::fidl_next::FromWire<WireBaz> for Baz {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireBaz, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next_test_middle::Bar as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+            true && <::fidl_next_test_middle::Bar as ::fidl_next::FromWire<
+                ::fidl_next_test_middle::WireBar,
+            >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireBaz) -> Self {
-        Self { g: ::fidl_next::TakeFrom::take_from(&from.g) }
+    fn from_wire(wire: WireBaz) -> Self {
+        Self { g: ::fidl_next::FromWire::from_wire(wire.g) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireBaz> for Baz {
+    #[inline]
+    fn from_wire_ref(wire: &WireBaz) -> Self {
+        Self { g: ::fidl_next::FromWireRef::from_wire_ref(&wire.g) }
     }
 }
 
@@ -89,7 +143,9 @@ pub struct WireBaz {
     pub g: ::fidl_next_test_middle::WireBar,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBaz {
+unsafe impl ::fidl_next::Wire for WireBaz {
+    type Decoded<'de> = WireBaz;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -116,12 +172,4 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireBaz> for ::fidl_test_transitivedependencies::Baz {
-        #[inline]
-        fn take_from(from: &crate::WireBaz) -> Self {
-            Self { g: ::fidl_next::TakeFrom::take_from(&from.g) }
-        }
-    }
-}
+pub mod compat {}

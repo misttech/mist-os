@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include "src/developer/forensics/utils/purge_memory.h"
 #include "src/lib/files/path.h"
 
 namespace forensics {
@@ -17,6 +18,12 @@ namespace system_log_recorder {
 // No rate limiting in the first minute of recording to allow us to catch up on all the log
 // messages prior to listening.
 constexpr zx::duration kNoRateLimitDuration = zx::sec(60);
+
+// 150 seconds was chosen as an appropriate delay in https://fxbug.dev/397695466. Experiments showed
+// memory usage staying low after an initial surge of usage within the first 150 seconds. This surge
+// could be due to the initial snapshot of logs from Diagnostics or due to rate limiting being
+// disabled for the first 60 seconds.
+constexpr zx::duration kPurgeMemoryDuration = zx::sec(150);
 
 SystemLogRecorder::SystemLogRecorder(async_dispatcher_t* archive_dispatcher,
                                      async_dispatcher_t* write_dispatcher,
@@ -39,6 +46,8 @@ void SystemLogRecorder::Start() {
 
   async::PostDelayedTask(
       archive_dispatcher_, [this] { store_.TurnOnRateLimiting(); }, kNoRateLimitDuration);
+
+  PurgeAllMemoryAfter(archive_dispatcher_, kPurgeMemoryDuration);
 }
 
 void SystemLogRecorder::Flush(const std::optional<std::string>& message) {

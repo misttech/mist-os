@@ -7,7 +7,6 @@
 source_set("tests") {
   sources = [ "kconcurrent-tests.cc" ]
   deps = [
-    "//sdk/lib/stdcompat",
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/kconcurrent",
     "//zircon/kernel/lib/unittest",

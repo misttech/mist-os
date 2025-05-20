@@ -10,7 +10,7 @@ using fuchsia.diagnostics.types;
 const MAX_LOG_SELECTORS uint8 = 64;
 
 /// A specified Interest coupled with its designated target,
-@available(replaced=NEXT)
+@available(replaced=27)
 type LogInterestSelector = struct {
     /// Matches the components for which the interest will be requested.
     selector ComponentSelector;
@@ -19,7 +19,7 @@ type LogInterestSelector = struct {
     interest Interest;
 };
 
-@available(added=NEXT)
+@available(added=27)
 type LogInterestSelector = struct {
     /// Matches the components for which the interest will be requested.
     selector ComponentSelector;
@@ -52,7 +52,7 @@ closed protocol LogSettings {
     /// When the connection to `LogSettings` is finished, the interests are
     /// undone. Each matched component minimum interest is updated with the
     /// new minimum interest in the set.
-    @available(added=12, removed=NEXT)
+    @available(added=12, removed=27)
     strict SetInterest(struct {
         selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;
     }) -> ();
@@ -72,7 +72,7 @@ closed protocol LogSettings {
     /// When the connection to `LogSettings` is finished, the interests are
     /// undone, unless persist is set to true. Each matched component minimum
     /// interest is updated with the new minimum interest in the set.
-    @available(added=NEXT)
+    @available(added=27)
     strict SetComponentInterest(table {
         /// List of selectors. Required.
         1: selectors vector<LogInterestSelector>:MAX_LOG_SELECTORS;

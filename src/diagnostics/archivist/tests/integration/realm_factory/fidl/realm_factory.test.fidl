@@ -29,9 +29,9 @@ type ComponentInitialInterest = table {
     /// The moniker to which this interest applies.
     1: moniker string:MAX;
     /// The initial severity for this moniker.
-    @available(replaced=NEXT)
+    @available(replaced=27)
     2: log_severity fuchsia.diagnostics.Severity;
-    @available(added=NEXT)
+    @available(added=27)
     2: log_severity fuchsia.diagnostics.types.Severity;
 };
 

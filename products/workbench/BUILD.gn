@@ -29,13 +29,9 @@ if (current_cpu == "x64") {
     bazel_recovery_image_target = "//products/zedboot:x64"
     bazel_elf_sizes_target = "//products/workbench:elf_sizes.x64"
     bazel_inputs_from_gn = [
+      "//boards/x64:x64.bazel_input",
       "//build/images/flash:esp.bazel_input",
       "//products/workbench/workbench_session:workbench_session_bazel_inputs",
-
-      # Add the board configuration as a dependency via the GN arg, as vendor-
-      # repo boards can shadow the ones in //boards.
-      get_label_info(board_configuration_label, "label_no_toolchain") +
-          ".bazel_input",
     ]
   }
 }
@@ -51,13 +47,9 @@ if (current_cpu == "arm64") {
     bazel_recovery_image_target = "//products/zedboot:arm64"
     bazel_elf_sizes_target = "//products/workbench:elf_sizes.arm64"
     bazel_inputs_from_gn = [
+      "//boards/arm64:arm64.bazel_input",
       "//build/images/flash:esp.bazel_input",
       "//products/workbench/workbench_session:workbench_session_bazel_inputs",
-
-      # Add the board configuration as a dependency via the GN arg, as vendor-
-      # repo boards can shadow the ones in //boards.
-      get_label_info(board_configuration_label, "label_no_toolchain") +
-          ".bazel_input",
     ]
   }
 

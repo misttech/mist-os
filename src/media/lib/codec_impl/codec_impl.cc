@@ -12,13 +12,13 @@
 #include <lib/media/codec_impl/codec_impl.h>
 #include <lib/media/codec_impl/codec_vmo_range.h>
 #include <lib/media/codec_impl/log.h>
-#include <lib/stdcompat/optional.h>
-#include <lib/stdcompat/variant.h>
 #include <threads.h>
 #include <zircon/compiler.h>
 #include <zircon/threads.h>
 
 #include <mutex>
+#include <optional>
+#include <variant>
 
 #include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/macros.h>
@@ -2058,7 +2058,7 @@ void CodecImpl::EnsureBuffersNotConfigured(std::unique_lock<std::mutex>& lock, C
   // This ~FakeMapRange (which calls zx::vmar::destroy()) is among the motivations for calling
   // EnsureBuffersNotConfigured() during the Unbind() sequence / during ~CodecImpl.
   if (fake_map_range_[port]) {
-    fake_map_range_[port] = cpp17::nullopt;
+    fake_map_range_[port] = std::nullopt;
   }
 
   all_packets_[port].clear();
@@ -3309,17 +3309,17 @@ bool CodecImpl::IsDecryptor() const { return params_.index() == 2; }
 
 const fuchsia::mediacodec::CreateDecoder_Params& CodecImpl::decoder_params() const {
   ZX_DEBUG_ASSERT(IsDecoder());
-  return cpp17::get<fuchsia::mediacodec::CreateDecoder_Params>(params_);
+  return std::get<fuchsia::mediacodec::CreateDecoder_Params>(params_);
 }
 
 const fuchsia::mediacodec::CreateEncoder_Params& CodecImpl::encoder_params() const {
   ZX_DEBUG_ASSERT(IsEncoder());
-  return cpp17::get<fuchsia::mediacodec::CreateEncoder_Params>(params_);
+  return std::get<fuchsia::mediacodec::CreateEncoder_Params>(params_);
 }
 
 const fuchsia::media::drm::DecryptorParams& CodecImpl::decryptor_params() const {
   ZX_DEBUG_ASSERT(IsDecryptor());
-  return cpp17::get<fuchsia::media::drm::DecryptorParams>(params_);
+  return std::get<fuchsia::media::drm::DecryptorParams>(params_);
 }
 
 void CodecImpl::LogEvent(

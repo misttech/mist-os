@@ -17,7 +17,7 @@
 #include <explicit-memory/bytes.h>
 #include <kernel/mutex.h>
 #include <ktl/atomic.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <openssl/chacha.h>
 #include <openssl/sha.h>
 

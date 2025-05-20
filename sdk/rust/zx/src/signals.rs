@@ -82,6 +82,7 @@ bitflags! {
         const CLOCK_UPDATED       = ZX_CLOCK_UPDATED;
 
         // Counter
+        const COUNTER_SIGNALED    = ZX_COUNTER_SIGNALED;
         const COUNTER_POSITIVE    = ZX_COUNTER_POSITIVE;
         const COUNTER_NON_POSITIVE    = ZX_COUNTER_NON_POSITIVE;
 
@@ -107,6 +108,7 @@ bitflags! {
 
         // Iob
         const IOB_PEER_CLOSED = ZX_IOB_PEER_CLOSED;
+        const IOB_SHARED_REGION_UPDATED = ZX_IOB_SHARED_REGION_UPDATED;
 
         // Job
         const JOB_TERMINATED   = ZX_JOB_TERMINATED;

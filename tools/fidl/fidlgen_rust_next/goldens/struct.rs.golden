@@ -10,7 +10,7 @@ pub struct BasicStruct {
 }
 
 impl ::fidl_next::Encodable for BasicStruct {
-    type Encoded = WireBasicStruct;
+    type Encoded = WireBasicStruct<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for BasicStruct
@@ -21,7 +21,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -33,26 +33,54 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.x, encoder, x)?;
+        ::fidl_next::Encode::encode(self.x, encoder, x)?;
 
-        ::fidl_next::Encode::encode(&mut self.y, encoder, y)?;
+        ::fidl_next::Encode::encode(self.y, encoder, y)?;
 
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<BasicStruct> {
-    type EncodedOption = ::fidl_next::WireBox<WireBasicStruct>;
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for BasicStruct
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                x,
+                y,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.x, encoder, x)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.y, encoder, y)?;
+
+        Ok(())
+    }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<BasicStruct>
+impl ::fidl_next::EncodableOption for BasicStruct {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireBasicStruct<'static>>;
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for BasicStruct
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     BasicStruct: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -67,13 +95,46 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireBasicStruct> for BasicStruct {
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for BasicStruct
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    BasicStruct: ::fidl_next::EncodeRef<___E>,
+{
     #[inline]
-    fn take_from(from: &WireBasicStruct) -> Self {
-        Self {
-            x: ::fidl_next::TakeFrom::take_from(&from.x),
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
 
-            y: ::fidl_next::TakeFrom::take_from(&from.y),
+        Ok(())
+    }
+}
+
+impl<'de> ::fidl_next::FromWire<WireBasicStruct<'de>> for BasicStruct {
+    #[inline]
+    fn from_wire(wire: WireBasicStruct<'de>) -> Self {
+        Self {
+            x: ::fidl_next::FromWire::from_wire(wire.x),
+
+            y: ::fidl_next::FromWire::from_wire(wire.y),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireBasicStruct<'de>> for BasicStruct {
+    #[inline]
+    fn from_wire_ref(wire: &WireBasicStruct<'de>) -> Self {
+        Self {
+            x: ::fidl_next::FromWireRef::from_wire_ref(&wire.x),
+
+            y: ::fidl_next::FromWireRef::from_wire_ref(&wire.y),
         }
     }
 }
@@ -81,13 +142,15 @@ impl ::fidl_next::TakeFrom<WireBasicStruct> for BasicStruct {
 /// The wire type corresponding to [`BasicStruct`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireBasicStruct {
+pub struct WireBasicStruct<'de> {
     pub x: ::fidl_next::WireU32,
 
-    pub y: ::fidl_next::WireString,
+    pub y: ::fidl_next::WireString<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBasicStruct {
+unsafe impl ::fidl_next::Wire for WireBasicStruct<'static> {
+    type Decoded<'de> = WireBasicStruct<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         unsafe {
@@ -96,7 +159,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireBasicStruct {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireBasicStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireBasicStruct<'static>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -131,7 +194,7 @@ pub struct Simple {
 }
 
 impl ::fidl_next::Encodable for Simple {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireSimple> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <u8 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
@@ -147,7 +210,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -159,26 +222,52 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.f1, encoder, f1)?;
+        ::fidl_next::Encode::encode(self.f1, encoder, f1)?;
 
-        ::fidl_next::Encode::encode(&mut self.f2, encoder, f2)?;
+        ::fidl_next::Encode::encode(self.f2, encoder, f2)?;
 
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<Simple> {
-    type EncodedOption = ::fidl_next::WireBox<WireSimple>;
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for Simple
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                f1,
+                f2,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.f1, encoder, f1)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.f2, encoder, f2)?;
+
+        Ok(())
+    }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<Simple>
+impl ::fidl_next::EncodableOption for Simple {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireSimple>;
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Simple
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     Simple: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -193,20 +282,53 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireSimple> for Simple {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for Simple
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    Simple: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+impl ::fidl_next::FromWire<WireSimple> for Simple {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireSimple, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <u8 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <u8 as ::fidl_next::FromWire<u8>>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::FromWire<bool>>::COPY_OPTIMIZATION.is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireSimple) -> Self {
+    fn from_wire(wire: WireSimple) -> Self {
         Self {
-            f1: ::fidl_next::TakeFrom::take_from(&from.f1),
+            f1: ::fidl_next::FromWire::from_wire(wire.f1),
 
-            f2: ::fidl_next::TakeFrom::take_from(&from.f2),
+            f2: ::fidl_next::FromWire::from_wire(wire.f2),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireSimple> for Simple {
+    #[inline]
+    fn from_wire_ref(wire: &WireSimple) -> Self {
+        Self {
+            f1: ::fidl_next::FromWireRef::from_wire_ref(&wire.f1),
+
+            f2: ::fidl_next::FromWireRef::from_wire_ref(&wire.f2),
         }
     }
 }
@@ -220,7 +342,9 @@ pub struct WireSimple {
     pub f2: bool,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireSimple {
+unsafe impl ::fidl_next::Wire for WireSimple {
+    type Decoded<'de> = WireSimple;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -250,27 +374,4 @@ where
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireBasicStruct> for ::fidl_test_struct::BasicStruct {
-        #[inline]
-        fn take_from(from: &crate::WireBasicStruct) -> Self {
-            Self {
-                x: ::fidl_next::TakeFrom::take_from(&from.x),
-
-                y: ::fidl_next::TakeFrom::take_from(&from.y),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireSimple> for ::fidl_test_struct::Simple {
-        #[inline]
-        fn take_from(from: &crate::WireSimple) -> Self {
-            Self {
-                f1: ::fidl_next::TakeFrom::take_from(&from.f1),
-
-                f2: ::fidl_next::TakeFrom::take_from(&from.f2),
-            }
-        }
-    }
-}
+pub mod compat {}

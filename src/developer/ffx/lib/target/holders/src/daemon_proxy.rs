@@ -5,6 +5,7 @@
 use crate::init_connection_behavior;
 use async_trait::async_trait;
 use ffx_command_error::{user_error, Error, FfxContext as _, Result};
+use ffx_target::fho::target_interface;
 use fho::{FhoEnvironment, TryFromEnv, TryFromEnvWith};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
@@ -31,14 +32,16 @@ impl From<ffx_fidl::DaemonProxy> for DaemonProxyHolder {
 #[async_trait(?Send)]
 impl TryFromEnv for DaemonProxyHolder {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
+        let target_env = target_interface(env);
+        if target_env.behavior().is_none() {
             let b = init_connection_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
+            target_env.set_behavior(b);
         }
         // Might need to revisit whether it's necessary to cast every daemon_factory() invocation
         // into a user error. This line originally casted every error into "Failed to create daemon
         // proxy", which obfuscates the original error.
-        env.injector::<Self>()
+        target_env
+            .injector::<Self>(env)
             .await?
             .daemon_factory()
             .await

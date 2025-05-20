@@ -50,7 +50,10 @@ func (f *FFXTool) IsolateDir() IsolateDir {
 }
 
 func (f *FFXTool) StopDaemon(ctx context.Context) error {
-	args := []string{"daemon", "stop", "--wait"}
+	// TODO(https://fxbug.dev/415899721): We put a time
+	// limit because the command fails when run inside an nsjail.
+	// Remove when bug is fixed.
+	args := []string{"daemon", "stop", "-t", "4000"}
 	_, err := f.runFFXCmd(ctx, args...)
 	return err
 }
@@ -203,6 +206,43 @@ func (f *FFXTool) TargetGetSshTime(ctx context.Context, target string) (time.Dur
 	return monotonicTime, nil
 }
 
+func (f *FFXTool) TargetUpdateChannelSet(ctx context.Context, channel string) error {
+	args := []string{
+		"target",
+		"update",
+		"channel",
+		"set",
+		channel,
+	}
+
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
+}
+
+func (f *FFXTool) TargetUpdateCheckNowMonitor(ctx context.Context) ([]byte, error) {
+	args := []string{
+		"target",
+		"update",
+		"check-now",
+		"--monitor",
+	}
+
+	return f.runFFXCmd(ctx, args...)
+}
+
+func (f *FFXTool) TargetUpdateForceInstallNoReboot(ctx context.Context, url string) error {
+	args := []string{
+		"target",
+		"update",
+		"force-install",
+		url,
+		"--reboot",
+		"false",
+	}
+
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
+}
 func (f *FFXTool) Flasher() *Flasher {
 	return newFlasher(f)
 }

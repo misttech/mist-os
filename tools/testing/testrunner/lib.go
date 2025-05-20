@@ -33,6 +33,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
+	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 	"go.fuchsia.dev/fuchsia/tools/testing/testparser"
@@ -266,7 +267,7 @@ func execute(
 	}
 
 	var finalError error
-	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir); err != nil {
+	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir, fuchsiaTester); err != nil {
 		finalError = err
 	}
 
@@ -380,6 +381,7 @@ func runAndOutputTests(
 	testerForTest func(testsharder.Test) (Tester, *[]runtests.DataSinkReference, error),
 	outputs *TestOutputs,
 	globalOutDir string,
+	fuchsiaTester Tester,
 ) error {
 	// Since only a single goroutine writes to and reads from the queue it would
 	// be more appropriate to use a true Queue data structure, but we'd need to
@@ -398,7 +400,18 @@ func runAndOutputTests(
 	// a length check within the loop body anyway, and it's more robust to put
 	// the length check in the for loop condition.
 	testIndex := 0
+	shouldRunHealthCheck := false
+	againstDevice := (os.Getenv(botanistconstants.NodenameEnvKey) != targets.DefaultEmulatorNodename &&
+		os.Getenv(botanistconstants.NodenameEnvKey) != "")
 	for len(testQueue) > 0 {
+		if shouldRunHealthCheck && fuchsiaTester != nil {
+			if err := runHealthCheck(ctx, fuchsiaTester); err != nil {
+				// Device is in a bad state and cannot run any more tests,
+				// so fail and return early.
+				return fmt.Errorf("failed to run health check: %w", err)
+			}
+			shouldRunHealthCheck = false
+		}
 		test := <-testQueue
 
 		t, sinks, err := testerForTest(test.Test)
@@ -435,6 +448,9 @@ func runAndOutputTests(
 		}
 		testIndex++
 
+		if againstDevice && !result.Passed() {
+			shouldRunHealthCheck = true
+		}
 		if shouldKeepGoing(test.Test, result, test.totalDuration) {
 			// Schedule the test to be run again.
 			testQueue <- test
@@ -474,6 +490,29 @@ func retryOnConnectionFailure(ctx context.Context, t Tester, execFunc func() err
 		}
 		return retry.Fatal(err)
 	}, nil)
+}
+
+func runHealthCheck(ctx context.Context, t Tester) error {
+	if err := t.Reconnect(ctx); err == nil {
+		return nil
+	}
+	r := &subprocess.Runner{Env: os.Environ()}
+	if err := setPowerState(ctx, r, "cycle"); err != nil {
+		return fmt.Errorf("failed to power cycle target: %w", err)
+	}
+	return t.Reconnect(ctx)
+}
+
+func setPowerState(ctx context.Context, r *subprocess.Runner, state string) error {
+	cmd := []string{
+		os.Getenv(constants.DMCPathEnvKey),
+		"set-power-state",
+		"--nodename",
+		os.Getenv(botanistconstants.NodenameEnvKey),
+		"--state",
+		state,
+	}
+	return r.Run(ctx, cmd, subprocess.RunOptions{})
 }
 
 // shouldKeepGoing returns whether we should schedule another run of the test.

@@ -45,6 +45,8 @@ using driver_manager::Devfs;
 using driver_manager::DriverRunner;
 using driver_manager::InspectManager;
 
+using OnBindCallback = fit::function<void(std::optional<zx::event>&)>;
+
 static const test_utils::TestPkg::Config kDefaultDriverHostPkgConfig = {
     .main_module = {.test_pkg_path = "/pkg/bin/fake_driver_host_with_bootstrap",
                     .open_path = "bin/driver_host2"},
@@ -204,13 +206,15 @@ struct Driver {
 class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
  public:
   explicit TestDriver(async_dispatcher_t* dispatcher, fidl::ClientEnd<fdfw::Node> node,
-                      fidl::ServerEnd<fdh::Driver> server)
+                      std::optional<zx::event> node_token, fidl::ServerEnd<fdh::Driver> server)
       : dispatcher_(dispatcher),
         stop_handler_([]() {}),
         node_(std::move(node), dispatcher),
+        node_token_(std::move(node_token)),
         driver_binding_(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure) {}
 
   fidl::Client<fdfw::Node>& node() { return node_; }
+  const std::optional<zx::event>& node_token() const { return node_token_; }
 
   using StopHandler = fit::function<void()>;
   void SetStopHandler(StopHandler handler) { stop_handler_ = std::move(handler); }
@@ -227,12 +231,13 @@ class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
 
   std::shared_ptr<CreatedChild> AddChild(
       fdfw::NodeAddArgs child_args, bool owned, bool expect_error,
-      fit::function<void()> on_bind = []() {});
+      OnBindCallback on_bind = [](std::optional<zx::event>&) {});
 
  private:
   async_dispatcher_t* dispatcher_;
   StopHandler stop_handler_;
   fidl::Client<fdfw::Node> node_;
+  std::optional<zx::event> node_token_;
   fidl::ServerBinding<fdh::Driver> driver_binding_;
   bool dont_close_binding_in_stop_ = false;
 

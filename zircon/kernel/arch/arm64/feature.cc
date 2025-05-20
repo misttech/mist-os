@@ -24,7 +24,7 @@ uint32_t arm64_isa_features;
 // Whether FEAT_PMUv3 is implemented.
 bool feat_pmuv3_enabled;
 
-static arm64_cache_info_t cache_info[SMP_MAX_CPUS];
+static arm64_cache_info cache_info[SMP_MAX_CPUS];
 
 // MMU features
 struct arm64_mmu_features arm64_mmu_features;
@@ -34,7 +34,7 @@ uint32_t arm64_zva_size = 32;
 uint32_t arm64_icache_size = 32;
 uint32_t arm64_dcache_size = 32;
 
-void arm64_get_cache_info(arm64_cache_info_t* info) {
+void arm64_get_cache_info(arm64_cache_info* info) {
   *info = {};
 
   uint64_t clidr = __arm_rsr64("clidr_el1");
@@ -57,7 +57,7 @@ void arm64_get_cache_info(arm64_cache_info_t* info) {
     __arm_wsr64("csselr_el1", (level << 1) | (instruction ? 1 : 0));  // Select cache level
     __isb(ARM_MB_SY);
 
-    arm64_cache_desc_t* desc =
+    arm64_cache_desc* desc =
         instruction ? &info->level_inst_type[level] : &info->level_data_type[level];
     desc->ctype = ctype;
 
@@ -95,7 +95,7 @@ void arm64_get_cache_info(arm64_cache_info_t* info) {
 }
 
 void arm64_dump_cache_info(cpu_num_t cpu) {
-  arm64_cache_info_t* info = &(cache_info[cpu]);
+  arm64_cache_info* info = &(cache_info[cpu]);
   printf("==== ARM64 CACHE INFO CORE %u ====\n", cpu);
   printf("Inner Boundary = L%u\n", info->inner_boundary);
   printf("Level of Unification Uniprocessor = L%u\n", info->lou_u);

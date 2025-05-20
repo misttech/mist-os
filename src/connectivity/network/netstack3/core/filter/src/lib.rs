@@ -31,6 +31,7 @@ pub use conntrack::{
 };
 pub use context::{
     FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
+    SocketEgressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext,
 };
 pub use logic::{
     FilterHandler, FilterImpl, FilterTimerId, IngressVerdict, ProofOfEgressCheck, Verdict,

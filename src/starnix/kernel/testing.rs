@@ -4,7 +4,10 @@
 
 use crate::container_namespace::ContainerNamespace;
 use crate::device::mem::new_null_file;
-use crate::execution::execute_task_with_prerun_result;
+use crate::execution::{
+    create_init_child_process, create_init_process, create_system_task,
+    execute_task_with_prerun_result,
+};
 use crate::fs::fuchsia::RemoteFs;
 use crate::fs::tmpfs::TmpFs;
 use crate::mm::syscalls::{do_mmap, sys_mremap};
@@ -100,7 +103,7 @@ where
         + Sync
         + 'static,
 {
-    let security_server = SecurityServer::new();
+    let security_server = SecurityServer::new_default();
     let security_server_for_callback = security_server.clone();
     spawn_kernel_and_run_internal(
         move |unlocked, current_task| {
@@ -188,7 +191,7 @@ fn create_test_init_task(
 ) -> TaskBuilder {
     let init_pid = kernel.pids.write().allocate_pid();
     assert_eq!(init_pid, 1);
-    let init_task = CurrentTask::create_init_process(
+    let init_task = create_init_process(
         locked,
         kernel,
         init_pid,
@@ -199,8 +202,7 @@ fn create_test_init_task(
     .expect("failed to create first task");
     init_task.mm().unwrap().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
-    let system_task =
-        CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
+    let system_task = create_system_task(locked, kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
     let system_task = kernel.kthreads.system_task();
@@ -247,11 +249,11 @@ pub fn create_task(
     kernel: &Arc<Kernel>,
     task_name: &str,
 ) -> AutoReleasableTask {
-    let task = CurrentTask::create_init_child_process(
+    let task = create_init_child_process(
         locked,
         kernel,
         &CString::new(task_name).unwrap(),
-        None,
+        Some(&CString::new("#kernel").unwrap()),
     )
     .expect("failed to create second task");
     task.mm().unwrap().initialize_mmap_layout_for_test(ArchWidth::Arch64);
@@ -520,7 +522,7 @@ impl<'a> UserMemoryWriter<'a> {
         let bytes_written = self.mm.write_memory(self.current_addr, data).unwrap();
         assert_eq!(bytes_written, data.len());
         let start_addr = self.current_addr;
-        self.current_addr += bytes_written;
+        self.current_addr = (self.current_addr + bytes_written).unwrap();
         start_addr
     }
 

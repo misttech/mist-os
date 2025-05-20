@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_time_AllInstantsTable;
 const fidl_type_t* AllInstants::FidlType = &test_time_AllInstantsTable;
 
 void AllInstants::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<AllInstants>::value) {
     memcpy(_encoder->template GetPtr<AllInstants>(_offset), this, sizeof(AllInstants));
   } else {
@@ -179,7 +179,7 @@ ComplexInstants& ComplexInstants::set_boot_ticks(::std::array<::fidl::basic_tick
 }
 
 void ComplexInstants::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;

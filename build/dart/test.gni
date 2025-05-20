@@ -26,6 +26,10 @@ import("//build/testing/test_spec.gni")
 #     Optional: List of labels this package depends on that are not Dart
 #       packages.
 #
+#   package_deps
+#     Optional: List of `fuchsia_package` labels needed by the test at runtime.
+#       See //build/testing/test_spec.gni for more details.
+#
 #   environments
 #     Optional: What environments this test should target. Only used here for
 #       linux and mac tests, with a default value of a general linux/mac
@@ -185,6 +189,7 @@ template("dart_test") {
     forward_variables_from(invoker,
                            [
                              "environments",
+                             "isolated",
                              "package_deps",
                              "timeout_secs",
                            ])

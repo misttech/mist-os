@@ -51,7 +51,7 @@ def _instantiate_from_local_dir(ctx, local_clang):
                 # buildifier: disable=print
                 print("### Ignoring %s value, path should be relative to workspace root: %s" % (_LOCAL_FUCHSIA_CLANG_VERSION_FILE, version_file))
             else:
-                ctx.path(Label("@//:" + version_file))
+                ctx.path("%s/%s" % (ctx.workspace_root, version_file))
 
 def _instantiate_from_local_fuchsia_tree(ctx):
     # Copies clang prebuilt from a local Fuchsia platform tree.

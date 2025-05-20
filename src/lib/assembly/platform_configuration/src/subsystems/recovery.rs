@@ -38,10 +38,10 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                 .context("getting gen dir for factory-reset-trigger config file")?
                 .join("forced-fdr-channel-indices.config");
             let config_file = File::create(&config_file_path).with_context(|| {
-                format!("Creating factory-reset-trigger config file: {}", config_file_path)
+                format!("Creating factory-reset-trigger config file: {config_file_path}")
             })?;
             serde_json::to_writer_pretty(config_file, &config).with_context(|| {
-                format!("Writing factory-reset-trigger config file: {}", config_file_path)
+                format!("Writing factory-reset-trigger config file: {config_file_path}")
             })?;
 
             builder
@@ -53,7 +53,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                 .context("Adding factory-reset-trigger config data entry")?;
         }
 
-        if *context.feature_set_level == FeatureSupportLevel::Standard
+        if *context.feature_set_level == FeatureSetLevel::Standard
             || config.system_recovery.is_some()
         {
             // factory_reset is required by the standard feature set level, and when system_recovery
@@ -77,9 +77,14 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
         )?;
 
         if let Some(system_recovery) = &config.system_recovery {
-            context.ensure_feature_set_level(&[FeatureSupportLevel::Utility], "System Recovery")?;
+            context.ensure_feature_set_level(&[FeatureSetLevel::Utility], "System Recovery")?;
             match system_recovery {
                 SystemRecovery::Fdr => builder.platform_bundle("recovery_fdr"),
+                SystemRecovery::Android => {
+                    builder.platform_bundle("recovery_android");
+                    builder.platform_bundle("fastbootd_usb_support");
+                    builder.platform_bundle("adb_support");
+                }
             }
 
             // Create the recovery domain configuration package

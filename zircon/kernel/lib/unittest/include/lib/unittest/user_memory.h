@@ -9,8 +9,8 @@
 
 #include <lib/user_copy/user_ptr.h>
 
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/pmm.h>
 #include <vm/scanner.h>
 #include <vm/vm.h>

@@ -4,6 +4,9 @@
 
 mod crash_reporter;
 mod executor;
+mod table;
+mod task_creation;
 
 pub use crash_reporter::*;
 pub use executor::*;
+pub use task_creation::*;

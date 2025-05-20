@@ -13,7 +13,7 @@ use netstack3_base::sync::{RwLock, WeakRc};
 use netstack3_base::{
     CoreTimerContext, Device, DeviceIdContext, Inspectable, TimerContext, WeakDeviceIdentifier,
 };
-use netstack3_ip::device::{DualStackIpDeviceState, IpAddressIdSpec, IpDeviceTimerId};
+use netstack3_ip::device::{DualStackIpDeviceState, IpDeviceTimerId};
 use netstack3_ip::RawMetric;
 
 use crate::internal::base::{DeviceCounters, DeviceLayerTypes, OriginTracker};
@@ -89,9 +89,8 @@ impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
     /// Create a new `IpLinkDeviceState` with a link-specific state `link`.
     pub fn new<
         D: WeakDeviceIdentifier,
-        A: IpAddressIdSpec,
-        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, A>, BC>
-            + CoreTimerContext<IpDeviceTimerId<Ipv4, D, A>, BC>,
+        CC: CoreTimerContext<IpDeviceTimerId<Ipv6, D, BC>, BC>
+            + CoreTimerContext<IpDeviceTimerId<Ipv4, D, BC>, BC>,
     >(
         bindings_ctx: &mut BC,
         device_id: D,
@@ -100,7 +99,7 @@ impl<T, BC: DeviceLayerTypes + TimerContext> IpLinkDeviceStateInner<T, BC> {
         origin: OriginTracker,
     ) -> Self {
         Self {
-            ip: DualStackIpDeviceState::new::<D, A, CC>(bindings_ctx, device_id, metric),
+            ip: DualStackIpDeviceState::new::<D, CC>(bindings_ctx, device_id, metric),
             link,
             origin,
             sockets: RwLock::new(HeldDeviceSockets::default()),

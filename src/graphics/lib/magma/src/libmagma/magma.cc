@@ -94,6 +94,13 @@ magma_status_t magma_connection_create_context(magma_connection_t connection,
   return magma::PlatformConnectionClient::cast(connection)->CreateContext(context_id_out);
 }
 
+magma_status_t magma_connection_create_context2(magma_connection_t connection,
+                                                magma_priority_t priority,
+                                                uint32_t* context_id_out) {
+  return magma::PlatformConnectionClient::cast(connection)
+      ->CreateContext2(context_id_out, priority);
+}
+
 void magma_connection_release_context(magma_connection_t connection, uint32_t context_id) {
   magma::PlatformConnectionClient::cast(connection)->DestroyContext(context_id);
 }

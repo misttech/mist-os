@@ -62,11 +62,7 @@ mod test {
             let payload_max = payload_size_for_order(order);
             assert!(
                 payload_size <= payload_max,
-                "Needed {} bytes for a payload, but only got {}; block size {}, order {}",
-                payload_size,
-                payload_max,
-                block_size,
-                order
+                "Needed {payload_size} bytes for a payload, but only got {payload_max}; block size {block_size}, order {order}"
             );
         }
     }

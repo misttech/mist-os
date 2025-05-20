@@ -22,6 +22,8 @@ ZX_ERR_INTERNAL = fuchsia_controller_py.ZxStatus.ZX_ERR_INTERNAL
 
 
 class RtcFcTests(unittest.TestCase):
+    """Unit tests for the rtc_using_fc.RtcUsingFc class."""
+
     def setUp(self) -> None:
         self.m_run = self.enterContext(mock.patch.object(asyncio, "run"))
         self.m_proxy = self.enterContext(
@@ -35,7 +37,7 @@ class RtcFcTests(unittest.TestCase):
             affordances_capable.RebootCapableDevice
         )
 
-        self.rtc = rtc_using_fc.RtcUisngFc(self.transport, self.reboot_af)
+        self.rtc = rtc_using_fc.RtcUsingFc(self.transport, self.reboot_af)
         self.transport.connect_device_proxy.assert_called_once()
         self.reboot_af.register_for_on_device_boot.assert_called_once()
 
@@ -48,17 +50,17 @@ class RtcFcTests(unittest.TestCase):
             ZX_OK,
         ]
 
-        _ = rtc_using_fc.RtcUisngFc(self.transport, self.reboot_af)
+        _ = rtc_using_fc.RtcUsingFc(self.transport, self.reboot_af)
         self.assertEqual(self.transport.connect_device_proxy.call_count, 2)
         self.reboot_af.register_for_on_device_boot.assert_called_once()
 
         (ep1,), _ = self.transport.connect_device_proxy.call_args_list[0]
         (ep2,), _ = self.transport.connect_device_proxy.call_args_list[1]
 
-        self.assertEqual(rtc_using_fc.RtcUisngFc.MONIKER_OLD, ep1.moniker)
+        self.assertEqual(rtc_using_fc.RtcUsingFc.MONIKER_OLD, ep1.moniker)
         self.assertEqual(rtc_using_fc.CAPABILITY, ep1.protocol)
 
-        self.assertEqual(rtc_using_fc.RtcUisngFc.MONIKER_NEW, ep2.moniker)
+        self.assertEqual(rtc_using_fc.RtcUsingFc.MONIKER_NEW, ep2.moniker)
         self.assertEqual(rtc_using_fc.CAPABILITY, ep2.protocol)
 
     def test_rtc_get(self) -> None:

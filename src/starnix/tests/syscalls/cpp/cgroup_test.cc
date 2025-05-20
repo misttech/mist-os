@@ -109,32 +109,37 @@ class CgroupTest : public ::testing::Test {
     }
   }
 
-  static void CheckFileForLine(const std::string& path, const std::string& line,
-                               const bool should_exist) {
+  static testing::AssertionResult CheckFileForLine(const std::string& path, const std::string& line,
+                                                   const bool should_exist) {
     std::ifstream file(path);
-    ASSERT_TRUE(file.is_open());
+    if (!file.is_open()) {
+      return testing::AssertionFailure() << "Unable to open " << path;
+    }
 
     std::string file_line;
     while (std::getline(file, file_line)) {
       if (line == file_line) {
         if (should_exist) {
-          return;
+          return testing::AssertionSuccess();
         }
-        FAIL() << "Unexpectedly found " << line << " in " << path;
+        return testing::AssertionFailure() << "Unexpectedly found " << line << " in " << path;
       }
     }
 
     if (should_exist) {
-      FAIL() << "Could not find " << line << " in " << path;
+      return testing::AssertionFailure() << "Could not find " << line << " in " << path;
     }
+    return testing::AssertionSuccess();
   }
 
-  static void CheckFileHasLine(const std::string& path, const std::string& line) {
-    CheckFileForLine(path, line, true);
+  static testing::AssertionResult CheckFileHasLine(const std::string& path,
+                                                   const std::string& line) {
+    return CheckFileForLine(path, line, true);
   }
 
-  static void CheckFileDoesNotHaveLine(const std::string& path, const std::string& line) {
-    CheckFileForLine(path, line, false);
+  static testing::AssertionResult CheckFileDoesNotHaveLine(const std::string& path,
+                                                           const std::string& line) {
+    return CheckFileForLine(path, line, false);
   }
 
   void CreateCgroup(std::string path) {
@@ -237,7 +242,7 @@ TEST_F(CgroupTest, MoveProcessToCgroup) {
   std::string pid_string = std::to_string(getpid());
 
   CreateCgroup(child_path);
-  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED));
 
   {
     // Write pid to /child/cgroup.procs
@@ -247,9 +252,9 @@ TEST_F(CgroupTest, MoveProcessToCgroup) {
                 SyscallSucceeds());
   }
 
-  CheckFileDoesNotHaveLine(root_procs_path, pid_string);
-  CheckFileHasLine(child_procs_path, pid_string);
-  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
+  ASSERT_TRUE(CheckFileDoesNotHaveLine(root_procs_path, pid_string));
+  ASSERT_TRUE(CheckFileHasLine(child_procs_path, pid_string));
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_POPULATED));
 
   {
     // Write pid to /cgroup.procs
@@ -258,9 +263,9 @@ TEST_F(CgroupTest, MoveProcessToCgroup) {
     EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
   }
 
-  CheckFileDoesNotHaveLine(child_procs_path, pid_string);
-  CheckFileHasLine(root_procs_path, pid_string);
-  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileDoesNotHaveLine(child_procs_path, pid_string));
+  ASSERT_TRUE(CheckFileHasLine(root_procs_path, pid_string));
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED));
 }
 
 TEST_F(CgroupTest, EventsWithPopulatedChild) {
@@ -275,8 +280,8 @@ TEST_F(CgroupTest, EventsWithPopulatedChild) {
   CreateCgroup(child_path);
   CreateCgroup(grandchild_path);
 
-  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
-  CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED));
+  ASSERT_TRUE(CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED));
 
   {
     // Write pid to /child/grandchild/cgroup.procs
@@ -286,8 +291,8 @@ TEST_F(CgroupTest, EventsWithPopulatedChild) {
                 SyscallSucceeds());
   }
 
-  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
-  CheckFileHasLine(grandchild_events_path, EVENTS_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_POPULATED));
+  ASSERT_TRUE(CheckFileHasLine(grandchild_events_path, EVENTS_POPULATED));
 
   {
     // Write pid to /cgroup.procs
@@ -296,8 +301,8 @@ TEST_F(CgroupTest, EventsWithPopulatedChild) {
     EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
   }
 
-  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
-  CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED));
+  ASSERT_TRUE(CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED));
 }
 
 TEST_F(CgroupTest, PollEvents) {
@@ -312,7 +317,7 @@ TEST_F(CgroupTest, PollEvents) {
   ASSERT_TRUE(events_fd.is_valid());
 
   // Initially, the cgroup should not be populated.
-  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED));
 
   struct pollfd pfd = {.fd = events_fd.get(), .events = POLLPRI};
   fbl::unique_fd procs_fd(open(child_procs_path.c_str(), O_WRONLY));
@@ -324,7 +329,7 @@ TEST_F(CgroupTest, PollEvents) {
   EXPECT_TRUE(pfd.revents & (POLLPRI | POLLERR));
 
   // Verify the populated state has changed.
-  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_POPULATED));
 
   // Now remove the process from the cgroup.
   std::string root_procs_path = root_path() + "/" + PROCS_FILE;
@@ -337,7 +342,7 @@ TEST_F(CgroupTest, PollEvents) {
   EXPECT_TRUE(pfd.revents & (POLLPRI | POLLERR));
 
   // Verify the populated state has changed.
-  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED));
 }
 
 TEST_F(CgroupTest, UnlinkCgroupWithProcess) {
@@ -431,7 +436,7 @@ TEST_F(CgroupTest, KillCgroupWithProcess) {
                 SyscallSucceeds());
   }
 
-  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_POPULATED));
 
   {
     fbl::unique_fd child_kill_fd(open(child_kill_path.c_str(), O_WRONLY));
@@ -440,7 +445,7 @@ TEST_F(CgroupTest, KillCgroupWithProcess) {
   }
 
   EXPECT_TRUE(fork_helper.WaitForChildren());
-  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED));
 }
 
 TEST_F(CgroupTest, KillCgroupWithDescendant) {
@@ -473,7 +478,7 @@ TEST_F(CgroupTest, KillCgroupWithDescendant) {
                 SyscallSucceeds());
   }
 
-  CheckFileHasLine(grandchild_events_path, EVENTS_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(grandchild_events_path, EVENTS_POPULATED));
 
   {
     fbl::unique_fd child_kill_fd(open(grandchild_kill_path.c_str(), O_WRONLY));
@@ -482,7 +487,7 @@ TEST_F(CgroupTest, KillCgroupWithDescendant) {
   }
 
   EXPECT_TRUE(fork_helper.WaitForChildren());
-  CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
+  ASSERT_TRUE(CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED));
 }
 
 TEST_F(CgroupTest, ProcfsCgroup) {
@@ -496,7 +501,7 @@ TEST_F(CgroupTest, ProcfsCgroup) {
   std::string procfs_cgroup_path = "/proc/self/cgroup";
   std::string pid_string = std::to_string(getpid());
 
-  CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + std::string("/"));
+  ASSERT_TRUE(CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + std::string("/")));
 
   CreateCgroup(child_path);
   CreateCgroup(grandchild_path);
@@ -508,7 +513,7 @@ TEST_F(CgroupTest, ProcfsCgroup) {
                 SyscallSucceeds());
   }
 
-  CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + child_path_from_root);
+  ASSERT_TRUE(CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + child_path_from_root));
 
   {
     fbl::unique_fd grandchild_procs_fd(open(grandchild_procs_path.c_str(), O_WRONLY));
@@ -517,7 +522,7 @@ TEST_F(CgroupTest, ProcfsCgroup) {
                 SyscallSucceeds());
   }
 
-  CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + grandchild_path_from_root);
+  ASSERT_TRUE(CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + grandchild_path_from_root));
   {
     fbl::unique_fd procs_fd(open(root_procs_path.c_str(), O_WRONLY));
     ASSERT_TRUE(procs_fd.is_valid());
@@ -570,14 +575,14 @@ TEST_F(CgroupTest, ForkedProcessInheritsCgroup) {
     EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
                 SyscallSucceeds());
   }
-  CheckFileHasLine(procfs_cgroup_path, procfs_cgroup_str);
+  ASSERT_TRUE(CheckFileHasLine(procfs_cgroup_path, procfs_cgroup_str));
 
   test_helper::ForkHelper fork_helper;
   fork_helper.OnlyWaitForForkedChildren();
 
   fork_helper.RunInForkedProcess([&]() {
     // Child process should be in same cgroup as parent.
-    CheckFileHasLine(procfs_cgroup_path, procfs_cgroup_str);
+    EXPECT_TRUE(CheckFileHasLine(procfs_cgroup_path, procfs_cgroup_str));
     return 0;
   });
   EXPECT_TRUE(fork_helper.WaitForChildren());

@@ -13,6 +13,7 @@ group("timekeeper") {
     "adjust",
     "alarms",
     "persistence",
+    "pretty",
   ]
 }
 
@@ -23,6 +24,7 @@ group("tests") {
     "adjust:tests",
     "alarms:tests",
     "persistence:tests",
+    "pretty:tests",
   ]
 }
 
@@ -34,6 +36,7 @@ timekeeper_deps = [
   "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
+  "//sdk/fidl/fuchsia.net.reachability:fuchsia.net.reachability_rust",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
   "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
   "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
@@ -42,6 +45,7 @@ timekeeper_deps = [
   "//sdk/fidl/fuchsia.time.test:fuchsia.time.test_rust",
   "//sdk/lib/device-watcher/rust",
   "//sdk/rust/zx",
+  "//src/lib/async-utils",
   "//src/lib/cobalt/rust/builders",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
@@ -62,6 +66,7 @@ timekeeper_deps = [
   "//src/sys/time/timekeeper/adjust:time_adjust",
   "//src/sys/time/timekeeper/alarms",
   "//src/sys/time/timekeeper/persistence:lib",
+  "//src/sys/time/timekeeper/pretty:time_pretty",
   "//third_party/cobalt/src/lib/client/rust:cobalt-client",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",
@@ -85,6 +90,7 @@ timekeeper_sources = [
   "src/estimator/mod.rs",
   "src/main.rs",
   "src/power_topology_integration.rs",
+  "src/reachability.rs",
   "src/rtc.rs",
   "src/rtc_testing.rs",
   "src/time_source.rs",

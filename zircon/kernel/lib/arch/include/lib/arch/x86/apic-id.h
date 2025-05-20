@@ -8,7 +8,8 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_X86_APIC_ID_H_
 
 #include <lib/arch/x86/cpuid.h>
-#include <lib/stdcompat/bit.h>
+
+#include <bit>
 
 namespace arch {
 
@@ -251,7 +252,7 @@ class ApicIdDecoder {
     return max;
   }
 
-  static size_t CeilLog2(size_t n) { return cpp20::countr_zero(cpp20::bit_ceil(n)); }
+  static size_t CeilLog2(size_t n) { return std::countr_zero(std::bit_ceil(n)); }
 
   static uint32_t ToMask(size_t width) { return ~(uint32_t{0xffffffff} << width); }
 

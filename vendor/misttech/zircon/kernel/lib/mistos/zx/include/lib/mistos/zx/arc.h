@@ -8,7 +8,7 @@
 #include <lib/mistos/zx/object.h>
 
 #include <fbl/ref_counted.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 namespace zx {
 

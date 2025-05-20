@@ -62,7 +62,7 @@ config("compiler") {
   }
 
   if (support_rust) {
-    if (!is_debug) {
+    if (is_release) {
       # https://fxbug.dev/42166874#c15: forcing one codegen unit produces
       # smaller binaries but makes builds slower.
       # Enforce one codegen unit only when we really care about

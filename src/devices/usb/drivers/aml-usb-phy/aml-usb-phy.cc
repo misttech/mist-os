@@ -4,8 +4,6 @@
 
 #include "src/devices/usb/drivers/aml-usb-phy/aml-usb-phy.h"
 
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
-
 #include <soc/aml-common/aml-registers.h>
 
 #include "src/devices/usb/drivers/aml-usb-phy/usb-phy-regs.h"
@@ -49,19 +47,20 @@ zx_status_t AmlUsbPhy::InitPhy2() {
     reset_level = reset_level | (1 << (16 + portnum));
   }
 
-  auto level_result =
+  fidl::WireResult level_result =
       reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, reset_level, reset_level);
-  if ((level_result.status() != ZX_OK) || level_result->is_error()) {
-    FDF_LOG(ERROR, "Reset Level Write failed\n");
+  if (!level_result.ok() || level_result->is_error()) {
+    fdf::error("Reset Level Write failed: {}", level_result.FormatDescription().c_str());
     return ZX_ERR_INTERNAL;
   }
 
   // amlogic_new_usbphy_reset_v2()
-  auto register_result1 = reset_register_->WriteRegister32(
+  fidl::WireResult register_result1 = reset_register_->WriteRegister32(
       RESET1_REGISTER_OFFSET, aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK,
       aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK);
-  if ((register_result1.status() != ZX_OK) || register_result1->is_error()) {
-    FDF_LOG(ERROR, "Reset Register Write on 1 << 2 failed\n");
+  if (!register_result1.ok() || register_result1->is_error()) {
+    fdf::error("Reset Register Write on 1 << 2 failed: {}",
+               register_result1.FormatDescription().c_str());
     return ZX_ERR_INTERNAL;
   }
 
@@ -74,7 +73,7 @@ zx_status_t AmlUsbPhy::InitPhy2() {
       u2p_ro_v2.set_idpullup0(1).set_drvvbus0(1);
     }
     u2p_ro_v2.set_por(1)
-        .set_host_device(phy.dr_mode() != UsbMode::Peripheral)
+        .set_host_device(phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kPeripheral)
         .WriteTo(usbctrl_mmio);
     u2p_ro_v2.set_por(0).WriteTo(usbctrl_mmio);
   }
@@ -82,20 +81,22 @@ zx_status_t AmlUsbPhy::InitPhy2() {
   zx::nanosleep(zx::deadline_after(zx::usec(10)));
 
   // amlogic_new_usbphy_reset_phycfg_v2()
-  auto register_result2 =
+  fidl::WireResult register_result2 =
       reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, reset_level, ~reset_level);
-  if ((register_result2.status() != ZX_OK) || register_result2->is_error()) {
-    FDF_LOG(ERROR, "Reset Register Write on 1 << 16 failed\n");
+  if (!register_result2.ok() || register_result2->is_error()) {
+    fdf::error("Reset Register Write on 1 << 16 failed: {}",
+               register_result2.FormatDescription().c_str());
     return ZX_ERR_INTERNAL;
   }
 
   zx::nanosleep(zx::deadline_after(zx::usec(100)));
 
-  auto register_result3 =
+  fidl::WireResult register_result3 =
       reset_register_->WriteRegister32(RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_LEVEL_MASK,
                                        aml_registers::USB_RESET1_LEVEL_MASK);
-  if ((register_result3.status() != ZX_OK) || register_result3->is_error()) {
-    FDF_LOG(ERROR, "Reset Register Write on 1 << 16 failed\n");
+  if (!register_result3.ok() || register_result3->is_error()) {
+    fdf::error("Reset Register Write on 1 << 16 failed: {}",
+               register_result3.FormatDescription().c_str());
     return ZX_ERR_INTERNAL;
   }
 
@@ -110,7 +111,7 @@ zx_status_t AmlUsbPhy::InitPhy2() {
     while (!u2p_r1.ReadFrom(usbctrl_mmio).phy_rdy()) {
       // wait phy ready max 5ms, common is 100us
       if (count > 1000) {
-        FDF_LOG(WARNING, "AmlUsbPhy::InitPhy U2P_R1_PHY_RDY wait failed");
+        fdf::warn("AmlUsbPhy::InitPhy U2P_R1_PHY_RDY wait failed");
         break;
       }
 
@@ -141,7 +142,7 @@ zx_status_t AmlUsbPhy::InitPhy3() {
   for (auto& usbphy3 : usbphy3_) {
     auto status = usbphy3.Init(usbctrl_mmio_);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "usbphy3.Init() error %s", zx_status_get_string(status));
+      fdf::error("usbphy3.Init() error {}", zx_status_get_string(status));
       return status;
     }
   }
@@ -149,22 +150,22 @@ zx_status_t AmlUsbPhy::InitPhy3() {
   return ZX_OK;
 }
 
-void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, UsbMode new_mode) {
+void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, fuchsia_hardware_usb_phy::Mode new_mode) {
   auto old_mode = phy.phy_mode();
   if (new_mode == old_mode) {
-    FDF_LOG(ERROR, "Already in %d mode", static_cast<uint8_t>(new_mode));
+    fdf::error("Already in {} mode", static_cast<uint32_t>(new_mode));
     return;
   }
   phy.SetMode(new_mode, usbctrl_mmio_);
 
-  if (new_mode == UsbMode::Host) {
+  if (new_mode == fuchsia_hardware_usb_phy::Mode::kHost) {
     ++controller_->xhci_;
-    if (old_mode != UsbMode::Unknown) {
+    if (old_mode != fuchsia_hardware_usb_phy::Mode::kUnknown) {
       --controller_->dwc2_;
     }
   } else {
     ++controller_->dwc2_;
-    if (old_mode != UsbMode::Unknown) {
+    if (old_mode != fuchsia_hardware_usb_phy::Mode::kUnknown) {
       --controller_->xhci_;
     }
   }
@@ -176,7 +177,7 @@ void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, z
     return;
   }
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "irq_.wait failed: %d", status);
+    fdf::error("irq_.wait failed: {}", status);
     return;
   }
 
@@ -187,11 +188,12 @@ void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, z
 
     // Read current host/device role.
     for (auto& phy : usbphy2_) {
-      if (phy.dr_mode() != UsbMode::Otg) {
+      if (phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kOtg) {
         continue;
       }
 
-      ChangeMode(phy, r5.iddig_curr() == 0 ? UsbMode::Host : UsbMode::Peripheral);
+      ChangeMode(phy, r5.iddig_curr() == 0 ? fuchsia_hardware_usb_phy::Mode::kHost
+                                           : fuchsia_hardware_usb_phy::Mode::kPeripheral);
     }
   }
 
@@ -202,41 +204,44 @@ zx_status_t AmlUsbPhy::Init() {
   bool has_otg = false;
   auto status = InitPhy2();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "InitPhy2() error %s", zx_status_get_string(status));
+    fdf::error("InitPhy2() error {}", zx_status_get_string(status));
     return status;
   }
   status = InitOtg();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "InitOtg() error %s", zx_status_get_string(status));
+    fdf::error("InitOtg() error {}", zx_status_get_string(status));
     return status;
   }
   status = InitPhy3();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "InitPhy3() error %s", zx_status_get_string(status));
+    fdf::error("InitPhy3() error {}", zx_status_get_string(status));
     return status;
   }
 
   for (auto& phy : usbphy2_) {
-    UsbMode mode;
-    if (phy.dr_mode() != UsbMode::Otg) {
-      mode = phy.dr_mode() == UsbMode::Host ? UsbMode::Host : UsbMode::Peripheral;
+    fuchsia_hardware_usb_phy::Mode mode;
+    if (phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kOtg) {
+      mode = phy.dr_mode() == fuchsia_hardware_usb_phy::Mode::kHost
+                 ? fuchsia_hardware_usb_phy::Mode::kHost
+                 : fuchsia_hardware_usb_phy::Mode::kPeripheral;
     } else {
       has_otg = true;
       // Wait for PHY to stabilize before reading initial mode.
       zx::nanosleep(zx::deadline_after(zx::sec(1)));
-      mode = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_).iddig_curr() == 0 ? UsbMode::Host
-                                                                         : UsbMode::Peripheral;
+      mode = USB_R5_V2::Get().ReadFrom(&usbctrl_mmio_).iddig_curr() == 0
+                 ? fuchsia_hardware_usb_phy::Mode::kHost
+                 : fuchsia_hardware_usb_phy::Mode::kPeripheral;
     }
 
     ChangeMode(phy, mode);
   }
 
   for (auto& phy : usbphy3_) {
-    if (phy.dr_mode() != UsbMode::Host) {
-      FDF_LOG(ERROR, "Not support USB3 in non-host mode yet");
+    if (phy.dr_mode() != fuchsia_hardware_usb_phy::Mode::kHost) {
+      fdf::error("Not support USB3 in non-host mode yet");
     }
 
-    ChangeMode(phy, UsbMode::Host);
+    ChangeMode(phy, fuchsia_hardware_usb_phy::Mode::kHost);
   }
 
   if (has_otg) {

@@ -46,7 +46,7 @@ def _fuchsia_icu_config_impl(repo_ctx):
     workspace_root = str(repo_ctx.path(Label("@//:WORKSPACE.bazel")).dirname)
 
     # Ensure this repository is regenerated any time the content hash file
-    # changes. Creating a content hash file in update-workspace.py allows
+    # changes. Creating a content hash file at `fx gen` time allows
     # grabbing the correct path to the real .git/HEAD when submodules are
     # used, which is harder to use in Starlark than in Python.
     if hasattr(repo_ctx.attr, "content_hash_file"):

@@ -16,6 +16,7 @@
         {
             protocol: [
                 "fuchsia.net.filter.Control",
+                "fuchsia.net.filter.SocketControl",
                 "fuchsia.net.filter.State",
                 "fuchsia.net.root.Filter",
             ],
@@ -38,6 +39,7 @@
         {
             protocol: [
                 "fuchsia.net.filter.Control",
+                "fuchsia.net.filter.SocketControl",
                 "fuchsia.net.filter.State",
                 "fuchsia.net.root.Filter",
             ],

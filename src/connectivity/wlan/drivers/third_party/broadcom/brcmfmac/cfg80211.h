@@ -506,6 +506,9 @@ struct brcmf_cfg80211_info {
   bool target_bss_authenticated;
   // Tracks whether the roam start indication has been sent yet.
   bool roam_start_sent;
+  // Tracks the BT Coex WLAN preempt counter from when brcmfmac most recently dumped stats
+  // to syslog.
+  uint32_t wlan_preempt_counter;
 };
 
 /**

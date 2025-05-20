@@ -39,14 +39,14 @@ async-channel = "1.8.0"
 async-lock = "2.3"
 async-ringbuf  = "0.3.1"
 async-stream = "0.3.5"
-async-trait = "0.1.71"
+async-trait = "0.1.88"
 base64 = "0.22.1"
 bincode = "1.3"
 bit-set = "0.5.3"
 bit-vec = { version = "0.6.3", features = [ "serde" ] }
 bitfield = "0.14.0"
 bitflags = { version = "2.8.0", features = ["serde"] }
-blocking = "1.0.2"
+blocking = "1.3"
 bstr = { version = "1.5.0", default-features = false, features = [ "std" ] }
 bt-common = "0.0.1"
 bt-gatt = "0.0.1"
@@ -82,20 +82,19 @@ clap = "2.34"
 cmac = "0.7.2"
 crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
-crossbeam = "0.8.0"
-crossbeam-channel = "0.5.1"
-crossbeam-utils = "0.8.14"
+crossbeam = "0.8.4"
+crossbeam-channel = "0.5.15"
+crossbeam-utils = "0.8.21"
 crypto-common = "0.1.6"
 csv = "1.3.1"
-darling = "0.20.10"
+darling = "0.20.11"
 data-encoding = "2.1.2"
 derivative = { version = "2.2.0", features = ["use_core"] }
 derive_builder = "0.11.1"
-derp = "0.0.14"
 difference = "2.0.0"
 digest = "0.10.7"
-downcast-rs = "1.2.0"
-dyn-clone = "1.0.5"
+downcast-rs = "2.0.1"
+dyn-clone = "1.0.19"
 ecb = "0.1.2"
 ecdsa = { version = "0.14.3", features = ["pkcs8"] }
 either = "1.14.0"
@@ -143,28 +142,28 @@ json5format = "0.2.6"
 lazy_static = "1.4"
 libc = { version = "0.2.171", features = ["extra_traits"] }
 libm = "0.2.1"
-linked-hash-map = "0.5.3"
+linked-hash-map = "0.5.6"
 lock_api = "0.4.11"
 log = { version = "0.4.22", features = ["kv", "std"] }
 lru-cache = "0.1.2"
 macro_rules_attribute = "0.1.3"
 maplit = "1.0"
 maybe-owned = "0.3.4"
-md-5 = "0.10.5"
+md-5 = "0.10.6"
 memchr = "2.7.4"
 memoffset = "0.9.1"
 miniz_oxide = "0.3.6"
-mock-omaha-server = { version = "0.3.3", default-features = false }
+mock-omaha-server = { version = "0.3.4", default-features = false }
 mockall = "0.9"
-munge = "0.4.3"
+munge = "0.4.4"
 nix = { version = "0.29.0", features = ["feature", "fs", "hostname", "net", "process", "signal", "user"] }
 nom = { version = "8.0.0", default-features = false, features = ["std"] }
 nom-language = "0.1.0"
 nom_locate = "5.0.0"
 nu-ansi-term = "0.46.0"
-num = { version = "0.4.0", features = ["rand"] }
+num = { version = "0.4.3", features = ["rand"] }
 num-derive = "0.4.2"
-num-traits = "0.2.18"
+num-traits = "0.2.19"
 omaha_client = "0.2"
 once_cell = "1.20.2"
 overload = "0.1.1"
@@ -177,6 +176,7 @@ pest = "2.7.8"
 pest_derive = "2.7.8"
 pin-project = "1.0.11"
 pin-project-lite = "0.2.13"
+pin-weak = "1.1.0"
 pkcs8 = "0.10.2"
 png = "0.14" # saved for future use
 pretty = "0.5.2"
@@ -191,7 +191,7 @@ rand = { version = "0.8", features = ["small_rng"] }
 rand_core = "0.6.4"
 rand_xorshift = "0.3"
 rayon = "1.10.0"
-ref-cast = "1.0.23"
+ref-cast = "1.0.24"
 regex = "1.7.3"
 regex-syntax = "0.8.3"
 ring = "0.17.8"
@@ -204,14 +204,13 @@ rustyline = "2.1.0"
 rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.2.0"
-scrypt = "0.10.0"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_derive = "1.0.147"
 serde_json = "1.0.128"
 serde_json5 = "0.2.1"
 serde_repr = "0.1.7"
 sha1 = "0.10.6"
-sha2 = "0.10.2"
+sha2 = "0.10.8"
 signature =  "1.4.0"
 # TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
 # targetting fuchsia.
@@ -230,7 +229,7 @@ tempfile = "3.2"
 termion = "1.5.3"
 termtree = "0.5.1"
 test-case = "3.2.1"
-textwrap = "0.11.0"
+textwrap = { version = "0.16.2", default-features = false }
 thiserror = "2.0.11"
 tokio-rustls = "0.24.1"
 toml = "0.5"
@@ -244,10 +243,10 @@ typed-builder = "0.10.0"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
 unicase = "2.8.1"
-unicode-segmentation = "1.10"
+unicode-segmentation = "1.12"
 unicode-width = "0.2.0"
 unicode-xid = "0.2.0"
-untrusted = "0.7.1"
+untrusted = "0.9"
 url = "2.3"
 utf8parse = "0.2.2"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
@@ -307,11 +306,9 @@ zeroize = "1.8.1"
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
 # keep-sorted start
 askama = { version = "0.12.1", default-features = false, features = ["config"] }
-async-executor = "1.5.0"
 async-fs = "1.6.0"
 cargo_metadata = "0.18.1"
 crossterm = "0.19"
-easy-parallel = "3.1"
 fs_extra = "1.2.0"
 fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.9"
@@ -330,15 +327,15 @@ parking_lot = "0.12.0"
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.94", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
-quote = "1.0.38"
+quote = "1.0.40"
 rustfix = "0.9.0"
 rustls-native-certs = "0.6.3"
-semver = "1.0.23"
+semver = "1.0.26"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
 serial_test = "0.5.1" # Not for use on Fuchsia, only for a single process.
-shared_child = "1.0.0"
+shared_child = "1.0.1"
 signal-hook = "0.3.17"
-syn = { version = "2.0.100", features = ["full", "visit", "visit-mut", "extra-traits"] }
+syn = { version = "2.0.101", features = ["full", "visit", "visit-mut", "extra-traits"] }
 synstructure = "0.13.1"
 tar = "0.4.25"
 term_grid = "0.2.0"
@@ -403,6 +400,7 @@ windows-core = { path = "empty/windows-core" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }
+windows-sys-0_59_0 = { package = "windows-sys", path = "empty/windows-sys-0.59.0" }
 windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-targets-0.48.5" }
 windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
 # keep-sorted end
@@ -516,7 +514,7 @@ rustflags = []
 [gn.package.async-fs."1.6.0"]
 rustflags = []
 
-[gn.package.async-trait."0.1.71"]
+[gn.package.async-trait."0.1.88"]
 rustflags = []
 
 [gn.package.base64."0.13.0"]
@@ -564,7 +562,7 @@ env_vars = ["OUT_DIR=../../../compat/crc"]
 [gn.package.crc32fast."1.2.0"]
 rustflags = ["--cfg=crc32fast_stdarchx86"]
 
-[gn.package.crossbeam-utils."0.8.14"]
+[gn.package.crossbeam-utils."0.8.21"]
 rustflags = []
 
 [gn.package.crunchy."0.2.3"]
@@ -685,11 +683,8 @@ rustflags = ["--cfg=has_const_fn_trait_bound"]
 deps = [ "//build/validate:non_production_tag" ]
 testonly = true
 
-[gn.package.md-5."0.10.5"]
+[gn.package.md-5."0.10.6"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "md5_visibility" }
-
-[gn.package.memoffset."0.6.3"]
-rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
 
 [gn.package.memoffset."0.7.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
@@ -700,7 +695,7 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 [gn.package.mime_guess."2.0.5"]
 env_vars = ["MIME_TYPES_GENERATED_PATH=../../../compat/mime_guess/mime_types_generated.rs"]
 
-[gn.package.mock-omaha-server."0.3.3"]
+[gn.package.mock-omaha-server."0.3.4"]
 rustflags = ["--cfg=fasync"]
 deps = [
   "//src/lib/fuchsia-async",
@@ -709,7 +704,7 @@ deps = [
   "//third_party/rust_crates:argh"
 ]
 
-[gn.package.mock-omaha-server."0.3.3".platform."cfg(not(target_os = \"fuchsia\"))"]
+[gn.package.mock-omaha-server."0.3.4".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   "//third_party/rust_crates:tokio",
 ]
@@ -741,20 +736,20 @@ rustflags = [
   "--cfg=macos",
 ]
 
-[gn.package.num-bigint."0.4.3"]
+[gn.package.num-bigint."0.4.6"]
 rustflags = [
   "--cfg=u64_digit",
   "--cfg=has_try_from",
 ]
 env_vars = ["OUT_DIR=../../../../compat/num-bigint"]
 
-[gn.package.num-bigint."0.4.3".platform."cfg(target_arch = \"x86_64\")"]
+[gn.package.num-bigint."0.4.6".platform."cfg(target_arch = \"x86_64\")"]
 rustflags = ["--cfg=use_addcarry"]
 
 [gn.package.num-bigint-dig."0.8.4"]
 rustflags = ["--cfg=has_i128"]
 
-[gn.package.num-complex."0.4.0"]
+[gn.package.num-complex."0.4.6"]
 rustflags = ["--cfg=has_i128", "--cfg=has_const_fn"]
 
 [gn.package.num_cpus."1.16.0"]
@@ -762,16 +757,16 @@ rustflags = ["--cfg=has_i128", "--cfg=has_const_fn"]
 # to first party code.
 visibility = [ ":*" ]
 
-[gn.package.num-integer."0.1.44"]
+[gn.package.num-integer."0.1.46"]
 rustflags = ["--cfg=has_i128"]
 
-[gn.package.num-iter."0.1.42"]
+[gn.package.num-iter."0.1.45"]
 rustflags = ["--cfg=has_i128"]
 
-[gn.package.num-rational."0.4.0"]
+[gn.package.num-rational."0.4.2"]
 rustflags = ["--cfg=has_int_exp_fmt"]
 
-[gn.package.num-traits."0.2.18"]
+[gn.package.num-traits."0.2.19"]
 rustflags = [
   "--cfg=has_copysign",
   "--cfg=has_div_euclid",
@@ -857,8 +852,8 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.rand_os."0.1.3"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.rand_pcg."0.1.1"]
-rustflags = ["--cfg=rust_1_26"]
+[gn.package.rand_pcg."0.1.2"]
+rustflags = ["--cfg=rustc_1_26"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_xorshift."0.1.1"]
@@ -873,7 +868,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.rayon-core."1.12.1"]
 # Has build script but no config needed.
 
-[gn.package.ref-cast."1.0.23"]
+[gn.package.ref-cast."1.0.24"]
 rustflags = []
 
 [gn.package.ring."0.17.8"]
@@ -952,13 +947,7 @@ visibility = [
 ]
 testonly = true
 
-# We always want to optimize scrypt for speed, because a single key derivation
-# that takes 150 msec when speed-optimized takes 20 seconds (!) when not
-# optimized, and that's a terrible experience for checking passwords.
-[gn.package.scrypt."0.10.0"]
-configs = [ "//build/config:optimize_speed" ]
-
-[gn.package.semver."1.0.23"]
+[gn.package.semver."1.0.26"]
 rustflags = []
 
 [gn.package.serde."1.0.204"]
@@ -1111,13 +1100,13 @@ env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-char-pr
 [gn.package.unic-ucd-block."0.9.0"]
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-ucd-block\\\"",  "CARGO_PKG_DESCRIPTION=\\\"\\\"", ]
 
-[gn.package.unicode-bidi."0.3.4"]
+[gn.package.unicode-bidi."0.3.18"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-normalization."0.1.19"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.unicode-segmentation."1.10.1"]
+[gn.package.unicode-segmentation."1.12.0"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-width."0.1.14"]

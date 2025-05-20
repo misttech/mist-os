@@ -96,6 +96,18 @@
       "hidden": false
     },
     {
+      "kind": {
+        "Option": {
+          "arg_name": "custom-boot-shim-aib"
+        }
+      },
+      "optionality": "optional",
+      "long": "--custom-boot-shim-aib",
+      "short": null,
+      "description": "path to an AIB containing a customized qemu_kernel boot shim to use instead of the in the platform AIBs.",
+      "hidden": false
+    },
+    {
       "kind": "Switch",
       "optionality": "optional",
       "long": "--suppress-overrides-warning",

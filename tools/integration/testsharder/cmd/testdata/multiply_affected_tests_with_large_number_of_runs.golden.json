@@ -19,7 +19,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "1"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/affected-test1#meta/affected-test1.cm",
@@ -38,7 +39,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "1"
                     }
-                ]
+                ],
+                "metadata": {}
             },
             {
                 "name": "fuchsia-pkg://fuchsia.com/affected-test2#meta/affected-test2.cm",
@@ -57,7 +59,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "1"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -67,6 +70,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [

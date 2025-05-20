@@ -186,12 +186,12 @@ impl Puppet {
         let instance_child_name = instance.root.child_name().to_string();
         let _puppet_stopped_watchdog = Task::spawn(async move {
             EventMatcher::ok()
-                .moniker(format!("./realm_builder:{}/puppet", instance_child_name))
+                .moniker(format!("./realm_builder:{instance_child_name}/puppet"))
                 .wait::<Stopped>(&mut event_stream)
                 .await
                 .unwrap();
             let status = event_stream.next().await;
-            panic!("puppet should not exit! status: {:?}", status);
+            panic!("puppet should not exit! status: {status:?}");
         });
 
         let start_time = zx::BootInstant::get();
@@ -332,8 +332,7 @@ impl Puppet {
                     } else {
                         Err(TestCaseError::Fail(
                             format!(
-                                "unexpected test record: received {:?}, expected {:?}",
-                                observed, expected
+                                "unexpected test record: received {observed:?}, expected {expected:?}"
                             )
                             .into(),
                         ))

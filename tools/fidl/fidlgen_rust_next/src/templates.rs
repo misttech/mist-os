@@ -39,7 +39,23 @@ impl Context {
     }
 
     fn wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
-        WireTypeTemplate { ty, context: self }
+        WireTypeTemplate { ty, context: self, lifetime: "'de" }
+    }
+
+    fn static_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, context: self, lifetime: "'static" }
+    }
+
+    fn wire_type_with_lifetime<'a>(
+        &'a self,
+        ty: &'a Type,
+        lifetime: &'static str,
+    ) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, context: self, lifetime }
+    }
+
+    fn anonymous_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, context: self, lifetime: "'_" }
     }
 
     fn wire_optional_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
@@ -58,20 +74,24 @@ impl Context {
         CompatTemplate { context: self }
     }
 
-    fn rust_bindings_restriction(&self, ident: &CompId) -> BindingsRestriction {
-        self.rust_bindings_restriction_inner(ident, None)
+    fn bindings_compat_restriction(&self, ident: &CompId) -> BindingsRestriction {
+        self.bindings_restriction_inner(&["rust", "rust_next"], ident, None)
     }
 
-    fn rust_bindings_restriction_inner(
+    fn bindings_denylist_restriction(&self, ident: &CompId) -> BindingsRestriction {
+        self.bindings_restriction_inner(&["rust_next"], ident, None)
+    }
+
+    fn bindings_restriction_inner(
         &self,
+        bindings_names: &[&str],
         ident: &CompId,
         next: Option<&str>,
     ) -> BindingsRestriction {
-        fn denylist_contains_rust(attributes: &Attributes) -> bool {
-            attributes
-                .attributes
-                .get("bindings_denylist")
-                .is_some_and(|attr| attr.args["value"].value.value.split(", ").any(|x| x == "rust"))
+        fn denylist_contains_any(attributes: &Attributes, names: &[&str]) -> bool {
+            attributes.attributes.get("bindings_denylist").is_some_and(|attr| {
+                attr.args["value"].value.value.split(", ").any(|x| names.iter().any(|y| *x == **y))
+            })
         }
 
         let (attributes, naming_context) = match self.schema.declarations[ident] {
@@ -100,10 +120,13 @@ impl Context {
 
                 let is_method_denylisted = next.is_some_and(|next| {
                     protocol.methods.iter().any(|m| {
-                        m.name.non_canonical() == next && denylist_contains_rust(&m.attributes)
+                        m.name.non_canonical() == next
+                            && denylist_contains_any(&m.attributes, bindings_names)
                     })
                 });
-                if denylist_contains_rust(&protocol.attributes) || is_method_denylisted {
+                if denylist_contains_any(&protocol.attributes, bindings_names)
+                    || is_method_denylisted
+                {
                     return BindingsRestriction::Never;
                 }
 
@@ -116,15 +139,16 @@ impl Context {
             _ => return BindingsRestriction::Always,
         };
 
-        if denylist_contains_rust(attributes) {
+        if denylist_contains_any(attributes, bindings_names) {
             BindingsRestriction::Never
         } else {
-            self.rust_bindings_naming_context_restriction(naming_context)
+            self.bindings_naming_context_restriction(bindings_names, naming_context)
         }
     }
 
-    fn rust_bindings_naming_context_restriction(
+    fn bindings_naming_context_restriction(
         &self,
+        bindings_names: &[&str],
         naming_context: &[String],
     ) -> BindingsRestriction {
         let mut aggregate = format!("{}/", self.schema.name);
@@ -134,7 +158,11 @@ impl Context {
             aggregate = format!("{aggregate}{name}");
             let comp_ident = CompIdent::new(aggregate.clone());
             if self.schema.declarations.contains_key(&comp_ident) {
-                result = result.max(self.rust_bindings_restriction_inner(&comp_ident, Some(next)));
+                result = result.max(self.bindings_restriction_inner(
+                    bindings_names,
+                    &comp_ident,
+                    Some(next),
+                ));
             }
         }
         result
@@ -196,6 +224,7 @@ struct PrefixedIdTemplate<'a> {
 struct WireTypeTemplate<'a> {
     ty: &'a Type,
     context: &'a Context,
+    lifetime: &'static str,
 }
 
 #[derive(Template)]
@@ -312,21 +341,34 @@ impl StructTemplate<'_> {
 }
 
 struct UnionTemplateStrings {
+    de: &'static str,
+    static_: &'static str,
+    phantom: &'static str,
     decode_unknown: &'static str,
     decode_as: &'static str,
     encode_as: &'static str,
 }
 
 impl UnionTemplate<'_> {
+    fn has_only_static_members(&self) -> bool {
+        self.union.members.iter().all(|m| m.ty.shape.max_out_of_line == 0)
+    }
+
     fn template_strings(&self) -> &'static UnionTemplateStrings {
         if self.union.shape.max_out_of_line == 0 {
             &UnionTemplateStrings {
+                de: "",
+                static_: "",
+                phantom: "()",
                 decode_unknown: "decode_unknown_static",
                 decode_as: "decode_as_static",
                 encode_as: "encode_as_static",
             }
         } else {
             &UnionTemplateStrings {
+                de: "<'de>",
+                static_: "<'static>",
+                phantom: "&'de mut [::fidl_next::Chunk]",
                 decode_unknown: "decode_unknown",
                 decode_as: "decode_as",
                 encode_as: "encode_as",

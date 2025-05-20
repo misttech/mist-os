@@ -9,37 +9,39 @@
 )]
 
 {% for ident in schema.declaration_order %}
-    {% match schema.declarations[ident] %}
-        {% when DeclType::Alias %}
-            {{ self.alias(schema.alias_declarations[ident]) }}
-        {% when DeclType::Bits %}
-            {{ self.bits(schema.bits_declarations[ident]) }}
-        {% when DeclType::Const %}
-            {{ self.cnst(schema.const_declarations[ident]) }}
-        {% when DeclType::Enum %}
-            {{ self.enm(schema.enum_declarations[ident]) }}
-        {% when DeclType::Struct %}
-            {% let strct = schema.struct_declarations[ident] %}
-            {% if !strct.is_empty_success_struct %}
-                {{ self.strct(schema.struct_declarations[ident]) }}
-            {% else %}
-                {{ self.empty_success_struct(schema.struct_declarations[ident]) }}
-            {% endif %}
-        {% when DeclType::Table %}
-            {{ self.table(schema.table_declarations[ident]) }}
-        {% when DeclType::Union %}
-            {% let union = schema.union_declarations[ident] %}
-            {% if !union.is_result %}
-                {{ self.union(union) }}
-            {% endif %}
-        {% when DeclType::NewType %} {{ todo!("newtypes are not supported yet") }}
-        {% when DeclType::Overlay %} {{ todo!("overlays are not supported yet") }}
-        {% when DeclType::Protocol %}
-            {{ self.protocol(schema.protocol_declarations[ident]) }}
-        {% when DeclType::Resource %}
-        {% when DeclType::Service %}
-            {{ self.service(schema.service_declarations[ident]) }}
-    {% endmatch %}
+    {% if !matches!(self.bindings_denylist_restriction(ident), BindingsRestriction::Never) %}
+        {% match schema.declarations[ident] %}
+            {% when DeclType::Alias %}
+                {{ self.alias(schema.alias_declarations[ident]) }}
+            {% when DeclType::Bits %}
+                {{ self.bits(schema.bits_declarations[ident]) }}
+            {% when DeclType::Const %}
+                {{ self.cnst(schema.const_declarations[ident]) }}
+            {% when DeclType::Enum %}
+                {{ self.enm(schema.enum_declarations[ident]) }}
+            {% when DeclType::Struct %}
+                {% let strct = schema.struct_declarations[ident] %}
+                {% if !strct.is_empty_success_struct %}
+                    {{ self.strct(schema.struct_declarations[ident]) }}
+                {% else %}
+                    {{ self.empty_success_struct(schema.struct_declarations[ident]) }}
+                {% endif %}
+            {% when DeclType::Table %}
+                {{ self.table(schema.table_declarations[ident]) }}
+            {% when DeclType::Union %}
+                {% let union = schema.union_declarations[ident] %}
+                {% if !union.is_result %}
+                    {{ self.union(union) }}
+                {% endif %}
+            {% when DeclType::NewType %} {{ todo!("newtypes are not supported yet") }}
+            {% when DeclType::Overlay %} {{ todo!("overlays are not supported yet") }}
+            {% when DeclType::Protocol %}
+                {{ self.protocol(schema.protocol_declarations[ident]) }}
+            {% when DeclType::Resource %}
+            {% when DeclType::Service %}
+                {{ self.service(schema.service_declarations[ident]) }}
+        {% endmatch %}
+    {% endif %}
 {% endfor %}
 
 {% if config.emit_compat %}

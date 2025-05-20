@@ -6,6 +6,16 @@ library fuchsia.hardware.vreg;
 
 using zx;
 
+// For regulators that can be placed in performance states, this enum specifies the list of
+// available performance states.
+// Entries in this enum are generally sorted in ascening order of performance (and power
+// consumption) with gaps left in between entries in case the enum should need to be extended with
+// additional intermediate values.
+type RegulatorMode = flexible enum {
+    LOW_POWER = 0x100;
+    HIGH_PERFORMANCE = 0x200;
+};
+
 @discoverable
 closed protocol Vreg {
     // Set the step which yields a voltage of min_uv + step_size_uv * step.
@@ -19,6 +29,16 @@ closed protocol Vreg {
     strict GetVoltageStep() -> (struct {
         result uint32;
     }) error zx.Status;
+
+    // Sets the state of the regulator. Each field is optional but at least one field must be
+    // present. Not all regulators may support all fields.
+    // Returns ZX_ERR_INVALID_ARGS if the combination of args provided cannot be realized.
+    strict SetState(table {
+        1: step uint32;
+        2: enable bool;
+        3: current_ua uint32;
+        4: mode RegulatorMode;
+    }) -> () error zx.Status;
 
     // Enable this regulator.
     // If Enable() is called before the regulator has been configured via a call to `SetVoltageStep`

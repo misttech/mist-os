@@ -4,11 +4,8 @@
 
 use ffx_e2e_emu::IsolatedEmulator;
 use ffx_symbolize::{MappingDetails, MappingFlags, ResolveError, Symbolizer};
-use tracing::info;
-
-mod shared;
-
-use shared::*;
+use log::info;
+use symbolize_test_utils::{Module, SymbolizationTestOutputs};
 
 #[fuchsia::test(logging_minimum_severity = "TRACE")]
 async fn symbolize_fn_ptr() {
@@ -21,9 +18,18 @@ async fn symbolize_fn_ptr() {
 
     info!("creating symbolizer instance...");
     let mut symbolizer = Symbolizer::with_context(emu.env_context()).unwrap();
+    symbolize_and_validate_result(&outputs, &mut symbolizer);
+    symbolizer.reset();
+    let invalid_location_one = symbolizer.resolve_addr(outputs.fn_one_addr);
+    assert!(invalid_location_one.is_err());
+    symbolizer.reset();
+    symbolize_and_validate_result(&outputs, &mut symbolizer);
+    emu.stop().await;
+}
 
+fn symbolize_and_validate_result(outputs: &SymbolizationTestOutputs, symbolizer: &mut Symbolizer) {
     info!("adding modules to symbolizer...");
-    for Module { name, build_id, mappings } in outputs.modules {
+    for Module { name, build_id, mappings } in &outputs.modules {
         let id = symbolizer.add_module(&name, &build_id);
         for mapping in mappings {
             let mut flags = MappingFlags::empty();

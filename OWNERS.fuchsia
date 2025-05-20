@@ -40,7 +40,7 @@ per-file shac.star,shac.textproto = file:/scripts/shac/OWNERS
 per-file .gitmodules = file:/third_party/OWNERS
 
 # Add owners to source related files
-per-file .gitignore,.gitmodules = file:/infra/OWNERS
+per-file .gitignore,.gitmodules = file:/manifests/SOURCE_OWNERS
 
 # OSS Compliance:
 per-file **/README.fuchsia = file:/build/licenses/OWNERS
@@ -55,10 +55,5 @@ per-file **/*COPYING* = file:/build/licenses/OWNERS
 # quarterly, the next review at the start of 2023Q4: 2023-10-01
 per-file {**/,}README.md = aaronwood@google.com
 per-file **.cml = aaronwood@google.com
-
-# For the effort to reform the way we handle Global Approvers, grant some folks
-# ownership over OWNERS files.  This should be re-evaluated for removal
-# quarterly, the next review at the start of 2024Q1: 2024-01-01
-per-file {**/,}OWNERS = hjfreyer@google.com,neelsa@google.com
 
 per-file .ignore = *

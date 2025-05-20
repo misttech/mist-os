@@ -91,8 +91,6 @@ impl PidTable {
         match self.last_pid.checked_add(1) {
             Some(p) => self.last_pid = p,
             None => {
-                // NB: If/when we re-use pids, we need to check that PidFdFileObject is holding onto
-                // the task correctly.
                 track_stub!(TODO("https://fxbug.dev/322874557"), "pid wraparound");
                 self.last_pid = self.last_pid.overflowing_add(1).0;
             }

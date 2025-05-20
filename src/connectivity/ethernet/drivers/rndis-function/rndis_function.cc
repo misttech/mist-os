@@ -4,10 +4,10 @@
 
 #include "src/connectivity/ethernet/drivers/rndis-function/rndis_function.h"
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <zircon/status.h>
 
 #include <algorithm>
@@ -1074,13 +1074,21 @@ zx::result<> RndisFunction::Start() {
     return zx::error(status);
   }
 
-  zx::result metadata = compat::GetMetadata<std::array<uint8_t, ETH_MAC_SIZE>>(
-      incoming(), DEVICE_METADATA_MAC_ADDRESS);
-  if (metadata.is_ok()) {
-    mac_addr_ = *std::move(metadata.value());
+  zx::result metadata_result =
+      fdf_metadata::GetMetadataIfExists<fuchsia_boot_metadata::MacAddressMetadata>(*incoming());
+  if (metadata_result.is_error()) {
+    fdf::error("Failed to get MAC address metadata: {}", metadata_result);
+    return metadata_result.take_error();
+  }
+  if (metadata_result.value().has_value()) {
+    const auto& metadata = metadata_result.value().value();
+    if (!metadata.mac_address().has_value()) {
+      fdf::error("MAC address metadata missing mac_address field");
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    mac_addr_ = metadata.mac_address().value().octets();
   } else {
-    fdf::warn("Generating random address: Failed to get MAC address: {}", metadata);
-
+    fdf::info("Generating random address: Ethernet MAC metadata not found");
     zx_cprng_draw(mac_addr_.data(), mac_addr_.size());
     mac_addr_[0] = 0x02;
   }

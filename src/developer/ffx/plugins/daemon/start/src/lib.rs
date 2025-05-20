@@ -37,11 +37,11 @@ impl<T: TryFromEnv + 'static> FfxMain for DaemonStartTool<T> {
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         if self.cmd.background {
-            tracing::debug!("invoking daemon background start");
+            log::debug!("invoking daemon background start");
             drop(self.daemon_checker.await.user_message("Unable to connect to daemon proxy")?);
             return Ok(());
         }
-        tracing::debug!("in daemon start main");
+        log::debug!("in daemon start main");
         let node = overnet_core::Router::new(Some(CIRCUIT_REFRESH_RATE))
             .user_message("Failed to initialize overnet")?;
         let ascendd_path = match self.cmd.path {
@@ -54,14 +54,14 @@ impl<T: TryFromEnv + 'static> FfxMain for DaemonStartTool<T> {
         };
         let parent_dir =
             ascendd_path.parent().ok_or_else(|| user_error!("Daemon socket path had no parent"))?;
-        tracing::debug!("creating daemon socket dir");
+        log::debug!("creating daemon socket dir");
         std::fs::create_dir_all(parent_dir).with_user_message(|| {
             format!(
                 "Could not create directory for the daemon socket ({path})",
                 path = parent_dir.display()
             )
         })?;
-        tracing::debug!("creating daemon");
+        log::debug!("creating daemon");
         let mut daemon = ffx_daemon_server::Daemon::new(ascendd_path);
         daemon.start(node).await.bug()
     }

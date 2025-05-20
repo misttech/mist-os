@@ -13,7 +13,6 @@
 #include "src/ui/lib/escher/base/reffable.h"
 #include "src/ui/lib/escher/forward_declarations.h"
 #include "src/ui/lib/escher/impl/command_buffer.h"
-#include "src/ui/lib/escher/profiling/timestamp_profiler.h"
 #include "src/ui/lib/escher/renderer/uniform_block_allocator.h"
 #include "src/ui/lib/escher/util/block_allocator.h"
 #include "src/ui/lib/escher/vk/command_buffer.h"
@@ -22,7 +21,7 @@
 
 namespace escher {
 
-typedef fit::function<void()> FrameRetiredCallback;
+using FrameRetiredCallback = fit::function<void()>;
 
 class Frame;
 using FramePtr = fxl::RefPtr<Frame>;
@@ -54,13 +53,6 @@ class Frame : public Resource {
   // millisecond later.
   void EndFrame(const std::vector<SemaphorePtr>& semaphores,
                 FrameRetiredCallback frame_retired_callback);
-
-  // If profiling is enabled, inserts a Vulkan timestamp query into the frame's
-  // current CommandBuffer; the result will be inserted into the trace log.
-  // |stages| denotes the set of pipeline stages that must be completed by all
-  // previously-issued commands; see TimestampProfiler docs for more details.
-  void AddTimestamp(const char* name,
-                    vk::PipelineStageFlagBits stages = vk::PipelineStageFlagBits::eBottomOfPipe);
 
   // See |CommandBuffer::DisableLazyPipelineCreation()|.  Disables lazy pipeline creation on the
   // frame's current and subsequent CommandBuffers.
@@ -166,7 +158,6 @@ class Frame : public Resource {
   // AllocateUniform(), above.
   UniformBlockAllocator uniform_block_allocator_;
 
-  TimestampProfilerPtr profiler_;
   uint32_t submission_count_ = 0;
 
   // TODO(https://fxbug.dev/42151346): ideally we can move away from explicitly retaining used

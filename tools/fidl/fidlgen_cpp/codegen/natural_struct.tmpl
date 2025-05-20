@@ -11,9 +11,7 @@ class {{ .Name }};
 
 {{- define "Struct:NaturalTypesHeader" }}
 {{ EnsureNamespace . }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ .Docs }}
 class {{ .Name }} {
@@ -46,12 +44,8 @@ class {{ .Name }} {
     {{ .Name }}(const {{ .Name }}& other) noexcept;
     {{ .Name }}& operator=(const {{ .Name }}& other) noexcept;
 
-    bool operator==(const {{ .Name }}& other) const noexcept {
-      return ::fidl::internal::NaturalStructCodingTraits<{{ . }}, {{ .TypeShapeV2.InlineSize }}>::Equal(this, &other);
-    }
-    bool operator!=(const {{ .Name }}& other) const noexcept {
-      return !::fidl::internal::NaturalStructCodingTraits<{{ . }}, {{ .TypeShapeV2.InlineSize }}>::Equal(this, &other);
-    }
+    bool operator==(const {{ .Name }}& other) const noexcept;
+    bool operator!=(const {{ .Name }}& other) const noexcept;
   {{- end }}
 
   {{- range .Members }}
@@ -61,14 +55,10 @@ class {{ .Name }} {
     {{- else }}
       const {{ .Type }} &
     {{- end }}
-    {{ .Name }}() const {
-      return storage_.{{ .Name }};
-    }
+    {{ .Name }}() const;
 
     {{ .Docs }}
-    {{ .Type }}& {{ .Name }}() {
-      return storage_.{{ .Name }};
-    }
+    {{ .Type }}& {{ .Name }}();
 
     // Setter for {{ .Name }}.
     //
@@ -120,70 +110,16 @@ class {{ .Name }} {
 
 };
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 
 {{- define "Struct:InlineDefinition:NaturalTypesHeader" }}
-  {{ EnsureNamespace . }}
-  {{ if .IsResourceType }}
-    {{- IfdefFuchsia -}}
-  {{- end }}
-
-  inline {{ .Name }}::{{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-
-  {{- if len .Members }}
-    inline {{ .Name }}::{{ .Name }}(
-    {{- range $i, $m := .Members }}
-      {{- if $i }}, {{ end }}
-      {{- $m.Type }} {{ $m.Name }}
-    {{- end }}) noexcept
-    : storage_({
-    {{- range $i, $m := .Members }}
-      {{- if $i }}, {{ end }}
-      .{{ $m.Name }} = std::move({{ $m.Name}})
-    {{- end }}
-    }) {}
-  {{- end }}
-
-  {{- if not .IsResourceType }}
-    inline {{ .Name }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ . }}(other.CloneStorage_()){}
-    inline {{ .Name }}& {{ . }}::operator=(const {{ . }}& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
-  {{- end }}
-
-  inline {{ .Name }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{
-    {{- range .Members }}
-      .{{ .Name }} =
-      {{- if .DefaultValue.IsSet }}
-        {{- .DefaultValue }}
-      {{- else }}
-        {{- .NaturalPossiblyInvalidDefaultInitializer }}
-      {{- end }},
-    {{- end }}
-  }) {}
-
-  {{- range .Members }}
-    inline {{ $.Name }}& {{ $.Name }}::{{ .Name }}({{ .Type }} value) {
-      storage_.{{ .Name }} = std::move(value);
-      return *this;
-    }
-  {{- end }}
-
-  {{ if .IsResourceType }}
-    {{- EndifFuchsia -}}
-  {{- end }}
 {{- end }}
 
 
 {{- define "Struct:Traits:NaturalTypesHeader" }}
-  {{ if .IsResourceType }}
-  {{- IfdefFuchsia -}}
-  {{- end }}
+  {{- IfdefFuchsiaIf .IsResourceType -}}
 
   {{ if .IsResourceType }}
   template <>
@@ -212,38 +148,96 @@ class {{ .Name }} {
     : public ::fidl::internal::NaturalStructCodingTraits<{{ . }}, {{ .TypeShapeV2.InlineSize }}> {};
   {{- end }}
 
-  {{ if .IsResourceType }}
-  {{- EndifFuchsia -}}
-  {{ end }}
+  {{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 
 {{- define "Struct:NaturalTypesSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+  {{- IfdefFuchsiaIf .IsResourceType -}}
 
-{{- EnsureNamespace "" }}
-{{- if not .IsResourceType }}
-  {{ . }}::Storage_ {{ .NoLeading }}::CloneStorage_() const {
-    return Storage_{
-      {{- range $i, $m := .Members }}
-        {{- if $i }}, {{ end }}
-        ::fidl::internal::NaturalClone(storage_.{{ .Name }})
-      {{- end }}
-    };
-  }
-{{- end }}
+  {{- EnsureNamespace "" }}
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+  {{ . }}::{{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+  {{- if len .Members }}
+    {{ . }}::{{ .Name }}(
+    {{- range $i, $m := .Members }}
+      {{- if $i }}, {{ end }}
+      {{- $m.Type }} {{ $m.Name }}
+    {{- end }}) noexcept
+    : storage_({
+    {{- range $i, $m := .Members }}
+      {{- if $i }}, {{ end }}
+      .{{ $m.Name }} = std::move({{ $m.Name}})
+    {{- end }}
+    }) {}
+  {{- end }}
+
+  {{ . }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{
+    {{- range .Members }}
+      .{{ .Name }} =
+      {{- if .DefaultValue.IsSet }}
+        {{- .DefaultValue }}
+      {{- else }}
+        {{- .NaturalPossiblyInvalidDefaultInitializer }}
+      {{- end }},
+    {{- end }}
+  }) {}
+
+  {{- if not .IsResourceType }}
+    {{ . }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ . }}(other.CloneStorage_()){}
+
+    {{ . }}& {{ .NoLeading }}::operator=(const {{ . }}& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+    bool {{ .NoLeading }}::operator==(const {{ .Name }}& other) const noexcept {
+      return ::fidl::internal::NaturalStructCodingTraits<{{ . }}, {{ .TypeShapeV2.InlineSize }}>::Equal(this, &other);
+    }
+
+    bool {{ .NoLeading }}::operator!=(const {{ .Name }}& other) const noexcept {
+      return !::fidl::internal::NaturalStructCodingTraits<{{ . }}, {{ .TypeShapeV2.InlineSize }}>::Equal(this, &other);
+    }
+
+    {{ . }}::Storage_ {{ .NoLeading }}::CloneStorage_() const {
+      return Storage_{
+        {{- range $i, $m := .Members }}
+          {{- if $i }}, {{ end }}
+          ::fidl::internal::NaturalClone(storage_.{{ .Name }})
+        {{- end }}
+      };
+    }
+  {{- end }}
+
+
+  {{- range .Members }}
+    {{- if .Type.IsPrimitiveType }}
+      {{ .Type }}
+    {{- else }}
+      const {{ .Type }} &
+    {{- end }}
+    {{ $.NoLeading}}::{{ .Name }}() const {
+      return storage_.{{ .Name }};
+    }
+
+    {{ .Type }}& {{ $ }}::{{ .Name }}() {
+      return storage_.{{ .Name }};
+    }
+
+    {{ $ }}& {{ $ }}::{{ .Name }}({{ .Type }} value) {
+      storage_.{{ .Name }} = std::move(value);
+      return *this;
+    }
+
+
+  {{- end }}
+
+  {{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Struct:Traits:TypeConversionsHeader" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType }}
 
 template <>
 struct WireNaturalConversionTraits<{{ .Wire }}, {{ .Unified }}> {
@@ -260,15 +254,11 @@ struct WireTypeForNaturalType<{{ .Unified }}> {
     using type = {{ .Wire }};
 };
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Struct:Traits:TypeConversionsSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType }}
 
 {{ .Unified }} WireNaturalConversionTraits<{{ .Wire }}, {{ .Unified }}>::ToNatural({{ .Wire }} src) {
   {{- if eq (len .Members) 1 }}
@@ -289,7 +279,5 @@ struct WireTypeForNaturalType<{{ .Unified }}> {
   };
 }
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

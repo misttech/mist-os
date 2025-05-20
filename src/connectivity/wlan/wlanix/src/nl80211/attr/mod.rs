@@ -223,7 +223,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for Nl80211Attr {
                     .context("Invalid NL80211_ATTR_MAX_SCAN_PLAN_ITERATIONS value")?,
             ),
             other => {
-                return Err(DecodeError::from(format!("Unhandled NL80211 attribute: {}", other)));
+                return Err(DecodeError::from(format!("Unhandled NL80211 attribute: {other}")));
             }
         })
     }

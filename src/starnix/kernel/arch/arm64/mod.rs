@@ -11,4 +11,3 @@ pub mod task;
 pub mod vdso;
 
 pub const ARCH_NAME: &'static [u8] = b"aarch64";
-pub const ARCH_NAME_COMPAT: &'static [u8] = b"armv7l";

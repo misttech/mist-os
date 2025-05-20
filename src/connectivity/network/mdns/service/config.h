@@ -31,7 +31,7 @@ class Config {
   // Reads the config files from |config_dir|. |local_host_name| is the local host name as
   // defined by the operating system (e.g. the result of posix's |gethostname|).
   // The default value for |config_dir| is "/config/data".
-  void ReadConfigFiles(const std::string& local_host_name,
+  void ReadConfigFiles(const std::string& local_host_name, const std::string& serial,
                        const std::string& boot_config_dir = kBootConfigDir,
                        const std::string& config_dir = kConfigDir);
 
@@ -63,11 +63,13 @@ class Config {
 
   // Integrates the config file represented by |document| into this
   // configuration.
-  void IntegrateDocument(const rapidjson::Document& document, const std::string& local_host_name);
+  void IntegrateDocument(const rapidjson::Document& document, const std::string& local_host_name,
+                         const std::string& serial);
 
   // Integrates the publication represented by |value| into this configuration.
   // |value| must be a JSON object.
-  void IntegratePublication(const rapidjson::Value& value, const std::string& local_host_name);
+  void IntegratePublication(const rapidjson::Value& value, const std::string& local_host_name,
+                            const std::string& serial);
 
   // Sets the value indicating whether a host name probe is required.
   void SetPerformHostNameProbe(bool perform_host_name_probe);

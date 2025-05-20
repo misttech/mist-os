@@ -25,7 +25,7 @@ alias Name = string:MAX_NAME_LENGTH;
 const MAX_NAME_LENGTH uint64 = 255;
 
 /// The maximum length, in bytes, of a single filesystem component.
-@available(deprecated=NEXT, removed=HEAD, note="Use MAX_NAME_LENGTH instead.")
+@available(deprecated=27, removed=HEAD, note="Use MAX_NAME_LENGTH instead.")
 const MAX_FILENAME uint64 = 255;
 
 /// A path is a string of one or more components, separated by "/".

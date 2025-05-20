@@ -88,7 +88,21 @@ zx_status_t mmio_buffer_init_physical(mmio_buffer_t* buffer, zx_paddr_t base, si
 
 void mmio_buffer_release(mmio_buffer_t* buffer) {
   if (buffer->vmo != ZX_HANDLE_INVALID) {
-    zx_vmar_unmap(zx_vmar_root_self(), (uintptr_t)buffer->vaddr, buffer->size);
+    // Recalculate the original mapping size and address returned from
+    // zx_vmar_map.
+    //
+    // When offset is not page aligned, the vaddr field contains the mapped
+    // address + page_offset.
+    //
+    // The size field holds the original requested size, but the mapping was for
+    // (size + page_offset) rounded up to the next multiple of page_size.
+    const size_t vmo_offset = MMIO_ROUNDDOWN(buffer->offset, zx_system_get_page_size());
+    const size_t page_offset = buffer->offset - vmo_offset;
+    const size_t vmo_size = MMIO_ROUNDUP(buffer->size + page_offset, zx_system_get_page_size());
+
+    zx_vmar_unmap(zx_vmar_root_self(),
+                  reinterpret_cast<uintptr_t>(buffer->vaddr) - static_cast<uintptr_t>(page_offset),
+                  vmo_size);
     zx_handle_close(buffer->vmo);
     buffer->vmo = ZX_HANDLE_INVALID;
   }

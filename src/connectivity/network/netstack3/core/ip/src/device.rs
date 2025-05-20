@@ -20,24 +20,23 @@ use core::hash::Hash;
 use core::num::NonZeroU8;
 
 use derivative::Derivative;
-use log::info;
+use log::{debug, info};
 use net_types::ip::{
-    AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
-    Subnet,
+    AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ipv6, Ipv6Addr,
+    Ipv6SourceAddr, Mtu, Subnet,
 };
-use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
+use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, AssignedAddrIpExt, CounterContext, DeferredResourceRemovalContext, DeviceIdContext,
-    EventContext, ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes,
-    InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr,
-    Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
-    TxMetadataBindingsTypes, WeakDeviceIdentifier, WeakIpAddressId,
+    AnyDevice, AssignedAddrIpExt, Counter, DeferredResourceRemovalContext, DeviceIdContext,
+    EventContext, ExistsError, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,
+    IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr, Ipv6DeviceAddr,
+    NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext, RngContext,
+    SendFrameError, StrongDeviceIdentifier, TimerContext, TimerHandler, TxMetadataBindingsTypes,
+    WeakDeviceIdentifier, WeakIpAddressId,
 };
 use netstack3_filter::ProofOfEgressCheck;
 use packet::{BufferMut, Serializer};
 use packet_formats::icmp::mld::MldPacket;
-use packet_formats::icmp::ndp::options::NdpNonce;
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 use zerocopy::SplitByteSlice;
@@ -48,7 +47,9 @@ use crate::internal::counters::IpCounters;
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
-use crate::internal::device::dad::{DadAddressStateLookupResult, DadHandler, DadTimerId};
+use crate::internal::device::dad::{
+    DadHandler, DadIncomingPacketResult, DadIpExt, DadTimerId, Ipv6PacketResultMetadata,
+};
 use crate::internal::device::nud::NudIpHandler;
 use crate::internal::device::route_discovery::{
     Ipv6DiscoveredRoute, Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler,
@@ -56,11 +57,10 @@ use crate::internal::device::route_discovery::{
 use crate::internal::device::router_solicitation::{RsHandler, RsTimerId};
 use crate::internal::device::slaac::{SlaacHandler, SlaacTimerId};
 use crate::internal::device::state::{
-    IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
-    IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
-    Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-    Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceState,
-    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
+    IpAddressData, IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
+    IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddrConfig,
+    Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceState, Ipv6NetworkLearnedParameters,
+    Lifetime, PreferredLifetime, WeakAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
@@ -82,66 +82,97 @@ use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo};
     Debug(bound = "")
 )]
 #[generic_over_ip(I, Ip)]
-pub struct IpDeviceTimerId<I: IpDeviceIpExt, D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-    I::Timer<D, A>,
-);
+pub struct IpDeviceTimerId<
+    I: IpDeviceIpExt,
+    D: WeakDeviceIdentifier,
+    BT: IpDeviceStateBindingsTypes,
+>(I::Timer<D, BT>);
 
 /// A timer ID for IPv4 devices.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub struct Ipv4DeviceTimerId<D: WeakDeviceIdentifier>(IgmpTimerId<D>);
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    Eq(bound = ""),
+    Hash(bound = ""),
+    PartialEq(bound = "")
+)]
+pub enum Ipv4DeviceTimerId<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> {
+    /// The timer ID is specific to the IGMP protocol suite.
+    Igmp(IgmpTimerId<D>),
+    /// The timer ID is specific to duplicate address detection.
+    Dad(DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BT>>),
+}
 
-impl<D: WeakDeviceIdentifier> Ipv4DeviceTimerId<D> {
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> Ipv4DeviceTimerId<D, BT> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D::Strong> {
-        let Self(this) = self;
-        this.device_id().upgrade()
+        match self {
+            Ipv4DeviceTimerId::Igmp(igmp) => igmp.device_id().upgrade(),
+            Ipv4DeviceTimerId::Dad(dad) => dad.device_id().upgrade(),
+        }
     }
 
     /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
-    pub fn into_common<S: IpAddressIdSpec>(self) -> IpDeviceTimerId<Ipv4, D, S> {
+    pub fn into_common(self) -> IpDeviceTimerId<Ipv4, D, BT> {
         self.into()
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv4, D, A>>
-    for Ipv4DeviceTimerId<D>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<IpDeviceTimerId<Ipv4, D, BT>>
+    for Ipv4DeviceTimerId<D, BT>
 {
-    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv4, D, A>) -> Self {
+    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv4, D, BT>) -> Self {
         inner
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<Ipv4DeviceTimerId<D>>
-    for IpDeviceTimerId<Ipv4, D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<Ipv4DeviceTimerId<D, BT>>
+    for IpDeviceTimerId<Ipv4, D, BT>
 {
-    fn from(value: Ipv4DeviceTimerId<D>) -> Self {
+    fn from(value: Ipv4DeviceTimerId<D, BT>) -> Self {
         Self(value)
     }
 }
 
-impl<D: WeakDeviceIdentifier> From<IgmpTimerId<D>> for Ipv4DeviceTimerId<D> {
-    fn from(id: IgmpTimerId<D>) -> Ipv4DeviceTimerId<D> {
-        Ipv4DeviceTimerId(id)
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<IgmpTimerId<D>>
+    for Ipv4DeviceTimerId<D, BT>
+{
+    fn from(id: IgmpTimerId<D>) -> Ipv4DeviceTimerId<D, BT> {
+        Ipv4DeviceTimerId::Igmp(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, BC: TimerBindingsTypes, CC: TimerHandler<BC, IgmpTimerId<D>>>
-    HandleableTimer<CC, BC> for Ipv4DeviceTimerId<D>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>
+    From<DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BT>>> for Ipv4DeviceTimerId<D, BT>
+{
+    fn from(id: DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BT>>) -> Ipv4DeviceTimerId<D, BT> {
+        Ipv4DeviceTimerId::Dad(id)
+    }
+}
+
+impl<
+        D: WeakDeviceIdentifier,
+        BC: IpDeviceStateBindingsTypes,
+        CC: TimerHandler<BC, IgmpTimerId<D>>
+            + TimerHandler<BC, DadTimerId<Ipv4, D, WeakAddressId<Ipv4, BC>>>,
+    > HandleableTimer<CC, BC> for Ipv4DeviceTimerId<D, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
-        let Self(id) = self;
-        core_ctx.handle_timer(bindings_ctx, id, timer);
+        match self {
+            Ipv4DeviceTimerId::Igmp(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            Ipv4DeviceTimerId::Dad(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+        }
     }
 }
 
-impl<I, CC, BC, A> HandleableTimer<CC, BC> for IpDeviceTimerId<I, CC::WeakDeviceId, A>
+impl<I, CC, BC> HandleableTimer<CC, BC> for IpDeviceTimerId<I, CC::WeakDeviceId, BC>
 where
     I: IpDeviceIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<I, BC>,
-    A: IpAddressIdSpec,
     for<'a> CC::WithIpDeviceConfigurationInnerCtx<'a>:
-        TimerHandler<BC, I::Timer<CC::WeakDeviceId, A>>,
+        TimerHandler<BC, I::Timer<CC::WeakDeviceId, BC>>,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         let Self(id) = self;
@@ -155,33 +186,40 @@ where
 }
 
 /// A timer ID for IPv6 devices.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Debug(bound = ""),
+    Eq(bound = ""),
+    Hash(bound = ""),
+    PartialEq(bound = "")
+)]
 #[allow(missing_docs)]
-pub enum Ipv6DeviceTimerId<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> {
+pub enum Ipv6DeviceTimerId<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> {
     Mld(MldTimerId<D>),
-    Dad(DadTimerId<D, A>),
+    Dad(DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BT>>),
     Rs(RsTimerId<D>),
     RouteDiscovery(Ipv6DiscoveredRouteTimerId<D>),
     Slaac(SlaacTimerId<D>),
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<IpDeviceTimerId<Ipv6, D, A>>
-    for Ipv6DeviceTimerId<D, A::WeakV6>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<IpDeviceTimerId<Ipv6, D, BT>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv6, D, A>) -> Self {
+    fn from(IpDeviceTimerId(inner): IpDeviceTimerId<Ipv6, D, BT>) -> Self {
         inner
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: IpAddressIdSpec> From<Ipv6DeviceTimerId<D, A::WeakV6>>
-    for IpDeviceTimerId<Ipv6, D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<Ipv6DeviceTimerId<D, BT>>
+    for IpDeviceTimerId<Ipv6, D, BT>
 {
-    fn from(value: Ipv6DeviceTimerId<D, A::WeakV6>) -> Self {
+    fn from(value: Ipv6DeviceTimerId<D, BT>) -> Self {
         Self(value)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D, A> {
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> Ipv6DeviceTimerId<D, BT> {
     /// Gets the device ID from this timer IFF the device hasn't been destroyed.
     fn device_id(&self) -> Option<D::Strong> {
         match self {
@@ -195,61 +233,60 @@ impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> Ipv6DeviceTimerId<D,
     }
 
     /// Transforms this timer ID into the common [`IpDeviceTimerId`] version.
-    pub fn into_common<S: IpAddressIdSpec<WeakV6 = A>>(self) -> IpDeviceTimerId<Ipv6, D, S> {
+    pub fn into_common(self) -> IpDeviceTimerId<Ipv6, D, BT> {
         self.into()
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<MldTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<MldTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: MldTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: MldTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Mld(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<DadTimerId<D, A>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>
+    From<DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BT>>> for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: DadTimerId<D, A>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BT>>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Dad(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<RsTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<RsTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: RsTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: RsTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Rs(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<Ipv6DiscoveredRouteTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<Ipv6DiscoveredRouteTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: Ipv6DiscoveredRouteTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: Ipv6DiscoveredRouteTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::RouteDiscovery(id)
     }
 }
 
-impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<SlaacTimerId<D>>
-    for Ipv6DeviceTimerId<D, A>
+impl<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> From<SlaacTimerId<D>>
+    for Ipv6DeviceTimerId<D, BT>
 {
-    fn from(id: SlaacTimerId<D>) -> Ipv6DeviceTimerId<D, A> {
+    fn from(id: SlaacTimerId<D>) -> Ipv6DeviceTimerId<D, BT> {
         Ipv6DeviceTimerId::Slaac(id)
     }
 }
 
 impl<
         D: WeakDeviceIdentifier,
-        A: WeakIpAddressId<Ipv6Addr>,
-        BC: TimerBindingsTypes,
+        BC: IpDeviceStateBindingsTypes,
         CC: TimerHandler<BC, RsTimerId<D>>
             + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D>>
             + TimerHandler<BC, MldTimerId<D>>
             + TimerHandler<BC, SlaacTimerId<D>>
-            + TimerHandler<BC, DadTimerId<D, A>>,
-    > HandleableTimer<CC, BC> for Ipv6DeviceTimerId<D, A>
+            + TimerHandler<BC, DadTimerId<Ipv6, D, WeakAddressId<Ipv6, BC>>>,
+    > HandleableTimer<CC, BC> for Ipv6DeviceTimerId<D, BC>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         match self {
@@ -263,7 +300,7 @@ impl<
 }
 
 /// An extension trait adding IP device properties.
-pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt {
+pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt + DadIpExt {
     /// IP layer state kept by the device.
     type State<BT: IpDeviceStateBindingsTypes>: AsRef<IpDeviceState<Self, BT>>
         + AsMut<IpDeviceState<Self, BT>>;
@@ -275,19 +312,15 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt {
         + Eq
         + PartialEq;
     /// High level IP device timer.
-    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec>: Into<IpDeviceTimerId<Self, D, A>>
-        + From<IpDeviceTimerId<Self, D, A>>
+    type Timer<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>: Into<IpDeviceTimerId<Self, D, BT>>
+        + From<IpDeviceTimerId<Self, D, BT>>
         + Clone
         + Eq
         + PartialEq
         + Debug
         + Hash;
-    /// Device address configuration.
-    type AddressConfig<I: Instant>: Default + Debug;
     /// Manual device address configuration (user-initiated).
     type ManualAddressConfig<I: Instant>: Default + Debug + Into<Self::AddressConfig<I>>;
-    /// Device address associated state.
-    type AddressState<I: Instant>: 'static + Inspectable;
     /// Device configuration update request.
     type ConfigurationUpdate: From<IpDeviceConfigurationUpdate>
         + AsRef<IpDeviceConfigurationUpdate>
@@ -296,59 +329,35 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt {
     /// Gets the common properties of an address from its configuration.
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I>;
 
-    /// Returns whether the address is currently assigned based on state.
-    fn is_addr_assigned<I: Instant>(addr_state: &Self::AddressState<I>) -> bool;
-
     /// Extracts the device ID from a device timer.
-    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-        timer: &Self::Timer<D, A>,
+    fn timer_device_id<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
+        timer: &Self::Timer<D, BT>,
     ) -> Option<D::Strong>;
-
-    /// Extracts the address configuration from the state in preparation for
-    /// removal.
-    fn take_addr_config_for_removal<I: Instant>(
-        addr_state: &mut Self::AddressState<I>,
-    ) -> Option<Self::AddressConfig<I>>;
 }
 
 impl IpDeviceIpExt for Ipv4 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv4DeviceState<BT>;
     type Configuration = Ipv4DeviceConfiguration;
-    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv4DeviceTimerId<D>;
-    type AddressConfig<I: Instant> = Ipv4AddrConfig<I>;
+    type Timer<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> = Ipv4DeviceTimerId<D, BT>;
     type ManualAddressConfig<I: Instant> = Ipv4AddrConfig<I>;
-    type AddressState<I: Instant> = Ipv4AddressState<I>;
     type ConfigurationUpdate = Ipv4DeviceConfigurationUpdate;
 
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
-        config.common
+        config.properties
     }
 
-    fn is_addr_assigned<I: Instant>(addr_state: &Ipv4AddressState<I>) -> bool {
-        let Ipv4AddressState { config: _ } = addr_state;
-        true
-    }
-
-    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-        timer: &Self::Timer<D, A>,
+    fn timer_device_id<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
+        timer: &Self::Timer<D, BT>,
     ) -> Option<D::Strong> {
         timer.device_id()
-    }
-
-    fn take_addr_config_for_removal<I: Instant>(
-        addr_state: &mut Self::AddressState<I>,
-    ) -> Option<Self::AddressConfig<I>> {
-        addr_state.config.take()
     }
 }
 
 impl IpDeviceIpExt for Ipv6 {
     type State<BT: IpDeviceStateBindingsTypes> = Ipv6DeviceState<BT>;
     type Configuration = Ipv6DeviceConfiguration;
-    type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec> = Ipv6DeviceTimerId<D, A::WeakV6>;
-    type AddressConfig<I: Instant> = Ipv6AddrConfig<I>;
+    type Timer<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes> = Ipv6DeviceTimerId<D, BT>;
     type ManualAddressConfig<I: Instant> = Ipv6AddrManualConfig<I>;
-    type AddressState<I: Instant> = Ipv6AddressState<I>;
     type ConfigurationUpdate = Ipv6DeviceConfigurationUpdate;
 
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
@@ -358,20 +367,10 @@ impl IpDeviceIpExt for Ipv6 {
         }
     }
 
-    fn is_addr_assigned<I: Instant>(addr_state: &Ipv6AddressState<I>) -> bool {
-        addr_state.flags.assigned
-    }
-
-    fn timer_device_id<D: WeakDeviceIdentifier, A: IpAddressIdSpec>(
-        timer: &Self::Timer<D, A>,
+    fn timer_device_id<D: WeakDeviceIdentifier, BT: IpDeviceStateBindingsTypes>(
+        timer: &Self::Timer<D, BT>,
     ) -> Option<D::Strong> {
         timer.device_id()
-    }
-
-    fn take_addr_config_for_removal<I: Instant>(
-        addr_state: &mut Self::AddressState<I>,
-    ) -> Option<Self::AddressConfig<I>> {
-        addr_state.config.take()
     }
 }
 /// IP address assignment states.
@@ -514,56 +513,22 @@ impl<
 {
 }
 
-/// A marker trait for a spec of address IDs.
-///
-/// This allows us to write types that are GenericOverIp that take the spec from
-/// some type.
-pub trait IpAddressIdSpec {
-    /// The weak V4 address ID.
-    type WeakV4: WeakIpAddressId<Ipv4Addr>;
-    /// The weak V6 address ID.
-    type WeakV6: WeakIpAddressId<Ipv6Addr>;
-}
-
-pub trait IpAddressIdExt: Ip {
-    type Weak<BT: IpDeviceStateBindingsTypes>: WeakIpAddressId<Self::Addr>;
-}
-
-impl IpAddressIdExt for Ipv4 {
-    type Weak<BT: IpDeviceStateBindingsTypes> = WeakAddressId<Ipv4AddressEntry<BT>>;
-}
-
-impl IpAddressIdExt for Ipv6 {
-    type Weak<BT: IpDeviceStateBindingsTypes> = WeakAddressId<Ipv6AddressEntry<BT>>;
-}
-
-/// Ties an [`IpAddressIdSpec`] to a core context implementation.
-pub trait IpAddressIdSpecContext:
-    IpDeviceAddressIdContext<Ipv4> + IpDeviceAddressIdContext<Ipv6>
-{
-    /// The address ID spec for this context.
-    type AddressIdSpec: IpAddressIdSpec<
-        WeakV4 = <Self as IpDeviceAddressIdContext<Ipv4>>::WeakAddressId,
-        WeakV6 = <Self as IpDeviceAddressIdContext<Ipv6>>::WeakAddressId,
-    >;
-}
-
 /// The core context providing access to device IP address state.
 pub trait IpDeviceAddressContext<I: IpDeviceIpExt, BT: InstantBindingsTypes>:
     IpDeviceAddressIdContext<I>
 {
-    /// Calls the callback with a reference to the address state `addr_id` on
+    /// Calls the callback with a reference to the address data `addr_id` on
     /// `device_id`.
-    fn with_ip_address_state<O, F: FnOnce(&I::AddressState<BT::Instant>) -> O>(
+    fn with_ip_address_data<O, F: FnOnce(&IpAddressData<I, BT::Instant>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
         cb: F,
     ) -> O;
 
-    /// Calls the callback with a mutable reference to the address state
+    /// Calls the callback with a mutable reference to the address data
     /// `addr_id` on `device_id`.
-    fn with_ip_address_state_mut<O, F: FnOnce(&mut I::AddressState<BT::Instant>) -> O>(
+    fn with_ip_address_data_mut<O, F: FnOnce(&mut IpAddressData<I, BT::Instant>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr_id: &Self::AddressId,
@@ -675,6 +640,7 @@ pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BT: IpDeviceStateB
     type IpDeviceStateCtx<'s>: IpDeviceStateContext<I, BT, DeviceId = Self::DeviceId>
         + GmpHandler<I, BT>
         + NudIpHandler<I, BT>
+        + DadHandler<I, BT>
         + 's
     where
         Self: 's;
@@ -859,16 +825,38 @@ pub trait Ipv6DeviceContext<BC: IpDeviceBindingsContext<Ipv6, Self::DeviceId>>:
 }
 
 /// An implementation of an IP device.
-pub trait IpDeviceHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpDeviceHandler<I: IpDeviceIpExt, BC>: DeviceIdContext<AnyDevice> {
+    /// Returns whether the device is a router.
     fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool;
 
+    /// Sets the device's default hop limit.
     fn set_default_hop_limit(&mut self, device_id: &Self::DeviceId, hop_limit: NonZeroU8);
+
+    /// Handles a received Duplicate Address Detection Packet.
+    ///
+    /// Takes action in response to a received DAD packet for the given address.
+    /// Returns the assignment state of the address on the given interface, if
+    /// there was one before any action was taken. That is, this method returns
+    /// `IpAddressState::Tentative` when the address was tentatively assigned
+    /// (and now removed), `IpAddressState::Assigned` if the address was
+    /// assigned (and so not removed), otherwise `IpAddressState::Unassigned`.
+    ///
+    /// For IPv4, a DAD packet is either an ARP request or response. For IPv6 a
+    /// DAD packet is either a Neighbor Solicitation or a Neighbor
+    /// Advertisement.
+    fn handle_received_dad_packet(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr: SpecifiedAddr<I::Addr>,
+        packet_data: I::ReceivedPacketData<'_>,
+    ) -> IpAddressState;
 }
 
 impl<
         I: IpDeviceIpExt,
         BC: IpDeviceBindingsContext<I, CC::DeviceId>,
-        CC: IpDeviceConfigurationContext<I, BC>,
+        CC: IpDeviceConfigurationContext<I, BC> + ResourceCounterContext<CC::DeviceId, IpCounters<I>>,
     > IpDeviceHandler<I, BC> for CC
 {
     fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool {
@@ -880,6 +868,87 @@ impl<
             *default_hop_limit = hop_limit
         })
     }
+
+    fn handle_received_dad_packet(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr: SpecifiedAddr<I::Addr>,
+        packet_data: I::ReceivedPacketData<'_>,
+    ) -> IpAddressState {
+        let addr_id = match self.get_address_id(device_id, addr) {
+            Ok(o) => o,
+            Err(NotFoundError) => return IpAddressState::Unavailable,
+        };
+
+        match self.with_ip_device_configuration(device_id, |_config, mut core_ctx| {
+            core_ctx.handle_incoming_packet(bindings_ctx, device_id, &addr_id, packet_data)
+        }) {
+            DadIncomingPacketResult::Assigned => return IpAddressState::Assigned,
+            DadIncomingPacketResult::Tentative { meta } => {
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(I, Ip)]
+                struct Wrapped<I: IpDeviceIpExt>(I::IncomingPacketResultMeta);
+                let is_looped_back = I::map_ip_in(
+                    Wrapped(meta),
+                    // Note: Looped back ARP probes are handled directly in the
+                    // ARP engine.
+                    |Wrapped(())| false,
+                    // Per RFC 7527 section 4.2:
+                    //   If the node has been configured to use the Enhanced DAD algorithm and
+                    //   an interface on the node receives any NS(DAD) message where the
+                    //   Target Address matches the interface address (in tentative or
+                    //   optimistic state), the receiver compares the nonce included in the
+                    //   message, with any stored nonce on the receiving interface.  If a
+                    //   match is found, the node SHOULD log a system management message,
+                    //   SHOULD update any statistics counter, and MUST drop the received
+                    //   message.  If the received NS(DAD) message includes a nonce and no
+                    //   match is found with any stored nonce, the node SHOULD log a system
+                    //   management message for a DAD-failed state and SHOULD update any
+                    //   statistics counter.
+                    |Wrapped(Ipv6PacketResultMetadata { matched_nonce })| matched_nonce,
+                );
+
+                if is_looped_back {
+                    // Increment a counter (IPv6 only).
+                    self.increment_both(device_id, |c| {
+                        #[derive(GenericOverIp)]
+                        #[generic_over_ip(I, Ip)]
+                        struct InCounters<'a, I: IpDeviceIpExt>(&'a I::RxCounters<Counter>);
+                        I::map_ip_in::<_, _>(
+                            InCounters(&c.version_rx),
+                            |_counters| unreachable!("Looped back ARP probes are dropped in ARP"),
+                            |InCounters(counters)| &counters.drop_looped_back_dad_probe,
+                        )
+                    });
+
+                    // Return `Tentative` without removing the address if the
+                    // probe is looped back.
+                    return IpAddressState::Tentative;
+                }
+            }
+            DadIncomingPacketResult::Uninitialized => {}
+        }
+
+        // If we're here, we've had a conflicting packet and we should remove the
+        // address.
+        match del_ip_addr(
+            self,
+            bindings_ctx,
+            device_id,
+            DelIpAddr::AddressId(addr_id),
+            AddressRemovedReason::DadFailed,
+        ) {
+            Ok(result) => {
+                bindings_ctx.defer_removal_result(result);
+                IpAddressState::Tentative
+            }
+            Err(NotFoundError) => {
+                // We may have raced with user removal of this address.
+                IpAddressState::Unavailable
+            }
+        }
+    }
 }
 
 /// Handles receipt of an IGMP packet on `device`.
@@ -887,7 +956,7 @@ pub fn receive_igmp_packet<CC, BC, B, H>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    src_ip: Ipv4Addr,
+    src_ip: Ipv4SourceAddr,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
     buffer: B,
     info: &LocalDeliveryPacketInfo<Ipv4, H>,
@@ -929,36 +998,6 @@ pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
         retrans_timer: NonZeroDuration,
     );
 
-    /// Handles a received neighbor solicitation that has been determined to be
-    /// due to a node performing duplicate address detection for `addr`. Removes
-    /// `addr` from `device_id` if it is determined `addr` is a duplicate
-    /// tentative address.
-    ///
-    /// Returns the assignment state of `addr` on the interface, if there was
-    /// one before any action was taken.
-    fn handle_received_dad_neighbor_solicitation(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-        nonce: Option<NdpNonce<&'_ [u8]>>,
-    ) -> IpAddressState;
-
-    /// Handles a received neighbor advertisement.
-    ///
-    /// Takes action in response to a received neighbor advertisement for the
-    /// specified address. Returns the assignment state of the address on the
-    /// given interface, if there was one before any action was taken. That is,
-    /// this method returns `Some(Tentative {..})` when the address was
-    /// tentatively assigned (and now removed), `Some(Assigned)` if the address
-    /// was assigned (and so not removed), otherwise `None`.
-    fn handle_received_neighbor_advertisement(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-    ) -> IpAddressState;
-
     /// Sets the link MTU for the device.
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
 
@@ -997,7 +1036,7 @@ impl<
         BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
         CC: Ipv6DeviceContext<BC>
             + Ipv6DeviceConfigurationContext<BC>
-            + CounterContext<IpCounters<Ipv6>>,
+            + ResourceCounterContext<CC::DeviceId, IpCounters<Ipv6>>,
     > Ipv6DeviceHandler<BC> for CC
 {
     type LinkLayerAddr = CC::LinkLayerAddr;
@@ -1015,108 +1054,6 @@ impl<
         self.with_network_learned_parameters_mut(device_id, |state| {
             state.retrans_timer = Some(retrans_timer)
         })
-    }
-
-    fn handle_received_dad_neighbor_solicitation(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-        nonce: Option<NdpNonce<&'_ [u8]>>,
-    ) -> IpAddressState {
-        let addr_id = match self.get_address_id(device_id, addr.into_specified()) {
-            Ok(o) => o,
-            Err(NotFoundError) => return IpAddressState::Unavailable,
-        };
-
-        match self.with_ipv6_device_configuration(device_id, |_config, mut core_ctx| {
-            core_ctx.handle_incoming_dad_neighbor_solicitation(
-                bindings_ctx,
-                device_id,
-                &addr_id,
-                nonce,
-            )
-        }) {
-            DadAddressStateLookupResult::Assigned => IpAddressState::Assigned,
-            DadAddressStateLookupResult::Tentative { matched_nonce: true } => {
-                self.counters().version_rx.drop_looped_back_dad_probe.increment();
-
-                // Per RFC 7527 section 4.2, "the receiver compares the nonce
-                // included in the message, with any stored nonce on the
-                // receiving interface. If a match is found, the node SHOULD log
-                // a system management message, SHOULD update any statistics
-                // counter, and MUST drop the received message."
-
-                // The matched nonce indicates the neighbor solicitation was
-                // looped back to us, so don't remove the address.
-                IpAddressState::Tentative
-            }
-            DadAddressStateLookupResult::Uninitialized
-            | DadAddressStateLookupResult::Tentative { matched_nonce: false } => {
-                // Per RFC 7527 section 4.2, "If the received NS(DAD) message
-                // includes a nonce and no match is found with any stored nonce,
-                // the node SHOULD log a system management message for a
-                // DAD-failed state and SHOULD update any statistics counter."
-                // -- meaning that we should treat this as an indication that we
-                // have detected a duplicate address.
-
-                match del_ip_addr(
-                    self,
-                    bindings_ctx,
-                    device_id,
-                    DelIpAddr::AddressId(addr_id),
-                    AddressRemovedReason::DadFailed,
-                ) {
-                    Ok(result) => {
-                        bindings_ctx.defer_removal_result(result);
-                        IpAddressState::Tentative
-                    }
-                    Err(NotFoundError) => {
-                        // We may have raced with user removal of this address.
-                        IpAddressState::Unavailable
-                    }
-                }
-            }
-        }
-    }
-
-    fn handle_received_neighbor_advertisement(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-        addr: UnicastAddr<Ipv6Addr>,
-    ) -> IpAddressState {
-        let addr_id = match self.get_address_id(device_id, addr.into_specified()) {
-            Ok(o) => o,
-            Err(NotFoundError) => return IpAddressState::Unavailable,
-        };
-
-        let assigned = self.with_ip_address_state(
-            device_id,
-            &addr_id,
-            |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| *assigned,
-        );
-
-        if assigned {
-            IpAddressState::Assigned
-        } else {
-            match del_ip_addr(
-                self,
-                bindings_ctx,
-                device_id,
-                DelIpAddr::AddressId(addr_id),
-                AddressRemovedReason::DadFailed,
-            ) {
-                Ok(result) => {
-                    bindings_ctx.defer_removal_result(result);
-                    IpAddressState::Tentative
-                }
-                Err(NotFoundError) => {
-                    // We may have raced with user removal of this address.
-                    IpAddressState::Unavailable
-                }
-            }
-        }
     }
 
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu) {
@@ -1236,17 +1173,21 @@ fn enable_ipv6_device_with_config<
         .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
         .into_iter()
         .for_each(|addr_id| {
-            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
-                device: device_id.clone(),
-                addr: addr_id.addr().into(),
-                state: IpAddressState::Tentative,
-            });
-            DadHandler::start_duplicate_address_detection(
+            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
                 core_ctx,
                 bindings_ctx,
                 device_id,
                 &addr_id,
-            );
+            )
+            .into_address_state_and_start_dad();
+            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
+                device: device_id.clone(),
+                addr: addr_id.addr().into(),
+                state,
+            });
+            if let Some(token) = start_dad {
+                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+            }
         });
 
     // Only generate a link-local address if the device supports link-layer
@@ -1291,10 +1232,10 @@ fn disable_ipv6_device_with_config<
         .with_address_ids(device_id, |addrs, core_ctx| {
             addrs
                 .map(|addr_id| {
-                    core_ctx.with_ip_address_state(
+                    core_ctx.with_ip_address_data(
                         device_id,
                         &addr_id,
-                        |Ipv6AddressState { flags: _, config }| (addr_id.clone(), *config),
+                        |IpAddressData { flags: _, config }| (addr_id.clone(), *config),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -1347,7 +1288,7 @@ fn disable_ipv6_device_with_config<
 
 fn enable_ipv4_device_with_config<
     BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
-    CC: IpDeviceStateContext<Ipv4, BC> + GmpHandler<Ipv4, BC>,
+    CC: IpDeviceStateContext<Ipv4, BC> + GmpHandler<Ipv4, BC> + DadHandler<Ipv4, BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1363,15 +1304,26 @@ fn enable_ipv4_device_with_config<
         config,
     );
     GmpHandler::gmp_handle_maybe_enabled(core_ctx, bindings_ctx, device_id);
-    core_ctx.with_address_ids(device_id, |addrs, _core_ctx| {
-        addrs.for_each(|addr| {
+    core_ctx
+        .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
+        .into_iter()
+        .for_each(|addr_id| {
+            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
+                core_ctx,
+                bindings_ctx,
+                device_id,
+                &addr_id,
+            )
+            .into_address_state_and_start_dad();
             bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
-                addr: addr.addr().into(),
-                state: IpAddressState::Assigned,
+                addr: addr_id.addr().into(),
+                state,
             });
+            if let Some(token) = start_dad {
+                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+            }
         })
-    })
 }
 
 fn disable_ipv4_device_with_config<
@@ -1594,9 +1546,18 @@ pub fn add_ip_addr_subnet_with_config<
     let ip_enabled =
         core_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
-    let state = match ip_enabled {
-        true => CC::INITIAL_ADDRESS_STATE,
-        false => IpAddressState::Unavailable,
+    let (state, start_dad) = if ip_enabled {
+        DadHandler::initialize_duplicate_address_detection(
+            core_ctx,
+            bindings_ctx,
+            device_id,
+            &addr_id,
+        )
+        .into_address_state_and_start_dad()
+    } else {
+        // NB: We don't start DAD if the device is disabled. DAD will be
+        // performed when the device is enabled for all addresses.
+        (IpAddressState::Unavailable, None)
     };
 
     bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
@@ -1607,10 +1568,8 @@ pub fn add_ip_addr_subnet_with_config<
         preferred_lifetime,
     });
 
-    if ip_enabled {
-        // NB: We don't start DAD if the device is disabled. DAD will be
-        // performed when the device is enabled for all addresses.
-        DadHandler::start_duplicate_address_detection(core_ctx, bindings_ctx, device_id, &addr_id)
+    if let Some(token) = start_dad {
+        core_ctx.start_duplicate_address_detection(bindings_ctx, token);
     }
 
     Ok(addr_id)
@@ -1719,9 +1678,7 @@ pub fn del_ip_addr_inner<
     // for deletion. If the configuration has already been taken, consider as if
     // the address is already removed.
     let addr_config = core_ctx
-        .with_ip_address_state_mut(device_id, &addr_id, |addr_state| {
-            I::take_addr_config_for_removal(addr_state)
-        })
+        .with_ip_address_data_mut(device_id, &addr_id, |addr_data| addr_data.config.take())
         .ok_or(NotFoundError)?;
 
     let addr_sub = addr_id.addr_sub();
@@ -1848,9 +1805,85 @@ pub fn clear_ipv6_device_state<
     })
 }
 
+/// Dispatches a received ARP packet (Request or Reply) to the IP layer.
+///
+/// Returns the `IpAddressState` of `target_addr` on `device`.
+pub fn on_arp_packet<CC, BC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    sender_addr: Ipv4Addr,
+    target_addr: Ipv4Addr,
+) -> IpAddressState
+where
+    CC: IpDeviceHandler<Ipv4, BC>,
+{
+    // As Per RFC 5227, section 2.1.1
+    //   If [...] the host receives any ARP packet (Request *or* Reply) on the
+    //   interface where the probe is being performed, where the packet's
+    //   'sender IP address' is the address being probed for, then the host MUST
+    //   treat this address as being in use by some other host.
+    if let Some(sender_addr) = SpecifiedAddr::new(sender_addr) {
+        let sender_addr_state = IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
+            core_ctx,
+            bindings_ctx,
+            &device_id,
+            sender_addr,
+            (),
+        );
+        match sender_addr_state {
+            // As Per RFC 5227 section 2.4:
+            //   At any time, if a host receives an ARP packet (Request *or*
+            //   Reply) where the 'sender IP address' is (one of) the host's own
+            //   IP address(es) configured on that interface, but the 'sender
+            //   hardware address' does not match any of the host's own
+            //   interface addresses, then this is a conflicting ARP packet,
+            //   indicating some other host also thinks it is validly using this
+            //   address.
+            IpAddressState::Assigned => {
+                // TODO(https://fxbug.dev/42077260): Implement one of the
+                // address defence strategies outlined in RFC 5227 section 2.4.
+                info!("DAD received conflicting ARP packet for assigned addr=({sender_addr})");
+            }
+            IpAddressState::Tentative => {
+                debug!("DAD received conflicting ARP packet for tentative addr=({sender_addr})");
+            }
+            IpAddressState::Unavailable => {}
+        }
+    }
+
+    // As Per RFC 5227, section 2.1.1
+    //  In addition, if during this period the host receives any ARP Probe
+    //  where the packet's 'target IP address' is the address being probed
+    //  for, [... ] then the host SHOULD similarly treat this as an address
+    //  conflict.
+    let Some(target_addr) = SpecifiedAddr::new(target_addr) else {
+        return IpAddressState::Unavailable;
+    };
+    let target_addr_state = IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
+        core_ctx,
+        bindings_ctx,
+        &device_id,
+        target_addr,
+        (),
+    );
+    match target_addr_state {
+        // Unlike the sender_addr, it's not concerning to receive an ARP
+        // packet whose target_addr is assigned to us.
+        IpAddressState::Assigned => {}
+        IpAddressState::Tentative => {
+            debug!("DAD received conflicting ARP packet for tentative addr=({sender_addr})");
+        }
+        IpAddressState::Unavailable => {}
+    }
+    target_addr_state
+}
+
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::boxed::Box;
+
+    use crate::device::IpAddressFlags;
 
     use super::*;
 
@@ -1895,12 +1928,10 @@ pub(crate) mod testutil {
         core_ctx.with_address_ids(device_id, |addrs, core_ctx| {
             cb(Box::new(addrs.filter_map(|addr_id| {
                 core_ctx
-                    .with_ip_address_state(
+                    .with_ip_address_data(
                         device_id,
                         &addr_id,
-                        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| {
-                            *assigned
-                        },
+                        |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| *assigned,
                     )
                     .then(|| addr_id.addr_sub())
             })))

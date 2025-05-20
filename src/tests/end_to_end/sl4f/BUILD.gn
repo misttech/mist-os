@@ -27,6 +27,7 @@ dart_test("sl4f_test") {
     "//third_party/dart-pkg/pub/mockito",
     "//third_party/dart-pkg/pub/test",
   ]
+  package_deps = [ "//src/tests/end_to_end/sl4f/testing:sl4f-testing" ]
 
   non_dart_deps = [ ":runtime_deps($host_toolchain)" ]
 

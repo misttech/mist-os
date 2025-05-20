@@ -341,7 +341,7 @@ mod tests {
         inspect_log!(node, s: s);
 
         // Should not cause compiler error since value is not moved
-        println!("{}", s);
+        println!("{s}");
     }
 
     #[fuchsia::test]

@@ -74,6 +74,7 @@ pub mod pseudo_directory;
 pub use vfs_macros::pseudo_directory;
 
 pub use common::CreationMode;
+pub use execution_scope::ExecutionScope;
 pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
 pub use path::Path;
 pub use protocols::ProtocolsExt;
@@ -85,7 +86,6 @@ pub use protocols::ProtocolsExt;
 extern crate self as vfs;
 
 use directory::entry_container::Directory;
-use execution_scope::ExecutionScope;
 use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 
@@ -101,7 +101,7 @@ pub fn serve_directory<D: Directory + ?Sized>(
 ) -> fio::DirectoryProxy {
     let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     let request = flags.to_object_request(server);
-    request.handle(|request| root.open3(ExecutionScope::new(), path, flags, request));
+    request.handle(|request| root.open(ExecutionScope::new(), path, flags, request));
     proxy
 }
 
@@ -117,6 +117,6 @@ pub fn serve_file<D: Directory + ?Sized>(
 ) -> fio::FileProxy {
     let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
     let request = flags.to_object_request(server);
-    request.handle(|request| root.open3(ExecutionScope::new(), path, flags, request));
+    request.handle(|request| root.open(ExecutionScope::new(), path, flags, request));
     proxy
 }

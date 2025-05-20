@@ -273,7 +273,9 @@ impl<B: PacketBuffer> Connection<B> {
                 return Ok(());
             }
             if let Err(err) = payload_socket.lock().await.write_all(payload).await {
-                debug!("Write to socket address {address:?} failed, resetting connection immediately: {err:?}");
+                debug!(
+                    "Write to socket address {address:?} failed, resetting connection immediately: {err:?}"
+                );
                 self.reset(&address).await.inspect_err(|err| warn!("Attempt to reset connection to {address:?} failed after write error: {err:?}")).ok();
             }
             Ok(())
@@ -311,7 +313,9 @@ impl<B: PacketBuffer> Connection<B> {
             };
             let (notify_closed, notify_closed_rx) = mpsc::channel(2);
             if connected_tx.send(Ok(ConnectionState(notify_closed_rx))).is_err() {
-                warn!("Accept packet received for {address:?} but connect caller stopped waiting for it");
+                warn!(
+                    "Accept packet received for {address:?} but connect caller stopped waiting for it"
+                );
             }
 
             let reader_task = Scope::new_with_name("connection-reader");
@@ -339,7 +343,9 @@ impl<B: PacketBuffer> Connection<B> {
                 });
             }
             Entry::Occupied(_) => {
-                warn!("Received connect packet for already existing connection for address {address:?}. Ignoring");
+                warn!(
+                    "Received connect packet for already existing connection for address {address:?}. Ignoring"
+                );
                 return Ok(());
             }
         }
@@ -359,12 +365,16 @@ impl<B: PacketBuffer> Connection<B> {
         let mut notify;
         if let Some(conn) = self.connections.lock().unwrap().remove(&address) {
             let VsockConnectionState::Connected { notify_closed, .. } = conn.state else {
-                warn!("Received finish (close) packet for {address:?} which was not in a connected state. Ignoring and dropping connection state.");
+                warn!(
+                    "Received finish (close) packet for {address:?} which was not in a connected state. Ignoring and dropping connection state."
+                );
                 return Ok(());
             };
             notify = notify_closed;
         } else {
-            warn!("Received finish (close) packet for connection that didn't exist on address {address:?}. Ignoring");
+            warn!(
+                "Received finish (close) packet for connection that didn't exist on address {address:?}. Ignoring"
+            );
             return Ok(());
         }
 
@@ -386,10 +396,14 @@ impl<B: PacketBuffer> Connection<B> {
             if let VsockConnectionState::Connected { notify_closed, .. } = conn.state {
                 notify = Some(notify_closed);
             } else {
-                debug!("Received reset packet for connection that wasn't in a connecting or disconnected state on address {address:?}.");
+                debug!(
+                    "Received reset packet for connection that wasn't in a connecting or disconnected state on address {address:?}."
+                );
             }
         } else {
-            warn!("Received reset packet for connection that didn't exist on address {address:?}. Ignoring");
+            warn!(
+                "Received reset packet for connection that didn't exist on address {address:?}. Ignoring"
+            );
         }
 
         if let Some(mut notify) = notify {
@@ -547,7 +561,7 @@ mod test {
             socket.read_exact(&mut buf).await.unwrap();
             assert_eq!(buf, vec![size; size as usize]);
         }
-        echo_task.cancel().await;
+        echo_task.abort().await;
     }
 
     #[fuchsia::test]
@@ -576,7 +590,7 @@ mod test {
             socket.read_exact(&mut buf).await.unwrap();
             assert_eq!(buf, vec![size; size as usize]);
         }
-        echo_task.cancel().await;
+        echo_task.abort().await;
     }
 
     #[fuchsia::test]
@@ -609,7 +623,7 @@ mod test {
             socket.read_exact(&mut buf).await.unwrap();
             assert_eq!(buf, vec![size; size as usize]);
         }
-        echo_task.cancel().await;
+        echo_task.abort().await;
     }
 
     async fn copy_connection(from: &Connection<Vec<u8>>, to: &Connection<Vec<u8>>) {
@@ -659,7 +673,7 @@ mod test {
             left_side(connection1, incoming_requests1),
             right_side(connection2, incoming_requests2)
         );
-        passthrough_task.cancel().await;
+        passthrough_task.abort().await;
         res
     }
 

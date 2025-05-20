@@ -12,11 +12,4 @@
             url: "#meta/fake-dependencies.cm",
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.kernel.VmexResource" ],
-            from: "parent",
-            to: "#fake_dependencies",
-        },
-    ],
 }

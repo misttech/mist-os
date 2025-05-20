@@ -6,6 +6,7 @@
 
 #include <zircon/status.h>
 
+#include <algorithm>
 #include <iomanip>
 #include <ostream>
 
@@ -55,19 +56,19 @@ void TestFixture::ExpectCallbacks() {
 
         if (callback->sequence_num <= prev_callback.sequence_num) {
           std::ostringstream out_stream;
-          auto format_cb_entry = [&out_stream](const PendingCallback callback_entry) {
+          auto format_cb_entry = [&out_stream](const PendingCallback& callback_entry) {
             out_stream << std::right << std::setw(23)
                        << (std::string("'") + callback_entry.name + "'  [")
-                       << callback_entry.sequence_num << "]" << std::endl;
+                       << callback_entry.sequence_num << "]" << '\n';
           };
 
-          out_stream << "      Expected order  [Actual order]" << std::endl;
-          std::for_each(retired_callbacks.begin(), retired_callbacks.end(), format_cb_entry);
+          out_stream << "      Expected order  [Actual order]" << '\n';
+          std::ranges::for_each(retired_callbacks, format_cb_entry);
           format_cb_entry(*callback);
 
           ADD_FAILURE() << "Out-of-order callbacks: '" << callback->name
                         << "' completed too early -- should have been after '" << prev_callback.name
-                        << "'" << std::endl
+                        << "'" << '\n'
                         << out_stream.str();
         }
       }
@@ -93,12 +94,8 @@ void TestFixture::ExpectErrors(const std::vector<std::shared_ptr<ErrorHandler>>&
 
   RunLoopWithTimeoutOrUntil(
       [errors]() {
-        for (auto& eh : errors) {
-          if (eh->error_code != eh->expected_error_code) {
-            return false;
-          }
-        }
-        return true;
+        return std::ranges::all_of(
+            errors, [](auto& eh) { return eh->error_code == eh->expected_error_code; });
       },
       kLoopTimeout);
 
@@ -109,9 +106,9 @@ void TestFixture::ExpectErrors(const std::vector<std::shared_ptr<ErrorHandler>>&
 void TestFixture::ExpectNoUnexpectedErrors(const std::string& msg_for_failure) {
   for (auto& [_, eh] : error_handlers_) {
     EXPECT_EQ(eh->error_code, eh->expected_error_code)
-        << msg_for_failure << ": " << eh->name << " had an unexpected error\nExpected error is "
-        << zx_status_get_string(eh->expected_error_code) << "\nActual error is "
-        << zx_status_get_string(eh->error_code);
+        << msg_for_failure << ": " << eh->name << " had an unexpected error" << '\n'
+        << "Expected error is " << zx_status_get_string(eh->expected_error_code) << '\n'
+        << "Actual error is " << zx_status_get_string(eh->error_code);
   }
 }
 
@@ -135,12 +132,8 @@ std::shared_ptr<TestFixture::PendingCallback> TestFixture::NewPendingCallback(
 }
 
 bool TestFixture::ErrorOccurred() {
-  for (auto& [_, eh] : error_handlers_) {
-    if (eh->error_code != ZX_OK) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(error_handlers_,
+                             [](const auto& eh) { return eh.second->error_code != ZX_OK; });
 }
 
 }  // namespace media::audio::test

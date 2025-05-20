@@ -43,6 +43,12 @@ pub struct MemoryId {
     parent: Option<Box<MemoryId>>,
 }
 
+impl MemoryId {
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+}
+
 impl From<u64> for MemoryId {
     fn from(id: u64) -> Self {
         Self { id, parent: None }
@@ -643,6 +649,9 @@ impl Type {
                     ))
                 }
             }
+            (_, Type::Releasable { inner, .. }) => {
+                inner.match_parameter_type(context, parameter_type, index, next)
+            }
 
             _ => Err(format!("incorrect parameter for index {index} at pc {}", context.pc)),
         }
@@ -734,18 +743,18 @@ impl CallingContext {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) struct StructAccess {
-    pub(crate) pc: ProgramCounter,
+#[derive(Debug, PartialEq, Clone)]
+pub struct StructAccess {
+    pub pc: ProgramCounter,
 
     // Memory Id of the struct being accessed.
-    pub(crate) memory_id: MemoryId,
+    pub memory_id: MemoryId,
 
     // Offset of the field being loaded.
-    pub(crate) field_offset: usize,
+    pub field_offset: usize,
 
     // Indicates that this is a 32-bit pointer load. These instructions must be remapped.
-    pub(crate) is_32_bit_ptr_load: bool,
+    pub is_32_bit_ptr_load: bool,
 }
 
 #[derive(Debug)]
@@ -765,8 +774,21 @@ impl VerifiedEbpfProgram {
         self.code
     }
 
-    pub fn from_verified_code(code: Vec<EbpfInstruction>, args: Vec<Type>) -> Self {
-        Self { code, struct_access_instructions: vec![], maps: vec![], args }
+    pub fn code(&self) -> &[EbpfInstruction] {
+        &self.code
+    }
+
+    pub fn struct_access_instructions(&self) -> &[StructAccess] {
+        &self.struct_access_instructions
+    }
+
+    pub fn from_verified_code(
+        code: Vec<EbpfInstruction>,
+        args: Vec<Type>,
+        struct_access_instructions: Vec<StructAccess>,
+        maps: Vec<MapSchema>,
+    ) -> Self {
+        Self { code, args, struct_access_instructions, maps }
     }
 }
 
@@ -1207,7 +1229,7 @@ impl PartialOrd for Stack {
 
 macro_rules! bpf_log {
     ($context:ident, $verification_context:ident, $($msg:tt)*) => {
-        let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code);
+        let prefix = format!("{}: ({:02x})", $context.pc, $verification_context.code[$context.pc].code());
         let suffix = format!($($msg)*);
         $verification_context.logger.log(format!("{prefix} {suffix}").as_bytes());
     }

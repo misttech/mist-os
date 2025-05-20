@@ -10,6 +10,12 @@ config("openthread_240214") {
   rustflags = [ "--cfg=openthread_240214" ]
 }
 
+# TODO(b/413796835): Temporarily disable unnecessary_transmutes warnings
+#                    while addressing underlying issues in "src/bindings.rs"
+config("allow_unnecessary_transmutes") {
+  rustflags = [ "-Aunnecessary_transmutes" ]
+}
+
 rustc_library("openthread_sys") {
   edition = "2021"
   sources = [
@@ -23,6 +29,8 @@ rustc_library("openthread_sys") {
       "49c59ec519cc8b49dd58978d1bc80b7ae7ba88d0") {
     configs += [ ":openthread_240214" ]
   }
+
+  configs += [ ":allow_unnecessary_transmutes" ]
 
   deps = []
 

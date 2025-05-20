@@ -24,6 +24,7 @@ rustc_staticlib("lib") {
     "//sdk/rust/zx-types",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/plugins/target/wait:ffx_wait",
@@ -34,8 +35,8 @@ rustc_staticlib("lib") {
     "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

@@ -19,12 +19,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 /// A lock-free thread-safe future.
-
+//
 // The debugger knows the layout so that async backtraces work, so if this changes the debugger
 // might need to be changed too.
 //
 // This is `repr(C)` so that we can cast between `NonNull<Meta>` and `NonNull<AtomicFuture<F>>`.
-
+//
 // LINT.IfChange
 #[repr(C)]
 struct AtomicFuture<F: Future> {
@@ -36,7 +36,7 @@ struct AtomicFuture<F: Future> {
 }
 // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 
-/// A lock-free thread-safe future.  The handles can be cloned.
+/// A lock-free thread-safe future. The handles can be cloned.
 pub struct AtomicFutureHandle<'a>(NonNull<Meta>, PhantomData<&'a ()>);
 
 /// `AtomicFutureHandle` is safe to access from multiple threads at once.
@@ -76,6 +76,23 @@ impl Meta {
             self.retain();
             self.scope().executor().task_is_ready(AtomicFutureHandle(self.into(), PhantomData));
         }
+    }
+
+    // Returns true if a guard should be acquired.
+    //
+    // # Safety
+    //
+    // This mints a handle with the 'static lifetime, so this should only be called from
+    // `AtomicFutureHandle<'static>`.
+    unsafe fn wake_with_active_guard(&self) -> bool {
+        let old = self.state.fetch_or(READY | WITH_ACTIVE_GUARD, Relaxed);
+        if old & (INACTIVE | READY | DONE) == INACTIVE {
+            self.retain();
+            self.scope().executor().task_is_ready(AtomicFutureHandle(self.into(), PhantomData));
+        }
+
+        // If the task is DONE, the guard won't be released, so we must let the caller know.
+        old & (DONE | WITH_ACTIVE_GUARD) == 0
     }
 
     fn scope(&self) -> &ScopeHandle {
@@ -174,7 +191,7 @@ impl<F: Future> AtomicFuture<F> {
     unsafe fn poll(meta: NonNull<Meta>, cx: &mut Context<'_>) -> Poll<()> {
         let future = &mut meta.cast::<Self>().as_mut().future;
         let result = ready!(Pin::new_unchecked(&mut *future.future).poll(cx));
-        // This might panic which will leave ourselves in a bad state.  We deal with this by
+        // This might panic which will leave ourselves in a bad state. We deal with this by
         // aborting (see below).
         ManuallyDrop::drop(&mut future.future);
         future.result = ManuallyDrop::new(result);
@@ -195,14 +212,14 @@ impl<F: Future> AtomicFuture<F> {
 }
 
 /// State Bits
-
+//
 // Exclusive access is gained by clearing this bit.
 const INACTIVE: usize = 1 << 63;
 
 // Set to indicate the future needs to be polled again.
 const READY: usize = 1 << 62;
 
-// Terminal state: the future is dropped upon entry to this state.  When in this state, other bits
+// Terminal state: the future is dropped upon entry to this state. When in this state, other bits
 // can be set, including READY (which has no meaning).
 const DONE: usize = 1 << 61;
 
@@ -210,10 +227,13 @@ const DONE: usize = 1 << 61;
 const DETACHED: usize = 1 << 60;
 
 // The task has been cancelled.
-const CANCELLED: usize = 1 << 59;
+const ABORTED: usize = 1 << 59;
+
+// The task has an active guard that should be dropped when the task is next polled.
+const WITH_ACTIVE_GUARD: usize = 1 << 58;
 
 // The result has been taken.
-const RESULT_TAKEN: usize = 1 << 58;
+const RESULT_TAKEN: usize = 1 << 57;
 
 // The mask for the ref count.
 const REF_COUNT_MASK: usize = RESULT_TAKEN - 1;
@@ -231,20 +251,20 @@ pub enum AttemptPollResult {
     /// The future was polled, did not complete, but it is woken whilst it is polled so it
     /// should be polled again.
     Yield,
-    /// The future was cancelled.
-    Cancelled,
+    /// The future was aborted.
+    Aborted,
 }
 
-/// The result of calling the `cancel_and_detach` function.
+/// The result of calling the `abort_and_detach` function.
 #[must_use]
-pub enum CancelAndDetachResult {
+pub enum AbortAndDetachResult {
     /// The future has finished; it can be dropped.
     Done,
 
-    /// The future needs to be added to a run queue to be cancelled.
+    /// The future needs to be added to a run queue to be aborted.
     AddToRunQueue,
 
-    /// The future is soon to be cancelled and nothing needs to be done.
+    /// The future is soon to be aborted and nothing needs to be done.
     Pending,
 }
 
@@ -299,7 +319,7 @@ impl<'a> AtomicFutureHandle<'a> {
 
     /// Returns the associated scope.
     pub fn scope(&self) -> &ScopeHandle {
-        &self.meta().scope()
+        self.meta().scope()
     }
 
     /// Attempt to poll the underlying future.
@@ -308,41 +328,63 @@ impl<'a> AtomicFutureHandle<'a> {
     /// unless it has already finished.
     pub fn try_poll(&self, cx: &mut Context<'_>) -> AttemptPollResult {
         let meta = self.meta();
-        loop {
+        let has_active_guard = loop {
             // Attempt to acquire sole responsibility for polling the future (by clearing the
-            // INACTIVE bit) and also clear the READY bit at the same time so that we track if it
-            // becomes READY again whilst we are polling.
-            let old = meta.state.fetch_and(!(INACTIVE | READY), Acquire);
+            // INACTIVE bit) and also clear the READY and WITH_ACTIVE_GUARD bits at the same time.
+            // We clear both so that we can track if they are set again whilst we are polling.
+            let old = meta.state.fetch_and(!(INACTIVE | READY | WITH_ACTIVE_GUARD), Acquire);
             assert_ne!(old & REF_COUNT_MASK, 0);
             if old & DONE != 0 {
-                // Someone else completed this future already
+                // If the DONE bit is set, the WITH_ACTIVE_GUARD bit should be ignored; it may or
+                // may not be set, but it doesn't reflect whether an active guard is held so even
+                // though we just cleared it, we shouldn't release a guard here.
                 return AttemptPollResult::SomeoneElseFinished;
             }
+            let has_active_guard = old & WITH_ACTIVE_GUARD != 0;
             if old & INACTIVE != 0 {
                 // We are now the (only) active worker, proceed to poll...
-                if old & CANCELLED != 0 {
-                    // The future was cancelled.
+                if old & ABORTED != 0 {
+                    if has_active_guard {
+                        meta.scope().release_cancel_guard();
+                    }
+                    // The future was aborted.
                     // SAFETY: We have exclusive access.
                     unsafe {
                         self.drop_future_unchecked();
                     }
-                    return AttemptPollResult::Cancelled;
+                    return AttemptPollResult::Aborted;
                 }
-                break;
+                break has_active_guard;
             }
             // Future was already active; this shouldn't really happen because we shouldn't be
-            // polling it from multiple threads at the same time.  Still, we handle it by setting
-            // the READY bit so that it gets polled again.  We do this regardless of whether we
+            // polling it from multiple threads at the same time. Still, we handle it by setting
+            // the READY bit so that it gets polled again. We do this regardless of whether we
             // cleared the READY bit above.
-            let old = meta.state.fetch_or(READY, Relaxed);
+            let old2 = meta.state.fetch_or(READY | (old & WITH_ACTIVE_GUARD), Relaxed);
+
+            if old2 & DONE != 0 {
+                // If `has_active_guard` is true, we are responsible for releasing a guard since it
+                // means we cleared the `WITH_ACTIVE_GUARD` bit.
+                if has_active_guard {
+                    meta.scope().release_cancel_guard();
+                }
+                return AttemptPollResult::SomeoneElseFinished;
+            }
+
+            if has_active_guard && old2 & WITH_ACTIVE_GUARD != 0 {
+                // Within the small window, something else gave this task an active guard, so we
+                // must return one of them.
+                meta.scope().release_cancel_guard();
+            }
+
             // If the future is still active, or the future was already marked as ready, we can
             // just return and it will get polled again.
-            if old & INACTIVE == 0 || old & READY != 0 {
+            if old2 & INACTIVE == 0 || old2 & READY != 0 {
                 return AttemptPollResult::Pending;
             }
             // The worker finished, and we marked the future as ready, so we must try again because
             // the future won't be in a run queue.
-        }
+        };
 
         // We cannot recover from panics.
         let bomb = Bomb;
@@ -352,6 +394,10 @@ impl<'a> AtomicFutureHandle<'a> {
 
         std::mem::forget(bomb);
 
+        if has_active_guard {
+            meta.scope().release_cancel_guard();
+        }
+
         if let Poll::Ready(()) = result {
             // The future will have been dropped, so we just need to set the state.
             //
@@ -359,9 +405,15 @@ impl<'a> AtomicFutureHandle<'a> {
             // that takes or drops the result.
             let old = meta.state.fetch_or(DONE, Release);
 
+            if old & WITH_ACTIVE_GUARD != 0 {
+                // Whilst we were polling the task, it was given an active guard. We must return it
+                // now.
+                meta.scope().release_cancel_guard();
+            }
+
             if old & DETACHED != 0 {
-                // If the future is detached, we should eagerly drop the result.  This can be Relaxed
-                // ordering because the result was written by this thread.
+                // If the future is detached, we should eagerly drop the result. This can be
+                // Relaxed ordering because the result was written by this thread.
 
                 // SAFETY: The future has completed.
                 unsafe {
@@ -381,15 +433,23 @@ impl<'a> AtomicFutureHandle<'a> {
 
     /// Drops the future without checking its current state.
     ///
+    /// # Panics
+    ///
+    /// This will panic if the future is already marked with `DONE`.
+    ///
     /// # Safety
     ///
     /// This doesn't check the current state, so this must only be called if it is known that there
-    /// is no concurrent access.  This also does *not* include any memory barriers before dropping
+    /// is no concurrent access. This also does *not* include any memory barriers before dropping
     /// the future.
     pub unsafe fn drop_future_unchecked(&self) {
         // Set the state first in case we panic when we drop.
         let meta = self.meta();
-        assert!(meta.state.fetch_or(DONE | RESULT_TAKEN, Relaxed) & DONE == 0);
+        let old = meta.state.fetch_or(DONE | RESULT_TAKEN, Relaxed);
+        assert_eq!(old & DONE, 0);
+        if old & WITH_ACTIVE_GUARD != 0 {
+            meta.scope().release_cancel_guard();
+        }
         (meta.vtable.drop_future)(meta.into());
     }
 
@@ -410,11 +470,10 @@ impl<'a> AtomicFutureHandle<'a> {
         }
     }
 
-    /// Cancels the task.  Returns true if the task needs to be added to a run queue.
+    /// Aborts the task. Returns true if the task needs to be added to a run queue.
     #[must_use]
-    pub fn cancel(&self) -> bool {
-        self.meta().state.fetch_or(CANCELLED | READY, Relaxed) & (INACTIVE | READY | DONE)
-            == INACTIVE
+    pub fn abort(&self) -> bool {
+        self.meta().state.fetch_or(ABORTED | READY, Relaxed) & (INACTIVE | READY | DONE) == INACTIVE
     }
 
     /// Marks the task as detached.
@@ -423,7 +482,7 @@ impl<'a> AtomicFutureHandle<'a> {
         let old = meta.state.fetch_or(DETACHED, Relaxed);
 
         if old & (DONE | RESULT_TAKEN) == DONE {
-            // If the future is done, we should eagerly drop the result.  This needs to be acquire
+            // If the future is done, we should eagerly drop the result. This needs to be acquire
             // ordering because another thread might have written the result.
 
             // SAFETY: The future has completed.
@@ -433,14 +492,14 @@ impl<'a> AtomicFutureHandle<'a> {
         }
     }
 
-    /// Marks the task as cancelled and detached (for when the caller isn't interested in waiting
-    /// for the cancellation to be finished).  Returns true if the task should be added to a run
+    /// Marks the task as aborted and detached (for when the caller isn't interested in waiting
+    /// for the cancellation to be finished). Returns true if the task should be added to a run
     /// queue.
-    pub fn cancel_and_detach(&self) -> CancelAndDetachResult {
+    pub fn abort_and_detach(&self) -> AbortAndDetachResult {
         let meta = self.meta();
-        let old_state = meta.state.fetch_or(CANCELLED | DETACHED | READY, Relaxed);
+        let old_state = meta.state.fetch_or(ABORTED | DETACHED | READY, Relaxed);
         if old_state & DONE != 0 {
-            // If the future is done, we should eagerly drop the result.  This needs to be acquire
+            // If the future is done, we should eagerly drop the result. This needs to be acquire
             // ordering because another thread might have written the result.
 
             // SAFETY: The future has completed.
@@ -448,11 +507,11 @@ impl<'a> AtomicFutureHandle<'a> {
                 meta.drop_result(Acquire);
             }
 
-            CancelAndDetachResult::Done
+            AbortAndDetachResult::Done
         } else if old_state & (INACTIVE | READY) == INACTIVE {
-            CancelAndDetachResult::AddToRunQueue
+            AbortAndDetachResult::AddToRunQueue
         } else {
-            CancelAndDetachResult::Pending
+            AbortAndDetachResult::Pending
         }
     }
 
@@ -541,6 +600,17 @@ impl AtomicFutureHandle<'static> {
         unsafe {
             self.meta().wake();
         }
+    }
+
+    /// Wakes the future with an active guard. Returns true if successful i.e. a guard needs to be
+    /// acquired.
+    ///
+    /// NOTE: `Scope::release_cancel_guard` can be called *before* this function returns because the
+    /// task can be polled on another thread. For this reason, the caller either needs to hold a
+    /// lock, or it should preemptively take the guard.
+    pub fn wake_with_active_guard(&self) -> bool {
+        // SAFETY: The lifetime on `AtomicFutureHandle` is 'static.
+        unsafe { self.meta().wake_with_active_guard() }
     }
 }
 

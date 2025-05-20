@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocolrequest/cpp/markers.h>
 #include <fidl/test.protocolrequest/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -16,38 +18,19 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_protocolrequest::Child> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Child> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Child>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_protocolrequest::Child> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocolrequest::Child>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocolrequest::Child> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -79,13 +62,9 @@ class ::fidl::SyncEventHandler<::test_protocolrequest::Child>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocolrequest::Child> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Child>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocolrequest::Child> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -98,8 +77,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocolrequest::Child>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_protocolrequest::Child> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -119,19 +96,13 @@ class ::fidl::Server<::test_protocolrequest::Child> : public ::fidl::internal::I
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolrequest::Child> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocolrequest::Child> final {
@@ -146,8 +117,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocolrequest::Child> 
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolrequest::Parent::GetChild> {
@@ -181,13 +150,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocolrequest::Parent::Take
   using Completer = fidl::Completer<>;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_protocolrequest::Parent::GetChild> final : public ::test_protocolrequest::ParentGetChildResponse {
  public:
   using ::test_protocolrequest::ParentGetChildResponse::ParentGetChildResponse;
-  Response(::test_protocolrequest::ParentGetChildResponse v) : ParentGetChildResponse(std::move(v)) {}
+  Response(::test_protocolrequest::ParentGetChildResponse v);
 };
 
 template <>
@@ -203,7 +170,7 @@ template <>
 class ::fidl::Response<::test_protocolrequest::Parent::GetChildRequest> final : public ::test_protocolrequest::ParentGetChildRequestResponse {
  public:
   using ::test_protocolrequest::ParentGetChildRequestResponse::ParentGetChildRequestResponse;
-  Response(::test_protocolrequest::ParentGetChildRequestResponse v) : ParentGetChildRequestResponse(std::move(v)) {}
+  Response(::test_protocolrequest::ParentGetChildRequestResponse v);
 };
 
 template <>
@@ -228,10 +195,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocolrequest::Parent> final 
   ::fit::result<::fidl::OneWayError> TakeChildRequest(::fidl::Request<::test_protocolrequest::Parent::TakeChildRequest> request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent>> {
@@ -245,15 +208,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocolrequest::Parent> fi
   ::fit::result<::fidl::OneWayError> TakeChildRequest(::fidl::Request<::test_protocolrequest::Parent::TakeChildRequest> request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocolrequest::Parent>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocolrequest::Parent> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -285,13 +241,9 @@ class ::fidl::SyncEventHandler<::test_protocolrequest::Parent>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocolrequest::Parent> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocolrequest::Parent>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocolrequest::Parent> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -304,8 +256,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocolrequest::Parent>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocolrequest::Parent::GetChild> : public ::fidl::CompleterBase {
@@ -365,19 +315,13 @@ class ::fidl::Server<::test_protocolrequest::Parent> : public ::fidl::internal::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocolrequest::Parent> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocolrequest::Parent> final {
@@ -393,6 +337,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocolrequest::Parent>
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

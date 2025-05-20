@@ -31,8 +31,8 @@ use fidl::endpoints::ClientEnd;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
-    log_error, log_trace, log_warn, trace_duration, trace_instant_flow_begin,
-    trace_instant_flow_end, track_stub, with_zx_name, CATEGORY_STARNIX,
+    log_error, log_trace, log_warn, trace_duration, trace_instaflow_begin, trace_instaflow_end,
+    track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
     ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex,
@@ -1222,17 +1222,10 @@ impl Releasable for BinderProcess {
             }
         }
 
-        // Notify all callers that had transactions scheduled for this process that the recipient is
-        // dead.
-        for (command, _trace_guard) in self.command_queue.into_inner().commands {
-            if let Command::Transaction { sender, .. } = command {
-                if let Some(sender_thread) = sender.thread.upgrade() {
-                    sender_thread
-                        .lock()
-                        .enqueue_command(Command::DeadReply { pop_transaction: true });
-                }
-            }
-        }
+        // Generate dead replies for transactions currently in the command queue of this process.
+        // Transactions that have been scheduled with a specific thread will generate dead replies
+        // when the threads are released below.
+        generate_dead_replies(self.command_queue.into_inner().commands, self.identifier, None);
 
         for transaction in state.active_transactions.into_values() {
             transaction.release(());
@@ -1242,6 +1235,72 @@ impl Releasable for BinderProcess {
 
         for thread in state.thread_pool.0.into_values() {
             thread.release(context);
+        }
+    }
+}
+
+/// Generates dead replies for all the transactions in `commands` that are targeting
+/// `target_thread` and `target_proc`.
+///
+/// If a transaction has a target thread specified, it must match `target_thread` in order to be
+/// marked dead. If a transaction does not specify a target thread, it is marked dead if the
+/// target process matches `target_proc`.
+///
+/// If the top transaction of the transaction's `sender_thread` is targeting `target_thread` or
+/// `target_proc`, the transaction is popped and a `DeadReply` command is enqueued on the
+/// transaction's `sender_thread`.
+fn generate_dead_replies(
+    commands: VecDeque<(Command, CommandTraceGuard)>,
+    target_proc: u64,
+    target_thread: Option<i32>,
+) {
+    // Notify all callers that had transactions scheduled for this process that the recipient is
+    // dead.
+    for (command, _trace_guard) in commands {
+        if let Command::Transaction { sender, .. } = command {
+            if let Some(sender_thread) = sender.thread.upgrade() {
+                let sender_thread = &mut sender_thread.lock();
+
+                generate_dead_replies_for_transactions(sender_thread, target_proc, target_thread);
+            }
+        }
+    }
+}
+
+/// Generates dead replies for all the `sender_thread`'s transactions targeting `target_thread`
+/// and `target_proc`.
+///
+/// If a transaction has a target thread specified, it must match `target_thread` in order to be
+/// marked dead. If a transaction does not specify a target thread, it is marked dead if the
+/// target process matches `target_proc`.
+///
+/// If the top transaction of the transaction's `sender_thread` is targeting `target_thread` or
+/// `target_proc`, the transaction is popped and a `DeadReply` command is enqueued on the
+/// transaction's `sender_thread`.
+fn generate_dead_replies_for_transactions(
+    sender_thread: &mut BinderThreadState,
+    target_proc: u64,
+    target_thread: Option<i32>,
+) {
+    if let Some((top_transaction, remaining_transactions)) =
+        sender_thread.transactions.split_last_mut()
+    {
+        // Check if the currently active transaction of the sender_thread is
+        // targeting this process. If it is, that means that we might need
+        // to pop the transaction and schedule a dead reply.
+        let top_transaction_was_marked_dead = top_transaction.mark_dead(target_proc, target_thread);
+
+        // Mark all other sender_thread transactions as dead if they are targeting
+        // a dead process.
+        for transaction in remaining_transactions {
+            transaction.mark_dead(target_proc, target_thread);
+        }
+
+        // If the top transaction is targeting this process, then pop the
+        // transaction and enqueue the `DeadReply`.
+        if top_transaction_was_marked_dead {
+            let _ = sender_thread.transactions.pop();
+            sender_thread.enqueue_command(Command::DeadReply);
         }
     }
 }
@@ -1408,37 +1467,32 @@ impl SharedMemory {
             .and_then(|v| v.checked_add(security_context_buffer_length))
             .ok_or_else(|| errno!(EINVAL))?;
         let base_offset = self.allocate(total_length)?;
+        let security_context_buffer = if security_context_buffer_length > 0 {
+            Some(SharedBuffer::new(
+                self,
+                base_offset + data_cap + offsets_length + sg_buffers_length,
+                security_context_buffer_length,
+            )?)
+        } else {
+            None
+        };
 
-        // SAFETY: The offsets and lengths have been bounds-checked above. Constructing a
-        // `SharedBuffer` should be safe.
-        unsafe {
-            Ok(SharedMemoryAllocation {
-                data_buffer: SharedBuffer::new_unchecked(self, base_offset, data_length),
-                offsets_buffer: SharedBuffer::new_unchecked(
-                    self,
-                    base_offset + data_cap,
-                    offsets_length,
-                ),
-                scatter_gather_buffer: SharedBuffer::new_unchecked(
-                    self,
-                    base_offset + data_cap + offsets_length,
-                    sg_buffers_length,
-                ),
-                security_context_buffer: (security_context_buffer_length > 0).then(|| {
-                    SharedBuffer::new_unchecked(
-                        self,
-                        base_offset + data_cap + offsets_length + sg_buffers_length,
-                        security_context_buffer_length,
-                    )
-                }),
-            })
-        }
+        Ok(SharedMemoryAllocation {
+            data_buffer: SharedBuffer::new(self, base_offset, data_length)?,
+            offsets_buffer: SharedBuffer::new(self, base_offset + data_cap, offsets_length)?,
+            scatter_gather_buffer: SharedBuffer::new(
+                self,
+                base_offset + data_cap + offsets_length,
+                sg_buffers_length,
+            )?,
+            security_context_buffer,
+        })
     }
 
     // Reclaim the buffer so that it can be reused.
     fn free_buffer(&mut self, buffer: UserAddress) -> Result<(), Errno> {
         // Sanity check that the buffer being freed came from this memory region.
-        if buffer < self.user_address || buffer >= self.user_address + self.length {
+        if buffer < self.user_address || buffer >= (self.user_address + self.length)? {
             return error!(EINVAL);
         }
         let offset = buffer - self.user_address;
@@ -1455,6 +1509,8 @@ struct SharedBuffer<'a, T> {
     offset: usize,
     /// The length of the buffer in bytes.
     length: usize,
+    /// The underlying buffer.
+    user_buffer: UserBuffer,
     // A zero-sized type that satisfies the compiler's need for the struct to reference `T`, which
     // is used in `as_mut_bytes` and `as_bytes`.
     _phantom_data: std::marker::PhantomData<T>,
@@ -1462,18 +1518,20 @@ struct SharedBuffer<'a, T> {
 
 impl<'a, T: IntoBytes> SharedBuffer<'a, T> {
     /// Creates a new `SharedBuffer`, which represents a sub-region of `memory` starting at `offset`
-    /// bytes, with `length` bytes.
-    ///
-    /// This is unsafe because the caller is responsible for bounds-checking the sub-region and
-    /// ensuring it is not aliased.
-    unsafe fn new_unchecked(memory: &'a SharedMemory, offset: usize, length: usize) -> Self {
-        Self { memory, offset, length, _phantom_data: std::marker::PhantomData }
+    /// bytes, with `length` bytes. Will return EFAULT if the sub-region is not within memory bounds.
+    /// The caller is responsible for ensuring it is not aliased.
+    fn new(memory: &'a SharedMemory, offset: usize, length: usize) -> Result<Self, Errno> {
+        let memory_address = (memory.user_address + offset)?;
+        // Validate that the entire buffer length is valid as well.
+        let _ = (memory_address + length)?;
+        let user_buffer = UserBuffer { address: memory_address, length: length };
+        Ok(Self { memory, offset, length, user_buffer, _phantom_data: std::marker::PhantomData })
     }
 
     /// Returns a mutable slice of the buffer.
     fn as_mut_bytes(&mut self) -> &'a mut [T] {
-        // SAFETY: `offset + length` was bounds-checked by `allocate_buffers`, and the
-        // memory region pointed to was zero-allocated by mapping a new VMO.
+        // SAFETY: `offset + length` was bounds-checked by `new`, and the memory region pointed to
+        // was zero-allocated by mapping a new VMO in `allocate_buffers`.
         unsafe {
             std::slice::from_raw_parts_mut(
                 self.memory.kernel_address.add(self.offset) as *mut T,
@@ -1484,8 +1542,8 @@ impl<'a, T: IntoBytes> SharedBuffer<'a, T> {
 
     /// Returns an immutable slice of the buffer.
     fn as_bytes(&self) -> &'a [T] {
-        // SAFETY: `offset + length` was bounds-checked by `allocate_buffers`, and the
-        // memory region pointed to was zero-allocated by mapping a new VMO.
+        // SAFETY: `offset + length` was bounds-checked by `new`, and the memory region pointed to
+        // was zero-allocated by mapping a new VMO in `allocate_buffers`.
         unsafe {
             std::slice::from_raw_parts(
                 self.memory.kernel_address.add(self.offset) as *const T,
@@ -1496,7 +1554,7 @@ impl<'a, T: IntoBytes> SharedBuffer<'a, T> {
 
     /// The userspace address and length of the buffer.
     fn user_buffer(&self) -> UserBuffer {
-        UserBuffer { address: self.memory.user_address + self.offset, length: self.length }
+        self.user_buffer
     }
 }
 
@@ -1851,20 +1909,21 @@ struct BinderThread {
     weak_self: WeakRef<BinderThread>,
 
     tid: pid_t,
+
     /// The mutable state of the binder thread, protected by a single lock.
     state: Mutex<BinderThreadState>,
 }
 
 impl BinderThread {
-    fn new(_binder_proc: &BinderProcessGuard<'_>, tid: pid_t) -> OwnedRef<Self> {
-        let state = Mutex::new(BinderThreadState::new(tid));
+    fn new(binder_proc: &BinderProcessGuard<'_>, tid: pid_t) -> OwnedRef<Self> {
+        let state = Mutex::new(BinderThreadState::new(tid, binder_proc.base.identifier));
         #[cfg(any(test, debug_assertions))]
         {
             // The state must be acquired after the mutable state from the `BinderProcess` and before
             // `command_queue`. `binder_proc` being a guard, the mutable state of `BinderProcess` is
             // already locked.
             let _l1 = state.lock();
-            let _l2 = _binder_proc.base.command_queue.lock();
+            let _l2 = binder_proc.base.command_queue.lock();
         }
         OwnedRef::new_cyclic(|weak_self| Self { weak_self, tid, state })
     }
@@ -1887,6 +1946,10 @@ impl Releasable for BinderThread {
 #[derive(Debug)]
 struct BinderThreadState {
     tid: pid_t,
+
+    /// The process identifier of the `BinderProcess` to which this thread belongs. Note that this
+    /// is not the same as the actual `pid` of the process.
+    process_identifier: u64,
     /// The registered state of the thread.
     registration: RegistrationState,
     /// The stack of transactions that are active for this thread.
@@ -1900,9 +1963,10 @@ struct BinderThreadState {
 }
 
 impl BinderThreadState {
-    fn new(tid: pid_t) -> Self {
+    fn new(tid: pid_t, process_identifier: u64) -> Self {
         Self {
             tid,
+            process_identifier,
             registration: RegistrationState::default(),
             transactions: Default::default(),
             command_queue: Default::default(),
@@ -1987,7 +2051,7 @@ impl BinderThreadState {
                 });
                 Ok((process, thread, policy))
             }
-            TransactionRole::Sender => {
+            TransactionRole::Sender(_) => {
                 log_warn!("caller got confused, nothing to reply to!");
                 error!(EINVAL)?
             }
@@ -2006,15 +2070,7 @@ impl Releasable for BinderThreadState {
         log_trace!("Dropping BinderThreadState id={}", self.tid);
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
-        for (command, _trace_guard) in self.command_queue.commands {
-            if let Command::Transaction { sender, .. } = command {
-                if let Some(sender_thread) = sender.thread.upgrade() {
-                    sender_thread
-                        .lock()
-                        .enqueue_command(Command::DeadReply { pop_transaction: true });
-                }
-            }
-        }
+        generate_dead_replies(self.command_queue.commands, self.process_identifier, Some(self.tid));
 
         // If there are any transactions that this thread was processing, we need to tell the caller
         // that this thread is now dead and to not expect a reply.
@@ -2029,9 +2085,12 @@ impl Releasable for BinderThreadState {
                     policy.disarm();
                 }
                 if let Some(peer_thread) = peer.thread.upgrade() {
-                    peer_thread
-                        .lock()
-                        .enqueue_command(Command::DeadReply { pop_transaction: true });
+                    let sender_thread = &mut peer_thread.lock();
+                    generate_dead_replies_for_transactions(
+                        sender_thread,
+                        self.process_identifier,
+                        Some(self.tid),
+                    );
                 }
             }
         }
@@ -2124,11 +2183,7 @@ enum Command {
     /// more memory available to allocate a buffer.
     FailedReply,
     /// Notifies the initiator of a transaction that the recipient is dead.
-    DeadReply {
-        /// Whether the initiator must pop the `TransactionRole::Sender` from its transaction
-        /// stack.
-        pop_transaction: bool,
-    },
+    DeadReply,
     /// Notifies a binder process that a binder object has died.
     DeadBinder(binder_uintptr_t),
     /// Notifies the initiator of a sync transaction that the recipient is frozen.
@@ -2356,7 +2411,7 @@ impl CommandTraceGuard {
     fn begin(kind: &'static CStr) -> Self {
         if starnix_logging::regular_trace_category_enabled(TRACE_CATEGORY) {
             let id = fuchsia_trace::Id::random();
-            trace_instant_flow_begin!(TRACE_CATEGORY, kind, c"BinderFlow", id);
+            trace_instaflow_begin!(TRACE_CATEGORY, kind, c"BinderFlow", id);
             Self(Some(CommandTraceGuardInner { id, kind }))
         } else {
             Self(None)
@@ -2367,7 +2422,7 @@ impl CommandTraceGuard {
 impl Drop for CommandTraceGuard {
     fn drop(&mut self) {
         if let Some(CommandTraceGuardInner { id, kind }) = self.0.take() {
-            trace_instant_flow_end!(TRACE_CATEGORY, kind, c"BinderFlow", id);
+            trace_instaflow_end!(TRACE_CATEGORY, kind, c"BinderFlow", id);
         }
     }
 }
@@ -2854,10 +2909,68 @@ struct LocalBinderObject {
 #[derive(Debug)]
 enum TransactionRole {
     /// The binder thread initiated the transaction and is awaiting a reply from a peer.
-    Sender,
+    Sender(TransactionSender),
+
     /// The binder thread is receiving a transaction and is expected to reply to the peer binder
     /// process and thread.
     Receiver(WeakBinderPeer, SchedulerGuard),
+}
+
+#[derive(Debug)]
+struct TransactionSender {
+    /// The target process of the transaction. Used to determine whether or not this transaction is
+    /// still alive.
+    target_proc: u64,
+
+    /// The target thread of the transaction. Used to determine whether or not this transaction is
+    /// still alive. If `None`, the transaction will be marked dead when the handling thread in
+    /// `target_proc` is released.
+    target_thread: Option<i32>,
+
+    /// Whether or not the target of this transaction is still alive. Used to determine whether or
+    /// not a `DeadReply` should be inserted into the command queue when a thread is waiting for
+    /// this transaction to complete.
+    is_alive: bool,
+}
+
+impl TransactionRole {
+    /// Marks the transaction as dead if it is a `Sender` targeting `thread` or `process`.
+    fn mark_dead(&mut self, process: u64, thread: Option<i32>) -> bool {
+        match (thread, self) {
+            (
+                // If a thread is provided to `mark_dead`, it means that the transaction should
+                // only be marked dead if the `target_thread` actually matches `thread`.
+                Some(thread),
+                TransactionRole::Sender(TransactionSender {
+                    target_thread: Some(target),
+                    is_alive,
+                    ..
+                }),
+            ) if *target == thread => {
+                *is_alive = false;
+                true
+            }
+            (
+                // If there is no target thread for the transaction, the transaction is process
+                // bound. This means that the transaction should be marked dead if the
+                // `target_proc` matches `process`, regardless of whether or not a `thread` was
+                // provided to `mark_dead`.
+                _any_thread,
+                TransactionRole::Sender(TransactionSender {
+                    target_thread: None,
+                    target_proc,
+                    is_alive,
+                    ..
+                }),
+            ) if *target_proc == process => {
+                *is_alive = false;
+                true
+            }
+            // The transaction specifies a `target_thread` that does not match `thread`, or the
+            // transaction's `target_proc` does not match `process`.
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -3163,16 +3276,27 @@ impl MemoryAccessor for RemoteResourceAccessor {
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         profile_duration!("RemoteWriteMemory");
-        let vmo = with_zx_name(
-            zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?,
-            b"starnix:device_binder",
-        );
-        vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
-        vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
-        self.process_accessor
-            .write_memory(addr.ptr() as u64, vmo, zx::MonotonicInstant::INFINITE)
-            .map_err(|_| errno!(ENOENT))?
-            .map_err(Self::map_fidl_posix_errno)?;
+        if bytes.len() <= fbinder::MAX_WRITE_BYTES as usize {
+            self.process_accessor.write_bytes(
+                addr.ptr() as u64,
+                bytes,
+                zx::MonotonicInstant::INFINITE,
+            )
+        } else {
+            let vmo = with_zx_name(
+                zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?,
+                b"starnix:device_binder",
+            );
+            vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
+            vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
+            self.process_accessor.write_memory(
+                addr.ptr() as u64,
+                vmo,
+                zx::MonotonicInstant::INFINITE,
+            )
+        }
+        .map_err(|_| errno!(ENOENT))?
+        .map_err(Self::map_fidl_posix_errno)?;
         Ok(bytes.len())
     }
 
@@ -4016,9 +4140,18 @@ impl BinderDriver {
                         _ => None,
                     };
 
+                    let transaction_sender = TransactionSender {
+                        target_proc: target_proc.identifier,
+                        target_thread: target_thread.as_ref().map(|t| t.tid),
+                        is_alive: true,
+                    };
+
                     // Make the sender thread part of the transaction so it doesn't get scheduled to handle
                     // any other transactions.
-                    binder_thread.lock().transactions.push(TransactionRole::Sender);
+                    binder_thread
+                        .lock()
+                        .transactions
+                        .push(TransactionRole::Sender(transaction_sender));
 
                     // Register the transaction buffer.
                     target_proc.lock().active_transactions.insert(
@@ -4181,8 +4314,22 @@ impl BinderDriver {
             // Select which command queue to read from, preferring the thread-local one.
             // If a transaction is pending, deadlocks can happen if reading from the process queue.
             let command_queue = Self::get_active_queue(&mut thread_state, &mut proc_command_queue);
+            let command = match command_queue.pop_front() {
+                Some(command) => Some(command),
+                // If there is no pending command, but the current transaction is marked as dead,
+                // pop the transaction and dispatch a `DeadReply`.
+                None => match thread_state.transactions.last() {
+                    Some(TransactionRole::Sender(TransactionSender {
+                        is_alive: false, ..
+                    })) => {
+                        thread_state.transactions.pop();
+                        Some(Command::DeadReply)
+                    }
+                    _ => None,
+                },
+            };
 
-            if let Some(command) = command_queue.pop_front() {
+            if let Some(command) = command {
                 profile_duration!("ThreadReadCommand");
                 // Attempt to write the command to the thread's buffer.
                 let bytes_written = command.write_to_memory(resource_accessor, read_buffer)?;
@@ -4210,13 +4357,20 @@ impl BinderDriver {
                         let tx = TransactionRole::Receiver(sender, scheduler_policy);
                         thread_state.transactions.push(tx);
                     }
-                    Command::DeadReply { pop_transaction: true } | Command::Reply(..) => {
+                    Command::Reply(..) => {
                         // The sender got a reply, pop the sender entry from the transaction stack.
                         let transaction =
                             thread_state.transactions.pop().expect("transaction stack underflow!");
                         // Command::Reply is sent to the receiver side. So the popped transaction
                         // must be a Sender role.
-                        assert!(matches!(transaction, TransactionRole::Sender));
+                        assert!(
+                            matches!(transaction, TransactionRole::Sender(_)),
+                            "Active Transaction: {:?}, Pending Transactions {:?}, Command: {:?}, Pending Commands: {:?}",
+                            transaction,
+                            thread_state.transactions,
+                            command,
+                            thread_state.command_queue,
+                        );
                     }
                     Command::TransactionComplete
                     | Command::OnewayTransaction(..)
@@ -4227,7 +4381,7 @@ impl BinderDriver {
                     | Command::DecRef(..)
                     | Command::Error(..)
                     | Command::FailedReply
-                    | Command::DeadReply { .. }
+                    | Command::DeadReply
                     | Command::DeadBinder(..)
                     | Command::FrozenReply
                     | Command::PendingFrozen
@@ -4266,6 +4420,7 @@ impl BinderDriver {
             }
 
             // Put this thread to sleep.
+            // TODO(https://fxbug.dev/401258133) pass a thread handle for priority inheritance
             current_task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
         }
     }
@@ -4534,7 +4689,7 @@ impl BinderDriver {
                         let padded_length =
                             round_up_to_increment(length, std::mem::size_of::<binder_uintptr_t>())?;
                         sg_remaining_buffer = UserBuffer {
-                            address: sg_remaining_buffer.address + padded_length,
+                            address: (sg_remaining_buffer.address + padded_length)?,
                             length: sg_remaining_buffer.length - padded_length,
                         };
                         sg_buffer_offset += padded_length;
@@ -4645,7 +4800,7 @@ impl BinderDriver {
             prot_flags,
             prot_flags.to_access(),
             mapping_options,
-            MappingName::File(filename.into_active()),
+            MappingName::File(Box::new(filename.into_active())),
             FileWriteGuardRef(None),
         )?;
 
@@ -4923,7 +5078,7 @@ impl TransactionError {
                 Command::Error(err.return_value() as i32)
             }
             TransactionError::Failure => Command::FailedReply,
-            TransactionError::Dead => Command::DeadReply { pop_transaction: false },
+            TransactionError::Dead => Command::DeadReply,
             TransactionError::Frozen => Command::FrozenReply,
         });
         Ok(())
@@ -5120,6 +5275,7 @@ pub mod tests {
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         BINDER_TYPE_WEAK_HANDLE,
     };
+    use static_assertions::const_assert;
     use std::sync::Weak;
     use zerocopy::{FromZeros, KnownLayout};
 
@@ -5202,7 +5358,7 @@ pub mod tests {
                     .data_buffer;
                 buffer.memory.user_address + buffer.offset
             };
-            addresses.push(address);
+            addresses.push(address.expect("buffer address range is out of bounds!"));
         }
         addresses
     }
@@ -5501,16 +5657,19 @@ pub mod tests {
         );
         assert_eq!(
             allocations.offsets_buffer.user_buffer(),
-            UserBuffer { address: BASE_ADDR + 8usize, length: OFFSETS_LEN }
+            UserBuffer { address: (BASE_ADDR + 8usize).unwrap(), length: OFFSETS_LEN }
         );
         assert_eq!(
             allocations.scatter_gather_buffer.user_buffer(),
-            UserBuffer { address: BASE_ADDR + 8usize + OFFSETS_LEN, length: BUFFERS_LEN }
+            UserBuffer {
+                address: (BASE_ADDR + (8usize + OFFSETS_LEN)).unwrap(),
+                length: BUFFERS_LEN
+            }
         );
         assert_eq!(
             allocations.security_context_buffer.as_ref().expect("security_context").user_buffer(),
             UserBuffer {
-                address: BASE_ADDR + 8usize + OFFSETS_LEN + BUFFERS_LEN,
+                address: (BASE_ADDR + (8usize + OFFSETS_LEN + BUFFERS_LEN)).unwrap(),
                 length: SECURITY_CONTEXT_BUFFER_LEN
             }
         );
@@ -5584,19 +5743,32 @@ pub mod tests {
         );
         assert_eq!(
             allocations.offsets_buffer.user_buffer(),
-            UserBuffer { address: BASE_ADDR + BUF1_DATA_LEN, length: BUF1_OFFSETS_LEN }
+            UserBuffer {
+                address: BASE_ADDR.checked_add(BUF1_DATA_LEN).unwrap(),
+                length: BUF1_OFFSETS_LEN
+            }
         );
         assert_eq!(
             allocations.scatter_gather_buffer.user_buffer(),
             UserBuffer {
-                address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN,
+                address: BASE_ADDR
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap(),
                 length: BUF1_BUFFERS_LEN
             }
         );
         assert_eq!(
             allocations.security_context_buffer.expect("security_context").user_buffer(),
             UserBuffer {
-                address: BASE_ADDR + BUF1_DATA_LEN + BUF1_OFFSETS_LEN + BUF1_BUFFERS_LEN,
+                address: BASE_ADDR
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_BUFFERS_LEN)
+                    .unwrap(),
                 length: BUF1_SECURITY_CONTEXT_BUFFER_LEN
             }
         );
@@ -5617,10 +5789,14 @@ pub mod tests {
             allocations.data_buffer.user_buffer(),
             UserBuffer {
                 address: BASE_ADDR
-                    + BUF1_DATA_LEN
-                    + BUF1_OFFSETS_LEN
-                    + BUF1_BUFFERS_LEN
-                    + BUF1_SECURITY_CONTEXT_BUFFER_LEN,
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_BUFFERS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_SECURITY_CONTEXT_BUFFER_LEN)
+                    .unwrap(),
                 length: BUF2_DATA_LEN
             }
         );
@@ -5628,11 +5804,16 @@ pub mod tests {
             allocations.offsets_buffer.user_buffer(),
             UserBuffer {
                 address: BASE_ADDR
-                    + BUF1_DATA_LEN
-                    + BUF1_OFFSETS_LEN
-                    + BUF1_BUFFERS_LEN
-                    + BUF1_SECURITY_CONTEXT_BUFFER_LEN
-                    + BUF2_DATA_LEN,
+                    .checked_add(BUF1_DATA_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_OFFSETS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_BUFFERS_LEN)
+                    .unwrap()
+                    .checked_add(BUF1_SECURITY_CONTEXT_BUFFER_LEN)
+                    .unwrap()
+                    .checked_add(BUF2_DATA_LEN)
+                    .unwrap(),
                 length: BUF2_OFFSETS_LEN
             }
         );
@@ -5750,17 +5931,17 @@ pub mod tests {
         let buffer_1 = {
             let allocations =
                 shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
-            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
+            (allocations.data_buffer.memory.user_address + allocations.data_buffer.offset).unwrap()
         };
         let buffer_2 = {
             let allocations =
                 shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
-            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
+            (allocations.data_buffer.memory.user_address + allocations.data_buffer.offset).unwrap()
         };
         let buffer_3 = {
             let allocations =
                 shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
-            allocations.data_buffer.memory.user_address + allocations.data_buffer.offset
+            (allocations.data_buffer.memory.user_address + allocations.data_buffer.offset).unwrap()
         };
 
         // Attempt to allocate a buffer at the end that is larger than 1/4th.
@@ -6187,11 +6368,12 @@ pub mod tests {
                 cookie: 0,
             }));
 
-            let offsets_addr = data_addr
+            let offsets_addr = (data_addr
                 + sender
                     .task
                     .write_memory(data_addr, &transaction_data)
-                    .expect("failed to write transaction data");
+                    .expect("failed to write transaction data"))
+            .unwrap();
 
             // Write the offsets data (where in the data buffer `flat_binder_object`s are).
             let offsets_data: u64 = BINDER_DATA.len() as u64;
@@ -6243,11 +6425,11 @@ pub mod tests {
 
             // Check that the returned buffers are in-bounds of process 2's shared memory.
             assert!(data_buffer.address >= BASE_ADDR);
-            assert!(data_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(data_buffer.address < BASE_ADDR.checked_add(VMO_LENGTH).unwrap());
             assert!(offsets_buffer.address >= BASE_ADDR);
-            assert!(offsets_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(offsets_buffer.address < BASE_ADDR.checked_add(VMO_LENGTH).unwrap());
             assert!(security_context_buffer.address >= BASE_ADDR);
-            assert!(security_context_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(security_context_buffer.address < BASE_ADDR.checked_add(VMO_LENGTH).unwrap());
 
             // Verify the contents of the copied data in process 2's shared memory VMO.
             let mut buffer = [0u8; BINDER_DATA.len() + std::mem::size_of::<flat_binder_object>()];
@@ -6971,7 +7153,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -7165,7 +7347,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -7285,7 +7467,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8110,10 +8292,7 @@ pub mod tests {
             );
 
             TransactionError::Dead.dispatch(&proc.thread).expect("no error");
-            assert_matches!(
-                proc.thread.lock().command_queue.pop_front(),
-                Some(Command::DeadReply { pop_transaction: false })
-            );
+            assert_matches!(proc.thread.lock().command_queue.pop_front(), Some(Command::DeadReply));
         });
     }
 
@@ -8127,7 +8306,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (object, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8269,7 +8448,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (object, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8382,7 +8561,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8426,9 +8605,141 @@ pub mod tests {
             // Check that there is a dead reply command for the sending thread.
             assert_matches!(
                 sender.thread.lock().command_queue.commands.front(),
-                Some((Command::DeadReply { pop_transaction: true }, _))
+                Some((Command::DeadReply, _))
             );
-            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+            // Check that the transaction has been popped.
+            assert_matches!(sender.thread.lock().transactions.pop(), None);
+        });
+    }
+
+    #[fuchsia::test]
+    async fn dead_reply_when_transaction_recipient_proc_dies_not_top_transaction() {
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let second_receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+
+            // Create the first transaction, which will be sent from `sender` to `receiver`.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
+
+            // Create the second transaction, which will be sent from `sender` to
+            // `second_receiver`.
+            const OBJECT_ADDR_2: UserAddress = UserAddress::const_from(0x20);
+            let (_, guard) = register_binder_object(
+                &second_receiver.proc,
+                OBJECT_ADDR_2,
+                (OBJECT_ADDR_2 + 1u64).unwrap(),
+            );
+            let second_handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            const SECOND_TRANSACTION_CODE: u32 = 43;
+            let second_transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: SECOND_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: second_handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
+
+            // Submit the transactions, creating a transaction stack where the transaction
+            // targeting `second_receiver` is on top.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    second_transaction,
+                )
+                .expect("failed to handle the transaction");
+
+            // Check that both receivers have a transaction scheduled.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some((Command::Transaction { .. }, _))
+            );
+            assert_matches!(
+                second_receiver.proc.command_queue.lock().commands.front(),
+                Some((Command::Transaction { .. }, _))
+            );
+
+            // Drop the receiving process for the bottom transaction.
+            std::mem::drop(receiver);
+
+            // Check that there are no dead replies waiting for the thread, and that no
+            // transactions have been popped, since `receiver` was not the target of the top
+            // transaction.
+            assert_matches!(sender.thread.lock().command_queue.commands.front(), None);
+            assert_eq!(sender.thread.lock().transactions.len(), 2);
+
+            // Drop the second receiver.
+            std::mem::drop(second_receiver);
+
+            // Check that there is one dead reply now, and that one transaction has been popped.
+            assert_matches!(
+                sender.thread.lock().command_queue.commands.front(),
+                Some((Command::DeadReply, _))
+            );
+            assert_eq!(sender.thread.lock().transactions.len(), 1);
+
+            // Read out the first dead reply and verify that there is still one pending transaction
+            // left (the bottom one, targeting `receiver`).
+            let read_buffer_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
+            device
+                .handle_thread_read(
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
+                )
+                .expect("read command");
+            assert_eq!(sender.thread.lock().transactions.len(), 1);
+
+            // Make sure that there is no command left to be processed, but that the next time the
+            // thread handles a read, it detects that the top transaction is dead, generates a dead
+            // reply, and pops the transaction.
+            assert_matches!(sender.thread.lock().command_queue.commands.front(), None);
+            device
+                .handle_thread_read(
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
+                )
+                .expect("read command");
+            // Verify that the transaction was popped by the dead reply.
+            assert_eq!(sender.thread.lock().transactions.len(), 0);
         });
     }
 
@@ -8442,7 +8753,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8486,9 +8797,9 @@ pub mod tests {
             // Check that there is a dead reply command for the sending thread.
             assert_matches!(
                 sender.thread.lock().command_queue.commands.front(),
-                Some((Command::DeadReply { pop_transaction: true }, _))
+                Some((Command::DeadReply, _))
             );
-            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+            assert_matches!(sender.thread.lock().transactions.pop(), None);
         });
     }
 
@@ -8502,7 +8813,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8572,9 +8883,9 @@ pub mod tests {
             // Check that there is a dead reply command for the sending thread.
             assert_matches!(
                 sender.thread.lock().command_queue.commands.front(),
-                Some((Command::DeadReply { pop_transaction: true }, _))
+                Some((Command::DeadReply, _))
             );
-            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+            assert_matches!(sender.thread.lock().transactions.pop(), None);
         });
     }
 
@@ -8588,7 +8899,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8718,6 +9029,13 @@ pub mod tests {
                     content.read(buffer, 0)?;
                     responder.send(Ok(()))?;
                 }
+                fbinder::ProcessAccessorRequest::WriteBytes { address, bytes, responder } => {
+                    // SAFETY: This is not safe and rely on the client being correct.
+                    let buffer =
+                        unsafe { std::slice::from_raw_parts_mut(address as *mut u8, bytes.len()) };
+                    buffer.copy_from_slice(bytes.as_slice());
+                    responder.send(Ok(()))?;
+                }
                 fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
                     let mut response = fbinder::FileResponse::default();
                     for fd in payload.close_requests.unwrap_or(vec![]) {
@@ -8767,6 +9085,9 @@ pub mod tests {
     #[::fuchsia::test]
     async fn remote_binder_task() {
         const vector_size: usize = 128 * 1024 * 1024;
+        const_assert!(vector_size > fbinder::MAX_WRITE_BYTES as usize);
+        const small_size: usize = 128;
+        const_assert!(small_size <= fbinder::MAX_WRITE_BYTES as usize);
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>();
 
@@ -8796,9 +9117,16 @@ pub mod tests {
             vector.resize(vector_size, 0);
             remote_binder_task
                 .write_memory((vector.as_ptr() as u64).into(), &other_vector)
-                .expect("read_memory");
+                .expect("write_memory");
             assert_eq!(vector[1], 1);
             assert_eq!(vector, other_vector);
+            vector.clear();
+            vector.resize(vector_size, 0);
+            remote_binder_task
+                .write_memory((vector.as_ptr() as u64).into(), &other_vector[..small_size])
+                .expect("write_memory");
+            assert_eq!(vector[1], 1);
+            assert_eq!(vector[..small_size], other_vector[..small_size]);
 
             let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
             let fd0 = remote_binder_task
@@ -8858,7 +9186,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()
@@ -8911,7 +9239,10 @@ pub mod tests {
 
             // Check that there is a frozen reply command for the sending thread.
             assert!(sender.thread.lock().command_queue.commands.is_empty());
-            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+            assert_matches!(
+                sender.thread.lock().transactions.pop(),
+                Some(TransactionRole::Sender(_))
+            );
         })
     }
 
@@ -8925,7 +9256,7 @@ pub mod tests {
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
             let (_, guard) =
-                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+                register_binder_object(&receiver.proc, OBJECT_ADDR, (OBJECT_ADDR + 1u64).unwrap());
             let handle = sender
                 .proc
                 .lock()

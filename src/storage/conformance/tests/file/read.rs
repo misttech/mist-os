@@ -9,14 +9,11 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn file_read_with_sufficient_rights() {
     let harness = TestHarness::new().await;
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
-    {
-        let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+    for flags in harness.file_rights.combinations_containing(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let _data: Vec<u8> = file
             .read(0)
             .await
@@ -29,12 +26,11 @@ async fn file_read_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_read_with_insufficient_rights() {
     let harness = TestHarness::new().await;
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::READ_BYTES) {
-        let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+    for flags in harness.file_rights.combinations_without(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let result = file.read(0).await.expect("read failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE))
     }
@@ -43,16 +39,12 @@ async fn file_read_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_read_with_max_transfer() {
     let harness = TestHarness::new().await;
+    let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize];
+    let entries = vec![file(TEST_FILE, contents)];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
-    {
-        let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize];
-        let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
-
+    for flags in harness.file_rights.combinations_containing(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let len = file
             .read(fio::MAX_TRANSFER_SIZE)
             .await
@@ -67,16 +59,12 @@ async fn file_read_with_max_transfer() {
 #[fuchsia::test]
 async fn file_read_over_max_transfer() {
     let harness = TestHarness::new().await;
+    let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize + 1];
+    let entries = vec![file(TEST_FILE, contents)];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
-    {
-        let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize + 1];
-        let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
-
+    for flags in harness.file_rights.combinations_containing(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let result = file
             .read(fio::MAX_TRANSFER_SIZE + 1)
             .await
@@ -89,14 +77,11 @@ async fn file_read_over_max_transfer() {
 #[fuchsia::test]
 async fn file_read_at_with_sufficient_rights() {
     let harness = TestHarness::new().await;
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
-    {
-        let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+    for flags in harness.file_rights.combinations_containing(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let _: Vec<u8> = file
             .read_at(0, 0)
             .await
@@ -109,12 +94,11 @@ async fn file_read_at_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_read_at_with_insufficient_rights() {
     let harness = TestHarness::new().await;
+    let entries = vec![file(TEST_FILE, vec![])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::READ_BYTES) {
-        let entries = vec![file(TEST_FILE, vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
+    for flags in harness.file_rights.combinations_without(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let result =
             file.read_at(0, 0).await.expect("read_at failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE))
@@ -124,16 +108,12 @@ async fn file_read_at_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_read_at_with_max_transfer() {
     let harness = TestHarness::new().await;
+    let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize];
+    let entries = vec![file(TEST_FILE, contents)];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
-    {
-        let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize];
-        let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
-
+    for flags in harness.file_rights.combinations_containing(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let len = file
             .read_at(fio::MAX_TRANSFER_SIZE, 0)
             .await
@@ -148,16 +128,12 @@ async fn file_read_at_with_max_transfer() {
 #[fuchsia::test]
 async fn file_read_at_over_max_transfer() {
     let harness = TestHarness::new().await;
+    let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize + 1];
+    let entries = vec![file(TEST_FILE, contents)];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
-    {
-        let contents = vec![0u8; fio::MAX_TRANSFER_SIZE as usize + 1];
-        let entries = vec![file(TEST_FILE, contents)];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, TEST_FILE).await;
-
+    for flags in harness.file_rights.combinations_containing(fio::Rights::READ_BYTES) {
+        let file = dir.open_node::<fio::FileMarker>(TEST_FILE, flags, None).await.unwrap();
         let result = file
             .read_at(fio::MAX_TRANSFER_SIZE + 1, 0)
             .await
@@ -170,14 +146,12 @@ async fn file_read_at_over_max_transfer() {
 #[fuchsia::test]
 async fn file_read_in_subdirectory() {
     let harness = TestHarness::new().await;
+    let entries = vec![directory("subdir", vec![file("testing.txt", vec![])])];
+    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
 
-    for file_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
-    {
-        let entries = vec![directory("subdir", vec![file("testing.txt", vec![])])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-        let file = deprecated_open_file_with_flags(&dir, file_flags, "subdir/testing.txt").await;
+    for flags in harness.file_rights.combinations_containing(fio::Rights::READ_BYTES) {
+        let file =
+            dir.open_node::<fio::FileMarker>("subdir/testing.txt", flags, None).await.unwrap();
         let _data: Vec<u8> = file
             .read(0)
             .await

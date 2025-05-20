@@ -187,7 +187,7 @@ pub async fn run_stream<'a>(
             ),
             errors
                 .map(|e| {
-                    tracing::warn!("An ascendd client circuit stream failed: {e:?}");
+                    log::warn!("An ascendd client circuit stream failed: {e:?}");
                 })
                 .collect::<()>(),
         )
@@ -223,14 +223,14 @@ pub async fn run_linked_ascendd<'a>(
         },
         errors
             .map(|e| {
-                tracing::warn!("An ascendd linking circuit stream failed: {e:?}");
+                log::warn!("An ascendd linking circuit stream failed: {e:?}");
             })
             .collect::<()>(),
     )
     .map(|(result, ())| result)
     .await
     {
-        tracing::debug!(err = ?e, "Link to other ascendd closed");
+        log::debug!(err:? = e; "Link to other ascendd closed");
     }
 }
 
@@ -241,7 +241,7 @@ async fn bind_listener(
     let Opt { sockpath, serial: _, client_routing, link: _ } = opt;
     let client_routing =
         if client_routing { AscenddClientRouting::Enabled } else { AscenddClientRouting::Disabled };
-    tracing::debug!(node_id = node_id.0, "starting ascendd on {}", sockpath.display(),);
+    log::debug!(node_id = node_id.0; "starting ascendd on {}", sockpath.display(),);
 
     let incoming = loop {
         let safe_socket_path = short_socket_path(&sockpath)?;
@@ -260,21 +260,21 @@ async fn bind_listener(
                     .await
                 {
                     Ok(_) => {
-                        tracing::error!(
+                        log::error!(
                             "another ascendd is already listening at {}",
                             sockpath.display()
                         );
                         bail!("another ascendd is aleady listening at {}!", sockpath.display());
                     }
                     Err(e) if e.kind() == ErrorKind::ConnectionRefused => {
-                        tracing::info!(
+                        log::info!(
                             "trying to clean up stale ascendd socket at {} (error: {e:?})",
                             sockpath.display()
                         );
                         std::fs::remove_file(&sockpath)?;
                     }
                     Err(e) => {
-                        tracing::info!("An unexpected error occurred while trying to connect to the existing ascendd socket at: {}: {e:?}", sockpath.display());
+                        log::info!("An unexpected error occurred while trying to connect to the existing ascendd socket at: {}: {e:?}", sockpath.display());
                         bail!(
                             "unexpected error while trying to connect to the existing ascendd socket at: {}: {e}",
                             sockpath.display()
@@ -283,7 +283,7 @@ async fn bind_listener(
                 }
             }
             Err(e) => {
-                tracing::info!("An unexpected error occurred while trying to bind to the ascendd socket at {}: {e:?}", sockpath.display());
+                log::info!("An unexpected error occurred while trying to bind to the ascendd socket at {}: {e:?}", sockpath.display());
                 bail!(
                     "unexpected error while trying to bind to ascendd socket at {}: {e}",
                     sockpath.display()
@@ -294,7 +294,7 @@ async fn bind_listener(
 
     // as this file is purely advisory, we won't fail for any error, but we can log it.
     if let Err(e) = write_pidfile(&sockpath, std::process::id()) {
-        tracing::warn!("failed to write pidfile alongside {}: {e:?}", sockpath.display());
+        log::warn!("failed to write pidfile alongside {}: {e:?}", sockpath.display());
     }
     Ok((sockpath, client_routing, incoming))
 }
@@ -318,7 +318,7 @@ async fn run_ascendd(
 ) -> Result<(), Error> {
     node.set_client_routing(client_routing);
 
-    tracing::debug!("ascendd listening to socket {}", sockpath.display());
+    log::debug!("ascendd listening to socket {}", sockpath.display());
 
     #[allow(clippy::large_futures)]
     futures::future::try_join(
@@ -329,7 +329,7 @@ async fn run_ascendd(
                     match UnixStream::connect(&path).await {
                         Ok(sock) => break sock,
                         Err(e) => {
-                            tracing::debug!(path = ?path.display(), error = ?e,
+                            log::debug!(path:? = path.display(), error:? = e;
                             "Linking to socket failed. Retrying..");
                             fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await
                         }
@@ -358,26 +358,22 @@ async fn run_ascendd(
                                             RunStreamError::Circuit(
                                                 circuit::Error::ConnectionClosed(reason),
                                             ) => {
-                                                tracing::debug!(
-                                                    "Circuit connection closed: {reason:?}"
-                                                )
+                                                log::debug!("Circuit connection closed: {reason:?}")
                                             }
                                             RunStreamError::Circuit(other) => {
-                                                tracing::warn!("Failed serving socket: {other:?}")
+                                                log::warn!("Failed serving socket: {other:?}")
                                             }
                                             RunStreamError::EarlyHangup(e) => {
-                                                tracing::debug!("Socket hung up early: {e:?}")
+                                                log::debug!("Socket hung up early: {e:?}")
                                             }
                                             RunStreamError::Unsupported => {
-                                                tracing::warn!(
-                                                    "Socket was not a circuit connection."
-                                                )
+                                                log::warn!("Socket was not a circuit connection.")
                                             }
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    tracing::warn!("Failed starting socket: {:?}", e);
+                                    log::warn!("Failed starting socket: {:?}", e);
                                 }
                             }
                         }

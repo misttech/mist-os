@@ -9,8 +9,6 @@
 #include "src/ui/lib/escher/paper/paper_renderer.h"
 #include "src/ui/lib/escher/paper/paper_renderer_static_config.h"
 #include "src/ui/lib/escher/paper/paper_scene.h"
-#include "src/ui/lib/escher/paper/paper_timestamp_graph.h"
-#include "src/ui/lib/escher/renderer/batch_gpu_uploader.h"
 #include "src/ui/lib/escher/test/common/paper_renderer_test.h"
 #include "src/ui/lib/escher/types/color.h"
 #include "src/ui/lib/escher/types/color_histogram.h"
@@ -128,57 +126,6 @@ VK_TEST_F(DebugShapeTest, Lines) {
     draw_and_check_histogram(escher::DebugRects::kPurple, (uint8_t)500);
     draw_and_check_histogram(escher::DebugRects::kRed, (uint8_t)800);
     draw_and_check_histogram(escher::DebugRects::kYellow, (uint8_t)200);
-    TeardownFrame();
-  }
-  EXPECT_VK_SUCCESS(escher()->vk_device().waitIdle());
-  ASSERT_TRUE(escher()->Cleanup());
-}
-
-// Tests drawing fake data used by the Debug Graph.
-VK_TEST_F(DebugShapeTest, PaperTimestampGraph) {
-  int16_t expected_colored = 0;
-
-  PaperTimestampGraph graph;
-
-  for (int32_t i = 1; i <= 10; ++i) {
-    SetupFrame();
-
-    // Creates an escher Timestamp where |done_time| > |start_time| so that the values are
-    // not negative. All other values are 0 to simplify the test.
-    std::function<void(int8_t, int8_t)> draw_and_check_histogram = [&](uint8_t start_time,
-                                                                       uint8_t done_time) {
-      EXPECT_TRUE(depth_buffer() || i == 1);
-      BeginRenderingFrame();
-      EXPECT_TRUE(depth_buffer());
-
-      PaperRenderer::Timestamp ts;
-      ts.latch_point = 0;
-      ts.update_done = 0;
-      ts.render_start = start_time;
-      ts.render_done = done_time;
-      ts.target_present = 0;
-      ts.actual_present = 0;
-
-      graph.AddTimestamp(ts);
-      constexpr uint32_t kGraphHeight = 500;
-      constexpr uint32_t kGraphWidth = 500;
-      graph.DrawGraphContentOn(renderer(), {{0, 0}, {kGraphWidth, kGraphHeight}});
-
-      EndRenderingFrame();
-      int16_t render_time = done_time - start_time;
-
-      const int16_t h_interval = kGraphHeight / 35;
-      const int16_t w_interval = PaperTimestampGraph::kSampleLineThickness;
-
-      expected_colored += (render_time * h_interval) * w_interval;
-      auto returned_colored = GetColoredData(escher::DebugRects::kRed);
-      EXPECT_EQ(expected_colored, returned_colored)
-          << "FAILED WHILE DRAWING DEBUG DATA FOR RENDER TIME " << render_time;
-    };
-
-    int8_t end = i * 2;
-    draw_and_check_histogram(1, end);
-
     TeardownFrame();
   }
   EXPECT_VK_SUCCESS(escher()->vk_device().waitIdle());

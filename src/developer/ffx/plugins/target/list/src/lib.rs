@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use analytics::add_custom_event;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_bail_with_code};
@@ -37,6 +38,7 @@ pub struct ListTool {
     #[with(deferred(daemon_protocol()))]
     tc_proxy: Deferred<ffx::TargetCollectionProxy>,
     context: EnvironmentContext,
+    fho_env: fho::FhoEnvironment,
 }
 
 fho::embedded_plugin!(ListTool);
@@ -45,16 +47,33 @@ fho::embedded_plugin!(ListTool);
 impl FfxMain for ListTool {
     type Writer = VerifiedMachineWriter<Vec<JsonTarget>>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let cmd = self.update_from_target();
         // XXX Shouldn't check `is_strict()`. Eventually we'll _always_ do local discovery,
         // at which point this check goes away.
         let infos =
             if !self.context.is_strict() && ffx_target::is_discovery_enabled(&self.context).await {
-                list_targets(self.tc_proxy.await?, &self.cmd).await?
+                list_targets(self.tc_proxy.await?, &cmd).await?
             } else {
-                local_list_targets(&self.context, &self.cmd).await?
+                local_list_targets(&self.context, &cmd).await?
             };
-        show_targets(self.cmd, infos, &mut writer, &self.context).await?;
+        emit_device_stats_event(infos.len(), &cmd.nodename).await;
+        show_targets(cmd, infos, &mut writer, &self.context).await?;
         Ok(())
+    }
+}
+
+impl ListTool {
+    // Users might reasonable expect that they can say `ffx -t foo target list`, rather
+    // than `ffx target list foo`. Update the ListCommand as though they had typed the
+    // command "correctly". (If they use both, the positional argument at the end takes
+    // precedence over the "-t" argument.)
+    fn update_from_target(&self) -> ListCommand {
+        let cmd = self.cmd.clone();
+        if cmd.nodename.is_some() {
+            cmd
+        } else {
+            ListCommand { nodename: self.fho_env.ffx_command().global.target.clone(), ..cmd }
+        }
     }
 }
 
@@ -124,7 +143,6 @@ async fn try_get_target_info(
     Ok((rcs_state, pc, bc))
 }
 
-#[tracing::instrument]
 async fn get_target_info(
     context: &EnvironmentContext,
     addrs: &[addr::TargetAddr],
@@ -139,7 +157,7 @@ async fn get_target_info(
         } else {
             format!("{addr}:{}", addr.port().unwrap())
         };
-        tracing::debug!("Trying to make a connection to spec {spec:?}");
+        log::debug!("Trying to make a connection to spec {spec:?}");
 
         match try_get_target_info(spec, context)
             .on_timeout(ssh_timeout, || {
@@ -151,11 +169,11 @@ async fn get_target_info(
                 return Ok(res);
             }
             Err(KnockError::NonCriticalError(e)) => {
-                tracing::debug!("Could not connect to {addr:?}: {e:?}");
+                log::debug!("Could not connect to {addr:?}: {e:?}");
                 continue;
             }
             e => {
-                tracing::debug!("Got error {e:?} when trying to connect to {addr:?}");
+                log::debug!("Got error {e:?} when trying to connect to {addr:?}");
                 return Ok((ffx::RemoteControlState::Unknown, None, None));
             }
         }
@@ -179,9 +197,11 @@ async fn handle_to_info(
     handle: discovery::TargetHandle,
     connect_to_target: bool,
 ) -> Result<ffx::TargetInfo> {
+    let mut serial_number = None;
     let (target_state, addresses) = match handle.state {
         discovery::TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        discovery::TargetState::Product(target_addrs) => {
+        discovery::TargetState::Product { addrs: target_addrs, serial } => {
+            serial_number = serial;
             (ffx::TargetState::Product, Some(target_addrs))
         }
         discovery::TargetState::Fastboot(fts) => {
@@ -210,10 +230,12 @@ async fn handle_to_info(
     Ok(ffx::TargetInfo {
         nodename: handle.node_name,
         addresses,
+        serial_number,
         rcs_state: Some(rcs_state),
         target_state: Some(target_state),
         board_config,
         product_config,
+        is_manual: Some(handle.manual),
         ..Default::default()
     })
 }
@@ -288,8 +310,29 @@ async fn list_targets(
     Ok(res)
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// tests
+fn query_type(query: &str) -> &str {
+    match query.into() {
+        TargetInfoQuery::NodenameOrSerial(_) => "nodename_or_serial",
+        TargetInfoQuery::Serial(_) => "serial",
+        TargetInfoQuery::Addr(_) => "addr",
+        TargetInfoQuery::VSock(_) => "vsock",
+        TargetInfoQuery::Usb(_) => "usb",
+        TargetInfoQuery::First => "first",
+    }
+}
+
+/// Emit an event indicating how many devices were in the result.
+pub async fn emit_device_stats_event(num_devices: usize, query: &Option<String>) {
+    let query = query.as_ref().map_or("", |v| v);
+    let _ = add_custom_event(
+        Some("ffx_target_list_devices"),
+        Some(query_type(query)),
+        None,
+        [("devices", (num_devices as u64).into())].into_iter().collect(),
+    )
+    .await;
+} ///////////////////////////////////////////////////////////////////////////////
+  // tests
 
 #[cfg(test)]
 mod test {
@@ -622,10 +665,50 @@ mod test {
                 serial_number: "12345678".to_string(),
                 connection_state: discovery::FastbootConnectionState::Usb,
             }),
+            manual: false,
         });
         let stream = futures::stream::once(async { handle });
         let targets = handles_to_infos(stream, &env.context, true).await;
         let targets = targets.unwrap();
         assert_ne!(targets[0].addresses, None);
+    }
+
+    async fn build_list_tool(
+        cmd: ListCommand,
+        env: &ffx_config::TestEnv,
+        fho_env: fho::FhoEnvironment,
+    ) -> ListTool {
+        ListTool {
+            cmd,
+            tc_proxy: fho::TryFromEnvWith::try_from_env_with(deferred(daemon_protocol()), &fho_env)
+                .await
+                .expect("deferred tc_proxy failed"),
+            fho_env,
+            context: env.context.clone(),
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_command_target() {
+        let ffx_cmd =
+            ffx_command::Ffx { target: Some(String::from("mytarget")), ..Default::default() };
+        let ffx_cmd_line = ffx_command::FfxCommandLine { global: ffx_cmd, ..Default::default() };
+        let env = ffx_config::test_init().await.unwrap();
+        let fho_env = fho::FhoEnvironment::new(&env.context, &ffx_cmd_line);
+        let tool = build_list_tool(ListCommand::default(), &env, fho_env).await;
+        let cmd = tool.update_from_target();
+        assert_eq!(cmd.nodename, Some(String::from("mytarget")));
+    }
+
+    #[fuchsia::test]
+    async fn test_command_target_preserves_arg() {
+        let ffx_cmd_line = ffx_command::FfxCommandLine::default();
+        let env = ffx_config::test_init().await.unwrap();
+        let fho_env = fho::FhoEnvironment::new(&env.context, &ffx_cmd_line);
+        let list_cmd =
+            ListCommand { nodename: Some(String::from("mytarget")), ..Default::default() };
+        let tool = build_list_tool(list_cmd, &env, fho_env).await;
+        let cmd = tool.update_from_target();
+        assert_eq!(cmd.nodename, Some(String::from("mytarget")));
     }
 }

@@ -77,4 +77,8 @@ void MockProcess::LoadInfoHandleTable(
   MessageLoop::Current()->PostTask(FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err()); });
 }
 
+std::optional<debug_ipc::AddressRegion> MockProcess::GetSharedAddressSpace() const {
+  return std::nullopt;
+}
+
 }  // namespace zxdb

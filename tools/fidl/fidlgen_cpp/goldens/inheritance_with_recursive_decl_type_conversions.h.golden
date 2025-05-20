@@ -37,10 +37,6 @@ struct WireTypeForNaturalType<::test_inheritancewithrecursivedecl::ParentFirstRe
   using type = ::test_inheritancewithrecursivedecl::wire::ParentFirstRequest;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest, ::test_inheritancewithrecursivedecl::ChildSecondRequest> {
   static ::test_inheritancewithrecursivedecl::ChildSecondRequest ToNatural(::test_inheritancewithrecursivedecl::wire::ChildSecondRequest src);
@@ -55,10 +51,6 @@ template <>
 struct WireTypeForNaturalType<::test_inheritancewithrecursivedecl::ChildSecondRequest> {
   using type = ::test_inheritancewithrecursivedecl::wire::ChildSecondRequest;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

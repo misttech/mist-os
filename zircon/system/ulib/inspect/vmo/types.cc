@@ -287,19 +287,19 @@ void internal::ArrayValue<double>::Subtract(size_t index, double value) {
 }
 
 namespace {
-cpp17::optional<zx_koid_t> GetKoidForStringReferenceId() {
+std::optional<zx_koid_t> GetKoidForStringReferenceId() {
   zx::event event;
   zx::event::create(0, &event);
   zx_info_handle_basic_t info;
   zx_status_t status = event.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return status == ZX_OK ? cpp17::optional<zx_koid_t>(info.koid) : cpp17::nullopt;
+  return status == ZX_OK ? std::optional<zx_koid_t>(info.koid) : std::nullopt;
 }
 }  // namespace
 
 StringReference::StringReference(const char* data)
     : data_(data), reference_id_(*GetKoidForStringReferenceId()) {}
 
-cpp17::string_view StringReference::Data() const { return data_; }
+std::string_view StringReference::Data() const { return data_; }
 
 uint64_t StringReference::ID() const { return reference_id_; }
 

@@ -133,11 +133,11 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{12, 23}: Pass,
 	{12, 24}: Pass,
 	{12, 25}: Pass,
-	{12, 26}: AnvlSkip,
-	{12, 27}: AnvlSkip,
-	{12, 28}: AnvlSkip,
-	{12, 29}: AnvlSkip,
-	{12, 30}: AnvlSkip,
+	{12, 26}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 27}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 28}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 29}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 30}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
 	{12, 31}: Fail,
 	{13, 1}:  Pass,
 	{13, 2}:  Pass,
@@ -172,11 +172,11 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{17, 20}: Pass,
 	{18, 17}: Pass,
 	{18, 21}: Pass,
-	{19, 17}: Fail,
-	{19, 20}: Fail,
-	{19, 21}: AnvlSkip,
-	{19, 22}: AnvlSkip,
-	{19, 23}: AnvlSkip,
+	{19, 17}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 20}: Skip, // Tests a clause in RFC 1122 that was removed in RFC 9293.
+	{19, 21}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 22}: Skip, // Tests a clause in RFC 793 that was removed in RFC 9293.
+	{19, 23}: Skip, // Tests setting Urgent pointer on send which is obsolete.
 	{20, 17}: Pass,
 	{20, 18}: Pass,
 	{20, 19}: Pass,
@@ -316,11 +316,11 @@ var tcpCoreExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{12, 23}: Pass,
 	{12, 24}: Pass,
 	{12, 25}: Pass,
-	{12, 26}: AnvlSkip,
-	{12, 27}: AnvlSkip,
-	{12, 28}: AnvlSkip,
-	{12, 29}: AnvlSkip,
-	{12, 30}: AnvlSkip,
+	{12, 26}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 27}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 28}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 29}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
+	{12, 30}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
 	{12, 31}: Fail,
 	{13, 1}:  Pass,
 	{13, 2}:  Pass,
@@ -355,11 +355,11 @@ var tcpCoreExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{17, 20}: Pass,
 	{18, 17}: Pass,
 	{18, 21}: Pass,
-	{19, 17}: Fail,
-	{19, 20}: Fail,
-	{19, 21}: AnvlSkip,
-	{19, 22}: AnvlSkip,
-	{19, 23}: AnvlSkip,
+	{19, 17}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 20}: Skip, // Tests a clause in RFC 1122 that was removed in RFC 9293.
+	{19, 21}: Skip, // Tests setting Urgent pointer on send which is obsolete.
+	{19, 22}: Skip, // Tests a clause in RFC 793 that was removed in RFC 9293.
+	{19, 23}: Skip, // Tests setting Urgent pointer on send which is obsolete.
 	{20, 17}: Pass,
 	{20, 18}: Pass,
 	{20, 19}: Pass,

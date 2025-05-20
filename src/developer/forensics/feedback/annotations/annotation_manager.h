@@ -31,7 +31,8 @@ class AnnotationManager {
                     std::vector<DynamicSyncAnnotationProvider*> dynamic_sync_providers = {},
                     std::vector<StaticAsyncAnnotationProvider*> static_async_providers = {},
                     std::vector<CachedAsyncAnnotationProvider*> cached_async_providers = {},
-                    std::vector<DynamicAsyncAnnotationProvider*> dynamic_async_providers = {});
+                    std::vector<DynamicAsyncAnnotationProvider*> dynamic_async_providers = {},
+                    const std::set<std::string>& product_exclude_list = {});
 
   // Returns all annotations collected by the manager in a promise that is guaranteed to complete
   // before |timeout| expires.

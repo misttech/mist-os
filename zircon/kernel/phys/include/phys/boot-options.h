@@ -11,11 +11,9 @@
 #include <ktl/span.h>
 #include <ktl/string_view.h>
 
-struct BootOptions;
+#include "main.h"
 
-namespace zbitl {
-using ByteView = ktl::span<const ktl::byte>;
-}
+struct BootOptions;
 
 // Sets the given boot-options with the specifications encoded in the given ZBI, as well in an
 // additional legacy command-line when relevant.
@@ -38,13 +36,13 @@ using ByteView = ktl::span<const ktl::byte>;
 // It is expected that |boot_opts.serial| is set to legacy UART driver(if any) in order to preserve
 // this priority.
 //
-void SetBootOptions(BootOptions& boot_opts, zbitl::ByteView zbi,
+void SetBootOptions(BootOptions& boot_opts, ktl::optional<EarlyBootZbi> zbi,
                     ktl::string_view legacy_cmdline = {});
 
 // Just like |SetBootOptions| but leaves the entropy from the command-line if
 // available, which will restore the entropy bits. This allows to reuse BootOptions infratructure
 // for parsing specific arguments.
-void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, zbitl::ByteView zbi,
+void SetBootOptionsWithoutEntropy(BootOptions& boot_opts, ktl::optional<EarlyBootZbi> zbi,
                                   ktl::string_view legacy_cmdline = {});
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_BOOT_OPTIONS_H_

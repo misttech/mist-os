@@ -7,8 +7,6 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_ATOMIC_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_ATOMIC_H_
 
-#include <lib/stdcompat/atomic.h>
-
 #include <atomic>
 
 // On arm64 and x86-64, lock-free 128-bit (16-byte) atomics are available.
@@ -22,6 +20,8 @@
 namespace ktl {
 
 using std::atomic;
+using std::atomic_init;
+using std::atomic_ref;
 
 using std::memory_order;
 
@@ -32,12 +32,8 @@ using std::memory_order_relaxed;
 using std::memory_order_release;
 using std::memory_order_seq_cst;
 
-using std::atomic_init;
-
 using std::atomic_signal_fence;
 using std::atomic_thread_fence;
-
-using cpp20::atomic_ref;
 
 }  // namespace ktl
 

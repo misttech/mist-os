@@ -1,22 +1,15 @@
-// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(not(feature = "starnix_lite"))]
 use crate::{
     expose_root, get_serial_number, parse_features, parse_numbered_handles, run_container_features,
     serve_component_runner, serve_container_controller, serve_graphical_presenter, Features,
     MountAction,
 };
-#[cfg(feature = "starnix_lite")]
-use crate::{
-    expose_root, parse_features, parse_numbered_handles, run_container_features,
-    serve_component_runner, serve_container_controller, Features, MountAction,
-};
 use anyhow::{anyhow, bail, Context, Error};
-use bstr::BString;
-#[cfg(not(feature = "starnix_lite"))]
+use bootreason::get_android_bootreason;
+use bstr::{BString, ByteSlice};
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
@@ -30,12 +23,13 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
 use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::container_namespace::ContainerNamespace;
-use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::execution::{
+    create_init_process, create_system_task, execute_task_with_prerun_result,
+};
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{
     FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
@@ -46,7 +40,6 @@ use starnix_logging::{
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_modules_layeredfs::LayeredFs;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::get_magma_params;
 use starnix_modules_overlayfs::OverlayStack;
 use starnix_sync::{Locked, Unlocked};
@@ -58,27 +51,15 @@ use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
 use std::sync::Arc;
-#[cfg(not(feature = "starnix_lite"))]
 use zx::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };
-#[cfg(feature = "starnix_lite")]
-use zx::{
-    Task as _, {self as zx},
-};
-#[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_element as felement, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
-};
-#[cfg(feature = "starnix_lite")]
-use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_starnix_container as fstarcontainer,
-    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
 
 use std::sync::Weak;
@@ -251,7 +232,6 @@ pub struct ContainerProgram {
     #[serde(default)]
     startup_file_path: String,
 
-    #[cfg(not(feature = "starnix_lite"))]
     /// The remote block devices to use for the container.
     #[serde(default)]
     remote_block_devices: Vec<String>,
@@ -351,10 +331,8 @@ impl Container {
             let mut fs = ServiceFs::new_local();
             fs.dir("svc")
                 .add_fidl_service(ExposedServices::ComponentRunner)
-                .add_fidl_service(ExposedServices::ContainerController);
-
-            #[cfg(not(feature = "starnix_lite"))]
-            fs.dir("svc").add_fidl_service(ExposedServices::GraphicalPresenter);
+                .add_fidl_service(ExposedServices::ContainerController)
+                .add_fidl_service(ExposedServices::GraphicalPresenter);
 
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy();
@@ -382,7 +360,6 @@ impl Container {
                             .await
                             .expect("failed to start container.")
                     }
-                    #[cfg(not(feature = "starnix_lite"))]
                     ExposedServices::GraphicalPresenter(request_stream) => {
                         serve_graphical_presenter(request_stream, &self.kernel)
                             .await
@@ -419,7 +396,6 @@ impl Container {
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     ContainerController(fstarcontainer::ControllerRequestStream),
-    #[cfg(not(feature = "starnix_lite"))]
     GraphicalPresenter(felement::GraphicalPresenterRequestStream),
 }
 
@@ -499,7 +475,6 @@ pub async fn create_component_from_stream(
                 let service_config =
                     ContainerServiceConfig { start_info, request_stream, receiver };
 
-                #[cfg(not(feature = "starnix_lite"))]
                 container.kernel.kthreads.spawn_future({
                     let vvar = container.kernel.vdso.vvar_writeable.clone();
                     let utc_clock =
@@ -536,14 +511,8 @@ async fn create_container(
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
     let features = parse_features(&start_info)?;
-
-    #[cfg(not(feature = "starnix_lite"))]
     log_debug!("Creating container with {:#?}", features);
     let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
-    #[cfg(feature = "starnix_lite")]
-    let kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
-
-    #[cfg(not(feature = "starnix_lite"))]
     if features.android_serialno {
         match get_serial_number().await {
             Ok(serial) => {
@@ -553,7 +522,18 @@ async fn create_container(
             Err(err) => log_warn!("could not get serial number: {err:?}"),
         }
     }
-    #[cfg(not(feature = "starnix_lite"))]
+    if features.android_bootreason {
+        kernel_cmdline.extend(b" androidboot.bootreason=");
+        match get_android_bootreason() {
+            Ok(reason) => {
+                kernel_cmdline.extend(reason.bytes());
+            }
+            Err(err) => {
+                log_warn!("could not get android bootreason: {err:?}. falling back to 'unknown'");
+                kernel_cmdline.extend(b"unknown");
+            }
+        }
+    }
     if let Some(supported_vendors) = &features.magma_supported_vendors {
         kernel_cmdline.extend(b" ");
         let params = get_magma_params(supported_vendors);
@@ -583,34 +563,11 @@ async fn create_container(
     kernel_node.record_int("created_at", zx::MonotonicInstant::get().into_nanos());
     features.record_inspect(&kernel_node);
 
-    // The SELinux `exceptions_path` may provide a path to an exceptions file to read, or the
-    // special "#strict" value, to run with no exceptions applied.
-    // If no `exceptions_path` is specified then a default set of exceptions are used.
-    let selinux_exceptions_config =
-        match features.selinux.exceptions_path.as_ref().map(|x| x.as_str()) {
-            Some("#strict") => String::new(),
-            Some(file_path) => {
-                let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-
-                let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
-
-                pkg_dir_proxy
-                    .open(&file_path, flags, &fio::Options::default(), server_end.into_channel())
-                    .expect("open SELinux exceptions config file");
-
-                let contents = match fuchsia_fs::file::read(&file).await {
-                    Ok(contents) => contents,
-                    Err(e) => {
-                        panic!("read SELinux exceptions from \"{}\" (error: {})", file_path, e);
-                    }
-                };
-
-                String::from_utf8(contents).expect("parsing security exception file")
-            }
-            None => security::DEFAULT_EXCEPTIONS_CONFIG.into(),
-        };
-    let security_state =
-        security::kernel_init_security(features.selinux.enabled, selinux_exceptions_config);
+    let security_state = security::kernel_init_security(
+        features.selinux.enabled,
+        features.selinux.options.clone(),
+        features.selinux.exceptions.clone(),
+    );
 
     // XXX(fmil): Should there also be a condition to allow this *only* for specific containers?
     //
@@ -626,6 +583,8 @@ async fn create_container(
         None
     };
 
+    log_debug!("final kernel cmdline: {kernel_cmdline:?}");
+    kernel_node.record_string("cmdline", kernel_cmdline.to_str_lossy());
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),
@@ -650,7 +609,7 @@ async fn create_container(
     // Lots of software assumes that the pid for the init process is 1.
     debug_assert_eq!(init_pid, 1);
 
-    let system_task = CurrentTask::create_system_task(
+    let system_task = create_system_task(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
         Arc::clone(&fs_context),
@@ -695,7 +654,6 @@ async fn create_container(
         )?;
     }
 
-    #[cfg(not(feature = "starnix_lite"))]
     if features.android_fdr {
         init_remote_block_devices(
             kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -751,7 +709,7 @@ async fn create_container(
     }
 
     log_debug!("Creating init process.");
-    let init_task = CurrentTask::create_init_process(
+    let init_task = create_init_process(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         &kernel,
         init_pid,
@@ -909,7 +867,6 @@ fn mount_filesystems(
     Ok(())
 }
 
-#[cfg(not(feature = "starnix_lite"))]
 fn init_remote_block_devices(
     locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
@@ -923,7 +880,6 @@ fn init_remote_block_devices(
     Ok(())
 }
 
-#[cfg(not(feature = "starnix_lite"))]
 fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
     if block_size_str.is_empty() {
         return Err(anyhow!("Invalid empty block size"));
@@ -943,7 +899,6 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
         .and_then(|val| multiplier.checked_mul(val).ok_or_else(|| anyhow!("Block size overflow")))
 }
 
-#[cfg(not(feature = "starnix_lite"))]
 fn create_remote_block_device_from_spec<'a>(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,

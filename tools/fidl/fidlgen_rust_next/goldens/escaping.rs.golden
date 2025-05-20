@@ -14,7 +14,7 @@ pub const DOLLAR_BRACE: &str = "${";
 pub struct DocCommentWithQuotes {}
 
 impl ::fidl_next::Encodable for DocCommentWithQuotes {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireDocCommentWithQuotes> =
         unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
 
     type Encoded = WireDocCommentWithQuotes;
@@ -26,7 +26,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -40,18 +40,38 @@ where
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<DocCommentWithQuotes> {
-    type EncodedOption = ::fidl_next::WireBox<WireDocCommentWithQuotes>;
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for DocCommentWithQuotes
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+
+            } = out;
+        }
+
+        Ok(())
+    }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<DocCommentWithQuotes>
+impl ::fidl_next::EncodableOption for DocCommentWithQuotes {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireDocCommentWithQuotes>;
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for DocCommentWithQuotes
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     DocCommentWithQuotes: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -66,12 +86,41 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for DocCommentWithQuotes
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    DocCommentWithQuotes: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+impl ::fidl_next::FromWire<WireDocCommentWithQuotes> for DocCommentWithQuotes {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireDocCommentWithQuotes, Self> =
         unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
 
     #[inline]
-    fn take_from(from: &WireDocCommentWithQuotes) -> Self {
+    fn from_wire(wire: WireDocCommentWithQuotes) -> Self {
+        Self {}
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireDocCommentWithQuotes> for DocCommentWithQuotes {
+    #[inline]
+    fn from_wire_ref(wire: &WireDocCommentWithQuotes) -> Self {
         Self {}
     }
 }
@@ -81,7 +130,9 @@ impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
 #[repr(C)]
 pub struct WireDocCommentWithQuotes {}
 
-unsafe impl ::fidl_next::ZeroPadding for WireDocCommentWithQuotes {
+unsafe impl ::fidl_next::Wire for WireDocCommentWithQuotes {
+    type Decoded<'de> = WireDocCommentWithQuotes;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -117,14 +168,4 @@ pub const SMILE_LOWER: &str = "\u{1f600}";
 pub const SMILE_UPPER: &str = "\u{1f600}";
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireDocCommentWithQuotes>
-        for ::fidl_test_escaping::DocCommentWithQuotes
-    {
-        #[inline]
-        fn take_from(from: &crate::WireDocCommentWithQuotes) -> Self {
-            Self {}
-        }
-    }
-}
+pub mod compat {}

@@ -17,6 +17,7 @@ use discovery::{
     wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
 };
 use futures::{Stream, StreamExt};
+use log::LevelFilter;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use std::collections::HashMap;
@@ -26,7 +27,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use target::{TargetInfo, TargetMode};
 use timeout::timeout;
-use tracing_subscriber::filter::LevelFilter;
 
 mod errors;
 mod logging;
@@ -36,7 +36,7 @@ mod target;
 mod update;
 
 fn default_log_level() -> LevelFilter {
-    LevelFilter::ERROR
+    LevelFilter::Error
 }
 
 fn default_repository_ports() -> Vec<u32> {
@@ -333,7 +333,7 @@ fn write_target_event<W: Write>(mut writer: W, event: TargetEvent) -> Result<()>
 fn write_target_state<W: Write>(writer: &mut W, state: TargetState) -> Result<()> {
     match state {
         TargetState::Unknown => write!(writer, "Unknown")?,
-        TargetState::Product(addrs) => {
+        TargetState::Product { addrs, .. } => {
             write!(writer, "Product\t")?;
             let addr_strs =
                 addrs.iter().map(|addr| format!("{}", addr)).collect::<Vec<_>>().join("\t");
@@ -372,7 +372,7 @@ where
                         targets.remove(&handle.node_name.unwrap_or_else(|| "".to_string()));
                     }
                     TargetEvent::Added(handle) => match handle.state {
-                        TargetState::Product(addr) => {
+                        TargetState::Product { addrs: addr, .. } => {
                             targets.insert(
                                 handle.node_name.unwrap_or_else(|| "".to_string()),
                                 (addr, TargetMode::Product),

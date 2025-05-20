@@ -488,6 +488,9 @@ type Dhcp6PdState = flexible enum {
 
     /// DHCPv6 PD is enabled and will try to request and publish a prefix.
     DHCP6_PD_STATE_RUNNING = 3;
+
+    /// DHCPv6 PD is idle; Higher-prf prefix published by other BRs.
+    DHCP6_PD_STATE_IDLE = 4;
 };
 
 /// DHCPv6 PD related info.

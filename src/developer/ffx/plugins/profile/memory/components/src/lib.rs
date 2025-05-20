@@ -7,20 +7,22 @@ mod output;
 
 #[macro_use]
 extern crate prettytable;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use attribution_processing::kernel_statistics::KernelStatistics;
-use attribution_processing::summary::MemorySummary;
-use attribution_processing::{AttributionData, Principal, Resource};
+use attribution_processing::summary::{ComponentProfileResult, MemorySummary};
+use attribution_processing::{AttributionData, Principal, Resource, ZXName};
 use errors::ffx_error;
 use ffx_profile_memory_components_args::ComponentsCommand;
-use ffx_writer::{SimpleWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO};
 use fho::{AvailabilityFlag, FfxMain, FfxTool};
+use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use futures::AsyncReadExt;
 use json::JsonConvertible;
+use serde::Serialize;
+use std::io::Write;
 use target_holders::moniker;
-
-use fidl_fuchsia_memory_attribution_plugin as fplugin;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_memory_components"))]
@@ -33,19 +35,54 @@ pub struct MemoryComponentsTool {
 
 fho::embedded_plugin!(MemoryComponentsTool);
 
+/// Minimal interface to output text or data.
+/// It makes possible to adapt `MachineWriter` of various types and to delegate execution between
+/// plugins.
+pub trait PluginOutput<T>
+where
+    T: Serialize,
+{
+    fn is_machine(&self) -> bool;
+    fn machine(&mut self, output: T) -> Result<()>;
+    fn stderr(&mut self) -> &mut dyn Write;
+    fn stdout(&mut self) -> &mut dyn Write;
+}
+
+impl PluginOutput<ComponentProfileResult> for MachineWriter<ComponentProfileResult> {
+    fn is_machine(&self) -> bool {
+        ToolIO::is_machine(self)
+    }
+
+    fn machine(&mut self, output: ComponentProfileResult) -> Result<()> {
+        MachineWriter::<ComponentProfileResult>::machine(self, &output)?;
+        Ok(())
+    }
+
+    fn stderr(&mut self) -> &mut dyn Write {
+        ToolIO::stderr(self)
+    }
+
+    fn stdout(&mut self) -> &mut dyn Write {
+        self
+    }
+}
+
 #[async_trait(?Send)]
 impl FfxMain for MemoryComponentsTool {
-    type Writer = SimpleWriter;
+    type Writer = MachineWriter<ComponentProfileResult>;
 
     /// Forwards the specified memory pressure level to the fuchsia.memory.debug.MemoryPressure FIDL
     /// interface.
-    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, writer: MachineWriter<ComponentProfileResult>) -> fho::Result<()> {
         self.run(writer).await
     }
 }
 
 impl MemoryComponentsTool {
-    pub async fn run(&self, mut writer: impl ToolIO) -> fho::Result<()> {
+    pub async fn run(
+        &self,
+        mut writer: impl PluginOutput<ComponentProfileResult>,
+    ) -> fho::Result<()> {
         let snapshot = match self.cmd.stdin_input {
             false => self.load_from_device().await?,
             true => {
@@ -53,13 +90,29 @@ impl MemoryComponentsTool {
                     .unwrap()
             }
         };
+
         if self.cmd.debug_json {
             println!("{}", serde_json::to_string(&snapshot.to_json()).unwrap());
+            return Ok(());
+        }
+
+        let (summary, kernel_statistics, thrashing_metrics) = process_snapshot(snapshot);
+        if writer.is_machine() {
+            writer.machine(ComponentProfileResult {
+                kernel: kernel_statistics,
+                principals: summary.principals,
+                undigested: summary.undigested,
+            })?;
         } else {
-            let (output, kernel_statistics) = process_snapshot(snapshot);
-            output::write_summary(&mut writer, &self.cmd, &output, kernel_statistics)
-                .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
-                .map_err(|e| fho::Error::Unexpected(e.into()))?;
+            output::write_summary(
+                &mut writer.stdout(),
+                self.cmd.csv,
+                &summary,
+                kernel_statistics,
+                thrashing_metrics,
+            )
+            .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
+            .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }
         Ok(())
     }
@@ -83,7 +136,9 @@ impl MemoryComponentsTool {
     }
 }
 
-fn process_snapshot(snapshot: fplugin::Snapshot) -> (MemorySummary, KernelStatistics) {
+fn process_snapshot(
+    snapshot: fplugin::Snapshot,
+) -> (MemorySummary, KernelStatistics, fplugin::PerformanceImpactMetrics) {
     // Map from moniker token ID to Principal struct.
     let principals: Vec<Principal> =
         snapshot.principals.into_iter().flatten().map(|p| p.into()).collect();
@@ -98,11 +153,17 @@ fn process_snapshot(snapshot: fplugin::Snapshot) -> (MemorySummary, KernelStatis
         attribution_processing::attribute_vmos(AttributionData {
             principals_vec: principals,
             resources_vec: resources,
-            resource_names: snapshot.resource_names.unwrap(),
+            resource_names: snapshot
+                .resource_names
+                .unwrap()
+                .iter()
+                .map(|n| ZXName::from_string_lossy(n))
+                .collect(),
             attributions,
         })
         .summary(),
         snapshot.kernel_statistics.unwrap().into(),
+        snapshot.performance_metrics.unwrap(),
     )
 }
 
@@ -461,10 +522,15 @@ mod tests {
                 }),
                 ..Default::default()
             }),
+            performance_metrics: Some(fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(10),
+                full_memory_stalls_ns: Some(5),
+                ..Default::default()
+            }),
             ..Default::default()
         };
 
-        let (output, _) = process_snapshot(snapshot);
+        let (output, _, performance_metrics) = process_snapshot(snapshot);
 
         // VMO 1011 is the parent of VMO 1010, but not claimed by any Principal; it is thus
         // undigested.
@@ -490,7 +556,7 @@ mod tests {
                 processes: vec!["root_process (1001)".to_owned()],
                 vmos: vec![
                     (
-                        "root_vmo".to_owned(),
+                        ZXName::from_string_lossy("root_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -503,7 +569,7 @@ mod tests {
                         }
                     ),
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -536,7 +602,7 @@ mod tests {
                 attributor: Some("root".to_owned()),
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![(
-                    "runner_vmo".to_owned(),
+                    ZXName::from_string_lossy("runner_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,
@@ -569,7 +635,7 @@ mod tests {
                 processes: vec!["2_process (1009)".to_owned()],
                 vmos: vec![
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -582,7 +648,7 @@ mod tests {
                         }
                     ),
                     (
-                        "2_vmo".to_owned(),
+                        ZXName::from_string_lossy("2_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -616,7 +682,7 @@ mod tests {
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![
                     (
-                        "component_vmo".to_owned(),
+                        ZXName::from_string_lossy("component_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 128,
@@ -629,7 +695,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -642,7 +708,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped2".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped2"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -657,6 +723,15 @@ mod tests {
                 ]
                 .into_iter()
                 .collect(),
+            }
+        );
+
+        assert_eq!(
+            performance_metrics,
+            fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(10),
+                full_memory_stalls_ns: Some(5),
+                ..Default::default()
             }
         );
     }
@@ -814,10 +889,15 @@ mod tests {
                 }),
                 ..Default::default()
             }),
+            performance_metrics: Some(fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(10),
+                full_memory_stalls_ns: Some(5),
+                ..Default::default()
+            }),
             ..Default::default()
         };
 
-        let (output, _) = process_snapshot(snapshot);
+        let (output, _, _) = process_snapshot(snapshot);
 
         assert_eq!(output.undigested, 0);
         assert_eq!(output.principals.len(), 3);
@@ -876,7 +956,7 @@ mod tests {
                 attributor: Some("component 1".to_owned()),
                 processes: vec!["component_process (1002)".to_owned()],
                 vmos: vec![(
-                    "component_vmo".to_owned(),
+                    ZXName::from_string_lossy("component_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,

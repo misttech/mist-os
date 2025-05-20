@@ -4,7 +4,9 @@
 
 #include "src/performance/trace_manager/trace_manager.h"
 
+#include <fidl/fuchsia.sysinfo/cpp/fidl.h>
 #include <fuchsia/tracing/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/clone.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
@@ -16,6 +18,7 @@
 #include <unordered_set>
 
 #include "src/performance/trace_manager/app.h"
+#include "src/performance/trace_manager/deferred_buffer_forwarder.h"
 
 namespace tracing {
 namespace {
@@ -56,6 +59,19 @@ struct KnownCategoryEquals {
 using KnownCategorySet =
     std::unordered_set<fuchsia::tracing::KnownCategory, KnownCategoryHash, KnownCategoryEquals>;
 using KnownCategoryVector = std::vector<fuchsia::tracing::KnownCategory>;
+
+std::optional<std::string> GetBoardName() {
+  zx::result client_end = component::Connect<fuchsia_sysinfo::SysInfo>();
+  if (!client_end.is_ok()) {
+    return std::nullopt;
+  }
+  fidl::SyncClient client{std::move(*client_end)};
+  fidl::Result<fuchsia_sysinfo::SysInfo::GetBoardName> board_name_res = client->GetBoardName();
+  if (board_name_res.is_error()) {
+    return std::nullopt;
+  }
+  return board_name_res->name();
+}
 
 }  // namespace
 
@@ -308,8 +324,27 @@ void TraceManager::InitializeTracing(fidl::InterfaceRequest<controller::Session>
     start_timeout = zx::msec(config.start_timeout_milliseconds());
   }
 
+  std::string board_name = GetBoardName().value_or("");
+
+  DataForwarding forwarding = DataForwarding::kEager;
+  // astro has very little disk space to use to buffer, so we're better of keeping the data in
+  // memory.
+  //
+  // TODO(https://fxbug.dev/416067886): Currently, to determine whether to buffer our trace to disk
+  // or not, we check that we're not currently running on astro, since astro has very little disk
+  // space. We should generalize this check to say, check for how much storage is available and make
+  // a decision based on that instead of just checking a specific hardcoded board name.
+  if (config.has_defer_transfer() && config.defer_transfer() && board_name != "astro") {
+    forwarding = DataForwarding::kBuffered;
+  }
+
+  std::shared_ptr<BufferForwarder> forwarder =
+      forwarding == DataForwarding::kEager
+          ? std::make_shared<BufferForwarder>(std::move(output))
+          : std::make_shared<DeferredBufferForwarder>(std::move(output));
+
   auto session = std::make_unique<TraceSession>(
-      executor_, std::move(output), std::move(categories), default_buffer_size_megabytes,
+      executor_, std::move(forwarder), std::move(categories), default_buffer_size_megabytes,
       tracing_buffering_mode, std::move(provider_specs), start_timeout, kStopTimeout,
       std::move(fxt_version),
       [this]() {

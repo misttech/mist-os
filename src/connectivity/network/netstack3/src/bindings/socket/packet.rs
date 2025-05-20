@@ -8,12 +8,12 @@ use std::ops::ControlFlow;
 
 use {
     fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fpsocket,
-    fidl_fuchsia_posix_socket_packet as fppacket,
+    fidl_fuchsia_posix_socket_packet as fppacket, fuchsia_async as fasync,
 };
 
-use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _, RequestStream as _};
+use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _};
 use fidl::Peered as _;
-use futures::StreamExt as _;
+use futures::TryStreamExt as _;
 use log::{error, info, warn};
 use net_types::ethernet::Mac;
 use net_types::ip::IpVersion;
@@ -37,7 +37,8 @@ use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
 use crate::bindings::socket::{IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 use crate::bindings::util::{
     DeviceNotFoundError, IntoCore as _, IntoFidl as _, RemoveResourceResultExt as _,
-    ResultExt as _, TryFromFidl, TryIntoCoreWithContext as _, TryIntoFidlWithContext,
+    ResultExt as _, ScopeExt as _, TryFromFidl, TryIntoCoreWithContext as _,
+    TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
@@ -90,41 +91,27 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
 
 pub(crate) async fn serve(
     ctx: Ctx,
-    stream: fppacket::ProviderRequestStream,
-) -> crate::bindings::util::TaskWaitGroup {
+    mut stream: fppacket::ProviderRequestStream,
+) -> Result<(), fidl::Error> {
     let ctx = &ctx;
-    let (wait_group, spawner) = crate::bindings::util::TaskWaitGroup::new();
-    let spawner: worker::ProviderScopedSpawner<_> = spawner.into();
-    stream
-        .map(|req| {
-            let req = match req {
-                Ok(req) => req,
-                Err(e) => {
-                    if !e.is_closed() {
-                        error!("{} request error {e:?}", fppacket::ProviderMarker::DEBUG_NAME);
-                    }
-                    return;
-                }
-            };
-            match req {
-                fppacket::ProviderRequest::Socket { responder, kind } => {
-                    let (client, request_stream) = fidl::endpoints::create_request_stream();
-                    spawner.spawn(SocketWorker::serve_stream_with(
+    while let Some(req) = stream.try_next().await? {
+        match req {
+            fppacket::ProviderRequest::Socket { responder, kind } => {
+                let (client, request_stream) = fidl::endpoints::create_request_stream();
+                fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                    SocketWorker::serve_stream_with(
                         ctx.clone(),
                         move |ctx, properties| BindingData::new(ctx, kind, properties),
                         SocketWorkerProperties {},
-                        request_stream,
+                        rs,
                         (),
-                        spawner.clone(),
-                    ));
-                    responder.send(Ok(client)).unwrap_or_log("failed to respond");
-                }
+                    )
+                });
+                responder.send(Ok(client)).unwrap_or_log("failed to respond");
             }
-        })
-        .collect::<()>()
-        .await;
-
-    wait_group
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -241,13 +228,11 @@ impl worker::SocketWorkerHandler for BindingData {
     type RequestStream = fppacket::SocketRequestStream;
     type CloseResponder = fppacket::SocketCloseResponder;
     type SetupArgs = ();
-    type Spawner = ();
 
     async fn handle_request(
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-        _spawners: &worker::TaskSpawnerCollection<()>,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
     }
@@ -259,7 +244,7 @@ impl worker::SocketWorkerHandler for BindingData {
             .api()
             .device_socket()
             .remove(id)
-            .map_deferred(|d| d.into_future("packet socket", &weak))
+            .map_deferred(|d| d.into_future("packet socket", &weak, ctx))
             .into_future()
             .await;
     }

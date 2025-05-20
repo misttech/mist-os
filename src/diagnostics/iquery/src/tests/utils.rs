@@ -206,7 +206,7 @@ impl fmt::Display for IqueryCommand {
             Self::Selectors => "selectors",
             Self::Show => "show",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -229,7 +229,7 @@ impl fmt::Display for Format {
             Self::Json => "json",
             Self::Text => "text",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -276,9 +276,9 @@ impl TestInExecution {
     }
 
     fn read_golden(&self, golden_basename: &str, format: Format) -> String {
-        let path = format!("/pkg/data/goldens/{}.{}", golden_basename, format);
+        let path = format!("/pkg/data/goldens/{golden_basename}.{format}");
         fs::read_to_string(Path::new(&path))
-            .unwrap_or_else(|e| panic!("loaded golden {}: {:?}", path, e))
+            .unwrap_or_else(|e| panic!("loaded golden {path}: {e:?}"))
     }
 }
 
@@ -325,7 +325,7 @@ impl<'a> CommandAssertion<'a> {
                 }
                 Err(e) => {
                     if zx::MonotonicInstant::get() >= started + self.max_retry_time {
-                        panic!("Error: {:?}", e);
+                        panic!("Error: {e:?}");
                     }
                 }
             }
@@ -373,12 +373,12 @@ impl<'a> CommandAssertion<'a> {
         // timestamp in metadatas.
         let mut string: String = string.into();
         for value in &["timestamp", "start_timestamp_nanos"] {
-            let re = Regex::new(&format!("\"{}\": \\d+", value)).unwrap();
-            let replacement = format!("\"{}\": \"TIMESTAMP\"", value);
+            let re = Regex::new(&format!("\"{value}\": \\d+")).unwrap();
+            let replacement = format!("\"{value}\": \"TIMESTAMP\"");
             string = re.replace_all(&string, replacement.as_str()).to_string();
 
-            let re = Regex::new(&format!("{} = \\d+", value)).unwrap();
-            let replacement = format!("{} = TIMESTAMP", value);
+            let re = Regex::new(&format!("{value} = \\d+")).unwrap();
+            let replacement = format!("{value} = TIMESTAMP");
             string = re.replace_all(&string, replacement.as_str()).to_string();
         }
         string

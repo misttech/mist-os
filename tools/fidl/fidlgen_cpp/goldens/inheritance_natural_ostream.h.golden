@@ -33,49 +33,29 @@ std::ostream& operator<<(std::ostream& os, const ::test_inheritance::SuperFooRes
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritance::Super>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Super>& value) {
-    return os << "ClientEnd<" << "test_inheritance::Super" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Super>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritance::Super>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Super>& value) {
-    return os << "ServerEnd<" << "test_inheritance::Super" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Super>& value);
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritance::Sub>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Sub>& value) {
-    return os << "ClientEnd<" << "test_inheritance::Sub" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Sub>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritance::Sub>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Sub>& value) {
-    return os << "ServerEnd<" << "test_inheritance::Sub" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Sub>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Super>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Super>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritance::Super>>::Format(os, value);
-}
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Super>& value);
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Sub>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Super>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritance::Super>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_inheritance::Sub>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritance::Sub>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Sub>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritance::Sub>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_inheritance::Sub>& value);
 
 #endif  // __Fuchsia__
 

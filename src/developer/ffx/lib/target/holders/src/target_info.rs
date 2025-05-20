@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::DeviceLookupDefaultImpl;
-use anyhow::anyhow;
 use async_trait::async_trait;
+use ffx_config::EnvironmentContext;
 use std::any::Any;
 use std::ops::Deref;
 
-use ffx_command_error::{bug, user_error, Error, Result};
-use fho::{DeviceLookup, FhoEnvironment, FhoTargetInfo, TryFromEnv};
+use ffx_command_error::{bug, user_error, Result};
+use fho::{return_user_error, FfxContext, FhoEnvironment, TryFromEnv};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 
 /// Holder struct for TargetInfo. This one is a little different since
@@ -18,16 +17,16 @@ use fidl_fuchsia_developer_ffx as ffx_fidl;
 #[derive(Debug, Clone)]
 pub struct TargetInfoHolder(ffx_fidl::TargetInfo);
 
-impl FhoTargetInfo for TargetInfoHolder {
-    fn nodename(&self) -> Option<String> {
+impl TargetInfoHolder {
+    pub fn nodename(&self) -> Option<String> {
         self.0.nodename.clone()
     }
 
-    fn serial_number(&self) -> Option<String> {
+    pub fn serial_number(&self) -> Option<String> {
         self.0.serial_number.clone()
     }
 
-    fn addresses(&self) -> Vec<std::net::SocketAddr> {
+    pub fn addresses(&self) -> Vec<std::net::SocketAddr> {
         let mut addrs = vec![];
         if let Some(address_list) = &self.0.addresses {
             for addr in address_list {
@@ -42,7 +41,7 @@ impl FhoTargetInfo for TargetInfoHolder {
         addrs
     }
 
-    fn ssh_address(&self) -> Option<std::net::SocketAddr> {
+    pub fn ssh_address(&self) -> Option<std::net::SocketAddr> {
         if let Some(ssh_address) = &self.0.ssh_address {
             let address: addr::TargetIpAddr = ssh_address.into();
             Some(address.into())
@@ -56,24 +55,21 @@ impl FhoTargetInfo for TargetInfoHolder {
     }
 }
 
+async fn resolve_target_query_to_info(
+    query: Option<String>,
+    ctx: &EnvironmentContext,
+) -> Result<Vec<TargetInfoHolder>> {
+    match ffx_target::resolve_target_query_to_info(query, ctx).await.bug_context("resolving target")
+    {
+        Ok(targets) => Ok(targets.iter().map(|t| t.into()).collect()),
+        Err(e) => return_user_error!(e),
+    }
+}
 #[async_trait(?Send)]
 impl TryFromEnv for TargetInfoHolder {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.lookup().await.is_none() {
-            env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await;
-        }
-
-        let looker = env.lookup().await;
-        let lookup: Result<&Box<dyn DeviceLookup>> = if let Some(ref lookup) = *looker {
-            Ok(lookup)
-        } else {
-            Err(Error::Unexpected(anyhow!("Could not get env lookup")))
-        };
-
-        let look = lookup?;
-        let query = look.target_spec(env.environment_context().clone()).await?;
-        let info_list =
-            look.resolve_target_query_to_info(query, env.environment_context().clone()).await?;
+        let query = ffx_target::get_target_specifier(&env.environment_context()).await?;
+        let info_list = resolve_target_query_to_info(query, env.environment_context()).await?;
 
         match &info_list[..] {
             [info] => match info.as_any().downcast_ref::<Self>() {

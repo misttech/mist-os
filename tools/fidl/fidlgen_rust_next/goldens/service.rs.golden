@@ -66,7 +66,7 @@ where
     fn method_on_first(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(6352548393671797041, &mut ())
+        self.as_untyped().send_one_way(6352548393671797041, ())
     }
 }
 
@@ -329,7 +329,7 @@ where
     fn method_on_second(
         &self,
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(8121179205110225988, &mut ())
+        self.as_untyped().send_one_way(8121179205110225988, ())
     }
 }
 
@@ -466,9 +466,9 @@ pub mod compat {
     pub type FirstProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>;
 
-    impl ::fidl_next::TakeFrom<crate::FirstProtocol> for ::fidl_test_service::FirstProtocolMarker {
+    impl ::core::convert::From<crate::FirstProtocol> for ::fidl_test_service::FirstProtocolMarker {
         #[inline]
-        fn take_from(from: &crate::FirstProtocol) -> Self {
+        fn from(_: crate::FirstProtocol) -> Self {
             Self
         }
     }
@@ -479,9 +479,9 @@ pub mod compat {
     pub type SecondProtocolProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>;
 
-    impl ::fidl_next::TakeFrom<crate::SecondProtocol> for ::fidl_test_service::SecondProtocolMarker {
+    impl ::core::convert::From<crate::SecondProtocol> for ::fidl_test_service::SecondProtocolMarker {
         #[inline]
-        fn take_from(from: &crate::SecondProtocol) -> Self {
+        fn from(_: crate::SecondProtocol) -> Self {
             Self
         }
     }

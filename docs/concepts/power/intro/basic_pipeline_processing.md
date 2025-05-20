@@ -44,10 +44,11 @@ If choosing to use a timeout, **choose your timeout carefully** because the
 system will not be able to suspend until all copies of `LeaseToken` are dropped.
 Long timeouts are strongly discouraged, the reason to use a timeout is because
 you have relatively high event rates, which means you should be able to pick a
-short timeout. If you are writing C++ there is a [helper][wake_lease] available
-for managing leases and extending timeouts based on the arrival of new events.
-Use the helper by calling `AcquireWakeLease` instead of talking to the
-`ActivityGovernor` capability yourself.
+short timeout. If you are writing C++ you can use the
+[`TimeoutWakeLease`][wake_lease] class for managing leases and extending
+timeouts based on the arrival of new events. Use the helper by calling
+`AcquireWakeLease` instead of talking to the `ActivityGovernor` capability
+yourself.
 
 ### Protocol interlocks
 
@@ -78,10 +79,10 @@ use a timeout, **choose your timeout carefully** because the system will not be
 able to suspend until the `LeaseToken` is dropped. Long timeouts are strongly
 discouraged, the reason to use a timeout is because you have relatively high
 event rates, which means you should be able to pick a short timeout. If you are
-writing C++ there is a [helper][wake_lease] available for managing leases and
-extending timeouts based on the arrival of new events. Use the helper by calling
-`AcquireWakeLease` instead of talking to the `ActivityGovernor` capability
-yourself.
+writing C++ the [`TimeoutWakeLease`][wake_lease] class is available for managing
+leases and extending timeouts based on the arrival of new events. Use the
+helper by calling `AcquireWakeLease` instead of talking to the
+`ActivityGovernor` capability yourself.
 
 ### Timeouts
 

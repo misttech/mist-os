@@ -87,7 +87,7 @@ def find_fx_build_dir(fuchsia_dir: Path) -> T.Optional[Path]:
 
 def get_bazel_relative_topdir(
     fuchsia_dir: str | Path, workspace_name: str
-) -> T.Tuple[str, T.Set[Path]]:
+) -> tuple[str, set[Path]]:
     """Return Bazel topdir for a given workspace, relative to Ninja output dir.
 
     Args:
@@ -312,9 +312,9 @@ class GeneratedWorkspaceFiles(object):
     """
 
     def __init__(self) -> None:
-        self._files: T.Dict[str, T.Any] = {}
+        self._files: dict[str, T.Any] = {}
         self._file_hasher: T.Optional[FileHasherType] = None
-        self._input_files: T.Set[Path] = set()
+        self._input_files: set[Path] = set()
 
     def set_file_hasher(self, file_hasher: FileHasherType) -> None:
         self._file_hasher = file_hasher
@@ -325,7 +325,7 @@ class GeneratedWorkspaceFiles(object):
         )
 
     @property
-    def input_files(self) -> T.Set[Path]:
+    def input_files(self) -> set[Path]:
         """The set of input file Paths that were read through read_text_file()."""
         return self._input_files
 
@@ -473,6 +473,143 @@ class GeneratedWorkspaceFiles(object):
         return True
 
 
+class RootBazelFilesVariantsGenerator(object):
+    """Generate fuchsia and no-sdk variants of root Bazel files.
+
+    This generates variants of root Bazel files like WORKSPACE.bazel
+    or .bazelrc in two separate directories, i.e.:
+
+    - workspace/fuchsia_build_generated/bazel_root_files.fuchsia
+    - workspace/fuchsia_build_generated/bazel_root_files.no_sdk
+
+    In addition to this, workspace/fuchsia_build_generated/bazel_root_files
+    will be a single symlink pointing to one of these directories, and
+    updated by `fx bazel, `fx bazel-no-sdk` or `bazel_action.py` on
+    demand.
+
+    The root files themselves (e.g. workspace/WORKSPACE.bazel) will be
+    symlinks crossing the root_bazel_files symlink to access their
+    target (e.g.
+    workspace/fuchsia_build_generated/root_bazel_files/WORKSPACE.bazel)
+
+    This allows using a single symlink redirection to manage several
+    root files all at once.
+
+    Usage is:
+      - Create instance, passing a GeneratedWorkspaceFiles instance.
+
+      - Call add_file_content() to add variants for a root file
+        based from the content of a single input path.
+
+      - Call add_template_expansion() to add variants for a root file
+        based on expansion of an input template file instead.
+    """
+
+    # The line prefix used to determine where to cut an input file or template
+    # expansion to generate the corresponding no-sdk variant.
+    FUCHSIA_SDK_CUTOFF = "### FUCHSIA_SDK_CUTOFF"
+
+    def __init__(self, generated: GeneratedWorkspaceFiles) -> None:
+        # The name of the root filenames that need variants.
+        self._generated = generated
+        self._root_filenames: set[str] = set()
+        self._root_files_symlink = (
+            "workspace/fuchsia_build_generated/bazel_root_files"
+        )
+        self._fuchsia_root_files_dir = f"{self._root_files_symlink}.fuchsia"
+        self._no_sdk_root_files_dir = f"{self._root_files_symlink}.no_sdk"
+
+        # Make the symlink point to the Fuchsia variants dir by default.
+        self._generated.record_raw_symlink(
+            self._root_files_symlink, "bazel_root_files.fuchsia"
+        )
+
+        self._fuchsia_sdk_cutoff_prefix = "### FUCHSIA_SDK_CUTOFF"
+
+    def filter_no_sdk_content(
+        self, content: str, input_path: str | Path
+    ) -> str:
+        """Remove Fuchsia-specific definitions from an input file.
+
+        This files the line that starts with FUCHSIA_CUTOFF_PREFIX then
+        removes it, as well as all following lines, from the output.
+
+        Args:
+            content: input content.
+            input_path: input file path (used only for errors).
+        Returns:
+            Input content, with Fuchsia definitions removed.
+        Raises:
+            AssertionError if the input does not include fuchsia_cutoff_prefix.
+        """
+        cutoff_index = content.find(self.FUCHSIA_SDK_CUTOFF)
+        assert (
+            cutoff_index >= 0
+        ), f"Missing marker prefix [{self.FUCHSIA_SDK_CUTOFF}] in {input_path}"
+        return content[:cutoff_index]
+
+    def add_file(self, root_filename: str, input_path: Path) -> None:
+        self._add_root_filename(root_filename)
+
+        # Write the Fuchsia variant of the file.
+        self._generated.record_symlink(
+            f"{self._fuchsia_root_files_dir}/{root_filename}", input_path
+        )
+
+        # Write the no-sdk variant of the file.
+        content = self._generated.read_text_file(input_path)
+        self._generated.record_file_content(
+            f"{self._no_sdk_root_files_dir}/{root_filename}",
+            self.filter_no_sdk_content(content, input_path),
+        )
+
+    def add_content(
+        self, root_filename: str, content: str, input_path: str | Path
+    ) -> None:
+        self._add_root_filename(root_filename)
+
+        # Write the Fuchsia variant of the file.
+        self._generated.record_file_content(
+            f"{self._fuchsia_root_files_dir}/{root_filename}", content
+        )
+
+        # Write the no-sdk variant of the file.
+        self._generated.record_file_content(
+            f"{self._no_sdk_root_files_dir}/{root_filename}",
+            self.filter_no_sdk_content(content, input_path),
+        )
+
+    def add_template_expansion(
+        self, root_filename: str, template_path: Path, **kwargs: T.Any
+    ) -> None:
+        self._add_root_filename(root_filename)
+
+        # Expand template and write Fuchsia variant.
+        content = self._generated.read_text_file(template_path).format(**kwargs)
+        self._generated.record_file_content(
+            f"{self._fuchsia_root_files_dir}/{root_filename}",
+            content,
+        )
+
+        # Write the no-sdk variant of the file.
+        self._generated.record_file_content(
+            f"{self._no_sdk_root_files_dir}/{root_filename}",
+            self.filter_no_sdk_content(content, template_path),
+        )
+
+    def _add_root_filename(self, root_filename: str) -> None:
+        assert (
+            root_filename not in self._root_filenames
+        ), f"Root filename {root_filename} is already in the set!"
+        self._root_filenames.add(root_filename)
+
+        # Top-level symlink goes through the bazel_root_files symlink.
+        self._generated.record_raw_symlink(
+            f"workspace/{root_filename}",
+            f"fuchsia_build_generated/bazel_root_files/{root_filename}",
+        )
+
+
 def record_fuchsia_workspace(
     generated: GeneratedWorkspaceFiles,
     top_dir: Path,
@@ -541,6 +678,8 @@ def record_fuchsia_workspace(
   Git binary path:        {git_bin_path}"""
         )
 
+    variants_generator = RootBazelFilesVariantsGenerator(generated)
+
     def expand_template_file(
         generated: GeneratedWorkspaceFiles, filename: str, **kwargs: T.Any
     ) -> str:
@@ -585,14 +724,40 @@ def record_fuchsia_workspace(
             fuchsia_dir / "build" / "bazel" / "toplevel.MODULE.bazel",
         )
     else:
-        generated.record_symlink(
-            "workspace/WORKSPACE.bazel",
+        # Generate two distinct Bazel workspace definition files.
+        #
+        # - WORKSPACE.no_sdk.bazel + no_sdk.bazelrc:
+        #
+        #   Omits any repository definition related to the IDK and the SDK.
+        #   I.e. there is no @fuchsia_in_tree_idk or @fuchsia_sdk repository
+        #   in this workspace. This allows building Bazel targets immediately
+        #   after `fx gen`, as long as they do not reference labels pointing
+        #   to @fuchsia_sdk or @fuchsia_in_tree_idk. This is used to implement
+        #   `fx bazel-no-sdk` and the `no_sdk = true` attribute in the GN
+        #   bazel_action() template.
+        #
+        # - WORKSPACE.fuchsia.bazel + fuchsia.bazelrc:
+        #
+        #   Contains the full set of repository definitions, which currently
+        #   require the IDK to be built with Ninja before being able to use the
+        #   workspace, even for simpler queries. Used to implement `fx bazel`
+        #   and the GN bazel_action() without `no_sdk = true`.
+        #
+        # The WORKSPACE.bazel and .bazelrc files are simple symlinks to either
+        # one of these set of files, and will be adjusted before invoking Bazel
+        # by `fx bazel`, `fx bazel-no-sdk` and `bazel_action.py`.
+        #
+
+        # This file contains all definitions, with a special marker line.
+        # workspace/WORKSPACE.fuchsia.bazel is a symlink to it, then its
+        # content is processed and cut to generate workspace/WORKSPACE.no_sdk.bazel.
+        variants_generator.add_file(
+            "WORKSPACE.bazel",
             fuchsia_dir / "build" / "bazel" / "toplevel.WORKSPACE.bazel",
         )
 
-    generated.record_symlink(
-        "workspace/BUILD.bazel",
-        fuchsia_dir / "build" / "bazel" / "toplevel.BUILD.bazel",
+    variants_generator.add_file(
+        "BUILD.bazel", fuchsia_dir / "build" / "bazel" / "toplevel.BUILD.bazel"
     )
 
     # Generate top-level symlinks
@@ -629,13 +794,12 @@ def record_fuchsia_workspace(
     host_cpu = get_host_arch()
     host_tag = get_host_tag()
 
-    record_expanded_template(
-        generated,
-        "workspace/platform_mappings",
-        "template.platform_mappings",
-        host_os=host_os,
+    variants_generator.add_template_expansion(
+        "platform_mappings",
+        templates_dir / "template.platform_mappings",
+        bazel_host_cpu=_BAZEL_CPU_MAP.get(host_cpu, host_cpu),
         host_cpu=host_cpu,
-        bazel_host_cpu=_BAZEL_CPU_MAP[host_cpu],
+        host_os=host_os,
     )
 
     # Generate the content of .bazelrc
@@ -648,13 +812,14 @@ def record_fuchsia_workspace(
         execution_log_file=f"{logs_dir_from_workspace}/exec_log.pb.zstd",
     )
 
-    if not enable_bzlmod:
-        bazelrc_content += """
-# Disable BzlMod, i.e. support for MODULE.bazel files, now that Bazel 7.0
-# enables BzlMod by default.
-common --enable_bzlmod=false
-"""
-    generated.record_file_content("workspace/.bazelrc", bazelrc_content)
+    if enable_bzlmod:
+        bazelrc_content = bazelrc_content.replace(
+            "--enable_bzlmod=false", "--enable_bzlmod=true"
+        )
+
+    variants_generator.add_content(
+        ".bazelrc", bazelrc_content, templates_dir / "template.bazelrc"
+    )
 
     # Generate wrapper script in topdir/bazel that invokes Bazel with the right --output_base.
 
@@ -709,31 +874,61 @@ common --enable_bzlmod=false
 
     # LINT.IfChange
     generated.record_symlink(
+        "workspace/fuchsia_build_generated/com_google_googletest.hash",
+        gn_output_dir
+        / "regenerator_outputs"
+        / "bazel_content_hashes"
+        / "com_google_googletest.hash",
+    )
+    # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+
+    generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
-        gn_output_dir / "obj/build/bazel/fuchsia_in_tree_idk.hash",
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
+        # LINT.ThenChange(//build/regenerator.py)
+    )
+
+    # Used when merging the IDK sub-build directories. For other use cases,
+    # prefer a symlink with a narrower scope.
+    generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/ninja_root_build_dir",
+        # LINT.ThenChange(//build/bazel/bazel_sdk/BUILD.bazel)
+        gn_output_dir,
     )
 
     generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.IfChange
         gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
+        # LINT.ThenChange(//build/bazel/BUILD.gn)
     )
 
-    # LINT.ThenChange(//build//bazel/BUILD.gn)
-
-    # LINT.IfChange
     # The following symlinks are used only by bazel_action.py when processing
     # the list of Bazel source inputs, the actual repository setup in
-    # WORKSPACE.bazel reuse the two symlinks above instead.
+    # WORKSPACE.bazel reuses the two symlinks above instead.
     generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_sdk.hash",
-        gn_output_dir / "obj/build/bazel/fuchsia_in_tree_idk.hash",
+        # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+        # LINT.IfChange
+        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
+        # LINT.ThenChange(//build/regenerator.py)
     )
 
     generated.record_symlink(
+        # LINT.IfChange
         "workspace/fuchsia_build_generated/internal_sdk.hash",
+        # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+        # LINT.IfChange
         gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
+        # LINT.ThenChange(//build/bazel/BUILD.gn)
     )
-    # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 
     # Create a link to an empty repository. This is updated by bazel_action.py
     # before each Bazel invocation to point to the @gn_targets content specific
@@ -749,7 +944,7 @@ def generate_fuchsia_workspace(
     build_dir: Path,
     log: T.Optional[T.Callable[[str], None]] = None,
     enable_bzlmod: bool = False,
-) -> T.Set[Path]:
+) -> set[Path]:
     """Generate the Fuchsia Bazel workspace and associated files.
 
     Args:
@@ -792,7 +987,7 @@ def generate_fuchsia_workspace(
         gn_output_dir=build_dir,
         git_bin_path=Path(git_bin_path),
         log=log,
-        enable_bzlmod=False,
+        enable_bzlmod=True,
     )
 
     # Remove the old workspace's content, which is just a set
@@ -818,240 +1013,171 @@ def generate_fuchsia_workspace(
 
 
 class GnBuildArgs(object):
-    """A class to handle gn_build_args.txt input files.
+    """A class to handle `gn_build_variables_for_bazel.json` input files.
 
-    These files are used to filter the content of the GN-generated
-    `args.json` file and generate corresponding args.bzl or
-    vendor_<name>_args.bzl in the @fuchsia_build_info Bazel repository.
+    These files are used to export the values of GN args to an `args.bzl` file
+    and optionally `vendor_<name>_args.bzl` files in the @fuchsia_build_info
+    Bazel repository.
 
-    See comments in //build/bazel/gn_build_args.txt for their specific
-    format.
+    See the comments for //build/bazel:gn_build_variables_for_bazel for the
+    format of the `gn_build_variables_for_bazel.json` files.
 
-    Vendor-specific files should always be placed under
-    //vendor/<name>/build/bazel/gn_build_args.txt.
+    Vendor-specific files should always be placed at
+        $OUT_DIR/vendor_<name>_gn_build_variables_for_bazel.json
+    and the target that generates them must always be in the dependency graph
+    when building anything from the vendor repo.
     """
 
     @staticmethod
-    def find_and_read_all_build_args(
-        fuchsia_dir: Path,
-    ) -> T.Tuple[T.Dict[str, str], T.Set[Path]]:
-        """Find and read all gn_build_args.txt files in Fuchsia checkout.
+    def find_all_gn_build_variables_for_bazel(
+        fuchsia_dir: Path, build_dir: Path
+    ) -> list[str]:
+        """Find `all gn_build_variables_for_bazel.json` files in the Fuchsia checkout.
 
         Args:
             fuchsia_dir: Path to Fuchsia source dir.
+            build_dir: Path to Fuchsia build directory.
 
         Returns:
-            A (mapping, extra_ninja_inputs) pair, where |mapping| is a dictionary
-            mapping Fuchsia relative file paths to their string content, and
-            where |extra_ninja_inputs| is a set of extra Ninja inputs used by regenerator
-            to patch the Ninja build plan.
+            A list of `gn_build_variables_for_bazel.json` file paths relative to
+            the build directory root.
 
         Raises:
             ValueError if a required input file is missing.
         """
-        mapping: T.Dict[str, str] = {}
-        extra_ninja_inputs: T.Set[Path] = set()
+        args_files: list[str] = []
 
-        def add_file(relative_path: str, required: bool = False) -> None:
-            file_path = fuchsia_dir / relative_path
-            if not file_path.exists():
-                if required:
-                    raise ValueError(
-                        f"Missing required build arguments file: {file_path}"
-                    )
-                return
+        base_file_name = "gn_build_variables_for_bazel.json"
 
-            extra_ninja_inputs.add(file_path)
-            mapping[relative_path] = file_path.read_text()
+        main_file_path = build_dir / base_file_name
+        if not (main_file_path).exists():
+            raise ValueError(
+                f"Missing required build arguments file: {main_file_path}"
+            )
+        args_files.append(base_file_name)
 
-        add_file("build/bazel/gn_build_args.txt", required=True)
-
-        # The //vendor/ tree is optional and does not exist on open-source checkouts.
+        # The //vendor/ tree is optional and does not exist in open-source checkouts.
         vendor_dir = fuchsia_dir / "vendor"
         if vendor_dir.is_dir():
             for vendor_name in os.listdir(vendor_dir):
-                add_file(
-                    f"vendor/{vendor_name}/build/bazel/gn_build_args.txt",
-                    required=False,
-                )
+                vendor_file = f"vendor_{vendor_name}_{base_file_name}"
+                if (build_dir / vendor_file).exists():
+                    args_files.append(vendor_file)
 
-        return mapping, extra_ninja_inputs
+        return args_files
 
     @staticmethod
     def generate_args_bzl(
-        gn_args: T.Mapping[str, T.Any], build_args: str, build_args_path: str
+        gn_args_to_export: list[dict[str, T.Any]], args_json_path: Path
     ) -> str:
-        """Generate an args.bzl file that defines values extracted from GN's args.gn.
+        """Generate an `args.bzl` file defining values extracted from GN's args.
 
         Args:
-            gn_args: The GN args.json file as a JSON dictionary.
-            build_args: The content of a gn_build_args.txt file as a string.
-            build_args_path: Path of source file for build_args (never accessed).
+            gn_args_to_export: A list of dictionaries describing each GN arg.
+                See comments for //build/bazel:gn_build_variables_for_bazel for
+                the format.
+            args_json_path: Path of source file for build_args (never accessed).
         Returns:
-            The content of the generated args.bzl file as a string.
+            The content of the generated `args.bzl` file as a string.
         Raises:
-            ValueError is the input content is malformed.
+            ValueError if the input content is malformed.
         """
 
         def fail(msg: str) -> None:
             raise ValueError(msg)
 
-        # Parse the list file to generate the content of args.bzl
         args_contents = """# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
 # Variables listed from {source_path}
 
+\"\"\"A subset of GN args that are needed in the Bazel build.\"\"\"
 """.format(
-            source_path=build_args_path
+            source_path=args_json_path
         )
 
-        # Avoid Gerrit warnings by constructing the linting prefixes with string concatenation.
-        lint_change_if_prefix = "LINT." + "IfChange("
-        lint_change_then_prefix = "LINT." + "ThenChange("
-        lint_change_if_start_line = -1
-        pending_lines = ""
-        line_count = 0
-        for line in build_args.splitlines():
-            line_count += 1
-            line = line.strip()
-
-            if not line:  # Ignore empty lines
-                continue
-
-            if line[0] == "#":
-                comment = line[1:].lstrip()
-                if comment.startswith(lint_change_if_prefix):
-                    if pending_lines:
-                        fail(
-                            "{}:{}: Previous {} at line {} was never closed!".format(
-                                build_args_path,
-                                line_count,
-                                lint_change_if_prefix,
-                                lint_change_if_start_line,
-                            )
-                        )
-                    lint_change_if_start_line = line_count
-                    continue
-
-                if comment.startswith(lint_change_then_prefix):
-                    source_start = len(lint_change_then_prefix)
-                    source_end = comment.find(")", source_start)
-                    if source_end < 0:
-                        fail(
-                            "{}:{}: Unterminated {} line: {}".format(
-                                build_args_path,
-                                line_count,
-                                lint_change_then_prefix,
-                                line,
-                            )
-                        )
-                    source_path = comment[source_start:source_end]
-                    args_contents += (
-                        "# From {}\n".format(source_path) + pending_lines + "\n"
-                    )
-                    pending_lines = ""
-                    continue
-
-                # Skip other comment lines.
-                continue
-
-            name_end = line.find(":")
-            if name_end < 0:
-                fail(
-                    "{}:{}: Missing colon separator: {}".format(
-                        build_args_path, line_count, line
-                    )
-                )
-
-            varname = line[0:name_end]
-            vartype = line[name_end + 1 :].strip()
-            if vartype == "bool":
-                value = gn_args.get(varname, False)
-                pending_lines += "{} = {}\n".format(varname, value)
-            elif vartype == "string":
-                value = gn_args.get(varname, "")
-                pending_lines += '{} = "{}"\n'.format(varname, value)
-            elif vartype == "string_or_false":
-                if not gn_args.get(varname):
+        for gn_arg in gn_args_to_export:
+            args_contents += "\n# From {}\n".format(gn_arg["location"])
+            varname = gn_arg["name"]
+            vartype = gn_arg["type"]
+            value = gn_arg["value"]
+            if vartype in ["bool", "array_of_strings"]:
+                args_contents += "{} = {}".format(varname, value)
+            elif vartype in ["string", "string_or_false", "path"]:
+                if vartype == "string_or_false" and not value:
                     value = ""
-                else:
-                    value = gn_args[varname]
-                pending_lines += '{} = "{}"\n'.format(varname, value)
+                elif vartype == "path":
+                    if value.startswith("//"):
+                        value = value[2:]
+                    elif value.startswith("/"):
+                        # Pass through the absolute path.
+                        value = value
+                    else:
+                        fail(
+                            "Path '{}' does not begin with '//' or '/'".format(
+                                value,
+                            )
+                        )
+
+                args_contents += '{} = "{}"'.format(varname, value)
             else:
                 fail(
-                    "{}:{}: Unknown type name '{}': {}".format(
-                        build_args_path,
-                        line_count,
+                    "Unknown type name '{}'".format(
                         vartype,
-                        line,
                     )
                 )
-
-        if pending_lines:
-            fail(
-                "{}:{}: {} statement was never closed!".format(
-                    build_args_path,
-                    lint_change_if_start_line,
-                    lint_change_if_prefix,
-                )
-            )
+            args_contents += "\n"
 
         return args_contents
 
     @staticmethod
     def record_fuchsia_build_config_dir(
         fuchsia_dir: Path,
-        args_json: T.Mapping[str, T.Any],
+        build_dir: Path,
         generated: GeneratedWorkspaceFiles,
-    ) -> T.Set[Path]:
+    ) -> None:
         """Record the content of @fuchsia_build_info in a GeneratedWorkspaceFiles instance.
 
         Args:
-            fuchsia_dir: Path to fuchsia source directory.
-            args_json: The GN-generated args.json file content as a JSON value.
+            fuchsia_dir: Path to Fuchsia source directory.
+            build_dir: Path to Fuchsia build directory.
             generated: A GeneratedWorkspaceFiles instance. Its record_file_content()
                 method will be called to populate the repository.
-
-        Returns:
-            A set of Path for extra inputs, used by regenerator to patch the Ninja build plan.
         """
-        (
-            build_args_map,
-            extra_ninja_inputs,
-        ) = GnBuildArgs.find_and_read_all_build_args(fuchsia_dir)
-
         generated.record_file_content("WORKSPACE.bazel", "")
         generated.record_file_content("BUILD.bazel", "")
 
-        for relative_path, build_args in sorted(build_args_map.items()):
-            args_bzl_content = GnBuildArgs.generate_args_bzl(
-                args_json, build_args, relative_path
+        args_files_relative_paths = (
+            GnBuildArgs.find_all_gn_build_variables_for_bazel(
+                fuchsia_dir, build_dir
             )
-            if relative_path.startswith("vendor/"):
-                vendor_name = relative_path.split("/")[1]
+        )
+
+        for relative_path in sorted(args_files_relative_paths):
+            file_path = build_dir / relative_path
+            with (file_path).open("rb") as f:
+                gn_args_json = json.load(f)
+            args_bzl_content = GnBuildArgs.generate_args_bzl(
+                gn_args_json, file_path
+            )
+
+            if relative_path.startswith("vendor_"):
+                vendor_name = relative_path.split("_")[1]
                 args_bzl_filename = f"vendor_{vendor_name}_args.bzl"
             else:
                 args_bzl_filename = "args.bzl"
             generated.record_file_content(args_bzl_filename, args_bzl_content)
 
-        return extra_ninja_inputs
-
     @staticmethod
     def generate_fuchsia_build_info(
         fuchsia_dir: Path, build_dir: Path, repository_dir: Path
-    ) -> T.Set[Path]:
-        # Read args.json
-        with (build_dir / "args.json").open("rb") as f:
-            args_json = json.load(f)
-
+    ) -> None:
         generated = GeneratedWorkspaceFiles()
-        extra_ninja_inputs = GnBuildArgs.record_fuchsia_build_config_dir(
-            fuchsia_dir, args_json, generated
+        GnBuildArgs.record_fuchsia_build_config_dir(
+            fuchsia_dir, build_dir, generated
         )
 
         generated.update_if_needed(
             repository_dir, Path(f"{repository_dir}.generated-info.json")
         )
-        return extra_ninja_inputs
 
 
 def record_gn_targets_dir(
@@ -1127,7 +1253,7 @@ def record_gn_targets_dir(
     all_files = []
 
     # Build a { bazel_package -> { gn_target_name -> entry } } map.
-    package_map: T.Dict[str, T.Dict[str, str]] = {}
+    package_map: dict[str, dict[str, str]] = {}
     for entry in json.loads(generated.read_text_file(inputs_manifest_path)):
         bazel_package = entry["bazel_package"]
         bazel_name = entry["bazel_name"]
@@ -1244,7 +1370,7 @@ license(
 def check_regenerator_inputs_updates(
     build_dir: Path,
     inputs_file: str = "regenerator_outputs/regenerator_inputs.txt",
-) -> T.Set[str]:
+) -> set[str]:
     """Check whether any regenerator input has changed.
 
     Args:
@@ -1263,7 +1389,7 @@ def check_regenerator_inputs_updates(
         return {inputs_file}
 
     inputs_timestamp = inputs_path.stat().st_mtime
-    changed_inputs: T.Set[str] = set()
+    changed_inputs: set[str] = set()
     for dep in inputs_path.read_text().splitlines():
         dep_path = build_dir / dep
         if not dep_path.exists():

@@ -205,7 +205,7 @@ zx_status_t svc_directory_remove_entry(svc_dir_t* dir, const char* path, size_t 
   return status;
 }
 
-#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT)
+#if FUCHSIA_API_LEVEL_LESS_THAN(27)
 
 // Deprecated function implementations
 zx_status_t svc_dir_create(async_dispatcher_t* dispatcher, zx_handle_t dir_request,

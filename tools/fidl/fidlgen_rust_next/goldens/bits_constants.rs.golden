@@ -29,7 +29,21 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::EncodeRef::encode_ref(&self, encoder, out)
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for BitsType
+where
+    ___E: ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
         _: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -45,10 +59,17 @@ impl ::core::convert::From<WireBitsType> for BitsType {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
+impl ::fidl_next::FromWire<WireBitsType> for BitsType {
     #[inline]
-    fn take_from(from: &WireBitsType) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireBitsType) -> Self {
+        Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireBitsType> for BitsType {
+    #[inline]
+    fn from_wire_ref(wire: &WireBitsType) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -59,7 +80,9 @@ pub struct WireBitsType {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
+unsafe impl ::fidl_next::Wire for WireBitsType {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
@@ -104,10 +127,10 @@ pub const CONST3: crate::BitsType = crate::BitsType::from_bits_retain(131);
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireBitsType> for ::fidl_test_bitsconstants::BitsType {
+    impl ::core::convert::From<crate::BitsType> for ::fidl_test_bitsconstants::BitsType {
         #[inline]
-        fn take_from(from: &crate::WireBitsType) -> Self {
-            Self::from_bits_retain(from.value.into())
+        fn from(from: crate::BitsType) -> Self {
+            Self::from_bits_retain(from.bits())
         }
     }
 }

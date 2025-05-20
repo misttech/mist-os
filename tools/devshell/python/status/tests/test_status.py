@@ -252,7 +252,7 @@ class TestStatusCommand(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             main.main([])
         lines = set(out.getvalue().splitlines())
-        self.assertSetContains(set(lines), "  Device name: foo (set by fx -d)")
+        self.assertSetContains(set(lines), "  Device name: foo (set by fx -t)")
 
     def test_device_name_from_build(self) -> None:
         """Retrieve device name from build file"""

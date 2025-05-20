@@ -27,6 +27,10 @@ pub struct TwoWayAddResponse {
 
 impl fidl::Persistable for TwoWayAddResponse {}
 
+pub mod two_way_ordinals {
+    pub const ADD: u64 = 0xdbc3aab0bc6850f;
+}
+
 mod internal {
     use super::*;
 

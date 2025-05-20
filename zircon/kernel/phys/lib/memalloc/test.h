@@ -9,10 +9,10 @@
 
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/span.h>
 #include <stdio.h>
 
 #include <memory>
+#include <span>
 #include <vector>
 
 //
@@ -31,7 +31,7 @@ struct PoolContext {
   });
 };
 
-inline cpp20::span<memalloc::Range> RangesFromBytes(const std::vector<std::byte>& bytes) {
+inline std::span<memalloc::Range> RangesFromBytes(const std::vector<std::byte>& bytes) {
   void* ptr = const_cast<void*>(static_cast<const void*>(bytes.data()));
   size_t space = bytes.size();
   for (size_t size = space; size > 0; --size) {

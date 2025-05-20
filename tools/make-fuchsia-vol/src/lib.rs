@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, ensure, Context, Error};
-use assembly_manifest::Image;
+use assembled_system::Image;
 use assembly_partitions_config::{Partition, PartitionsConfig, Slot};
 use byteorder::{BigEndian, WriteBytesExt};
 use camino::{Utf8Path, Utf8PathBuf};

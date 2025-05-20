@@ -75,7 +75,6 @@ struct EmulatorWatcherHandler {
     throttle: HashMap<String, Instant>,
     cutoff: Duration,
 }
-#[tracing::instrument()]
 pub fn start_emulator_watching(instance_root: PathBuf) -> Result<EmulatorWatcher> {
     let (emu_instance_tx, emu_instance_rx) = mpsc::channel::<EmulatorInstanceEvent>(100);
     if !instance_root.exists() {
@@ -109,7 +108,6 @@ pub fn start_emulator_watching(instance_root: PathBuf) -> Result<EmulatorWatcher
 }
 impl EmulatorWatcherHandler {
     // Given a PathBuf, return the name of the emulator instance, if any.
-    #[tracing::instrument()]
     fn instance_name_from_path<T: AsRef<Path> + std::fmt::Debug>(
         &self,
         instance_path: T,
@@ -154,7 +152,7 @@ impl notify::EventHandler for EmulatorWatcherHandler {
                                     continue;
                                 }
                             }
-                            tracing::debug!("triggered by {p:?}");
+                            log::debug!("triggered by {p:?}");
                             self.throttle.insert(instance_name.clone(), now);
                             let _ = self
                                 .emu_instance_tx
@@ -163,7 +161,7 @@ impl notify::EventHandler for EmulatorWatcherHandler {
                                     Create(CreateKind::Any),
                                 ))
                                 .map_err(|e| {
-                                    tracing::error!(
+                                    log::error!(
                                         "Error sending emulator instance event: {:?} {e:?}",
                                         &p
                                     )
@@ -174,7 +172,7 @@ impl notify::EventHandler for EmulatorWatcherHandler {
             }
             Ok(Event { kind: Remove(RemoveKind::Folder), paths, .. }) => {
                 for p in paths {
-                    tracing::debug!("Removal of {p:?} is being processed");
+                    log::debug!("Removal of {p:?} is being processed");
                     if let Some(instance_name) = self.instance_name_from_path(&p) {
                         let _ = self
                             .emu_instance_tx
@@ -183,10 +181,7 @@ impl notify::EventHandler for EmulatorWatcherHandler {
                                 Remove(RemoveKind::Folder),
                             ))
                             .map_err(|e| {
-                                tracing::error!(
-                                    "Error sending emulator instance event: {:?} {e:?}",
-                                    &p
-                                )
+                                log::error!("Error sending emulator instance event: {:?} {e:?}", &p)
                             });
                     }
                 }
@@ -194,12 +189,12 @@ impl notify::EventHandler for EmulatorWatcherHandler {
             Err(ref e @ notify::Error { ref kind, .. }) => {
                 match kind {
                     notify::ErrorKind::Io(ioe) => {
-                        tracing::debug!("IO error. Ignoring {ioe:?}");
+                        log::debug!("IO error. Ignoring {ioe:?}");
                     }
                     _ => {
                         // If we get a non-spurious error, treat that as something that
                         // should cause us to exit.
-                        tracing::warn!("Exiting due to file watcher error: {e:?}");
+                        log::warn!("Exiting due to file watcher error: {e:?}");
                     }
                 }
             }
@@ -212,20 +207,18 @@ impl EmulatorWatcher {
     ///  or None if it is not needed.
     pub async fn emulator_target_detected(&mut self) -> Option<EmulatorTargetAction> {
         if let Some(event) = self.emu_instance_rx.next().await {
-            tracing::trace!("checking instance {:?}", event);
+            log::trace!("checking instance {:?}", event);
             match event {
                 EmulatorInstanceEvent::Name(instance_name, kind) => {
-                    let instance_dir = match self
-                        .emu_instances
-                        .get_instance_dir(&instance_name, false)
-                    {
-                        Ok(d) => d,
+                    let instance_dir =
+                        match self.emu_instances.get_instance_dir(&instance_name, false) {
+                            Ok(d) => d,
 
-                        Err(e) => {
-                            tracing::error!("Error getting instance dir for {instance_name}: {e}");
-                            return None;
-                        }
-                    };
+                            Err(e) => {
+                                log::error!("Error getting instance dir for {instance_name}: {e}");
+                                return None;
+                            }
+                        };
                     match crate::read_from_disk(&instance_dir) {
                         Ok(EngineOption::DoesExist(emu_instance)) => {
                             if let Some(target_info) = Self::handle_instance(&emu_instance) {
@@ -236,10 +229,7 @@ impl EmulatorWatcher {
                         }
                         Ok(EngineOption::DoesNotExist(_)) => {
                             // This usually
-                            tracing::trace!(
-                                "Emulator instance:{:?} does not exist.",
-                                &instance_name
-                            );
+                            log::trace!("Emulator instance:{:?} does not exist.", &instance_name);
                             // Only remove if the kind is Remove. It is possible to get
                             // DoesNotExist if the json file for the instance is not written completely.
                             if kind == Remove(RemoveKind::Folder) {
@@ -251,7 +241,7 @@ impl EmulatorWatcher {
                             }
                         }
                         Err(e) => {
-                            tracing::trace!("Cannot read emulator instance: {e:?}");
+                            log::trace!("Cannot read emulator instance: {e:?}");
                             if kind == Remove(RemoveKind::Folder) {
                                 let target_info = ffx::TargetInfo {
                                     nodename: Some(instance_name),
@@ -282,7 +272,7 @@ impl EmulatorWatcher {
     }
     fn handle_instance(instance: &EmulatorInstanceData) -> Option<ffx::TargetInfo> {
         if instance.is_running() && instance.get_networking_mode() != &NetworkingMode::Tap {
-            tracing::debug!(
+            log::debug!(
                 "Making target from {} using ssh port {:?}",
                 &instance.get_name(),
                 &instance.get_ssh_port()
@@ -292,7 +282,6 @@ impl EmulatorWatcher {
             None
         }
     }
-    #[tracing::instrument()]
     fn make_target(instance: &EmulatorInstanceData) -> Option<ffx::TargetInfo> {
         let nodename: String = instance.get_name().into();
         let mut addresses = Vec::with_capacity(2);
@@ -307,23 +296,20 @@ impl EmulatorWatcher {
         }
 
         if nodename.is_empty() {
-            tracing::debug!("Skipping making target for emulator with empty nodename");
+            log::debug!("Skipping making target for emulator with empty nodename");
             return None;
         }
 
         // TUN/TAP emulators are discoverable via mDNS.
         if instance.get_networking_mode() == &NetworkingMode::Tap {
-            tracing::debug!(
-                "Skipping making target for {}, since it is tun/tap networking",
-                nodename
-            );
+            log::debug!("Skipping making target for {}, since it is tun/tap networking", nodename);
             return None;
         }
         let ssh_port = instance.get_ssh_port();
         let ssh_address = if ssh_port.is_none() {
             if vsock_device.is_none() {
                 // No ssh port assigned so don't create a target.
-                tracing::debug!(
+                log::debug!(
                     "Skipping making target for {}, since ssh port and vsock device are both none",
                     nodename
                 );

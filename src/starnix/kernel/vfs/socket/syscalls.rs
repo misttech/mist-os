@@ -10,7 +10,7 @@ use crate::vfs::buffers::{
     AncillaryData, ControlMsg, UserBuffersInputBuffer, UserBuffersOutputBuffer,
 };
 use crate::vfs::socket::{
-    new_socket_file, resolve_unix_socket_address, Socket, SocketAddress, SocketDomain, SocketFile,
+    resolve_unix_socket_address, Socket, SocketAddress, SocketDomain, SocketFile,
     SocketMessageFlags, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, UnixSocket,
     SA_FAMILY_SIZE, SA_STORAGE_SIZE,
 };
@@ -89,7 +89,7 @@ pub fn sys_socket(
     // Should we use parse_socket_protocol here?
     let protocol = SocketProtocol::from_raw(protocol);
     let open_flags = socket_flags_to_open_flags(flags);
-    let socket_file = new_socket_file(
+    let socket_file = SocketFile::new_socket(
         locked,
         current_task,
         domain,
@@ -230,7 +230,7 @@ pub fn sys_bind(
                 .map_err(|_| errno!(EACCES))?;
         }
     }
-    security::check_socket_bind_access(current_task, &file.node(), &address)?;
+    security::check_socket_bind_access(current_task, socket, &address)?;
     match address {
         SocketAddress::Unspecified => return error!(EINVAL),
         SocketAddress::Unix(mut name) => {
@@ -328,13 +328,13 @@ pub fn sys_accept4(
     }
 
     let open_flags = socket_flags_to_open_flags(flags);
-    let accepted_socket_file = Socket::new_file(
+    let accepted_socket_file = SocketFile::from_socket(
         locked,
         current_task,
         accepted_socket,
         open_flags,
         /* kernel_private= */ false,
-    );
+    )?;
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)
@@ -348,7 +348,6 @@ pub fn sys_connect(
     user_address_length: usize,
 ) -> Result<(), Errno> {
     let client_file = current_task.files.get(fd)?;
-    let client_node = client_file.node();
     let client_socket = Socket::get_from_file(&client_file)?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     let peer = match address {
@@ -358,23 +357,17 @@ pub fn sys_connect(
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
-            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, name.as_ref())?)
         }
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),
         SocketAddress::Inet(ref addr) | SocketAddress::Inet6(ref addr) => {
             log_trace!("connect to inet socket named {:?}", addr);
-            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Address(address)
         }
-        SocketAddress::Netlink(_) => {
-            security::check_socket_connect_access(current_task, client_node, &address)?;
-            SocketPeer::Address(address)
-        }
+        SocketAddress::Netlink(_) => SocketPeer::Address(address),
         SocketAddress::Packet(ref addr) => {
             log_trace!("connect to packet socket named {:?}", addr);
-            security::check_socket_connect_access(current_task, client_node, &address)?;
             SocketPeer::Address(address)
         }
     };
@@ -595,7 +588,7 @@ where
 
         if !message_bytes.is_empty() {
             current_task
-                .write_memory(message_header.control + cmsg_bytes_written, &message_bytes)?;
+                .write_memory((message_header.control + cmsg_bytes_written)?, &message_bytes)?;
             cmsg_bytes_written += message_bytes.len();
             if !truncated {
                 cmsg_bytes_written = cmsg_align(current_task, cmsg_bytes_written)?;
@@ -670,7 +663,7 @@ pub fn sys_recvmmsg(
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let current_ptr = user_mmsgvec.at(index);
+        let current_ptr = user_mmsgvec.at(index)?;
         let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
         match recvmsg_internal_with_header(
             locked,
@@ -779,7 +772,8 @@ where
         if space < header_size {
             break;
         }
-        let cmsg_ref = CMsgHdrPtr::new(current_task, message_header.control + next_message_offset);
+        let cmsg_ref =
+            CMsgHdrPtr::new(current_task, (message_header.control + next_message_offset)?);
         let cmsg = current_task.read_multi_arch_object(cmsg_ref)?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
@@ -788,10 +782,9 @@ where
         }
 
         let data_size = std::cmp::min(cmsg.cmsg_len as usize - header_size, space);
-        let data = current_task.read_memory_to_vec(
-            message_header.control + next_message_offset + header_size,
-            data_size,
-        )?;
+        let next_data_offset = next_message_offset + header_size;
+        let data = current_task
+            .read_memory_to_vec((message_header.control + next_data_offset)?, data_size)?;
         next_message_offset += cmsg_align(current_task, header_size + data.len())?;
         let data = AncillaryData::from_cmsg(
             current_task,
@@ -850,7 +843,7 @@ pub fn sys_sendmmsg(
 
     let mut index = 0usize;
     while index < vlen as usize {
-        let current_ptr = user_mmsgvec.at(index);
+        let current_ptr = user_mmsgvec.at(index)?;
         let mut current_mmsghdr = current_task.read_multi_arch_object(current_ptr)?;
         match sendmsg_internal_with_header(locked, current_task, &file, &current_mmsghdr.hdr, flags)
         {
@@ -968,7 +961,7 @@ pub fn sys_shutdown(
         SHUT_RDWR => SocketShutdownFlags::READ | SocketShutdownFlags::WRITE,
         _ => return error!(EINVAL),
     };
-    socket.shutdown(locked, how)?;
+    socket.shutdown(locked, current_task, how)?;
     Ok(())
 }
 
@@ -986,7 +979,8 @@ mod arch32 {
     use starnix_uapi::user_address::UserAddress;
 
     pub use super::{
-        sys_accept as sys_arch32_accept, sys_bind as sys_arch32_bind,
+        sys_accept as sys_arch32_accept, sys_accept4 as sys_arch32_accept4,
+        sys_bind as sys_arch32_bind, sys_getpeername as sys_arch32_getpeername,
         sys_getsockname as sys_arch32_getsockname, sys_getsockopt as sys_arch32_getsockopt,
         sys_listen as sys_arch32_listen, sys_recvfrom as sys_arch32_recvfrom,
         sys_recvmmsg as sys_arch32_recvmmsg, sys_recvmsg as sys_arch32_recvmsg,

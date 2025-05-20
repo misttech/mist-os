@@ -38,10 +38,7 @@ must be used.
 
 ## Interacting with drivers
 
-The DriverTestRealm component exposes the `/dev/` directory from DriverManager,
-which is how test code will interact with drivers. The `/dev/` directory works
-identically to the devfs on a running system. For example, if the test adds a
-mock input device, it will show up at `/dev/class/input-report/XXX`.
+See [Using Services with DriverTestRealm][services-with-dtr].
 
 ## Including drivers
 
@@ -220,3 +217,9 @@ to call `fuchsia.driver.test/Realm:Start`.
   * Make sure `fuchsia.driver.test/Realm:Start` is called.
 * `fuchsia.driver.test/Realm:Start` returns ZX_ERR_ALREADY_BOUND
   * Start can only be called once per component. If you want a new DriverTestRealm per test, please see the RealmBuilder section.
+
+
+
+<!-- Reference links -->
+
+[services-with-dtr]: /docs/concepts/drivers/driver_communication.md#using-services-with-dtr

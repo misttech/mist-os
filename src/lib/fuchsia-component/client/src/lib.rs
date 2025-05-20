@@ -60,7 +60,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
     /// Note, this method does not check if the protocol exists. It is up to the
     /// caller to call `exists` to check for existence.
     pub fn connect_with(self, server_end: zx::Channel) -> Result<(), Error> {
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         return self
             .svc_dir
             .borrow()
@@ -71,7 +71,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
                 server_end.into(),
             )
             .context("error connecting to protocol");
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         return self
             .svc_dir
             .borrow()
@@ -240,14 +240,14 @@ pub struct ServiceInstanceDirectory(pub fio::DirectoryProxy, pub String);
 impl MemberOpener for ServiceInstanceDirectory {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory, _) = self;
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         return directory.open(
             member,
             fio::Flags::PROTOCOL_SERVICE,
             &fio::Options::default(),
             server_end,
         );
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         return directory.open3(
             member,
             fio::Flags::PROTOCOL_SERVICE,
@@ -313,6 +313,11 @@ impl<S: ServiceMarker> Service<S> {
         Ok(Self::from_service_dir_proxy(open_service::<S>()?, marker))
     }
 
+    /// Returns a new [`Service`] from the process's incoming service namespace.
+    pub fn open_at(service_name: impl AsRef<str>, marker: S) -> Result<Self, Error> {
+        Ok(Self::from_service_dir_proxy(open_service_at(service_name)?, marker))
+    }
+
     /// Returns a new [`Service`] that is in the given directory.
     pub fn open_from_dir(svc_dir: impl AsRefDirectory, marker: S) -> Result<Self, Error> {
         let dir = open_directory_async(&svc_dir, S::SERVICE_NAME, fio::Rights::empty())?;
@@ -361,14 +366,14 @@ impl<S: ServiceMarker> Service<S> {
         server_end: zx::Channel,
     ) -> Result<(), fidl::Error> {
         let path = format!("{}/{}", instance.as_ref(), member.as_ref());
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         return self.dir.open(
             &path,
             fio::Flags::PROTOCOL_SERVICE,
             &fio::Options::default(),
             server_end,
         );
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         return self.dir.open3(
             &path,
             fio::Flags::PROTOCOL_SERVICE,
@@ -529,6 +534,13 @@ pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
 /// Opens a FIDL service as a directory, which holds instances of the service.
 pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
+    fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
+        .context("namespace open failed")
+}
+
+/// Opens a FIDL service with a custom name as a directory, which holds instances of the service.
+pub fn open_service_at(service_name: impl AsRef<str>) -> Result<fio::DirectoryProxy, Error> {
+    let service_path = format!("{SVC_DIR}/{}", service_name.as_ref());
     fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
         .context("namespace open failed")
 }

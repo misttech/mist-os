@@ -157,6 +157,22 @@ type TraceConfig = table {
     /// Maximum trace format version supported byt the client.
     /// If not set, this defaults to the latest available trace format version.
     6: version FxtVersion;
+
+    /// When true, the session will buffer the trace within the
+    /// fuchsia.tracing.controller server and only send the trace over the
+    /// output socket to the client once the trace completes.
+    ///
+    /// It is recommended that defering the trace transfer be set to true when
+    /// using streaming mode and the fuchsia.tracing.controller client is across
+    /// the host-device boundary, such as with ffx. In this, or other cases
+    /// where sending the trace data could cause exess cpu overhead, the disk
+    /// writing cost is preferrable to the cost of sending to the client.
+    ///
+    /// NOTE: defer_transfer only has effect during BufferingMode.STREAMING as
+    /// other modes don't otherwise send trace data to the client during a
+    /// trace.
+    @available(added=NEXT)
+    7: defer_transfer bool;
 };
 
 /// Statistics data per provider collected over the course of the tracing session

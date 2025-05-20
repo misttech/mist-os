@@ -74,14 +74,14 @@ void LogMemory() {
 
 }  // namespace
 
-int TestMain(void* zbi_ptr, arch::EarlyTicks ticks) {
+int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::EarlyTicks ticks) {
   MainSymbolize symbolize("phys-memory-test");
 
   printf("Initializing memory...\n");
 
   // Initialize memory for allocation/free.
   AddressSpace aspace;
-  InitMemory(zbi_ptr, &aspace);
+  InitMemory(bootloader_data, ktl::move(zbi), &aspace);
 
   LogMemory();
 

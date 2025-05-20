@@ -13,7 +13,6 @@ import argparse
 import re
 import subprocess
 import sys
-import typing as T
 from pathlib import Path
 
 
@@ -23,7 +22,7 @@ def error_message(msg: str) -> int:
     return 1
 
 
-def make_bazel_quiet_command(bazel: str, command: str) -> T.List[str]:
+def make_bazel_quiet_command(bazel: str, command: str) -> list[str]:
     """Create command argument list for a Bazel command that does not print too much.
 
     Args:
@@ -152,7 +151,7 @@ def cmd_set_gn_targets(args: argparse.Namespace) -> int:
     if bazel_target[0] == "@//":
         bazel_target = bazel_target[1:]
 
-    def format_targets_list(targets: T.List[str]) -> str:
+    def format_targets_list(targets: list[str]) -> str:
         """Helper to pretty-print a list of GN or Bazel targets."""
         return "\n".join(f"  {target}" for target in targets)
 
@@ -169,7 +168,7 @@ def cmd_set_gn_targets(args: argparse.Namespace) -> int:
             return error_message("Cannot find Bazel launcher, use --bazel=PATH")
         bazel_args = [bazel_launcher]
 
-    errors: T.List[str] = []
+    errors: list[str] = []
 
     gn_actions = gn_targets_utils.find_gn_bazel_action_infos_for(
         args.bazel_target,

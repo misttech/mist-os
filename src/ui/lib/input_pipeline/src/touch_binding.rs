@@ -577,7 +577,7 @@ fn process_touch_screen_reports(
             .filter(|contact| !current_contacts.contains_key(&contact.id)),
     );
 
-    let trace_id = fuchsia_trace::Id::new();
+    let trace_id = fuchsia_trace::Id::random();
     fuchsia_trace::flow_begin!(c"input", c"event_in_input_pipeline", trace_id);
     send_touch_screen_event(
         hashmap! {
@@ -637,7 +637,7 @@ fn process_touchpad_reports(
         None => HashSet::new(),
     };
 
-    let trace_id = fuchsia_trace::Id::new();
+    let trace_id = fuchsia_trace::Id::random();
     fuchsia_trace::flow_begin!(c"input", c"event_in_input_pipeline", trace_id);
     send_touchpad_event(
         current_contacts,

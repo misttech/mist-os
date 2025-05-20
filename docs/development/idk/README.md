@@ -95,15 +95,9 @@ given build system. The presence of extensive metadata in the archive itself
 allows for this kind of processing.
 
 
-## IDK and IDK add-ons {#core-idk-and-idk-add-ons}
+## IDK
 
-The Core IDK is represented by the `//sdk:core` target.
-That IDK is complemented by multiple IDK add-ons:
-
-- `//sdk:e2e_testing`: an end-to-end testing framework for Fuchsia;
-- `//sdk:fuchsia_dart`: a Dart SDK to build mods and agents.
-
-Internally these targets are all instances of the `sdk` GN template.
+The partner IDK is represented by the `//sdk:final_fuchsia_idk` target.
 
 
 ## Recipes {#recipes}

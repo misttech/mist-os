@@ -85,14 +85,12 @@ class StringRef<RefType::kInline> {
   size_t size_;
 };
 
-#if __cplusplus >= 201703L
 StringRef(const char*) -> StringRef<RefType::kInline>;
 
 StringRef(const char*, size_t) -> StringRef<RefType::kInline>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 StringRef(const T&) -> StringRef<RefType::kInline>;
-#endif
 
 template <>
 class StringRef<RefType::kId> {
@@ -127,14 +125,12 @@ class StringRef<RefType::kId> {
   uint16_t id_;
 };
 
-#if __cplusplus >= 201703L
 StringRef(uint16_t) -> StringRef<RefType::kId>;
 
 StringRef(const InternedString&) -> StringRef<RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
 StringRef(const T&) -> StringRef<RefType::kId>;
-#endif
 
 }  // namespace fxt
 

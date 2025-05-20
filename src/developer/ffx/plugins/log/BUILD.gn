@@ -37,10 +37,10 @@ ffx_plugin("ffx_log") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing",
   ]
 
   args_sources = [ "src/args.rs" ]
@@ -55,6 +55,7 @@ ffx_plugin("ffx_log") {
   ]
 
   test_deps = [
+    "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/diagnostics/lib/log-command",
     "//src/lib/diagnostics/selectors",

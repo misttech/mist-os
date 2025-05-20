@@ -46,6 +46,18 @@ type QueryId = flexible enum : uint64 {
     VENDOR_QUERY_0 = 10000;
 };
 
+/// Specified priorities. The hardware will attempt to allocate resources in favor
+/// of higher priority tasks.
+/// Requesting a priority above MEDIUM is only allowed for trusted clients.
+/// MEDIUM is considered to be the default priority.
+@available(added=NEXT)
+type Priority = flexible enum : uint64 {
+    LOW = 128;
+    MEDIUM = 256;
+    HIGH = 512;
+    REALTIME = 1024;
+};
+
 /// The maximum number of ICDs supported by a Magma system driver.
 const MAX_ICD_COUNT uint64 = 8;
 
@@ -116,6 +128,8 @@ closed protocol CombinedDevice {
 };
 
 /// Additional device methods for the purposes of testing the MSD and should not be used by ICDs.
+/// DEPRECATED: Please use TestDevice2.
+@available(removed=HEAD)
 closed protocol TestDevice {
     compose CombinedDevice;
 
@@ -128,6 +142,7 @@ closed protocol TestDevice {
 type Object = flexible resource union {
     1: semaphore zx.Handle:EVENT;
     2: buffer zx.Handle:VMO;
+    @available(removed=HEAD)
     3: vmo_semaphore zx.Handle:VMO;
     // A counter-based semaphore. This can store a timestamp, and uses less memory to do so than the
     // VMO equivalent.
@@ -140,7 +155,7 @@ type ObjectType = flexible enum : uint32 {
     EVENT = 10;
     /// A memory object backeed by a Zircon VMO.
     BUFFER = 11;
-    /// A sync object backed by a Zircon event, VMO, or counter.
+    /// A sync object backed by a Zircon event or counter.
     @available(added=13)
     SEMAPHORE = 12;
 };
@@ -164,7 +179,7 @@ type BufferOp = flexible enum : uint32 {
 };
 
 /// The batch size used to send multiple immediate commands in a single message.
-@available(removed=NEXT)
+@available(removed=27)
 const MAX_IMMEDIATE_COMMANDS_DATA_SIZE uint32 = 2048;
 
 /// The batch size used to send multiple inline commands in a single message.
@@ -263,8 +278,18 @@ closed protocol Primary {
 
     /// Creates context `context_id` for use in command execution.  A context may be associated
     /// with hardware state.
+    /// DEPRECATED: Please use CreateContext2.
+    /// TODO(https://fxbug.dev/413030654): Fully deprecate this API.
     strict CreateContext(struct {
         context_id ContextId;
+    });
+
+    /// Creates context `context_id` for use in command execution.  A context may be associated
+    /// with hardware state.
+    @available(added=NEXT)
+    strict CreateContext2(struct {
+        context_id ContextId;
+        priority Priority;
     });
 
     /// Destroys context `context_id`.
@@ -289,7 +314,7 @@ closed protocol Primary {
     /// Submits a series of commands for execution on the hardware without using a command buffer.
     /// `semaphores` must refer to events that have been imported, and will be signaled after
     /// the commands are completed.
-    @available(removed=NEXT)
+    @available(removed=27)
     strict ExecuteImmediateCommands(struct {
         context_id ContextId;
         command_data vector<uint8>:MAX_IMMEDIATE_COMMANDS_DATA_SIZE;
@@ -562,8 +587,41 @@ open protocol PowerElementProvider {
     }) error zx.Status;
 };
 
+/// Low-level protocol exposed by the GPU driver used mainly for testing and debugging the driver.
+@available(added=HEAD)
+closed protocol DebugUtils {
+    /// Set the GPU power state. Returns after the transition is complete.
+    strict SetPowerState(struct {
+        power_state int64;
+    }) -> () error zx.Status;
+};
+
 @available(added=HEAD)
 service Service {
     device client_end:CombinedDevice;
     power_element_provider client_end:PowerElementProvider;
+};
+
+/// This service has additional abilities above the normal service.
+@available(added=HEAD)
+service TrustedService {
+    device client_end:CombinedDevice;
+    power_element_provider client_end:PowerElementProvider;
+    debug_utils client_end:DebugUtils;
+};
+
+/// Additional methods for reporting tests run in the MSD.
+@available(added=HEAD)
+closed protocol TestDevice2 {
+    strict GetUnitTestStatus() -> (struct {
+        status zx.Status;
+    });
+};
+
+/// This service is only exposed by test MSDs. This should not be used by an ICD.
+@available(added=HEAD)
+service TestService {
+    device client_end:CombinedDevice;
+    power_element_provider client_end:PowerElementProvider;
+    test_device client_end:TestDevice2;
 };

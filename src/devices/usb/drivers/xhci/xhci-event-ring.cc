@@ -241,9 +241,10 @@ fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint
         // USB 2.0 specification section 9.2.6.3
         // states that we must wait 10 milliseconds.
         needs_enum = false;
-        pending_enumeration = hci_->Timeout(interrupter_, zx::deadline_after(zx::msec(10)))
-                                  .and_then([=]() { return LinkUp(static_cast<uint8_t>(port_id)); })
-                                  .box();
+        pending_enumeration =
+            hci_->Timeout(interrupter_, zx::deadline_after(zx::msec(10)))
+                .and_then([port_id, this]() { return LinkUp(static_cast<uint8_t>(port_id)); })
+                .box();
       } else {
         needs_enum = false;
         pending_enumeration = LinkUp(static_cast<uint8_t>(port_id));
@@ -314,7 +315,7 @@ fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint
   }
   if (needs_enum) {
     return WaitForPortStatusChange(port_id)
-        .and_then([=]() {
+        .and_then([port_id, this]() {
           // Retry enumeration
           SchedulePortStatusChange(port_id, true);
           return fpromise::ok();
@@ -335,7 +336,7 @@ fpromise::promise<void, zx_status_t> EventRing::WaitForPortStatusChange(uint8_t 
 void EventRing::CallPortStatusChanged(fbl::RefPtr<PortStatusChangeState> state) {
   if (state->port_index < state->port_count) {
     ScheduleTask(HandlePortStatusChangeEvent(static_cast<uint8_t>(state->port_index))
-                     .then([=](fpromise::result<void, zx_status_t>& result)
+                     .then([=, this](fpromise::result<void, zx_status_t>& result)
                                -> fpromise::result<void, zx_status_t> {
                        if (result.is_error()) {
                          if (result.error() == ZX_ERR_BAD_STATE) {
@@ -399,7 +400,7 @@ zx_status_t EventRing::Ring0Bringup() {
 }
 
 void EventRing::ScheduleTask(fpromise::promise<void, zx_status_t> promise) {
-  auto continuation = promise.or_else([=](const zx_status_t& status) {
+  auto continuation = promise.or_else([=, this](const zx_status_t& status) {
     // ZX_ERR_BAD_STATE is a special value that we use to signal
     // a fatal error in xHCI. When this occurs, we should immediately
     // attempt to shutdown the controller. This error cannot be recovered from.

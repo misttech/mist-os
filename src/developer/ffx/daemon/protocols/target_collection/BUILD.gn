@@ -25,7 +25,7 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/emulator_instance:lib",
-    "//src/developer/ffx/lib/fastboot:lib",
+    "//src/developer/ffx/lib/fastboot/connection_factory:lib",
     "//src/developer/ffx/lib/fastboot/interface:lib",
     "//src/developer/ffx/lib/manual_targets:lib",
     "//src/developer/ffx/lib/netext:lib",
@@ -41,8 +41,8 @@ rustc_library("ffx_daemon_protocol_target_collection") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing",
   ]
 
   if (!is_mac) {

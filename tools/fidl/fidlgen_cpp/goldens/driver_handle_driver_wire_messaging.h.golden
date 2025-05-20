@@ -6,7 +6,6 @@
 
 #include <fidl/test.driverhandle/cpp/markers.h>
 #include <fidl/test.driverhandle/cpp/wire_types.h>
-#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #ifdef __Fuchsia__
 
@@ -16,8 +15,7 @@
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl_driver/cpp/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
-
-#endif  // __Fuchsia__
+#include <lib/fidl_driver/cpp/wire_messaging.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -28,7 +26,6 @@ class DriverProtocol;
 
 class HandlesInProtocol;
 
-#ifdef __Fuchsia__
 }  // namespace test_driverhandle
 
 template <>
@@ -47,15 +44,6 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::DriverProtoco
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_driverhandle {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_driverhandle
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -74,8 +62,7 @@ class ::fdf::WireAsyncEventHandler<::test_driverhandle::DriverProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_driverhandle::DriverProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::DriverProtocol>* event_handler);
 };
 
 template <>
@@ -109,24 +96,13 @@ class ::fdf::WireServer<::test_driverhandle::DriverProtocol> : public ::fidl::in
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::DriverProtocol> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::WireMethodTypes<::test_driverhandle::HandlesInProtocol::SendHandles> {
@@ -135,16 +111,6 @@ struct ::fidl::internal::WireMethodTypes<::test_driverhandle::HandlesInProtocol:
 
   using Completer = fidl::Completer<>;
 };
-
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-namespace test_driverhandle {
-
-#ifdef __Fuchsia__
-}  // namespace test_driverhandle
 
 template <>
 struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProtocol> final {
@@ -162,31 +128,17 @@ struct ::fidl::internal::WireServerDispatcher<::test_driverhandle::HandlesInProt
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-namespace test_driverhandle {
 
-#endif  // __Fuchsia__
-}  // namespace test_driverhandle
-
-#ifdef __Fuchsia__
 template <>
 struct ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles> final {
   FIDL_ALIGNDECL
   fidl_message_header_t header;
 
   ::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest body;
-  explicit TransactionalRequest(::test_driverhandle::wire::T t)
-      : body(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest{t}) {
-    _InitHeader();
-  }
-  TransactionalRequest() {
-    _InitHeader();
-  }
-  void _CloseHandles() {
-    body._CloseHandles();
-  }
+  explicit TransactionalRequest(::test_driverhandle::wire::T t);
 
- private:
-  void _InitHeader();
+  TransactionalRequest();
+  void _CloseHandles();
 };
 
 template <bool IsRecursive>
@@ -194,23 +146,12 @@ struct ::fidl::internal::WireCodingTraits<::fidl::internal::TransactionalRequest
     : public WireStructCodingTraitsBase<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
   static constexpr size_t kInlineSize = 16 + sizeof(fidl_message_header_t);
 
-  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    *position.As<fidl_message_header_t>() = value->header;
-    WireCodingTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, WireCodingConstraintEmpty, IsRecursive>::Encode(
-        encoder, &value->body, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
-  static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    WireCodingTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, WireCodingConstraintEmpty, IsRecursive>::Decode(
-        decoder, position + sizeof(fidl_message_header_t), recursion_depth);
-  }
+  static void Encode(internal::WireEncoder* encoder, ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
+  static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
-
-#endif  // __Fuchsia__
 
 namespace fidl {
 
-#ifdef __Fuchsia__
 template <>
 struct IsFidlType<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> : public std::true_type {};
 template <>
@@ -229,16 +170,6 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::Ha
   static constexpr ::fidl::internal::TransactionalMessageKind kMessageKind =
       ::fidl::internal::TransactionalMessageKind::kRequest;
 };
-
-static_assert(sizeof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>) == TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>>::kPrimarySize);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, header) == 0);
-static_assert(offsetof(::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>, body) == sizeof(fidl_message_header_t));
-static_assert(sizeof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest) == TypeTraits<::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest>::kPrimarySize);
-static_assert(offsetof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRequest, t) == 0);
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 }  // namespace fidl
 
 template <>
@@ -274,8 +205,7 @@ class ::fdf::WireAsyncEventHandler<::test_driverhandle::HandlesInProtocol>
 template <>
 class ::fidl::internal::WireEventDispatcher<::test_driverhandle::HandlesInProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>> {
  public:
-  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_driverhandle::HandlesInProtocol>* event_handler);
 };
 
 template <>
@@ -324,23 +254,13 @@ class ::fdf::WireServer<::test_driverhandle::HandlesInProtocol> : public ::fidl:
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driverhandle::HandlesInProtocol> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-}  // namespace fidl
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driverhandle::DriverProtocol> : public ::fdf::internal::BufferClientImplBase {
@@ -369,13 +289,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driverhandle::DriverProtoc
  public:
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
-namespace fidl {
 
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakBufferEventSender<::test_driverhandle::DriverProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
  public:
@@ -388,10 +302,6 @@ class ::fidl::internal::WireBufferEventSender<::test_driverhandle::DriverProtoco
  public:
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::WireWeakOnewayBufferClientImpl<::test_driverhandle::HandlesInProtocol> : public ::fdf::internal::BufferClientImplBase {
@@ -427,9 +337,6 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driverhandle::HandlesInPro
   using WireWeakOnewayClientImpl::WireWeakOnewayClientImpl;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::WireWeakBufferEventSender<::test_driverhandle::HandlesInProtocol> : public ::fdf::internal::WeakBufferEventSenderBase {
  public:
@@ -443,6 +350,6 @@ class ::fidl::internal::WireBufferEventSender<::test_driverhandle::HandlesInProt
   using SyncEndpointBufferVeneer::SyncEndpointBufferVeneer;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

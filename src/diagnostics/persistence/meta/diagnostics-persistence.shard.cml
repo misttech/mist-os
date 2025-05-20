@@ -15,6 +15,12 @@
             "SCUDO_OPTIONS=release_to_os_interval_ms=0",
         ],
     },
+    capabilities: [
+        {
+            dictionary: "diagnostics-persist-capabilities",
+            path: "/svc/fuchsia.component.sandbox.DictionaryRouter",
+        },
+    ],
     use: [
         {
             protocol: [
@@ -28,11 +34,19 @@
             rights: [ "r*" ],
             path: "/config/data",
         },
+        {
+            protocol: [ "fuchsia.component.sandbox.CapabilityStore" ],
+            from: "framework",
+        },
 
         // Persistence also uses /cache but needs it declared differently in production and test.
         // TODO(https://fxbug.dev/42051341): Put /cache here when possible.
     ],
     expose: [
+        {
+            dictionary: "diagnostics-persist-capabilities",
+            from: "self",
+        },
         {
             protocol: "fuchsia.component.Binder",
             from: "framework",

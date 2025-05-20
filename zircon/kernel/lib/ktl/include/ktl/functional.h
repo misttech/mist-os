@@ -7,12 +7,12 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_FUNCTIONAL_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_FUNCTIONAL_H_
 
-#include <lib/stdcompat/functional.h>
+#include <functional>
 
 namespace ktl {
 
-using cpp20::bind_front;
-using cpp20::invoke;
+using std::bind_front;
+using std::invoke;
 
 }  // namespace ktl
 

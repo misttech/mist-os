@@ -34,8 +34,8 @@ ffx_plugin("ffx_target_repository_register") {
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
   ]
   args_deps = [
     "//src/developer/ffx/core:lib",

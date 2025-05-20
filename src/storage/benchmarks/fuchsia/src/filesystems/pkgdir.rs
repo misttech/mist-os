@@ -10,7 +10,6 @@ use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstan
 use futures::future::FutureExt;
 use std::path::Path;
 use storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig};
-use vfs::directory::entry_container::Directory as _;
 /// Config object for starting a `PkgDirInstance`. The `PkgDirInstance` allows blob benchmarks to
 /// open and read a blob through its package directory as opposed to talking directly to the
 /// filesystem.
@@ -132,11 +131,11 @@ impl PkgDirRealm {
                 "service_reflector",
                 move |handles| {
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    let () = exposed_dir.clone().open(
+                    vfs::directory::serve_on(
+                        exposed_dir.clone(),
+                        fio::PERM_READABLE,
                         scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE,
-                        vfs::path::Path::dot(),
-                        handles.outgoing_dir.into_channel().into(),
+                        handles.outgoing_dir,
                     );
                     async move {
                         scope.wait().await;
@@ -148,7 +147,6 @@ impl PkgDirRealm {
             )
             .await
             .unwrap();
-        builder.set_config_value(&pkgdir, "use_fxblob", fxblob.into()).await.unwrap();
         builder
             .add_route(
                 Route::new()
@@ -182,24 +180,23 @@ impl PkgDirRealm {
             )
             .await
             .unwrap();
-        if fxblob {
-            builder
-                .add_route(
-                    Route::new()
-                        .capability(
-                            Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>().path(
-                                format!(
-                                    "/blob/svc/{}",
-                                    fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME
-                                ),
-                            ),
-                        )
-                        .from(&service_reflector)
-                        .to(&pkgdir),
-                )
-                .await
-                .unwrap();
-        }
+        let svc_path = if fxblob {
+            format!("/blob/svc/{}", fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME)
+        } else {
+            format!("/blob/{}", fidl_fuchsia_fxfs::BlobReaderMarker::PROTOCOL_NAME)
+        };
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol::<fidl_fuchsia_fxfs::BlobReaderMarker>()
+                            .path(svc_path),
+                    )
+                    .from(&service_reflector)
+                    .to(&pkgdir),
+            )
+            .await
+            .unwrap();
         let realm = builder.build().await.expect("realm build failed");
         Self { realm }
     }

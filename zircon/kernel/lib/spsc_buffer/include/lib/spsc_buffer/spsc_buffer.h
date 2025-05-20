@@ -12,8 +12,8 @@
 #include <ktl/atomic.h>
 #include <ktl/bit.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
+#include <ktl/utility.h>
 
 // The CopyOutFunction concept sets up a concept that the Spsc::Read function uses to copy data
 // out of the ring buffer.

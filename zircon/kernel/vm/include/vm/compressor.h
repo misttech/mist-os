@@ -163,13 +163,13 @@ class VmCompressor {
  private:
   // Let the compression system be a friend to call the constructor.
   friend VmCompression;
-  VmCompressor(VmCompression& compressor, uint64_t temp_ref)
+  VmCompressor(VmCompression& compressor, uint32_t temp_ref)
       : compressor_(compressor), temp_reference_(temp_ref) {}
 
   // Reference to the owning compression system.
   VmCompression& compressor_;
   // The value given to us that represent our temporary reference to hand out.
-  const uint64_t temp_reference_;
+  const uint32_t temp_reference_;
 
   enum class State {
     // The compressor has been armed and is ready to start compression. The temporary reference has

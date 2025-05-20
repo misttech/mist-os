@@ -112,7 +112,7 @@ fn promote_type(operands: &[MetricValue]) -> Result<PromotedOperands, MetricValu
                 error_vec.push(problem);
             }
             bad_type => {
-                non_numeric_error = Some(Problem::Missing(format!("{} not numeric", bad_type)));
+                non_numeric_error = Some(Problem::Missing(format!("{bad_type} not numeric")));
             }
         }
     }

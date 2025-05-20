@@ -52,8 +52,9 @@ template("coverage_verification_test") {
 
   system_image_name = get_label_info(invoker.assembled_system, "name")
 
-  system_image_path = get_label_info("${invoker.assembled_system}",
-                                     "target_out_dir") + "/" + system_image_name
+  system_image_path =
+      get_label_info("${invoker.assembled_system}", "target_out_dir") + "/" +
+      system_image_name + "_gen"
 
   # This is used to tell the emulator which image to boot.
   zbi_name = "${system_image_name}"

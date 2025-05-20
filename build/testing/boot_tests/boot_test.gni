@@ -1,12 +1,11 @@
-# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/sdk/product_bundle.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/test_spec.gni")
 import("//zircon/kernel/phys/qemu.gni")
-
 declare_args() {
   # Default value for `disabled` parameter for generated `boot_test()`.
   # TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
@@ -108,7 +107,6 @@ template("_boot_test") {
     is_boot_test = true
     product_bundle = name
     expects_ssh = false
-    disable_fastboot = true
 
     forward_variables_from(invoker,
                            [
@@ -212,71 +210,184 @@ template("boot_test") {
       "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`, `dtbo`")
 
   main_target = target_name
-  image_manifest_target = "_boot_test.${target_name}.image_manifest"
-  rebased_image_manifest_target =
-      "_boot_test.${target_name}.rebased_image_manifest"
+  product_bundle_target = "$target_name.product_bundle"
 
-  image_manifest = "${target_gen_dir}/${main_target}.images.json"
-  generated_file(image_manifest_target) {
-    forward_variables_from(invoker,
-                           [
-                             "zbi",
-                             "qemu_kernel",
-                             "vbmeta",
-                             "dtbo",
-                           ])
-    testonly = true
-    data_keys = [ "images" ]
-    walk_keys = [ "images_barrier" ]
-    output_conversion = "json"
+  # If the boot test specifies an EFI disk image, then this should be regarded
+  # as the contents of a bootloader partition. Otherwise, default to the
+  # board-specific partition contents.
+  if (defined(invoker.efi_disk)) {
+    efi_disk_manifest_target = "_boot_test.${target_name}.efi_disk_manifest"
+    efi_disk_manifest = "${target_gen_dir}/${main_target}.efi_disks.json"
+    generated_file(efi_disk_manifest_target) {
+      testonly = true
 
-    deps = []
-    if (defined(zbi)) {
-      deps += [ zbi ]
-    }
-    if (defined(vbmeta)) {
-      deps += [ vbmeta ]
-    }
-    if (defined(dtbo)) {
-      deps += [ dtbo ]
+      data_keys = [ "images" ]
+      walk_keys = [ "images_barrier" ]
+      output_conversion = "json"
+
+      deps = [ invoker.efi_disk ]
+      outputs = [ efi_disk_manifest ]
     }
 
-    # For general QEMU support it is convenient to include the default QEMU boot
-    # shim when one is not explicitly specified, unless we expect to boot an EFI
-    # disk image.
-    if (defined(qemu_kernel)) {
-      deps += [ qemu_kernel ]
-    } else if (!defined(invoker.efi_disk)) {
-      deps += qemu_boot_shim.deps
+    partition_config_intermediate_path =
+        "${target_out_dir}/${main_target}.partition_config_intermediate.json"
+    partition_config_intermediate_target =
+        "_boot_test.${target_name}.create_efi_partition_config_intermediate"
+    action(partition_config_intermediate_target) {
+      testonly = true
+
+      sources = [ efi_disk_manifest ]
+      outputs = [ partition_config_intermediate_path ]
+
+      script = "//build/testing/boot_tests/create_efi_partition_config.py"
+      args = [
+        "--metadata",
+        rebase_path(sources[0], root_build_dir),
+        "--output",
+        rebase_path(outputs[0], root_build_dir),
+        "--hardware-revision",
+        current_cpu,
+      ]
+
+      deps = [ ":$efi_disk_manifest_target" ]
     }
 
-    outputs = [ image_manifest ]
+    partition_config_path = "${target_out_dir}/${main_target}.partitions_config"
+    partition_config_target = "${main_target}.partitions_config"
+    compiled_action(partition_config_target) {
+      testonly = true
+
+      # The contents of these folders are dynamic, and managed entirely by this
+      # action.  Further, this action will need to delete items from these
+      # directories that are not added back (on an incremental build, if an item
+      # is removed from one of these sets)
+      hermetic_action_ignored_prefixes = [ partition_config_path ]
+
+      tool = "//build/assembly/tools/assembly_config"
+      tool_output_name = "assembly_config"
+
+      depfile_path = "$target_out_dir/$target_name.depfile"
+      depfile = depfile_path
+
+      outputs = [ "$partition_config_path/partitions_config.json" ]
+      inputs = [ partition_config_intermediate_path ]
+
+      args = [
+        "generate",
+        "partitions",
+        "--config",
+        rebase_path(inputs[0], root_build_dir),
+        "--output",
+        rebase_path(partition_config_path, root_build_dir),
+        "--depfile",
+        rebase_path(depfile_path, root_build_dir),
+      ]
+
+      deps = [ ":$partition_config_intermediate_target" ]
+    }
+
+    _partition_config_label = ":$partition_config_target"
+  } else {
+    _partition_config_label = "//boards/partitions:default($default_toolchain)"
+    if (has_board) {
+      assert(partitions_config_label != false,
+             "Need to define partitions_config_label")
+      _partition_config_label = partitions_config_label
+    }
   }
 
-  # The above generated_file() contains path fields that are relative to the
-  # build directory. `ffx product create`, however, expects these paths to be
-  # relative to the manifest itself. To account for the mismatch we run the
-  # metadata through some simple post-processing.
-  rebased_image_manifest = "${target_out_dir}/${main_target}.images.json"
-  action(rebased_image_manifest_target) {
-    testonly = true
+  # Non-zbi based test need to manually generate their image manifest.
+  if (!defined(invoker.zbi)) {
+    image_manifest = "${target_gen_dir}/${main_target}.images.json"
+    image_manifest_target = "_boot_test.${target_name}.image_manifest"
+    rebased_image_manifest_target =
+        "_boot_test.${target_name}.rebased_image_manifest"
+    generated_file(image_manifest_target) {
+      forward_variables_from(invoker,
+                             [
+                               "zbi",
+                               "qemu_kernel",
+                               "vbmeta",
+                               "dtbo",
+                             ])
+      testonly = true
+      data_keys = [ "images" ]
+      walk_keys = [ "images_barrier" ]
+      output_conversion = "json"
 
-    sources = [ image_manifest ]
-    outputs = [ rebased_image_manifest ]
+      deps = []
+      if (defined(zbi)) {
+        deps += [ zbi ]
+      }
+      if (defined(vbmeta)) {
+        deps += [ vbmeta ]
+      }
+      if (defined(dtbo)) {
+        deps += [ dtbo ]
+      }
 
-    script = "//build/testing/boot_tests/rebase_metadata_paths.py"
-    args = [
-      "--root-build-dir",
-      ".",
-      "--new-base",
-      rebase_path(get_path_info(outputs[0], "dir"), root_build_dir),
-      "--metadata",
-      rebase_path(sources[0], root_build_dir),
-      "--output",
-      rebase_path(outputs[0], root_build_dir),
-    ]
+      # For general QEMU support it is convenient to include the default QEMU boot
+      # shim when one is not explicitly specified, unless we expect to boot an EFI
+      # disk image.
+      if (defined(qemu_kernel)) {
+        deps += [ qemu_kernel ]
+      } else if (!defined(invoker.efi_disk)) {
+        deps += qemu_boot_shim.deps
+      }
 
-    deps = [ ":$image_manifest_target" ]
+      outputs = [ image_manifest ]
+    }
+
+    # The above generated_file() contains path fields that are relative to the
+    # build directory. `ffx product create`, however, expects these paths to be
+    # relative to the manifest itself. To account for the mismatch we run the
+    # metadata through some simple post-processing.
+    rebased_image_manifest = "${target_out_dir}/${main_target}.images.json"
+    action(rebased_image_manifest_target) {
+      testonly = true
+
+      sources = [ image_manifest ]
+      outputs = [ rebased_image_manifest ]
+
+      script = "//build/testing/boot_tests/rebase_metadata_paths.py"
+      args = [
+        "--root-build-dir",
+        ".",
+        "--new-base",
+        rebase_path(get_path_info(outputs[0], "dir"), root_build_dir),
+        "--metadata",
+        rebase_path(sources[0], root_build_dir),
+        "--output",
+        rebase_path(outputs[0], root_build_dir),
+      ]
+      deps = [ ":$image_manifest_target" ]
+    }
+
+    product_bundle(product_bundle_target) {
+      testonly = true
+
+      name = main_target
+      system_a = rebased_image_manifest
+      partitions = _partition_config_label
+
+      deps = [ ":$rebased_image_manifest_target" ]
+    }
+  } else if (current_toolchain == default_toolchain) {
+    product_bundle(product_bundle_target) {
+      testonly = true
+
+      name = main_target
+      #system_a = "$target_out_dir/$assembled_system_target/images.json"
+      partitions = _partition_config_label
+
+      #deps = [ ":$assembled_system_target" ]
+    }
+  } else {
+    not_needed([ "_partition_config_label" ])
+    group(product_bundle_target) {
+      testonly = true
+      deps = [ ":${product_bundle_target}($default_toolchain)" ]
+    }
   }
 
   # If host_cpu != target_cpu, then we make sure to define a separate boot
@@ -298,6 +409,7 @@ template("boot_test") {
       visibility = [ ":*" ]
       output_name = main_target
       label = ":$main_target"
+      deps = [ ":$product_bundle_target" ]
     }
 
     _boot_test("$main_target.emu") {
@@ -329,6 +441,7 @@ template("boot_test") {
       label = ":$main_target"
       forward_variables_from(invoker, "*")
       cpu_for_host = host_cpu
+      deps = [ ":$product_bundle_target" ]
     }
   }
 }

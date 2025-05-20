@@ -47,6 +47,7 @@ source_set("magma_driver_base") {
   sources = [
     "dependency_injection_server.cc",
     "dependency_injection_server.h",
+    "magma_driver_base.cc",
     "magma_driver_base.h",
     "performance_counters_server.cc",
     "performance_counters_server.h",

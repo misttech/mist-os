@@ -17,7 +17,7 @@
 #include <arch/exception.h>
 #include <kernel/restricted.h>
 #include <ktl/array.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/exception_dispatcher.h>
 #include <object/job_dispatcher.h>
 #include <object/process_dispatcher.h>

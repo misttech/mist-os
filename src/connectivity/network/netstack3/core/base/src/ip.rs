@@ -6,7 +6,8 @@ use core::convert::Infallible as Never;
 use core::fmt::Debug;
 use core::num::NonZeroU32;
 
-use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6SourceAddr, Mtu};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4SourceAddr, Ipv6, Ipv6SourceAddr, Mtu};
+use net_types::Witness;
 use packet_formats::icmp::{
     IcmpDestUnreachable, Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4RedirectCode,
     Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6ParameterProblemCode,
@@ -154,7 +155,7 @@ pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + BroadcastIpExt + IpProt
     /// [`IpTransportContext::receive_ip_packet`].
     ///
     /// For IPv4, this is `Ipv4Addr`. For IPv6, this is [`Ipv6SourceAddr`].
-    type RecvSrcAddr: Into<Self::Addr> + TryFrom<Self::Addr, Error: Debug> + Copy + Clone;
+    type RecvSrcAddr: Witness<Self::Addr> + Copy + Clone;
     /// The length of an IP header without any IP options.
     const IP_HEADER_LENGTH: NonZeroU32;
     /// The maximum payload size an IP payload can have.
@@ -162,7 +163,7 @@ pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + BroadcastIpExt + IpProt
 }
 
 impl IpExt for Ipv4 {
-    type RecvSrcAddr = Ipv4Addr;
+    type RecvSrcAddr = Ipv4SourceAddr;
     const IP_HEADER_LENGTH: NonZeroU32 =
         NonZeroU32::new(packet_formats::ipv4::HDR_PREFIX_LEN as u32).unwrap();
     const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 =

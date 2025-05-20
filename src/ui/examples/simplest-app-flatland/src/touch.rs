@@ -76,7 +76,24 @@ pub fn spawn_touch_source_watcher(
                     pending_responses = generate_touch_event_responses(events.iter());
 
                     for e in events.iter() {
+                        fuchsia_trace::duration!(c"input", c"touch_source_watcher");
+
                         let trace_id = e.trace_flow_id.expect("Trace flow id should exist");
+                        // need to step dispatch_event_to_client to allow the flow end on scenic.
+                        fuchsia_trace::flow_step!(
+                            c"input",
+                            c"dispatch_event_to_client",
+                            trace_id.into()
+                        );
+
+                        // use different trace_id in this application to avoid confuse the trace.
+                        let trace_id = fuchsia_trace::Id::random();
+
+                        fuchsia_trace::flow_begin!(
+                            c"input",
+                            c"touch_in_simplest_app",
+                            trace_id.into()
+                        );
 
                         // Handle `pointer_sample` field, if it exists.
                         if let Some(fptr::TouchPointerSample {

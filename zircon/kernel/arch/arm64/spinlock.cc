@@ -11,20 +11,26 @@
 #include <kernel/spin_tracing.h>
 #include <ktl/atomic.h>
 
+// Make sure the spin_lock is functionally a uint32_t since the inline assembly in this file
+// operates that way.
+static_assert(sizeof(arch_spin_lock_t) == sizeof(cpu_num_t));
+static_assert(sizeof(arch_spin_lock_t) == sizeof(uint32_t));
+
 namespace {
+
 void on_lock_acquired(arch_spin_lock_t* lock) TA_ASSERT(lock) {
   WRITE_PERCPU_FIELD(num_spinlocks, READ_PERCPU_FIELD(num_spinlocks) + 1);
 }
 
-inline void arch_spin_lock_core(arch_spin_lock_t* lock, unsigned long val) TA_ACQ(lock) {
-  uint64_t temp;
+inline void arch_spin_lock_core(arch_spin_lock_t* lock, cpu_num_t val) TA_ACQ(lock) {
+  cpu_num_t temp;
 
   __asm__ volatile(
       "sevl;"
       "1: wfe;"
-      "2: ldaxr   %[temp], [%[lock]];"
-      "cbnz    %[temp], 1b;"
-      "stxr    %w[temp], %[val], [%[lock]];"
+      "2: ldaxr   %w[temp], [%[lock]];"
+      "cbnz    %w[temp], 1b;"
+      "stxr    %w[temp], %w[val], [%[lock]];"
       "cbnz    %w[temp], 2b;"
       : [temp] "=&r"(temp)
       : [lock] "r"(&lock->value), [val] "r"(val)
@@ -36,18 +42,17 @@ inline void arch_spin_lock_core(arch_spin_lock_t* lock, unsigned long val) TA_AC
 }  // namespace
 
 void arch_spin_lock_non_instrumented(arch_spin_lock_t* lock) TA_ACQ(lock) {
-  unsigned long val = arch_curr_cpu_num() + 1;
+  cpu_num_t val = arch_curr_cpu_num() + 1;
   arch_spin_lock_core(lock, val);
 }
 
 void arch_spin_lock_trace_instrumented(arch_spin_lock_t* lock,
                                        spin_tracing::EncodedLockId encoded_lock_id) TA_ACQ(lock) {
-  unsigned long val = arch_curr_cpu_num() + 1;
-  unsigned long expected = 0;
+  cpu_num_t val = arch_curr_cpu_num() + 1;
+  cpu_num_t expected = 0;
 
-  ktl::atomic_ref<decltype(lock->value)> avalue{lock->value};
-  if (avalue.compare_exchange_strong(expected, val, ktl::memory_order_acquire,
-                                     ktl::memory_order_relaxed)) {
+  if (lock->value.compare_exchange_strong(expected, val, ktl::memory_order_acquire,
+                                          ktl::memory_order_relaxed)) {
     on_lock_acquired(lock);
     return;
   }
@@ -58,13 +63,13 @@ void arch_spin_lock_trace_instrumented(arch_spin_lock_t* lock,
 }
 
 bool arch_spin_trylock(arch_spin_lock_t* lock) TA_NO_THREAD_SAFETY_ANALYSIS {
-  unsigned long val = arch_curr_cpu_num() + 1;
-  uint64_t out;
+  cpu_num_t val = arch_curr_cpu_num() + 1;
+  cpu_num_t out;
   __asm__ volatile(
       "1:"
-      "ldaxr   %[out], [%[lock]];"
-      "cbnz    %[out], 2f;"
-      "stxr    %w[out], %[val], [%[lock]];"
+      "ldaxr   %w[out], [%[lock]];"
+      "cbnz    %w[out], 2f;"
+      "stxr    %w[out], %w[val], [%[lock]];"
       // Even though this is a try lock, if the store on acquire fails we try
       // again. This is to prevent spurious failures from misleading the caller
       // into thinking the lock is held by another thread. See
@@ -84,5 +89,5 @@ bool arch_spin_trylock(arch_spin_lock_t* lock) TA_NO_THREAD_SAFETY_ANALYSIS {
 
 void arch_spin_unlock(arch_spin_lock_t* lock) TA_NO_THREAD_SAFETY_ANALYSIS {
   WRITE_PERCPU_FIELD(num_spinlocks, READ_PERCPU_FIELD(num_spinlocks) - 1);
-  __atomic_store_n(&lock->value, 0UL, __ATOMIC_RELEASE);
+  lock->value.store(0, ktl::memory_order_release);
 }

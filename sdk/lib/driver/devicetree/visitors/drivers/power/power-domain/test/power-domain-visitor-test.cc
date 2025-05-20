@@ -43,22 +43,22 @@ TEST(PowerDomainVisitorTest, TestMetadataAndBindProperty) {
   // Test the composite node spec
   auto cpufreq_node_spec = power_domain_visitor_tester->GetCompositeNodeSpecs("cpufreq");
   ASSERT_EQ(cpufreq_node_spec.size(), 1u);
-  ASSERT_TRUE(cpufreq_node_spec[0].parents().has_value());
-  ASSERT_EQ(cpufreq_node_spec[0].parents()->size(), 2lu);
+  ASSERT_TRUE(cpufreq_node_spec[0].parents2().has_value());
+  ASSERT_EQ(cpufreq_node_spec[0].parents2()->size(), 2lu);
 
   // 1st parent is pdev. Skipping that.
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-      {{fdf::MakeProperty(bind_fuchsia_hardware_power::SERVICE,
-                          bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeProperty(bind_fuchsia_power::POWER_DOMAIN,
-                          static_cast<uint32_t>(TEST_DOMAIN_ID))}},
-      cpufreq_node_spec[0].parents()->at(1).properties(), false));
+      {{fdf::MakeProperty2(bind_fuchsia_hardware_power::SERVICE,
+                           bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty2(bind_fuchsia_power::POWER_DOMAIN,
+                           static_cast<uint32_t>(TEST_DOMAIN_ID))}},
+      cpufreq_node_spec[0].parents2()->at(1).properties(), false));
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-      {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_power::SERVICE,
-                                bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
-        fdf::MakeAcceptBindRule(bind_fuchsia_power::POWER_DOMAIN,
-                                static_cast<uint32_t>(TEST_DOMAIN_ID))}},
-      cpufreq_node_spec[0].parents()->at(1).bind_rules(), false));
+      {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_power::SERVICE,
+                                 bind_fuchsia_hardware_power::SERVICE_ZIRCONTRANSPORT),
+        fdf::MakeAcceptBindRule2(bind_fuchsia_power::POWER_DOMAIN,
+                                 static_cast<uint32_t>(TEST_DOMAIN_ID))}},
+      cpufreq_node_spec[0].parents2()->at(1).bind_rules(), false));
 
   // Test the power controller metadata
   auto power_controller_node = power_domain_visitor_tester->GetPbusNodes("power-controller");

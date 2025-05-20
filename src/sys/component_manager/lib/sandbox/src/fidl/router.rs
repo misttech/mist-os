@@ -116,7 +116,9 @@ where
             ) -> Result<(), zx::Status> {
                 // Hold a guard to prevent this task from being dropped during component
                 // destruction.  This task is tied to the target component.
-                let _guard = open_request.scope().active_guard();
+                let Some(_guard) = open_request.scope().try_active_guard() else {
+                    return Err(zx::Status::PEER_CLOSED);
+                };
 
                 // Request a capability from the `router`.
                 let result = match self.router.route(None, false).await {

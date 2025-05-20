@@ -18,10 +18,10 @@
 #include <zircon/compiler.h>
 
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 
 // This file is concerned with the facilities for code-patching.
 

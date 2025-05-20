@@ -6,7 +6,6 @@
 
 {{- define "Protocol:EventSender:WireMessagingHeader" }}
 {{ EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 template<>
 class {{ .WireWeakEventSender }} : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -65,12 +64,10 @@ class {{ .WireBufferEventSender }}
   {{- end }}
 };
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 {{- define "Protocol:EventSender:WireMessagingSource" }}
 {{ EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
   {{- range .Events }}
 
     {{- /* Weak, managed */}}
@@ -137,14 +134,12 @@ fidl::OneWayStatus {{ $.WireBufferEventSender.NoLeading }}::{{ .Name }}(
 {{ "" }}
 
   {{- end }}
-{{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Protocol:EventSender:NaturalMessagingHeader" }}
 {{ EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 
 template<>
 class {{ .NaturalWeakEventSender }} : public ::fidl::internal::WeakEventSenderBase {
@@ -173,14 +168,12 @@ class {{ .NaturalEventSender }}
   {{ end }}
 };
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Protocol:EventSender:NaturalMessagingSource" }}
 {{ EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
   {{- range .Events }}
 
 ::fit::result<::fidl::OneWayError> {{ $.NaturalWeakEventSender.NoLeading }}::{{ .Name }}(
@@ -207,5 +200,4 @@ class {{ .NaturalEventSender }}
 }
 
   {{ end }}
-{{- EndifFuchsia -}}
 {{- end }}

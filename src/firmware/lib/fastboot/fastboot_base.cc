@@ -5,10 +5,10 @@
 #include "lib/fastboot/fastboot_base.h"
 
 #include <assert.h>
-#include <lib/stdcompat/span.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <span>
 #include <string>
 
 namespace fastboot {
@@ -42,7 +42,7 @@ zx::result<> FastbootBase::SendResponse(ResponseType resp_type, std::string_view
   }
 
   char resp_buffer[kMaxCommandPacketSize + 1] = {};
-  cpp20::span<char> buf(resp_buffer, kMaxCommandPacketSize);
+  std::span<char> buf(resp_buffer, kMaxCommandPacketSize);
 
   // Print type
   size_t s = snprintf(buf.data(), buf.size(), "%s", type);

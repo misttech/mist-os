@@ -16,21 +16,24 @@
 
 #include <ktl/enforce.h>
 
-void InitMemory(void* zbi, AddressSpace* aspace) {
+void InitMemory(const void* zbi_ptr, ktl::optional<EarlyBootZbi> zbi, AddressSpace* aspace) {
   ktl::span<zbi_mem_range_t> zbi_ranges;
   ktl::optional<memalloc::Range> nvram_range;
 
-  zbitl::View<zbitl::ByteView> view{
-      zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi))};
-  for (auto [header, payload] : view) {
+  ZX_DEBUG_ASSERT(zbi);
+
+  for (auto [header, wrapped_payload] : *zbi) {
     switch (header->type) {
-      case ZBI_TYPE_MEM_CONFIG:
+      case ZBI_TYPE_MEM_CONFIG: {
+        ktl::span payload = wrapped_payload.get();
         zbi_ranges = {
             const_cast<zbi_mem_range_t*>(reinterpret_cast<const zbi_mem_range_t*>(payload.data())),
             payload.size_bytes() / sizeof(zbi_mem_range_t)};
         break;
+      }
 
-      case ZBI_TYPE_NVRAM:
+      case ZBI_TYPE_NVRAM: {
+        ktl::span payload = wrapped_payload.get();
         ZX_ASSERT(payload.size_bytes() >= sizeof(zbi_nvram_t));
         const zbi_nvram_t* nvram = reinterpret_cast<const zbi_nvram_t*>(payload.data());
         nvram_range = {
@@ -39,14 +42,15 @@ void InitMemory(void* zbi, AddressSpace* aspace) {
             .type = memalloc::Type::kNvram,
         };
         break;
+      }
     }
   }
-  if (auto result = view.take_error(); result.is_error()) {
+  if (auto result = zbi->take_error(); result.is_error()) {
     zbitl::PrintViewError(result.error_value());
     ZX_PANIC("error occurred while parsing the data ZBI");
   }
 
   ZX_ASSERT_MSG(!zbi_ranges.empty(), "no MEM_CONFIG item found in the data ZBI");
 
-  ZbiInitMemory(zbi, zbi_ranges, nvram_range, aspace);
+  ZbiInitMemory(zbi_ptr, *zbi, zbi_ranges, nvram_range, aspace);
 }

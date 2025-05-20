@@ -14,7 +14,7 @@ use core::fmt::{Debug, Display};
 use core::hash::Hash;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-use packet::{BufferViewMut, PacketBuilder, ParsablePacket, ParseMetadata};
+use packet::{BufferViewMut, PacketBuilder, ParsablePacket, ParseMetadata, PartialPacketBuilder};
 use zerocopy::{
     FromBytes, Immutable, IntoBytes, KnownLayout, SplitByteSlice, SplitByteSliceMut, Unaligned,
 };
@@ -22,8 +22,10 @@ use zerocopy::{
 use crate::error::{IpParseError, IpParseResult};
 use crate::ethernet::EthernetIpExt;
 use crate::icmp::IcmpIpExt;
-use crate::ipv4::{Ipv4Header, Ipv4OnlyMeta, Ipv4Packet, Ipv4PacketBuilder};
-use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
+use crate::ipv4::{
+    Ipv4Header, Ipv4OnlyMeta, Ipv4Packet, Ipv4PacketBuilder, Ipv4PacketRaw, IPV4_MIN_HDR_LEN,
+};
+use crate::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder, Ipv6PacketRaw, IPV6_FIXED_HDR_LEN};
 use crate::private::Sealed;
 
 /// An [`Ip`] extension trait adding an associated type for the IP protocol
@@ -63,18 +65,31 @@ pub trait IpExt: EthernetIpExt + IcmpIpExt {
         + GenericOverIp<Self, Type = Self::Packet<B>>
         + GenericOverIp<Ipv4, Type = Ipv4Packet<B>>
         + GenericOverIp<Ipv6, Type = Ipv6Packet<B>>;
+    /// A raw IP packet type for this IP version.
+    type PacketRaw<B: SplitByteSlice>: IpPacketRaw<B, Self>
+        + GenericOverIp<Self, Type = Self::PacketRaw<B>>
+        + GenericOverIp<Ipv4, Type = Ipv4PacketRaw<B>>
+        + GenericOverIp<Ipv6, Type = Ipv6PacketRaw<B>>;
     /// An IP packet builder type for the IP version.
     type PacketBuilder: IpPacketBuilder<Self> + Eq;
+    /// Minimal IP header size.
+    const MIN_HEADER_LENGTH: usize;
 }
 
 impl IpExt for Ipv4 {
     type Packet<B: SplitByteSlice> = Ipv4Packet<B>;
+    type PacketRaw<B: SplitByteSlice> = Ipv4PacketRaw<B>;
     type PacketBuilder = Ipv4PacketBuilder;
+
+    const MIN_HEADER_LENGTH: usize = IPV4_MIN_HDR_LEN;
 }
 
 impl IpExt for Ipv6 {
     type Packet<B: SplitByteSlice> = Ipv6Packet<B>;
+    type PacketRaw<B: SplitByteSlice> = Ipv6PacketRaw<B>;
     type PacketBuilder = Ipv6PacketBuilder;
+
+    const MIN_HEADER_LENGTH: usize = IPV6_FIXED_HDR_LEN;
 }
 
 /// An error encountered during NAT64 translation.
@@ -350,8 +365,26 @@ impl<B: SplitByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
     }
 }
 
+/// A raw IPv4 or IPv6 packet.
+///
+/// `IpPacketRaw` is implemented by `Ipv4PacketRaw` and `Ipv6PacketRaw`.
+pub trait IpPacketRaw<B: SplitByteSlice, I: IpExt>:
+    Sized + ParsablePacket<B, (), Error = IpParseError<I>>
+{
+}
+
+impl<B: SplitByteSlice> IpPacketRaw<B, Ipv4> for Ipv4PacketRaw<B> {}
+impl<B: SplitByteSlice, I: IpExt> GenericOverIp<I> for Ipv4PacketRaw<B> {
+    type Type = <I as IpExt>::PacketRaw<B>;
+}
+
+impl<B: SplitByteSlice> IpPacketRaw<B, Ipv6> for Ipv6PacketRaw<B> {}
+impl<B: SplitByteSlice, I: IpExt> GenericOverIp<I> for Ipv6PacketRaw<B> {
+    type Type = <I as IpExt>::PacketRaw<B>;
+}
+
 /// A builder for IP packets.
-pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + Clone + Debug {
+pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + PartialPacketBuilder + Clone + Debug {
     /// Returns a new packet builder for an associated IP version with the given
     /// given source and destination IP addresses, TTL (IPv4)/Hop Limit (IPv4)
     /// and Protocol Number.

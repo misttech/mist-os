@@ -1,0 +1,58 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment_custom_logsink.shard.cml",
+        "syslog/use.shard.cml",
+    ],
+    children: [
+        {
+            name: "persistence",
+            url: "#meta/persistence.cm",
+            startup: "eager",
+            environment: "#elf-env",
+        },
+        {
+            name: "archivist",
+            url: "#meta/archivist-for-embedding.cm",
+            environment: "#elf-env",
+        },
+    ],
+    capabilities: [
+        { dictionary: "diagnostics" },
+    ],
+    offer: [
+        {
+            event_stream: [ "capability_requested" ],
+            from: "parent",
+            to: "#archivist",
+        },
+
+        // Modify handling of logs and inspect in children.
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#archivist",
+                "#elf_runner",
+                "#persistence",
+            ],
+            dependency: "weak",
+        },
+
+        // Handle inspect with the embedded archivist.
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "#archivist",
+            to: "self/diagnostics",
+        },
+
+        // But keep logs going to the system-wide archivist for visibility.
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "self/diagnostics",
+        },
+    ],
+}

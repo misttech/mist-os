@@ -17,11 +17,11 @@ jmp_buf.llvm_libc_function longjmp
   add sp, sp, -32
   .cfi_adjust_cfa_offset 32
   sd ra, 0(sp)
-  .cfi_offset ra, -32 + 0
+  .cfi_rel_offset ra, 0
   sd a0, 8(sp)
-  .cfi_offset ra, -32 + 8
+  .cfi_rel_offset a0, 8
   sd a1, 16(sp)
-  .cfi_offset ra, -32 + 16
+  .cfi_rel_offset a1, 16
   call __asan_handle_no_return
   ld ra, 0(sp)
   .cfi_same_value ra

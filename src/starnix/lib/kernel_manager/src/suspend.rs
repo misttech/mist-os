@@ -82,7 +82,10 @@ pub async fn suspend_container(
     let suspend_start = zx::BootInstant::get();
 
     if let Some(wake_locks) = payload.wake_locks {
-        match wake_locks.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::ZERO) {
+        match wake_locks
+            .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::ZERO)
+            .to_result()
+        {
             Ok(_) => {
                 // There were wake locks active after suspending all processes, resume
                 // and fail the suspend call.
@@ -206,10 +209,13 @@ async fn suspend_job(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> {
             for thread_koid in &threads {
                 fuchsia_trace::duration!(c"power", c"starnix-runner:suspend_kernel", "thread_koid" => *thread_koid);
                 if let Ok(thread) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS) {
-                    match thread.wait_handle(
-                        zx::Signals::THREAD_SUSPENDED,
-                        zx::MonotonicInstant::after(zx::MonotonicDuration::INFINITE),
-                    ) {
+                    match thread
+                        .wait_handle(
+                            zx::Signals::THREAD_SUSPENDED,
+                            zx::MonotonicInstant::after(zx::MonotonicDuration::INFINITE),
+                        )
+                        .to_result()
+                    {
                         Err(e) => {
                             log::warn!("Error waiting for task suspension: {:?}", e);
                             return Err(e.into());

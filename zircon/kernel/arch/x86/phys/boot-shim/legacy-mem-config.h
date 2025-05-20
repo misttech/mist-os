@@ -6,12 +6,12 @@
 #define ZIRCON_KERNEL_ARCH_X86_PHYS_BOOT_SHIM_LEGACY_MEM_CONFIG_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
 #include <lib/zbitl/storage-traits.h>
 #include <lib/zircon-internal/e820.h>
 
 #include <iterator>
+#include <span>
 #include <string_view>
 #include <variant>
 
@@ -27,10 +27,10 @@ constexpr uint32_t kLegacyZbiTypeEfiMemoryMap = 0x4d494645;  // EFIM
 namespace internal {
 
 // A view into a ZBI_TYPE_MEM_CONFIG payload.
-using MemConfigTable = cpp20::span<const zbi_mem_range_t>;
+using MemConfigTable = std::span<const zbi_mem_range_t>;
 
 // A view into a kLegacyZbiTypeE820Table payload.
-using E820Table = cpp20::span<const E820Entry>;
+using E820Table = std::span<const E820Entry>;
 
 // A view into a kLegacyZbiTypeEfiMemoryMap payload.
 struct EfiTable {

@@ -9,7 +9,7 @@
 #include <string-file.h>
 
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use pin_project::pin_project;
+use std::boxed::Box;
 use std::ffi::CStr;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -964,10 +965,10 @@ pub fn flow_step(
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instant_flow_begin!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_begin!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
-macro_rules! instant_flow_begin {
+macro_rules! instaflow_begin {
     (
         $category:expr,
         $event_name:expr,
@@ -978,7 +979,7 @@ macro_rules! instant_flow_begin {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                $crate::instant_flow_begin(
+                $crate::instaflow_begin(
                     &context,
                     $event_name,
                     $flow_name,
@@ -1001,10 +1002,10 @@ macro_rules! instant_flow_begin {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instant_flow_end!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_end!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
-macro_rules! instant_flow_end {
+macro_rules! instaflow_end {
     (
         $category:expr,
         $event_name:expr,
@@ -1015,7 +1016,7 @@ macro_rules! instant_flow_end {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                $crate::instant_flow_end(
+                $crate::instaflow_end(
                     &context,
                     $event_name,
                     $flow_name,
@@ -1038,10 +1039,10 @@ macro_rules! instant_flow_end {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instant_flow_step!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_step!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
-macro_rules! instant_flow_step {
+macro_rules! instaflow_step {
     (
         $category:expr,
         $event_name:expr,
@@ -1052,7 +1053,7 @@ macro_rules! instant_flow_step {
         {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
-                $crate::instant_flow_step(
+                $crate::instaflow_step(
                     &context,
                     $event_name,
                     $flow_name,
@@ -1075,7 +1076,7 @@ macro_rules! instant_flow_step {
 /// 0 to 15 arguments can be associated with the event, each of which is used to annotate the flow
 /// with additional information. The arguments provided to matching flow begin, flow step, and flow
 /// end events are combined together in the trace; it is not necessary to repeat them.
-pub fn instant_flow_begin(
+pub fn instaflow_begin(
     context: &TraceCategoryContext,
     event_name: &'static CStr,
     flow_name: &'static CStr,
@@ -1104,7 +1105,7 @@ pub fn instant_flow_begin(
 /// 0 to 15 arguments can be associated with the event, each of which is used to annotate the flow
 /// with additional information. The arguments provided to matching flow begin, flow step, and flow
 /// end events are combined together in the trace; it is not necessary to repeat them.
-pub fn instant_flow_end(
+pub fn instaflow_end(
     context: &TraceCategoryContext,
     event_name: &'static CStr,
     flow_name: &'static CStr,
@@ -1133,7 +1134,7 @@ pub fn instant_flow_end(
 /// 0 to 15 arguments can be associated with the event, each of which is used to annotate the flow
 /// with additional information. The arguments provided to matching flow begin, flow step, and flow
 /// end events are combined together in the trace; it is not necessary to repeat them.
-pub fn instant_flow_step(
+pub fn instaflow_step(
     context: &TraceCategoryContext,
     event_name: &'static CStr,
     flow_name: &'static CStr,
@@ -2146,7 +2147,8 @@ pub struct TraceFuture<'a, Fut: Future> {
     args: Vec<Arg<'a>>,
     flow_id: Option<Id>,
     #[pin]
-    future: Fut,
+    // This future can be large (> 3000 bytes) so we Box it to avoid extra memcpy's when creating
+    future: Pin<Box<Fut>>,
 }
 
 impl<'a, Fut: Future> TraceFuture<'a, Fut> {
@@ -2160,7 +2162,7 @@ impl<'a, Fut: Future> TraceFuture<'a, Fut> {
             name: args.name,
             args: args.args,
             flow_id: args.flow_id,
-            future: future,
+            future: Box::pin(future),
         };
         if let Some(context) = args.context {
             this.trace_create(context);

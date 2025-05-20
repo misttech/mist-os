@@ -19,9 +19,9 @@
 #include <ktl/algorithm.h>
 #include <ktl/forward.h>
 #include <ktl/limits.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 
 class CpuDistanceMap;
 

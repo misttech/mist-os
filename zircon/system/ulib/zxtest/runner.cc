@@ -337,8 +337,8 @@ bool MatchPatterns(std::string_view pattern, std::string_view str) {
 bool FilterOp::operator()(const fbl::String& test_case, const fbl::String& test) const {
   fbl::String full_test_name = fbl::StringPrintf("%s.%s", test_case.c_str(), test.c_str());
   if (!run_disabled) {
-    cpp17::string_view test_case_view(test_case.c_str(), test_case.size());
-    cpp17::string_view test_view(test.c_str(), test.size());
+    std::string_view test_case_view(test_case.c_str(), test_case.size());
+    std::string_view test_view(test.c_str(), test.size());
     if (test_case_view.find(kDisabledTestPrefix) == 0 || test_view.find(kDisabledTestPrefix) == 0) {
       return false;
     }

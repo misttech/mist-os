@@ -97,7 +97,7 @@ impl CommsBackend<UnixStream> for QemuSocket {
             let msg_start = "Warning: path to emulator socket is too long, temporaily changing the working directory.";
             let msg_restored = "Current directory restored";
             eprintln!("{msg_start}");
-            tracing::warn!("{msg_start}");
+            log::warn!("{msg_start}");
             let path = absolute_socket_path.parent().unwrap_or(&cwd);
             env::set_current_dir(path).map_err(|e| {
                 bug!("Error changing to instance directory {}: {e}.", path.display())
@@ -114,7 +114,7 @@ impl CommsBackend<UnixStream> for QemuSocket {
                 .map_err(|e| bug!("Returning to original working directory: {e}"))?;
 
             eprintln!("{msg_restored}");
-            tracing::warn!("{msg_restored}");
+            log::warn!("{msg_restored}");
             result
         } else {
             UnixStream::connect(absolute_socket_path)

@@ -556,7 +556,7 @@ impl<T: Timeline> HandleBased for Timer<T> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Signals;
+    use crate::{Signals, WaitResult};
 
     #[test]
     fn time_debug_repr_is_short() {
@@ -661,7 +661,7 @@ mod tests {
         // Should not signal yet.
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicInstant::after(ten_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty()),
         );
 
         // Set it, and soon it should signal.
@@ -669,7 +669,7 @@ mod tests {
         assert_eq!(timer.set(instant, slack), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, Instant::INFINITE),
-            Ok(Signals::TIMER_SIGNALED)
+            WaitResult::Ok(Signals::TIMER_SIGNALED)
         );
         // Once the timer has fired, its deadline is reset to zero.
         assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
@@ -678,7 +678,7 @@ mod tests {
         assert_eq!(timer.cancel(), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicInstant::after(ten_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty()),
         );
         assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
 
@@ -703,7 +703,7 @@ mod tests {
         // Should not signal yet.
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicInstant::after(ten_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty())
         );
 
         // Set it, and soon it should signal.
@@ -711,7 +711,7 @@ mod tests {
         assert_eq!(timer.set(instant, slack), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, Instant::INFINITE),
-            Ok(Signals::TIMER_SIGNALED)
+            WaitResult::Ok(Signals::TIMER_SIGNALED)
         );
         // Once the timer has fired, its deadline is reset to zero.
         assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
@@ -720,7 +720,7 @@ mod tests {
         assert_eq!(timer.cancel(), Ok(()));
         assert_eq!(
             timer.wait_handle(Signals::TIMER_SIGNALED, MonotonicInstant::after(ten_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty())
         );
         assert_eq!(timer.info().expect("info() failed").deadline, Instant::ZERO);
 

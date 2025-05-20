@@ -55,7 +55,9 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
                             size_t* mapped) override;
 
-  zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+  using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
+  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                     size_t* unmapped) override;
 
   // ARM states that we must perform a break-before-make when changing the block size used by the
@@ -64,7 +66,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   bool UnmapOnlyEnlargeOnOom() const override { return false; }
 
   zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                      EnlargeOperation enlarge) override;
+                      ArchUnmapOptions enlarge) override;
 
   zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override;
 
@@ -75,7 +77,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count, NonTerminalAction non_terminal_action,
                               TerminalAction terminal_action) override;
 
-  bool ActiveSinceLastCheck(bool clear) override;
+  bool AccessedSinceLastCheck(bool clear) override;
 
   paddr_t arch_table_phys() const override { return tt_phys_; }
   uint16_t arch_asid() const { return asid_; }
@@ -129,13 +131,13 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   // regardless of the error value, the num_mappings field in the page must be updated by the
   // caller.
   ktl::pair<zx_status_t, uint> UnmapPageTable(VirtualAddressCursor& cursor,
-                                              EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+                                              ArchUnmapOptions enlarge, CheckForEmptyPt pt_check,
                                               uint index_shift, volatile pte_t* page_table,
                                               ConsistencyManager& cm, Reclaim reclaim)
       TA_REQ(lock_);
 
   zx_status_t ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, size_t size_in, pte_t attrs,
-                               EnlargeOperation enlarge, uint index_shift,
+                               ArchUnmapOptions enlarge, uint index_shift,
                                volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
 
   size_t HarvestAccessedPageTable(size_t* entry_limit, vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
@@ -158,7 +160,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   pte_t MmuParamsFromFlags(uint mmu_flags);
 
-  zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs, EnlargeOperation enlarge,
+  zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs, ArchUnmapOptions enlarge,
                            vaddr_t vaddr_base, ConsistencyManager& cm) TA_REQ(lock_);
   zx_status_t QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) TA_REQ(lock_);
 
@@ -177,15 +179,6 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   void FlushAllAsids() const TA_REQ(lock_);
 
   uint MmuFlagsFromPte(pte_t pte);
-
-  // Helper method to mark this aspace active.
-  // This exists for clarity of call sites so that the comment explaining why this is done can be in
-  // one location.
-  void MarkAspaceModified() {
-    // If an aspace has been manipulated via a direction operation, then we want to try it
-    // equivalent to if it had been active on a CPU, since it may now have active/dirty information.
-    active_since_last_check_.store(true, ktl::memory_order_relaxed);
-  }
 
   // Panic if the page table is not empty.
   //
@@ -266,8 +259,9 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   // Number of CPUs this aspace is currently active on.
   ktl::atomic<uint32_t> num_active_cpus_ = 0;
 
-  // Whether not this has been active since |ActiveSinceLastCheck| was called.
-  ktl::atomic<bool> active_since_last_check_ = false;
+  // Whether not this has been accessed since |AccessedSinceLastCheck| was called. This is updated
+  // by MarkAccessed, and anywhere a mapping is installed with the AF flag set.
+  bool accessed_since_last_check_ TA_GUARDED(lock_) = false;
 
   // The number of times entries in the top level page are referenced by other page tables.
   // Unified page tables increment and decrement this value on their associated shared and

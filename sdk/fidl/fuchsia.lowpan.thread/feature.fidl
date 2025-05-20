@@ -55,6 +55,10 @@ type FeatureConfig = table {
     /// Determines if Link Metrics Manager is enabled or disabled.
     @available(added=20)
     8: link_metrics_manager_enabled bool;
+
+    /// Determines if ePSKc is enabled or disabled.
+    @available(added=27)
+    9: epskc_enabled bool;
 };
 
 /// Protocol for connecting to [`Feature`] on a LoWPAN device.

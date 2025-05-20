@@ -15,7 +15,7 @@ use packet_formats::ip::IpExt;
 use crate::conntrack::{Connection, FinalizeConnectionError, GetConnectionError};
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext};
 use crate::matchers::InterfaceProperties;
-use crate::packets::{IpPacket, MaybeTransportPacket};
+use crate::packets::{FilterIpExt, IpPacket, MaybeTransportPacket};
 use crate::state::{
     Action, FilterIpMetadata, FilterMarkMetadata, Hook, Routine, Rule, TransparentProxy,
 };
@@ -158,7 +158,7 @@ fn check_routine<I, P, D, DeviceClass, M>(
     metadata: &mut M,
 ) -> RoutineResult<I>
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     D: InterfaceProperties<DeviceClass>,
     M: FilterMarkMetadata,
@@ -209,7 +209,7 @@ fn check_routines_for_hook<I, P, D, DeviceClass, M>(
     metadata: &mut M,
 ) -> Verdict
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     D: InterfaceProperties<DeviceClass>,
     M: FilterMarkMetadata,
@@ -239,7 +239,7 @@ fn check_routines_for_ingress<I, P, D, DeviceClass, M>(
     metadata: &mut M,
 ) -> IngressVerdict<I>
 where
-    I: IpExt,
+    I: FilterIpExt,
     P: IpPacket<I>,
     D: InterfaceProperties<DeviceClass>,
     M: FilterMarkMetadata,
@@ -262,7 +262,7 @@ where
 
 /// An implementation of packet filtering logic, providing entry points at
 /// various stages of packet processing.
-pub trait FilterHandler<I: IpExt, BC: FilterBindingsTypes>:
+pub trait FilterHandler<I: FilterIpExt, BC: FilterBindingsTypes>:
     IpDeviceAddressIdContext<I, DeviceId: InterfaceProperties<BC::DeviceClass>>
 {
     /// The ingress hook intercepts incoming traffic before a routing decision
@@ -344,7 +344,7 @@ impl<CC: DeviceIdContext<AnyDevice>> DeviceIdContext<AnyDevice> for FilterImpl<'
 
 impl<I, CC> IpDeviceAddressIdContext<I> for FilterImpl<'_, CC>
 where
-    I: IpExt,
+    I: FilterIpExt,
     CC: IpDeviceAddressIdContext<I>,
 {
     type AddressId = CC::AddressId;
@@ -353,7 +353,7 @@ where
 
 impl<I, BC, CC> FilterHandler<I, BC> for FilterImpl<'_, CC>
 where
-    I: IpExt,
+    I: FilterIpExt,
     BC: FilterBindingsContext,
     CC: FilterIpContext<I, BC>,
 {
@@ -376,13 +376,17 @@ where
             let conn = match metadata.take_connection_and_direction() {
                 Some((c, d)) => Some((c, d)),
                 None => {
-                    match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
-                    {
-                        Ok(result) => result,
-                        // TODO(https://fxbug.dev/328064909): Support configurable dropping of
-                        // invalid packets.
-                        Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
-                    }
+                    packet.conntrack_packet().and_then(|packet| {
+                        match state
+                            .conntrack
+                            .get_connection_for_packet_and_update(bindings_ctx, packet)
+                        {
+                            Ok(result) => result,
+                            // TODO(https://fxbug.dev/328064909): Support configurable dropping of
+                            // invalid packets.
+                            Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
+                        }
+                    })
                 }
             };
 
@@ -448,7 +452,7 @@ where
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
-                None => {
+                None => packet.conntrack_packet().and_then(|packet| {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
                         Ok(result) => result,
@@ -456,7 +460,7 @@ where
                         // invalid packets.
                         Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
-                }
+                }),
             };
 
             let verdict = match check_routines_for_hook(
@@ -539,13 +543,14 @@ where
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
-            let conn =
+            let conn = packet.conntrack_packet().and_then(|packet| {
                 match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
                     Ok(result) => result,
                     // TODO(https://fxbug.dev/328064909): Support configurable dropping of invalid
                     // packets.
                     Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
-                };
+                }
+            });
 
             let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_egress,
@@ -602,7 +607,7 @@ where
                 // It's possible that there won't be a connection in the metadata by this point;
                 // this could be, for example, because the packet is for a protocol not tracked
                 // by conntrack.
-                None => {
+                None => packet.conntrack_packet().and_then(|packet| {
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
                         Ok(result) => result,
@@ -610,7 +615,7 @@ where
                         // invalid packets.
                         Err(GetConnectionError::InvalidPacket(c, d)) => Some((c, d)),
                     }
-                }
+                }),
             };
 
             let verdict = match check_routines_for_hook(
@@ -677,7 +682,7 @@ pub enum FilterTimerId<I: Ip> {
     ConntrackGc(IpVersionMarker<I>),
 }
 
-impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> HandleableTimer<CC, BC>
+impl<I: FilterIpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> HandleableTimer<CC, BC>
     for FilterTimerId<I>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
@@ -727,7 +732,7 @@ pub mod testutil {
 
     impl<I, BC, DeviceId> FilterHandler<I, BC> for NoopImpl<DeviceId>
     where
-        I: IpExt + AssignedAddrIpExt,
+        I: FilterIpExt + AssignedAddrIpExt,
         BC: FilterBindingsContext,
         DeviceId: FakeStrongDeviceId + InterfaceProperties<BC::DeviceClass>,
     {
@@ -826,7 +831,7 @@ mod tests {
 
     use super::*;
     use crate::actions::MarkAction;
-    use crate::conntrack::{self, ConnectionDirection, Tuple};
+    use crate::conntrack::{self, ConnectionDirection};
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass, FakeWeakAddressId};
     use crate::logic::nat::NatConfig;
     use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
@@ -1332,7 +1337,7 @@ mod tests {
     #[test_case(1023 => Verdict::Drop; "privileged port 1023 blocked")]
     #[test_case(53 => Verdict::Drop; "privileged port 53 blocked")]
     fn block_privileged_ports_except_ssh_http<I: TestIpExt>(port: u16) -> Verdict {
-        fn tcp_port_rule<I: IpExt>(
+        fn tcp_port_rule<I: FilterIpExt>(
             src_port: Option<PortMatcher>,
             dst_port: Option<PortMatcher>,
             action: Action<I, FakeDeviceClass, ()>,
@@ -1340,7 +1345,7 @@ mod tests {
             Rule::new(
                 PacketMatcher {
                     transport_protocol: Some(TransportProtocolMatcher {
-                        proto: <&FakeTcpSegment as TransportPacketExt<I>>::proto(),
+                        proto: <&FakeTcpSegment as TransportPacketExt<I>>::proto().unwrap(),
                         src_port,
                         dst_port,
                     }),
@@ -1350,7 +1355,7 @@ mod tests {
             )
         }
 
-        fn default_filter_rules<I: IpExt>() -> Routine<I, FakeDeviceClass, ()> {
+        fn default_filter_rules<I: FilterIpExt>() -> Routine<I, FakeDeviceClass, ()> {
             Routine {
                 rules: vec![
                     // pass in proto tcp to port 22;
@@ -1464,7 +1469,7 @@ mod tests {
         // The stashed reference should point to the connection that is in the table.
         let (stashed, _dir) =
             metadata.take_connection_and_direction().expect("metadata should include connection");
-        let tuple = Tuple::from_packet(&packet).expect("packet should be trackable");
+        let tuple = packet.conntrack_packet().expect("packet should be trackable").tuple().clone();
         let table = core_ctx
             .conntrack()
             .get_connection(&tuple)

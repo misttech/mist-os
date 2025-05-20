@@ -119,7 +119,7 @@ Dispatcher::AsyncWait::AsyncWait(async_wait_t* original_wait, Dispatcher& dispat
                    &Dispatcher::AsyncWait::Handler,
                    original_wait->object,
                    original_wait->trigger,
-                   0},
+                   original_wait->options},
       original_wait_(original_wait) {
   // Use one of the async_wait_t's reserved fields to stash a pointer to the AsyncWait object.
   original_wait_->state.reserved[0] = reinterpret_cast<uintptr_t>(this);

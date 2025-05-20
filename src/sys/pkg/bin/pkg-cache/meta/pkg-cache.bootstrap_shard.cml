@@ -22,7 +22,6 @@
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
                 "fuchsia.pkgcache.EnableUpgradablePackages",
-                "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
             ],
             from: "parent",
@@ -57,11 +56,6 @@
             dependency: "weak",
         },
         {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
-            from: "#shutdown_shim",
-            to: "#pkg-cache",
-        },
-        {
             directory: "blob-exec",
             from: "#fshost",
             to: [ "#pkg-cache" ],
@@ -70,13 +64,11 @@
             protocol: "fuchsia.fxfs.BlobCreator",
             from: "#fshost",
             to: "#pkg-cache",
-            availability: "optional",
         },
         {
             protocol: "fuchsia.fxfs.BlobReader",
             from: "#fshost",
             to: "#pkg-cache",
-            availability: "optional",
         },
         {
             directory: "boot",

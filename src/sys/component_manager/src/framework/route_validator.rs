@@ -104,8 +104,8 @@ impl RouteValidatorCapabilityProvider {
             let decl_type = Some(target.decl_type);
             let (availability, res) = request.route(&instance).await;
             match res {
-                Ok((outcome, moniker, service_instances)) => {
-                    let moniker = extended_moniker_to_str(scope_moniker, moniker);
+                Ok(RouteData { outcome, source, service_instances, dictionary_entries }) => {
+                    let moniker = extended_moniker_to_str(scope_moniker, source);
                     fsys::RouteReport {
                         capability,
                         decl_type,
@@ -114,6 +114,7 @@ impl RouteValidatorCapabilityProvider {
                         source_moniker: Some(moniker),
                         availability,
                         service_instances,
+                        dictionary_entries,
                         ..Default::default()
                     }
                 }
@@ -317,17 +318,19 @@ enum RouteRequest {
     Legacy(LegacyRouteRequest),
 }
 
+#[derive(Debug)]
+struct RouteData {
+    outcome: fsys::RouteOutcome,
+    source: ExtendedMoniker,
+    service_instances: Option<Vec<fsys::ServiceInstance>>,
+    dictionary_entries: Option<Vec<fsys::DictionaryEntry>>,
+}
+
 impl RouteRequest {
     async fn route(
         self,
         instance: &Arc<ComponentInstance>,
-    ) -> (
-        Option<fdecl::Availability>,
-        Result<
-            (fsys::RouteOutcome, ExtendedMoniker, Option<Vec<fsys::ServiceInstance>>),
-            Box<dyn Explain>,
-        >,
-    ) {
+    ) -> (Option<fdecl::Availability>, Result<RouteData, Box<dyn Explain>>) {
         match self {
             Self::Legacy(route_request) => {
                 let availability = route_request.availability().map(From::from);
@@ -349,18 +352,14 @@ impl RouteRequest {
     async fn route_legacy(
         route_request: LegacyRouteRequest,
         instance: &Arc<ComponentInstance>,
-    ) -> Result<
-        (fsys::RouteOutcome, ExtendedMoniker, Option<Vec<fsys::ServiceInstance>>),
-        RoutingError,
-    > {
+    ) -> Result<RouteData, RoutingError> {
         let source = route_request.route(&instance).await?;
         let source = source.source;
-        let source_moniker = source.source_moniker();
         let outcome = match &source {
             CapabilitySource::Void(_) => fsys::RouteOutcome::Void,
             _ => fsys::RouteOutcome::Success,
         };
-        let service_info = match &source {
+        let service_instances = match &source {
             CapabilitySource::AnonymizedAggregate(anonymized_aggregate_source) => Some(
                 anonymized_aggregate_source
                     .instances
@@ -371,16 +370,18 @@ impl RouteRequest {
             ),
             _ => None,
         };
-        Ok((outcome, source_moniker, service_info))
+        Ok(RouteData {
+            outcome,
+            source: source.source_moniker(),
+            service_instances,
+            dictionary_entries: None,
+        })
     }
 
     async fn route_bedrock(
         route_request: BedrockRouteRequest,
         instance: &Arc<ComponentInstance>,
-    ) -> Result<
-        (fsys::RouteOutcome, ExtendedMoniker, Option<Vec<fsys::ServiceInstance>>),
-        RouterError,
-    > {
+    ) -> Result<RouteData, RouterError> {
         let res: Result<Capability, ActionError> = async move {
             let resolved_state = instance.lock_resolved_state().await.map_err(|err| {
                 ActionError::from(StartActionError::ResolveActionError {
@@ -393,6 +394,7 @@ impl RouteRequest {
         .await;
         let router = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
 
+        let mut dictionary_entries = None;
         let res = match router {
             Capability::ConnectorRouter(router) => {
                 router.route(None, true).await.and_then(|resp| match resp {
@@ -404,13 +406,30 @@ impl RouteRequest {
                 })
             }
             Capability::DictionaryRouter(router) => {
-                router.route(None, true).await.and_then(|resp| match resp {
+                let res = router.route(None, true).await.and_then(|resp| match resp {
                     RouterResponse::Debug(data) => Ok(data),
                     _ => {
                         warn!("[route_validator] Route did not return debug info");
                         Err(RouterError::Internal)
                     }
-                })
+                });
+                let dict = router.route(None, false).await.and_then(|resp| match resp {
+                    RouterResponse::Capability(dict) => Ok(Some(dict)),
+                    RouterResponse::Unavailable => Ok(None),
+                    RouterResponse::Debug(_) => {
+                        warn!("[route_validator] Route returned debug info unexpectedly");
+                        Err(RouterError::Internal)
+                    }
+                })?;
+                dictionary_entries = dict.map(|dict| {
+                    dict.keys()
+                        .map(|s| fsys::DictionaryEntry {
+                            name: Some(s.into()),
+                            ..Default::default()
+                        })
+                        .collect()
+                });
+                res
             }
             Capability::DirEntryRouter(router) => {
                 router.route(None, true).await.and_then(|resp| match resp {
@@ -442,7 +461,7 @@ impl RouteRequest {
                 CapabilitySource::Void(_) => fsys::RouteOutcome::Void,
                 _ => fsys::RouteOutcome::Success,
             };
-            let service_info = match &capability_source {
+            let service_instances = match &capability_source {
                 CapabilitySource::AnonymizedAggregate(anonymized_aggregate_source) => Some(
                     anonymized_aggregate_source
                         .instances
@@ -453,7 +472,12 @@ impl RouteRequest {
                 ),
                 _ => None,
             };
-            (outcome, capability_source.source_moniker(), service_info)
+            RouteData {
+                outcome,
+                source: capability_source.source_moniker(),
+                service_instances,
+                dictionary_entries,
+            }
         })
     }
 
@@ -528,12 +552,13 @@ async fn validate_uses(
         let route_request = RouteRequest::from(use_);
         let (availability, res) = route_request.route(instance).await;
         let report = match res {
-            Ok((outcome, moniker, service_instances)) => {
-                let moniker = extended_moniker_to_str(&Moniker::root(), moniker);
+            Ok(RouteData { outcome, source, service_instances, dictionary_entries }) => {
+                let moniker = extended_moniker_to_str(&Moniker::root(), source);
                 fsys::RouteReport {
                     outcome: Some(outcome),
                     source_moniker: Some(moniker),
                     service_instances,
+                    dictionary_entries,
                     capability,
                     decl_type,
                     availability,
@@ -573,12 +598,13 @@ async fn validate_exposes(
             Ok(route_request) => {
                 let (availability, res) = route_request.route(instance).await;
                 match res {
-                    Ok((outcome, moniker, service_instances)) => {
-                        let moniker = extended_moniker_to_str(&Moniker::root(), moniker);
+                    Ok(RouteData { outcome, source, service_instances, dictionary_entries }) => {
+                        let moniker = extended_moniker_to_str(&Moniker::root(), source);
                         fsys::RouteReport {
                             outcome: Some(outcome),
                             source_moniker: Some(moniker),
                             service_instances,
+                            dictionary_entries,
                             capability,
                             decl_type,
                             availability,
@@ -677,6 +703,12 @@ mod tests {
                     .expose(ExposeBuilder::runner().name("elf").source(ExposeSource::Self_))
                     .expose(ExposeBuilder::dictionary().name("dict").source(ExposeSource::Self_))
                     .expose(ExposeBuilder::protocol().name("foo.bar").source(ExposeSource::Self_))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("foo.bar")
+                            .source(OfferSource::Self_)
+                            .target(OfferTarget::Capability("dict".parse().unwrap())),
+                    )
                     .build(),
             ),
         ];
@@ -772,9 +804,14 @@ mod tests {
                 capability: Some(s),
                 decl_type: Some(fsys::DeclType::Expose),
                 source_moniker: Some(m),
+                dictionary_entries: Some(d),
                 error: None,
                 ..
-            } if s == "dict" && m == "my_child"
+            } if s == "dict" && m == "my_child" &&
+                d == [fsys::DictionaryEntry {
+                    name: Some("foo.bar".into()),
+                    ..Default::default()
+                }]
         );
 
         let report = results.remove(0);
@@ -849,7 +886,7 @@ mod tests {
         test.model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -891,7 +928,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
 
         // Validate `my_child`
@@ -939,7 +976,7 @@ mod tests {
         test.model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         // Validate the root
@@ -978,7 +1015,7 @@ mod tests {
         );
 
         // This validation should have caused `my_child` to be resolved
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_some());
     }
 
@@ -1244,6 +1281,12 @@ mod tests {
                             .source_static_child("my_child"),
                     )
                     .expose(ExposeBuilder::dictionary().name("dict").source(ExposeSource::Self_))
+                    .offer(
+                        OfferBuilder::protocol()
+                            .name("elf")
+                            .source_static_child("my_child")
+                            .target(OfferTarget::Capability("dict".parse().unwrap())),
+                    )
                     .dictionary_default("dict")
                     .child_default("my_child")
                     .build(),
@@ -1301,9 +1344,14 @@ mod tests {
                 capability: Some(s),
                 decl_type: Some(fsys::DeclType::Expose),
                 source_moniker: Some(m),
+                dictionary_entries: Some(d),
                 error: None,
                 ..
-            } if s == "dict" && m == "."
+            } if s == "dict" && m == "." &&
+                d == [fsys::DictionaryEntry {
+                    name: Some("elf".into()),
+                    ..Default::default()
+                }]
         );
 
         let report = results.remove(0);
@@ -1668,7 +1716,7 @@ mod tests {
         test.model.start().await;
 
         // `my_child` should not be resolved right now
-        let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
+        let instance = test.model.root().find_resolved(&["my_child"].try_into().unwrap()).await;
         assert!(instance.is_none());
 
         let targets = &[

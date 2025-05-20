@@ -12,7 +12,7 @@ python_perf_test("flatland_benchmark") {
     "//src/performance/lib/trace_processing",
     "//src/performance/lib/perf_publish",
   ]
-  target_deps = [ "//src/ui/examples:flatland-examples" ]
+  package_deps = [ "//src/ui/examples:flatland-examples" ]
 }
 
 python_perf_test("input_latency_benchmark") {
@@ -24,7 +24,7 @@ python_perf_test("input_latency_benchmark") {
     "//src/performance/lib/trace_processing",
     "//src/performance/lib/perf_publish",
   ]
-  target_deps = [ "//src/ui/examples:flatland-examples" ]
+  package_deps = [ "//src/ui/examples:flatland-examples" ]
 }
 
 group("benchmarks") {

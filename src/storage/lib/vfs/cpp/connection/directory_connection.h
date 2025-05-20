@@ -50,13 +50,17 @@ class DirectoryConnection final : public Connection,
   void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final;
   void Close(CloseCompleter::Sync& completer) final;
   void Query(QueryCompleter::Sync& completer) final;
-  void GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) final;
   void Sync(SyncCompleter::Sync& completer) final;
   void GetAttr(GetAttrCompleter::Sync& completer) final;
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
+                         DeprecatedSetAttrCompleter::Sync& completer) final;
+#else
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
+#endif
   void GetFlags(GetFlagsCompleter::Sync& completer) final;
   void SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync& completer) final;
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   void DeprecatedGetFlags(DeprecatedGetFlagsCompleter::Sync& completer) final;
   void DeprecatedSetFlags(DeprecatedSetFlagsRequestView,
                           DeprecatedSetFlagsCompleter::Sync& completer) final;
@@ -88,7 +92,7 @@ class DirectoryConnection final : public Connection,
   // |fuchsia.io/Directory| operations.
   //
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) final;
   void DeprecatedOpen(DeprecatedOpenRequestView request,
                       DeprecatedOpenCompleter::Sync& completer) final;

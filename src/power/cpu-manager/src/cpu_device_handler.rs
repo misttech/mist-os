@@ -21,7 +21,7 @@ use {fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, serde_json as json};
 /// Node: CpuDeviceHandler
 ///
 /// Summary: Provides an interface to interact with a CPU driver via
-///          fuchsia.hardware.cpu_ctrl.Device.
+///          fuchsia.hardware.cpu.ctrl.Device.
 ///          Similar to CpuControlHandler in its logical management of a single CPU device, but is
 ///          more narrowly-scoped, as it does not administer thermal policy.
 ///
@@ -31,7 +31,7 @@ use {fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, serde_json as json};
 ///     - GetCpuOperatingPoints
 ///
 /// FIDL dependencies:
-///     - fuchsia.hardware.cpu_ctrl.Device: used to query descriptions of CPU operating points
+///     - fuchsia.hardware.cpu.ctrl.Device: used to query descriptions of CPU operating points
 //
 // TODO(https://fxbug.dev/42164952): Update summary when CpuControlHandler is removed.
 

@@ -30,7 +30,7 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/attribution.h>
 #include <vm/content_size_manager.h>
 #include <vm/page.h>
@@ -555,7 +555,7 @@ class VmObject : public VmHierarchyBase,
   // on this value unless instructed by user operations, and it is therefore the responsibility of
   // the user to ensure any synchronization of the reported value with the operation being
   // requested.
-  virtual void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) = 0;
+  virtual void SetUserStreamSize(fbl::RefPtr<ContentSizeManager> csm) = 0;
 
   // The associated VmObjectDispatcher will set an observer to notify user mode.
   void SetChildObserver(VmObjectChildObserver* child_observer);
@@ -722,6 +722,8 @@ class VmObject : public VmHierarchyBase,
     // Specialized case of Unmap where the caller is stating that it knows that any pages that might
     // need to be unmapped are all read instances of the shared zero page.
     UnmapZeroPage,
+    // Unmap, harvest accessed bit & update the page queues.
+    UnmapAndHarvest,
     RemoveWrite,
     // Unpin is not a 'real' operation in that it does not cause any actions, and is simply used as
     // a mechanism to allow the VmCowPages to trigger a search for any kernel mappings that are

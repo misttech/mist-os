@@ -2,30 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
+use index_table_builder::IndexTableBuilder;
 
 /// Helper data structure for string interning.
 pub struct StringTableBuilder {
-    strings: HashMap<String, i64>,
-    table: Vec<String>,
+    table_builder: IndexTableBuilder<String>,
 }
 
 impl Default for StringTableBuilder {
     fn default() -> StringTableBuilder {
-        let mut result = StringTableBuilder { strings: HashMap::new(), table: Vec::new() };
-        result.intern(""); // entry #0 must always be the empty string
-        result
+        let mut table_builder = IndexTableBuilder::default();
+        table_builder.intern(""); // entry #0 must always be the empty string
+        StringTableBuilder { table_builder }
     }
 }
 
 impl StringTableBuilder {
     /// Inserts a string, if not present yet, and returns its index.
     pub fn intern(&mut self, string: &str) -> i64 {
-        *self.strings.entry(string.to_string()).or_insert_with(|| {
-            let index = self.table.len();
-            self.table.push(string.to_string());
-            index as i64
-        })
+        self.table_builder.intern(string) as i64
     }
 
     /// Converts a build ID into a string and intern it.
@@ -35,7 +30,7 @@ impl StringTableBuilder {
 
     /// Consumes this StringTableBuilder and returns all the strings that were interned.
     pub fn build(self) -> Vec<String> {
-        self.table
+        self.table_builder.build()
     }
 }
 

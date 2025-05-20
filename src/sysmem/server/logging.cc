@@ -14,8 +14,18 @@
 
 namespace sysmem_service {
 
-void vLog(::fuchsia_logging::LogSeverity severity, const char* file, int line, const char* prefix,
-          const char* format, va_list args) {
+LogCallback& GetDefaultLogCallback() {
+  static LogCallback default_log_callback = [](::fuchsia_logging::LogSeverity severity,
+                                               const char* file, int line,
+                                               const char* formatted_str) {
+    ::fuchsia_logging::LogMessage(severity, file, line, nullptr, nullptr).stream() << formatted_str;
+  };
+  return default_log_callback;
+}
+
+void vLogToCallback(::fuchsia_logging::LogSeverity severity, const char* file, int line,
+                    const char* prefix, const char* format, va_list args,
+                    const LogCallback& log_callback) {
   fbl::String new_format;
   if (prefix) {
     new_format = fbl::StringPrintf("[%s] %s", prefix, format);
@@ -24,7 +34,12 @@ void vLog(::fuchsia_logging::LogSeverity severity, const char* file, int line, c
   }
   fbl::String formatted = fbl::StringVPrintf(new_format.c_str(), args);
   const char* formatted_str = formatted.c_str();
-  ::fuchsia_logging::LogMessage(severity, file, line, nullptr, nullptr).stream() << formatted_str;
+  log_callback(severity, file, line, formatted_str);
+}
+
+void vLog(::fuchsia_logging::LogSeverity severity, const char* file, int line, const char* prefix,
+          const char* format, va_list args) {
+  vLogToCallback(severity, file, line, prefix, format, args, GetDefaultLogCallback());
 }
 
 void Log(::fuchsia_logging::LogSeverity severity, const char* file, int line, const char* prefix,

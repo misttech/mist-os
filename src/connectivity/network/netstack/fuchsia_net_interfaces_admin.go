@@ -405,6 +405,10 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		properties.Lifetimes = propertiesToLifetimes(parameters.GetInitialProperties())
 	}
 
+	if parameters.HasPerformDad() {
+		_ = syslog.WarnTf(controlName, "ignoring 'perform_dad=%t' parameter. Not Supported.", parameters.GetPerformDad())
+	}
+
 	var reason admin.AddressRemovalReason
 	if protocolAddr.AddressWithPrefix.PrefixLen > protocolAddr.AddressWithPrefix.Address.BitLen() {
 		reason = admin.AddressRemovalReasonInvalid
@@ -799,6 +803,9 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			if ipv4Config.Arp.HasNud() {
 				previousArpConfig.SetNud(ci.applyNUDConfig(ipv4.ProtocolNumber, &ipv4Config.Arp.Nud))
 			}
+			if ipv4Config.Arp.HasDad() {
+				_ = syslog.WarnTf(controlName, "ignoring unsupported Ipv4 DAD configuration")
+			}
 
 			previousIpv4Config.SetArp(previousArpConfig)
 		}
@@ -847,7 +854,7 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 			}
 
 			if ipv6Config.Ndp.HasDad() {
-				_ = syslog.WarnTf(controlName, "ignoring unsupported DAD configuration")
+				_ = syslog.WarnTf(controlName, "ignoring unsupported IPv6 DAD configuration")
 			}
 
 			if ipv6Config.Ndp.HasSlaac() {

@@ -154,87 +154,87 @@ TEST(MailboxVisitorTest, TwoControllers) {
   const auto client_0 = mailbox_tester->FindMgrRequest("node-abcf0000_group");
   ASSERT_TRUE(client_0);
 
-  ASSERT_TRUE(client_0->parents());
-  ASSERT_EQ(client_0->parents()->size(), 4u);
+  ASSERT_TRUE(client_0->parents2());
+  ASSERT_EQ(client_0->parents2()->size(), 4u);
 
   // The 0th composite parent has the `compatible` string and is added by the default visitor.
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_mailbox::SERVICE,
-                                  bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CONTROLLER_ID, controller_0_id),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_mailbox::SERVICE,
+                                   bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CONTROLLER_ID, controller_0_id),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
       },
-      (*client_0->parents())[1].bind_rules(), false));
+      (*client_0->parents2())[1].bind_rules(), false));
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
       {
-          fdf::MakeProperty(bind_fuchsia_hardware_mailbox::SERVICE,
-                            bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CONTROLLER_ID, 0u),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL_NAME, "mailbox-1-1234"),
+          fdf::MakeProperty2(bind_fuchsia_hardware_mailbox::SERVICE,
+                             bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CONTROLLER_ID, 0u),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL_NAME, "mailbox-1-1234"),
       },
-      (*client_0->parents())[1].properties(), false));
+      (*client_0->parents2())[1].properties(), false));
 
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_mailbox::SERVICE,
-                                  bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CONTROLLER_ID, controller_0_id),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CHANNEL, 0x5678u),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_mailbox::SERVICE,
+                                   bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CONTROLLER_ID, controller_0_id),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CHANNEL, 0x5678u),
       },
-      (*client_0->parents())[2].bind_rules(), false));
+      (*client_0->parents2())[2].bind_rules(), false));
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
       {
-          fdf::MakeProperty(bind_fuchsia_hardware_mailbox::SERVICE,
-                            bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CONTROLLER_ID, 0u),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL, 0x5678u),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL_NAME, "mailbox-1-5678"),
+          fdf::MakeProperty2(bind_fuchsia_hardware_mailbox::SERVICE,
+                             bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CONTROLLER_ID, 0u),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL, 0x5678u),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL_NAME, "mailbox-1-5678"),
       },
-      (*client_0->parents())[2].properties(), false));
+      (*client_0->parents2())[2].properties(), false));
 
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_mailbox::SERVICE,
-                                  bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CONTROLLER_ID, controller_1_id),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CHANNEL, 0x9abcu),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_mailbox::SERVICE,
+                                   bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CONTROLLER_ID, controller_1_id),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CHANNEL, 0x9abcu),
       },
-      (*client_0->parents())[3].bind_rules(), false));
+      (*client_0->parents2())[3].bind_rules(), false));
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
       {
-          fdf::MakeProperty(bind_fuchsia_hardware_mailbox::SERVICE,
-                            bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CONTROLLER_ID, 1u),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL, 0x9abcu),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL_NAME, "mailbox-2-9abc"),
+          fdf::MakeProperty2(bind_fuchsia_hardware_mailbox::SERVICE,
+                             bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CONTROLLER_ID, 1u),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL, 0x9abcu),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL_NAME, "mailbox-2-9abc"),
       },
-      (*client_0->parents())[3].properties(), false));
+      (*client_0->parents2())[3].properties(), false));
 
   // Second client composite node specs
   const auto client_1 = mailbox_tester->FindMgrRequest("node-abd00000_group");
   ASSERT_TRUE(client_1);
 
-  ASSERT_TRUE(client_1->parents());
-  ASSERT_EQ(client_1->parents()->size(), 2u);
+  ASSERT_TRUE(client_1->parents2());
+  ASSERT_EQ(client_1->parents2()->size(), 2u);
 
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(bind_fuchsia_hardware_mailbox::SERVICE,
-                                  bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CONTROLLER_ID, controller_1_id),
-          fdf::MakeAcceptBindRule(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_mailbox::SERVICE,
+                                   bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CONTROLLER_ID, controller_1_id),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
       },
-      (*client_1->parents())[1].bind_rules(), false));
+      (*client_1->parents2())[1].bind_rules(), false));
   EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
       {
-          fdf::MakeProperty(bind_fuchsia_hardware_mailbox::SERVICE,
-                            bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CONTROLLER_ID, 0u),
-          fdf::MakeProperty(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
+          fdf::MakeProperty2(bind_fuchsia_hardware_mailbox::SERVICE,
+                             bind_fuchsia_hardware_mailbox::SERVICE_ZIRCONTRANSPORT),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CONTROLLER_ID, 0u),
+          fdf::MakeProperty2(bind_fuchsia_mailbox::CHANNEL, 0x1234u),
       },
-      (*client_1->parents())[1].properties(), false));
+      (*client_1->parents2())[1].properties(), false));
 }
 
 }  // namespace mailbox_dt

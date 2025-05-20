@@ -81,7 +81,7 @@ func TestInstaller(t *testing.T) {
 	i.RunCommand("log_listener &")
 	i.WaitForLogMessage("Set active configuration to 1")
 
-	i.RunCommand("dm shutdown")
+	i.RunCommand("power shutdown")
 	i.WaitForLogMessage("fshost shutdown complete")
 	cancel()
 

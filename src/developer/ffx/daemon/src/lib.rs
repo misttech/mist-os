@@ -32,15 +32,14 @@ pub use socket::SocketDetails;
 
 const CONFIG_DAEMON_CONNECT_TIMEOUT_MS: &str = "ffx.daemon_timeout";
 
-#[tracing::instrument]
 async fn create_daemon_proxy(
     node: &Arc<overnet_core::Router>,
     id: &mut NodeId,
 ) -> Result<DaemonProxy> {
     let (s, p) = fidl::Channel::create();
-    tracing::debug!("Connecting to daemon service on {id:?}");
+    log::debug!("Connecting to daemon service on {id:?}");
     node.connect_to_service((*id).into(), DaemonMarker::PROTOCOL_NAME, s).await?;
-    tracing::debug!("Connected to daemon service on {id:?}");
+    log::debug!("Connected to daemon service on {id:?}");
     let proxy = fidl::AsyncChannel::from_channel(p);
     Ok(DaemonProxy::new(proxy))
 }
@@ -55,13 +54,13 @@ pub async fn run_single_ascendd_link(
 ) -> Result<(), anyhow::Error> {
     const MAX_SINGLE_CONNECT_TIME: u64 = 1;
 
-    tracing::trace!(ascendd_path = %sockpath.display());
+    log::trace!(ascendd_path:% = sockpath.display(); "running ascendd link");
     let now = SystemTime::now();
 
     let unix_socket = loop {
         let safe_socket_path = ascendd::short_socket_path(&sockpath)?;
         let started = std::time::Instant::now();
-        tracing::debug!("Connecting to ascendd (starting at {started:?})");
+        log::debug!("Connecting to ascendd (starting at {started:?})");
         let conn = tokio::net::UnixStream::connect(&safe_socket_path)
             .on_timeout(Duration::from_secs(30), || {
                 Err(std::io::Error::new(
@@ -77,15 +76,15 @@ pub async fn run_single_ascendd_link(
             // We got our connections.
             Ok(conn) => {
                 let elapsed = std::time::Instant::now() - started;
-                tracing::debug!("Made connection to ascendd (in {elapsed:?})");
+                log::debug!("Made connection to ascendd (in {elapsed:?})");
                 if elapsed.as_millis() > 100 {
-                    tracing::warn!("Socket connection took {elapsed:?}");
+                    log::warn!("Socket connection took {elapsed:?}");
                 }
                 break conn;
             }
             // There was an error connecting that's likely due to the daemon not being ready yet.
             Err(e) if matches!(e.kind(), ErrorKind::NotFound | ErrorKind::ConnectionRefused) => {
-                tracing::debug!("ConnectionRefused when connecting to ascendd");
+                log::debug!("ConnectionRefused when connecting to ascendd");
                 if now.elapsed()?.as_secs() > MAX_SINGLE_CONNECT_TIME {
                     bail!(
                         "took too long connecting to ascendd socket at {}. Last error: {e:#?}",
@@ -103,20 +102,19 @@ pub async fn run_single_ascendd_link(
         }
     };
 
-    tracing::debug!("Got socket connection; splitting into read/write channels");
+    log::debug!("Got socket connection; splitting into read/write channels");
     let (mut rx, mut tx) = unix_socket.into_multithreaded_futures_stream().split();
 
-    tracing::debug!("Running the connection with the channels");
+    log::debug!("Running the connection with the channels");
     run_ascendd_connection(node, &mut rx, &mut tx).await
 }
 
-#[tracing::instrument(skip_all)]
 async fn run_ascendd_connection<'a>(
     node: Arc<overnet_core::Router>,
     rx: &'a mut (dyn AsyncRead + Unpin + Send),
     tx: &'a mut (dyn AsyncWrite + Unpin + Send),
 ) -> Result<(), anyhow::Error> {
-    tracing::debug!("Starting ascendd connection");
+    log::debug!("Starting ascendd connection");
     let (errors_sender, errors) = futures::channel::mpsc::unbounded();
     tx.write_all(&ascendd::CIRCUIT_ID).await?;
     futures::future::join(
@@ -131,7 +129,7 @@ async fn run_ascendd_connection<'a>(
         ),
         errors
             .map(|e| {
-                tracing::warn!("An ascendd circuit failed: {e:?}");
+                log::warn!("An ascendd circuit failed: {e:?}");
             })
             .collect::<()>(),
     )
@@ -140,7 +138,6 @@ async fn run_ascendd_connection<'a>(
     .map_err(anyhow::Error::from)
 }
 
-#[tracing::instrument]
 pub async fn get_daemon_proxy_single_link(
     node: &Arc<overnet_core::Router>,
     socket_path: PathBuf,
@@ -159,7 +156,7 @@ pub async fn get_daemon_proxy_single_link(
         .map_err(|_| ffx_error!("Could not get {} config", CONFIG_DAEMON_CONNECT_TIMEOUT_MS))?;
     let mut timeout = Timer::new(Duration::from_millis(timeout_ms)).fuse();
 
-    tracing::debug!("Starting race to get daemon proxy");
+    log::debug!("Starting race to get daemon proxy");
     let res = futures::select! {
         r = link => {
             Err(ffx_error!("Daemon link lost while attempting to connect to socket {}: {:#?}\nRun `ffx doctor` for further diagnostics.", socket_path.display(), r))
@@ -169,23 +166,22 @@ pub async fn get_daemon_proxy_single_link(
         }
         proxy = find => proxy.map_err(|e| ffx_error!("Error connecting to Daemon at socket: {}: {:#?}\nRun `ffx doctor` for further diagnostics.", socket_path.display(), e)),
     };
-    tracing::debug!(
+    log::debug!(
         "Race of (<run_ascendd_link>, <timeout>, <find_next_daemon>) completed with {res:?}"
     );
     res.map(|(nodeid, proxy)| (nodeid, proxy, link))
 }
 
-#[tracing::instrument]
 async fn find_next_daemon<'a>(
     node: &Arc<overnet_core::Router>,
     exclusions: Option<Vec<NodeId>>,
 ) -> Result<(NodeId, DaemonProxy)> {
     let lpc = node.new_list_peers_context().await;
     loop {
-        tracing::debug!("Waiting for ListPeers");
+        log::debug!("Waiting for ListPeers");
         let peers = lpc.list_peers().await?;
         for peer in peers.iter() {
-            tracing::debug!("Looking at peer {peer:?}");
+            log::debug!("Looking at peer {peer:?}");
             if !peer.services.iter().any(|name| *name == DaemonMarker::PROTOCOL_NAME) {
                 continue;
             }
@@ -197,7 +193,7 @@ async fn find_next_daemon<'a>(
                 }
                 None => {}
             }
-            tracing::debug!("Creating daemon proxy for {:?}", peer.node_id);
+            log::debug!("Creating daemon proxy for {:?}", peer.node_id);
             return create_daemon_proxy(node, &mut peer.node_id.into())
                 .await
                 .map(|proxy| (peer.node_id.into(), proxy));
@@ -228,7 +224,6 @@ async fn daemon_args(context: &EnvironmentContext) -> Result<Vec<String>> {
 }
 
 // This daemonizes the process, disconnecting it from the controlling terminal, etc.
-#[tracing::instrument]
 pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
     // daemonize the given command, and do not keep the current directory for the new process
     // (start) the daemon in the  / directory.
@@ -244,7 +239,6 @@ pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
 
 // This function is only used by isolate dir implementations. This allows cleaning up the daemon process
 // when the isolate is dropped.
-#[tracing::instrument]
 pub async fn run_daemon(context: &EnvironmentContext) -> Result<std::process::Child> {
     let mut cmd = context.rerun_prefix()?;
     let mut stdout = std::process::Stdio::null();
@@ -272,7 +266,7 @@ pub async fn run_daemon(context: &EnvironmentContext) -> Result<std::process::Ch
         .env("RUST_BACKTRACE", "full");
     cmd.args(daemon_args(context).await?.as_slice());
 
-    tracing::info!("Starting new ffx daemon from {:?}", &cmd.get_program());
+    log::info!("Starting new ffx daemon from {:?}", &cmd.get_program());
     let child = cmd.spawn().context("running daemon start")?;
     Ok(child)
 }
@@ -324,17 +318,16 @@ pub async fn try_to_kill_pid(pid: u32) -> Result<()> {
 ////////////////////////////////////////////////////////////////////////////////
 // start
 
-#[tracing::instrument]
 pub fn is_daemon_running_at_path(socket_path: &Path) -> bool {
     // Not strictly necessary check, but improves log output for diagnostics
     match std::fs::metadata(socket_path) {
         Ok(_) => {}
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
-            tracing::info!("no daemon found at {}", socket_path.display());
+            log::info!("no daemon found at {}", socket_path.display());
             return false;
         }
         Err(e) => {
-            tracing::info!("error stating {}: {}", socket_path.display(), e);
+            log::info!("error stating {}: {}", socket_path.display(), e);
             // speculatively carry on
         }
     }
@@ -344,11 +337,11 @@ pub fn is_daemon_running_at_path(socket_path: &Path) -> bool {
     match sock {
         Ok(sock) => match sock.peer_addr() {
             Ok(_) => {
-                tracing::debug!("found running daemon at {}", socket_path.display());
+                log::debug!("found running daemon at {}", socket_path.display());
                 true
             }
             Err(err) => {
-                tracing::info!(
+                log::info!(
                     "found daemon socket at {} but could not see peer: {}",
                     socket_path.display(),
                     err
@@ -357,7 +350,7 @@ pub fn is_daemon_running_at_path(socket_path: &Path) -> bool {
             }
         },
         Err(err) => {
-            tracing::info!("failed to connect to daemon at {}: {}", socket_path.display(), err);
+            log::info!("failed to connect to daemon at {}: {}", socket_path.display(), err);
             false
         }
     }

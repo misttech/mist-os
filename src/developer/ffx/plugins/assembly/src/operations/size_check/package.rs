@@ -250,7 +250,7 @@ fn load_blob_info(
     // `blob_size_paths`.
     if !incomplete_packages.is_empty() {
         let mut blobs = blob_size_calculator.calculate(&incomplete_packages).unwrap_or_else(|e| {
-            tracing::warn!("Failed to build the blobfs: {:?}", e);
+            log::warn!("Failed to build the blobfs: {:?}", e);
             Vec::default()
         });
         let mut blobs =

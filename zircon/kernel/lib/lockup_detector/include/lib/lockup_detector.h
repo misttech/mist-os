@@ -13,21 +13,22 @@
 
 // Documentation for this library can be found in kernel/lib/lockup_detector/README.md.
 
-// Initialize the lockup detector for the primary CPU.
+// Initialize the lockup detector subsystem.
 //
 // This should be called once on the boot CPU (|BOOT_CPU_ID|), before we've gone SMP, but after the
 // platform timer has been initialized since it needs to perform ticks to time conversion.
-void lockup_primary_init();
+void lockup_init();
 
-// Initialize the lockup detector for a secondary CPU.
+// Initialize the lockup detector for the calling CPU.
 //
-// This should be called once on each secondary CPU after the platform timer has been initialized.
-void lockup_secondary_init();
+// This should be called once on each CPU after the platform timer has been initialized and after
+// the boot CPU has called |lockup_init|.
+void lockup_percpu_init();
 
-// Shutdown the lockup detector for a secondary CPU.
+// Shutdown the lockup detector for the calling CPU.
 //
-// This should be called once on each secondary CPU prior to taking it offline.
-void lockup_secondary_shutdown();
+// This should be called once on each CPU prior to suspending or taking it offline.
+void lockup_percpu_shutdown();
 
 // Accessors exposed for testing.
 zx_ticks_t lockup_get_cs_threshold_ticks();

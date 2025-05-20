@@ -567,7 +567,7 @@ mod tests {
             let mut re_string = String::with_capacity(6 + subslice.len() * 4);
             re_string += "(?-u:";
             for b in subslice {
-                write!(re_string, "\\x{:02X}", b).unwrap();
+                write!(re_string, "\\x{b:02X}").unwrap();
             }
             re_string += ")";
             Regex::new(&re_string).unwrap()

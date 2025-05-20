@@ -17,6 +17,7 @@
 #include <zircon/system/ulib/elf-search/include/elf-search.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <unordered_map>
 #include <utility>
@@ -91,6 +92,23 @@ zx::result<> profiler::JobTarget::AddProcess(cpp20::span<const zx_koid_t> job_pa
   return next_child->second.AddProcess(job_path.subspan(1), std::move(process));
 }
 
+zx::result<profiler::ProcessTarget*> profiler::JobTarget::GetProcess(
+    std::span<const zx_koid_t> job_path, zx_koid_t pid) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  if (job_path.empty()) {
+    if (processes.contains(pid)) {
+      auto it = processes.find(pid);
+      return zx::ok(&it->second);
+    }
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  auto next_child = child_jobs.find(job_path[0]);
+  if (next_child == child_jobs.end()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  return next_child->second.GetProcess(job_path.subspan(1), pid);
+}
+
 zx::result<> profiler::JobTarget::AddThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid,
                                             ThreadTarget&& thread) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
@@ -144,9 +162,9 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
     return zx::ok(std::vector<zx_koid_t>{});
   }
 
-  zx_koid_t threads[num_threads];
+  auto threads = std::make_unique<zx_koid_t[]>(num_threads);
   size_t records_read;
-  status = process.get_info(ZX_INFO_PROCESS_THREADS, threads, num_threads * sizeof(threads[0]),
+  status = process.get_info(ZX_INFO_PROCESS_THREADS, threads.get(), num_threads * sizeof(zx_koid_t),
                             &records_read, nullptr);
 
   if (status != ZX_OK) {
@@ -159,11 +177,12 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  std::vector<zx_koid_t> children{threads, threads + num_threads};
+  std::vector<zx_koid_t> children{threads.get(), threads.get() + num_threads};
   return zx::ok(children);
 }
 
-zx::result<profiler::ProcessTarget> profiler::TargetTree::MakeProcessTarget(zx::process process) {
+zx::result<profiler::ProcessTarget> profiler::MakeProcessTarget(zx::process process,
+                                                                elf_search::Searcher& searcher) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx_info_handle_basic_t handle_info;
   zx_status_t res =
@@ -186,16 +205,17 @@ zx::result<profiler::ProcessTarget> profiler::TargetTree::MakeProcessTarget(zx::
       FX_PLOGS(ERROR, res) << "Failed to get handle for child (tid: " << child_tid << ")";
       continue;
     }
-    threads.try_emplace(child_tid, profiler::ThreadTarget{std::move(child_thread), child_tid});
+    threads.try_emplace(
+        child_tid, profiler::ThreadTarget{.handle = std::move(child_thread), .tid = child_tid});
   }
   profiler::ProcessTarget process_target{std::move(process), handle_info.koid, std::move(threads)};
 
-  zx::result<std::vector<profiler::Module>> modules =
-      GetProcessModules(*zx::unowned_process{process_target.handle});
+  zx::result<std::map<std::vector<std::byte>, profiler::Module>> modules =
+      GetProcessModules(*zx::unowned_process{process_target.handle}, searcher);
   if (modules.is_error()) {
     return zx::error(modules.error_value());
   }
-  for (const auto& module : *modules) {
+  for (const auto& [build_id, module] : *modules) {
     process_target.unwinder_data->modules.emplace_back(module.vaddr,
                                                        &process_target.unwinder_data->memory,
                                                        unwinder::Module::AddressMode::kProcess);
@@ -203,8 +223,9 @@ zx::result<profiler::ProcessTarget> profiler::TargetTree::MakeProcessTarget(zx::
   return zx::ok(std::move(process_target));
 }
 
-zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
-    zx::job job, cpp20::span<const zx_koid_t> ancestry) {
+zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
+                                                        cpp20::span<const zx_koid_t> ancestry,
+                                                        elf_search::Searcher& searcher) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx_info_handle_basic_t info;
   if (zx_status_t status =
@@ -244,15 +265,16 @@ zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
   // children.
   std::unordered_map<zx_koid_t, profiler::JobTarget> child_job_targets;
   if (num_child_jobs > 0) {
-    zx_koid_t child_jobs[num_child_jobs];
-    if (zx_status_t status =
-            job.get_info(ZX_INFO_JOB_CHILDREN, child_jobs, sizeof(child_jobs), nullptr, nullptr);
+    auto child_jobs = std::make_unique<zx_koid_t[]>(num_child_jobs);
+    if (zx_status_t status = job.get_info(ZX_INFO_JOB_CHILDREN, child_jobs.get(),
+                                          num_child_jobs * sizeof(zx_koid_t), nullptr, nullptr);
         status != ZX_OK) {
       FX_PLOGS(WARNING, status) << "failed to get job children";
       return zx::error(status);
     }
 
-    for (zx_koid_t child_koid : child_jobs) {
+    for (size_t i = 0; i < num_child_jobs; i++) {
+      zx_koid_t child_koid = child_jobs[i];
       zx::job child_job;
       if (zx_status_t status = job.get_child(child_koid, ZX_DEFAULT_JOB_RIGHTS, &child_job);
           status != ZX_OK) {
@@ -260,7 +282,7 @@ zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
         continue;
       }
       zx::result<profiler::JobTarget> child_job_target =
-          MakeJobTarget(std::move(child_job), child_job_ancestry);
+          MakeJobTarget(std::move(child_job), child_job_ancestry, searcher);
       if (child_job_target.is_error()) {
         FX_PLOGS(WARNING, child_job_target.status_value()) << "failed to make job_target";
         continue;
@@ -278,22 +300,24 @@ zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
   }
   std::unordered_map<zx_koid_t, profiler::ProcessTarget> process_targets;
   if (num_processes > 0) {
-    zx_koid_t processes[num_processes];
-    if (zx_status_t status =
-            job.get_info(ZX_INFO_JOB_PROCESSES, processes, sizeof(processes), nullptr, nullptr);
+    auto processes = std::make_unique<zx_koid_t[]>(num_processes);
+    if (zx_status_t status = job.get_info(ZX_INFO_JOB_PROCESSES, processes.get(),
+                                          num_processes * sizeof(zx_koid_t), nullptr, nullptr);
         status != ZX_OK) {
       FX_PLOGS(WARNING, status) << "failed to get job processes";
       return zx::error(status);
     }
 
-    for (zx_koid_t process_koid : processes) {
+    for (size_t i = 0; i < num_processes; i++) {
+      zx_koid_t process_koid = processes[i];
       zx::process process;
       if (zx_status_t status = job.get_child(process_koid, ZX_DEFAULT_PROCESS_RIGHTS, &process);
           status != ZX_OK) {
         FX_PLOGS(WARNING, status) << "failed to get process: " << process_koid;
         continue;
       }
-      zx::result<profiler::ProcessTarget> process_target = MakeProcessTarget(std::move(process));
+      zx::result<profiler::ProcessTarget> process_target =
+          MakeProcessTarget(std::move(process), searcher);
 
       if (process_target.is_error()) {
         FX_PLOGS(WARNING, process_target.status_value()) << "failed to make process_target";
@@ -306,8 +330,9 @@ zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
                                     std::move(child_job_targets), ancestry});
 }
 
-zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(zx::job job) {
-  return MakeJobTarget(std::move(job), cpp20::span<const zx_koid_t>{});
+zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
+                                                        elf_search::Searcher& searcher) {
+  return MakeJobTarget(std::move(job), cpp20::span<const zx_koid_t>{}, searcher);
 }
 
 zx::result<> profiler::TargetTree::AddJob(JobTarget&& job) {
@@ -340,11 +365,27 @@ zx::result<> profiler::TargetTree::AddProcess(cpp20::span<const zx_koid_t> job_p
     auto [it, emplaced] = processes_.try_emplace(pid, std::move(process));
     return zx::make_result(emplaced ? ZX_OK : ZX_ERR_ALREADY_EXISTS);
   }
-
   zx_koid_t next_child_koid = job_path[0];
   auto it = jobs_.find(next_child_koid);
   return it == jobs_.end() ? zx::error(ZX_ERR_NOT_FOUND)
                            : it->second.AddProcess(job_path.subspan(1), std::move(process));
+}
+
+zx::result<profiler::ProcessTarget*> profiler::TargetTree::GetProcess(
+    std::span<const zx_koid_t> job_path, zx_koid_t pid) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  if (job_path.empty()) {
+    if (processes_.contains(pid)) {
+      auto it = processes_.find(pid);
+      zx::ok(&it->second);
+    }
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  zx_koid_t next_child_koid = job_path[0];
+  auto it = jobs_.find(next_child_koid);
+  return it == jobs_.end() ? zx::error(ZX_ERR_NOT_FOUND)
+                           : it->second.GetProcess(job_path.subspan(1), pid);
 }
 
 zx::result<> profiler::TargetTree::AddThread(zx_koid_t pid, ThreadTarget&& thread) {
@@ -429,29 +470,28 @@ zx::result<> profiler::TargetTree::ForEachProcess(
   return zx::ok();
 }
 
-zx::result<std::vector<profiler::Module>> profiler::TargetTree::GetProcessModules(
-    const zx::process& process) {
+zx::result<std::map<std::vector<std::byte>, profiler::Module>> profiler::GetProcessModules(
+    const zx::process& process, elf_search::Searcher& searcher) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  std::vector<profiler::Module> modules;
-  zx_status_t search_result = searcher_.ForEachModule(
-      process, [&modules, count = 0u](const elf_search::ModuleInfo& info) mutable {
+  std::map<std::vector<std::byte>, profiler::Module> modules;
+  zx_status_t search_result =
+      searcher.ForEachModule(process, [&modules](const elf_search::ModuleInfo& info) mutable {
         TRACE_DURATION("cpu_profiler", "ForEachModule");
-        profiler::Module& mod = modules.emplace_back();
-        mod.module_id = count++;
-        mod.module_name = info.name;
-        mod.vaddr = info.vaddr;
-        std::transform(info.build_id.begin(), info.build_id.end(), std::back_inserter(mod.build_id),
-                       [](const uint8_t byte) { return std::byte{byte}; });
+        std::vector<std::byte> build_id;
+        std::ranges::transform(info.build_id, std::back_inserter(build_id),
+                               [](const uint8_t byte) { return std::byte{byte}; });
+        auto [it, inserted] = modules.try_emplace(build_id);
+        if (inserted) {
+          it->second.module_name = info.name;
+          it->second.vaddr = info.vaddr;
 
-        for (const auto& phdr : info.phdrs) {
-          if (phdr.p_type != PT_LOAD) {
-            continue;
+          for (const auto& phdr : info.phdrs) {
+            if (phdr.p_type != PT_LOAD) {
+              continue;
+            }
+            it->second.loads.push_back({phdr.p_vaddr, phdr.p_memsz, phdr.p_flags});
           }
-          mod.loads.push_back({phdr.p_vaddr, phdr.p_memsz, phdr.p_flags});
         }
       });
-  if (search_result != ZX_OK) {
-    return zx::error(search_result);
-  }
-  return zx::ok(std::move(modules));
+  return zx::make_result(search_result, std::move(modules));
 }

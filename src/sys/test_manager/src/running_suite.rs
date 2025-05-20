@@ -34,7 +34,7 @@ use futures::future::join_all;
 use futures::prelude::*;
 use futures::{lock, FutureExt};
 use log::{debug, error, info, warn};
-use moniker::{ChildName, Moniker};
+use moniker::Moniker;
 use resolver::AllowedPackages;
 use std::collections::HashSet;
 use std::fmt;
@@ -422,9 +422,11 @@ impl RunningSuite {
             // Monikers should be reported relative to the test root, so strip away the wrapping
             // components from the path.
             let moniker_parsed = Moniker::try_from(storage_moniker.as_str()).unwrap();
-            let path =
-                moniker_parsed.path().iter().skip(1).map(Clone::clone).collect::<Vec<ChildName>>();
-            let moniker_relative_to_test_root = Moniker::new(path);
+            let moniker_relative_to_test_root = if moniker_parsed.is_root() {
+                moniker_parsed
+            } else {
+                Moniker::new(&moniker_parsed.path()[1..])
+            };
             sender
                 .send(Ok(SuiteEvents::suite_custom_artifact(ftest_manager::CustomArtifact {
                     directory_and_token: Some(ftest_manager::DirectoryAndToken {

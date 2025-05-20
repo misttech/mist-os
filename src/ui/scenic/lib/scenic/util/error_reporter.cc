@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 
+#include <memory>
+
 namespace scenic_impl {
 
 namespace {

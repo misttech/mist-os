@@ -5,9 +5,11 @@
 package fidlgen_cpp
 
 import (
+	"bytes"
 	"io/fs"
 	"log"
 	"path"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -42,7 +44,8 @@ func NewGenerator(flags *CmdlineFlags, templates fs.FS, extraFuncs template.Func
 
 func NewFormatter(clangFormatPath string) fidlgen.Formatter {
 	// TODO(https://fxbug.dev/42058951): Investigate clang-format memory usage on large files.
-	return fidlgen.NewFormatterWithSizeLimit(128*1024, clangFormatPath, clangFormatArgs...)
+	clang_format := fidlgen.NewFormatterWithSizeLimit(128*1024, clangFormatPath, clangFormatArgs...)
+	return removeEmptyBlocks{clang_format}
 }
 
 func (gen *Generator) ExperimentEnabled(experiment string) bool {
@@ -85,4 +88,50 @@ func (gen *Generator) GenerateFiles(tree *Root, files []string) {
 			log.Fatalf("Error generating %s: %v", fn, err)
 		}
 	}
+}
+
+type removeEmptyBlocks struct {
+	formatter fidlgen.Formatter
+}
+
+func (f removeEmptyBlocks) Format(source []byte) ([]byte, error) {
+	for {
+		l := len(source)
+		source = removeBlankLines(source)
+		source = collapseIfdefs(source)
+		source = removeEmptyNamespaces(source)
+		if len(source) == l {
+			break
+		}
+	}
+	return f.formatter.Format(source)
+}
+
+var removeBlankLinesRE = regexp.MustCompile(`(?m)^\s*$[\r\n]*`)
+
+func removeBlankLines(source []byte) []byte {
+	return removeBlankLinesRE.ReplaceAll(source, []byte("\n"))
+}
+
+var collapseIfdefsRE1 = regexp.MustCompile(`(?m)#endif  // __Fuchsia__\s+#ifdef __Fuchsia__`)
+var collapseIfdefsRE2 = regexp.MustCompile(`(?m)#ifdef __Fuchsia__\s+#endif  // __Fuchsia__`)
+
+func collapseIfdefs(source []byte) []byte {
+	return collapseIfdefsRE2.ReplaceAll(collapseIfdefsRE1.ReplaceAll(source, nil), nil)
+}
+
+var removeEmptyNamespacesOuterRE = regexp.MustCompile(`(?m)namespace [a-z0-9_]+ \{\s*\}  // namespace [a-z0-9_]+`)
+
+func removeEmptyNamespaces(source []byte) []byte {
+	return removeEmptyNamespacesOuterRE.ReplaceAllFunc(source, func(match []byte) []byte {
+		re := regexp.MustCompile(`(?m)namespace ([a-z0-9_]+) \{\s*\}  // namespace ([a-z0-9_]+)`)
+		m := re.FindSubmatch(match)
+		if len(m) != 3 {
+			panic("namespace regex returned the wrong number of groups")
+		}
+		if bytes.Equal(m[1], m[2]) {
+			return nil
+		}
+		return match
+	})
 }

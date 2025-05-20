@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("@fuchsia_build_info//:args.bzl", "idk_buildable_api_levels", "idk_buildable_cpus")
 load("@rules_python//python:py_binary.bzl", "py_binary")
-load(":rules.bzl", "compare_bazel_sdk_contents", "generate_bazel_sdk")
+load(":rules.bzl", "compare_bazel_sdk_contents", "generate_bazel_sdk", "generate_merged_idk")
 
 # A script used to convert an IDK export directory into a Fuchsia Bazel SDK directory.
 #
@@ -49,23 +50,41 @@ py_binary(
     main = "compare_bazel_sdks.py",
 )
 
-# An alias to @fuchsia_idk//:final_idk because the GN bazel_action()
-# template does not support listing targets that belong to repository
-# rules in its `bazel_targets` argument.
-alias(
-    name = "final_fuchsia_in_tree_idk",
-    actual = "@fuchsia_in_tree_idk//:final_idk",
+# Generates the final merged Fuchsia IDK from one or more IDK collection builds.
+generate_merged_idk(
+    name = "final_fuchsia_idk",
+
+    # Support all CPU architectures and API levels.
+    buildable_api_levels = idk_buildable_api_levels,
+    buildable_cpus = idk_buildable_cpus,
+
+    # LINT.IfChange
+    collection_name = "fuchsia_collection",
+    # LINT.ThenChange(//sdk/BUILD.gn)
+
+    # LINT.IfChange
+    ninja_root_build_dir = "fuchsia_build_generated/ninja_root_build_dir",
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
 )
 
+# Generates a Bazel SDK from an IDK collection built by Ninja. This is only used
+# in the comparison test below.
 generate_bazel_sdk(
-    name = "bazel_in_tree_sdk",
+    name = "ninja_based_in_tree_sdk_for_test",
+    testonly = True,
+    # The GN target is actually a group wrapping a collection, but that is
+    # sufficient because an IDK is essentially merged collections. The
+    # association between the GN target and the collection's output directory is
+    # made by the "ninja_generated_in_tree_idk_for_test.bazel_input" GN target.
     idk_export_dir = "@gn_targets//sdk:bazel_in_tree_idk",
 )
 
 # A target used to force the creation of the @fuchsia_sdk repository,
 # by creating a symlink to @fuchsia_sdk//:BUILD.bazel. See the comments
 # for the GN //build/bazel/bazel_sdk:in_tree_fuchsia_sdk target for
-# details.
+# details. This target triggers the building of @fuchsia_sdk but is not involved
+# in building it. That happens in a fuchsia_sdk_repository() rule in
+# //build/bazel/toplevel.WORKSPACE.bazel.
 genrule(
     name = "in_tree_fuchsia_sdk",
     srcs = ["@fuchsia_sdk//:BUILD.bazel"],
@@ -83,34 +102,7 @@ genrule(
 # in a repository rule works in exactly the same way, as expected.
 compare_bazel_sdk_contents(
     name = "verify_fuchsia_sdk_repository",
+    testonly = True,
     first_sdk = "@fuchsia_sdk//:WORKSPACE.bazel",
-    second_sdk = ":bazel_in_tree_sdk",
-)
-
-# Generate the final Fuchsia Bazel SDK from the final Fuchsia platform IDK.
-#
-# This contains the same SDK atoms as the platform build's @fuchsia_sdk repository,
-# but does not include references to @fuchsia_platform_idk, and is directly usable
-# in out-of-tree workspaces, e.g. with a project WORKSPACE directive such as:
-#
-# ```
-# local_repository(
-#    name = "fuchsia_sdk",
-#    path = "/path/to/final_fuchsia_sdk",
-# )
-# ```
-#
-generate_bazel_sdk(
-    name = "final_fuchsia_in_tree_sdk",
-    idk_export_label = "@fuchsia_in_tree_idk//:final_idk",
-)
-
-# Compare the content of :final_fuchsia_in_tree_sdk with the one generated
-# by parsing the Ninja-generated in-tree IDK. Success means that
-# the Ninja IDK -> @fuchsia_in_tree_idk -> final_fuchsia_in_tree_idk -> final_fuchsia_in_tree_sdk
-# transformations are correct.
-compare_bazel_sdk_contents(
-    name = "verify_final_fuchsia_in_tree_sdk",
-    first_sdk = ":final_fuchsia_in_tree_sdk",
-    second_sdk = ":bazel_in_tree_sdk",
+    second_sdk = ":ninja_based_in_tree_sdk_for_test",
 )

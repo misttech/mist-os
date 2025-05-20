@@ -26,7 +26,7 @@ async fn file_get_flags() {
     let file = dir
         .open_node::<fio::FileMarker>(
             &TEST_FILE,
-            fio::Flags::PERM_READ | fio::Flags::FILE_APPEND,
+            fio::PERM_READABLE | fio::Flags::FILE_APPEND,
             None,
         )
         .await
@@ -34,7 +34,13 @@ async fn file_get_flags() {
 
     let flags =
         file.get_flags().await.expect("get_flags failed").expect("Failed to get node flags");
-    assert_eq!(flags, fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ | fio::Flags::FILE_APPEND);
+    assert_eq!(
+        flags,
+        fio::Flags::PROTOCOL_FILE
+            | fio::Flags::PERM_READ_BYTES
+            | fio::Flags::PERM_GET_ATTRIBUTES
+            | fio::Flags::FILE_APPEND
+    );
 }
 
 #[fuchsia::test]

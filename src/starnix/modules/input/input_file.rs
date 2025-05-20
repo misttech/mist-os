@@ -8,23 +8,28 @@ use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps};
-use starnix_logging::{log_info, track_stub};
+use starnix_logging::{log_info, trace_duration, trace_flow_begin, trace_flow_end, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::time::duration_from_timeval;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    error, uapi, ABS_CNT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_SLOT, ABS_MT_TRACKING_ID,
-    BTN_MISC, BTN_TOUCH, FF_CNT, INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT,
-    MSC_CNT, REL_CNT, REL_WHEEL, SW_CNT,
+    errno, error, uapi, ABS_CNT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_SLOT,
+    ABS_MT_TRACKING_ID, BTN_MISC, BTN_TOUCH, FF_CNT, INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT,
+    KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, REL_WHEEL, SW_CNT,
 };
 use std::collections::VecDeque;
 use std::sync::Arc;
 use zerocopy::IntoBytes as _; // for `as_bytes()`
 
-const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
+uapi::check_arch_independent_layout! {
+    input_id {}
+    input_absinfo {}
+}
+
+type InputEventPtr = MultiArchUserRef<uapi::input_event, uapi::arch32::input_event>;
 
 pub struct InputFileStatus {
     /// The number of FIDL events received by this file from Fuchsia input system.
@@ -137,9 +142,30 @@ pub struct InputFile {
     device_name: String,
 }
 
+pub struct LinuxEventWithTraceId {
+    pub event: uapi::input_event,
+    pub trace_id: Option<fuchsia_trace::Id>,
+}
+
+impl LinuxEventWithTraceId {
+    pub fn new(event: uapi::input_event) -> Self {
+        match event.type_ as u32 {
+            uapi::EV_SYN => {
+                let trace_id = fuchsia_trace::Id::random();
+                trace_duration!(c"input", c"linux_event_create");
+                trace_flow_begin!(c"input", c"linux_event", trace_id);
+                LinuxEventWithTraceId { event: event, trace_id: Some(trace_id) }
+            }
+            // EV_SYN marks the end of a complete input event. Other event types are its properties,
+            // so they don't initiate a trace.
+            _ => LinuxEventWithTraceId { event: event, trace_id: None },
+        }
+    }
+}
+
 // Mutable state of `InputFile`
 pub struct InputFileMutableState {
-    pub events: VecDeque<uapi::input_event>,
+    pub events: VecDeque<LinuxEventWithTraceId>,
     pub waiters: WaitQueue,
 }
 
@@ -482,7 +508,7 @@ impl FileOps for InputFile {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
@@ -496,11 +522,13 @@ impl FileOps for InputFile {
             return error!(EAGAIN);
         }
 
+        let input_event_size = InputEventPtr::size_of_object_for(current_task);
+
         // The limit of the buffer is determined by taking the available bytes
         // and using integer division on the size of uapi::input_event in bytes.
         // This is how many events we can write at a time, up to the amount of
         // events queued to be written.
-        let limit = std::cmp::min(data.available() / INPUT_EVENT_SIZE, num_events);
+        let limit = std::cmp::min(data.available() / input_event_size, num_events);
         if num_events > limit {
             log_info!(
                 "There was only space in the given buffer to read {} of the {} queued events. Sending a notification to prompt another read.",
@@ -509,15 +537,31 @@ impl FileOps for InputFile {
             );
             inner.waiters.notify_fd_events(FdEvents::POLLIN);
         }
-        let events: Vec<uapi::input_event> = inner.events.drain(..limit).collect::<Vec<_>>();
-        let last_event_timeval = events.last().expect("events is nonempty").time;
+        let events: Vec<LinuxEventWithTraceId> = inner.events.drain(..limit).collect::<Vec<_>>();
+        let last_event_timeval = events.last().expect("events is nonempty").event.time;
         let last_event_time_ns = duration_from_timeval::<zx::MonotonicTimeline>(last_event_timeval)
             .unwrap()
             .into_nanos();
         self.inspect_status
             .clone()
             .map(|status| status.count_read_events(events.len() as u64, last_event_time_ns));
-        data.write_all(events.as_bytes())
+
+        for event in &events {
+            if let Some(trace_id) = event.trace_id {
+                trace_duration!(c"input", c"linux_event_read");
+                trace_flow_end!(c"input", c"linux_event", trace_id);
+            }
+        }
+
+        if current_task.is_arch32() {
+            let events: Result<Vec<uapi::arch32::input_event>, _> =
+                events.iter().map(|e| uapi::arch32::input_event::try_from(e.event)).collect();
+            let events = events.map_err(|_| errno!(EINVAL))?;
+            data.write_all(events.as_bytes())
+        } else {
+            let events: Vec<uapi::input_event> = events.iter().map(|e| e.event).collect();
+            data.write_all(events.as_bytes())
+        }
     }
 
     fn write(

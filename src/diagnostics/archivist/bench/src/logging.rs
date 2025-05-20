@@ -39,7 +39,7 @@ fn make_message(msg: &str, timestamp: zx::BootInstant) -> StoredMessage {
 }
 
 fn get_component_identity() -> Arc<ComponentIdentity> {
-    Arc::new(ComponentIdentity::new(moniker::Moniker::try_from(vec!["a"]).unwrap().into(), ""))
+    Arc::new(ComponentIdentity::new(moniker::Moniker::try_from(["a"]).unwrap().into(), ""))
 }
 
 fn bench_fill(b: &mut criterion::Bencher, size: usize) {

@@ -45,7 +45,7 @@ use crate::bindings::socket::queue::{BodyLen, MessageQueue, QueueReadableListene
 use crate::bindings::socket::worker::{self, SocketWorker};
 use crate::bindings::util::{
     DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _, ResultExt as _,
-    TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
+    ScopeExt as _, TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
     TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingId, BindingsCtx, Ctx};
@@ -417,7 +417,7 @@ where
             .api()
             .udp()
             .close(id)
-            .map_deferred(|d| d.into_future("udp socket", &weak))
+            .map_deferred(|d| d.into_future("udp socket", &weak, ctx))
             .into_future()
             .await;
     }
@@ -770,7 +770,7 @@ where
             .api()
             .icmp_echo()
             .close(id)
-            .map_deferred(|d| d.into_future("icmp socket", &weak))
+            .map_deferred(|d| d.into_future("icmp socket", &weak, ctx))
             .into_future()
             .await;
     }
@@ -1244,54 +1244,57 @@ pub(super) fn spawn_worker(
     domain: fposix_socket::Domain,
     proto: fposix_socket::DatagramSocketProtocol,
     ctx: crate::bindings::Ctx,
-    events: fposix_socket::SynchronousDatagramSocketRequestStream,
+    request_stream: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
-    spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
     creation_opts: fposix_socket::SocketCreationOptions,
 ) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv4, Udp>::new,
-                properties,
-                events,
-                creation_opts,
-                spawner.clone(),
-            ));
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    BindingData::<Ipv4, Udp>::new,
+                    properties,
+                    rs,
+                    creation_opts,
+                )
+            });
             Ok(())
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv6, Udp>::new,
-                properties,
-                events,
-                creation_opts,
-                spawner.clone(),
-            ));
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    BindingData::<Ipv6, Udp>::new,
+                    properties,
+                    rs,
+                    creation_opts,
+                )
+            });
             Ok(())
         }
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv4, IcmpEcho>::new,
-                properties,
-                events,
-                creation_opts,
-                spawner.clone(),
-            ));
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    BindingData::<Ipv4, IcmpEcho>::new,
+                    properties,
+                    rs,
+                    creation_opts,
+                )
+            });
             Ok(())
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            spawner.spawn(SocketWorker::serve_stream_with(
-                ctx,
-                BindingData::<Ipv6, IcmpEcho>::new,
-                properties,
-                events,
-                creation_opts,
-                spawner.clone(),
-            ));
+            fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
+                SocketWorker::serve_stream_with(
+                    ctx,
+                    BindingData::<Ipv6, IcmpEcho>::new,
+                    properties,
+                    rs,
+                    creation_opts,
+                )
+            });
             Ok(())
         }
     }
@@ -1317,14 +1320,8 @@ where
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
     type CloseResponder = fposix_socket::SynchronousDatagramSocketCloseResponder;
     type SetupArgs = fposix_socket::SocketCreationOptions;
-    type Spawner = ();
 
-    fn setup(
-        &mut self,
-        ctx: &mut Ctx,
-        options: fposix_socket::SocketCreationOptions,
-        _spawners: &worker::TaskSpawnerCollection<()>,
-    ) {
+    fn setup(&mut self, ctx: &mut Ctx, options: fposix_socket::SocketCreationOptions) {
         let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
         for (domain, mark) in marks.into_iter().map(fidl_fuchsia_net_ext::Marks::from).flatten() {
             T::set_mark(ctx, &self.info.id, domain.into_core(), Mark(Some(mark)))
@@ -1335,7 +1332,6 @@ where
         &mut self,
         ctx: &mut Ctx,
         request: Self::Request,
-        _spawners: &worker::TaskSpawnerCollection<()>,
     ) -> ControlFlow<Self::CloseResponder, Option<Self::RequestStream>> {
         RequestHandler { ctx, data: self }.handle_request(request)
     }

@@ -84,9 +84,10 @@ class UnitTests : public ::testing::Test {
 // unload the normal MSD to replace it with the test MSD so we can run those tests and query the
 // test results.
 TEST_F(UnitTests, UnitTests) {
-  magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_MALI);
-  fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{test_base.magma_channel()};
-  const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
+  zx::result channel = magma::TestDeviceBase::GetTestFromVendorId(MAGMA_VENDOR_ID_MALI);
+  ASSERT_TRUE(channel.is_ok()) << channel.status_string();
+
+  const fidl::WireResult result = fidl::WireCall(*channel)->GetUnitTestStatus();
   ASSERT_TRUE(result.ok()) << result.FormatDescription();
   const fidl::WireResponse response = result.value();
   ASSERT_EQ(response.status, ZX_OK) << zx_status_get_string(response.status);

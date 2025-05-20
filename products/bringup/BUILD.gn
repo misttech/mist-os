@@ -10,7 +10,9 @@ _platform_configuration_base = {
   feature_set_level = "bootstrap"
   build_type = "eng"
   kernel = {
-    oom_behavior = "job_kill"
+    oom = {
+      behavior = "job_kill"
+    }
   }
   development_support = {
     include_netsvc = true

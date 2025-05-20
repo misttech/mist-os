@@ -50,9 +50,6 @@ struct WireTypeForNaturalType<::test_struct::BasicStruct> {
   using type = ::test_struct::wire::BasicStruct;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

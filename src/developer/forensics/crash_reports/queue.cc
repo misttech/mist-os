@@ -143,7 +143,7 @@ bool Queue::Add(Report report, FilingResultFn callback) {
   // Remove clients with special case snapshots. These clients will be present in
   // |snapshot_clients_|, but will be listed under their intended snapshot uuid rather than under
   // the special case snapshot uuid.
-  if (snapshot_clients_.count(report.SnapshotUuid()) == 0) {
+  if (!snapshot_clients_.contains(report.SnapshotUuid())) {
     FX_CHECK(IsSpecialCaseSnapshot(report.SnapshotUuid()));
     for (auto& [uuid, reports] : snapshot_clients_) {
       reports.erase(report.Id());

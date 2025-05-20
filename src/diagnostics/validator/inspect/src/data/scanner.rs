@@ -811,10 +811,7 @@ mod tests {
         let actual = data::Scanner::try_from(buffer as &[u8]).map(|d| d.data().to_string());
         if predicted.is_none() {
             if actual.is_err() {
-                println!(
-                    "With ({},{}) -> {}, got expected error {:?}",
-                    index, offset, value, actual
-                );
+                println!("With ({index},{offset}) -> {value}, got expected error {actual:?}");
             } else {
                 println!(
                     "BAD: With ({},{}) -> {}, expected error but got string {:?}",
@@ -825,10 +822,7 @@ mod tests {
                 );
             }
         } else if actual.is_err() {
-            println!(
-                "BAD: With ({},{}) -> {}, got unexpected error {:?}",
-                index, offset, value, actual
-            );
+            println!("BAD: With ({index},{offset}) -> {value}, got unexpected error {actual:?}");
         } else if actual.as_ref().ok().map(|s| &s[..]) == predicted {
             println!(
                 "With ({},{}) -> {}, got expected string {:?}",

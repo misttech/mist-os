@@ -136,14 +136,14 @@ TEST(Inspect, DeallocateStringReferencesThenAddMore) {
   EXPECT_EQ("outer", hierarchy.children()[0].name());
 }
 
-cpp17::optional<uint64_t> GetGenerationCount(const zx::vmo& vmo) {
+std::optional<uint64_t> GetGenerationCount(const zx::vmo& vmo) {
   uint8_t bytes[16];
   vmo.read(bytes, 0, sizeof bytes);
   const auto header = reinterpret_cast<inspect::internal::Block*>(bytes);
   return header->payload.u64;
 }
 
-cpp17::optional<uint64_t> GetGenerationCount(Inspector* insp) {
+std::optional<uint64_t> GetGenerationCount(Inspector* insp) {
   const auto state = inspect::internal::GetState(insp);
   if (state == nullptr) {
     return {};

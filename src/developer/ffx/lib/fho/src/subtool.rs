@@ -36,7 +36,7 @@ pub trait FfxTool: FfxMain + Sized {
         let should_format = match FfxCommandLine::from_env() {
             Ok(cli) => cli.global.machine.is_some(),
             Err(e) => {
-                tracing::warn!("Received error getting command line: {}", e);
+                log::warn!("Received error getting command line: {}", e);
                 match e {
                     Error::Help { .. } => false,
                     _ => true,
@@ -156,7 +156,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
             self.main.main(writer).await.map(|_| ExitStatus::from_raw(0))
         };
         let res = metrics.command_finished(&res, &self.redacted_args).await.and(res);
-        self.env.maybe_wrap_connection_errors(res).await
+        self.env.wrap_main_result(res)
     }
 }
 
@@ -188,7 +188,7 @@ impl<T: FfxTool> FhoTool<T> {
 
 #[async_trait::async_trait(?Send)]
 impl<M: FfxTool> ToolSuite for FhoSuite<M> {
-    async fn from_env(context: &EnvironmentContext) -> Result<Self> {
+    fn from_env(context: &EnvironmentContext) -> Result<Self> {
         let context = context.clone();
         Ok(Self { context: context, _p: Default::default() })
     }

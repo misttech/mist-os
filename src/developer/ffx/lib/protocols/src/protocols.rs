@@ -168,10 +168,7 @@ where
         svc.start(&cx).await?;
         let fut = Box::pin(async move {
             let serve_res = svc.serve(&cx, stream).await.map_err(|e| {
-                tracing::warn!(
-                    "protocol failure while handling stream. Stopping protocol: {:?}",
-                    e
-                );
+                log::warn!("protocol failure while handling stream. Stopping protocol: {:?}", e);
                 e
             });
             svc.stop(&cx).await?;
@@ -274,7 +271,7 @@ where
                     .serve(&cx, stream)
                     .await
             } else {
-                tracing::debug!("dropped singleton protocol Rc<_>");
+                log::debug!("dropped singleton protocol Rc<_>");
                 Ok(())
             }
         };

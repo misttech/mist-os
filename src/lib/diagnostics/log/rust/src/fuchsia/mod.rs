@@ -11,9 +11,9 @@ use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-#[cfg(fuchsia_api_level_less_than = "NEXT")]
+#[cfg(fuchsia_api_level_less_than = "27")]
 use fidl_fuchsia_diagnostics::Interest;
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "27")]
 use fidl_fuchsia_diagnostics_types::Interest;
 
 mod filter;

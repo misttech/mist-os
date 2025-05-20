@@ -61,10 +61,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         ];
         let model = T::new("a", components).build().await;
         model
-            .check_use(
-                vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Ok),
-            )
+            .check_use(["c"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
             .await;
     }
 
@@ -113,7 +110,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;
@@ -163,10 +160,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         ];
         let model = T::new("a", components).build().await;
         model
-            .check_use(
-                vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Ok),
-            )
+            .check_use(["c"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
             .await;
     }
 
@@ -215,7 +209,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;
@@ -265,10 +259,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         ];
         let model = T::new("a", components).build().await;
         model
-            .check_use(
-                vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Ok),
-            )
+            .check_use(["c"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
             .await;
     }
 
@@ -317,7 +308,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         let model = T::new("a", components).build().await;
         model
             .check_use(
-                vec!["c"].try_into().unwrap(),
+                ["c"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;
@@ -365,7 +356,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         model.install_namespace_directory("/offer_from_cm_namespace");
         model
             .check_use(
-                vec!["b"].try_into().unwrap(),
+                ["b"].try_into().unwrap(),
                 CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;

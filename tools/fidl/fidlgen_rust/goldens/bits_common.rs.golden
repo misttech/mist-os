@@ -67,19 +67,7 @@ bitflags! {
     }
 }
 
-impl MyBits {
-    #[deprecated = "Strict bits should not use `has_unknown_bits`"]
-    #[inline(always)]
-    pub fn has_unknown_bits(&self) -> bool {
-        false
-    }
-
-    #[deprecated = "Strict bits should not use `get_unknown_bits`"]
-    #[inline(always)]
-    pub fn get_unknown_bits(&self) -> u32 {
-        0
-    }
-}
+impl MyBits {}
 
 bitflags! {
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -89,19 +77,7 @@ bitflags! {
     }
 }
 
-impl StrictBits {
-    #[deprecated = "Strict bits should not use `has_unknown_bits`"]
-    #[inline(always)]
-    pub fn has_unknown_bits(&self) -> bool {
-        false
-    }
-
-    #[deprecated = "Strict bits should not use `get_unknown_bits`"]
-    #[inline(always)]
-    pub fn get_unknown_bits(&self) -> u64 {
-        0
-    }
-}
+impl StrictBits {}
 
 mod internal {
     use super::*;

@@ -53,7 +53,7 @@ class ServerBase(
         ...
 
     def __str__(self):
-        return f"server:{type(self).__name__}:{self.id}"
+        return f"server:{type(self).__name__}:{id(self)}"
 
     def __init__(self, channel: fc.Channel, channel_waker=None):
         global _SERVER_ID
@@ -73,6 +73,10 @@ class ServerBase(
         _LOGGER.debug(f"{self} closing")
         if self.channel is not None:
             self.channel_waker.unregister(self.channel)
+            self.channel = None
+
+    def close(self):
+        self.__del__()
 
     def serve(self):
         self.channel_waker.register(self.channel)

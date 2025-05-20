@@ -24,6 +24,7 @@ rustc_library("syncio") {
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:bstr",
+    "//third_party/rust_crates:pin-weak",
     "//third_party/rust_crates:zerocopy",
   ]
 

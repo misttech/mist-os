@@ -19,7 +19,7 @@ pub struct Socket(RWHandle<zx::Socket>);
 
 impl AsRef<zx::Socket> for Socket {
     fn as_ref(&self) -> &zx::Socket {
-        &self.0.get_ref()
+        self.0.get_ref()
     }
 }
 
@@ -106,9 +106,9 @@ impl Socket {
         let avail = self.0.get_ref().outstanding_read_bytes()?;
         let len = out.len();
         out.resize(len + avail, 0);
-        let (_, mut tail) = out.split_at_mut(len);
+        let (_, tail) = out.split_at_mut(len);
         loop {
-            match self.0.get_ref().read(&mut tail) {
+            match self.0.get_ref().read(tail) {
                 Err(zx::Status::SHOULD_WAIT) => ready!(self.need_readable(cx)?),
                 Err(e) => return Poll::Ready(Err(e)),
                 Ok(bytes) => {
@@ -131,7 +131,7 @@ impl Socket {
     /// Use this socket as a stream of `Result<Vec<u8>, zx::Status>` datagrams.
     ///
     /// Note: multiple concurrent streams from the same socket are not supported.
-    pub fn as_datagram_stream<'a>(&'a self) -> DatagramStream<&'a Self> {
+    pub fn as_datagram_stream(&self) -> DatagramStream<&Self> {
         DatagramStream(self)
     }
 
@@ -197,7 +197,7 @@ impl AsyncWrite for Socket {
     }
 }
 
-impl<'a> AsyncRead for &'a Socket {
+impl AsyncRead for &Socket {
     /// Note: this function will never return `PEER_CLOSED` as an error. Instead, it will return
     /// `Ok(0)` when the peer closes, to match the contract of `std::io::Read`.
     fn poll_read(
@@ -209,7 +209,7 @@ impl<'a> AsyncRead for &'a Socket {
     }
 }
 
-impl<'a> AsyncWrite for &'a Socket {
+impl AsyncWrite for &Socket {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -356,7 +356,7 @@ mod tests {
         let stream_read_fut = async move {
             let mut count = 0;
             while let Some(packet) = rx.try_next().await.expect("received error from stream") {
-                count = count + 1;
+                count += 1;
                 assert_eq!(packet.len(), count);
                 assert!(packet.iter().all(|&x| x == count as u8));
             }

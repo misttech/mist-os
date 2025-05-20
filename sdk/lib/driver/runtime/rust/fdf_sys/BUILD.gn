@@ -19,7 +19,7 @@ rustc_library("fdf_sys") {
 
   visibility = [
     "//sdk/lib/driver/*",
-    "//src/devices/bin/driver-host-rust/*",
+    "//src/devices/bin/driver-host/*",
   ]
 }
 

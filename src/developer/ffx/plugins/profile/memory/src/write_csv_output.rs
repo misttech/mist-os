@@ -8,6 +8,7 @@ use crate::write_human_readable_output::filter_and_order_vmo_groups_names_for_pr
 use crate::{digest, ProfileMemoryOutput};
 use anyhow::Result;
 use digest::processed;
+use errors::ffx_bail;
 use std::io::Write;
 
 /// Transforms nanoseconds into seconds, because tools that use the CSV output expect seconds.
@@ -104,6 +105,7 @@ pub fn write_csv_output<'a, W: Write>(
         ProfileMemoryOutput::ProcessDigest(processes_digest) => {
             write_detailed_processes_digest(w, &processes_digest)
         }
+        ProfileMemoryOutput::ComponentDigest(_) => ffx_bail!("Not supported"),
     }
 }
 

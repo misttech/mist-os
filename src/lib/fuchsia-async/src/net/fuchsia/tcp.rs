@@ -227,7 +227,7 @@ impl TcpStream {
         self.as_ref()
     }
 
-    fn std_mut<'a>(&'a mut self) -> &'a mut net::TcpStream {
+    fn std_mut(&mut self) -> &mut net::TcpStream {
         self.stream.as_mut()
     }
 }
@@ -323,7 +323,7 @@ mod tests {
     fn choose_listen_port_from_std() {
         let _exec = TestExecutor::new();
         let addr_request = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0);
-        let inner = net::TcpListener::bind(&addr_request).expect("could not create inner listener");
+        let inner = net::TcpListener::bind(addr_request).expect("could not create inner listener");
         let listener = TcpListener::from_std(inner).expect("could not create listener");
         let actual_addr = listener.local_addr().expect("local_addr query to succeed");
         assert_eq!(actual_addr.ip(), addr_request.ip());

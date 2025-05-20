@@ -456,7 +456,10 @@ unsafe impl lock_api::RawRwLock for RawSyncRwLock {
         RawSyncRwLock { state: zx::Futex::new(0), writer_queue: zx::Futex::new(0) };
 
     // These operations do not need to happen on the same thread.
-    type GuardMarker = lock_api::GuardSend;
+    // However, we set this to no send to catch mistakes where folks accidentally hold a lock across
+    // an async await, which is often not intentional behavior and can lead to a deadlock. If
+    // sufficient need is required, this may be changed back to `lock_api::GuardSend`.
+    type GuardMarker = lock_api::GuardNoSend;
 
     #[inline]
     fn lock_shared(&self) {

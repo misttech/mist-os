@@ -18,7 +18,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/optional.h>
 
 #include <linux/fcntl.h>

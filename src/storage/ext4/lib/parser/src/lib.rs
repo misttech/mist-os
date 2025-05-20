@@ -54,16 +54,11 @@ pub fn construct_fs(
 mod tests {
     use super::{construct_fs, FsSourceType};
 
-    // macros
-    use vfs::{
-        assert_close, assert_event, assert_read, assert_read_dirents,
-        open_as_vmo_file_assert_content, open_get_proxy_assert, open_get_vmo_file_proxy_assert_ok,
-    };
-
     use ext4_read_only::structs::MIN_EXT4_SIZE;
     use fidl_fuchsia_io as fio;
+    use fuchsia_fs::directory::{open_file, readdir, DirEntry, DirentKind};
+    use fuchsia_fs::file::read_to_string;
     use std::fs;
-    use vfs::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
     use zx::Vmo;
 
     #[fuchsia::test]
@@ -85,30 +80,25 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn list_root() {
+    async fn list_root() {
         let data = fs::read("/pkg/data/nest.img").expect("Unable to read file");
         let vmo = Vmo::create(data.len() as u64).expect("VMO is created");
         vmo.write(data.as_slice(), 0).expect("VMO write() succeeds");
         let buffer = FsSourceType::Vmo(vmo);
 
         let tree = construct_fs(buffer).expect("construct_fs parses the vmo");
+        let root = vfs::directory::serve(tree, fio::PERM_READABLE);
 
-        run_server_client(fio::OpenFlags::RIGHT_READABLE, tree, |root| async move {
-            {
-                let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
-                expected.add(fio::DirentType::Directory, b".");
-                expected.add(fio::DirentType::File, b"file1");
-                expected.add(fio::DirentType::Directory, b"inner");
-                expected.add(fio::DirentType::Directory, b"lost+found");
+        let expected = vec![
+            DirEntry { name: String::from("file1"), kind: DirentKind::File },
+            DirEntry { name: String::from("inner"), kind: DirentKind::Directory },
+            DirEntry { name: String::from("lost+found"), kind: DirentKind::Directory },
+        ];
+        assert_eq!(readdir(&root).await.unwrap(), expected);
 
-                assert_read_dirents!(root, 1000, expected.into_vec());
-            }
-
-            let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
-            let compare = "file1 contents.\n";
-            open_as_vmo_file_assert_content!(&root, flags, "file1", compare);
-
-            assert_close!(root);
-        });
+        let file = open_file(&root, "file1", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(read_to_string(&file).await.unwrap(), "file1 contents.\n");
+        file.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        root.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
     }
 }

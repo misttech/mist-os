@@ -68,10 +68,10 @@ class Flags final {
 
   // Constructs an instance of |Flags| from an underlying primitive value
   // if the primitive does not contain any unknown members not defined in the
-  // FIDL schema. Otherwise, returns |cpp17::nullopt|.
-  constexpr inline static cpp17::optional<Flags> TryFrom(uint16_t value) {
+  // FIDL schema. Otherwise, returns |std::nullopt|.
+  constexpr inline static std::optional<Flags> TryFrom(uint16_t value) {
     if (value & ~kMask.value_) {
-      return cpp17::nullopt;
+      return std::nullopt;
     }
     return Flags(value & Flags::kMask.value_);
   }
@@ -174,10 +174,10 @@ class BitsMember final {
 
   // Constructs an instance of |BitsMember| from an underlying primitive value
   // if the primitive does not contain any unknown members not defined in the
-  // FIDL schema. Otherwise, returns |cpp17::nullopt|.
-  constexpr inline static cpp17::optional<BitsMember> TryFrom(uint32_t value) {
+  // FIDL schema. Otherwise, returns |std::nullopt|.
+  constexpr inline static std::optional<BitsMember> TryFrom(uint32_t value) {
     if (value & ~kMask.value_) {
-      return cpp17::nullopt;
+      return std::nullopt;
     }
     return BitsMember(value & BitsMember::kMask.value_);
   }
@@ -326,7 +326,7 @@ class OverrideTest final {
   static inline ::std::unique_ptr<OverrideTest> New() { return ::std::make_unique<OverrideTest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, OverrideTest* value, size_t _offset);
   zx_status_t Clone(OverrideTest* result) const;
 };
@@ -424,7 +424,7 @@ class FunctionApplication final {
   static inline ::std::unique_ptr<FunctionApplication> New() { return ::std::make_unique<FunctionApplication>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, FunctionApplication* _value, size_t _offset);
   zx_status_t Clone(FunctionApplication* _result) const;
 
@@ -506,7 +506,7 @@ class Expression final {
   static inline ::std::unique_ptr<Expression> New() { return ::std::make_unique<Expression>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Expression* value, size_t offset);
   zx_status_t Clone(Expression* result) const;
 
@@ -622,7 +622,7 @@ class UnionMember final {
   static inline ::std::unique_ptr<UnionMember> New() { return ::std::make_unique<UnionMember>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, UnionMember* value, size_t offset);
   zx_status_t Clone(UnionMember* result) const;
 
@@ -695,7 +695,7 @@ class TableData final {
   static inline ::std::unique_ptr<TableData> New() { return ::std::make_unique<TableData>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TableData* value, size_t _offset);
   zx_status_t Clone(TableData* result) const;
 };
@@ -745,7 +745,7 @@ class TableMember final {
   static inline ::std::unique_ptr<TableMember> New() { return ::std::make_unique<TableMember>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TableMember* _value, size_t _offset);
   zx_status_t Clone(TableMember* _result) const;
 
@@ -796,7 +796,7 @@ class SomeProtocolSomeMethodRequest final {
   static inline ::std::unique_ptr<SomeProtocolSomeMethodRequest> New() { return ::std::make_unique<SomeProtocolSomeMethodRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SomeProtocolSomeMethodRequest* value, size_t _offset);
   zx_status_t Clone(SomeProtocolSomeMethodRequest* result) const;
 };
@@ -826,7 +826,7 @@ class SomeProtocol_SomeMethod_Response final {
   static inline ::std::unique_ptr<SomeProtocol_SomeMethod_Response> New() { return ::std::make_unique<SomeProtocol_SomeMethod_Response>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SomeProtocol_SomeMethod_Response* value, size_t _offset);
   zx_status_t Clone(SomeProtocol_SomeMethod_Response* result) const;
 };
@@ -861,7 +861,7 @@ class SomeProtocol_SomeMethod_Result final {
   static inline ::std::unique_ptr<SomeProtocol_SomeMethod_Result> New() { return ::std::make_unique<SomeProtocol_SomeMethod_Result>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SomeProtocol_SomeMethod_Result* value, size_t offset);
   zx_status_t Clone(SomeProtocol_SomeMethod_Result* result) const;
 
@@ -989,7 +989,7 @@ template <>
 struct CodingTraits<::test::anonymous::Op> {
   static constexpr size_t kInlineSize = sizeof(::test::anonymous::Op);
   static void Encode(Encoder* encoder, ::test::anonymous::Op* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -1047,7 +1047,7 @@ template <>
 struct CodingTraits<::test::anonymous::Flags> {
   static constexpr size_t kInlineSize = sizeof(::test::anonymous::Flags);
   static void Encode(Encoder* encoder, ::test::anonymous::Flags* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint16_t underlying = static_cast<uint16_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -1128,7 +1128,7 @@ struct CodingTraits<std::unique_ptr<::test::anonymous::Expression>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::anonymous::Expression>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1186,7 +1186,7 @@ struct CodingTraits<std::unique_ptr<::test::anonymous::UnionMember>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::anonymous::UnionMember>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1306,7 +1306,7 @@ template <>
 struct CodingTraits<::test::anonymous::BitsMember> {
   static constexpr size_t kInlineSize = sizeof(::test::anonymous::BitsMember);
   static void Encode(Encoder* encoder, ::test::anonymous::BitsMember* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -1357,7 +1357,7 @@ template <>
 struct CodingTraits<::test::anonymous::SomeProtocol_SomeMethod_Error> {
   static constexpr size_t kInlineSize = sizeof(::test::anonymous::SomeProtocol_SomeMethod_Error);
   static void Encode(Encoder* encoder, ::test::anonymous::SomeProtocol_SomeMethod_Error* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -1392,7 +1392,7 @@ struct CodingTraits<std::unique_ptr<::test::anonymous::SomeProtocol_SomeMethod_R
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::anonymous::SomeProtocol_SomeMethod_Result>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -1461,10 +1461,6 @@ constexpr uint64_t kSomeProtocol_SomeMethod_Ordinal = 0x22ea52ec7a5146d8lu;
 
 constexpr ::fidl::MessageDynamicFlags kSomeProtocol_SomeMethod_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class SomeProtocol {
  public:

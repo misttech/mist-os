@@ -69,28 +69,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_doccomments::Table& valu
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_doccomments::Interface>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_doccomments::Interface>& value) {
-    return os << "ClientEnd<" << "test_doccomments::Interface" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_doccomments::Interface>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_doccomments::Interface>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_doccomments::Interface>& value) {
-    return os << "ServerEnd<" << "test_doccomments::Interface" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_doccomments::Interface>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_doccomments::Interface>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_doccomments::Interface>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_doccomments::Interface>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_doccomments::Interface>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_doccomments::Interface>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_doccomments::Interface>& value);
 
 #endif  // __Fuchsia__
 

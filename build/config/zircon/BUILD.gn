@@ -99,11 +99,6 @@ config("compiler") {
   if (is_fuchsia || is_mistos) {
     ldflags += [ "-Wl,-z,start-stop-visibility=hidden" ]
 
-    # ld.bfd doesn't support -z relro for the targets we use it for.
-    if (!is_gcc || linker == "gold") {
-      ldflags += [ "-Wl,-z,relro" ]
-    }
-
     if (is_gcc) {
       # This is predefined by Clang --target=*-fuchsia.
       # But the GCC toolchain is the generic --target=*-elf one.
@@ -114,8 +109,9 @@ config("compiler") {
       ldflags += [
         "-Wl,--build-id",
         "-Wl,--hash-style=gnu",
-        "-Wl,-z,now",
         "-Wl,-z,combreloc",
+        "-Wl,-z,relro",
+        "-Wl,-z,now",
         "-Wl,-z,text",
       ]
 
@@ -123,14 +119,14 @@ config("compiler") {
         ldflags += [ "-Wl,--eh-frame-hdr" ]
       }
 
-      if (linker == "" || linker == "bfd") {
+      if (linker == "") {
         # This is the default in both LLD and Gold, but not in BFD.
         # However, Gold doesn't even have the switch.
         ldflags += [ "-Wl,-z,separate-code" ]
       }
 
       # This is the default in LLD, available in BFD, but not in Gold.
-      if (linker == "bfd") {
+      if (linker == "") {
         ldflags += [ "-Wl,-z,pack-relative-relocs" ]
       }
 
@@ -300,10 +296,6 @@ variant("user-executable") {
   if (is_gcc) {
     # This is already the default in Clang for Fuchsia targets.
     ldflags += [ "-pie" ]
-
-    # Gold doesn't handle --no-dynamic-linker and won't produce a PIE without a
-    # PT_INTERP.
-    ldflags += [ "-fuse-ld=bfd" ]
   }
 
   # crt1 and libc will come via explicit link dependencies if at all.
@@ -446,12 +438,8 @@ config("no-synthetic-sections") {
   ldflags = [
     "-Wl,--build-id=none",  # Don't generate .note.gnu.build-id section.
     "-Wl,--no-eh-frame-hdr",  # Don't generate .eh_frame_hdr section.
+    "-Wl,--no-dynamic-linker",  # Don't generate .interp section.
   ]
-  if (linker != "gold") {
-    ldflags += [
-      "-Wl,--no-dynamic-linker",  # Don't generate .interp section.
-    ]
-  }
 }
 
 # This is used by the basic_executable() for an hermetic partial link step.

@@ -12,11 +12,10 @@ participate in its computation.
 import argparse
 import subprocess
 import sys
-import typing as T
 from pathlib import Path
 
 
-def find_git_head_inputs(repo_dir: Path) -> T.Set[Path]:
+def find_git_head_inputs(repo_dir: Path) -> set[Path]:
     """Find all input files used to determine the git HEAD of a given repository.
 
     Args:
@@ -24,7 +23,7 @@ def find_git_head_inputs(repo_dir: Path) -> T.Set[Path]:
     Returns:
         A set of Path values that can be used as implicit inputs in a depfile.
     """
-    result: T.Set[Path] = set()
+    result: set[Path] = set()
 
     git_dir = repo_dir / ".git"
     if git_dir.is_dir():

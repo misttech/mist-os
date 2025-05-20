@@ -9,12 +9,12 @@
 
 namespace fake_suspend {
 
-using fuchsia_hardware_suspend::SuspenderGetSuspendStatesResponse;
-using fuchsia_hardware_suspend::SuspenderSuspendResponse;
+using fuchsia_hardware_power_suspend::SuspenderGetSuspendStatesResponse;
+using fuchsia_hardware_power_suspend::SuspenderSuspendResponse;
 using test_suspendcontrol::DeviceAwaitSuspendResponse;
 using test_suspendcontrol::DeviceResumeRequest;
 
-// fuchsia.hardware.suspend/Suspender.*
+// fuchsia.hardware.power.suspend/Suspender.*
 
 void DeviceServer::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
   get_suspend_states_completers_.push_back(completer.ToAsync());
@@ -84,7 +84,7 @@ void DeviceServer::Resume(ResumeRequest& request, ResumeCompleter::Sync& complet
 // Server methods
 
 void DeviceServer::Serve(async_dispatcher_t* dispatcher,
-                         fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> server) {
+                         fidl::ServerEnd<fuchsia_hardware_power_suspend::Suspender> server) {
   suspender_bindings_.AddBinding(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure);
 }
 
@@ -98,7 +98,7 @@ void DeviceServer::Serve(async_dispatcher_t* dispatcher,
 void DeviceServer::SendGetSuspendStatesResponses() {
   ZX_ASSERT(suspend_states_.has_value());
 
-  const std::vector<fuchsia_hardware_suspend::SuspendState>& states = suspend_states_.value();
+  const std::vector<fuchsia_hardware_power_suspend::SuspendState>& states = suspend_states_.value();
   // NB: |std::vector|'s move constructor guarantees that |get_suspend_states_completers_|
   // be empty, but |std::vector|'s move assignment only guarantees that will be in a
   // valid but undefined state.

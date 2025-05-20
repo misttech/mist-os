@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use {
     fidl_fuchsia_component_test as ffct, fidl_fuchsia_driver_test as fdt,
-    fidl_fuchsia_hardware_suspend as ffhs, fidl_fuchsia_kernel as ffk,
+    fidl_fuchsia_hardware_power_suspend as ffhs, fidl_fuchsia_kernel as ffk,
     fidl_fuchsia_test_suspend as fftsu, fidl_fuchsia_test_syscalls as ffts,
     fuchsia_async as fasync,
 };

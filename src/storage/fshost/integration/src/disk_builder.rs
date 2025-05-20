@@ -23,10 +23,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 use storage_isolated_driver_manager::fvm::format_for_fvm;
 use uuid::Uuid;
-use vfs::directory::entry_container::Directory;
-use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
-use vfs::ObjectRequest;
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
@@ -34,15 +30,17 @@ use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fa
 pub const TEST_DISK_BLOCK_SIZE: u32 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
 
-// The default disk size is about 110MiB, with about 106MiB dedicated to the data volume. This size
-// is chosen because the data volume has to be big enough to support f2fs, which has a relatively
-// large minimum size requirement to be formatted.
+// The default disk size is about 55MiB, with about 51MiB dedicated to the data volume. This size
+// is chosen because the data volume has to be big enough to support f2fs (>= DEFAULT_F2FS_MIN_BYTES
+// defined in //src/storage/fshost/device/constants.rs), which has a relatively large minimum size
+// requirement to be formatted.
 //
 // Only the data volume is actually created with a specific size, the other volumes aren't passed
 // any sizes. Blobfs can resize itself on the fvm, and the other two potential volumes are only
 // used in specific circumstances and are never formatted. The remaining volume size is just used
 // for calculation.
-pub const DEFAULT_DATA_VOLUME_SIZE: u64 = 101 * 1024 * 1024;
+pub const DEFAULT_F2FS_MIN_BYTES: u64 = 50 * 1024 * 1024;
+pub const DEFAULT_DATA_VOLUME_SIZE: u64 = DEFAULT_F2FS_MIN_BYTES + 1024 * 1024;
 pub const DEFAULT_REMAINING_VOLUME_SIZE: u64 = 4 * 1024 * 1024;
 // For migration tests, we make sure that the default disk size is twice the data volume size to
 // allow a second full data partition.
@@ -325,6 +323,10 @@ impl DiskBuilder {
 
     pub async fn build(mut self) -> (zx::Vmo, Option<[u8; 16]>) {
         log::info!("building disk: {:?}", self);
+        if self.data_spec.format == Some("f2fs") {
+            assert!(self.data_volume_size >= DEFAULT_F2FS_MIN_BYTES);
+        }
+
         let vmo = zx::Vmo::create(self.size).unwrap();
 
         if self.uninitialized {
@@ -364,11 +366,8 @@ impl DiskBuilder {
             let partitions_dir = vfs::directory::immutable::simple();
             let manager =
                 GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
-            let scope = ExecutionScope::new();
-            let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end.into_channel())
-                .handle(|request| partitions_dir.open3(scope.clone(), Path::dot(), flags, request));
+            let dir =
+                vfs::directory::serve(partitions_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
             gpt = Some(manager);
             Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
         } else {

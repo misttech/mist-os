@@ -36,30 +36,30 @@ var tcpAdvancedExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{8, 21}:  Fail,
 	{8, 22}:  Fail,
 	{8, 23}:  Fail,
-	{9, 1}:   AnvlSkip,
-	{9, 2}:   AnvlSkip,
-	{10, 2}:  AnvlSkip,
-	{10, 17}: AnvlSkip,
-	{10, 18}: AnvlSkip,
-	{10, 19}: AnvlSkip,
-	{10, 20}: AnvlSkip,
-	{11, 17}: AnvlSkip,
-	{12, 2}:  AnvlSkip,
-	{12, 17}: AnvlSkip,
-	{13, 1}:  AnvlSkip,
-	{14, 17}: AnvlSkip,
-	{14, 19}: AnvlSkip,
-	{14, 20}: AnvlSkip,
-	{15, 17}: AnvlSkip,
-	{15, 18}: AnvlSkip,
-	{15, 19}: AnvlSkip,
-	{15, 20}: AnvlSkip,
-	{16, 1}:  AnvlSkip,
-	{16, 2}:  AnvlSkip,
-	{16, 3}:  AnvlSkip,
-	{16, 4}:  AnvlSkip,
-	{16, 5}:  AnvlSkip,
-	{16, 6}:  AnvlSkip,
+	{9, 1}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{9, 2}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 18}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 19}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 20}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{11, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{13, 1}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{14, 17}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{14, 19}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{14, 20}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 17}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 18}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 19}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 20}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{16, 1}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 2}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 3}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 4}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 5}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 6}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
 	{17, 1}:  Pass,
 	{17, 17}: Pass,
 	{17, 18}: Fail,
@@ -101,30 +101,30 @@ var tcpAdvancedExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCase
 	{8, 21}:  Fail,
 	{8, 22}:  Fail,
 	{8, 23}:  Fail,
-	{9, 1}:   AnvlSkip,
-	{9, 2}:   AnvlSkip,
-	{10, 2}:  AnvlSkip,
-	{10, 17}: AnvlSkip,
-	{10, 18}: AnvlSkip,
-	{10, 19}: AnvlSkip,
-	{10, 20}: AnvlSkip,
-	{11, 17}: AnvlSkip,
-	{12, 2}:  AnvlSkip,
-	{12, 17}: AnvlSkip,
-	{13, 1}:  AnvlSkip,
-	{14, 17}: AnvlSkip,
-	{14, 19}: AnvlSkip,
-	{14, 20}: AnvlSkip,
-	{15, 17}: AnvlSkip,
-	{15, 18}: AnvlSkip,
-	{15, 19}: AnvlSkip,
-	{15, 20}: AnvlSkip,
-	{16, 1}:  AnvlSkip,
-	{16, 2}:  AnvlSkip,
-	{16, 3}:  AnvlSkip,
-	{16, 4}:  AnvlSkip,
-	{16, 5}:  AnvlSkip,
-	{16, 6}:  AnvlSkip,
+	{9, 1}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{9, 2}:   AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 18}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 19}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{10, 20}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{11, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 2}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{12, 17}: AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{13, 1}:  AnvlSkip, // Tests RFC 2385 TCP MD5 Signature Option which is obsolete.
+	{14, 17}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{14, 19}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{14, 20}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 17}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 18}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 19}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{15, 20}: AnvlSkip, // Test requires IPv6, but this is the IPv4 suite.
+	{16, 1}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 2}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 3}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 4}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 5}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
+	{16, 6}:  Flaky,    // TODO(https://fxbug.dev/414886191): Fix flakiness.
 	{17, 1}:  Fail,
 	{17, 17}: Pass,
 	{17, 18}: Fail,

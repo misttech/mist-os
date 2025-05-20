@@ -5,7 +5,6 @@
 import("//build/bazel/bazel_build_action.gni")
 
 bazel_build_action("hello_world") {
-  no_sdk = true
   bazel_target = ":hello_world"
   copy_outputs = [
     {

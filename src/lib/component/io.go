@@ -131,12 +131,6 @@ func (*Service) Representation() io.Representation {
 	return io.Representation{}
 }
 
-func (*Service) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
-	var connectionInfo io.ConnectionInfo
-	connectionInfo.SetRights(io.OperationsConnect)
-	return connectionInfo, nil
-}
-
 func (*Service) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
@@ -149,7 +143,7 @@ func (*Service) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	}, nil
 }
 
-func (*Service) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
+func (*Service) DeprecatedSetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
@@ -324,13 +318,6 @@ func (*DirectoryWrapper) DescribeDeprecated() io.NodeInfoDeprecated {
 	return nodeInfo
 }
 
-func (*directoryState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
-	var connectionInfo io.ConnectionInfo
-	rights := io.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
-}
-
 func (*directoryState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
@@ -343,7 +330,7 @@ func (*directoryState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	}, nil
 }
 
-func (*directoryState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
+func (*directoryState) DeprecatedSetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 
@@ -736,13 +723,6 @@ func (*fileState) LinkInto(fidl.Context, zx.Event, string) (io.LinkableLinkIntoR
 	return io.LinkableLinkIntoResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (fState *fileState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
-	var connectionInfo io.ConnectionInfo
-	rights := io.RStarDir
-	connectionInfo.SetRights(rights)
-	return connectionInfo, nil
-}
-
 func (*fileState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
@@ -756,7 +736,7 @@ func (fState *fileState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error)
 	}, nil
 }
 
-func (*fileState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
+func (*fileState) DeprecatedSetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) (int32, error) {
 	return int32(zx.ErrNotSupported), nil
 }
 

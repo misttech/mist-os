@@ -91,10 +91,18 @@ pub struct OtDriver<OT, NI, BI> {
 
     /// Multicast routing manager:
     multicast_routing_manager: MulticastRoutingManager,
+
+    /// Allows for controlling the publishing of border agent services.
+    publisher: fidl_fuchsia_net_mdns::ServiceInstancePublisherProxy,
 }
 
 impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
-    pub fn new(ot_instance: OT, net_if: NI, backbone_if: BI) -> Self {
+    pub fn new(
+        ot_instance: OT,
+        net_if: NI,
+        backbone_if: BI,
+        publisher: fidl_fuchsia_net_mdns::ServiceInstancePublisherProxy,
+    ) -> Self {
         OtDriver {
             driver_state: fuchsia_sync::Mutex::new(DriverState::new(ot_instance)),
             driver_state_change: AsyncCondition::new(),
@@ -106,6 +114,7 @@ impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
             )),
             border_agent_vendor_txt_entries: futures::lock::Mutex::new(vec![]),
             multicast_routing_manager: MulticastRoutingManager::new(),
+            publisher,
         }
     }
 

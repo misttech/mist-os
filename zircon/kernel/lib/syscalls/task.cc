@@ -403,30 +403,7 @@ zx_status_t sys_process_start(zx_handle_t process_handle, zx_handle_t thread_han
     arg_handle = up->handle_table().RemoveHandle(*up, arg_handle_value);
   }
 
-  // test that the thread belongs to the starting process
-  if (thread->process() != process.get())
-    return ZX_ERR_ACCESS_DENIED;
-
-  zx_handle_t arg_nhv = ZX_HANDLE_INVALID;
-  if (arg_handle) {
-    if (!arg_handle->HasRights(ZX_RIGHT_TRANSFER))
-      return ZX_ERR_ACCESS_DENIED;
-    arg_nhv = process->handle_table().MapHandleToValue(arg_handle);
-    process->handle_table().AddHandle(ktl::move(arg_handle));
-  }
-
-  status =
-      thread->Start(ThreadDispatcher::EntryState{pc, sp, static_cast<uintptr_t>(arg_nhv), arg2},
-                    /* ensure_initial_thread */ true);
-  if (status != ZX_OK) {
-    if (arg_nhv != ZX_HANDLE_INVALID) {
-      // Remove |arg_handle| from the process that failed to start.
-      process->handle_table().RemoveHandle(*process, arg_nhv);
-    }
-    return status;
-  }
-
-  return ZX_OK;
+  return process->Start(ktl::move(thread), pc, sp, ktl::move(arg_handle), arg2);
 }
 
 void sys_process_exit(int64_t retcode) {

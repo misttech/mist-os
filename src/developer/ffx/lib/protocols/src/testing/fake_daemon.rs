@@ -227,7 +227,7 @@ impl DaemonProtocolProvider for FakeDaemon {
                 .query_single_enabled_target(&query)
                 .map_err(|_| DaemonError::TargetAmbiguous)?
                 .ok_or_else(|| {
-                    tracing::error!("couldn't find target for query: {:?}", query);
+                    log::error!("couldn't find target for query: {:?}", query);
                     DaemonError::TargetNotFound
                 })?,
         ))

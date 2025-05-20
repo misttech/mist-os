@@ -26,10 +26,11 @@ use netstack3_device::queue::{
 };
 use netstack3_device::socket::{ParseSentFrameError, SentFrame};
 use netstack3_device::{
-    ArpConfigContext, ArpContext, ArpNudCtx, ArpSenderContext, ArpState,
-    DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError, IpLinkDeviceState,
+    ArpConfigContext, ArpContext, ArpIpLayerContext, ArpNudCtx, ArpSenderContext, ArpState,
+    DeviceId, DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError,
+    IpLinkDeviceState,
 };
-use netstack3_ip::device::AssignedAddressState;
+use netstack3_ip::device::IpAddressState;
 use netstack3_ip::icmp::{self, NdpCounters};
 use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
@@ -213,8 +214,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
                 [NdpOptionBuilder::SourceLinkLayerAddress(mac.bytes().as_ref())].iter(),
             )
             .into_serializer(),
-            IcmpZeroCode,
-            NeighborSolicitation::new(lookup_addr.get()),
+            icmp::NdpMessage::NeighborSolicitation {
+                message: NeighborSolicitation::new(lookup_addr.get()),
+                code: IcmpZeroCode,
+            },
         );
     }
 }
@@ -330,21 +333,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         cb(&mut arp, &mut locked)
     }
 
-    fn addr_on_interface(&mut self, device_id: &EthernetDeviceId<BC>, addr: Ipv4Addr) -> bool {
-        let mut state = integration::device_state(self, device_id);
-        let mut state = state.cast();
-        let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
-        // NB: This assignment is satisfying borrow checking on state.
-        let x = ipv4.iter().map(|addr| addr.addr().addr()).any(|a| a == addr);
-        x
-    }
-
     fn get_protocol_addr(&mut self, device_id: &EthernetDeviceId<BC>) -> Option<Ipv4Addr> {
         let mut state = integration::device_state(self, device_id);
         let mut state = state.cast();
         let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
         // NB: This assignment is satisfying borrow checking on state.
-        let x = ipv4.iter().next().map(|addr| addr.addr().addr());
+        let x = ipv4.iter().next().map(|addr| addr.addr().get());
         x
     }
 
@@ -380,6 +374,27 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         let arp = core_ctx_and_resource
             .lock_with::<crate::lock_ordering::EthernetIpv4Arp, _>(|c| c.right());
         cb(&arp)
+    }
+}
+
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
+    ArpIpLayerContext<EthernetLinkDevice, BC> for CoreCtx<'_, BC, L>
+{
+    fn on_arp_packet(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &EthernetDeviceId<BC>,
+        sender_addr: Ipv4Addr,
+        target_addr: Ipv4Addr,
+    ) -> IpAddressState {
+        let device_id = DeviceId::Ethernet(device_id.clone());
+        netstack3_ip::device::on_arp_packet(
+            self,
+            bindings_ctx,
+            &device_id,
+            sender_addr,
+            target_addr,
+        )
     }
 }
 

@@ -86,6 +86,9 @@ if (is_ubsan) {
 # statically-linked libc, but that will happen eventually.
 libc_namespace = "__fuchsia_libc"
 
+# This is used instead of $libc_namespace in the .testonly targets.
+libc_test_namespace = "fuchsia_libc_unittest"
+
 # Define source_set() targets for some libc code.
 #
 # This defines two source_set() targets, one with the main target name and one
@@ -135,6 +138,11 @@ libc_namespace = "__fuchsia_libc"
 #   * libc_deps
 #     - Optional: Used for deps on other libc_source_set() targets; as if each
 #     label were in $non_test_deps, and "$label.testonly" in $testonly_deps.
+#     - Type: list(label)
+#     - Default: []
+#
+#   * libc_public_deps
+#     - Optional: Just like $libc_deps, but for $public_deps.
 #     - Type: list(label)
 #     - Default: []
 #
@@ -199,6 +207,7 @@ template("libc_source_set") {
                              "dir",
                              "global_symbols",
                              "libc_deps",
+                             "libc_public_deps",
                              "local_sources",
                              "non_test_deps",
                              "non_test_vars",
@@ -316,12 +325,16 @@ template("libc_source_set") {
         }
         configs += libc_configs + set_configs
         deps = []
+        public_deps = []
         forward_variables_from(set_vars, "*")
         if (defined(invoker.non_test_vars)) {
           forward_variables_from(invoker.non_test_vars, "*")
         }
         if (defined(invoker.libc_deps)) {
           deps += invoker.libc_deps
+        }
+        if (defined(invoker.libc_public_deps)) {
+          public_deps += invoker.libc_public_deps
         }
         if (defined(invoker.non_test_deps)) {
           deps += invoker.non_test_deps
@@ -358,10 +371,16 @@ template("libc_source_set") {
     }
     configs += libc_testonly_configs + set_configs
     deps = []
+    public_deps = []
     forward_variables_from(set_vars, "*")
     if (defined(invoker.libc_deps)) {
       foreach(label, invoker.libc_deps) {
         deps += [ "$label.testonly" ]
+      }
+    }
+    if (defined(invoker.libc_public_deps)) {
+      foreach(label, invoker.libc_public_deps) {
+        public_deps += [ "$label.testonly" ]
       }
     }
     if (defined(invoker.testonly_deps)) {

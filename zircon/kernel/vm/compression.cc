@@ -13,6 +13,7 @@
 #include <vm/lz4_compressor.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
+#include <vm/slot_page_storage.h>
 #include <vm/tri_page_storage.h>
 #include <vm/vm.h>
 
@@ -55,7 +56,9 @@ VmCompression::VmCompression(fbl::RefPtr<VmCompressedStorage> storage,
     : storage_(ktl::move(storage)),
       strategy_(ktl::move(strategy)),
       compression_threshold_(ensure_threshold(compression_threshold)),
-      instance_(*this, kTempReferenceValue) {
+      // Currently only a single VmCompressor instance is supported, so only a single temporary
+      // reference value (the reserved value) is needed.
+      instance_(*this, CompressedRef::GetReservedValue().value()) {
   ASSERT(storage_);
   ASSERT(strategy_);
   // Ensure we can steal space to store the compression timestamp.
@@ -254,6 +257,14 @@ fbl::RefPtr<VmCompression> VmCompression::CreateDefault() {
         return nullptr;
       }
       printf("[ZRAM]: Using compressed storage strategy: tri_page\n");
+      break;
+    case CompressionStorageStrategy::kSlot:
+      storage = fbl::AdoptRef<VmSlotPageStorage>(new (&ac) VmSlotPageStorage());
+      if (!ac.check()) {
+        printf("[ZRAM]: Failed to create slot compressed storage area\n");
+        return nullptr;
+      }
+      printf("[ZRAM]: Using compressed storage strategy: slot\n");
       break;
     case CompressionStorageStrategy::kNone:
       // Original check should have handled this.

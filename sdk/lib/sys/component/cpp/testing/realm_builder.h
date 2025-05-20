@@ -380,14 +380,13 @@ class RealmBuilder final {
                fuchsia::component::test::BuilderSyncPtr builder_proxy,
                fuchsia::component::test::RealmSyncPtr test_realm_proxy);
 
-  static RealmBuilder CreateImpl(
-      cpp17::optional<std::string_view> fragment_only_url = cpp17::nullopt,
-      std::shared_ptr<sys::ServiceDirectory> svc = nullptr);
+  static RealmBuilder CreateImpl(std::optional<std::string_view> fragment_only_url = std::nullopt,
+                                 std::shared_ptr<sys::ServiceDirectory> svc = nullptr);
 
   bool realm_commited_ = false;
   bool start_on_build_ = true;
   std::string realm_collection_ = kDefaultCollection;
-  cpp17::optional<std::string> realm_name_ = cpp17::nullopt;
+  std::optional<std::string> realm_name_ = std::nullopt;
   std::shared_ptr<sys::ServiceDirectory> svc_;
   fuchsia::component::test::BuilderSyncPtr builder_proxy_;
   std::shared_ptr<internal::LocalComponentRunner::Builder> runner_builder_;

@@ -8,8 +8,8 @@
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_X86_CACHE_H_
 
 #include <lib/arch/x86/cpuid.h>
-#include <lib/stdcompat/bit.h>
 
+#include <bit>
 #include <optional>
 #include <type_traits>
 
@@ -196,7 +196,7 @@ class CpuCacheInfo {
     }
   }
 
-  static size_t CeilLog2(size_t n) { return cpp20::countr_zero(cpp20::bit_ceil(n)); }
+  static size_t CeilLog2(size_t n) { return std::countr_zero(std::bit_ceil(n)); }
 
   CpuCacheLevelInfo caches_[kMaxNumCaches];
   // Gives the actual number of `caches_` on which we have information.

@@ -136,6 +136,7 @@ void BtHciBroadcom::GetFeatures(GetFeaturesCompleter::Sync& completer) {
   fidl::Arena arena;
   auto builder = fhbt::wire::VendorFeatures::Builder(arena);
   builder.acl_priority_command(true);
+  builder.android_vendor_extensions(fhbt::wire::AndroidVendorSupport::Builder(arena).Build());
   completer.Reply(builder.Build());
 }
 
@@ -371,7 +372,7 @@ fpromise::promise<> BtHciBroadcom::LogControllerFallbackBdaddr() {
       });
 }
 
-constexpr auto kOpenFlags = fuchsia_io::Flags::kPermRead | fuchsia_io::Flags::kProtocolFile;
+constexpr auto kOpenFlags = fuchsia_io::Flags::kPermReadBytes | fuchsia_io::Flags::kProtocolFile;
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;

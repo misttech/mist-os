@@ -17,7 +17,7 @@ const BUFFER_SIZE: usize = 4096;
 
 /// Host-pipe-like task for communicating via vsock.
 pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
-    tracing::debug!(cid, "Spawning VSOCK host pipe");
+    log::debug!(cid; "Spawning VSOCK host pipe");
     let addr = VsockAddr::new(cid, OVERNET_VSOCK_PORT);
     #[cfg(not(target_os = "macos"))]
     let flags = SockFlag::SOCK_CLOEXEC | SockFlag::SOCK_NONBLOCK;
@@ -27,7 +27,7 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
     let socket = match socket(AddressFamily::Vsock, SockType::Stream, flags, None) {
         Ok(s) => s,
         Err(error) => {
-            tracing::warn!(cid, ?error, "Could not create VSOCK socket");
+            log::warn!(cid, error:?; "Could not create VSOCK socket");
             return;
         }
     };
@@ -39,7 +39,7 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
         if let Err(error) =
             fcntl(socket.as_raw_fd(), FcntlArg::F_SETFL(OFlag::O_NONBLOCK | OFlag::O_CLOEXEC))
         {
-            tracing::warn!(cid, ?error, "Could not set O_CLOEXEC|O_NONBLOCK on VSOCK socket");
+            log::warn!(cid, error:?; "Could not set O_CLOEXEC|O_NONBLOCK on VSOCK socket");
             return;
         }
     }
@@ -47,14 +47,14 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
     let socket = match tokio::io::unix::AsyncFd::new(socket) {
         Ok(s) => s,
         Err(error) => {
-            tracing::warn!(?error, "Could not create Tokio AsyncFD for VSOCK socket");
+            log::warn!(error:?; "Could not create Tokio AsyncFD for VSOCK socket");
             return;
         }
     };
 
     if let Err(error) = connect(socket.as_raw_fd(), &addr) {
         if error != Errno::EINPROGRESS {
-            tracing::warn!(cid, ?error, "Could not connect to VSOCK socket");
+            log::warn!(cid, error:?; "Could not connect to VSOCK socket");
             return;
         }
     }
@@ -62,9 +62,9 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
     // If we got EINPROGRESS above then the connection isn't actually
     // established and we need to block until it is.
     if let Err(error) = socket.writable().await {
-        tracing::warn!(
+        log::warn!(
             cid,
-            ?error,
+            error:?;
             "Error while waiting for VSOCK to become ready after connection"
         );
         return;
@@ -72,19 +72,19 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
         let error = match getsockopt(&socket, SocketError) {
             Ok(e) => e,
             Err(error) => {
-                tracing::warn!(cid, ?error, "Could not verify connection to VSOCK socket");
+                log::warn!(cid, error:?; "Could not verify connection to VSOCK socket");
                 return;
             }
         };
 
         if error != 0 {
             let error = Errno::from_raw(error);
-            tracing::warn!(cid, ?error, "Could not complete connection to VSOCK socket");
+            log::warn!(cid, error:?; "Could not complete connection to VSOCK socket");
             return;
         }
     }
 
-    tracing::debug!(cid, "VSOCK connection established");
+    log::debug!(cid; "VSOCK connection established");
 
     let (in_reader, in_writer) = circuit::stream::stream();
     let (out_reader, out_writer) = circuit::stream::stream();
@@ -102,14 +102,14 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
 
     let conn = async move {
         if let Err(error) = conn.await {
-            tracing::warn!(cid, ?error, "VSOCK Connection failed");
+            log::warn!(cid, error:?; "VSOCK Connection failed");
         }
     };
 
     let error_logger = {
         async move {
             while let Some(error) = error_receiver.next().await {
-                tracing::debug!(vsock_cid = cid, ?error, "Stream encountered an error");
+                log::debug!(vsock_cid = cid, error:?; "Stream encountered an error");
             }
         }
     };
@@ -121,7 +121,7 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
                 let mut socket = match socket.readable().await {
                     Ok(s) => s,
                     Err(error) => {
-                        tracing::warn!(cid, ?error, "Error waiting for data from VSOCK");
+                        log::warn!(cid, error:?; "Error waiting for data from VSOCK");
                         break;
                     }
                 };
@@ -140,9 +140,9 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
                     }
                 }) {
                     if let circuit::Error::ConnectionClosed(reason) = error {
-                        tracing::debug!(cid, ?reason, "VSOCK connection closed");
+                        log::debug!(cid, reason:?; "VSOCK connection closed");
                     } else {
-                        tracing::warn!(cid, ?error, "VSOCK connection read error")
+                        log::warn!(cid, error:?; "VSOCK connection read error")
                     }
                     break;
                 }
@@ -157,7 +157,7 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
                 let mut socket = match socket.writable().await {
                     Ok(s) => s,
                     Err(error) => {
-                        tracing::warn!(cid, ?error, "Error waiting for data from VSOCK");
+                        log::warn!(cid, error:?; "Error waiting for data from VSOCK");
                         break;
                     }
                 };
@@ -177,9 +177,9 @@ pub async fn spawn_vsock(cid: u32, node: Arc<overnet_core::Router>) {
                     .await
                 {
                     if let circuit::Error::ConnectionClosed(reason) = error {
-                        tracing::debug!(cid, ?reason, "VSOCK connection closed");
+                        log::debug!(cid, reason:?; "VSOCK connection closed");
                     } else {
-                        tracing::warn!(cid, ?error, "VSOCK connection write error")
+                        log::warn!(cid, error:?; "VSOCK connection write error")
                     }
                     break;
                 }

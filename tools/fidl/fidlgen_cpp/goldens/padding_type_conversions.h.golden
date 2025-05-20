@@ -260,9 +260,6 @@ struct WireTypeForNaturalType<::test_padding::Padding2ByteAlignmentLength6> {
   using type = ::test_padding::wire::Padding2ByteAlignmentLength6;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

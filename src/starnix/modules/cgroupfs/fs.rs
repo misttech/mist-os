@@ -31,8 +31,7 @@ impl CgroupV1Fs {
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let weak_kernel = Arc::downgrade(current_task.kernel());
-        let root = CgroupRoot::new(weak_kernel);
+        let root = CgroupRoot::new();
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&root));
         let root_dir = dir_nodes.root.clone();
         let fs = FileSystem::new(

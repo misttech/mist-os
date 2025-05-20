@@ -7,18 +7,18 @@
 #include "phys/boot-zbi.h"
 
 #include <inttypes.h>
-#include <lib/arch/zbi-boot.h>
 #include <lib/memalloc/range.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/item.h>
 
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
+#include <phys/zbi.h>
 #include <pretty/cpp/sizes.h>
 
 #include <ktl/enforce.h>
@@ -71,12 +71,12 @@ constexpr fit::error<BootZbi::Error> OutputError(
   }};
 }
 
-const arch::ZbiKernelImage* GetZirconKernel(const ktl::byte* kernel_payload) {
-  return reinterpret_cast<const arch::ZbiKernelImage*>(
+const ZbiKernelImage* GetZirconKernel(const ktl::byte* kernel_payload) {
+  return reinterpret_cast<const ZbiKernelImage*>(
       // The payload is the kernel item contents, i.e. the zbi_kernel_t header
       // followed by the rest of the load image.  But the actual kernel load
       // image for purposes of address arithmetic is defined as being the whole
-      // ZBI container, i.e. the whole arch::ZbiKernelImage enchilada that has the
+      // ZBI container, i.e. the whole ZbiKernelImage enchilada that has the
       // ZBI file (container) zbi_header_t followed by the kernel item's
       // zbi_header_t followed by that payload.  In a proper bootable ZBI, the
       // kernel item must be first and so kernel_ could always just be set to
@@ -85,7 +85,7 @@ const arch::ZbiKernelImage* GetZirconKernel(const ktl::byte* kernel_payload) {
       // code and hence the kernel item might not be the first item in the
       // container here. So, instead calculate the offset back from this
       // payload in memory to where the beginning of the whole container would
-      // be: thus the arch::ZbiKernelImage pointer here finds the zbi_kernel_t
+      // be: thus the ZbiKernelImage pointer here finds the zbi_kernel_t
       // payload in the right place in memory, and the kernel item zbi_header_t
       // before it.  Nothing in the kernel boot protocol actually cares about
       // looking at the container zbi_header_t (or the kernel item
@@ -94,7 +94,7 @@ const arch::ZbiKernelImage* GetZirconKernel(const ktl::byte* kernel_payload) {
       // loading.  The later uses of kernel_ in Load() and elsewhere likewise
       // don't care about those headers, only about the zbi_kernel_t portion
       // and the aligned physical memory address that corresponds to the
-      // arch::ZbiKernelImage pointer.  Unlike the formal ZBI boot protocol, the
+      // ZbiKernelImage pointer.  Unlike the formal ZBI boot protocol, the
       // Load() code handles the case where this address is not properly
       // aligned for the kernel handoff; but in the likely event that this
       // initial address is actually aligned, Load() may be able to avoid
@@ -105,7 +105,7 @@ const arch::ZbiKernelImage* GetZirconKernel(const ktl::byte* kernel_payload) {
 }  // namespace
 
 BootZbi::Size BootZbi::SuggestedAllocation(uint32_t zbi_size_bytes) {
-  return {.size = zbi_size_bytes, .alignment = arch::kZbiBootKernelAlignment};
+  return {.size = zbi_size_bytes, .alignment = kArchZbiKernelAlignment};
 }
 
 BootZbi::Size BootZbi::GetKernelAllocationSize(BootZbi::Zbi::iterator kernel_item) {
@@ -144,7 +144,7 @@ fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi) {
     auto [header, payload] = *it;
 
     switch (header->type) {
-      case arch::kZbiBootKernelType: {
+      case kArchZbiKernelType: {
         kernel_item_ = it;
         // Valid kernel_item implies no iteration error.
         zbi_.ignore_error();
@@ -190,7 +190,7 @@ fit::result<BootZbi::Error> BootZbi::Init(InputZbi arg_zbi, InputZbi::iterator k
 
 bool BootZbi::KernelCanLoadInPlace() const {
   // The kernel (container header) must be aligned as per the ZBI protocol.
-  if (KernelLoadAddress() % arch::kZbiBootKernelAlignment != 0) {
+  if (KernelLoadAddress() % kArchZbiKernelAlignment != 0) {
     return false;
   }
 
@@ -257,7 +257,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
   //         DLA = DataLoadAddress(), DLS = DataLoadSize()
   //         EDC = extra_data_capacity argument to Load()
   //
-  // Kernel memory image, aligned to arch::kZbiBootKernelAlignment:
+  // Kernel memory image, aligned to kArchZbiKernelAlignment:
   //
   //                     KLA +  0: zbi_header_t (ZBI_TYPE_CONTAINER, ignored)
   //                     KLA + 32: zbi_header_t (ZBI_TYPE_KERNEL_*, ignored)
@@ -271,7 +271,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
   //                    KLA + KLS: ...zbi_kernel_t.reserve_memory_size bytes...
   //                    KLA + KMS: <end of kernel memory image>
   //
-  // Data ZBI image, aligned to arch::kZbiBootDataAlignment:
+  // Data ZBI image, aligned to kArchZbiDataAlignment:
   //
   //                     DLA +  0: zbi_header_t       (ZBI_TYPE_CONTAINER)
   //                     DLA + 32: zbi_header_t       (first data item)
@@ -301,7 +301,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
   // start before kernel_item_.  In that case kernel_ now points 32 bytes back
   // into the ~~~ discard area.  When there are no discard items, then kernel_
   // now points directly at the start of the container; if this is already
-  // aligned to arch::kZbiBootKernelAlignment, then it may be possible to use
+  // aligned to kArchZbiKernelAlignment, then it may be possible to use
   // it where it is.
   //
   // In the kernel memory image, the ZBI headers and the zbi_kernel_t payload
@@ -333,7 +333,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
   uint32_t data_load_size = sizeof(zbi_header_t);
   if (it != zbi_.end()) {
     data_address = input_address + it.item_offset() - sizeof(zbi_header_t);
-    aligned_data_address = data_address & -arch::kZbiBootDataAlignment;
+    aligned_data_address = data_address & -kArchZbiDataAlignment;
     data_load_size =
         static_cast<uint32_t>(zbi_.size_bytes() - it.item_offset()) + sizeof(zbi_header_t);
   }
@@ -345,7 +345,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
   // already exactly aligned to leave space for a header with correct
   // alignment, or there's enough space to insert a ZBI_TYPE_DISCARD item after
   // an aligned header.
-  if (data_address != 0 && data_address % arch::kZbiBootDataAlignment == 0) {
+  if (data_address != 0 && data_address % kArchZbiDataAlignment == 0) {
     // It so happens it's perfectly aligned to use the whole thing in place.
     // The lower pages used for the kernel image will just be skipped over.
     data_.storage() = {
@@ -373,7 +373,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
   // If we can reuse either the kernel image or the data ZBI items in place,
   // choose whichever makes for less copying.
   if (input_address + input_capacity - data_address < data_required_size ||
-      (KernelCanLoadInPlace() && KernelLoadSize() < data_load_size)) {
+      (KernelCanLoadInPlace() && KernelLoadSize() > data_load_size)) {
     data_.storage() = {};
   }
 
@@ -389,20 +389,20 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
     fbl::AllocChecker ac;
     kernel_buffer_ =
         Allocation::New(ac, memalloc::Type::kKernel, static_cast<size_t>(KernelMemorySize()),
-                        arch::kZbiBootKernelAlignment);
+                        kArchZbiKernelAlignment);
     if (!ac.check()) {
       return WriteError("cannot allocate memory for kernel image",
                         static_cast<uint32_t>(KernelMemorySize()));
     }
     memcpy(kernel_buffer_.get(), KernelImage(), KernelLoadSize());
-    kernel_ = reinterpret_cast<arch::ZbiKernelImage*>(kernel_buffer_.get());
+    kernel_ = reinterpret_cast<ZbiKernelImage*>(kernel_buffer_.get());
   }
 
   if (data_.storage().empty()) {
     // Allocate new space for the data ZBI and copy it over.
     fbl::AllocChecker ac;
-    data_buffer_ = Allocation::New(ac, memalloc::Type::kDataZbi, data_required_size,
-                                   arch::kZbiBootDataAlignment);
+    data_buffer_ =
+        Allocation::New(ac, memalloc::Type::kDataZbi, data_required_size, kArchZbiDataAlignment);
     if (!ac.check()) {
       return WriteError("cannot allocate memory for data ZBI", data_required_size);
     }
@@ -413,7 +413,7 @@ fit::result<BootZbi::Error> BootZbi::Load(uint32_t extra_data_capacity,
     if (auto result = data_.Extend(it, zbi_.end()); result.is_error()) {
       return OutputError(result.error_value());
     }
-  } else if (data_address % arch::kZbiBootDataAlignment == 0) {
+  } else if (data_address % kArchZbiDataAlignment == 0) {
     // The data ZBI is perfect where it is.  Just overwrite where the end
     // of the kernel item was copied from with the new container header.
     auto hdr = reinterpret_cast<zbi_header_t*>(data_.storage().data());
@@ -449,8 +449,7 @@ void BootZbi::Log() {
 
 [[noreturn]] void BootZbi::Boot(ktl::optional<void*> argument) {
   ZX_ASSERT_MSG(KernelCanLoadInPlace(), "Has Load() been called?");
-  auto kernel_hdr = const_cast<arch::ZbiKernelImage*>(kernel_);
-  ZbiBoot(kernel_hdr, argument.value_or(data_.storage().data()));
+  ZbiBoot(static_cast<uintptr_t>(KernelEntryAddress()), argument.value_or(data_.storage().data()));
 }
 
 #define ADDR "0x%016" PRIx64

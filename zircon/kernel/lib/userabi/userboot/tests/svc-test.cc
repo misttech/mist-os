@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/standalone-test/standalone.h>
-#include <lib/stdcompat/array.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
 #include <zircon/errors.h>
@@ -13,6 +12,7 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
+#include <array>
 #include <cstdint>
 #include <string_view>
 
@@ -77,7 +77,7 @@ TEST_F(SvcSingleProcessTest, WritingIntoSvcShowsUpInStashHandle) {
   ASSERT_TRUE(local_svc()->is_valid());
   ASSERT_TRUE(stashed_svc()->is_valid());
 
-  auto written_message = cpp20::to_array("Hello World!");
+  auto written_message = std::to_array("Hello World!");
   ASSERT_OK(local_svc()->write(0, written_message.data(), written_message.size(), nullptr, 0));
   decltype(written_message) read_message = {};
   uint32_t actual_bytes, actual_handles;

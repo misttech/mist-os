@@ -62,7 +62,7 @@ func TestRunCommands(t *testing.T) {
 	socketPath := fmt.Sprintf("%d.sock", rand.Uint32())
 	defer os.Remove(socketPath)
 	server := fakeSerialServer{
-		shutdownString: "dm shutdown",
+		shutdownString: "power shutdown",
 		socketPath:     socketPath,
 		listeningChan:  make(chan bool),
 	}

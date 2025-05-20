@@ -15,6 +15,8 @@ from honeydew.transports.fuchsia_controller import (
 
 
 class BluetoothGapFCTests(unittest.TestCase):
+    """Unittests for Bluetooth GAP over FC."""
+
     def setUp(self) -> None:
         super().setUp()
         self.reboot_affordance_obj = mock.MagicMock(

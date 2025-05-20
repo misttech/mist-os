@@ -40,7 +40,7 @@ impl EventPair {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Duration, MonotonicInstant, Signals, Status};
+    use crate::{Duration, MonotonicInstant, Signals, WaitResult};
 
     #[test]
     fn wait_and_signal_peer() {
@@ -50,7 +50,7 @@ mod tests {
         // Waiting on one without setting any signal should time out.
         assert_eq!(
             p2.wait_handle(Signals::USER_0, MonotonicInstant::after(eighty_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty())
         );
 
         // If we set a signal, we should be able to wait for it.
@@ -70,7 +70,7 @@ mod tests {
         assert!(p1.signal_peer(Signals::USER_0, Signals::NONE).is_ok());
         assert_eq!(
             p2.wait_handle(Signals::USER_0, MonotonicInstant::after(eighty_ms)),
-            Err(Status::TIMED_OUT)
+            WaitResult::TimedOut(Signals::empty())
         );
     }
 }

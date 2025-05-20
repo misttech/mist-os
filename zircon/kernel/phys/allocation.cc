@@ -11,8 +11,8 @@
 #include <zircon/assert.h>
 
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/main.h>
 
 #include <ktl/enforce.h>

@@ -99,16 +99,17 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   // main methods
   zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
                             size_t* mapped) override;
+  using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
   zx_status_t Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
                   ExistingEntryAction existing_action, size_t* mapped) override;
-  zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                     size_t* unmapped) override;
   // x86 may generate duplicate TLB entries if changing the translation size of mapping, but this
   // does not lead to any incorrectness as long as the we invalidate the TLB (which we do),
   // therefore unmap is safe to split large pages without enlarging.
   bool UnmapOnlyEnlargeOnOom() const override { return true; }
   zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                      EnlargeOperation enlarge) override;
+                      ArchUnmapOptions enlarge) override;
   zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) override;
 
   vaddr_t PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size_t size, uint mmu_flags) override;
@@ -120,7 +121,7 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t HarvestAccessed(vaddr_t vaddr, size_t count, NonTerminalAction non_terminal_action,
                               TerminalAction terminal_action) override;
 
-  bool ActiveSinceLastCheck(bool clear) override;
+  bool AccessedSinceLastCheck(bool clear) override;
 
   paddr_t arch_table_phys() const override { return pt_->phys(); }
   paddr_t pt_phys() const { return pt_->phys(); }
@@ -156,15 +157,6 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   // Helper method to allocate a PCID for this ArchVmAspace.
   zx_status_t AllocatePCID();
 
-  // Helper method to mark this aspace active.
-  // This exists for clarity of call sites so that the comment explaining why this is done can be in
-  // one location.
-  void MarkAspaceModified() {
-    // If an aspace has been manipulated via a direction operation, then we want to try it
-    // equivalent to if it had been active on a CPU, since it may now have active/dirty information.
-    active_since_last_check_.store(true, ktl::memory_order_relaxed);
-  }
-
   bool IsUnified() const { return pt_->IsUnified(); }
 
   fbl::Canary<fbl::magic("VAAS")> canary_;
@@ -195,8 +187,8 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   // CPUs that are currently executing in this aspace.
   ktl::atomic<cpu_mask_t> active_cpus_{0};
 
-  // Whether not this has been active since |ActiveSinceLastCheck| was called.
-  ktl::atomic<bool> active_since_last_check_ = false;
+  // Whether not this has been accessed since |AccessedSinceLastCheck| was called.
+  ktl::atomic<bool> accessed_since_last_check_ = false;
 
   // A bitmap of cpus where the current PCID that was assigned is now dirty and should
   // be flushed on the next context switch.

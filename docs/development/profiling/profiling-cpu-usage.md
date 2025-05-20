@@ -32,7 +32,7 @@ do the following:
    for example:
 
    ```posix-terminal
-   ffx profiler attach --pid <TARGET_PID> --duration 5
+   ffx profiler attach --pids <TARGET_PID> --duration 5
    ```
 
    This command profiles `<TARGET_PID>` for 5 seconds, then creates

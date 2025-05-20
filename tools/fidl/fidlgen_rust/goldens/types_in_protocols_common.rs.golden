@@ -268,6 +268,45 @@ impl Union {
 
 impl fidl::Persistable for Union {}
 
+pub mod protocol_ordinals {
+    pub const ONE_WAY_BASIC: u64 = 0x7c311f0d9e662df9;
+    pub const TWO_WAY_BASIC: u64 = 0x205b92db5139c88f;
+    pub const ERROR_BASIC: u64 = 0x459eaa5d11b9ff93;
+    pub const EVENT_BASIC: u64 = 0x51c5b06295c10c40;
+    pub const ONE_WAY_COMPOUND: u64 = 0x2bc2bc3a9237c6cc;
+    pub const TWO_WAY_COMPOUND: u64 = 0x79f279c7201da131;
+    pub const ERROR_COMPOUND: u64 = 0x29817d89a19ec77d;
+    pub const EVENT_COMPOUND: u64 = 0x617c5410858734d5;
+    pub const ONE_WAY_ARRAY_BASIC: u64 = 0x62e2ebcadf35ca19;
+    pub const TWO_WAY_ARRAY_BASIC: u64 = 0x49ad7a74e28ba114;
+    pub const ERROR_ARRAY_BASIC: u64 = 0xf0dbde9626fff79;
+    pub const EVENT_ARRAY_BASIC: u64 = 0x51b76208b148f02e;
+    pub const ONE_WAY_ARRAY_COMPOUND: u64 = 0x464948bae1bda09d;
+    pub const TWO_WAY_ARRAY_COMPOUND: u64 = 0xbcae616f8e1ea7b;
+    pub const ERROR_ARRAY_COMPOUND: u64 = 0x52257f80e29c1a04;
+    pub const EVENT_ARRAY_COMPOUND: u64 = 0x1e63a00079aa7415;
+    pub const ONE_WAY_VECTOR_BASIC: u64 = 0x4f907dde77464657;
+    pub const TWO_WAY_VECTOR_BASIC: u64 = 0x7860cb3ed8362e74;
+    pub const ERROR_VECTOR_BASIC: u64 = 0xc27f841d6313f72;
+    pub const EVENT_VECTOR_BASIC: u64 = 0x3f9d405e7191eff6;
+    pub const ONE_WAY_VECTOR_COMPOUND: u64 = 0x19baae42829dbe90;
+    pub const TWO_WAY_VECTOR_COMPOUND: u64 = 0x371140db701b23b4;
+    pub const ERROR_VECTOR_COMPOUND: u64 = 0x760e278628f7a985;
+    pub const EVENT_VECTOR_COMPOUND: u64 = 0x53a1fc56e8b3cff3;
+    pub const ONE_WAY_VECTOR_OPTIONAL: u64 = 0x153c6b333c21c52f;
+    pub const TWO_WAY_VECTOR_OPTIONAL: u64 = 0xe4b620aaafd73f3;
+    pub const ERROR_VECTOR_OPTIONAL: u64 = 0x58e75cf86e2d715e;
+    pub const EVENT_VECTOR_OPTIONAL: u64 = 0x17617b54dfa8d85d;
+    pub const ONE_WAY_ARRAY_VECTOR_NESTED: u64 = 0x520dc9cb9b9b5ed7;
+    pub const TWO_WAY_ARRAY_VECTOR_NESTED: u64 = 0x4a438ce0948817dc;
+    pub const ERROR_ARRAY_VECTOR_NESTED: u64 = 0x7e168d89e1dac8a7;
+    pub const EVENT_ARRAY_VECTOR_NESTED: u64 = 0x110b72cfebc4037e;
+    pub const ONE_WAY_RESOURCE: u64 = 0x5af4795a9ed3a022;
+    pub const TWO_WAY_RESOURCE: u64 = 0x1904824a11c6ad5b;
+    pub const ERROR_RESOURCE: u64 = 0x5b28634d603175b6;
+    pub const EVENT_RESOURCE: u64 = 0x4fbde2864601698b;
+}
+
 mod internal {
     use super::*;
     unsafe impl fidl::encoding::TypeMarker for Bits {

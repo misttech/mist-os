@@ -296,18 +296,18 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 if reused {
                     self.cmd.reuse = true;
                     let message = "[emulator] Reusing existing instance.";
-                    tracing::info!("{message}");
+                    log::info!("{message}");
                     writer.line(message)?;
                 } else {
                     // They do not match, so don't reuse and reset the engine.
                     self.cmd.reuse = false;
                     let message =
                         "[emulator] Created new instance. Product bundle data has changed.";
-                    tracing::info!("{message}");
+                    log::info!("{message}");
                     writer.line(message)?;
                 }
             } else {
-                tracing::debug!("No existing instance to check as reusable.");
+                log::debug!("No existing instance to check as reusable.");
                 engine =
                     self.engine_operations.new_engine(&emulator_configuration, engine_type).await?;
                 let config = engine.emu_config_mut();
@@ -336,7 +336,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
 
                     engine.save_to_disk().await?;
                     let message = "[emulator] Reusing existing instance.";
-                    tracing::info!("{message}");
+                    log::info!("{message}");
                     writer.line(message)?;
                 } else {
                     let message = format!(
@@ -344,7 +344,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                         Creating a new emulator named '{name}'.",
                         name = emulator_configuration.runtime.name
                     );
-                    tracing::debug!("{message}");
+                    log::debug!("{message}");
                     writer.line("{message}")?;
                     self.cmd.reuse = false;
                     engine = self
@@ -390,7 +390,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
             let mac = generate_mac_address(&self.cmd.name.as_ref().unwrap());
             let m: Vec<_> = mac.split(":").collect();
             let name = format!("fuchsia-{}{}-{}{}-{}{}", m[0], m[1], m[2], m[3], m[4], m[5]);
-            tracing::info!("Setting emulator name to {} for --uefi", name);
+            log::info!("Setting emulator name to {} for --uefi", name);
             self.cmd.name = Some(name);
         }
 
@@ -491,7 +491,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 "[emulator] defaulting to qemu engine to support {unsupported_feature}.\n\
                 Use `--engine` to explicitly set the engine type if needed."
             );
-            tracing::warn!(msg);
+            log::warn!("{}", msg);
             writer.line(msg)?;
             return Ok("qemu".into());
         }
@@ -508,7 +508,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
         new_config: &EmulatorConfiguration,
         mut engine: Box<dyn EmulatorEngine>,
     ) -> Result<(bool, Box<dyn EmulatorEngine>)> {
-        tracing::debug!(
+        log::debug!(
             "New config image files kernel: {kernel:?} zbi:{zbi:?} disk:{fvm:?}",
             zbi = new_config.guest.zbi_image,
             fvm = new_config.guest.disk_image,
@@ -565,7 +565,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::Image;
+    use assembled_system::Image;
     use assembly_partitions_config::PartitionsConfig;
     use camino::{Utf8Path, Utf8PathBuf};
     use emulator_instance::{LogLevel, RuntimeConfig};

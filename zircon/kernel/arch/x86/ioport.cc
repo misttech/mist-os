@@ -19,8 +19,8 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mp.h>
 #include <kernel/thread.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/vm.h>
 #include <vm/vm_aspace.h>
 

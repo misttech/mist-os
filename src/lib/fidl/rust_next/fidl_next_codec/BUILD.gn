@@ -12,17 +12,18 @@ rustc_library("fidl_next_codec") {
   sources = [
     "src/chunk.rs",
     "src/compat.rs",
+    "src/copy_optimization.rs",
     "src/decode/error.rs",
     "src/decode/mod.rs",
+    "src/decoded.rs",
     "src/decoder.rs",
     "src/encode/error.rs",
     "src/encode/mod.rs",
     "src/encoder.rs",
+    "src/from_wire.rs",
     "src/lib.rs",
-    "src/owned.rs",
     "src/primitives.rs",
     "src/slot.rs",
-    "src/take.rs",
     "src/testing.rs",
     "src/wire/boxed.rs",
     "src/wire/envelope.rs",
@@ -45,6 +46,12 @@ rustc_library("fidl_next_codec") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]
+  features = []
+
+  # Enables compatibility impls with the existing Rust bindings.
+  # This can be removed once we no longer require backwards compatibility.
+  features += [ "compat" ]
+  deps += [ "//src/lib/fidl/rust/fidl" ]
 
   if (is_fuchsia) {
     sources += [
@@ -53,6 +60,7 @@ rustc_library("fidl_next_codec") {
       "src/fuchsia/mod.rs",
     ]
     deps += [ "//sdk/rust/zx" ]
+    features += [ "fuchsia" ]
   }
 
   with_unit_tests = true
@@ -64,11 +72,6 @@ rustc_library("fidl_next_codec") {
     "//tools/fidl/fidlc/testdata/*",
     "//tools/fidl/fidlgen_rust_next/*",
   ]
-
-  # Enables compatibility impls with the existing Rust bindings.
-  # This can be removed once we no longer require backwards compatibility.
-  features = [ "compat" ]
-  deps += [ "//src/lib/fidl/rust/fidl" ]
 }
 
 fuchsia_unittest_package("fidl_next_codec_test_package") {

@@ -21,8 +21,10 @@ PartitionDevice::PartitionDevice(SdmmcBlockDevice* sdmmc_parent, const block_inf
                                  EmmcPartition partition)
     : sdmmc_parent_(sdmmc_parent), block_info_(block_info), partition_(partition) {
   block_server::PartitionInfo info{
+      .device_flags = block_info.flags,
       .block_count = block_info.block_count,
       .block_size = block_info.block_size,
+      .max_transfer_size = block_info.max_transfer_size,
   };
   switch (partition_) {
     case USER_DATA_PARTITION: {
@@ -67,8 +69,7 @@ zx_status_t PartitionDevice::AddDevice() {
     auto result = compat_server_.Initialize(
         sdmmc_parent_->parent()->driver_incoming(), sdmmc_parent_->parent()->driver_outgoing(),
         sdmmc_parent_->parent()->driver_node_name(), partition_name_,
-        compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}), std::move(banjo_config),
-        path_from_parent);
+        compat::ForwardMetadata::None(), std::move(banjo_config), path_from_parent);
     if (result.is_error()) {
       return result.status_value();
     }
@@ -209,7 +210,8 @@ void PartitionDevice::StartThread(block_server::Thread thread) {
 void PartitionDevice::OnNewSession(block_server::Session session) {
   if (auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
           fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "Block Server Session",
-          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); });
+          [&](fdf_dispatcher_t* dispatcher) { fdf_dispatcher_destroy(dispatcher); },
+          "fuchsia.devices.block.drivers.sdmmc.worker");
       server_dispatcher.is_ok()) {
     async::PostTask(server_dispatcher->async_dispatcher(),
                     [session = std::move(session)]() mutable { session.Run(); });
@@ -219,9 +221,15 @@ void PartitionDevice::OnNewSession(block_server::Session session) {
   }
 }
 
-void PartitionDevice::OnRequests(const block_server::Session& session,
-                                 cpp20::span<block_server::Request> requests) {
-  sdmmc_parent_->OnRequests(session, *this, requests);
+void PartitionDevice::OnRequests(cpp20::span<block_server::Request> requests) {
+  sdmmc_parent_->OnRequests(*this, requests);
+}
+
+void PartitionDevice::SendReply(block_server::RequestId request, zx::result<> status) {
+  fbl::AutoLock lock(&lock_);
+  if (block_server_) {
+    block_server_->SendReply(request, status);
+  }
 }
 
 }  // namespace sdmmc

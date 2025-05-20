@@ -9,13 +9,6 @@ import("//build/cpp/library_headers.gni")
 library_headers("headers") {
   headers = []
 
-  # <ktl/bit.h> has #include <lib/stdcompat/bit.h>.
-  if (is_kernel) {
-    public_deps = [ "//sdk/lib/stdcompat:headers" ]
-  } else {
-    public_deps = [ "//sdk/lib/stdcompat" ]
-  }
-
   # ktl headers come before libc++ headers so they can override a few.  But
   # some libc++ headers use #include_next, so we need another directory that
   # comes after the libc++ headers where ktl can provide the headers libc++
@@ -43,7 +36,6 @@ static_library("ktl") {
 
     deps = [
       ":headers",  # Necessary to put ktl includes before libc.
-      "//sdk/lib/stdcompat:headers",
       "//zircon/kernel/lib/libc:headers",
     ]
   }

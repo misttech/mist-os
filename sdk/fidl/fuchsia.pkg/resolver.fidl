@@ -93,7 +93,6 @@ closed protocol PackageResolver {
     ///   of this package or subpackage.
     /// * error indicates failure. See `ResolveError` for values and error
     ///   scenarios.
-    // TODO(https://fxbug.dev/42122377) change `package_url` from string to PackageUrl
     strict ResolveWithContext(resource struct {
         package_url string;
         context ResolutionContext;

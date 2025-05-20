@@ -239,7 +239,7 @@ pub(crate) fn dedupe_kernel_args(
             if let Some(key) = a.split("=").next() {
                 Some((key, a))
             } else {
-                tracing::info!("kernel arg {a} does not contain an =, so skipping.");
+                log::info!("kernel arg {a} does not contain an =, so skipping.");
                 None
             }
         })
@@ -258,7 +258,7 @@ pub(crate) fn dedupe_kernel_args(
             if let Some(key) = a.split("=").next() {
                 Some((key, a))
             } else {
-                tracing::info!(
+                log::info!(
                     "Invalid kernel arg entry: {a}. Kernel args are of the form name=value."
                 );
                 None
@@ -305,7 +305,7 @@ fn process_flag_template_inner(
     handlebars.register_helper("di", Box::new(DiskImageHelper {}));
     let json = handlebars.render_template(&template_text, &emu_config)?;
 
-    tracing::trace!("Processed template ====\n {json}\n ======");
+    log::trace!("Processed template ====\n {json}\n ======");
     // Deserialize and return the flags from the template.
     let flags = serde_json::from_str(&json)?;
     Ok(flags)

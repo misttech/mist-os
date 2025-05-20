@@ -2,24 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Result};
+use anyhow::{format_err, Context, Result};
 use async_helpers::maybe_stream::MaybeStream;
-use fidl::endpoints::{ControlHandle, RequestStream, Responder};
+use async_utils::stream::FutureMap;
+use bt_hfp::{audio, sco};
+use fidl::endpoints::{ClientEnd, ControlHandle, RequestStream};
 use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::PeerId;
+use fuchsia_sync::Mutex;
 use futures::stream::{FusedStream, FuturesUnordered};
 use futures::{select, FutureExt, StreamExt};
 use log::{debug, info, warn};
 use profile_client::{ProfileClient, ProfileEvent};
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, zx,
 };
 
 use crate::config::HandsFreeFeatureSupport;
+use crate::one_to_one::OneToOneMatcher;
 use crate::peer::Peer;
 
 #[cfg(test)]
@@ -31,6 +35,15 @@ const SEARCH_RESULT_CONNECT_DELAY_DURATION: fasync::MonotonicDuration =
 
 type SearchResultTimer = Pin<Box<dyn Future<Output = (PeerId, Option<Vec<ProtocolDescriptor>>)>>>;
 
+type WatchPeerConnectedResponder = fidl_hfp::HandsFreeWatchPeerConnectedResponder;
+type WatchPeerConnectedResponse = (PeerId, ClientEnd<fidl_hfp::PeerHandlerMarker>);
+type WatchPeerConnectedResult = std::result::Result<(), anyhow::Error>;
+type WatchPeerConnectedHangingGetMatcher = OneToOneMatcher<
+    WatchPeerConnectedResponder,
+    WatchPeerConnectedResponse,
+    WatchPeerConnectedResult,
+>;
+
 /// Toplevel struct containing the streams of incoming events that are not specific to a single
 /// peer.
 ///
@@ -41,7 +54,7 @@ where
     S: FusedStream<Item = fidl_hfp::HandsFreeRequestStream> + Unpin + 'static,
 {
     /// Configuration for which HF features we support.
-    features: HandsFreeFeatureSupport,
+    hf_features: HandsFreeFeatureSupport,
     /// Provides Hfp with a means to drive the `fuchsia.bluetooth.bredr` related APIs.
     profile_client: ProfileClient,
     /// The client connection to the `fuchsia.bluetooth.bredr.Profile` protocol.
@@ -53,12 +66,14 @@ where
     hands_free_connection_stream: S,
     /// Stream of incoming HandsFree FIDL protocol Requests
     hands_free_request_maybe_stream: MaybeStream<fidl_hfp::HandsFreeRequestStream>,
+    // Matcher for matching connecting peers to hanging get responders for the `WatchPeerConnected` FIDL method.
+    watch_peer_connected_hanging_get_matcher: WatchPeerConnectedHangingGetMatcher,
     /// A collection of discovered and/or connected Bluetooth peers that support the AG role.
-    // TODO(https://fxbug.dev/42082435) Convert this to a FutureMap and await peer tasks finishing and clean up.
-    peers: HashMap<PeerId, Peer>,
-    // TODO(fxb/127364) Update HangingGet with peer, and delete this which just keeps the proxy
-    // around to make tests pass.
-    peer_handler_proxies: Vec<fidl_hfp::PeerHandlerProxy>,
+    peers: FutureMap<PeerId, Peer>,
+    // Struct for creating SCO connections
+    sco_connector: sco::Connector,
+    // Audio control for HFP aufio
+    audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
 }
 
 impl<S> Hfp<S>
@@ -66,24 +81,39 @@ where
     S: FusedStream<Item = fidl_hfp::HandsFreeRequestStream> + Unpin + 'static,
 {
     pub fn new(
-        features: HandsFreeFeatureSupport,
+        hf_features: HandsFreeFeatureSupport,
         profile_client: ProfileClient,
         profile_proxy: bredr::ProfileProxy,
+        sco_connector: sco::Connector,
+        audio_control: Box<dyn audio::Control>,
         hands_free_connection_stream: S,
     ) -> Self {
-        let search_result_timers = FuturesUnordered::new();
         let hands_free_connection_stream = hands_free_connection_stream;
         let hands_free_request_maybe_stream = MaybeStream::default();
-        let peers = HashMap::new();
+        let watch_peer_connected_hanging_get_matcher = OneToOneMatcher::new(
+            |responder: WatchPeerConnectedResponder, response: WatchPeerConnectedResponse| {
+                let peer_id: fidl_fuchsia_bluetooth::PeerId = response.0.into();
+                let client_end = response.1;
+                responder
+                    .send(Ok((&peer_id, client_end)))
+                    .context(format!("Sending peer connected result for peer {:}", response.0))
+            },
+        );
+        let peers = FutureMap::new();
+        let search_result_timers = FuturesUnordered::new();
+        let audio_control = Arc::new(Mutex::new(audio_control));
+
         Self {
-            features,
+            hf_features,
             profile_client,
             profile_proxy,
             hands_free_connection_stream,
             hands_free_request_maybe_stream,
+            watch_peer_connected_hanging_get_matcher,
             peers,
             search_result_timers,
-            peer_handler_proxies: Vec::new(),
+            sco_connector,
+            audio_control,
         }
     }
 
@@ -126,6 +156,22 @@ where
                             MaybeStream::take(&mut self.hands_free_request_maybe_stream);
                     }
                 }
+                watch_peer_connected_send_response_result = self.watch_peer_connected_hanging_get_matcher.next() => {
+                    if let Some(Err(err)) = watch_peer_connected_send_response_result {
+                        warn!("Error sending peer connected result: {:?}", err);
+                        Err(err)?
+                    }
+                    // None means the stream was closed, but that's not an error; it could reopen
+                    // later when more elements are enqueued.
+
+                }
+                finished_peer_option = self.peers.next() => {
+                    if let Some(finished_peer) = finished_peer_option {
+                        info!("Peer task for peer {:?} finished.", finished_peer);
+                        // Peer is automatically removed by FutureMap on completion.
+                    }
+                    // Otherwise the map is empty.
+                }
             }
         }
     }
@@ -133,16 +179,21 @@ where
     fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<()> {
         let peer_id = event.peer_id();
 
-        let peer = self
-            .peers
-            .entry(peer_id)
-            .or_insert_with(|| Peer::new(peer_id, self.features, self.profile_proxy.clone()));
+        let peer = self.peers.inner().entry(peer_id).or_insert_with(|| {
+            Box::pin(Peer::new(
+                peer_id,
+                self.hf_features,
+                self.profile_proxy.clone(),
+                self.sco_connector.clone(),
+                self.audio_control.clone(),
+            ))
+        });
 
         match event {
             ProfileEvent::PeerConnected { channel, .. } => {
                 info!("Received peer_connected for peer {}.", peer_id);
-                let peer_handler_proxy = peer.handle_peer_connected(channel);
-                self.report_peer_handler(peer_handler_proxy)
+                let peer_handler_client_end = peer.handle_peer_connected(channel);
+                self.report_peer_handler(peer_id, peer_handler_client_end)
             }
             ProfileEvent::SearchResult { protocol, .. } => {
                 debug!("Received search results for peer {}", peer_id);
@@ -195,9 +246,9 @@ where
     ) {
         debug!("Handle search results timer expired for peer {:?}", peer_id);
 
-        let peer_result = self.peers.get_mut(&peer_id);
+        let peer_result = self.peers.inner().get_mut(&peer_id);
 
-        let peer_handler_proxy_result = match peer_result {
+        let peer_handler_client_end_result = match peer_result {
             None => {
                 info!("Peer task for peer {} completed before handling search result.", peer_id);
                 Ok(None)
@@ -205,7 +256,7 @@ where
             Some(peer) => peer.handle_search_result(protocol).await,
         };
 
-        let peer_handler_proxy_option = match peer_handler_proxy_result {
+        let peer_handler_client_end_option = match peer_handler_client_end_result {
             Ok(proxy) => proxy,
             Err(err) => {
                 // An error handling one peer should not be a fatal error.
@@ -215,20 +266,19 @@ where
             }
         };
 
-        if let Some(peer_handler_proxy) = peer_handler_proxy_option {
-            self.report_peer_handler(peer_handler_proxy);
-        }
+        if let Some(peer_handler_client_end) = peer_handler_client_end_option {
+            self.report_peer_handler(peer_id, peer_handler_client_end);
+        } // Else the task was already created for this peer so nothing to do.
     }
 
-    /// Report the PeerHandlerProxy og a newly connected peer to the FIDL client of th HFP protocol
-    fn report_peer_handler(&mut self, peer_handler_proxy: fidl_hfp::PeerHandlerProxy) {
-        // TODO(fxb/127364) Update HangingGet with peer. Make sure to set the new
-        // PeerProxy on the peer.  Be careful of races between the new PeerProxy and any
-        // old ones.
-        //
-        // For now, just keep these around to prevent test failures caused by closing
-        // streams.
-        self.peer_handler_proxies.push(peer_handler_proxy);
+    /// Report the PeerHandler clienr end of a newly connected peer to the FIDL client of th HFP protocol
+    fn report_peer_handler(
+        &mut self,
+        peer_id: PeerId,
+        peer_handler_client_end: ClientEnd<fidl_hfp::PeerHandlerMarker>,
+    ) {
+        self.watch_peer_connected_hanging_get_matcher
+            .enqueue_right((peer_id, peer_handler_client_end));
     }
 
     fn handle_hands_free_request_stream(&mut self, stream: fidl_hfp::HandsFreeRequestStream) {
@@ -238,15 +288,13 @@ where
             control_handle.shutdown_with_epitaph(zx::Status::ALREADY_BOUND);
         } else {
             self.hands_free_request_maybe_stream.set(stream);
-            // TODO(fxb/127364) Update HangingGet with all peers.  Make sure to set the new PeerProxy
+            // TODO(http://fxbug.dev/127364) Update HangingGet with all peers.  Make sure to set the new PeerProxy
             // on each peer.  Be careful of races between the new PeerProxy and any old ones
         }
     }
 
     fn handle_hands_free_request(&mut self, request: fidl_hfp::HandsFreeRequest) {
         let fidl_hfp::HandsFreeRequest::WatchPeerConnected { responder } = request;
-        // TODO(fxb/127364) Update HangingGet with new subscriber.
-        // Handle FIDL calls here.
-        responder.drop_without_shutdown();
+        self.watch_peer_connected_hanging_get_matcher.enqueue_left(responder);
     }
 }

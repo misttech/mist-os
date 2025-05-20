@@ -33,7 +33,7 @@ where
     I: structured_ui::Interface,
 {
     let start = std::time::Instant::now();
-    tracing::debug!(
+    log::debug!(
         "transfer_download, transfer_manifest_url {:?}, local_dir {:?}",
         transfer_manifest_url,
         local_dir
@@ -59,7 +59,7 @@ where
         .await
         .context("transferring from v1 manifest")?,
     }
-    tracing::debug!("Total fetch images runtime {} seconds.", start.elapsed().as_secs_f32());
+    log::debug!("Total fetch images runtime {} seconds.", start.elapsed().as_secs_f32());
     Ok(())
 }
 
@@ -72,7 +72,7 @@ fn safe_join(base: &Path, relative: &Path) -> Result<PathBuf> {
             Component::Prefix(_) | Component::RootDir | Component::CurDir => {}
             Component::ParentDir => {
                 if !normalized_relative.pop() {
-                    tracing::warn!("Failed to normalize path: {}", relative.to_string_lossy());
+                    log::warn!("Failed to normalize path: {}", relative.to_string_lossy());
                     break;
                 }
             }
@@ -156,7 +156,7 @@ where
                 .await
                 .with_context(|| format!("creating local_parent {:?}", local_parent))?;
 
-            tracing::debug!("Transfer {:?} to {:?}", remote_file, local_parent);
+            log::debug!("Transfer {:?} to {:?}", remote_file, local_parent);
             tasks.push(async move {
                 fetch_from_url(
                     &remote_file,

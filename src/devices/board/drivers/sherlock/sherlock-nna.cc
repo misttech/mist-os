@@ -86,27 +86,27 @@ zx_status_t Sherlock::NnaInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('NNA_');
 
-  auto aml_nna_register_reset_node = fuchsia_driver_framework::ParentSpec{{
+  auto aml_nna_register_reset_node = fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_registers::SERVICE,
-                                      bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_registers::SERVICE,
+                                       bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule2(
                   bind_fuchsia_register::NAME,
                   bind_fuchsia_amlogic_platform::NAME_REGISTER_NNA_RESET_LEVEL2),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia_hardware_registers::SERVICE,
-                                bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia_register::NAME,
-                                bind_fuchsia_amlogic_platform::NAME_REGISTER_NNA_RESET_LEVEL2),
+              fdf::MakeProperty2(bind_fuchsia_hardware_registers::SERVICE,
+                                 bind_fuchsia_hardware_registers::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty2(bind_fuchsia_register::NAME,
+                                 bind_fuchsia_amlogic_platform::NAME_REGISTER_NNA_RESET_LEVEL2),
           },
   }};
 
   auto aml_nna_composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
       .name = "aml_nna",
-      .parents = {{aml_nna_register_reset_node}},
+      .parents2 = {{aml_nna_register_reset_node}},
   }};
 
   fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(

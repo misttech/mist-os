@@ -151,17 +151,12 @@ impl ModelBuilderForAnalyzer {
         let mut errors: Vec<anyhow::Error> = vec![];
         let mut dynamic_components: HashMap<Moniker, Vec<Child>> = HashMap::new();
         for (moniker, (url, environment)) in input.into_iter() {
-            let mut moniker_vec = moniker.path().clone();
-            let child_moniker = moniker_vec.pop();
-            let parent_moniker = Moniker::new(moniker_vec);
-            if child_moniker.is_none() {
+            let Some((parent_moniker, child_moniker)) = moniker.split_leaf() else {
                 errors.push(
                     BuildAnalyzerModelError::DynamicComponentInvalidMoniker(url.to_string()).into(),
                 );
                 continue;
-            }
-
-            let child_moniker = child_moniker.unwrap();
+            };
             if child_moniker.collection.is_none() {
                 errors.push(
                     BuildAnalyzerModelError::DynamicComponentWithoutCollection(

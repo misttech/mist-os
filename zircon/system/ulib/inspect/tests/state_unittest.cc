@@ -174,7 +174,7 @@ Block MakeBlock(uint64_t header, const char payload[9]) {
 // larger than sizeof(Block) (AKA order 0) would be a memory error in this context.
 // This will also reduce the order of the block to 0, even if `data` could be stored in its
 // entirety in a larger order block.
-Block MakeInlinedOrder0StringReferenceBlock(cpp17::string_view data,
+Block MakeInlinedOrder0StringReferenceBlock(std::string_view data,
                                             const uint64_t reference_count = 1) {
   EXPECT_LE(data.size(), 4);
 

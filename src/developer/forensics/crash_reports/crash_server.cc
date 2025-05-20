@@ -129,8 +129,8 @@ void CrashServer::MakeRequest(const Report& report, const Snapshot& snapshot,
   // Append the product and version parameters to the URL.
   const std::map<std::string, std::string> annotations =
       PrepareAnnotations(report, snapshot, annotation_manager_, clock_->BootNow());
-  FX_CHECK(annotations.count("product") != 0);
-  FX_CHECK(annotations.count("version") != 0);
+  FX_CHECK(annotations.contains("product"));
+  FX_CHECK(annotations.contains("version"));
   const std::string url = fxl::Substitute("$0?product=$1&version=$2", url_,
                                           crashpad::URLEncode(annotations.at("product")),
                                           crashpad::URLEncode(annotations.at("version")));
@@ -258,7 +258,7 @@ std::map<std::string, std::string> CrashServer::PrepareAnnotations(
 
   if (const feedback::Annotations immediate_annotations =
           annotation_manager->ImmediatelyAvailable();
-      immediate_annotations.count(feedback::kSystemBootIdCurrentKey) != 0) {
+      immediate_annotations.contains(feedback::kSystemBootIdCurrentKey)) {
     annotations.Set(feedback::kDebugReportUploadBootId,
                     immediate_annotations.at(feedback::kSystemBootIdCurrentKey));
   }

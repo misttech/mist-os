@@ -34,15 +34,16 @@ if (is_host) {
       "//src/developer/ffx/plugins/emulator/configuration:ffx_emulator_config",
       "//src/lib/assembly/vbmeta",
       "//src/lib/fuchsia-async",
+      "//src/storage/lib/sparse/rust:lib",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:camino",
       "//third_party/rust_crates:handlebars",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:nix",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:shared_child",
       "//third_party/rust_crates:tempfile",
-      "//third_party/rust_crates:tracing",
       "//tools/make-fuchsia-vol:lib",
     ]
     test_deps = [

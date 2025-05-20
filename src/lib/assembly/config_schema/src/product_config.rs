@@ -12,6 +12,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{path_schema, vec_path_schema, DriverDetails};
+use crate::release_info::ProductReleaseInfo;
 
 /// The Product-provided configuration details.
 #[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
@@ -47,10 +48,18 @@ pub struct ProductConfig {
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub component_policy: ComponentPolicyConfig,
 
+    /// Configuration strategy for TEE.
+    #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub tee: Tee,
+
     /// Components which depend on trusted applications running in the TEE.
+    ///
+    /// *NOTE*: This configuration parameter is deprecated. Use
+    /// `tee = Tee::GlobalPlatform(tee_clients)` instead.
     #[walk_paths]
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub tee_clients: Vec<TeeClient>,
+    pub tee_clients: Vec<GlobalPlatformTeeClient>,
 
     /// Components which should run as trusted applications in Fuchsia.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -65,11 +74,18 @@ pub struct ProductConfig {
     pub bootfs_files_package: Option<Utf8PathBuf>,
 
     /// Release version that this product config corresponds to.
-    /// TODO(https://fxbug.dev/397489730): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
+    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
+    /// repositories start using release_info below.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_version: Option<String>,
+
+    /// Release information about this assembly container artifact.
+    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_info: Option<ProductReleaseInfo>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -290,10 +306,47 @@ pub struct TeeClientFeatures {
     pub tmp_storage: bool,
 }
 
+/// Configuration strategy for TEE.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Tee {
+    /// Transitional value for deprecating `ProductConfig::tee_clients`. When this value is used,
+    /// the `Tee::GlobalPlatform` strategy is deployed using `ProductConfig::tee_clients`.
+    #[default]
+    Undefined,
+    /// Do not instantiate a TEE manager and associated routes.
+    NoTee,
+    /// Instantiate the platform-provided Global Platform (OPTEE) `tee_manager` component, with the
+    /// provided `GlobalPlatformTeeClient` specifications.
+    GlobalPlatform(GlobalPlatformTee),
+    /// Instantiate a product-provided TEE management stack configured by the provided
+    /// `ProprietaryTee`.
+    Proprietary(ProprietaryTee),
+}
+
+/// Configuration of platform-provided TEE stack.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
+pub struct GlobalPlatformTee {
+    /// Components which depend on trusted applications running in the TEE.
+    ///
+    /// *NOTE*: This configuration parameter replaces `ProductConfig::tee_clients`.
+    pub clients: Vec<GlobalPlatformTeeClient>,
+}
+
+/// Configuration of TEE stack with product-provided components that use custom proprietary TEE
+/// protocols.
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
+pub struct ProprietaryTee {
+    /// Absolute component URL of the product-provided component that consumes TEE driver
+    /// capabilities and provides TEE-related capabilities, including key management capabilities
+    /// that are routed to the storage stack and other capabilities that are routed to the session.
+    pub tee_manager_url: String,
+}
+
 /// A configuration for a component which depends on TEE-based protocols.
 /// Examples include components which implement DRM, or authentication services.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
-pub struct TeeClient {
+pub struct GlobalPlatformTeeClient {
     /// The URL of the component.
     pub component_url: String,
     /// GUIDs which of the form fuchsia.tee.Application.{GUID} will match a
@@ -660,5 +713,96 @@ mod tests {
             ]
         );
         assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn product_tee_serialization() {
+        let product_config = ProductConfig { tee: Tee::Undefined, ..Default::default() };
+        let serialized = serde_json::to_value(product_config).unwrap();
+        let expected = serde_json::json!({});
+        assert_eq!(serialized, expected);
+
+        let product_config = ProductConfig { tee: Tee::NoTee, ..Default::default() };
+        let serialized = serde_json::to_value(product_config).unwrap();
+        let expected = serde_json::json!(
+            {
+                "tee": "no_tee",
+            }
+        );
+        assert_eq!(serialized, expected);
+
+        let product_config = ProductConfig {
+            tee: Tee::GlobalPlatform(GlobalPlatformTee { clients: vec![] }),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_value(product_config).unwrap();
+        let expected = serde_json::json!(
+            {
+                "tee": {
+                    "global_platform": {
+                        "clients": []
+                    }
+                },
+            }
+        );
+        assert_eq!(serialized, expected);
+
+        let product_config = ProductConfig { tee: Tee::Proprietary(ProprietaryTee { tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm") }),
+            ..Default::default() };
+        let serialized = serde_json::to_value(product_config).unwrap();
+        let expected = serde_json::json!(
+            {
+                "tee": {
+                    "proprietary": {
+                        "tee_manager_url": "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm"
+                    }
+                },
+            }
+        );
+        assert_eq!(serialized, expected);
+    }
+
+    #[test]
+    fn product_tee_deserialization() {
+        let json5 = r#"{}"#;
+        let expected = ProductConfig { tee: Tee::Undefined, ..Default::default() };
+        let mut cursor = std::io::Cursor::new(json5);
+        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(product_config, expected);
+
+        let json5 = r#"{
+            tee: "no_tee",
+        }"#;
+        let expected = ProductConfig { tee: Tee::NoTee, ..Default::default() };
+        let mut cursor = std::io::Cursor::new(json5);
+        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(product_config, expected);
+
+        let json5 = r#"{
+            tee: {
+                global_platform: {
+                    clients: [],
+                },
+            },
+        }"#;
+        let expected = ProductConfig {
+            tee: Tee::GlobalPlatform(GlobalPlatformTee { clients: vec![] }),
+            ..Default::default()
+        };
+        let mut cursor = std::io::Cursor::new(json5);
+        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(product_config, expected);
+
+        let json5 = r#"{
+            tee: {
+                proprietary: {
+                    tee_manager_url: "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm",
+                },
+            },
+        }"#;
+        let expected = ProductConfig { tee: Tee::Proprietary(ProprietaryTee { tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm") }), ..Default::default() };
+        let mut cursor = std::io::Cursor::new(json5);
+        let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(product_config, expected);
     }
 }

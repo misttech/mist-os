@@ -67,8 +67,6 @@ source_set("legacy-mem-config") {
   visibility = [ ":*" ]
   sources = [ "legacy-mem-config.cc" ]
   public_deps = [
-    "//sdk/lib/stdcompat",
-
     # legacy-mem-config.h has #include <lib/zbi-format/zbi.h>
     "//sdk/lib/zbi-format",
 
@@ -112,6 +110,7 @@ if (toolchain_environment == "kernel.phys32" ||
       "//zircon/kernel/phys:boot-zbi",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:symbolize",
+      "//zircon/kernel/phys:zbi",
       "//zircon/kernel/phys/lib/boot-shim",
       "//zircon/system/ulib/hwreg",
     ]
@@ -176,6 +175,7 @@ if (toolchain_environment == "kernel.phys32" ||
         "//zircon/kernel/phys:stdio",
         "//zircon/kernel/phys:symbolize",
         "//zircon/kernel/phys:uart",
+        "//zircon/kernel/phys:zbi",
         "//zircon/system/ulib/uart",
       ]
     }

@@ -124,7 +124,10 @@ declare_args() {
   experimental_thread_sampler_enabled = false
 
   # Support streaming ktrace data out of the kernel.
-  experimental_ktrace_streaming_enabled = false
+  experimental_ktrace_streaming_enabled = true
+
+  # Use fine grained (per VMO) locks instead of a single lock for the entire clone hierarchy.
+  vmo_fine_grained_locking = true
 }
 
 declare_args() {
@@ -146,10 +149,11 @@ kernel_test_environments = [
   aemu_env,
   astro_env,
   crosvm_env,
-  qemu_env,
-  qemu_1cpu_env,
-  nuc7_env,
   nuc11_env,
+  nuc7_env,
+  qemu_1cpu_env,
+  qemu_env,
   sherlock_env,
+  sorrel_env,
   vim3_env,
 ]

@@ -22,7 +22,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 /// A name for the type used as an environment variable mapping for isolation override
-pub type EnvVars = HashMap<String, String>;
+pub(crate) type EnvVars = HashMap<String, String>;
 
 /// Contextual information about where this instance of ffx is running
 #[derive(Clone, Debug)]
@@ -36,6 +36,21 @@ pub struct EnvironmentContext {
     self_path: PathBuf,
     /// if true, do not read or write any environment files.
     pub(crate) no_environment: bool,
+}
+
+impl Default for EnvironmentContext {
+    fn default() -> Self {
+        Self {
+            kind: EnvironmentKind::NoContext,
+            exe_kind: ExecutableKind::Test,
+            env_vars: Default::default(),
+            runtime_args: Default::default(),
+            env_file_path: Default::default(),
+            cache: Default::default(),
+            self_path: std::env::current_exe().unwrap(),
+            no_environment: false,
+        }
+    }
 }
 
 impl std::cmp::PartialEq for EnvironmentContext {
@@ -570,21 +585,6 @@ mod test {
     use tempfile::tempdir;
 
     const DOMAINS_TEST_DATA_PATH: &str = env!("DOMAINS_TEST_DATA_PATH");
-
-    impl Default for EnvironmentContext {
-        fn default() -> Self {
-            Self {
-                kind: EnvironmentKind::NoContext,
-                exe_kind: ExecutableKind::Test,
-                env_vars: Default::default(),
-                runtime_args: Default::default(),
-                env_file_path: Default::default(),
-                cache: Default::default(),
-                self_path: std::env::current_exe().unwrap(),
-                no_environment: false,
-            }
-        }
-    }
 
     fn domains_test_data_path() -> &'static Utf8Path {
         Utf8Path::new(DOMAINS_TEST_DATA_PATH)

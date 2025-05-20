@@ -22,6 +22,7 @@ source_set("aml-usb-phy-visitor-impl") {
     "aml-usb-phy-visitor.h",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
     "//sdk/lib/driver/devicetree/manager",
     "//sdk/lib/driver/devicetree/visitors:registration",
     "//sdk/lib/driver/logging/cpp",
@@ -39,6 +40,7 @@ test("aml-usb-phy-visitor-test-bin") {
   sources = [ "test/aml-usb-phy-visitor-test.cc" ]
   deps = [
     ":aml-usb-phy-visitor-impl",
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
     "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
     "//sdk/lib/driver/devicetree/visitors:registry",
     "//sdk/lib/driver/devicetree/visitors/default/bind-property",

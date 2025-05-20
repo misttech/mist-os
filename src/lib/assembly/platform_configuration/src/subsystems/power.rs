@@ -64,18 +64,14 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding power_manager's thermal config file")?;
         }
 
-        if *context.feature_set_level != FeatureSupportLevel::Embeddable {
+        if *context.feature_set_level != FeatureSetLevel::Embeddable {
             builder.platform_bundle("legacy_power_framework");
         }
 
         if config.enable_non_hermetic_testing {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng],
-                &[
-                    FeatureSupportLevel::Bootstrap,
-                    FeatureSupportLevel::Utility,
-                    FeatureSupportLevel::Standard,
-                ],
+                &[FeatureSetLevel::Bootstrap, FeatureSetLevel::Utility, FeatureSetLevel::Standard],
                 "enable_non_hermetic_testing",
             )?;
 
@@ -87,11 +83,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         if config.suspend_enabled {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng, BuildType::UserDebug],
-                &[
-                    FeatureSupportLevel::Bootstrap,
-                    FeatureSupportLevel::Utility,
-                    FeatureSupportLevel::Standard,
-                ],
+                &[FeatureSetLevel::Bootstrap, FeatureSetLevel::Utility, FeatureSetLevel::Standard],
                 "suspend_enabled",
             )?;
 
@@ -118,8 +110,8 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             }
 
             match context.feature_set_level {
-                FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
-                FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {
+                FeatureSetLevel::Embeddable | FeatureSetLevel::Bootstrap => {}
+                FeatureSetLevel::Utility | FeatureSetLevel::Standard => {
                     // Include only when the base package set is available as
                     // these require the core realm, and base package functionality.
                     builder.platform_bundle("power_framework_development_support");
@@ -139,11 +131,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         if let Some(cpu_manager_config) = &context.board_info.configuration.cpu_manager {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng, BuildType::UserDebug, BuildType::User],
-                &[
-                    FeatureSupportLevel::Bootstrap,
-                    FeatureSupportLevel::Utility,
-                    FeatureSupportLevel::Standard,
-                ],
+                &[FeatureSetLevel::Bootstrap, FeatureSetLevel::Utility, FeatureSetLevel::Standard],
                 "cpu_manager",
             )?;
 
@@ -167,7 +155,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             Config::new(ConfigValueType::Bool, config.storage_power_management_enabled.into()),
         )?;
 
-        if let (Some(config), FeatureSupportLevel::Standard) =
+        if let (Some(config), FeatureSetLevel::Standard) =
             (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
         {
             builder.platform_bundle("power_metrics_recorder");
@@ -180,8 +168,8 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         // Include fake-battery driver through a platform AIB.
         if context.board_info.provides_feature("fuchsia::fake_battery") {
             // We only need this driver feature in the utility / standard feature set levels.
-            if *context.feature_set_level == FeatureSupportLevel::Standard
-                || *context.feature_set_level == FeatureSupportLevel::Utility
+            if *context.feature_set_level == FeatureSetLevel::Standard
+                || *context.feature_set_level == FeatureSetLevel::Utility
             {
                 builder.platform_bundle("fake_battery_driver");
             }
@@ -189,7 +177,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
         // Include fake-power-sensor through a platform AIB.
         if context.board_info.provides_feature("fuchsia::fake_power_sensor")
-            && *context.feature_set_level == FeatureSupportLevel::Standard
+            && *context.feature_set_level == FeatureSetLevel::Standard
             && *context.build_type == BuildType::Eng
         {
             builder.platform_bundle("fake_power_sensor");

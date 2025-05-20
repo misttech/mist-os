@@ -14,7 +14,7 @@ use std::collections::{HashMap, HashSet};
 use fidl_fuchsia_net::SocketAddress;
 use fidl_fuchsia_net_name::{
     DhcpDnsServerSource, Dhcpv6DnsServerSource, DnsServerSource, DnsServer_, NdpDnsServerSource,
-    StaticDnsServerSource,
+    SocketProxyDnsServerSource, StaticDnsServerSource,
 };
 
 pub use self::stream::*;
@@ -41,6 +41,9 @@ pub struct DnsServers {
 
     /// DNS servers obtained from NDP clients.
     ndp: HashMap<u64, Vec<DnsServer_>>,
+
+    /// DNS servers obtained from the socketproxy.
+    socketproxy: Vec<DnsServer_>,
 }
 
 impl DnsServers {
@@ -52,7 +55,7 @@ impl DnsServers {
         source: DnsServersUpdateSource,
         servers: Vec<DnsServer_>,
     ) {
-        let Self { default, netstack, dhcpv4, dhcpv6, ndp } = self;
+        let Self { default, netstack, dhcpv4, dhcpv6, ndp, socketproxy } = self;
 
         match source {
             DnsServersUpdateSource::Default => *default = servers,
@@ -84,6 +87,7 @@ impl DnsServers {
                     ndp.insert(interface_id, servers)
                 };
             }
+            DnsServersUpdateSource::SocketProxy => *socketproxy = servers,
         }
     }
 
@@ -137,9 +141,10 @@ impl DnsServers {
     ///
     /// See `consolidated` for details on ordering.
     fn consolidate_filter_map<T, F: Fn(DnsServer_) -> Option<T>>(&self, f: F) -> Vec<T> {
-        let Self { default, netstack, dhcpv4, dhcpv6, ndp } = self;
+        let Self { default, netstack, dhcpv4, dhcpv6, ndp, socketproxy } = self;
         let mut servers = netstack
             .iter()
+            .chain(socketproxy)
             .chain(dhcpv4.values().flatten())
             .chain(ndp.values().flatten())
             .chain(dhcpv6.values().flatten())
@@ -161,25 +166,32 @@ impl DnsServers {
 
     /// Returns the ordering of [`DnsServer_`]s.
     ///
-    /// The ordering from most to least preferred is is DHCP, NDP, DHCPv6, then Static. Preference
-    /// is currently informed by a goal of keeping servers discovered via the same internet
-    /// protocol together and preferring network-supplied configurations over product-supplied
-    /// ones.
+    /// The ordering from most to least preferred is is Socketproxy, DHCP, NDP, DHCPv6, then
+    /// Static. Preference is currently informed by a goal of keeping servers discovered via the
+    /// same internet protocol together and preferring network-supplied configurations over
+    /// product-supplied ones. Socketproxy DNS servers discovered on a Socketproxy-enabled product
+    /// are provided when the current default network was provisioned by an agent other
+    /// than Fuchsia.
     ///
-    /// TODO(https://fxbug.dev/42125772): We currently prioritize IPv4 servers over IPv6 as our DHCPv6
-    /// client does not yet support stateful address assignment. This can result in situations
-    /// where we can discover v6 nameservers that can't be reached as we've not discovered a global
-    /// address.
+    /// TODO(https://fxbug.dev/42125772): We currently prioritize IPv4 servers over IPv6 as our
+    /// DHCPv6 client does not yet support stateful address assignment. This can result in
+    /// situations where we can discover v6 nameservers that can't be reached as we've not
+    /// discovered a global address.
     ///
     /// An unspecified source will be treated as a static address.
     fn ordering(a: &DnsServer_, b: &DnsServer_) -> Ordering {
         let ordering = |source| match source {
-            Some(&DnsServerSource::Dhcp(DhcpDnsServerSource { source_interface: _, .. })) => 0,
-            Some(&DnsServerSource::Ndp(NdpDnsServerSource { source_interface: _, .. })) => 1,
+            Some(&DnsServerSource::SocketProxy(SocketProxyDnsServerSource {
+                source_interface: _,
+                ..
+            })) => 0,
+            Some(&DnsServerSource::Dhcp(DhcpDnsServerSource { source_interface: _, .. })) => 1,
+            Some(&DnsServerSource::Ndp(NdpDnsServerSource { source_interface: _, .. })) => 2,
             Some(&DnsServerSource::Dhcpv6(Dhcpv6DnsServerSource {
                 source_interface: _, ..
-            })) => 2,
-            Some(&DnsServerSource::StaticSource(StaticDnsServerSource { .. })) | None => 3,
+            })) => 3,
+            Some(&DnsServerSource::StaticSource(StaticDnsServerSource { .. })) => 4,
+            Some(&DnsServerSource::__SourceBreaking { .. }) | None => 5,
         };
         let a = ordering(a.source.as_ref());
         let b = ordering(b.source.as_ref());
@@ -216,6 +228,7 @@ mod tests {
             ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_server(), ndp_server()])]
                 .into_iter()
                 .collect(),
+            socketproxy: vec![socketproxy_server1(), socketproxy_server2(), socketproxy_server1()],
         };
         // Ordering across (the DHCPv6) sources is not guaranteed, but both DHCPv6 sources
         // have the same set of servers with the same order. With deduplication, we know
@@ -223,6 +236,8 @@ mod tests {
         assert_eq!(
             servers.consolidated(),
             vec![
+                SOCKETPROXY_SOURCE_SOCKADDR1,
+                SOCKETPROXY_SOURCE_SOCKADDR2,
                 DHCPV4_SOURCE_SOCKADDR1,
                 DHCPV4_SOURCE_SOCKADDR2,
                 NDP_SOURCE_SOCKADDR,
@@ -239,7 +254,12 @@ mod tests {
         // is observed by a higher priority source, then use the higher source for
         // ordering.
         let servers = DnsServers {
-            default: vec![static_server(), dhcpv4_server1(), dhcpv6_server1()],
+            default: vec![
+                static_server(),
+                dhcpv4_server1(),
+                dhcpv6_server1(),
+                socketproxy_server1(),
+            ],
             netstack: vec![static_server()],
             dhcpv4: [
                 (DHCPV4_SERVER1_INTERFACE_ID, vec![dhcpv4_server1()]),
@@ -254,11 +274,18 @@ mod tests {
             .into_iter()
             .collect(),
             ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_server()])].into_iter().collect(),
+            socketproxy: vec![socketproxy_server1()],
         };
         // No ordering is guaranteed across servers from different sources of the same
         // source-kind.
         let mut got = servers.consolidated();
         let mut got = got.drain(..);
+        let want_socketproxy = [SOCKETPROXY_SOURCE_SOCKADDR1];
+        assert_eq!(
+            HashSet::from_iter(got.by_ref().take(want_socketproxy.len())),
+            HashSet::from(want_socketproxy),
+        );
+
         let want_dhcpv4 = [DHCPV4_SOURCE_SOCKADDR1];
         assert_eq!(
             HashSet::from_iter(got.by_ref().take(want_dhcpv4.len())),
@@ -313,6 +340,7 @@ mod tests {
             ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_server(), dhcpv6_with_ndp_address()])]
                 .into_iter()
                 .collect(),
+            socketproxy: vec![],
         };
         let expected_servers =
             vec![dhcpv4_server1(), ndp_server(), dhcpv6_server1(), static_server()];
@@ -356,6 +384,7 @@ mod tests {
             ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_with_dhcpv6_sockaddr1()])]
                 .into_iter()
                 .collect(),
+            socketproxy: vec![],
         };
         let expected_servers = vec![ndp_with_dhcpv6_sockaddr1(), dhcpv6_server2(), static_server()];
         assert_eq!(servers.consolidate_filter_map(Some), expected_servers);
@@ -369,6 +398,10 @@ mod tests {
 
     #[test]
     fn test_dns_servers_ordering() {
+        assert_eq!(
+            DnsServers::ordering(&socketproxy_server1(), &socketproxy_server1()),
+            Ordering::Equal
+        );
         assert_eq!(DnsServers::ordering(&ndp_server(), &ndp_server()), Ordering::Equal);
         assert_eq!(DnsServers::ordering(&dhcpv4_server1(), &dhcpv4_server1()), Ordering::Equal);
         assert_eq!(DnsServers::ordering(&dhcpv6_server1(), &dhcpv6_server1()), Ordering::Equal);
@@ -377,31 +410,26 @@ mod tests {
             DnsServers::ordering(&unspecified_source_server(), &unspecified_source_server()),
             Ordering::Equal
         );
-        assert_eq!(
-            DnsServers::ordering(&static_server(), &unspecified_source_server()),
-            Ordering::Equal
-        );
 
-        let servers = [
-            dhcpv4_server1(),
-            ndp_server(),
-            dhcpv6_server1(),
-            static_server(),
+        let mut servers = vec![
             unspecified_source_server(),
+            dhcpv6_server1(),
+            dhcpv4_server1(),
+            static_server(),
+            ndp_server(),
+            socketproxy_server1(),
         ];
-        // We don't compare the last two servers in the list because their ordering is equal
-        // w.r.t. eachother.
-        for (i, a) in servers[..servers.len() - 2].iter().enumerate() {
-            for b in servers[i + 1..].iter() {
-                assert_eq!(DnsServers::ordering(a, b), Ordering::Less);
-            }
-        }
-
-        let mut servers = vec![dhcpv6_server1(), dhcpv4_server1(), static_server(), ndp_server()];
         servers.sort_by(DnsServers::ordering);
         assert_eq!(
             servers,
-            vec![dhcpv4_server1(), ndp_server(), dhcpv6_server1(), static_server()]
+            vec![
+                socketproxy_server1(),
+                dhcpv4_server1(),
+                ndp_server(),
+                dhcpv6_server1(),
+                static_server(),
+                unspecified_source_server(),
+            ]
         );
     }
 }

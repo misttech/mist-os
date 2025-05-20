@@ -14,7 +14,8 @@
 #include <object/dispatcher.h>
 #include <object/handle.h>
 
-class CounterDispatcher : public SoloDispatcher<CounterDispatcher, ZX_DEFAULT_COUNTER_RIGHTS> {
+class CounterDispatcher
+    : public SoloDispatcher<CounterDispatcher, ZX_DEFAULT_COUNTER_RIGHTS, ZX_COUNTER_SIGNALED> {
  public:
   ~CounterDispatcher() override;
 

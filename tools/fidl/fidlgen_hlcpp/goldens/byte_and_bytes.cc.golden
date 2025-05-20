@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_byteandbytes_ByteAndBytesTable;
 const fidl_type_t* ByteAndBytes::FidlType = &test_byteandbytes_ByteAndBytesTable;
 
 void ByteAndBytes::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ByteAndBytes>::value) {
     memcpy(_encoder->template GetPtr<ByteAndBytes>(_offset), this, sizeof(ByteAndBytes));
   } else {

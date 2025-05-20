@@ -51,7 +51,7 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for NonMetaSubdir<S> {
 }
 
 impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for NonMetaSubdir<S> {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -96,22 +96,25 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for No
         );
 
         if let Some(blob) = self.root_dir.non_meta_files.get(&file_path) {
-            let () =
-                self.root_dir.non_meta_storage.open(blob, flags, scope, server_end).unwrap_or_else(
-                    |e| error!("Error forwarding content blob open to blobfs: {:#}", anyhow!(e)),
-                );
+            let () = self
+                .root_dir
+                .non_meta_storage
+                .deprecated_open(blob, flags, scope, server_end)
+                .unwrap_or_else(|e| {
+                    error!("Error forwarding content blob open to blobfs: {:#}", anyhow!(e))
+                });
             return;
         }
 
         if let Some(subdir) = self.root_dir.get_non_meta_subdir(file_path + "/") {
-            let () = subdir.open(scope, flags, vfs::Path::dot(), server_end);
+            let () = subdir.deprecated_open(scope, flags, vfs::Path::dot(), server_end);
             return;
         }
 
         let () = send_on_open_with_error(describe, server_end, zx::Status::NOT_FOUND);
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: vfs::Path,
@@ -142,11 +145,11 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for No
             if path.is_dir() {
                 return Err(zx::Status::NOT_DIR);
             }
-            return self.root_dir.non_meta_storage.open3(blob, flags, scope, object_request);
+            return self.root_dir.non_meta_storage.open(blob, flags, scope, object_request);
         }
 
         if let Some(subdir) = self.root_dir.get_non_meta_subdir(file_path + "/") {
-            return subdir.open3(scope, vfs::Path::dot(), flags, object_request);
+            return subdir.open(scope, vfs::Path::dot(), flags, object_request);
         }
 
         Err(zx::Status::NOT_FOUND)
@@ -192,7 +195,6 @@ mod tests {
     use fuchsia_pkg_testing::blobfs::Fake as FakeBlobfs;
     use fuchsia_pkg_testing::PackageBuilder;
     use futures::prelude::*;
-    use vfs::directory::entry_container::Directory as _;
 
     struct TestEnv {
         _blobfs_fake: FakeBlobfs,
@@ -235,11 +237,7 @@ mod tests {
         }
         let root_dir = RootDir::new(blobfs_client, metafar_blob.merkle).await.unwrap();
         let sub_dir = NonMetaSubdir::new(root_dir, "dir0/".to_string());
-        let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let request = fio::PERM_WRITABLE.to_object_request(server);
-        request.handle(|request: &mut vfs::ObjectRequest| {
-            sub_dir.open3(ExecutionScope::new(), vfs::Path::dot(), fio::PERM_WRITABLE, request)
-        });
+        let proxy = vfs::directory::serve(sub_dir, fio::PERM_WRITABLE);
         assert_matches!(
             proxy.take_event_stream().try_next().await,
             Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })

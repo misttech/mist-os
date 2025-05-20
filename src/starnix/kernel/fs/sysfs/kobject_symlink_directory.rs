@@ -28,6 +28,18 @@ impl KObjectSymlinkDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
+
+    pub fn create_file_ops_entries(&self) -> Vec<VecDirectoryEntry> {
+        self.kobject()
+            .get_children_names()
+            .into_iter()
+            .map(|name| VecDirectoryEntry {
+                entry_type: DirectoryEntryType::LNK,
+                name,
+                inode: None,
+            })
+            .collect()
+    }
 }
 
 impl FsNodeOps for KObjectSymlinkDirectory {
@@ -40,17 +52,7 @@ impl FsNodeOps for KObjectSymlinkDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(
-            self.kobject()
-                .get_children_names()
-                .into_iter()
-                .map(|name| VecDirectoryEntry {
-                    entry_type: DirectoryEntryType::LNK,
-                    name,
-                    inode: None,
-                })
-                .collect(),
-        ))
+        Ok(VecDirectory::new_file(self.create_file_ops_entries()))
     }
 
     fn lookup(

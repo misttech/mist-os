@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMa
 const fidl_type_t* ExampleUseOfErrorSyntaxCallWhichMayFailRequest::FidlType = &test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
 
 void ExampleUseOfErrorSyntaxCallWhichMayFailRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                            cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                            std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>::value) {
     memcpy(_encoder->template GetPtr<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(_offset), this, sizeof(ExampleUseOfErrorSyntaxCallWhichMayFailRequest));
   } else {
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichM
 const fidl_type_t* ExampleUseOfErrorSyntax_CallWhichMayFail_Response::FidlType = &test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable;
 
 void ExampleUseOfErrorSyntax_CallWhichMayFail_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                               cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                               std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ExampleUseOfErrorSyntax_CallWhichMayFail_Response>::value) {
     memcpy(_encoder->template GetPtr<ExampleUseOfErrorSyntax_CallWhichMayFail_Response>(_offset), this, sizeof(ExampleUseOfErrorSyntax_CallWhichMayFail_Response));
   } else {
@@ -120,7 +120,7 @@ ExampleUseOfErrorSyntax_CallWhichMayFail_Result ExampleUseOfErrorSyntax_CallWhic
 }
 
 void ExampleUseOfErrorSyntax_CallWhichMayFail_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                                                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

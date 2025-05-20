@@ -2,7 +2,7 @@
   "name": "doctor",
   "description": "Run common checks for the ffx tool and host environment",
   "examples": [
-    "To run diagnostics:\n\n    $ ffx doctor\n\nTo capture the output and additional logs:\n\n    $ ffx doctor --record\n\nBy default, this outputs the zip in the current directory.\n\nTo override output dir:\n\n    $ ffx doctor --record --output-dir /tmp/ffx"
+    "To run diagnostics:\n\n    $ ffx doctor\n\nTo capture the output and additional logs:\n\n    $ ffx doctor --record\n\nBy default, this outputs the zip in the current directory. Enabling `--record`\nalso sets the `--verbose` flag to true.\n\nTo override output dir:\n\n    $ ffx doctor --record --output-dir /tmp/ffx"
   ],
   "flags": [
     {

@@ -423,7 +423,12 @@ impl TopologyInspect {
         });
     }
 
-    pub fn on_remove_element(&self, element: Element) {
+    pub fn on_remove_element(
+        &self,
+        element: Element,
+        current_level: Option<fpb::PowerLevel>,
+        required_level: Option<fpb::PowerLevel>,
+    ) {
         let mut vertex = element.inspect_vertex.as_ref().unwrap().borrow_mut();
 
         // Ensure we don't drop the properties when dropping the vertex since we'll be reparenting
@@ -439,6 +444,12 @@ impl TopologyInspect {
             node.record(name_property);
             let _ = valid_levels_prop.reparent(&node);
             node.record(valid_levels_prop);
+            if let Some(level) = current_level {
+                node.record_uint(CURRENT_LEVEL, level.into());
+            }
+            if let Some(level) = required_level {
+                node.record_uint(REQUIRED_LEVEL, level.into());
+            }
         });
     }
 

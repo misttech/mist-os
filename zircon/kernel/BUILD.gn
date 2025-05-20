@@ -70,7 +70,6 @@ if (current_toolchain == default_toolchain) {
         # TODO(https://fxbug.dev/42121444): Many include/ headers use <ktl/*.h> headers.
         "//zircon/kernel/lib/ktl:headers.config",
         "//sdk/lib/fit:headers.config",
-        "//sdk/lib/stdcompat:headers.config",
 
         # <stdlib.h> has #include <lib/heap.h>.
         "//zircon/kernel/lib/heap:headers.config",
@@ -113,9 +112,11 @@ if (current_toolchain == default_toolchain) {
         # <lib/ktrace.h> has #include <lib/zircon-internal/ktrace.h>.
         "//zircon/system/ulib/zircon-internal:headers.config",
 
+        # <lib/ktrace.h> has #include <lib/spsc_buffer/spsc_buffer.h>.
+        "//zircon/kernel/lib/spsc_buffer:headers.config",
+
         # <lib/ktrace.h> has #include <lib/ktrace/string_ref.h>.
         "//zircon/kernel/lib/ktrace:headers.config",
-        "//zircon/kernel/lib/ktrace:suppress-warning.config",
         "//zircon/kernel/lib/special-sections:headers.config",
         "//src/performance/lib/fxt:headers.config",
 
@@ -129,8 +130,11 @@ if (current_toolchain == default_toolchain) {
         "//zircon/system/ulib/mmio-ptr:headers.config",
 
         # Everywhere has #include <lib/fit/result.h>
-        # Everywhere has #include <zx/result.h>
+        # Everywhere has #include <lib/zx/result.h>
         "//zircon/system/ulib/zx:headers.config",
+
+        # Those (and others, like fbl) lead to stdcompat.
+        "//sdk/lib/stdcompat:headers.config",
 
         "//zircon/kernel/lib/backtrace:headers.config",
 
@@ -308,6 +312,7 @@ if (is_kernel) {
     configs = [
       ":jtrace_config",
       ":lock_dep",
+      ":vmo_fine_lock",
       ":scheduler",
       ":standalone",
       ":warnings",
@@ -509,8 +514,13 @@ if (is_kernel) {
     }
   }
 
-  kernel_elf_binary("physzircon") {
+  config("vmo_fine_lock") {
     visibility = [ ":*" ]
+    defines = [ "VMO_FINE_LOCK=$vmo_fine_grained_locking" ]
+  }
+
+  kernel_elf_binary("physzircon") {
+    visibility = [ "./*" ]
 
     configs += [ ":kernel.config" ]
     deps = [
@@ -695,7 +705,7 @@ if (!is_efi_toolchain) {
       ":kernel-unittests-boot-test",
       ":kernel-unittests-boot-test-bypass-debuglog",
       "phys:boot_tests",
-      "//zircon/kernel/lib/userabi/userboot/tests:boot_tests",
+      "//zircon/kernel/lib/userabi:boot_tests",
     ]
     if (all_cpu_kernel_boot_tests) {
       foreach(cpu, standard_fuchsia_cpus) {

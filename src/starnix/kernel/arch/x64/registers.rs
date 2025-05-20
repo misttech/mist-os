@@ -13,7 +13,7 @@ const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 2;
 ///
 /// Implements [`std::ops::Deref`] and [`std::ops::DerefMut`] as a way to get at the underlying
 /// [`zx::sys::zx_thread_state_general_regs_t`] that this type wraps.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
 pub struct RegisterState {
     real_registers: zx::sys::zx_thread_state_general_regs_t,
 
@@ -185,6 +185,15 @@ impl RegisterState {
             return error!(EINVAL);
         };
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for RegisterState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegisterState")
+            .field("real_registers", &self.real_registers)
+            .field("orig_rax", &format_args!("{:#x}", &self.orig_rax))
+            .finish()
     }
 }
 

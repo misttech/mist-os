@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::blob_benchmarks::{
-    OpenAndGetVmoContentBlobCold, OpenAndGetVmoContentBlobWarm, OpenAndGetVmoMetaFileCold,
-    OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
-    PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
+    OpenAndGetVmoBenchmark, PageInBlobBenchmark, WriteBlob, WriteRealisticBlobs,
 };
 use fuchsia_storage_benchmarks::block_devices::BenchmarkVolumeFactory;
 use fuchsia_storage_benchmarks::filesystems::{
@@ -122,9 +120,9 @@ fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {
     add_benchmarks!(
         benchmark_set,
         [
-            PageInBlobSequentialUncompressed::new(SMALL_BLOB_SIZE),
-            PageInBlobSequentialCompressed::new(SMALL_BLOB_SIZE),
-            PageInBlobRandomCompressed::new(SMALL_BLOB_SIZE),
+            PageInBlobBenchmark::new_sequential_uncompressed(SMALL_BLOB_SIZE),
+            PageInBlobBenchmark::new_sequential_compressed(SMALL_BLOB_SIZE),
+            PageInBlobBenchmark::new_random_compressed(SMALL_BLOB_SIZE),
             WriteBlob::new(SMALL_BLOB_SIZE),
             WriteBlob::new(LARGE_BLOB_SIZE),
             WriteRealisticBlobs::new(),
@@ -134,10 +132,10 @@ fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {
     add_benchmarks!(
         benchmark_set,
         [
-            OpenAndGetVmoContentBlobCold::new(),
-            OpenAndGetVmoContentBlobWarm::new(),
-            OpenAndGetVmoMetaFileCold::new(),
-            OpenAndGetVmoMetaFileWarm::new(),
+            OpenAndGetVmoBenchmark::new_content_blob_cold(),
+            OpenAndGetVmoBenchmark::new_content_blob_warm(),
+            OpenAndGetVmoBenchmark::new_meta_file_cold(),
+            OpenAndGetVmoBenchmark::new_meta_file_warm(),
         ],
         [PkgDirTest::new_fxblob(), PkgDirTest::new_blobfs()]
     );

@@ -298,8 +298,6 @@ source_set("semaphore") {
     "zircon_counter_semaphore.h",
     "zircon_platform_semaphore.cc",
     "zircon_platform_semaphore.h",
-    "zircon_vmo_semaphore.cc",
-    "zircon_vmo_semaphore.h",
   ]
 
   public_deps = [

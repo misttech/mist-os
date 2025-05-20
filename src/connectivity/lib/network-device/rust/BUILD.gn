@@ -31,7 +31,6 @@ rustc_library("rust") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:event-listener",
     "//third_party/rust_crates:futures",

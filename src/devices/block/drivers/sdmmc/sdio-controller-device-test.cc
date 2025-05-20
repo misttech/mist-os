@@ -1271,8 +1271,8 @@ TEST_F(SdioControllerDeviceTest, DifferentManufacturerProductIds) {
       std::vector properties = function_node.GetProperties();
       ASSERT_GE(properties.size(), std::size(kExpectedProps[0]));
       for (size_t j = 0; j < std::size(kExpectedProps[0]); j++) {
-        const fuchsia_driver_framework::NodeProperty& prop = properties[j];
-        EXPECT_EQ(prop.key().string_value().value(), kExpectedProps[i][j].first);
+        const fuchsia_driver_framework::NodeProperty2& prop = properties[j];
+        EXPECT_EQ(prop.key(), kExpectedProps[i][j].first);
         EXPECT_EQ(prop.value().int_value().value(), kExpectedProps[i][j].second);
       }
     }

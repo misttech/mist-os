@@ -1,0 +1,19 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/product_assembly_configuration.gni")
+
+# Product configuration for boot tests.
+product_assembly_configuration("product_config") {
+  testonly = true
+  platform = {
+    feature_set_level = "test_kernel_only"
+    build_type = "eng"
+    storage = {
+      filesystems = {
+        image_mode = "no_image"
+      }
+    }
+  }
+}

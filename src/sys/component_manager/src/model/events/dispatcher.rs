@@ -219,7 +219,7 @@ mod tests {
         // Sync events get a responder if the message was dispatched.
         let mut factory = EventDispatcherFactory::new();
         let dispatcher = factory.create_dispatcher(ExtendedMoniker::ComponentManager);
-        let source_moniker = vec!["root:0", "a:0", "b:0", "c:0"].try_into().unwrap();
+        let source_moniker = ["root:0", "a:0", "b:0", "c:0"].try_into().unwrap();
         assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_ok());
         assert_matches!(
             factory.next_event().await,
@@ -227,26 +227,24 @@ mod tests {
         );
 
         // Verify that we cannot dispatch the CapabilityRequested event to the root component.
-        let subscriber = ExtendedMoniker::ComponentInstance(vec!["root:0"].try_into().unwrap());
+        let subscriber = ExtendedMoniker::ComponentInstance(["root:0"].try_into().unwrap());
         let dispatcher = factory.create_dispatcher(subscriber);
         assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
 
         // Verify that we cannot dispatch the CapabilityRequested event to the root:0/a:0 component.
-        let subscriber =
-            ExtendedMoniker::ComponentInstance(vec!["root:0", "a:0"].try_into().unwrap());
+        let subscriber = ExtendedMoniker::ComponentInstance(["root:0", "a:0"].try_into().unwrap());
         let dispatcher = factory.create_dispatcher(subscriber);
         assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
 
         // Verify that we cannot dispatch the CapabilityRequested event to the root:0/a:0/b:0 component.
         let subscriber =
-            ExtendedMoniker::ComponentInstance(vec!["root:0", "a:0", "b:0"].try_into().unwrap());
+            ExtendedMoniker::ComponentInstance(["root:0", "a:0", "b:0"].try_into().unwrap());
         let dispatcher = factory.create_dispatcher(subscriber);
         assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
 
         // Verify that we CAN dispatch the CapabilityRequested event to the root:0/a:0/b:0/c:0 component.
-        let subscriber = ExtendedMoniker::ComponentInstance(
-            vec!["root:0", "a:0", "b:0", "c:0"].try_into().unwrap(),
-        );
+        let subscriber =
+            ExtendedMoniker::ComponentInstance(["root:0", "a:0", "b:0", "c:0"].try_into().unwrap());
         let dispatcher = factory.create_dispatcher(subscriber);
         assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_ok());
         assert_matches!(
@@ -256,7 +254,7 @@ mod tests {
 
         // Verify that we cannot dispatch the CapabilityRequested event to the root:0/a:0/b:0/c:0/d:0 component.
         let subscriber = ExtendedMoniker::ComponentInstance(
-            vec!["root:0", "a:0", "b:0", "c:0", "d:0"].try_into().unwrap(),
+            ["root:0", "a:0", "b:0", "c:0", "d:0"].try_into().unwrap(),
         );
         let dispatcher = factory.create_dispatcher(subscriber);
         assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());

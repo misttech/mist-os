@@ -67,6 +67,19 @@ cc_test_executable("reader_unittest_exe") {
   ]
 }
 
+cc_test_executable("shutdown_message_unittest_exe") {
+  testonly = true
+
+  sources = [ "shutdown_message_unittest.cc" ]
+
+  deps = [
+    "//src/developer/forensics/feedback_data/system_log_recorder:src",
+    "//src/developer/forensics/testing:gtest_with_syslog_main",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 cc_test_executable("system_log_recorder_unittest_exe") {
   testonly = true
 
@@ -130,6 +143,10 @@ fuchsia_unittest_component("reader_unittest") {
   ]
 }
 
+fuchsia_unittest_component("shutdown_message_unittest") {
+  deps = [ ":shutdown_message_unittest_exe" ]
+}
+
 fuchsia_unittest_component("system_log_recorder_unittest") {
   deps = [
     ":system_log_recorder_unittest_exe",
@@ -152,6 +169,7 @@ fuchsia_test_package("system-log-recorder-tests") {
     ":log_message_store_unittest",
     ":lz4_encoding_unittest",
     ":reader_unittest",
+    ":shutdown_message_unittest",
     ":system_log_recorder_unittest",
     ":writer_unittest",
   ]

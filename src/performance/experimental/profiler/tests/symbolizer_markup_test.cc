@@ -27,11 +27,11 @@ TEST(SymbolizMarkupTest, FormatSample) {
 }
 
 TEST(SymbolizMarkupTest, FormatModule) {
+  std::vector<std::byte> build_id{std::byte{0x01}, std::byte{0x23}, std::byte{0xca},
+                                  std::byte{0xfe}};
+  uint32_t module_id = 1;
   profiler::Module mod{
-      .module_id = 1,
       .module_name = "test_module.so",
-      .build_id = std::vector<std::byte>{std::byte{0x01}, std::byte{0x23}, std::byte{0xca},
-                                         std::byte{0xfe}},
       .vaddr = 0x1000,
       .loads =
           {
@@ -53,7 +53,7 @@ TEST(SymbolizMarkupTest, FormatModule) {
           },
   };
 
-  std::string formatted = profiler::symbolizer_markup::FormatModule(mod);
+  std::string formatted = profiler::symbolizer_markup::FormatModule(module_id, build_id, mod);
   // Pages sizes should be rounded up to the nearest page (0x1000);
   std::string expected =
       "{{{module:1:test_module.so:elf:0123cafe}}}\n"
@@ -62,11 +62,11 @@ TEST(SymbolizMarkupTest, FormatModule) {
       "{{{mmap:0x11000:0x1000:load:1:x:0x10000}}}\n";
   EXPECT_EQ(expected, formatted);
 
+  uint32_t module_id22 = 22;
+  std::vector<std::byte> build_id22{std::byte{0x01}, std::byte{0x23}, std::byte{0xca},
+                                    std::byte{0xfe}};
   profiler::Module mod22{
-      .module_id = 22,
       .module_name = "test_module.so",
-      .build_id = std::vector<std::byte>{std::byte{0x01}, std::byte{0x23}, std::byte{0xca},
-                                         std::byte{0xfe}},
       .vaddr = 0x1000,
       .loads =
           {
@@ -78,7 +78,8 @@ TEST(SymbolizMarkupTest, FormatModule) {
           },
   };
 
-  std::string formatted22 = profiler::symbolizer_markup::FormatModule(mod22);
+  std::string formatted22 =
+      profiler::symbolizer_markup::FormatModule(module_id22, build_id22, mod22);
   std::string expected22 =
       "{{{module:22:test_module.so:elf:0123cafe}}}\n"
       "{{{mmap:0x3000:0x1000:load:22:rx:0x2000}}}\n";

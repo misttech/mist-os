@@ -5,17 +5,17 @@
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_BACKENDS_H_
 #define SRC_FIRMWARE_GIGABOOT_CPP_BACKENDS_H_
 
-#include <lib/stdcompat/span.h>
+#include <span>
 
 #include "partition.h"
 
 namespace gigaboot {
 
-const cpp20::span<const uint8_t> GetPermanentAttributes();
-const cpp20::span<const uint8_t> GetPermanentAttributesHash();
+const std::span<const uint8_t> GetPermanentAttributes();
+const std::span<const uint8_t> GetPermanentAttributesHash();
 
 // Get factory default partition information
-const cpp20::span<const PartitionMap::PartitionEntry> GetPartitionCustomizations();
+const std::span<const PartitionMap::PartitionEntry> GetPartitionCustomizations();
 
 }  // namespace gigaboot
 

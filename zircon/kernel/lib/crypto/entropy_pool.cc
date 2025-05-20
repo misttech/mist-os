@@ -9,8 +9,8 @@
 
 #include <explicit-memory/bytes.h>
 #include <ktl/array.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
+#include <ktl/utility.h>
 #include <openssl/sha.h>
 
 #include <ktl/enforce.h>

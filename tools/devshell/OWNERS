@@ -41,6 +41,8 @@ per-file contrib/publish,contrib/publish.py,contrib/terminal.py,tests/subcommand
 
 per-file metrics,lib/metrics.sh,lib/metrics_custom_report.sh,tests/fx-internal/metrics_test = file: /src/lib/analytics/OWNERS
 
+per-file lib/fx-cmd-suggestions.py = chaselatta@google.com, djmurphy@google.com
+
 per-file create-pb-zip,sdk-deps = lijiaming@google.com,awolter@google.com, chaselatta@google.com
 
 per-file local-publish-platform = lijiaming@google.com, chaselatta@google.com, chandarren@google.com

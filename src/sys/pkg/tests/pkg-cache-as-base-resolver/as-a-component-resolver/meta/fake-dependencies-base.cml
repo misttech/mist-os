@@ -20,6 +20,14 @@
             ],
             path: "/blob",
         },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            path: "/fxfs-svc/fuchsia.fxfs.BlobCreator",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            path: "/fxfs-svc/fuchsia.fxfs.BlobReader",
+        },
     ],
     use: [
         { protocol: "fuchsia.process.Launcher" },
@@ -41,6 +49,14 @@
         },
         {
             directory: "blob-exec",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
             from: "self",
         },
     ],

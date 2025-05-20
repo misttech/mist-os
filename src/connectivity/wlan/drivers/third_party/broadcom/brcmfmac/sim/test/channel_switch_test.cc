@@ -77,7 +77,7 @@ TEST_F(ChannelSwitchTest, ChannelSwitch) {
   ScheduleChannelSwitch(kSwitchedChannel, zx::msec(500));
   env_->Run(kTestDuration);
 
-  // Channel switch will only be triggered when assciated.
+  // Channel switch will only be triggered when associated.
   EXPECT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
   EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kSwitchedChannel.primary);
 }
@@ -140,6 +140,33 @@ TEST_F(ChannelSwitchTest, SwitchBackInDiffInterval) {
   EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kSwitchedChannel.primary);
   client_ifc_.stats_.csa_indications.pop_front();
   EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kDefaultChannel.primary);
+}
+
+TEST_F(ChannelSwitchTest, ChannelSwitchWithSpuriousReassocAndRoamEvents) {
+  Init();
+
+  simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
+  ap.EnableBeacon(zx::msec(60));
+  aps_.push_back(&ap);
+
+  client_ifc_.AssociateWith(ap, zx::msec(10));
+  ScheduleChannelSwitch(kSwitchedChannel, zx::msec(500));
+  WithSimDevice([&](brcmfmac::SimDevice* device) {
+    SimFirmware& fw = *device->GetSim()->sim_fw;
+    env_->ScheduleNotification([&] { fw.TriggerFirmwareReassocEvent(kDefaultBssid); },
+                               zx::msec(501));
+    env_->ScheduleNotification([&] { fw.TriggerFirmwareRoamEvent(kDefaultBssid); }, zx::msec(502));
+  });
+
+  env_->Run(kTestDuration);
+
+  EXPECT_EQ(client_ifc_.stats_.csa_indications.size(), 1U);
+  EXPECT_EQ(client_ifc_.stats_.csa_indications.front().new_channel, kSwitchedChannel.primary);
+  EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
+  EXPECT_EQ(0U, client_ifc_.stats_.roam_attempts);
+  EXPECT_EQ(0U, client_ifc_.stats_.roam_result_indications.size());
+  EXPECT_EQ(0U, client_ifc_.stats_.roam_confirmations.size());
+  EXPECT_EQ(SimInterface::AssocContext::kAssociated, client_ifc_.assoc_ctx_.state);
 }
 
 // This test verifies CSA beacons from APs which are not associated with client will not trigger

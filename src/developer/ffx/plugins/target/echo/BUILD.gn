@@ -24,6 +24,7 @@ ffx_plugin("ffx_target_echo") {
   test_deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/target:lib",
     "//src/lib/fdomain/client",
     "//src/lib/fdomain/local",
     "//src/lib/fidl/rust/fidl",

@@ -34,7 +34,7 @@ pub async fn toolbox_directory(
         ));
     };
 
-    let dir = component_debug::dirs::open_instance_dir_root_readable(
+    let dir = component_debug::dirs::open_instance_directory(
         &moniker,
         sys2::OpenDirType::NamespaceDir.into(),
         &query,

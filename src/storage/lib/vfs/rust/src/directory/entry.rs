@@ -166,7 +166,7 @@ impl<'a> OpenRequest<'a> {
                 path,
                 object_request,
             } => {
-                dir.open(scope, flags, path, object_request.take().into_server_end());
+                dir.deprecated_open(scope, flags, path, object_request.take().into_server_end());
                 // This will cause issues for heavily nested directory structures because it thwarts
                 // tail recursion optimization, but that shouldn't occur in practice.
                 Ok(())
@@ -176,7 +176,7 @@ impl<'a> OpenRequest<'a> {
                 request_flags: RequestFlags::Open3(flags),
                 path,
                 object_request,
-            } => dir.open3(scope, path, flags, object_request),
+            } => dir.open(scope, path, flags, object_request),
         }
     }
 
@@ -281,11 +281,21 @@ impl<'a> OpenRequest<'a> {
                     let object_request = object_request.take();
                     scope.clone().spawn(async move {
                         if object_request.wait_till_ready().await {
-                            remote.open(scope, flags, path, object_request.into_server_end());
+                            remote.deprecated_open(
+                                scope,
+                                flags,
+                                path,
+                                object_request.into_server_end(),
+                            );
                         }
                     });
                 } else {
-                    remote.open(scope, flags, path, object_request.take().into_server_end());
+                    remote.deprecated_open(
+                        scope,
+                        flags,
+                        path,
+                        object_request.take().into_server_end(),
+                    );
                 }
                 Ok(())
             }
@@ -301,13 +311,13 @@ impl<'a> OpenRequest<'a> {
                     scope.clone().spawn(async move {
                         if object_request.wait_till_ready().await {
                             object_request.handle(|object_request| {
-                                remote.open3(scope, path, flags, object_request)
+                                remote.open(scope, path, flags, object_request)
                             });
                         }
                     });
                     Ok(())
                 } else {
-                    remote.open3(scope, path, flags, object_request)
+                    remote.open(scope, path, flags, object_request)
                 }
             }
         }
@@ -454,7 +464,7 @@ mod tests {
             "e" => sub_node
         );
 
-        root2.open(
+        root2.deprecated_open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
             Path::validate_and_split("e/c/d").unwrap(),

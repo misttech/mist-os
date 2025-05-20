@@ -15,7 +15,7 @@ _overrides_path =
 
 test_assembly_config("developer_overrides") {
   platform = {
-    feature_set_level = "empty"
+    feature_set_level = "test_no_platform"
     build_type = "eng"
   }
   additional_args = [

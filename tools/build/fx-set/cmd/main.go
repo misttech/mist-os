@@ -35,12 +35,14 @@ const (
 	// fx ensures that this env var is set.
 	checkoutDirEnvVar = "FUCHSIA_DIR"
 
-	// Populated when fx's top-level `--dir` flag is set. Guaranteed to be absolute.
+	// Populated when fx's top-level `--dir` flag is set.
 	buildDirEnvVar = "_FX_BUILD_DIR"
 
-	// We'll fall back to using this build dir if neither `fx --dir` nor `fx set
-	// --auto-dir` is specified.
-	defaultBuildDir = "out/default"
+	// out/default was the historical "default" build directory for Fuchsia.
+	// Many manual tests have hard-coded it. We preserve it as a symlink to the
+	// actual build directory, and now create directories by board to preserve
+	// local build artifacts between arch changes.
+	symlinkBuildDir = "out/default"
 
 	// When unspecified, this is used for --rbe-mode.
 	defaultRbeMode = "auto"
@@ -139,6 +141,13 @@ func mainImpl(ctx context.Context) error {
 		}
 	}
 
+	if args.checkoutDir == "" {
+		return fmt.Errorf("got unexpected empty checkoutDir")
+	}
+	if args.buildDir == "" {
+		return fmt.Errorf("got unexpected empty buildDir")
+	}
+
 	contextSpec := &fintpb.Context{
 		CheckoutDir: args.checkoutDir,
 		BuildDir:    filepath.Join(args.checkoutDir, args.buildDir),
@@ -157,7 +166,6 @@ func mainImpl(ctx context.Context) error {
 	if err := fx.run(ctx, "use", buildDir); err != nil {
 		return fmt.Errorf("failed to set build directory: %w", err)
 	}
-
 	return nil
 }
 
@@ -222,6 +230,17 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	cmd.ccacheDir = env[ccacheDirEnvVar] // Not required.
 
 	cmd.buildDir = env[buildDirEnvVar] // Not required.
+	// Check and rebase if buildDir is an absolute path.
+	if filepath.IsAbs(cmd.buildDir) {
+		if !strings.HasPrefix(cmd.buildDir, cmd.checkoutDir+"/") {
+			return nil, fmt.Errorf("build dir %q is not under checkout dir %q", cmd.buildDir, cmd.checkoutDir)
+		}
+		var err error
+		cmd.buildDir, err = filepath.Rel(cmd.checkoutDir, cmd.buildDir)
+		if err != nil {
+			return nil, fmt.Errorf("rebasing build dir to check out dir: %v", err)
+		}
+	}
 
 	flagSet := flag.NewFlagSet("fx set", flag.ExitOnError)
 	// TODO(olivernewman): Decide whether to have this tool print usage or
@@ -233,12 +252,11 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 
 	flagSet.BoolVar(&cmd.skipLocalArgs, "skip-local-args", false, "")
 
-	var autoDir bool
+	var autoDir = true // default to automatically creating a named build directory
 
 	// Help strings don't matter because `fx set -h` uses the help text from
 	// //tools/devshell/set, which should be kept up to date with these flags.
 	flagSet.BoolVar(&cmd.verbose, "verbose", false, "")
-	flagSet.BoolVar(&autoDir, "auto-dir", false, "")
 	flagSet.StringVar(&cmd.fintParamsPath, "fint-params-path", "", "")
 	flagSet.BoolVar(&cmd.useCcache, "ccache", false, "")
 	flagSet.BoolVar(&cmd.noCcache, "no-ccache", false, "")
@@ -291,17 +309,29 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		return nil, fmt.Errorf(message)
 	}
 
-	if cmd.buildDir == "" {
-		cmd.buildDir = defaultBuildDir
-	} else if autoDir {
-		return nil, fmt.Errorf("'fx --dir' and 'fx set --auto-dir' are mutually exclusive")
+	if cmd.buildDir != "" {
+		autoDir = false
+	}
+
+	if cmd.buildDir == symlinkBuildDir {
+		// If the developer wants to use out/default as the out dir, and we had been using `symlinkBuildDir` as a symlink, unlink it.
+		userSpecifiedPath := filepath.Join(cmd.checkoutDir, cmd.buildDir)
+		symlink, err := isSymlink(userSpecifiedPath)
+		if err != nil {
+			return nil, err
+		}
+		if symlink {
+			if err := os.Remove(userSpecifiedPath); err != nil {
+				return nil, fmt.Errorf("failed to unlink: %+v", err)
+			}
+		}
 	}
 
 	// If a fint params file was specified then no other arguments are required,
 	// so no need to validate them.
 	if cmd.fintParamsPath != "" {
-		if autoDir {
-			return nil, fmt.Errorf("--auto-dir is not supported with --fint-params-path")
+		if cmd.buildDir == "" {
+			return nil, fmt.Errorf("build directory must be set (e.g. through --dir) when --fint-params-path is set")
 		}
 		return cmd, nil
 	}
@@ -333,9 +363,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	if autoDir {
 		for _, variant := range cmd.variants {
 			if strings.Contains(variant, "/") {
-				return nil, fmt.Errorf(
-					"--auto-dir only works with simple catch-all --variant switches; choose your " +
-						"own directory name with fx --dir for a complex configuration")
+				return nil, fmt.Errorf("This variant builds cannot be automatically named. Please specify a directory name with fx --dir")
 			}
 		}
 		nameComponents := []string{productDotBoard}
@@ -347,7 +375,8 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		}
 		cmd.buildDir = filepath.Join("out", strings.Join(nameComponents, "-"))
 	}
-
+	message := "The build directory for this build is " + cmd.buildDir + "\n"
+	fmt.Printf(message)
 	return cmd, nil
 }
 
@@ -588,4 +617,18 @@ func canAccessRbe(checkoutDir string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// isSymlink returns true if the path is a symlink,
+// it returns false if the path doesn't exist.
+func isSymlink(path string) (bool, error) {
+	fileInfo, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("error checking path %s: %w", path, err)
+	}
+	isLink := fileInfo.Mode()&os.ModeSymlink != 0
+	return isLink, nil
 }

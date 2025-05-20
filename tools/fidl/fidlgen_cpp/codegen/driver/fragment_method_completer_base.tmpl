@@ -54,7 +54,6 @@ class {{ .WireCompleterBase }} : public ::fidl::CompleterBase, public {{ .WireCo
 
 {{- define "Method:CompleterBase:driver/WireMessagingSource" }}
 {{ EnsureNamespace "" }}
-{{- IfdefFuchsia -}}
 
 void
 {{ .WireBufferCompleterImpl.NoLeading }}::Reply({{ .WireReplyArgs }}) {
@@ -99,7 +98,6 @@ void
   }
 {{- end }}
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 

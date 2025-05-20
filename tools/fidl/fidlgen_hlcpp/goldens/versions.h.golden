@@ -21,10 +21,10 @@ class Bits final {
 
   // Constructs an instance of |Bits| from an underlying primitive value
   // if the primitive does not contain any unknown members not defined in the
-  // FIDL schema. Otherwise, returns |cpp17::nullopt|.
-  constexpr inline static cpp17::optional<Bits> TryFrom(uint32_t value) {
+  // FIDL schema. Otherwise, returns |std::nullopt|.
+  constexpr inline static std::optional<Bits> TryFrom(uint32_t value) {
     if (value & ~kMask.value_) {
-      return cpp17::nullopt;
+      return std::nullopt;
     }
     return Bits(value & Bits::kMask.value_);
   }
@@ -153,16 +153,9 @@ class Union;
 class OtherProtocol;
 using OtherProtocolHandle = ::fidl::InterfaceHandle<OtherProtocol>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Protocol;
 using ProtocolHandle = ::fidl::InterfaceHandle<Protocol>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class Service;
 
 #endif  // __Fuchsia__
@@ -182,7 +175,7 @@ class Struct final {
   static inline ::std::unique_ptr<Struct> New() { return ::std::make_unique<Struct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Struct* value, size_t _offset);
   zx_status_t Clone(Struct* result) const;
 };
@@ -193,10 +186,6 @@ inline zx_status_t Clone(const ::test::versions::Struct& _value,
 }
 
 using StructPtr = ::std::unique_ptr<Struct>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Table final {
  public:
@@ -236,7 +225,7 @@ class Table final {
   static inline ::std::unique_ptr<Table> New() { return ::std::make_unique<Table>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Table* _value, size_t _offset);
   zx_status_t Clone(Table* _result) const;
 
@@ -276,10 +265,6 @@ class Table final {
 
 using TablePtr = ::std::unique_ptr<Table>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class Union final {
  public:
   static const fidl_type_t* FidlType;
@@ -302,7 +287,7 @@ class Union final {
   static inline ::std::unique_ptr<Union> New() { return ::std::make_unique<Union>(); }
 
   void Encode(::fidl::Encoder* encoder, size_t offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Union* value, size_t offset);
   zx_status_t Clone(Union* result) const;
 
@@ -372,10 +357,6 @@ inline zx_status_t Clone(const ::test::versions::Union& value,
 
 using UnionPtr = ::std::unique_ptr<Union>;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 class OtherProtocol_RequestEncoder {
  public:
 };
@@ -383,10 +364,6 @@ class OtherProtocol_RequestEncoder {
 class OtherProtocol_ResponseEncoder {
  public:
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Protocol_RequestEncoder {
  public:
@@ -413,7 +390,7 @@ template <>
 struct CodingTraits<::test::versions::Bits> {
   static constexpr size_t kInlineSize = sizeof(::test::versions::Bits);
   static void Encode(Encoder* encoder, ::test::versions::Bits* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -442,7 +419,7 @@ template <>
 struct CodingTraits<::test::versions::Enum> {
   static constexpr size_t kInlineSize = sizeof(::test::versions::Enum);
   static void Encode(Encoder* encoder, ::test::versions::Enum* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);
@@ -490,10 +467,6 @@ struct Equality<::test::versions::Struct> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct CodingTraits<::test::versions::Table>
     : public EncodableCodingTraits<::test::versions::Table, 16> {};
@@ -519,10 +492,6 @@ struct Equality<::test::versions::Table> {
   }
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct IsFidlXUnion<::test::versions::Union> : public std::true_type {};
 
@@ -535,7 +504,7 @@ struct CodingTraits<std::unique_ptr<::test::versions::Union>> {
   static constexpr size_t kInlineSize = 16;
 
   static void Encode(Encoder* encoder, std::unique_ptr<::test::versions::Union>* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt) {
     auto&& p_xunion = *value;
     if (p_xunion) {
       p_xunion->Encode(encoder, offset);
@@ -597,10 +566,6 @@ class OtherProtocol_Sync;
 using OtherProtocolSyncPtr = ::fidl::SynchronousInterfacePtr<OtherProtocol>;
 class OtherProtocol_SyncProxy;
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 using ProtocolPtr = ::fidl::InterfacePtr<Protocol>;
 class Protocol_Proxy;
 class Protocol_Stub;
@@ -616,14 +581,7 @@ constexpr uint64_t kProtocol_Foo_Ordinal = 0x567a8096af6e6139lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_Foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 }  // namespace internal
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 class Service;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class OtherProtocol {
  public:
@@ -695,10 +653,6 @@ class OtherProtocol_SyncProxy : public ::test::versions::OtherProtocol_Sync {
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<OtherProtocol>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Protocol {
  public:
@@ -794,10 +748,6 @@ class Protocol_SyncProxy : public ::test::versions::Protocol_Sync {
   ::fidl::internal::SynchronousProxy proxy_;
   friend class ::fidl::SynchronousInterfacePtr<Protocol>;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class Service final {
  public:

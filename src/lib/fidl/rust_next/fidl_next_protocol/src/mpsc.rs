@@ -153,7 +153,11 @@ unsafe impl Decoder for RecvBuffer {
         unsafe { Ok(NonNull::new_unchecked(chunks)) }
     }
 
-    fn finish(&mut self) -> Result<(), DecodeError> {
+    fn commit(&mut self) {
+        // No resources to take, so commit is a no-op
+    }
+
+    fn finish(&self) -> Result<(), DecodeError> {
         if self.chunks_taken != self.chunks.len() {
             return Err(DecodeError::ExtraBytes {
                 num_extra: (self.chunks.len() - self.chunks_taken) * CHUNK_SIZE,

@@ -126,6 +126,8 @@ class BlobWriterWrapper {
     return zx::ok();
   }
 
+  fidl::WireSyncClient<fuchsia_fxfs::BlobWriter>& writer() { return writer_; }
+
  private:
   fidl::WireSyncClient<fuchsia_fxfs::BlobWriter> writer_;
 };
@@ -155,7 +157,7 @@ class BlobCreatorWrapper {
     fidl::Array<uint8_t, 32> hash;
     digest.CopyTo(hash.data_);
     auto result = creator_->Create(hash, allow_existing);
-    ZX_ASSERT(result.ok());
+    ZX_ASSERT_MSG(result.ok(), "%s", result.status_string());
     if (result->is_error()) {
       switch (result->error_value()) {
         case fuchsia_fxfs::CreateBlobError::kAlreadyExists:
@@ -189,7 +191,7 @@ class BlobCreatorTest : public BlobfsTest {
   const BlobCreatorWrapper& creator() const { return *creator_; }
   void Barrier() const {
     // This is just a barrier to reduce the risk of a race. There is no way for the caller to wait
-    // and guarantee that the channel close has gotten to the port on the server. So we send some
+    // and guarantee that the vmo close has gotten to the port on the server. So we send some
     // other message that will be handled by the server to ensure that we do some kind of waiting on
     // it. Since that server is single-threaded it is unlikely that the close has not made it back
     // to start handling before it gets the next message after this one.
@@ -267,8 +269,6 @@ TEST_F(BlobCreatorTest, AbandonOverwriteAllowsRestart) {
     EXPECT_STATUS(creator().CreateExisting(blob.digest).status_value(), ZX_ERR_ALREADY_EXISTS);
   }
 
-  Barrier();
-
   // First writer went away, so now we can try again.
   auto writer = creator().CreateExisting(blob.digest);
   EXPECT_OK(writer.status_value());
@@ -322,8 +322,6 @@ TEST_F(BlobCreatorTest, UnlinkPreventedByOverwrite) {
     ASSERT_OK(writer.status_value());
   }
 
-  Barrier();
-
   // Should be back where we started.
   {
     auto info = fs().GetFsInfo();
@@ -363,7 +361,7 @@ TEST_F(BlobCreatorTest, UnlinkDuringOverwrite) {
     ASSERT_EQ(unlinkat(fd.get(), blob.digest.ToString().c_str(), 0), 0);
 
     // Finish overwrite.
-    ASSERT_OK(writer.status_value());
+    ASSERT_OK(writer->WriteBlob(blob).status_value());
 
     // Try to read with the new info.
     char a;
@@ -680,6 +678,28 @@ TEST_F(BlobWriterTest, FailedOverwriteWithBadData) {
   uint8_t bad_byte = blob.delivery_blob.data()[payload_size - 1] ^ 0xFF;
   ASSERT_OK(vmo->write(&bad_byte, 0, 1));
   EXPECT_STATUS(writer->BytesReady(1).status_value(), ZX_ERR_IO_DATA_INTEGRITY);
+}
+
+// Ensure that dropping a handle and reopening a blob do not race.
+TEST_F(BlobWriterTest, CloseRaceTest) {
+  auto blob = GenerateUncompressedBlob(10);
+  for (int i = 0; i < 1000; ++i) {
+    auto writer_or = creator().Create(blob.digest);
+    ASSERT_OK(writer_or);
+    auto writer = std::move(writer_or.value());
+    ASSERT_OK(writer.GetVmo(blob.delivery_blob.size()).status_value());
+  }
+}
+
+TEST_F(BlobWriterTest, OverwriteCloseRaceTest) {
+  auto blob = GenerateUncompressedBlob(10);
+  ASSERT_OK(creator().CreateAndWriteBlob(blob).status_value());
+  for (int i = 0; i < 1000; ++i) {
+    auto writer_or = creator().CreateExisting(blob.digest);
+    ASSERT_OK(writer_or);
+    auto writer = std::move(writer_or.value());
+    ASSERT_OK(writer.GetVmo(blob.delivery_blob.size()).status_value());
+  }
 }
 
 using BlobReaderTest = BlobCreatorTest;

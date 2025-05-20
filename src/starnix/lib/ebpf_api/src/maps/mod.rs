@@ -13,7 +13,7 @@ mod vmar;
 
 pub use ring_buffer::{RingBuffer, RingBufferWakeupPolicy, RINGBUF_SIGNAL};
 
-use ebpf::{BpfValue, MapReference, MapSchema};
+use ebpf::{BpfValue, EbpfBufferPtr, MapReference, MapSchema};
 use fidl_fuchsia_ebpf as febpf;
 use inspect_stubs::track_stub;
 use linux_uapi::{
@@ -33,7 +33,7 @@ use linux_uapi::{
     bpf_map_type_BPF_MAP_TYPE_STACK, bpf_map_type_BPF_MAP_TYPE_STACK_TRACE,
     bpf_map_type_BPF_MAP_TYPE_STRUCT_OPS, bpf_map_type_BPF_MAP_TYPE_TASK_STORAGE,
     bpf_map_type_BPF_MAP_TYPE_UNSPEC, bpf_map_type_BPF_MAP_TYPE_USER_RINGBUF,
-    bpf_map_type_BPF_MAP_TYPE_XSKMAP,
+    bpf_map_type_BPF_MAP_TYPE_XSKMAP, BPF_EXIST, BPF_NOEXIST,
 };
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -72,13 +72,12 @@ pub enum MapError {
     Internal,
 }
 
-pub trait MapImpl: Send + Sync + Debug {
-    fn get_raw(&self, key: &[u8]) -> Option<*mut u8>;
-    fn lookup(&self, key: &[u8]) -> Option<Vec<u8>>;
+trait MapImpl: Send + Sync + Debug {
+    fn lookup<'a>(&'a self, key: &[u8]) -> Option<MapValueRef<'a>>;
     fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError>;
     fn delete(&self, key: &[u8]) -> Result<(), MapError>;
     fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, MapError>;
-    fn vmo(&self) -> Option<Arc<zx::Vmo>>;
+    fn vmo(&self) -> &Arc<zx::Vmo>;
 
     // Returns true if `POLLIN` is signaled for the map FD. Should be
     // overridden only for ring buffers.
@@ -151,31 +150,41 @@ impl Map {
     }
 
     pub fn share(&self) -> Result<febpf::Map, MapError> {
-        let mut result = febpf::Map::default();
-        result.schema = Some(febpf::MapSchema {
-            type_: bpf_map_type_to_fidl_map_type(self.schema.map_type),
-            key_size: self.schema.key_size,
-            value_size: self.schema.value_size,
-            max_entries: self.schema.max_entries,
-        });
-        result.vmo = Some(
-            self.map_impl
-                .vmo()
-                .and_then(|vmo| (*vmo).duplicate_handle(zx::Rights::SAME_RIGHTS).ok())
-                .ok_or(MapError::Internal)?,
-        );
-        Ok(result)
+        Ok(febpf::Map {
+            schema: Some(febpf::MapSchema {
+                type_: bpf_map_type_to_fidl_map_type(self.schema.map_type),
+                key_size: self.schema.key_size,
+                value_size: self.schema.value_size,
+                max_entries: self.schema.max_entries,
+            }),
+            vmo: Some(
+                self.map_impl
+                    .vmo()
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .map_err(|_| MapError::Internal)?,
+            ),
+            ..Default::default()
+        })
     }
 
-    pub fn get_raw(&self, key: &[u8]) -> Option<*mut u8> {
-        self.map_impl.get_raw(key)
-    }
-
-    pub fn lookup(&self, key: &[u8]) -> Option<Vec<u8>> {
+    pub fn lookup<'a>(&'a self, key: &[u8]) -> Option<MapValueRef<'a>> {
         self.map_impl.lookup(key)
     }
 
+    pub fn load(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let mut result = self.lookup(key)?.ptr().load();
+
+        // Remove padding if any.
+        result.resize(self.schema.value_size as usize, 0);
+
+        Some(result)
+    }
+
     pub fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError> {
+        if flags & (BPF_EXIST as u64) > 0 && flags & (BPF_NOEXIST as u64) > 0 {
+            return Err(MapError::InvalidParam);
+        }
+
         self.map_impl.update(key, value, flags)
     }
 
@@ -187,7 +196,7 @@ impl Map {
         self.map_impl.get_next_key(key)
     }
 
-    pub fn vmo(&self) -> Option<Arc<zx::Vmo>> {
+    pub fn vmo(&self) -> &Arc<zx::Vmo> {
         self.map_impl.vmo()
     }
 
@@ -200,10 +209,30 @@ impl Map {
     }
 }
 
-type PinnedBuffer = Pin<Box<[u8]>>;
+pub enum MapValueRef<'a> {
+    PlainRef(EbpfBufferPtr<'a>),
+    HashMapRef(hashmap::HashMapEntryRef<'a>),
+}
 
-fn new_pinned_buffer(size: usize) -> PinnedBuffer {
-    vec![0u8; size].into_boxed_slice().into()
+impl<'a> MapValueRef<'a> {
+    fn new(buf: EbpfBufferPtr<'a>) -> Self {
+        Self::PlainRef(buf)
+    }
+
+    fn new_from_hashmap(hash_map_ref: hashmap::HashMapEntryRef<'a>) -> Self {
+        Self::HashMapRef(hash_map_ref)
+    }
+
+    pub fn is_ref_counted(&self) -> bool {
+        matches!(&self, MapValueRef::HashMapRef(_))
+    }
+
+    pub fn ptr(&self) -> EbpfBufferPtr<'a> {
+        match self {
+            MapValueRef::PlainRef(buf) => *buf,
+            MapValueRef::HashMapRef(hash_map_ref) => hash_map_ref.ptr(),
+        }
+    }
 }
 
 fn create_map_impl(
@@ -402,7 +431,27 @@ mod test {
         let key = vec![0, 0, 0, 0];
         let value = [0, 1, 2, 3];
         map1.update(MapKey::from_vec(key.clone()), &value, 0).unwrap();
-        assert_eq!(&map2.lookup(&key).unwrap(), &value);
+        assert_eq!(&map2.load(&key).unwrap(), &value);
+    }
+
+    #[fuchsia::test]
+    fn test_sharing_hash_map() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_HASH,
+            key_size: 4,
+            value_size: 4,
+            max_entries: 10,
+        };
+
+        // Create two array maps sharing the content.
+        let map1 = Map::new(schema, 0).unwrap();
+        let map2 = Map::new_shared(map1.share().unwrap()).unwrap();
+
+        // Set a value in one map and check that it's updated in the other.
+        let key = vec![0, 0, 0, 0];
+        let value = [0, 1, 2, 3];
+        map1.update(MapKey::from_vec(key.clone()), &value, 0).unwrap();
+        assert_eq!(&map2.load(&key).unwrap(), &value);
     }
 
     #[fuchsia::test]
@@ -435,7 +484,7 @@ mod test {
         assert_eq!(map.update(get_key(10001), &get_value(10001, 1), 0), Err(MapError::SizeLimit));
 
         for i in 0..10000 {
-            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 0)));
+            assert_eq!(map.load(&get_key(i)), Some(get_value(i, 0)));
         }
 
         // Update some elements.
@@ -443,7 +492,7 @@ mod test {
             assert!(map.update(get_key(i), &get_value(i, 1), 0).is_ok());
         }
         for i in 8000..9000 {
-            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 1)));
+            assert_eq!(map.load(&get_key(i)), Some(get_value(i, 1)));
         }
 
         // Delete half of the entries.
@@ -451,18 +500,19 @@ mod test {
             assert!(map.delete(&get_key(i)).is_ok());
         }
         for i in 5000..10000 {
-            assert_eq!(map.lookup(&get_key(i)), None);
+            assert_eq!(map.load(&get_key(i)), None);
         }
 
         // Replace removed entries with new ones
         for i in 10000..15000 {
             assert!(map.update(get_key(i), &get_value(i, 2), 0).is_ok());
         }
+
         for i in 0..5000 {
-            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 0)));
+            assert_eq!(map.load(&get_key(i)), Some(get_value(i, 0)));
         }
         for i in 10000..15000 {
-            assert_eq!(map.lookup(&get_key(i)), Some(get_value(i, 2)));
+            assert_eq!(map.load(&get_key(i)), Some(get_value(i, 2)));
         }
     }
 
@@ -481,11 +531,55 @@ mod test {
         assert!(map.update(key.clone(), &value, 0).is_ok());
 
         // Access a value directly the way eBPF programs do.
-        let ptr = map.get_raw(&key).unwrap();
+        let value_ref = map.lookup(&key).unwrap();
         unsafe {
-            *(ptr as *mut u32) = 0xabacadae;
+            *value_ref.ptr().get_ptr::<u32>(0).unwrap().deref_mut() = 0xabacadae;
         }
 
-        assert_eq!(map.lookup(&key), Some(vec![0xae, 0xad, 0xac, 0xab, 4, 5, 6, 7, 8, 9, 10]));
+        assert_eq!(map.load(&key), Some(vec![0xae, 0xad, 0xac, 0xab, 4, 5, 6, 7, 8, 9, 10]));
+    }
+
+    #[fuchsia::test]
+    fn test_hash_map_ref_counting() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_HASH,
+            key_size: 5,
+            value_size: 11,
+            max_entries: 2,
+        };
+
+        let map = Map::new(schema, 0).unwrap();
+        let key = MapKey::from_vec("12345".to_string().into_bytes());
+        let key2 = MapKey::from_vec("24122".to_string().into_bytes());
+        let value = (0..11).collect::<Vec<u8>>();
+        assert!(map.update(key.clone(), &value, 0).is_ok());
+        assert!(map.update(key2.clone(), &value, 0).is_ok());
+
+        let value_ref = map.lookup(&key).unwrap();
+
+        // Delete an element. The corresponding data entry should not be
+        // released until `value_ref` is dropped.
+        assert!(map.delete(&key).is_ok());
+        assert_eq!(map.update(key.clone(), &value, 0), Err(MapError::SizeLimit));
+        drop(value_ref);
+        assert!(map.update(key.clone(), &value, 0).is_ok());
+    }
+
+    #[fuchsia::test]
+    fn test_ringbug_sharing() {
+        let schema = MapSchema {
+            map_type: bpf_map_type_BPF_MAP_TYPE_RINGBUF,
+            key_size: 0,
+            value_size: 0,
+            max_entries: 4096 * 2,
+        };
+
+        let map = Map::new(schema, 0).unwrap();
+        map.ringbuf_reserve(8000, 0).expect("ringbuf_reserve failed");
+
+        let map2 = Map::new_shared(map.share().unwrap()).unwrap();
+
+        // Expected to fail since there is no space left.
+        map2.ringbuf_reserve(2000, 0).expect_err("ringbuf_reserve expected to fail");
     }
 }

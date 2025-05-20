@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_arrays_StructSmallArrayTable;
 const fidl_type_t* StructSmallArray::FidlType = &test_arrays_StructSmallArrayTable;
 
 void StructSmallArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                              cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                              std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructSmallArray>::value) {
     memcpy(_encoder->template GetPtr<StructSmallArray>(_offset), this, sizeof(StructSmallArray));
   } else {
@@ -43,7 +43,7 @@ extern "C" const fidl_type_t test_arrays_StructLargeArrayTable;
 const fidl_type_t* StructLargeArray::FidlType = &test_arrays_StructLargeArrayTable;
 
 void StructLargeArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                              cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                              std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<StructLargeArray>::value) {
     memcpy(_encoder->template GetPtr<StructLargeArray>(_offset), this, sizeof(StructLargeArray));
   } else {
@@ -113,7 +113,7 @@ TableSmallArray& TableSmallArray::set_a(::std::array<uint32_t, 2> _value) {
 }
 
 void TableSmallArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -234,7 +234,7 @@ TableLargeArray& TableLargeArray::set_a(::std::array<uint32_t, 100> _value) {
 }
 
 void TableLargeArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -351,7 +351,7 @@ UnionSmallArray UnionSmallArray::WithA(::std::array<uint32_t, 2>&& val) {
 }
 
 void UnionSmallArray::Encode(::fidl::Encoder* encoder, size_t offset,
-                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -502,7 +502,7 @@ UnionLargeArray UnionLargeArray::WithA(::std::array<uint32_t, 100>&& val) {
 }
 
 void UnionLargeArray::Encode(::fidl::Encoder* encoder, size_t offset,
-                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 

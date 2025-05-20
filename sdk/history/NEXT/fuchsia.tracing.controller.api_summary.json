@@ -396,6 +396,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.tracing.controller/TraceConfig.defer_transfer",
+        "ordinal": "7",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.tracing.controller/TraceConfig.provider_specs",
         "ordinal": "5",
         "type": "vector<fuchsia.tracing.controller/ProviderSpec>:100"

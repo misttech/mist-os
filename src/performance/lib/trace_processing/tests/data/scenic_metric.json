@@ -199,7 +199,7 @@
         },
         {
             "cat": "gfx",
-            "name": "Display::Controller::OnDisplayVsync",
+            "name": "Flatland::DisplayCompositor::OnVsync",
             "ts": 20,
             "pid": 5693,
             "tid": 14044,
@@ -211,7 +211,7 @@
         },
         {
             "cat": "gfx",
-            "name": "Display::Controller::OnDisplayVsync",
+            "name": "Flatland::DisplayCompositor::OnVsync",
             "ts": 100,
             "pid": 5693,
             "tid": 14044,
@@ -223,7 +223,7 @@
         },
         {
             "cat": "gfx",
-            "name": "Display::Controller::OnDisplayVsync",
+            "name": "Flatland::DisplayCompositor::OnVsync",
             "ts": 200,
             "pid": 5693,
             "tid": 14044,
@@ -295,7 +295,7 @@
         },
         {
             "cat": "gfx",
-            "name": "Display::Controller::OnDisplayVsync",
+            "name": "Flatland::DisplayCompositor::OnVsync",
             "ts": 400,
             "pid": 5693,
             "tid": 14044,
@@ -367,7 +367,7 @@
         },
         {
             "cat": "gfx",
-            "name": "Display::Controller::OnDisplayVsync",
+            "name": "Flatland::DisplayCompositor::OnVsync",
             "ts": 502,
             "pid": 5693,
             "tid": 14044,
@@ -420,7 +420,7 @@
         },
         {
             "cat": "gfx",
-            "name": "Display::Controller::OnDisplayVsync",
+            "name": "Flatland::DisplayCompositor::OnVsync",
             "ts": 600,
             "pid": 5693,
             "tid": 14044,
@@ -464,7 +464,7 @@
         },
         {
             "cat": "gfx",
-            "name": "Display::Controller::OnDisplayVsync",
+            "name": "Flatland::DisplayCompositor::OnVsync",
             "ts": 700,
             "pid": 5693,
             "tid": 14044,

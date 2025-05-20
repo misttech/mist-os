@@ -101,7 +101,7 @@ constexpr uint8_t kBadSize[] = {
 
 TEST(ZbitlDebugdataTests, Good) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kGoodPayload)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kGoodPayload)));
   EXPECT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_EQ(debugdata.sink_name(), "abc");
   EXPECT_EQ(debugdata.vmo_name(), "def");
@@ -115,7 +115,7 @@ TEST(ZbitlDebugdataTests, MutableContents) {
   memcpy(buffer.data(), kGoodPayload, buffer.size());
 
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(buffer)));
+  auto result = debugdata.Init(std::as_bytes(std::span(buffer)));
   EXPECT_TRUE(result.is_ok()) << result.error_value();
 
   ASSERT_EQ(debugdata.contents().size(), 5u);
@@ -131,49 +131,49 @@ TEST(ZbitlDebugdataTests, MutableContents) {
 
 TEST(ZbitlDebugdataTests, BadTrailer) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kBadTrailer)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kBadTrailer)));
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), "ZBI_TYPE_DEBUGDATA item too small for debugdata trailer");
 }
 
 TEST(ZbitlDebugdataTests, BadContents) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kBadContents)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kBadContents)));
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), "ZBI_TYPE_DEBUGDATA item too small for content size");
 }
 
 TEST(ZbitlDebugdataTests, BadSink) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kBadSink)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kBadSink)));
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), "ZBI_TYPE_DEBUGDATA item too small for data-sink name");
 }
 
 TEST(ZbitlDebugdataTests, BadVmo) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kBadVmo)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kBadVmo)));
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), "ZBI_TYPE_DEBUGDATA item too small for VMO name");
 }
 
 TEST(ZbitlDebugdataTests, BadLog) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kBadLog)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kBadLog)));
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), "ZBI_TYPE_DEBUGDATA item too small for log text");
 }
 
 TEST(ZbitlDebugdataTests, BadAlign) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kBadAlign)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kBadAlign)));
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), "ZBI_TYPE_DEBUGDATA item size not aligned");
 }
 
 TEST(ZbitlDebugdataTests, BadSize) {
   zbitl::Debugdata debugdata;
-  auto result = debugdata.Init(cpp20::as_bytes(cpp20::span(kBadSize)));
+  auto result = debugdata.Init(std::as_bytes(std::span(kBadSize)));
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), "ZBI_TYPE_DEBUGDATA item too large for encoded sizes");
 }

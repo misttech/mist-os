@@ -94,30 +94,30 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
 
     fuchsia_driver_framework::CompositeNodeSpec composite_node_spec = i2c_tester->env().SyncCall(
         &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-    ASSERT_TRUE(composite_node_spec.parents().has_value());
-    const std::vector<fuchsia_driver_framework::ParentSpec>& parent_specs =
-        *composite_node_spec.parents();
+    ASSERT_TRUE(composite_node_spec.parents2().has_value());
+    const std::vector<fuchsia_driver_framework::ParentSpec2>& parent_specs =
+        *composite_node_spec.parents2();
 
     // The first parent is the pdev node and the rest parents are I2c nodes.
     ASSERT_GT(parent_specs.size(), 1lu);
-    cpp20::span<const fuchsia_driver_framework::ParentSpec> i2c_nodes(++parent_specs.begin(),
-                                                                      parent_specs.end());
+    cpp20::span<const fuchsia_driver_framework::ParentSpec2> i2c_nodes(++parent_specs.begin(),
+                                                                       parent_specs.end());
 
     if (node_name == "child-c") {
       ASSERT_EQ(i2c_nodes.size(), 1lu);
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {
-              fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
-                                bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS1}),
+              fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
+                                 bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS1}),
           },
           i2c_nodes[0].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
-                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, 0u),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS1}),
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
+                                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, 0u),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS1}),
           }},
           i2c_nodes[0].bind_rules(), false));
     }
@@ -126,17 +126,17 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
       ASSERT_EQ(i2c_nodes.size(), 1lu);
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {
-              {fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
-                                 bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)},
-              fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS2}),
+              {fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
+                                  bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)},
+              fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS2}),
           },
           i2c_nodes[0].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
-                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, 0u),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS2}),
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
+                                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, 0u),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS2}),
           }},
           i2c_nodes[0].bind_rules(), false));
     }
@@ -146,33 +146,33 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {
-              {fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
-                                 bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)},
-              fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS3}),
+              {fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
+                                  bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)},
+              fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS3}),
           },
           i2c_nodes[0].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
-                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, 0u),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS3}),
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
+                                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, 0u),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS3}),
           }},
           i2c_nodes[0].bind_rules(), false));
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {
-              {fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
-                                 bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)},
-              fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS4}),
+              {fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
+                                  bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)},
+              fdf::MakeProperty2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS4}),
           },
           i2c_nodes[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{
-              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
-                                      bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, 0u),
-              fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS4}),
+              fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
+                                       bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, 0u),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS, uint32_t{I2C_ADDRESS4}),
           }},
           i2c_nodes[1].bind_rules(), false));
     }

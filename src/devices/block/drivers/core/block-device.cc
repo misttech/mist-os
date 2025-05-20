@@ -418,8 +418,7 @@ zx_status_t BlockDevice::Bind(void* ctx, zx_device_t* dev) {
 
   // We implement |ZX_PROTOCOL_BLOCK|, not |ZX_PROTOCOL_BLOCK_IMPL|. This is the
   // "core driver" protocol for block device drivers.
-  status =
-      bdev->DdkAdd(ddk::DeviceAddArgs("block").forward_metadata(dev, DEVICE_METADATA_GPT_INFO));
+  status = bdev->DdkAdd(ddk::DeviceAddArgs("block"));
   if (status != ZX_OK) {
     return status;
   }

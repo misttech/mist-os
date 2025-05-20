@@ -44,11 +44,7 @@ pub async fn daemonize(
     cmd.stdin(Stdio::null()).stdout(stdout).stderr(stderr).env("RUST_BACKTRACE", "full");
     cmd.args(args);
 
-    tracing::info!(
-        "Starting new background process {:?} {:?}",
-        &cmd.get_program(),
-        &cmd.get_args()
-    );
+    log::info!("Starting new background process {:?} {:?}", &cmd.get_program(), &cmd.get_args());
     // Run the command as a daemon process, keeping the current working directory
     // for the daemon process.
     daemonize_cmd(&mut cmd, keep_current_dir)

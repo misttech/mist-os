@@ -8,7 +8,7 @@ use crate::types::{
 };
 use anyhow::{Context, Result};
 use argh::FromArgs;
-use assembly_manifest::{AssemblyManifest, Image, PackageSetMetadata, PackagesMetadata};
+use assembled_system::{AssembledSystem, Image, PackageSetMetadata, PackagesMetadata};
 use camino::{Utf8Path, Utf8PathBuf};
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Reader as FARReader;
@@ -52,7 +52,7 @@ pub struct ProcessCommand {
 
 impl ProcessCommand {
     pub async fn execute(self) -> Result<()> {
-        let manifest = AssemblyManifest::try_load_from(&self.assembly_manifest)?;
+        let manifest = AssembledSystem::try_load_from(&self.assembly_manifest)?;
 
         if self.debug_no_parallel {
             ThreadPoolBuilder::new().num_threads(1).build_global().expect("make thread pool");

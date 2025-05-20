@@ -5,7 +5,8 @@
 include /src/connectivity/bluetooth/OWNERS
 include /src/connectivity/network/OWNERS
 include /src/connectivity/wlan/OWNERS
+include /src/storage/OWNERS
 include /src/sys/pkg/OWNERS
 include /src/tee/OWNERS
-include /third_party/rust_crates/vendor/hkdf-0.12.3/OWNERS
+include /third_party/rust_crates/vendor/hkdf-0.12.4/OWNERS
 include /third_party/rust_crates/vendor/rfc6979-0.3.1/OWNERS

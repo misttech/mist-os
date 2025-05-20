@@ -55,7 +55,7 @@ fuchsia_prebuilt_lacewing_test = rule(
             doc = "The tool used to run the lacewing test.",
             default = "//fuchsia/tools:run_lacewing_test",
             executable = True,
-            cfg = "target",
+            cfg = "exec",
         ),
     },
     test = True,

@@ -23,7 +23,7 @@ class ObjectConverter : public ::fidl_codec::TypeVisitor {
  private:
   explicit ObjectConverter(PyObject* obj) : obj_(obj) {}
   bool HandleNone(const ::fidl_codec::Type* type);
-  void VisitList(const ::fidl_codec::ElementSequenceType* type, std::optional<size_t> count);
+  void VisitSequence(const ::fidl_codec::ElementSequenceType* type, std::optional<size_t> count);
   void VisitInteger(bool is_signed);
   // TypeVisitor implementation
   void VisitType(const ::fidl_codec::Type* type) override;

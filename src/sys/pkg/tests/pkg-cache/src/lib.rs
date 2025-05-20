@@ -11,7 +11,6 @@ use assert_matches::assert_matches;
 use blobfs_ramdisk::BlobfsRamdisk;
 use diagnostics_assertions::TreeAssertion;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_hardware_power_statecontrol::RebootOptions;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_inspect::reader::DiagnosticsHierarchy;
 use fuchsia_merkle::Hash;
@@ -23,12 +22,9 @@ use mock_boot_arguments::MockBootArgumentsService;
 use mock_health_verification::MockHealthVerificationService;
 use mock_metrics::MockMetricEventLoggerFactory;
 use mock_paver::{MockPaverService, MockPaverServiceBuilder};
-use mock_reboot::MockRebootService;
 use std::collections::HashMap;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
-use vfs::ToObjectRequest as _;
 use zx::{self as zx, Status};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fcomponent_resolution,
@@ -47,7 +43,6 @@ mod inspect;
 mod pkgfs;
 mod retained_packages;
 mod space;
-mod startup;
 mod sync;
 
 static SHELL_COMMANDS_BIN_PATH: &str = "shell-commands-bin";
@@ -499,9 +494,9 @@ where
     }
 
     async fn build(self) -> TestEnv<ConcreteBlobfs> {
-        let (blob_implementation, blob_implementation_overridden) = match self.blob_implementation {
-            Some(blob_implementation) => (blob_implementation, true),
-            None => (blobfs_ramdisk::Implementation::from_env(), false),
+        let blob_implementation = match self.blob_implementation {
+            Some(blob_implementation) => blob_implementation,
+            None => blobfs_ramdisk::Implementation::from_env(),
         };
         let (blobfs, system_image) = (self.blobfs_and_system_image)(blob_implementation).await;
         let local_child_svc_dir = vfs::pseudo_directory! {};
@@ -515,28 +510,6 @@ where
                     fmetrics::MetricEventLoggerFactoryMarker::PROTOCOL_NAME,
                     vfs::service::host(move |stream| {
                         Arc::clone(&logger_factory).run_logger_factory(stream)
-                    }),
-                )
-                .unwrap();
-        }
-
-        let reboot_options = Arc::new(Mutex::new(vec![]));
-        let reboot_service = Arc::new(MockRebootService::new(Box::new({
-            let reboot_options = Arc::clone(&reboot_options);
-            move |options| {
-                reboot_options.lock().push(options);
-                Ok(())
-            }
-        })));
-        {
-            let reboot_service = Arc::clone(&reboot_service);
-            local_child_svc_dir
-                .add_entry(
-                    fidl_fuchsia_hardware_power_statecontrol::AdminMarker::PROTOCOL_NAME,
-                    vfs::service::host(move |stream| {
-                        Arc::clone(&reboot_service).run_reboot_service(stream).unwrap_or_else(|e| {
-                            panic!("error running reboot service: {:#}", anyhow!(e))
-                        })
                     }),
                 )
                 .unwrap();
@@ -614,11 +587,9 @@ where
             "bootfs-blobs" => bootfs_blobs,
             "svc" => local_child_svc_dir,
         };
-        if matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob) {
-            local_child_out_dir
-                .add_entry("blob-svc", vfs::remote::remote_dir(blobfs.svc_dir()))
-                .unwrap();
-        }
+        local_child_out_dir
+            .add_entry("blob-svc", vfs::remote::remote_dir(blobfs.svc_dir()))
+            .unwrap();
 
         let local_child_out_dir = Mutex::new(Some(local_child_out_dir));
 
@@ -686,29 +657,6 @@ where
             )
             .await
             .unwrap();
-        if blob_implementation_overridden {
-            builder
-                .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                    name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
-                    value: matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob)
-                        .into(),
-                }))
-                .await
-                .unwrap();
-        }
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
-                    .from(if blob_implementation_overridden {
-                        Ref::self_()
-                    } else {
-                        (&pkg_cache_config).into()
-                    })
-                    .to(&pkg_cache),
-            )
-            .await
-            .unwrap();
         let system_update_committer = builder
             .add_child(
                 "system_update_committer",
@@ -725,15 +673,13 @@ where
                         .lock()
                         .take()
                         .expect("mock component should only be launched once");
-                    let scope = vfs::execution_scope::ExecutionScope::new();
-                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        local_child_out_dir.open3(
-                            scope.clone(),
-                            vfs::Path::dot(),
-                            OUT_DIR_FLAGS,
-                            request,
-                        )
-                    });
+                    let scope = vfs::ExecutionScope::new();
+                    vfs::directory::serve_on(
+                        local_child_out_dir,
+                        OUT_DIR_FLAGS,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
                     async move {
                         scope.wait().await;
                         Ok(())
@@ -764,9 +710,6 @@ where
                     .capability(
                         Capability::protocol::<fidl_fuchsia_tracing_provider::RegistryMarker>(),
                     )
-                    .capability(Capability::protocol::<
-                        fidl_fuchsia_hardware_power_statecontrol::AdminMarker,
-                    >())
                     .capability(
                         Capability::directory("blob-exec")
                             .path("/blob")
@@ -782,28 +725,22 @@ where
             )
             .await
             .unwrap();
-        if matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob) {
-            builder
-                .add_route(
-                    Route::new()
-                        .capability(
-                            Capability::protocol::<ffxfs::BlobCreatorMarker>().path(format!(
-                                "/blob-svc/{}",
-                                ffxfs::BlobCreatorMarker::PROTOCOL_NAME
-                            )),
-                        )
-                        .capability(
-                            Capability::protocol::<ffxfs::BlobReaderMarker>().path(format!(
-                                "/blob-svc/{}",
-                                ffxfs::BlobReaderMarker::PROTOCOL_NAME
-                            )),
-                        )
-                        .from(&service_reflector)
-                        .to(&pkg_cache),
-                )
-                .await
-                .unwrap();
-        }
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol::<ffxfs::BlobCreatorMarker>()
+                            .path(format!("/blob-svc/{}", ffxfs::BlobCreatorMarker::PROTOCOL_NAME)),
+                    )
+                    .capability(
+                        Capability::protocol::<ffxfs::BlobReaderMarker>()
+                            .path(format!("/blob-svc/{}", ffxfs::BlobReaderMarker::PROTOCOL_NAME)),
+                    )
+                    .from(&service_reflector)
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
         builder
             .add_route(
                 Route::new()
@@ -917,11 +854,9 @@ where
             apps: Apps { realm_instance },
             blobfs,
             system_image,
-            reboot_options,
             proxies,
             mocks: Mocks {
                 logger_factory,
-                reboot_service,
                 _paver_service: paver_service,
                 _verifier_service: verifier_service,
             },
@@ -939,7 +874,6 @@ struct Proxies {
 
 pub struct Mocks {
     pub logger_factory: Arc<MockMetricEventLoggerFactory>,
-    pub reboot_service: Arc<MockRebootService>,
     _paver_service: Arc<MockPaverService>,
     _verifier_service: Arc<MockHealthVerificationService>,
 }
@@ -952,7 +886,6 @@ struct TestEnv<B = BlobfsRamdisk> {
     apps: Apps,
     blobfs: B,
     system_image: Option<Hash>,
-    reboot_options: Arc<Mutex<Vec<RebootOptions>>>,
     proxies: Proxies,
     pub mocks: Mocks,
 }
@@ -1072,9 +1005,5 @@ impl<B: Blobfs> TestEnv<B> {
         let () = compress_and_write_blob(contents, blobfs.open_blob_for_write(hash).await.unwrap())
             .await
             .unwrap();
-    }
-
-    fn take_reboot_options(&self) -> Vec<RebootOptions> {
-        std::mem::take(&mut *self.reboot_options.lock())
     }
 }

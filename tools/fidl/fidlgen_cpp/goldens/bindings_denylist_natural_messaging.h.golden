@@ -4,9 +4,12 @@
 
 #pragma once
 
+#include <fidl/test.dependent/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.bindingsdenylist/cpp/markers.h>
 #include <fidl/test.bindingsdenylist/cpp/natural_types.h>
-#include <fidl/test.dependent/cpp/markers.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/internal/thenable.h>
@@ -17,38 +20,19 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::OnlyCppAndDeps> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyCppAndDeps> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::OnlyCppAndDeps>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::OnlyCppAndDeps> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -80,13 +64,9 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::OnlyCppAndDeps>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::OnlyCppAndDeps> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::OnlyCppAndDeps>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -99,8 +79,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::OnlyCppAndDe
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -120,19 +98,13 @@ class ::fidl::Server<::test_bindingsdenylist::OnlyCppAndDeps> : public ::fidl::i
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::OnlyCppAndDeps> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::OnlyCppAndDeps> final {
@@ -147,8 +119,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::OnlyCp
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> {
@@ -210,13 +180,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::DenyEachBin
   using DomainError = uint32_t;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse> v);
   Response() = delete;
 };
 template <>
@@ -224,13 +192,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart>& m);
 };
 
 template <>
@@ -246,7 +208,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse> v);
   Response() = delete;
 };
 template <>
@@ -254,13 +216,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyGo>& m);
 };
 
 template <>
@@ -276,7 +232,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResponse> v);
   Response() = delete;
 };
 template <>
@@ -284,13 +240,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyPythonResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyPython>& m);
 };
 
 template <>
@@ -306,7 +256,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse> v);
   Response() = delete;
 };
 template <>
@@ -314,13 +264,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenyRust>& m);
 };
 
 template <>
@@ -336,7 +280,7 @@ template <>
 class ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> final : public ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> {
  public:
   using ::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse>::result;
-  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse> v);
   Response() = delete;
 };
 template <>
@@ -344,13 +288,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_bindingsdenylist::DenyEa
   using DomainObject = ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& m);
 };
 
 template <>
@@ -377,10 +315,6 @@ class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::DenyEachBindi
   ::fidl::internal::NaturalThenable<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> OnlyDenySyzkaller(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachBinding> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachBinding>> {
@@ -396,15 +330,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::DenyEachB
   ::fidl::Result<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller> OnlyDenySyzkaller(const ::fidl::Request<::test_bindingsdenylist::DenyEachBinding::OnlyDenySyzkaller>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::DenyEachBinding> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -436,13 +363,9 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::DenyEachBinding>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::DenyEachBinding> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::DenyEachBinding>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -455,8 +378,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::DenyEachBind
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_bindingsdenylist::DenyEachBinding::OnlyDenyDart> : public ::fidl::CompleterBase {
@@ -551,19 +472,13 @@ class ::fidl::Server<::test_bindingsdenylist::DenyEachBinding> : public ::fidl::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::DenyEachBinding> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::DenyEachBinding> final {
@@ -579,34 +494,19 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::DenyEa
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::Allowed> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::Allowed> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::Allowed>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::Allowed> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::Allowed>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::Allowed> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -638,13 +538,9 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::Allowed>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::Allowed> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::Allowed>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::Allowed> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -657,8 +553,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::Allowed>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_bindingsdenylist::Allowed> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -678,19 +572,13 @@ class ::fidl::Server<::test_bindingsdenylist::Allowed> : public ::fidl::internal
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::Allowed> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Allowed> final {
@@ -706,8 +594,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Allowe
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::ImportsSameNameContext::Unattributed> {
   using Completer = fidl::Completer<>;
@@ -718,8 +604,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_bindingsdenylist::ImportsSame
   using Completer = fidl::Completer<>;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::ImportsSameNameContext> final : public ::fidl::internal::NaturalClientBase {
  public:
@@ -728,10 +612,6 @@ class ::fidl::internal::NaturalClientImpl<::test_bindingsdenylist::ImportsSameNa
 
   ::fit::result<::fidl::OneWayError> AlwaysAppearsInImportingLibrary() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSameNameContext> final
@@ -742,15 +622,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_bindingsdenylist::ImportsSa
   ::fit::result<::fidl::OneWayError> AlwaysAppearsInImportingLibrary();
 
  private:
-  ::fidl::UnownedClientEnd<::test_bindingsdenylist::ImportsSameNameContext> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_bindingsdenylist::ImportsSameNameContext>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_bindingsdenylist::ImportsSameNameContext> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -782,13 +655,9 @@ class ::fidl::SyncEventHandler<::test_bindingsdenylist::ImportsSameNameContext>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_bindingsdenylist::ImportsSameNameContext> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_bindingsdenylist::ImportsSameNameContext>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_bindingsdenylist::ImportsSameNameContext> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -801,8 +670,6 @@ class ::fidl::internal::NaturalEventSender<::test_bindingsdenylist::ImportsSameN
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_bindingsdenylist::ImportsSameNameContext> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -832,19 +699,13 @@ class ::fidl::Server<::test_bindingsdenylist::ImportsSameNameContext> : public :
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::ImportsSameNameContext> final {
@@ -860,6 +721,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_bindingsdenylist::Import
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

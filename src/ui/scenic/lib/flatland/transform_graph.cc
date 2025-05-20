@@ -52,15 +52,15 @@ bool TransformGraph::AddChild(TransformHandle parent, TransformHandle child) {
   auto [iter, end_iter] = children_.equal_range({parent, NORMAL});
   for (; iter != end_iter; ++iter) {
     if (iter->second == child) {
-      FLATLAND_VERBOSE_LOG << "TransformGraph::AddChild(" << parent << "," << child
-                           << "): failure!";
-
+      FLATLAND_VERBOSE_LOG << "TransformGraph::AddChild() parent=" << parent << "  child=" << child
+                           << "  failure!";
       return false;
     }
   }
 
   children_.insert({{parent, NORMAL}, child});
-  FLATLAND_VERBOSE_LOG << "TransformGraph::AddChild(" << parent << "," << child << "): success!";
+  FLATLAND_VERBOSE_LOG << "TransformGraph::AddChild() parent=" << parent << "  child=" << child
+                       << "  success!";
 
   return true;
 }
@@ -73,14 +73,15 @@ bool TransformGraph::RemoveChild(TransformHandle parent, TransformHandle child) 
   for (; iter != end_iter; ++iter) {
     if (iter->second == child) {
       children_.erase(iter);
-      FLATLAND_VERBOSE_LOG << "TransformGraph::RemoveChild(" << parent << "," << child
-                           << "): success!";
+      FLATLAND_VERBOSE_LOG << "TransformGraph::RemoveChild() parent=" << parent
+                           << "  child=" << child << "  success!";
 
       return true;
     }
   }
 
-  FLATLAND_VERBOSE_LOG << "TransformGraph::RemoveChild(" << parent << "," << child << "): failure!";
+  FLATLAND_VERBOSE_LOG << "TransformGraph::RemoveChild() parent=" << parent << "  child=" << child
+                       << "  failure!";
 
   return false;
 }
@@ -101,11 +102,13 @@ bool TransformGraph::ReplaceChildren(TransformHandle parent,
     }
   }
   ClearChildren(parent);
+  size_t verbose_child_count = 0;
   for (auto child : new_children) {
+    FLATLAND_VERBOSE_LOG << "TransformGraph::ReplaceChildren() parent=" << parent << "  child-"
+                         << verbose_child_count++ << "=" << child << "  success!";
     children_.insert({{parent, NORMAL}, child});
-    FLATLAND_VERBOSE_LOG << "TransformGraph::ReplaceChildren(" << parent << ", [.., " << child
-                         << ", ..]): success!";
   }
+
   return true;
 }
 

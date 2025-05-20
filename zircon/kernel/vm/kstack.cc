@@ -17,7 +17,7 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
@@ -32,19 +32,45 @@ namespace {
 struct StackType {
   const char* name;
   size_t size;
+  enum class Grow : bool {
+    Up,
+    Down,
+  } dir;
 };
 
 KCOUNTER(vm_kernel_stack_bytes, "vm.kstack.allocated_bytes")
 
-constexpr StackType kSafe = {"kernel-safe-stack", DEFAULT_STACK_SIZE};
+constexpr StackType kSafe = {"kernel-safe-stack", DEFAULT_STACK_SIZE, StackType::Grow::Down};
 #if __has_feature(safe_stack)
-constexpr StackType kUnsafe = {"kernel-unsafe-stack", DEFAULT_STACK_SIZE};
+constexpr StackType kUnsafe = {"kernel-unsafe-stack", DEFAULT_STACK_SIZE, StackType::Grow::Down};
 #endif
 #if __has_feature(shadow_call_stack)
-constexpr StackType kShadowCall = {"kernel-shadow-call-stack", ZX_PAGE_SIZE};
+constexpr StackType kShadowCall = {"kernel-shadow-call-stack", ZX_PAGE_SIZE, StackType::Grow::Up};
 #endif
 
 constexpr size_t kStackPaddingSize = PAGE_SIZE;
+
+// Choose a pattern for the stack canary that hopefully doesn't collide with other patterns that
+// might get used on the stack. Explicitly avoid 0xAA, for example, as it is used for filling
+// uninitialized stack variables.
+constexpr unsigned char kStackCanary = 0xBB;
+
+size_t stack_canary_offset(const StackType& type) {
+  const size_t off = type.size / 100 * ktl::min(100ul, gBootOptions->stack_canary_percent_free);
+  return type.dir == StackType::Grow::Down ? off : type.size - off - 1;
+}
+
+void stack_canary_write(const StackType& type, void* base) {
+  static_cast<unsigned char*>(base)[stack_canary_offset(type)] = kStackCanary;
+}
+
+void stack_canary_check(const StackType& type, void* base) {
+  const size_t off = stack_canary_offset(type);
+  if (static_cast<unsigned char*>(base)[off] != kStackCanary) {
+    KERNEL_OOPS("Canary at offset %zu in stack %s as base %p of size %zu was corrupted.", off,
+                type.name, base, type.size);
+  }
+}
 
 // Takes a portion of the VMO and maps a kernel stack with one page of padding before and after the
 // mapping.
@@ -90,6 +116,9 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   if (status != ZX_OK) {
     return status;
   }
+
+  stack_canary_write(type, reinterpret_cast<void*>(mapping_result->base));
+
   vm_kernel_stack_bytes.Add(type.size);
 
   // Cancel the cleanup handler on the vmar since we're about to save a
@@ -102,6 +131,23 @@ zx_status_t map(const StackType& type, fbl::RefPtr<VmObjectPaged>& vmo, uint64_t
   // Increase the offset to claim this portion of the VMO.
   *offset += type.size;
 
+  return ZX_OK;
+}
+
+zx_status_t unmap(const StackType& type, KernelStack::Mapping& map) {
+  if (!map.vmar_) {
+    return ZX_OK;
+  }
+  LTRACEF("removing vmar at at %#" PRIxPTR "\n", map.vmar_->base());
+
+  stack_canary_check(type, reinterpret_cast<void*>(map.base()));
+
+  zx_status_t status = map.vmar_->Destroy();
+  if (status != ZX_OK) {
+    return status;
+  }
+  map.vmar_.reset();
+  vm_kernel_stack_bytes.Add(-static_cast<int64_t>(type.size));
   return ZX_OK;
 }
 
@@ -193,35 +239,20 @@ KernelStack::~KernelStack() {
 }
 
 zx_status_t KernelStack::Teardown() {
-  if (main_map_.vmar_) {
-    LTRACEF("removing vmar at at %#" PRIxPTR "\n", main_map_.vmar_->base());
-    zx_status_t status = main_map_.vmar_->Destroy();
-    if (status != ZX_OK) {
-      return status;
-    }
-    main_map_.vmar_.reset();
-    vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kSafe.size));
+  zx_status_t status = unmap(kSafe, main_map_);
+  if (status != ZX_OK) {
+    return status;
   }
 #if __has_feature(safe_stack)
-  if (unsafe_map_.vmar_) {
-    LTRACEF("removing unsafe vmar at at %#" PRIxPTR "\n", unsafe_map_.vmar_->base());
-    zx_status_t status = unsafe_map_.vmar_->Destroy();
-    if (status != ZX_OK) {
-      return status;
-    }
-    unsafe_map_.vmar_.reset();
-    vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kUnsafe.size));
+  status = unmap(kUnsafe, unsafe_map_);
+  if (status != ZX_OK) {
+    return status;
   }
 #endif
 #if __has_feature(shadow_call_stack)
-  if (shadow_call_map_.vmar_) {
-    LTRACEF("removing shadow call vmar at at %#" PRIxPTR "\n", shadow_call_map_.vmar_->base());
-    zx_status_t status = shadow_call_map_.vmar_->Destroy();
-    if (status != ZX_OK) {
-      return status;
-    }
-    shadow_call_map_.vmar_.reset();
-    vm_kernel_stack_bytes.Add(-static_cast<int64_t>(kShadowCall.size));
+  status = unmap(kShadowCall, shadow_call_map_);
+  if (status != ZX_OK) {
+    return status;
   }
 #endif
   return ZX_OK;

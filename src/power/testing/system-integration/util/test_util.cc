@@ -4,7 +4,7 @@
 
 #include "test_util.h"
 
-#include <fidl/fuchsia.hardware.suspend/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/test.suspendcontrol/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -15,7 +15,7 @@
 namespace system_integration_utils {
 namespace {
 
-namespace fh_suspend = fuchsia_hardware_suspend;
+namespace fh_suspend = fuchsia_hardware_power_suspend;
 
 template <typename T>
 std::string ToString(const T& value) {

@@ -85,7 +85,7 @@ rust_library(
         "//third_party/rust_crates/vendor/fastrand-1.4.0:fastrand",
         "//third_party/rust_crates/vendor/futures-core-0.3.30:futures_core",
         "//third_party/rust_crates/vendor/futures-io-0.3.30:futures_io",
-        "//third_party/rust_crates/vendor/parking-2.0.0:parking",
+        "//third_party/rust_crates/vendor/parking-2.2.1:parking",
         "//third_party/rust_crates/vendor/pin-project-lite-0.2.13:pin_project_lite",
         "//third_party/rust_crates/vendor/waker-fn-1.1.0:waker_fn",
     ],

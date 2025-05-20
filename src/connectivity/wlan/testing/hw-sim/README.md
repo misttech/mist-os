@@ -37,7 +37,7 @@ The most convenient way to run this test locally is to run it in a QEMU instance
 1. After the test finishes, exit QEMU by
 
     ```sh
-    dm shutdown
+    power shutdown
     ```
 
 ### Emulator with network (run test with `ffx emu` from host)

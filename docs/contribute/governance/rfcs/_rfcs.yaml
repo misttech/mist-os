@@ -3504,3 +3504,29 @@
   reviewers: ['hjfreyer@google.com', "crjohns@google.com", 'wilkinsonclay@google.com']
   submitted: '2025-02-20'
   reviewed: '2025-04-02'
+
+- name: 'RFC-0269'
+  title: 'Measuring Memory Stalls'
+  short_description: 'Detecting and reporting memory stalls to userspace'
+  authors: ['fdurso@google.com']
+  file: '0269_measuring_memory_stalls.md'
+  area: ['Kernel']
+  issue: ['319641298']
+  gerrit_change_id: ['1138712']
+  status: 'Accepted'
+  reviewers: ['adanis@google.com', 'eieio@google.com', 'maniscalco@google.com', 'rashaeqbal@google.com']
+  submitted: '2024-10-15'
+  reviewed: '2025-04-10'
+
+- name: 'RFC-0270'
+  title: 'Zircon Virtual Interrupt Signals'
+  short_description: 'Proposes a new signal for virtual interrupt objects.'
+  authors: ['johngro@google.com']
+  file: '0270_zircon_virtual_interrupt_signals.md'
+  area: ['Kernel']
+  issue: ['408022016']
+  gerrit_change_id: ['1243187']
+  status: 'Accepted'
+  reviewers: ['maniscalco@google.com', 'bradenkell@google.com', 'rudymathu@google.com', 'cpu@google.com']
+  submitted: '2025-04-02'
+  reviewed: '2025-04-16'

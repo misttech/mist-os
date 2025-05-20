@@ -40,6 +40,11 @@
             storage: "custom_artifacts",
             path: "/custom_artifacts",
         },
+        {
+            event_stream: "stopped",
+            from: "parent",
+            path: "/events/stopped",
+        },
     ],
     offer: [
         {

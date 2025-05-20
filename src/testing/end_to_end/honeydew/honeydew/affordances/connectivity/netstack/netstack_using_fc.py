@@ -172,7 +172,7 @@ class NetstackUsingFc(AsyncAdapter, netstack.Netstack):
                 except ZxStatus as status:
                     raise HoneydewNetstackError(
                         f"Interfaces.GetMac() error {status}"
-                    )
+                    ) from status
 
                 properties.append(
                     InterfaceProperties.from_fidl(event.existing, mac)

@@ -62,6 +62,10 @@ impl MapBuffer {
         // buffer.
         unsafe { EbpfBufferPtr::new(self.addr as *mut u8, self.size) }
     }
+
+    pub fn round_up_to_alignment(value_size: usize) -> Option<usize> {
+        Some(value_size.checked_add(Self::ALIGNMENT - 1)? & !(Self::ALIGNMENT - 1))
+    }
 }
 
 impl Drop for MapBuffer {

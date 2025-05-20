@@ -8,11 +8,9 @@
 #include <zircon/syscalls.h>
 #endif
 
-#include "src/lib/fxl/macros.h"
 #include "src/ui/lib/escher/escher.h"
 #include "src/ui/lib/escher/impl/frame_manager.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
-#include "src/ui/lib/escher/vk/command_buffer.h"
 
 namespace escher {
 
@@ -43,17 +41,7 @@ Frame::Frame(impl::FrameManager* manager, escher::CommandBuffer::Type requested_
       queue_(escher()->device()->vk_main_queue()),
       command_buffer_type_(requested_type),
       block_allocator_(std::move(allocator)),
-      uniform_block_allocator_(std::move(uniform_buffer_pool)),
-      // vkCmdBeginQuery, vkCmdEndQuery that is used in querying gpu cannot be executed on a
-      // protected command buffer.
-      // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCmdBeginQuery.html
-      //
-      // TODO(https://fxbug.dev/42144764): instantiation of the profiler shouldn't depend on
-      // |enable_gpu_logging|.
-      profiler_((escher()->supports_timer_queries() && enable_gpu_logging && !use_protected_memory)
-                    ? fxl::MakeRefCounted<TimestampProfiler>(escher()->vk_device(),
-                                                             escher()->timestamp_period())
-                    : TimestampProfilerPtr()) {
+      uniform_block_allocator_(std::move(uniform_buffer_pool)) {
   FX_DCHECK(queue_);
 }
 
@@ -78,7 +66,6 @@ void Frame::BeginFrame() {
                  "escher_frame_number", escher_frame_number_);
   FX_DCHECK(state_ == State::kReadyToBegin);
   IssueCommandBuffer();
-  AddTimestamp("start of frame");
 }
 
 void Frame::IssueCommandBuffer() {
@@ -130,8 +117,6 @@ void Frame::EndFrame(const std::vector<SemaphorePtr>& semaphores,
   FX_DCHECK(state_ == State::kInProgress);
   state_ = State::kFinishing;
 
-  AddTimestamp("end of frame");
-
   for (const auto& semaphore : semaphores) {
     command_buffer_->AddSignalSemaphore(semaphore);
   }
@@ -142,29 +127,10 @@ void Frame::EndFrame(const std::vector<SemaphorePtr>& semaphores,
   // NOTE: this closure refs this Frame via a FramePtr, guaranteeing that it
   // will not be destroyed until the frame is finished rendering.
   command_buffer_->Submit(
-      queue_, [client_callback{std::move(frame_retired_callback)}, profiler{std::move(profiler_)},
-               frame_number = frame_number_, escher_frame_number = escher_frame_number_,
-               trace_literal = trace_literal_, gpu_vthread_literal = gpu_vthread_literal_,
-               gpu_vthread_id = gpu_vthread_id_, enable_gpu_logging = enable_gpu_logging_,
-               this_frame = FramePtr(this)]() {
+      queue_, [client_callback{std::move(frame_retired_callback)}, this_frame = FramePtr(this)]() {
         // Run the client-specified callback.
         if (client_callback) {
           client_callback();
-        }
-
-        // If GPU profiling was enabled, read/interpret the query results and:
-        // - add them to the system trace (if active).
-        // - if specified, log a summary.
-        if (profiler) {
-          auto timestamps = profiler->GetQueryResults();
-          auto trace_events = profiler->ProcessTraceEvents(timestamps);
-
-          profiler->TraceGpuQueryResults(trace_events, frame_number, escher_frame_number,
-                                         trace_literal, gpu_vthread_literal, gpu_vthread_id);
-
-          if (enable_gpu_logging) {
-            profiler->LogGpuQueryResults(escher_frame_number, timestamps);
-          }
         }
 
         // |this_frame| refs the frame until rendering is finished, and
@@ -191,11 +157,6 @@ void Frame::EndFrame(const std::vector<SemaphorePtr>& semaphores,
   block_allocator_.Reset();
 
   escher()->Cleanup();
-}
-
-void Frame::AddTimestamp(const char* name, vk::PipelineStageFlagBits stages) {
-  if (profiler_)
-    profiler_->AddTimestamp(command_buffer_, stages, name);
 }
 
 void Frame::KeepAlive(ResourcePtr resource) { keep_alive_.push_back(std::move(resource)); }

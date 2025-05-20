@@ -107,7 +107,13 @@ impl GptPartition {
                 .gpt
                 .partitions()
                 .get(&self.index)
-                .map(|info| convert_partition_info(info, self.block_client.block_flags()))
+                .map(|info| {
+                    convert_partition_info(
+                        info,
+                        self.block_client.block_flags(),
+                        self.block_client.max_transfer_blocks(),
+                    )
+                })
                 .ok_or(zx::Status::BAD_STATE)
         } else {
             Err(zx::Status::BAD_STATE)
@@ -189,9 +195,11 @@ impl GptPartition {
 fn convert_partition_info(
     info: &gpt::PartitionInfo,
     device_flags: fblock::Flag,
+    max_transfer_blocks: Option<NonZero<u32>>,
 ) -> block_server::DeviceInfo {
     block_server::DeviceInfo::Partition(block_server::PartitionInfo {
         device_flags,
+        max_transfer_blocks,
         block_range: Some(info.start_block..info.start_block + info.num_blocks),
         type_guid: info.type_guid.to_bytes(),
         instance_guid: info.instance_guid.to_bytes(),
@@ -505,10 +513,9 @@ mod tests {
     use fidl::HandleBased as _;
     use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
     use gpt::{Gpt, Guid, PartitionInfo};
+    use std::num::NonZero;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use vfs::directory::entry_container::Directory as _;
-    use vfs::ObjectRequest;
     use {
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
         fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions,
@@ -900,30 +907,16 @@ mod tests {
             .await
             .expect("load should succeed");
 
-        let (part_0_dir, server_end_0) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let (part_1_dir, server_end_1) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        let flags =
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
-        let options = fio::Options::default();
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        partitions_dir
-            .clone()
-            .open3(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-000").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end_0.into_channel().into()),
-            )
-            .unwrap();
-        partitions_dir
-            .clone()
-            .open3(
-                scope.clone(),
-                vfs::path::Path::validate_and_split("part-001").unwrap(),
-                flags.clone(),
-                &mut ObjectRequest::new(flags, &options, server_end_1.into_channel().into()),
-            )
-            .unwrap();
+        let part_0_dir = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
+        let part_1_dir = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::Path::validate_and_split("part-001").unwrap(),
+            fio::PERM_READABLE,
+        );
         let part_0_proxy = connect_to_named_protocol_at_dir_root::<fpartitions::PartitionMarker>(
             &part_0_dir,
             "partition",
@@ -1212,6 +1205,7 @@ mod tests {
             FakeServerOptions {
                 block_count: Some(8),
                 block_size: 512,
+                max_transfer_blocks: NonZero::new(2),
                 flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
                 ..Default::default()
             },
@@ -1243,6 +1237,7 @@ mod tests {
         assert_eq!(info.block_count, 1);
         assert_eq!(info.block_size, 512);
         assert_eq!(info.flags, fblock::Flag::READONLY | fblock::Flag::REMOVABLE);
+        assert_eq!(info.max_transfer_size, 1024);
 
         let metadata =
             part_block.get_metadata().await.expect("FIDL error").expect("get_metadata failed");
@@ -1381,13 +1376,12 @@ mod tests {
             fio::PERM_READABLE,
         );
 
-        // Open a session that shifts all block offsets by one.  The apparent range of the partition
-        // should be [0..512) bytes (which corresponds to [512..1024) in the partition), because
-        // bytes [512..1024) would be mapped to [1024..1536) which exceeds the partition's limit.
         let part_block =
             connect_to_named_protocol_at_dir_root::<fblock::BlockMarker>(&part_dir, "volume")
                 .expect("Failed to open Block service");
-        let info = part_block.get_info().await.expect("FIDL error").expect("get_info failed");
+
+        // Attempting to open a session with an offset map that extends past the end of the device
+        // should fail.
         let (session, server_end) = fidl::endpoints::create_proxy::<fblock::SessionMarker>();
         part_block
             .open_session_with_offset_map(
@@ -1400,23 +1394,21 @@ mod tests {
                 }]),
             )
             .expect("FIDL error");
+        session.get_fifo().await.expect_err("Session should be closed");
 
-        let client = Arc::new(RemoteBlockClient::from_session(info, session).await.unwrap());
-        let mut buffer = vec![0xaa; 512];
-        client.flush().await.expect("Flush should succeed");
-        client
-            .read_at(MutableBufferSlice::Memory(&mut buffer), 0)
-            .await
-            .expect("Read should succeed");
-        client.write_at(BufferSlice::Memory(&buffer), 0).await.expect("Write should succeed");
-        client
-            .read_at(MutableBufferSlice::Memory(&mut buffer), 512)
-            .await
-            .expect_err("Read past end should fail");
-        client
-            .write_at(BufferSlice::Memory(&buffer), 512)
-            .await
-            .expect_err("Write past end should fail");
+        let (session, server_end) = fidl::endpoints::create_proxy::<fblock::SessionMarker>();
+        part_block
+            .open_session_with_offset_map(
+                server_end,
+                None,
+                Some(&[fblock::BlockOffsetMapping {
+                    source_block_offset: 0,
+                    target_block_offset: 0,
+                    length: 3,
+                }]),
+            )
+            .expect("FIDL error");
+        session.get_fifo().await.expect_err("Session should be closed");
 
         runner.shutdown().await;
     }

@@ -344,7 +344,7 @@ mod tests {
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>();
-        let (mut stream, stalled) = until_stalled(stream, idle_duration);
+        let (stream, stalled) = until_stalled(stream, idle_duration);
 
         let mut stalled = pin!(stalled);
         assert_matches!(TestExecutor::poll_until_stalled(&mut stalled).await, Poll::Pending);

@@ -17,9 +17,9 @@
 
 namespace suspendctl {
 
-namespace fh_suspend = fuchsia_hardware_suspend;
+namespace fh_suspend = fuchsia_hardware_power_suspend;
 
-constexpr char kSuspenderServicePath[] = "/svc/fuchsia.hardware.suspend.SuspendService";
+constexpr char kSuspenderServicePath[] = "/svc/fuchsia.hardware.power.suspend.SuspendService";
 
 // For now we assume that the system only supports one suspend state.
 constexpr int kDefaultSuspendState = 0;

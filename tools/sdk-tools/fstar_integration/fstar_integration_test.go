@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -181,37 +180,34 @@ func TestFSSH(t *testing.T) {
 
 	t.Logf("Using device name: %s and device ip: %s", deviceName, deviceIP)
 
-	// Set the default device in ffx.
-	ffxSetDefaultDeviceArgs := []string{"target", "default", "set", deviceName}
-	t.Logf("Setting the default device by running: %s %s", tools.ffxPath, ffxSetDefaultDeviceArgs)
-	cmd := exec.Command(tools.ffxPath, ffxSetDefaultDeviceArgs...)
-
-	_, err = cmd.Output()
-	if err != nil {
-		t.Errorf("ffx returned unexpected error: %s", err)
+	if err := sdkcommon.SetFFXDefaultDevice(deviceName); err != nil {
+		t.Errorf("unable to set default device to %s: %v", deviceName, err)
 	}
 
-	usr, err := user.Current()
-	if err != nil {
-		t.Fatalf("unable to get users home dir: %s", err)
-	}
+	// FIXME(https://fxbug.dev/416755812): The following variables aren't used and
+	// cause build errors. Uncomment or delete them once we understand what their
+	// intended use is.
+	// usr, err := user.Current()
+	// if err != nil {
+	// 	t.Fatalf("unable to get users home dir: %s", err)
+	// }
 
-	expectedGetAllDeviceConfig := sdkcommon.DeviceConfig{
-		DeviceName:   deviceName,
-		Bucket:       "fuchsia",
-		Image:        "",
-		DeviceIP:     deviceIP,
-		SSHPort:      "22",
-		PackageRepo:  filepath.Join(usr.HomeDir, ".fuchsia", deviceName, "packages", "amber-files"),
-		PackagePort:  "8083",
-		IsDefault:    true,
-		Discoverable: true,
-	}
+	// expectedGetAllDeviceConfig := sdkcommon.DeviceConfig{
+	// 	DeviceName:   deviceName,
+	// 	Bucket:       "fuchsia",
+	// 	Image:        "",
+	// 	DeviceIP:     deviceIP,
+	// 	SSHPort:      "22",
+	// 	PackageRepo:  filepath.Join(usr.HomeDir, ".fuchsia", deviceName, "packages", "amber-files"),
+	// 	PackagePort:  "8083",
+	// 	IsDefault:    true,
+	// 	Discoverable: true,
+	// }
 
 	// fssh into the default device.
 	fsshArgs := []string{"-private-key", os.Getenv(constants.SSHKeyEnvKey), "echo", "\"Hello World\""}
 	t.Logf("SSH'ing into the default device by running: %s %s", tools.fsshPath, fsshArgs)
-	cmd = exec.Command(tools.fsshPath, fsshArgs...)
+	cmd := exec.Command(tools.fsshPath, fsshArgs...)
 
 	sshOutput, err := cmd.Output()
 	if err != nil {

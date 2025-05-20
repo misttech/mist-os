@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use self::task::PeerTask;
+
 use async_trait::async_trait;
 use async_utils::channel::TrySend;
+use bt_hfp::{audio, sco};
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use fidl::endpoints::ServerEnd;
@@ -19,11 +21,9 @@ use futures::{Future, FutureExt, SinkExt, TryFutureExt};
 use profile_client::ProfileEvent;
 use std::sync::Arc;
 
-use crate::audio::{AudioControl, AudioControlEvent};
 use crate::config::AudioGatewayFeatureSupport;
 use crate::error::Error;
 use crate::hfp;
-use crate::sco_connector::ScoConnector;
 
 #[cfg(test)]
 use async_utils::event::{Event, EventWaitResult};
@@ -33,7 +33,6 @@ pub mod gain_control;
 pub mod indicators;
 pub mod procedure;
 mod ringer;
-mod sco_state;
 pub mod service_level_connection;
 pub mod slc_request;
 mod task;
@@ -43,7 +42,7 @@ pub mod update;
 #[derive(Debug)]
 pub enum PeerRequest {
     Profile(ProfileEvent),
-    Audio(AudioControlEvent),
+    Audio(audio::ControlEvent),
     #[allow(dead_code)]
     Handle(PeerHandlerProxy),
     ManagerConnected {
@@ -86,8 +85,8 @@ pub trait Peer: Future<Output = PeerId> + Unpin + Send {
 
     /// Send a new audio event to the Peer.  The Peer can then react by performing some actions
     /// such as starting the audio connection or stopping it when an error occurs.
-    /// The AudioControlEvent should be for this peer (i.e. event.id() == self.id())
-    async fn audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error>;
+    /// The audio::ControlEvent should be for this peer (i.e. event.id() == self.id())
+    async fn audio_event(&mut self, event: audio::ControlEvent) -> Result<(), Error>;
 
     /// Notify the `Peer` of a newly connected call manager.
     /// `id` is the unique identifier for the connection to this call manager.
@@ -121,9 +120,9 @@ pub struct PeerImpl {
     // Peer.
     queue: mpsc::Sender<PeerRequest>,
     /// A handle to the audio control interface.
-    audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
+    audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
     hfp_sender: mpsc::Sender<hfp::Event>,
-    sco_connector: ScoConnector,
+    sco_connector: sco::Connector,
     /// The last call manager connected.  Used on re-connect to a peer
     last_call_manager: Option<hfp::ManagerConnectionId>,
     inspect_node: inspect::Node,
@@ -133,11 +132,11 @@ impl PeerImpl {
     pub fn new(
         id: PeerId,
         profile_proxy: ProfileProxy,
-        audio_control: Arc<Mutex<Box<dyn AudioControl>>>,
+        audio_control: Arc<Mutex<Box<dyn audio::Control>>>,
         local_config: AudioGatewayFeatureSupport,
         connection_behavior: ConnectionBehavior,
         hfp_sender: mpsc::Sender<hfp::Event>,
-        sco_connector: ScoConnector,
+        sco_connector: sco::Connector,
         inspect_node: inspect::Node,
     ) -> Result<Self, Error> {
         let (task, queue) = PeerTask::spawn(
@@ -219,10 +218,10 @@ impl Peer for PeerImpl {
         Ok(())
     }
 
-    /// This method will panic if the peer cannot accept an AudioControlEvent. This is
+    /// This method will panic if the peer cannot accept an audio::ControlEvent. This is
     /// not expected to happen under normal operation and likely indicates a bug or unrecoverable
     /// failure condition in the system.
-    async fn audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+    async fn audio_event(&mut self, event: audio::ControlEvent) -> Result<(), Error> {
         if let Err(request) = self.queue.try_send_fut(PeerRequest::Audio(event)).await {
             // Task ended, so let's spin it back up since somebody wants it.
             self.spawn_task()?;
@@ -320,7 +319,7 @@ pub(crate) mod fake {
             Ok(())
         }
 
-        async fn audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+        async fn audio_event(&mut self, event: audio::ControlEvent) -> Result<(), Error> {
             self.expect_send_request(PeerRequest::Audio(event)).await;
             Ok(())
         }
@@ -365,16 +364,14 @@ mod tests {
     use std::collections::HashSet;
     use std::pin::pin;
 
-    use crate::audio::TestAudioControl;
-
-    fn new_audio_control() -> Arc<Mutex<Box<dyn AudioControl>>> {
-        Arc::new(Mutex::new(Box::new(TestAudioControl::default())))
+    fn new_audio_control() -> Arc<Mutex<Box<dyn audio::Control>>> {
+        Arc::new(Mutex::new(Box::new(audio::TestControl::default())))
     }
 
     fn make_peer(id: PeerId) -> (PeerImpl, mpsc::Receiver<hfp::Event>) {
         let proxy = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().0;
         let (send, recv) = mpsc::channel(1);
-        let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
+        let sco_connector = sco::Connector::build(proxy.clone(), HashSet::new());
         let audio_control = new_audio_control();
         let peer = PeerImpl::new(
             id,

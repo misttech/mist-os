@@ -111,8 +111,12 @@
     expose: [
         {
             service: [
+                "fuchsia.gpu.magma.TestService",
+                "fuchsia.gpu.magma.TrustedService",
                 "fuchsia.hardware.google.nanohub.Service",
+                "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.overnet.Service",
+                "fuchsia.hardware.qcom.hvdcpopti.Service",
                 "fuchsia.hardware.sockettunnel.Service",
 
                 // These duplicate a service advertised by devfs, below.
@@ -171,6 +175,7 @@
                 "fuchsia.hardware.serial.Service",
                 "fuchsia.hardware.skipblock.Service",
                 "fuchsia.hardware.spi.ControllerService",
+                "fuchsia.hardware.tee.proprietary.Service",
                 "fuchsia.hardware.tee.Service",
                 "fuchsia.hardware.temperature.Service",
                 "fuchsia.hardware.thermal.Service",

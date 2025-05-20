@@ -19,8 +19,9 @@ use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::{DataObjectHandle, ObjectDescriptor, FSCRYPT_KEY_ID};
 use fxfs_macros::ToWeakNode;
+use std::fmt::{Debug, Formatter};
 use std::ops::Range;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use storage_device::buffer;
 use vfs::directory::entry::{EntryInfo, GetEntryInfo};
@@ -39,7 +40,7 @@ use zx::{self as zx, HandleBased, Status};
 /// When the top bit of the open count is set, it means the file has been deleted and when the count
 /// drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
 /// (assertions will fire).
-const TO_BE_PURGED: usize = 1 << (usize::BITS - 1);
+const TO_BE_PURGED: u64 = 1 << (u64::BITS - 1);
 
 /// This is the second most significant bit of `open_count`. It set, it indicates that the file is
 /// an unnamed temporary file (i.e. it lives in the graveyard *temporarily* and can be moved out if
@@ -49,130 +50,56 @@ const TO_BE_PURGED: usize = 1 << (usize::BITS - 1);
 /// graveyard. We need to be able to identify if a file is an unnamed temporary file whenever there
 /// is an attempt to link it into a directory. Once it has been linked into the filesystem, it is no
 /// longer temporary (it does not reside in the graveyard anymore) and this bit will be set to 0.
-const IS_TEMPORARILY_IN_GRAVEYARD: usize = 1 << (usize::BITS - 2);
+const IS_TEMPORARILY_IN_GRAVEYARD: u64 = 1 << (u64::BITS - 2);
+
+/// The file is dirty and needs to be flushed.  When this bit is set, we hold a strong count to
+/// ensure the file cannot be dropped.
+const IS_DIRTY: u64 = 1 << (u64::BITS - 3);
 
 /// An unnamed temporary file lives in the graveyard and has to marked to be purged to make sure
 /// that the storage this file uses will be freed when the last handle to it closes.
-const IS_UNNAMED_TEMPORARY: usize = IS_TEMPORARILY_IN_GRAVEYARD | TO_BE_PURGED;
+const IS_UNNAMED_TEMPORARY: u64 = IS_TEMPORARILY_IN_GRAVEYARD | TO_BE_PURGED;
 
 /// The maximum value of open counts. The two most significant bits are used to indicate other
 /// information regarding the state of the file. See the consts defined above.
-const MAX_OPEN_COUNTS: usize = usize::MAX >> 2;
+const MAX_OPEN_COUNTS: u64 = IS_DIRTY - 1;
 
-fn open_count(state: usize) -> usize {
-    state & MAX_OPEN_COUNTS
+struct State(u64);
+
+impl Debug for State {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("State")
+            .field("open_count", &self.open_count())
+            .field("to_be_purged", &self.to_be_purged())
+            .field("is_temporarily_in_graveyard", &self.is_temporarily_in_graveyard())
+            .field("is_dirty", &self.is_dirty())
+            .finish()
+    }
 }
-
-fn to_be_purged(state: usize) -> bool {
-    state & TO_BE_PURGED == TO_BE_PURGED
-}
-
-fn is_unnamed_temporary(state: usize) -> bool {
-    state & IS_UNNAMED_TEMPORARY == IS_UNNAMED_TEMPORARY
-}
-
-fn will_be_tombstoned(state: usize) -> bool {
-    to_be_purged(state) && open_count(state) == 0
-}
-
-struct Flags {
-    is_unnamed_temporary: bool,
-    to_be_purged: bool,
-}
-
-/// Open count and state of the file. See the consts defined above.
-#[derive(Debug)]
-#[repr(transparent)]
-struct State(AtomicUsize);
 
 impl State {
-    fn new(state: usize) -> Self {
-        State(AtomicUsize::new(state))
+    fn open_count(&self) -> u64 {
+        self.0 & MAX_OPEN_COUNTS
     }
 
-    fn get_flags(&self) -> Flags {
-        let state = self.0.load(Ordering::Relaxed);
-        Flags {
-            is_unnamed_temporary: is_unnamed_temporary(state),
-            to_be_purged: to_be_purged(state),
-        }
+    fn to_be_purged(&self) -> bool {
+        self.0 & TO_BE_PURGED != 0
     }
 
-    // Increments the open count by 1. Returns the new open count, or None if the node has been
-    // marked to be purged and it has no references to it (and it is not an unnamed temporary file).
-    fn increment_open_count(&self) -> Option<usize> {
-        let mut old = self.0.load(Ordering::Relaxed);
-        loop {
-            if !is_unnamed_temporary(old) && will_be_tombstoned(old) {
-                // For regular files, we cannot increment open count if the file has already been
-                // marked to be purged and the open count was zero (this file will be tombstoned).
-                // However, we treat unnamed temporary files as a special case. There is a moment
-                // during its creation where it will have the `TO_BE_PURGED` bit (and
-                // `IS_TEMPORARILY_IN_GRAVEYARD` bit) set, and its open count is zero. This
-                // operation is called to increment to open count to one when creating the file.
-                return None;
-            }
-
-            assert!(open_count(old) < MAX_OPEN_COUNTS);
-
-            match self.0.compare_exchange_weak(old, old + 1, Ordering::Relaxed, Ordering::Relaxed) {
-                Ok(x) => {
-                    return Some(open_count(x));
-                }
-                Err(new_value) => old = new_value,
-            }
-        }
+    fn is_temporarily_in_graveyard(&self) -> bool {
+        self.0 & IS_TEMPORARILY_IN_GRAVEYARD != 0
     }
 
-    // Decrements the open count by 1. Returns the remaining open count, or None if the node has no
-    // references and should be purged.
-    fn decrement_open_count(&self) -> Option<usize> {
-        let old = self.0.fetch_sub(1, Ordering::Relaxed);
-
-        let old_open_count = open_count(old);
-        assert!(old_open_count > 0);
-
-        if old_open_count == 1 {
-            if to_be_purged(old) {
-                return None;
-            }
-            return Some(0);
-        }
-        Some(old_open_count - 1)
+    fn is_unnamed_temporary(&self) -> bool {
+        self.0 & IS_UNNAMED_TEMPORARY == IS_UNNAMED_TEMPORARY
     }
 
-    // Mark the state as to be purged. Returns true if there are no open references.
-    fn mark_to_be_purged(&self) -> bool {
-        let mut old = self.0.load(Ordering::Relaxed);
-        loop {
-            assert!(!to_be_purged(old));
-            match self.0.compare_exchange_weak(
-                old,
-                old | TO_BE_PURGED,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return open_count(old) == 0,
-                Err(x) => old = x,
-            }
-        }
+    fn will_be_tombstoned(&self) -> bool {
+        self.to_be_purged() && self.open_count() == 0
     }
 
-    // Mark the state as permanent (to be used when the file is currently marked as temporary).
-    fn mark_as_permanent(&self) {
-        let mut old = self.0.load(Ordering::Relaxed);
-        loop {
-            assert!(is_unnamed_temporary(old));
-            match self.0.compare_exchange_weak(
-                old,
-                old & !IS_UNNAMED_TEMPORARY,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return,
-                Err(x) => old = x,
-            }
-        }
+    fn is_dirty(&self) -> bool {
+        self.0 & IS_DIRTY != 0
     }
 }
 
@@ -180,43 +107,31 @@ impl State {
 #[derive(ToWeakNode)]
 pub struct FxFile {
     handle: PagedObjectHandle,
-    state: State,
+    state: AtomicU64,
     pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
 }
 
 #[fxfs_trace::trace]
 impl FxFile {
-    fn create_new_file(
-        handle: DataObjectHandle<FxVolume>,
-        is_unnamed_temporary: bool,
-    ) -> Arc<Self> {
-        let size = handle.get_size();
-        let (vmo, pager_packet_receiver_registration) = handle
-            .owner()
-            .pager()
-            .create_vmo(size, zx::VmoOptions::UNBOUNDED | zx::VmoOptions::TRAP_DIRTY)
-            .unwrap();
-        let file = Arc::new(Self {
-            handle: PagedObjectHandle::new(handle, vmo),
-            state: if is_unnamed_temporary {
-                State::new(IS_UNNAMED_TEMPORARY)
-            } else {
-                State::new(0)
-            },
-            pager_packet_receiver_registration,
-        });
-        file.handle.owner().pager().register_file(&file);
-        file
-    }
-
     /// Creates a new regular FxFile.
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
-        Self::create_new_file(handle, /*is_unnamed_temporary*/ false)
-    }
-
-    /// Creates an unnamed temporary FxFile.
-    pub fn new_unnamed_temporary(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
-        Self::create_new_file(handle, /*is_unnamed_temporary*/ true)
+        let size = handle.get_size();
+        Arc::new_cyclic(|weak| {
+            let (vmo, pager_packet_receiver_registration) = handle
+                .owner()
+                .pager()
+                .create_vmo(
+                    weak.clone(),
+                    size,
+                    zx::VmoOptions::UNBOUNDED | zx::VmoOptions::TRAP_DIRTY,
+                )
+                .unwrap();
+            Self {
+                handle: PagedObjectHandle::new(handle, vmo),
+                state: AtomicU64::new(0),
+                pager_packet_receiver_registration,
+            }
+        })
     }
 
     /// Creates a new connection on the given `scope`. May take a read lock on the object.
@@ -249,15 +164,17 @@ impl FxFile {
             .await
     }
 
-    /// Marks the file to be purged when the open count drops to zero.
-    /// Returns true if there are no open references.
-    pub fn mark_to_be_purged(&self) -> bool {
-        self.state.mark_to_be_purged()
+    /// Open the file as a temporary.  The file must have just been created with no other open
+    /// counts.
+    pub fn open_as_temporary(self: Arc<Self>) -> OpenedNode<dyn FxNode> {
+        assert_eq!(self.state.swap(1 | IS_UNNAMED_TEMPORARY, Ordering::Relaxed), 0);
+        OpenedNode(self)
     }
 
-    // Indicate the file is permanent (to be used when the file is currently marked as temporary).
+    /// Mark the state as permanent (to be used when the file is currently marked as temporary).
     pub fn mark_as_permanent(&self) {
-        self.state.mark_as_permanent()
+        assert!(State(self.state.fetch_and(!IS_UNNAMED_TEMPORARY, Ordering::Relaxed))
+            .is_unnamed_temporary());
     }
 
     pub fn is_verified_file(&self) -> bool {
@@ -270,8 +187,8 @@ impl FxFile {
 
     /// If this instance has not been marked to be purged, returns an OpenedNode instance.
     /// If marked for purging, returns None.
-    pub fn clone_as_opened_node(self: &Arc<Self>) -> Option<OpenedNode<FxFile>> {
-        self.state.increment_open_count().map(|_| OpenedNode(self.clone()))
+    pub fn into_opened_node(self: Arc<Self>) -> Option<OpenedNode<FxFile>> {
+        self.increment_open_count().then(|| OpenedNode(self))
     }
 
     /// Persists any unflushed data to disk.
@@ -280,8 +197,8 @@ impl FxFile {
     /// ensure that we don't accidentally try to flush a file handle that is in the process of
     /// being removed. (See use of cache in `FxVolume::flush_all_files`.)
     #[trace]
-    pub async fn flush(this: &OpenedNode<FxFile>) -> Result<(), Error> {
-        this.handle.flush().await.map(|_| ())
+    pub async fn flush(this: &OpenedNode<FxFile>, last_chance: bool) -> Result<(), Error> {
+        this.handle.flush(last_chance).await.map(|_| ())
     }
 
     pub fn get_block_size(&self) -> u64 {
@@ -325,47 +242,6 @@ impl FxFile {
         self.handle.uncached_handle().get_size()
     }
 
-    /// Decrements the open count by one and optionally flushes contents to disk if the count
-    /// drops to zero. This function also takes care of purging files that were
-    /// 'marked_to_be_purged' due to being deleted while still open.
-    fn open_count_sub_one_and_maybe_flush(self: Arc<Self>) {
-        match self.state.decrement_open_count() {
-            None => {
-                // This node is marked `TO_BE_PURGED` and there are no more references to it. This
-                // file will be tombstoned. Actual purging is queued to be done asynchronously. We
-                // don't need to do any flushing in this case - if the file is going to be deleted
-                // anyway, there is no point.
-                self.handle.owner().clone().spawn(async move {
-                    let store = self.handle.store();
-                    let fs = store.filesystem();
-                    // Take a truncate lock on the object, because flush also takes this lock, so
-                    // this will make sure any previously triggered flushes will complete before we
-                    // purge.
-                    let keys = lock_keys![LockKey::truncate(
-                        store.store_object_id(),
-                        self.handle.object_id()
-                    )];
-                    let _flush_guard = fs.lock_manager().write_lock(keys).await;
-                    store
-                        .filesystem()
-                        .graveyard()
-                        .queue_tombstone_object(store.store_object_id(), self.object_id());
-                });
-            }
-            Some(0) => {
-                if self.handle.needs_flush() {
-                    // If this file is no longer referenced by anything, do a final flush if needed.
-                    self.handle.owner().clone().spawn(async move {
-                        if let Err(error) = self.handle.flush().await {
-                            log::warn!(error:?; "flush on close failed");
-                        }
-                    });
-                }
-            }
-            Some(_) => {}
-        }
-    }
-
     async fn fscrypt_wrapping_key_id(&self) -> Result<Option<[u8; 16]>, zx::Status> {
         if !self.handle.store().is_encrypted() {
             return Ok(None);
@@ -374,6 +250,47 @@ impl FxFile {
                 self.handle.store().get_keys(self.object_id()).await.map_err(map_to_status)?;
             Ok(wrapped_keys.get_wrapping_key_with_id(FSCRYPT_KEY_ID))
         }
+    }
+
+    /// Forcibly marks the file as clean.
+    pub fn force_clean(&self) {
+        let old = State(self.state.fetch_and(!IS_DIRTY, Ordering::Relaxed));
+        if old.is_dirty() {
+            if self.handle.needs_flush() {
+                warn!("File {} was forcibly marked clean; data may be lost", self.object_id(),);
+            }
+            // SAFETY: The IS_DIRTY bit means we took a reference.
+            unsafe {
+                let _ = Arc::from_raw(self);
+            }
+        }
+    }
+
+    // Increments the open count by 1. Returns true if successful.
+    #[must_use]
+    fn increment_open_count(&self) -> bool {
+        let mut old = self.load_state();
+        loop {
+            if old.will_be_tombstoned() {
+                return false;
+            }
+
+            assert!(old.open_count() < MAX_OPEN_COUNTS);
+
+            match self.state.compare_exchange_weak(
+                old.0,
+                old.0 + 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return true,
+                Err(new_value) => old.0 = new_value,
+            }
+        }
+    }
+
+    fn load_state(&self) -> State {
+        State(self.state.load(Ordering::Relaxed))
     }
 }
 
@@ -398,11 +315,102 @@ impl FxNode for FxFile {
     }
 
     fn open_count_add_one(&self) {
-        assert!(self.state.increment_open_count().is_some());
+        assert!(self.increment_open_count());
     }
 
     fn open_count_sub_one(self: Arc<Self>) {
-        self.open_count_sub_one_and_maybe_flush();
+        let mut current = self.load_state();
+        loop {
+            // If it's the last open count, we need to handle flushing dirty data, and purging if it
+            // is so marked.
+            if current.open_count() == 1 {
+                if current.to_be_purged() {
+                    match self.state.compare_exchange_weak(
+                        current.0,
+                        (current.0 & !IS_DIRTY) - 1,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(_) => {
+                            if current.is_dirty() {
+                                // SAFETY: The IS_DIRTY bit means we took a reference.
+                                unsafe {
+                                    let _ = Arc::from_raw(Arc::as_ptr(&self));
+                                }
+                            }
+                            // This node is marked `TO_BE_PURGED` and there are no more references
+                            // to it. This file will be tombstoned. Actual purging is queued to be
+                            // done asynchronously. We don't need to do any flushing in this case -
+                            // if the file is going to be deleted anyway, there is no point.
+                            self.handle.owner().clone().spawn(async move {
+                                let store = self.handle.store();
+                                store.filesystem().graveyard().queue_tombstone_object(
+                                    store.store_object_id(),
+                                    self.object_id(),
+                                );
+                            });
+                            return;
+                        }
+                        Err(old) => {
+                            current.0 = old;
+                            continue;
+                        }
+                    }
+                }
+                // If the file is dirty, we need to hold a strong reference to make sure the file
+                // doesn't go away until it has been flushed.
+                if self.handle.needs_flush() {
+                    if !current.is_dirty() {
+                        match self.state.compare_exchange_weak(
+                            current.0,
+                            (current.0 | IS_DIRTY) - 1,
+                            Ordering::Relaxed,
+                            Ordering::Relaxed,
+                        ) {
+                            Ok(_) => {
+                                // We need to hold a strong reference to prevent the node from being
+                                // dropped.
+                                let _ = Arc::into_raw(self);
+                                return;
+                            }
+                            Err(old) => {
+                                current.0 = old;
+                                continue;
+                            }
+                        }
+                    }
+                } else if current.is_dirty() {
+                    // File is no longer dirty.
+                    match self.state.compare_exchange_weak(
+                        current.0,
+                        (current.0 & !IS_DIRTY) - 1,
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    ) {
+                        Ok(_) => {
+                            // SAFETY: The IS_DIRTY bit means we took a reference.
+                            unsafe {
+                                let _ = Arc::from_raw(Arc::as_ptr(&self));
+                            }
+                            return;
+                        }
+                        Err(old) => {
+                            current.0 = old;
+                            continue;
+                        }
+                    }
+                }
+            }
+            match self.state.compare_exchange_weak(
+                current.0,
+                current.0 - 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return,
+                Err(old) => current.0 = old,
+            }
+        }
     }
 
     fn object_descriptor(&self) -> ObjectDescriptor {
@@ -411,6 +419,13 @@ impl FxNode for FxFile {
 
     fn terminate(&self) {
         self.pager_packet_receiver_registration.stop_watching_for_zero_children();
+    }
+
+    // Mark the state as to be purged. Returns true if there are no open references.
+    fn mark_to_be_purged(&self) -> bool {
+        let old = State(self.state.fetch_or(TO_BE_PURGED, Ordering::Relaxed));
+        assert!(!old.to_be_purged());
+        old.open_count() == 0
     }
 }
 
@@ -433,7 +448,7 @@ impl vfs::node::Node for FxFile {
         // no more open references to it. For these two cases, the link count should be zero (the
         // object reference count is one as they live in the graveyard). In both cases,
         // `TO_BE_PURGED` will be set and `refs` is one.
-        let Flags { to_be_purged, .. } = self.state.get_flags();
+        let to_be_purged = self.load_state().to_be_purged();
         let link_count = if to_be_purged && props.refs == 1 { 0 } else { props.refs };
 
         if requested_attributes.contains(fio::NodeAttributesQuery::PENDING_ACCESS_TIME_UPDATE) {
@@ -513,7 +528,9 @@ impl vfs::node::Node for FxFile {
             self.fscrypt_wrapping_key_id().await?.map(|x| u128::from_le_bytes(x)),
         )?;
 
-        let Flags { is_unnamed_temporary, to_be_purged } = self.state.get_flags();
+        let state = self.load_state();
+        let is_unnamed_temporary = state.is_unnamed_temporary();
+        let to_be_purged = state.to_be_purged();
         if is_unnamed_temporary {
             // Remove object from graveyard and link it to `name`.
             dir.link_graveyard_object(transaction, &name, object_id, ObjectDescriptor::File, || {
@@ -556,7 +573,7 @@ impl File for FxFile {
 
     async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Status> {
         self.handle.set_read_only();
-        self.handle.flush().await.map_err(map_to_status)?;
+        self.handle.flush(false).await.map_err(map_to_status)?;
         self.handle.uncached_handle().enable_verity(options).await.map_err(map_to_status)
     }
 
@@ -652,7 +669,7 @@ impl File for FxFile {
     }
 
     async fn sync(&self, mode: SyncMode) -> Result<(), Status> {
-        self.handle.flush().await.map_err(map_to_status)?;
+        self.handle.flush(false).await.map_err(map_to_status)?;
 
         // TODO(https://fxbug.dev/42178163): at the moment, this doesn't send a flush to the device, which
         // doesn't match minfs.
@@ -753,7 +770,6 @@ mod tests {
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
-    use vfs::common::rights_to_posix_mode_bits;
     use zx::Status;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -778,19 +794,18 @@ mod tests {
             .expect("read failed");
         assert!(buf.is_empty());
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_ne!(attrs.id, INVALID_OBJECT_ID);
-        assert_eq!(
-            attrs.mode,
-            fio::MODE_TYPE_FILE | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false)
-        );
-        assert_eq!(attrs.content_size, 0u64);
-        assert_eq!(attrs.storage_size, 0u64);
-        assert_eq!(attrs.link_count, 1u64);
-        assert_ne!(attrs.creation_time, 0u64);
-        assert_ne!(attrs.modification_time, 0u64);
-        assert_eq!(attrs.creation_time, attrs.modification_time);
+        let (mutable_attrs, immutable_attrs) = file
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .expect("FIDL call failed")
+            .expect("GetAttributes failed");
+        assert_ne!(immutable_attrs.id.unwrap(), INVALID_OBJECT_ID);
+        assert_eq!(immutable_attrs.content_size.unwrap(), 0u64);
+        assert_eq!(immutable_attrs.storage_size.unwrap(), 0u64);
+        assert_eq!(immutable_attrs.link_count.unwrap(), 1u64);
+        assert_ne!(mutable_attrs.creation_time.unwrap(), 0u64);
+        assert_ne!(mutable_attrs.modification_time.unwrap(), 0u64);
+        assert_eq!(mutable_attrs.creation_time.unwrap(), mutable_attrs.modification_time.unwrap());
 
         close_file_checked(file).await;
         fixture.close().await;
@@ -888,12 +903,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -933,12 +943,7 @@ mod tests {
         let reused_device = {
             let fixture = TestFixture::open(
                 DeviceHolder::new(device),
-                TestFixtureOptions {
-                    format: true,
-                    as_blob: false,
-                    encrypted: true,
-                    serve_volume: false,
-                },
+                TestFixtureOptions { format: true, ..Default::default() },
             )
             .await;
             let root = fixture.root();
@@ -968,12 +973,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -1003,12 +1003,7 @@ mod tests {
         for i in 0..2 {
             let fixture = TestFixture::open(
                 device,
-                TestFixtureOptions {
-                    format: i == 0,
-                    as_blob: false,
-                    encrypted: true,
-                    serve_volume: false,
-                },
+                TestFixtureOptions { format: i == 0, ..Default::default() },
             )
             .await;
             let root = fixture.root();
@@ -1958,16 +1953,9 @@ mod tests {
         let device = fixture.close().await;
         device.ensure_unique();
         device.reopen(false);
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                encrypted: true,
-                as_blob: false,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
 
         let root = fixture.root();
         let file =
@@ -2028,12 +2016,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2105,12 +2088,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2363,12 +2341,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2442,12 +2415,7 @@ mod tests {
 
         let fixture = TestFixture::open(
             reused_device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
+            TestFixtureOptions { format: false, ..Default::default() },
         )
         .await;
         let root = fixture.root();
@@ -2484,7 +2452,7 @@ mod tests {
             .map_err(zx::Status::from_raw)
             .expect("seek error");
         let read_buf = file::read(&permanent_file).await.expect("read failed");
-        assert_eq!(read_buf, buf);
+        assert!(read_buf == buf);
 
         fsck(fixture.fs().clone()).await.expect("fsck failed");
 
@@ -2739,16 +2707,9 @@ mod tests {
             fixture.close().await
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let file = open_file_checked(
             &root,
@@ -2841,16 +2802,9 @@ mod tests {
             (fixture.close().await, mutable_attributes.access_time, initial_ctime)
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let file = open_file_checked(
             &root,

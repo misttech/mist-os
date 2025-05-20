@@ -6,11 +6,37 @@
 #define ZIRCON_SYSCALLS_NEXT_H_
 
 #include <stdint.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
 #include <zircon/syscalls/iob.h>
 #include <zircon/types.h>
+
+#ifdef __Fuchsia__
+
+// Only allow `syscalls-next.h` when the target API level is `HEAD` or
+// `PLATFORM`.
+#if FUCHSIA_API_LEVEL_LESS_THAN(HEAD)
+
+// TODO(https://fxbug.dev/415034348): Remove this opt-out mechanism.
+#ifndef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_INCOMPATIBLE_BUILDS
+#error zircon/syscalls-next.h may not be included when targeting NEXT or a stable API level.
+#endif
+#endif
+
+#else  // ifdef __Fuchsia__
+
+// Sometimes host libraries indirectly include the syscall interface, but they
+// don't have a defined target API level, so we can't check that they're
+// targeting HEAD or PLATFORM.
+//
+// TODO(https://fxbug.dev/415033686): Remove this opt-out mechanism.
+#ifndef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
+#error zircon/syscalls-next.h may only be included in on-target code.
+#endif
+
+#endif  // ifdef __Fuchsia__
 
 // ====== Pager writeback support ====== //
 
@@ -246,30 +272,6 @@ typedef struct zx_iob_discipline_mediated_write_ring_buffer {
 #define ZX_IOB_SHARED_REGION_UPDATED __ZX_OBJECT_SIGNALED
 
 // ====== End of upcoming IOB support ====== //
-
-// ====== Stall measurement and notification ====== //
-
-// Contains the accumulated stall times since boot.
-typedef struct zx_info_memory_stall {
-  // Total time spent with at least one memory-stalled thread.
-  zx_duration_mono_t stall_time_some;
-
-  // Total time spent with all threads memory-stalled.
-  zx_duration_mono_t stall_time_full;
-} zx_info_memory_stall_t;
-
-#define ZX_INFO_MEMORY_STALL ((zx_object_info_topic_t)38u)  // zx_info_memory_stall_t[1]
-
-// Specifies a type of stall to be observed.
-typedef uint32_t zx_system_memory_stall_type_t;
-
-#define ZX_SYSTEM_MEMORY_STALL_SOME ((zx_system_memory_stall_type_t)(0u))
-#define ZX_SYSTEM_MEMORY_STALL_FULL ((zx_system_memory_stall_type_t)(1u))
-
-#define ZX_DEFAULT_SYSTEM_MEMORY_STALL_EVENT_RIGHTS \
-  (ZX_RIGHT_WAIT | ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER)
-
-// ====== End stall measurement and notification ====== //
 
 #ifndef _KERNEL
 

@@ -647,8 +647,8 @@ void Workload::ParseTracing(const rapidjson::Value& tracing) {
         config.group_mask = KTRACE_GRP_ALL;
       } else if (group_mask_str == "KTRACE_GRP_META") {
         config.group_mask = KTRACE_GRP_META;
-      } else if (group_mask_str == "KTRACE_GRP_LIFECYCLE") {
-        config.group_mask = KTRACE_GRP_LIFECYCLE;
+      } else if (group_mask_str == "KTRACE_GRP_MEMORY") {
+        config.group_mask = KTRACE_GRP_MEMORY;
       } else if (group_mask_str == "KTRACE_GRP_SCHEDULER") {
         config.group_mask = KTRACE_GRP_SCHEDULER;
       } else if (group_mask_str == "KTRACE_GRP_TASKS") {

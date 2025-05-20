@@ -43,7 +43,7 @@ func TestBasicCrash(t *testing.T) {
 	i.WaitForLogMessage("usage: k <command>")
 
 	// Crash the kernel.
-	i.RunCommand("k crash")
+	i.RunCommand("k crash deref")
 
 	// See that it panicked.
 	i.WaitForLogMessage("ZIRCON KERNEL PANIC")
@@ -73,7 +73,7 @@ func TestReadUserMemoryViolation(t *testing.T) {
 	i.WaitForLogMessage("usage: k <command>")
 
 	// Crash the kernel by causing a userspace data read.
-	i.RunCommand("k crash_user_read")
+	i.RunCommand("k crash user_read")
 
 	// See that an SMAP failure was identified and that the kernel panicked.
 	i.WaitForLogMessageAssertNotSeen("SMAP failure", "cpu does not support smap; will not crash")
@@ -100,7 +100,7 @@ func TestExecuteUserMemoryViolation(t *testing.T) {
 	i.WaitForLogMessage("usage: k <command>")
 
 	// Crash the kernel by causing a userspace code execution.
-	i.RunCommand("k crash_user_execute")
+	i.RunCommand("k crash user_execute")
 
 	i.WaitForLogMessage("ZIRCON KERNEL PANIC")
 	if arch == emulator.X64 {
@@ -142,7 +142,7 @@ func pmmCheckerTestCommon(t *testing.T, ctx context.Context, check_action string
 	i.WaitForLogMessage("pmm checker enabled")
 
 	// Corrupt the free list.
-	i.RunCommand("k crash_pmm_use_after_free")
+	i.RunCommand("k crash pmm_use_after_free")
 	i.WaitForLogMessage("crash_pmm_use_after_free done")
 
 	// Force a check.
@@ -174,7 +174,7 @@ func TestPmmCheckerPanic(t *testing.T) {
 	i.WaitForLogMessage("dump of page follows")
 }
 
-// See that `k crash_assert` crashes the kernel.
+// See that `k crash assert` crashes the kernel.
 func TestCrashAssert(t *testing.T) {
 	exDir := execDir(t)
 	distro := emulatortest.UnpackFrom(t, filepath.Join(exDir, "test_data"), emulator.DistributionParams{
@@ -192,7 +192,7 @@ func TestCrashAssert(t *testing.T) {
 	i.WaitForLogMessage("usage: k <command>")
 
 	// Crash the kernel.
-	i.RunCommand("k crash_assert")
+	i.RunCommand("k crash assert")
 
 	// See that it panicked.
 	i.WaitForLogMessage("ZIRCON KERNEL PANIC")

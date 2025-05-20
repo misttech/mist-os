@@ -109,11 +109,41 @@ kernel_package("code-patches-test") {
   ]
 }
 
-zbi_test("zbi-self-code-patching-test") {
-  args = []
+# This tags a test module with the PT_INTERP matching the test's build ID.
+kernel_elf_interp("elf-code-patching-test.interp") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  deps = [ ":elf-code-patching-test.binary" ]
+}
+
+kernel_elf_binary("elf-code-patching-test-add-one") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  output_name = "add-one"
+
+  configs += [ "//zircon/kernel/phys:phys-elf-module.config" ]
+  ldflags = [ "-Wl,-e,AddOne" ]
+
   deps = [
-    ":code-patches-test",
-    ":zbi-self-code-patching-test.executable",
+    ":add-one",
+    ":elf-code-patching-test.interp",
+  ]
+}
+
+kernel_elf_binary("elf-code-patching-test-multiply") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  output_name = "multiply_by_factor"
+
+  configs += [ "//zircon/kernel/phys:phys-elf-module.config" ]
+  ldflags = [ "-Wl,-e,multiply_by_factor" ]
+
+  deps = [
+    ":elf-code-patching-test.interp",
+    ":multiply_by_factor",
   ]
 }
 
@@ -134,44 +164,16 @@ physload_binary_test("elf-code-patching-test") {
   ]
 
   data_deps = [
-    ":elf-code-patching-test-add-one",
-    ":elf-code-patching-test-multiply",
+    ":elf-code-patching-test-add-one($phys_toolchain)",
+    ":elf-code-patching-test-multiply($phys_toolchain)",
   ]
 }
 
-# This tags a test module with the PT_INTERP matching the test's build ID.
-kernel_elf_interp("elf-code-patching-test.interp") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  deps = [ ":elf-code-patching-test.binary" ]
-}
-
-kernel_elf_binary("elf-code-patching-test-add-one") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  output_name = "add-one"
-
-  ldflags = [ "-Wl,-e,AddOne" ]
-
+zbi_test("zbi-self-code-patching-test") {
+  args = []
   deps = [
-    ":add-one",
-    ":elf-code-patching-test.interp",
-  ]
-}
-
-kernel_elf_binary("elf-code-patching-test-multiply") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  output_name = "multiply_by_factor"
-
-  ldflags = [ "-Wl,-e,multiply_by_factor" ]
-
-  deps = [
-    ":elf-code-patching-test.interp",
-    ":multiply_by_factor",
+    ":code-patches-test($phys_toolchain)",
+    ":zbi-self-code-patching-test.executable($phys_toolchain)",
   ]
 }
 

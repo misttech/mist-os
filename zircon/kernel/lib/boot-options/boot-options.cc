@@ -9,8 +9,9 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/boot-options/types.h>
 #include <lib/boot-options/word-view.h>
-#include <lib/stdcompat/algorithm.h>
 #include <zircon/compiler.h>
+
+#include <algorithm>
 
 namespace {
 
@@ -18,8 +19,8 @@ template <auto MemberPtr>
 constexpr auto kDefaultValue = MemberPtr;
 
 // Provides constants for the default value of each member.
-#define DEFINE_OPTION(name, type, member, init, doc) \
-  template <>                                        \
+#define DEFINE_OPTION(name, type, member, init, doc, ...) \
+  template <>                                             \
   constexpr type kDefaultValue<&BootOptions::member> init;
 #include <lib/boot-options/options.inc>
 #undef DEFINE_OPTION
@@ -102,7 +103,7 @@ constexpr char kComplainPrefix[] = "kernel";
 // avoids having a constexpr table of string_view constants, which doesn't fly
 // for pure PIC.
 enum class Index {
-#define DEFINE_OPTION(name, type, member, init, doc) member,
+#define DEFINE_OPTION(name, type, member, init, doc, ...) member,
 #include <lib/boot-options/options.inc>
 #undef DEFINE_OPTION
 };
@@ -112,8 +113,8 @@ enum class Index {
 // constants, but that optimization is disabled when pure PIC is required.
 constexpr std::string_view OptionName(Index idx) {
   switch (idx) {
-#define DEFINE_OPTION(name, type, member, init, doc) \
-  case Index::member:                                \
+#define DEFINE_OPTION(name, type, member, init, doc, ...) \
+  case Index::member:                                     \
     return name##sv;
 #include <lib/boot-options/options.inc>
 #undef DEFINE_OPTION
@@ -128,17 +129,17 @@ constexpr std::string_view OptionName(std::string_view name) { return name; }
 constexpr auto OptionLessThan = [](auto&& a, auto&& b) { return OptionName(a) < OptionName(b); };
 
 constexpr auto CheckSortedNames = [](const auto& names) {
-  return cpp20::is_sorted(names.begin(), names.end(), OptionLessThan);
+  return std::is_sorted(names.begin(), names.end(), OptionLessThan);
 };
 
 // kSortedNames lists Index values in ascending lexicographic order of name.
 constexpr auto kSortedNames = []() {
   std::array names{
-#define DEFINE_OPTION(name, type, member, init, doc) Index::member,
+#define DEFINE_OPTION(name, type, member, init, doc, ...) Index::member,
 #include <lib/boot-options/options.inc>
 #undef DEFINE_OPTION
   };
-  cpp20::sort(names.begin(), names.end(), OptionLessThan);
+  std::sort(names.begin(), names.end(), OptionLessThan);
   return names;
 }();
 
@@ -162,7 +163,7 @@ constexpr size_t kMaxNameLen =
 template <Index member, typename T>
 void ShowOption(const T& value, bool defaults, FILE* out);
 
-#define DEFINE_OPTION(name, type, member, init, doc)                                  \
+#define DEFINE_OPTION(name, type, member, init, doc, ...)                             \
   template <>                                                                         \
   void ShowOption<Index::member, type>(const type& value, bool defaults, FILE* out) { \
     const type default_value init;                                                    \
@@ -195,7 +196,7 @@ BootOptions::WordResult BootOptions::ParseWord(std::string_view word) {
   // returns true when the key was known but the value was unparsable.
   if (auto option = FindOption(key)) {
     switch (*option) {
-#define DEFINE_OPTION(name, type, member, init, doc)      \
+#define DEFINE_OPTION(name, type, member, init, doc, ...) \
   case Index::member:                                     \
     if (!Parse(value, &BootOptions::member)) {            \
       this->member = kDefaultValue<&BootOptions::member>; \
@@ -244,7 +245,7 @@ void BootOptions::SetMany(std::string_view cmdline, FILE* complain) {
 int BootOptions::Show(std::string_view key, bool defaults, FILE* out) const {
   if (auto option = FindOption(key)) {
     switch (*option) {
-#define DEFINE_OPTION(name, type, member, init, doc)        \
+#define DEFINE_OPTION(name, type, member, init, doc, ...)   \
   case Index::member:                                       \
     ShowOption<Index::member, type>(member, defaults, out); \
     break;
@@ -257,7 +258,7 @@ int BootOptions::Show(std::string_view key, bool defaults, FILE* out) const {
 }
 
 void BootOptions::Show(bool defaults, FILE* out) const {
-#define DEFINE_OPTION(name, type, member, init, doc) \
+#define DEFINE_OPTION(name, type, member, init, doc, ...) \
   ShowOption<Index::member, type>(member, defaults, out);
 #include <lib/boot-options/options.inc>
 #undef DEFINE_OPTION

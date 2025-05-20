@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! FFX plugin for get a path of the image inside product bundle.
-use assembly_manifest::Image;
+use assembled_system::Image;
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::EnvironmentContext;
@@ -162,7 +162,8 @@ impl PbGetImagePathTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::BlobfsContents;
+    use assembled_system::BlobfsContents;
+    use assembly_container::AssemblyContainer;
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
     use ffx_writer::{Format, TestBuffers};
@@ -231,7 +232,7 @@ mod tests {
         create_temp_file("bootloader");
         create_temp_file("credential.zip");
 
-        let config = PartitionsConfig::try_load_from(partitions_config_path).unwrap();
+        let config = PartitionsConfig::from_dir(&tempdir).unwrap();
 
         let pb = ProductBundle::V2(ProductBundleV2 {
             product_name: "".to_string(),

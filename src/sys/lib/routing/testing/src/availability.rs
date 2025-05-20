@@ -215,7 +215,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                 },
                 CheckUse::Storage {
                     path: "/storage".parse().unwrap(),
-                    storage_relation: Some(Moniker::try_from(vec!["c"]).unwrap()),
+                    storage_relation: Some(Moniker::try_from(["c"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: Some("cache".to_string()),
                     expected_res: ExpectedResult::Ok,
@@ -227,7 +227,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     name: "started".parse().unwrap(),
                 },
             ] {
-                model.check_use(vec!["c"].try_into().unwrap(), check_use).await;
+                model.check_use(["c"].try_into().unwrap(), check_use).await;
             }
         }
     }
@@ -406,7 +406,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             ] {
-                model.check_use(vec!["c"].try_into().unwrap(), check_use).await;
+                model.check_use(["c"].try_into().unwrap(), check_use).await;
             }
         }
     }
@@ -533,7 +533,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     expected_res: ExpectedResult::Ok,
                 },
             ] {
-                model.check_use_exposed_dir(vec!["b"].try_into().unwrap(), check_use).await;
+                model.check_use_exposed_dir(["b"].try_into().unwrap(), check_use).await;
             }
         }
     }

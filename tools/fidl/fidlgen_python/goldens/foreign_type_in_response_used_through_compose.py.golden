@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -57,16 +55,14 @@ class TopServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_get_foo: typing.TypeAlias = (
-        fidl_test_middle.MiddleGetFooResponse
-    )
+    GetFooResponse: typing.TypeAlias = fidl_test_middle.MiddleGetFooResponse
 
     @abstractmethod
     def get_foo(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_get_foo]
-        | _MethodResponse_get_foo
+        typing.Coroutine[typing.Any, typing.Any, GetFooResponse]
+        | GetFooResponse
     ):
         ...
 

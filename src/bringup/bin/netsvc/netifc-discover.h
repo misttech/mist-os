@@ -19,6 +19,6 @@ struct NetdeviceInterface {
 };
 
 zx::result<NetdeviceInterface> netifc_discover(const std::string& devdir,
-                                               cpp17::string_view topological_path);
+                                               std::string_view topological_path);
 
 #endif  // SRC_BRINGUP_BIN_NETSVC_NETIFC_DISCOVER_H_

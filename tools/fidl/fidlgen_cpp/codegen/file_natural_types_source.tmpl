@@ -21,6 +21,8 @@ fidl/{{ .LibraryDots }}/cpp/natural_types.cc
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+{{ range .Bits }}{{ template "Bits:NaturalTypesSource" . }}{{ end }}
+{{ range .Enums }}{{ template "Enum:NaturalTypesSource" . }}{{ end }}
 {{ range .Structs }}{{ template "Struct:NaturalTypesSource" . }}{{ end }}
 {{ range .Tables }}{{ template "Table:NaturalTypesSource" . }}{{ end }}
 {{ range .Unions }}{{ template "Union:NaturalTypesSource" . }}{{ end }}

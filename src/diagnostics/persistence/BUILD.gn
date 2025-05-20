@@ -16,6 +16,7 @@ rustc_library("lib") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//sdk/rust/zx",
@@ -26,9 +27,11 @@ rustc_library("lib") {
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/selectors",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
+    "//src/lib/sandbox",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:chrono",
@@ -64,6 +67,7 @@ rustc_library("lib") {
 fuchsia_component_manifest("persistence-manifest") {
   component_name = "diagnostics-persistence"
   manifest = "meta/persistence-for-production.cml"
+  restricted_features = [ "dynamic_dictionaries" ]
 }
 
 fuchsia_component("diagnostics-persistence-component") {

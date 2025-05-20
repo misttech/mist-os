@@ -134,7 +134,7 @@ const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.packet/Socket";
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
 // TODO(https://fxbug.dev/42166513): Implement RFC-0109 for packet sockets.
-@discoverable
+@discoverable(server="platform")
 closed protocol Socket {
     compose fuchsia.posix.socket.BaseSocket;
 
@@ -234,7 +234,7 @@ closed protocol Socket {
 };
 
 /// A packet socket provider.
-@discoverable
+@discoverable(server="platform")
 closed protocol Provider {
     /// Requests a packet socket.
     ///

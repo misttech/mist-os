@@ -101,6 +101,10 @@ if (is_host) {
       "//src/lib/android/libbase",
       "//src/lib/android/logging",
     ]
+
+    # TODO(https://fxbug.dev/418047052): Remove when upstream googletest
+    # resolves https://github.com/google/googletest/issues/4762
+    configs += [ "//build/config:Wno-character-conversion" ]
   }
 
   rustc_binary("aidl_wrapper") {

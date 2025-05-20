@@ -2,22 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::cell::RefCell;
-use std::rc::Rc;
-use tokio::task::LocalSet;
-
-thread_local!(
-    static LOCAL_EXECUTOR: RefCell<Option<Rc<LocalSet>>> = const { RefCell::new(None) }
-);
-
 pub mod scope;
 
 pub mod task {
-    use super::LOCAL_EXECUTOR;
     use core::task::{Context, Poll};
     use std::future::Future;
     use std::mem::ManuallyDrop;
     use std::pin::Pin;
+    pub use tokio::task::yield_now;
     use tokio::task::AbortHandle;
 
     use futures::FutureExt;
@@ -63,13 +55,7 @@ pub mod task {
         where
             T: Send,
         {
-            let task = LOCAL_EXECUTOR.with(|e| {
-                if let Some(e) = e.borrow().as_ref() {
-                    e.spawn_local(fut)
-                } else {
-                    tokio::task::spawn(fut)
-                }
-            });
+            let task = tokio::task::spawn(fut);
             Self { task, abort_on_drop: true }
         }
 
@@ -80,9 +66,7 @@ pub mod task {
         /// `local` may panic if not called in the context of a local executor
         /// (e.g. within a call to `run` or `run_singlethreaded`).
         pub fn local(fut: impl Future<Output = T> + 'static) -> Self {
-            let task = LOCAL_EXECUTOR.with(|e| {
-                e.borrow().as_ref().expect("Executor must be created first").spawn_local(fut)
-            });
+            let task = tokio::task::spawn_local(fut);
             Self { task, abort_on_drop: true }
         }
 
@@ -91,9 +75,10 @@ pub mod task {
             self.abort_on_drop = false;
         }
 
-        /// Cancel a task and returns a future that resolves once the cancellation is complete.  The
-        /// future can be ignored in which case the task will still be cancelled.
-        pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
+        /// Abort a task and returns a future that resolves once the task is
+        /// aborted. The future can be ignored in which case the task will still
+        /// be aborted.
+        pub fn abort(mut self) -> impl Future<Output = Option<T>> {
             self.task.abort();
             async move {
                 let res = (&mut self.task).await;
@@ -177,25 +162,49 @@ pub mod task {
 }
 
 pub mod executor {
-    use super::LOCAL_EXECUTOR;
-
     use crate::runtime::WakeupTime;
     use crate::Timer;
     use futures::future::BoxFuture;
     use std::future::Future;
     use std::ops::{Deref, DerefMut};
     use std::pin::Pin;
-    use std::rc::Rc;
     use std::task::{Context, Poll};
 
     pub use std::time::Duration as MonotonicDuration;
     /// A time relative to the executor's clock.
     pub use std::time::Instant as MonotonicInstant;
-    use tokio::task::LocalSet;
+    use tokio::runtime::{EnterGuard, Runtime};
+    use tokio::task::{LocalEnterGuard, LocalSet};
 
     impl WakeupTime for MonotonicInstant {
         fn into_timer(self) -> Timer {
             Timer::from(self)
+        }
+    }
+
+    /// A tokio runtime with an active [`EnterGuard`].
+    ///
+    /// This type allows [`SendExecutor`] and [`LocalExecutor`] to behave like
+    /// the Fuchsia implementation: the runtime is in scope for the local thread
+    /// from the executor's creation.
+    struct GuardedRuntime {
+        // Drop order matters. We have transmuted the EnterGuard into a static
+        // lifetime, so we must drop it before the runtime.
+        _guard: EnterGuard<'static>,
+        runtime: Pin<Box<Runtime>>,
+    }
+
+    impl GuardedRuntime {
+        fn new(runtime: Runtime) -> Self {
+            let runtime = Box::pin(runtime);
+            let guard = runtime.enter();
+            // SAFETY: We're transmuting the lifecycle here. We guarantee that
+            // EnterGuard is dropped before the runtime in GuardedRuntime. The
+            // runtime is pinned, so any references kept by the guard remain
+            // valid.
+            let guard =
+                unsafe { std::mem::transmute::<EnterGuard<'_>, EnterGuard<'static>>(guard) };
+            Self { _guard: guard, runtime }
         }
     }
 
@@ -209,13 +218,19 @@ pub mod executor {
     /// The current implementation of Executor does not isolate work (as the underlying executor is
     /// not yet capable of this).
     pub struct SendExecutor {
-        num_threads: u8,
+        runtime: GuardedRuntime,
     }
 
     impl SendExecutor {
         /// Create a new executor running with actual time.
         pub fn new(num_threads: u8) -> Self {
-            Self { num_threads }
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(num_threads.into())
+                .enable_time()
+                .enable_io()
+                .build()
+                .expect("Could not start tokio runtime on current thread");
+            Self { runtime: GuardedRuntime::new(rt) }
         }
 
         /// Run a single future to completion using multiple threads.
@@ -224,14 +239,7 @@ pub mod executor {
             F: Future + Send + 'static,
             F::Output: Send + 'static,
         {
-            let rt = tokio::runtime::Builder::new_multi_thread()
-                .worker_threads(self.num_threads as usize)
-                .enable_time()
-                .enable_io()
-                .build()
-                .expect("Could not start tokio runtime on current thread");
-
-            rt.block_on(main_future)
+            self.runtime.runtime.block_on(main_future)
         }
     }
 
@@ -241,19 +249,32 @@ pub mod executor {
     ///
     /// The current implementation of Executor does not isolate work
     /// (as the underlying executor is not yet capable of this).
-    pub struct LocalExecutor(Rc<LocalSet>);
+    pub struct LocalExecutor {
+        // Drop order matters here. Drop the guard before the runtime, and the
+        // local guard after the local set.
+        local_set: LocalSet,
+        _local_guard: LocalEnterGuard,
+        runtime: GuardedRuntime,
+    }
+
+    impl Default for LocalExecutor {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 
     impl LocalExecutor {
         /// Create a new executor.
         pub fn new() -> Self {
-            let local_set = Rc::new(LocalSet::new());
-            LOCAL_EXECUTOR.with(|e| {
-                assert!(
-                    e.borrow_mut().replace(local_set.clone()).is_none(),
-                    "Cannot create multiple executors"
-                );
-            });
-            Self(local_set)
+            let local_set = LocalSet::new();
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_io()
+                .enable_time()
+                .build()
+                .expect("Could not start tokio runtime on current thread");
+            let runtime = GuardedRuntime::new(runtime);
+            let local_guard = local_set.enter();
+            Self { local_set, _local_guard: local_guard, runtime }
         }
 
         /// Run a single future to completion on a single thread.
@@ -261,18 +282,7 @@ pub mod executor {
         where
             F: Future,
         {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_io()
-                .enable_time()
-                .build()
-                .expect("Could not start tokio runtime on current thread");
-            self.0.block_on(&rt, main_future)
-        }
-    }
-
-    impl Drop for LocalExecutor {
-        fn drop(&mut self) {
-            LOCAL_EXECUTOR.with(|e| e.borrow_mut().take());
+            self.local_set.block_on(&self.runtime.runtime, main_future)
         }
     }
 
@@ -282,6 +292,12 @@ pub mod executor {
     /// (as the underlying executor is not yet capable of this).
     pub struct TestExecutor {
         executor: LocalExecutor,
+    }
+
+    impl Default for TestExecutor {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl TestExecutor {
@@ -354,7 +370,7 @@ pub mod timer {
 
     impl From<crate::MonotonicInstant> for Timer {
         fn from(instant: crate::MonotonicInstant) -> Self {
-            Timer { inner: None, deadline: instant.into() }
+            Timer { inner: None, deadline: instant }
         }
     }
 
@@ -366,5 +382,50 @@ pub mod timer {
             }
             self.inner.as_mut().unwrap().poll_unpin(cx).map(drop)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::executor::{LocalExecutor, SendExecutor};
+    use super::task::Task;
+
+    struct SpawnOnDrop(bool);
+
+    impl Drop for SpawnOnDrop {
+        fn drop(&mut self) {
+            let fut = async move {
+                panic!("should not run on drop");
+            };
+            if self.0 {
+                Task::local(fut).detach();
+            } else {
+                Task::spawn(fut).detach();
+            }
+        }
+    }
+
+    #[test]
+    fn local_exec_spawn_local_on_drop() {
+        let exec = LocalExecutor::new();
+        let bomb = SpawnOnDrop(true);
+        Task::local(async move { drop(bomb) }).detach();
+        drop(exec);
+    }
+
+    #[test]
+    fn local_exec_spawn_on_drop() {
+        let exec = LocalExecutor::new();
+        let bomb = SpawnOnDrop(false);
+        Task::spawn(async move { drop(bomb) }).detach();
+        drop(exec);
+    }
+
+    #[test]
+    fn send_exec_spawn_on_drop() {
+        let exec = SendExecutor::new(2);
+        let bomb = SpawnOnDrop(false);
+        Task::spawn(async move { drop(bomb) }).detach();
+        drop(exec);
     }
 }

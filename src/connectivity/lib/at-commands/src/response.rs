@@ -7,7 +7,7 @@
 use crate::highlevel;
 
 /// Responses and indications.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Response {
     /// The success indication.  Its format is described in HFP v1.8 Section 4.34.1, and it is
     /// used throughout the spec.
@@ -26,7 +26,7 @@ pub enum Response {
 }
 
 // Hardedcoded error indications described in HFP v1.8 Section 4.34.2
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HardcodedError {
     NoCarrier,
     Busy,

@@ -4,16 +4,21 @@
 
 use anyhow::{format_err, Result};
 use at_commands as at;
+use log::info;
 
-use super::{at_cmd, at_ok, at_resp, CommandToHf, Procedure, ProcedureInput, ProcedureOutput};
+use super::{
+    at_cmd, at_ok, at_resp, CommandFromHf, CommandToHf, Procedure, ProcedureInput, ProcedureOutput,
+};
 
-use crate::features::{extract_features_from_command, AgFeatures, CVSD, MSBC};
+use crate::features::{extract_features_from_command, AgFeatures, HfFeatures};
 use crate::peer::ag_indicators::AgIndicatorIndex;
+use crate::peer::at_connection::Response as AtResponse;
 use crate::peer::hf_indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 #[derive(Debug, PartialEq)]
 pub enum State {
+    Starting,
     SentSupportedFeatures,         // Sent AT+BRSF, waiting for +BRSF.
     ReceivedSupportedFeatures,     // Received +BRSF, waiting for OK.
     SentAvailableCodecs,           // Sent AT+BAC, waiting for OK.
@@ -37,10 +42,6 @@ pub struct SlcInitProcedure {
 }
 
 impl SlcInitProcedure {
-    pub fn new() -> Self {
-        Self { state: State::SentSupportedFeatures }
-    }
-
     #[cfg(test)]
     pub fn start_at_state(state: State) -> Self {
         Self { state, ..SlcInitProcedure::new() }
@@ -49,6 +50,13 @@ impl SlcInitProcedure {
     #[cfg(test)]
     pub fn start_terminated() -> Self {
         Self { state: State::Terminated }
+    }
+
+    pub fn send_supported_hf_features(&mut self, hf_features: HfFeatures) -> Vec<ProcedureOutput> {
+        self.state = State::SentSupportedFeatures;
+        vec![ProcedureOutput::AtCommandToAg(at::Command::Brsf {
+            features: hf_features.bits() as i64,
+        })]
     }
 
     fn receive_supported_features(
@@ -66,10 +74,8 @@ impl SlcInitProcedure {
         state: &mut ProcedureManipulatedState,
     ) -> Vec<ProcedureOutput> {
         self.state = State::SentAvailableCodecs;
-        state.supported_codecs.push(MSBC);
-        // TODO(https://fxbug.dev/42081215) Make this configurable.
-        // By default, we support the CVSD and MSBC codecs.
-        vec![at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] })]
+        let codecs: Vec<i64> = state.supported_codecs.iter().map(|&c| c.into()).collect();
+        vec![at_cmd!(Bac { codecs })]
     }
 
     fn test_supported_ag_indicators(&mut self) -> Vec<ProcedureOutput> {
@@ -77,33 +83,24 @@ impl SlcInitProcedure {
         vec![at_cmd!(CindTest {})]
     }
 
-    fn receive_supported_ag_indicators(&mut self, _bytes: Vec<u8>) -> Vec<ProcedureOutput> {
-        // TODO(fxbug.dev/108331): Read actual indicator values by parsing raw bytes.
+    fn receive_supported_ag_indicators(
+        &mut self,
+        ordered_indicators: Vec<AgIndicatorIndex>,
+    ) -> Vec<ProcedureOutput> {
         self.state = State::ReceivedSupportedAgIndicators;
-        vec![
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::ServiceAvailable,
-                index: 1,
-            }
-            .into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Call, index: 2 }.into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::CallSetup, index: 3 }
-                .into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::CallHeld, index: 4 }
-                .into(),
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::SignalStrength,
-                index: 5,
-            }
-            .into(),
-            CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Roaming, index: 6 }
-                .into(),
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::BatteryCharge,
-                index: 7,
-            }
-            .into(),
-        ]
+
+        let outputs = ordered_indicators
+            .into_iter()
+            .enumerate()
+            .map(|(index, indicator)| {
+                let index: i64 =
+                    index.try_into().expect("Failed to fit AG indicator index into i64?");
+                // Indicator indices are 1-indexed
+                let index: i64 = index + 1;
+                CommandToHf::SetAgIndicatorIndex { indicator, index }.into()
+            })
+            .collect();
+        outputs
     }
 
     fn read_ag_indicator_statuses(&mut self) -> Vec<ProcedureOutput> {
@@ -111,9 +108,9 @@ impl SlcInitProcedure {
         vec![at_cmd!(CindRead {})]
     }
 
-    fn receive_ag_indicator_statuses(&mut self, cmd: at::Success) -> Vec<ProcedureOutput> {
+    fn receive_ag_indicator_statuses(&mut self, ordered_values: Vec<i64>) -> Vec<ProcedureOutput> {
         self.state = State::ReceivedAgIndicatorStatuses;
-        let output = convert_cind_to_hf_command(cmd);
+        let output = CommandToHf::SetInitialAgIndicatorValues { ordered_values }.into();
         vec![output]
     }
 
@@ -172,6 +169,7 @@ impl SlcInitProcedure {
     }
 
     fn terminate(&mut self) -> Vec<ProcedureOutput> {
+        info!("SLCI complete!");
         self.state = State::Terminated;
         vec![]
     }
@@ -179,7 +177,7 @@ impl SlcInitProcedure {
 
 impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
     fn new() -> Self {
-        Self { state: State::SentSupportedFeatures }
+        Self { state: State::Starting }
     }
 
     fn name(&self) -> &str {
@@ -201,6 +199,12 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
             ));
         }
         let outputs = match (&self.state, input) {
+            // Start by sending AT+BRSF ///////////////////////////////////////////////////////////
+            (
+                State::Starting,
+                ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features }),
+            ) => self.send_supported_hf_features(hf_features),
+
             // Sent AT+BRSF, waiting for +BRSF /////////////////////////////////////////////////////
             (State::SentSupportedFeatures, at_resp!(Brsf { features })) => {
                 self.receive_supported_features(state, features)
@@ -221,19 +225,16 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
             // Sent AT+CIND=?, waiting for +CIND: //////////////////////////////////////////////////
             (
                 State::TestedSupportedAgIndicators,
-                ProcedureInput::AtResponseFromAg(at::Response::RawBytes(bytes)),
-            ) => self.receive_supported_ag_indicators(bytes),
+                ProcedureInput::AtResponseFromAg(AtResponse::CindTest { ordered_indicators }),
+            ) => self.receive_supported_ag_indicators(ordered_indicators),
 
             // Received +CIND, waiting for OK /////////////////////////////////////////////////////
             (State::ReceivedSupportedAgIndicators, at_ok!()) => self.read_ag_indicator_statuses(),
 
             // Sent AT+CIND?, waiting for +CIND: ///////////////////////////////////////////////////
-            (
-                State::ReadAgIndicatorStatuses,
-                ProcedureInput::AtResponseFromAg(at::Response::Success(
-                    cmd @ at::Success::Cind { .. },
-                )),
-            ) => self.receive_ag_indicator_statuses(cmd),
+            (State::ReadAgIndicatorStatuses, at_resp!(CindRead { ordered_values })) => {
+                self.receive_ag_indicator_statuses(ordered_values)
+            }
 
             // Received +CIND:, waiting for OK /////////////////////////////////////////////////////
             (State::ReceivedAgIndicatorStatuses, at_ok!()) => {
@@ -278,9 +279,9 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
             // Sent AT+BIND?, waiting for +BIND: or OK /////////////////////////////////////////////
             (
                 State::ReadEnabledHfIndicators,
-                ProcedureInput::AtResponseFromAg(at::Response::Success(
+                ProcedureInput::AtResponseFromAg(AtResponse::Recognized(at::Response::Success(
                     cmd @ at::Success::BindStatus { .. },
-                )),
+                ))),
             ) => self.receive_enabled_hf_indicator(state, &cmd)?,
 
             // Sent AT+BIND?, waiting for +BIND: or OK /////////////////////////////////////////////
@@ -305,35 +306,15 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
     }
 }
 
-// Must be called with CIND.
-fn convert_cind_to_hf_command(cind: at::Success) -> ProcedureOutput {
-    let at::Success::Cind { service, call, callsetup, callheld, signal, roam, battchg } = cind
-    else {
-        panic!("convert_cind_to_hf_command called with non-CIND: {cind:?}");
-    };
-    // TODO(fxb/137097) We won't necessarily get the fields in this order, so we need to hand
-    // parse this +CIND.
-    CommandToHf::SetInitialAgIndicatorValues {
-        values: vec![
-            service as i64, // This should be fixed as part of hand-parsing the +CIND
-            call as i64,    // This should be fixed as part of hand-parsing the +CIND
-            callsetup,
-            callheld,
-            signal,
-            roam as i64, // This should be fixed as part of hand-parsing the +CIND
-            battchg,
-        ],
-    }
-    .into()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use crate::config::HandsFreeFeatureSupport;
     use crate::features::{CallHoldAction, HfFeatures};
+
     use assert_matches::assert_matches;
+    use bt_hfp::codec_id::CodecId;
 
     fn supported_indicator_indices_output(
         service_available: i64,
@@ -345,11 +326,6 @@ mod tests {
         battery_charge: i64,
     ) -> Vec<ProcedureOutput> {
         vec![
-            CommandToHf::SetAgIndicatorIndex {
-                indicator: AgIndicatorIndex::ServiceAvailable,
-                index: service_available,
-            }
-            .into(),
             CommandToHf::SetAgIndicatorIndex { indicator: AgIndicatorIndex::Call, index: call }
                 .into(),
             CommandToHf::SetAgIndicatorIndex {
@@ -377,29 +353,31 @@ mod tests {
                 index: battery_charge,
             }
             .into(),
+            CommandToHf::SetAgIndicatorIndex {
+                indicator: AgIndicatorIndex::ServiceAvailable,
+                index: service_available,
+            }
+            .into(),
         ]
     }
-
-    // TODO(fxb/71668) Stop using raw bytes.
-    const CIND_TEST_RESPONSE_BYTES: &[u8] = b"+CIND: \
-    (\"service\",(0,1)),\
-    (\"call\",(0,1)),\
-    (\"callsetup\",(0,3)),\
-    (\"callheld\",(0,2)),\
-    (\"signal\",(0,5)),\
-    (\"roam\",(0,1)),\
-    (\"battchg\",(0,5)\
-    )";
 
     #[fuchsia::test]
     /// Checks that the mandatory exchanges between the AG and HF roles properly progresses
     /// our state and sends the expected responses until our procedure it marked complete.
     fn slci_mandatory_exchanges_and_termination() {
         let mut procedure = SlcInitProcedure::new();
-        let config = HandsFreeFeatureSupport::default();
-        let mut state = ProcedureManipulatedState::new(config);
+        let hf_feature_support = HandsFreeFeatureSupport::default();
+        let mut state = ProcedureManipulatedState::new(hf_feature_support);
 
         assert!(!procedure.is_terminated());
+
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci {
+            hf_features: hf_feature_support.into(),
+        });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
 
         let response1 = at_resp!(Brsf { features: AgFeatures::default().bits() });
         let response1_ok = at_ok!();
@@ -408,16 +386,26 @@ mod tests {
         assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
         assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
 
-        let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
-        let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let response2 = ProcedureInput::AtResponseFromAg(AtResponse::CindTest {
+            ordered_indicators: vec![
+                AgIndicatorIndex::Call,
+                AgIndicatorIndex::CallSetup,
+                AgIndicatorIndex::CallHeld,
+                AgIndicatorIndex::SignalStrength,
+                AgIndicatorIndex::Roaming,
+                AgIndicatorIndex::BatteryCharge,
+                AgIndicatorIndex::ServiceAvailable,
+            ],
+        });
         let expected_output2 = supported_indicator_indices_output(
-            1, // service
-            2, // call
-            3, // callsetup
-            4, // callheld
-            5, // signal
-            6, // roam
-            7, // battchg
+            // Indices out of order to catch any assumptions about order.
+            7, // service
+            1, // call
+            2, // callsetup
+            3, // callheld
+            4, // signal
+            5, // roam
+            6, // battchg
         );
         let response2_ok = at_ok!();
         let expected_command2 = vec![at_cmd!(CindRead {})];
@@ -425,25 +413,27 @@ mod tests {
 
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = at_resp!(Cind {
-            service: false,
-            call: false,
-            callsetup: 0,
-            callheld: 0,
-            signal: 0,
-            roam: false,
-            battchg: 0,
+        let response3 = at_resp!(CindRead {
+            ordered_values: vec![
+                6, // service
+                5, // call
+                4, // callsetup
+                3, // callheld
+                2, // signal
+                1, // roam
+                7, // battchg
+            ]
         });
         let update3 =
             vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
-                values: vec![
-                    0, // service
-                    0, // call
-                    0, // callsetup
-                    0, // callheld
-                    0, // signal
-                    0, // roam
-                    0, // battchg
+                ordered_values: vec![
+                    6, // service
+                    5, // call
+                    4, // callsetup
+                    3, // callheld
+                    2, // signal
+                    1, // roam
+                    7, // battchg
                 ],
             })];
         let response3_ok = at_ok!();
@@ -474,6 +464,12 @@ mod tests {
         assert!(!state.hf_indicators.battery_level.0.enabled);
         assert!(!procedure.is_terminated());
 
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
+
         let response1 = at_resp!(Brsf { features: ag_features.bits() });
         let response1_ok = at_ok!();
         let expected_command1 = vec![at_cmd!(CindTest {})];
@@ -481,16 +477,26 @@ mod tests {
         assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
         assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
 
-        let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
-        let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let response2 = ProcedureInput::AtResponseFromAg(AtResponse::CindTest {
+            ordered_indicators: vec![
+                AgIndicatorIndex::Call,
+                AgIndicatorIndex::CallSetup,
+                AgIndicatorIndex::CallHeld,
+                AgIndicatorIndex::SignalStrength,
+                AgIndicatorIndex::Roaming,
+                AgIndicatorIndex::BatteryCharge,
+                AgIndicatorIndex::ServiceAvailable,
+            ],
+        });
         let expected_output2 = supported_indicator_indices_output(
-            1, // service
-            2, // call
-            3, // callsetup
-            4, // callheld
-            5, // signal
-            6, // roam
-            7, // battchg
+            // Indices out of order to catch any assumptions about order.
+            7, // service
+            1, // call
+            2, // callsetup
+            3, // callheld
+            4, // signal
+            5, // roam
+            6, // battchg
         );
         let response2_ok = at_ok!();
         let expected_command2 = vec![at_cmd!(CindRead {})];
@@ -498,25 +504,27 @@ mod tests {
         assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_output2);
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = at_resp!(Cind {
-            service: false,
-            call: false,
-            callsetup: 0,
-            callheld: 0,
-            signal: 0,
-            roam: false,
-            battchg: 0,
+        let response3 = at_resp!(CindRead {
+            ordered_values: vec![
+                6, // service
+                5, // call
+                4, // callsetup
+                3, // callheld
+                2, // signal
+                1, // roam
+                7, // battchg
+            ]
         });
         let expected_command3 =
             vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
-                values: vec![
-                    0, // service
-                    0, // call
-                    0, // callsetup
-                    0, // callheld
-                    0, // signal
-                    0, // roam
-                    0, // battchg
+                ordered_values: vec![
+                    6, // service
+                    5, // call
+                    4, // callsetup
+                    3, // callheld
+                    2, // signal
+                    1, // roam
+                    7, // battchg
                 ],
             })];
         let response3_ok = at_ok!();
@@ -573,9 +581,16 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
+
         let response1 = at_resp!(Brsf { features: ag_features.bits() });
         let response1_ok = at_ok!();
-        let expected_command1 = vec![at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] })];
+        let expected_command1 =
+            vec![at_cmd!(Bac { codecs: vec![CodecId::CVSD.into(), CodecId::MSBC.into()] })];
 
         assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
         assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
@@ -599,6 +614,12 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
+        let start_input = ProcedureInput::CommandFromHf(CommandFromHf::StartSlci { hf_features });
+        let hf_features_bitfield = state.hf_features.bits();
+        let expected_command0 = vec![at_cmd!(Brsf { features: hf_features_bitfield })];
+
+        assert_eq!(procedure.transition(&mut state, start_input).unwrap(), expected_command0);
+
         let response1 = at_resp!(Brsf { features: ag_features.bits() });
         let response1_ok = at_ok!();
         let expected_command1 = vec![at_cmd!(CindTest {})];
@@ -606,41 +627,53 @@ mod tests {
         assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
         assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
 
-        let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
-        let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let response2 = ProcedureInput::AtResponseFromAg(AtResponse::CindTest {
+            ordered_indicators: vec![
+                AgIndicatorIndex::Call,
+                AgIndicatorIndex::CallSetup,
+                AgIndicatorIndex::CallHeld,
+                AgIndicatorIndex::SignalStrength,
+                AgIndicatorIndex::Roaming,
+                AgIndicatorIndex::BatteryCharge,
+                AgIndicatorIndex::ServiceAvailable,
+            ],
+        });
         let expected_output2 = supported_indicator_indices_output(
-            1, // service
-            2, // call
-            3, // callsetup
-            4, // callheld
-            5, // signal
-            6, // roam
-            7, // battchg
+            // Indices out of order to catch any assumptions about order.
+            7, // service
+            1, // call
+            2, // callsetup
+            3, // callheld
+            4, // signal
+            5, // roam
+            6, // battchg
         );
         let response2_ok = at_ok!();
         let expected_command2 = vec![at_cmd!(CindRead {})];
         assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_output2);
         assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = at_resp!(Cind {
-            service: false,
-            call: false,
-            callsetup: 0,
-            callheld: 0,
-            signal: 0,
-            roam: false,
-            battchg: 0,
+        let response3 = at_resp!(CindRead {
+            ordered_values: vec![
+                6, // service
+                5, // call
+                4, // callsetup
+                3, // callheld
+                2, // signal
+                1, // roam
+                7, // battchg
+            ]
         });
         let update3 =
             vec![ProcedureOutput::CommandToHf(CommandToHf::SetInitialAgIndicatorValues {
-                values: vec![
-                    0, // service
-                    0, // call
-                    0, // callsetup
-                    0, // callheld
-                    0, // signal
-                    0, // roam
-                    0, // battchg
+                ordered_values: vec![
+                    6, // service
+                    5, // call
+                    4, // callsetup
+                    3, // callheld
+                    2, // signal
+                    1, // roam
+                    7, // battchg
                 ],
             })];
         let response3_ok = at_ok!();

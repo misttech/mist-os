@@ -24,15 +24,13 @@ impl FidlProtocol for Echo {
         }
     }
 
-    #[tracing::instrument(skip(self, _cx))]
     async fn start(&mut self, _cx: &Context) -> Result<()> {
-        tracing::debug!("started echo protocol");
+        log::debug!("started echo protocol");
         Ok(())
     }
 
-    #[tracing::instrument(skip(self, _cx))]
     async fn stop(&mut self, _cx: &Context) -> Result<()> {
-        tracing::debug!("stopped echo protocol");
+        log::debug!("stopped echo protocol");
         Ok(())
     }
 }

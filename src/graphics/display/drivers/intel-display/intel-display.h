@@ -288,13 +288,6 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   // completed.
   bool driver_initialized_ __TA_GUARDED(display_lock_) = false;
 
-  Gtt gtt_ __TA_GUARDED(gtt_lock_);
-  mutable fbl::Mutex gtt_lock_;
-  // These regions' VMOs are not owned
-  fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_images_ __TA_GUARDED(gtt_lock_);
-  // These regions' VMOs are owned
-  fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_gtt_regions_ __TA_GUARDED(gtt_lock_);
-
   // Pixel formats of imported images.
   std::unordered_map<display::DriverImageId, PixelFormatAndModifier> imported_image_pixel_formats_
       __TA_GUARDED(gtt_lock_);
@@ -308,7 +301,16 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   fbl::Mutex bar_lock_;
   // The mmio_space_ is read only. The internal registers are guarded by various locks where
   // appropriate.
+  //
+  // Must outlive `gtt_`.
   std::optional<fdf::MmioView> mmio_space_;
+
+  Gtt gtt_ __TA_GUARDED(gtt_lock_);
+  mutable fbl::Mutex gtt_lock_;
+  // These regions' VMOs are not owned
+  fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_images_ __TA_GUARDED(gtt_lock_);
+  // These regions' VMOs are owned
+  fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_gtt_regions_ __TA_GUARDED(gtt_lock_);
 
   std::optional<PchEngine> pch_engine_;
   std::unique_ptr<Power> power_;

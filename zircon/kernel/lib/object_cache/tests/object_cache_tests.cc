@@ -20,9 +20,9 @@
 #include <ktl/algorithm.h>
 #include <ktl/array.h>
 #include <ktl/atomic.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

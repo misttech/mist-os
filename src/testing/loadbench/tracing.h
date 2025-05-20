@@ -20,7 +20,7 @@
 
 class Tracing {
  public:
-  Tracing() { Stop(); }
+  Tracing();
 
   Tracing(const Tracing&) = delete;
   Tracing& operator=(const Tracing&) = delete;
@@ -28,7 +28,14 @@ class Tracing {
   Tracing(Tracing&&) = delete;
   Tracing& operator=(Tracing&&) = delete;
 
-  virtual ~Tracing() { Stop(); }
+  virtual ~Tracing() {
+    Stop();
+#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+    buffer_.reset();
+    buffer_capacity_ = 0;
+    buffer_size_ = 0;
+#endif
+  }
 
   struct DurationStats {
     uint64_t begin_ts_ns = 0;
@@ -92,6 +99,15 @@ class Tracing {
 
   zx_handle_t tracing_resource_ = GetTracingResource()->get();
   bool running_ = false;
+
+#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
+  // An intermediate heap allocated buffer used to store ktrace data.
+  std::unique_ptr<uint8_t[]> buffer_{nullptr};
+  // The capacity of buffer_.
+  size_t buffer_capacity_{0};
+  // The amount of data in the buffer.
+  size_t buffer_size_{0};
+#endif
 };
 
 #endif  // SRC_TESTING_LOADBENCH_TRACING_H_

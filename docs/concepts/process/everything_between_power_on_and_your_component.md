@@ -94,7 +94,8 @@ software.
 
 [Driver manager][glossary.driver manager] is the component responsible for finding
 hardware, running drivers to service the hardware, and exposing a handle for
-[devfs][devfs] to Fuchsia.
+[devfs][devfs] to Fuchsia. Devfs is being deprecated in favor of services,
+which a driver exposes directly. (see [Driver Communication][driver-communication])
 
 Drivers are run by [driver hosts][glossary.driver host], which are child processes that
 driver manager starts. Each driver is a dynamic library stored in either bootfs
@@ -169,6 +170,7 @@ component_manager.
 [component-manager]: /docs/concepts/components/v2/introduction.md#component-manager
 [critical-processes]: /reference/syscalls/job_set_critical.md
 [devfs]: /docs/development/drivers/concepts/device_driver_model/device-model.md
+[driver-communication]: /docs/concepts/drivers/driver_communication.md
 [driver-manager-exposes]: /src/devices/bin/driver_manager/meta/driver-manager-base.shard.cml?l=83&drc=2deafe53a4a1626b5be2263c13e3dd57024be7db
 [dynamic-linking]: https://en.wikipedia.org/wiki/Dynamic_linker
 [fs-mount]: /docs/concepts/filesystems/filesystems.md#mounting

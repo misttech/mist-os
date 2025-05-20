@@ -79,6 +79,33 @@ paddr_t root_lower_page_table_phys;
 
 namespace {
 
+// If lock is contended, limit harvesting to 32 entries per iteration with the
+// arch aspace lock held to avoid delays in accessed faults in the same aspace
+// running in parallel.
+//
+// This limit is derived from the following observations:
+// 1. Worst case runtime to harvest a terminal PTE on a low-end A53 is ~780ns.
+// 2. Real workloads can result in harvesting thousands of terminal PTEs in a
+//    single aspace.
+// 3. An access fault handler will spin up to 150us on the aspace adaptive
+//    mutex before blocking.
+// 4. Unnecessarily blocking is costly when the system is heavily loaded,
+//    especially during accessed faults, which tend to occur multiple times in
+//    quick succession within and across threads in the same process.
+//
+// To achieve optimal contention between access harvesting and access faults,
+// it is important to avoid exhausting the 150us mutex spin phase by holding
+// the aspace mutex for too long. The selected entry limit results in a worst
+// case harvest time of about 1/6 of the mutex spin phase.
+//
+//   Ti = worst case runtime per top-level harvest iteration.
+//   Te = worst case runtime per terminal entry harvest.
+//   L  = max entries per top-level harvest iteration.
+//
+//   Ti = Te * L = 780ns * 32 = 24.96us
+//
+constexpr size_t kHarvestEntriesBetweenUnlocks = 32;
+
 // Whether ASID use is enabled.
 bool feat_asid_enabled;
 
@@ -842,8 +869,10 @@ void ArmArchVmAspace::FlushAsid() const {
   __UNREACHABLE;
 }
 
+using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
 ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
-    VirtualAddressCursor& cursor, EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+    VirtualAddressCursor& cursor, ArchUnmapOptions unmap_options, CheckForEmptyPt pt_check,
     const uint index_shift, volatile pte_t* page_table, ConsistencyManager& cm, Reclaim reclaim) {
   const vaddr_t block_size = 1UL << index_shift;
   const uint num_entries = (1u << (page_size_shift_ - 3));
@@ -865,14 +894,14 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
         (!IS_ALIGNED(cursor.vaddr_rel(), block_size) || cursor.size() < block_size)) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure we are permitted to do that.
-      if (!allow_bbm && enlarge != EnlargeOperation::Yes) {
+      if (!allow_bbm && !(unmap_options & ArchUnmapOptions::Enlarge)) {
         return {ZX_ERR_NOT_SUPPORTED, unmapped};
       }
       zx_status_t s = SplitLargePage(cursor.vaddr(), index_shift, index, page_table, cm);
       if (unlikely(s != ZX_OK)) {
         // If split fails, just unmap the whole thing, and let a
         // subsequent page fault clean it up.
-        if (enlarge == EnlargeOperation::No) {
+        if (unmap_options == ArchUnmapOptions::None) {
           return {s, unmapped};
         }
         // We must unmap here, and not in the normal block below, so that we can use SkipEntry
@@ -899,7 +928,7 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
       // pass to remove a PT.
       const vaddr_t unmap_vaddr = cursor.vaddr();
       auto [status, lower_unmapped] =
-          UnmapPageTable(cursor, enlarge, pt_check, index_shift - (page_size_shift_ - 3),
+          UnmapPageTable(cursor, unmap_options, pt_check, index_shift - (page_size_shift_ - 3),
                          next_page_table, cm, reclaim);
       bool unmap_lower = false;
       // Regardless of success or failure we must update the mapping count. Since this involves
@@ -935,6 +964,16 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
       LTRACEF("pte %p[0x%x] = 0 (was phys %#lx)\n", page_table, index,
               page_table[index] & MMU_PTE_OUTPUT_ADDR_MASK);
       update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
+
+      if (!!(unmap_options & ArchUnmapOptions::Harvest)) {
+        const paddr_t pte_addr = pte & MMU_PTE_OUTPUT_ADDR_MASK;
+        const paddr_t paddr = pte_addr + (cursor.vaddr_rel() & (block_size - 1));
+        vm_page_t* page = paddr_to_vm_page(paddr);
+        if (likely(page) && (pte & MMU_PTE_ATTR_AF)) {
+          pmm_page_queues()->MarkAccessed(page);
+        }
+      }
+
       unmapped++;
       cm.FlushEntry(cursor.vaddr(), true);
       cursor.Consume(block_size);
@@ -1090,7 +1129,7 @@ ktl::pair<zx_status_t, uint> ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro,
 }
 
 zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
-                                              size_t size_in, pte_t attrs, EnlargeOperation enlarge,
+                                              size_t size_in, pte_t attrs, ArchUnmapOptions enlarge,
                                               const uint index_shift, volatile pte_t* page_table,
                                               ConsistencyManager& cm) {
   vaddr_t vaddr = vaddr_in;
@@ -1120,7 +1159,7 @@ zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_re
         chunk_size != block_size) {
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure that is permitted.
-      if (!allow_bbm && enlarge != EnlargeOperation::Yes) {
+      if (!allow_bbm && !(enlarge & ArchUnmapOptions::Enlarge)) {
         return ZX_ERR_NOT_SUPPORTED;
       }
       zx_status_t s = SplitLargePage(vaddr, index_shift, index, page_table, cm);
@@ -1246,7 +1285,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
           DEBUG_ASSERT(result);
         }
         auto [result, lower_unmapped] =
-            UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::No,
+            UnmapPageTable(unmap_cursor, ArchUnmapOptions::None, CheckForEmptyPt::No,
                            index_shift - (page_size_shift_ - 3), next_page_table, cm, Reclaim::Yes);
         ASSERT(result == ZX_OK);
         if (!lower_page) {
@@ -1295,8 +1334,18 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
     // for too long. However, the remaining limit balance is updated at the end
     // of the loop to ensure that harvesting makes progress, even if the initial
     // limit is too small to reach a terminal PTE.
-    if (*entry_limit > 0) {
+    if (*entry_limit > 1) {
       *entry_limit -= 1;
+    } else if (!lock_.lock().IsContested() && pending_access_faults_.load() == 0) {
+      // The entry_limit is either about to be, or already is, 0, but since the lock is not
+      // contended and there are no access faults in progress, we can reset the counter and perform
+      // another block of work before checking again.
+      *entry_limit = kHarvestEntriesBetweenUnlocks;
+    } else {
+      // This either changes the entry_limit from 1->0, or is a no-op if it was already 0. As the
+      // lock is contested this ensures we'll break out back to the parent scope where the lock can
+      // be dropped.
+      *entry_limit = 0;
     }
   }
 
@@ -1347,7 +1396,7 @@ void ArmArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in,
 }
 
 zx_status_t ArmArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs,
-                                          EnlargeOperation enlarge, vaddr_t vaddr_base,
+                                          ArchUnmapOptions enlarge, vaddr_t vaddr_base,
                                           ConsistencyManager& cm) {
   vaddr_t vaddr_rel = vaddr - vaddr_base;
   vaddr_t vaddr_rel_max = 1UL << top_size_shift_;
@@ -1406,6 +1455,9 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
   if (!(mmu_flags & ARCH_MMU_FLAG_PERM_READ)) {
     return ZX_ERR_INVALID_ARGS;
   }
+  if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) && arch_mmu_flags_uncached(mmu_flags)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   // paddr and vaddr must be aligned.
   DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
@@ -1445,12 +1497,12 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, ExistingEntryAction::Error, cursor, cm);
     tt_page_->mmu.num_mappings += lower_mapped;
-    MarkAspaceModified();
+    accessed_since_last_check_ = true;
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
         auto [unmap_status, unmapped] =
-            UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
+            UnmapPageTable(unmap_cursor, ArchUnmapOptions::None, CheckForEmptyPt::Yes,
                            top_index_shift_, tt_virt_, cm, Reclaim::No);
         DEBUG_ASSERT(unmap_status == ZX_OK);
         tt_page_->mmu.num_mappings -= unmapped;
@@ -1494,6 +1546,9 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   if (!(mmu_flags & ARCH_MMU_FLAG_PERM_READ)) {
     return ZX_ERR_INVALID_ARGS;
   }
+  if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) && arch_mmu_flags_uncached(mmu_flags)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   // vaddr must be aligned.
   DEBUG_ASSERT(IS_PAGE_ALIGNED(vaddr));
@@ -1530,12 +1585,12 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, existing_action, cursor, cm);
     tt_page_->mmu.num_mappings += lower_mapped;
-    MarkAspaceModified();
+    accessed_since_last_check_ = true;
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
         auto [unmap_status, unmapped] =
-            UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
+            UnmapPageTable(unmap_cursor, ArchUnmapOptions::None, CheckForEmptyPt::Yes,
                            top_index_shift_, tt_virt_, cm, Reclaim::No);
         DEBUG_ASSERT(unmap_status == ZX_OK);
         tt_page_->mmu.num_mappings -= unmapped;
@@ -1561,7 +1616,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   return ZX_OK;
 }
 
-zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions unmap_options,
                                    size_t* unmapped) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
@@ -1587,10 +1642,9 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation
   if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  auto [ret, lower_unmapped] = UnmapPageTable(cursor, enlarge, CheckForEmptyPt::No,
+  auto [ret, lower_unmapped] = UnmapPageTable(cursor, unmap_options, CheckForEmptyPt::No,
                                               top_index_shift_, tt_virt_, cm, Reclaim::No);
   tt_page_->mmu.num_mappings -= lower_unmapped;
-  MarkAspaceModified();
 
   DEBUG_ASSERT(cursor.size() == 0 || ret != ZX_OK);
 
@@ -1602,7 +1656,7 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation
 }
 
 zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                                     EnlargeOperation enlarge) {
+                                     ArchUnmapOptions enlarge) {
   canary_.Assert();
 
   if (!IsValidVaddr(vaddr)) {
@@ -1616,13 +1670,16 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
   if (!(mmu_flags & ARCH_MMU_FLAG_PERM_READ)) {
     return ZX_ERR_INVALID_ARGS;
   }
+  if ((mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) && arch_mmu_flags_uncached(mmu_flags)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
 
   // The stage 2 data and instructions aborts do not contain sufficient information for us to
   // resolve permission faults, and these kinds of faults generate a hard error. As such we cannot
   // safely perform protections and instead upgrade any protect to a complete unmap, therefore
   // causing a regular translation fault that we can handle to repopulate the correct mapping.
   if (type_ == ArmAspaceType::kGuest) {
-    return Unmap(vaddr, count, EnlargeOperation::Yes, nullptr);
+    return Unmap(vaddr, count, ArchUnmapOptions::Enlarge, nullptr);
   }
 
   Guard<CriticalMutex> a{&lock_};
@@ -1655,7 +1712,6 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
 
     ConsistencyManager cm(*this);
     ret = ProtectPages(vaddr, count * PAGE_SIZE, attrs, enlarge, vaddr_base_, cm);
-    MarkAspaceModified();
   }
 
   return ret;
@@ -1676,7 +1732,6 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   // work performed with the lock held and preemption disabled is limited. Other
   // O(n) operations under this lock are opt-in by the user (e.g. Map, Protect)
   // and are performed with preemption enabled.
-  Guard<CriticalMutex> guard{&lock_};
 
   const vaddr_t vaddr_rel = vaddr - vaddr_base_;
   const vaddr_t vaddr_rel_max = 1UL << top_size_shift_;
@@ -1691,65 +1746,34 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
 
   LOCAL_KTRACE("mmu harvest accessed", ("vaddr", vaddr), ("size", size));
 
-  // Limit harvesting to 32 entries per iteration with the arch aspace lock held
-  // to avoid delays in accessed faults in the same aspace running in parallel.
-  //
-  // This limit is derived from the following observations:
-  // 1. Worst case runtime to harvest a terminal PTE on a low-end A53 is ~780ns.
-  // 2. Real workloads can result in harvesting thousands of terminal PTEs in a
-  //    single aspace.
-  // 3. An access fault handler will spin up to 150us on the aspace adaptive
-  //    mutex before blocking.
-  // 4. Unnecessarily blocking is costly when the system is heavily loaded,
-  //    especially during accessed faults, which tend to occur multiple times in
-  //    quick succession within and across threads in the same process.
-  //
-  // To achieve optimal contention between access harvesting and access faults,
-  // it is important to avoid exhausting the 150us mutex spin phase by holding
-  // the aspace mutex for too long. The selected entry limit results in a worst
-  // case harvest time of about 1/6 of the mutex spin phase.
-  //
-  //   Ti = worst case runtime per top-level harvest iteration.
-  //   Te = worst case runtime per terminal entry harvest.
-  //   L  = max entries per top-level harvest iteration.
-  //
-  //   Ti = Te * L = 780ns * 32 = 24.96us
-  //
-  const size_t kMaxEntriesPerIteration = 32;
-
   size_t remaining_size = size;
   vaddr_t current_vaddr = vaddr;
   vaddr_t current_vaddr_rel = vaddr_rel;
 
   while (remaining_size) {
-    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
-        LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
-    size_t entry_limit = kMaxEntriesPerIteration;
-    // The consistency manager must be scoped narrowly here as it is incorrect keep it alive without
-    // the lock held, which we will drop later on.
-    {
-      ConsistencyManager cm(*this);
-      const size_t harvested_size = HarvestAccessedPageTable(
-          &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
-          non_terminal_action, terminal_action, tt_virt_, cm);
-      DEBUG_ASSERT(harvested_size > 0);
-      DEBUG_ASSERT(harvested_size <= remaining_size);
-
-      remaining_size -= harvested_size;
-      current_vaddr += harvested_size;
-      current_vaddr_rel += harvested_size;
-    }
-
     // Release and re-acquire the lock to let contending threads have a chance
     // to acquire the arch aspace lock between iterations. Use arch::Yield() to
     // give other CPUs spinning on the aspace mutex a slight edge in acquiring
     // the mutex. Reenable preemption to flush any pending preemptions that may
     // have pended during the critical section.
-    guard.CallUnlocked([this] {
-      while (pending_access_faults_.load() != 0) {
-        arch::Yield();
-      }
-    });
+    Guard<CriticalMutex> guard{&lock_};
+    if (pending_access_faults_.load() != 0) {
+      arch::Yield();
+      continue;
+    }
+    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
+        LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
+    size_t entry_limit = kHarvestEntriesBetweenUnlocks;
+    ConsistencyManager cm(*this);
+    const size_t harvested_size = HarvestAccessedPageTable(
+        &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
+        non_terminal_action, terminal_action, tt_virt_, cm);
+    DEBUG_ASSERT(harvested_size > 0);
+    DEBUG_ASSERT(harvested_size <= remaining_size);
+
+    remaining_size -= harvested_size;
+    current_vaddr += harvested_size;
+    current_vaddr_rel += harvested_size;
   }
 
   return ZX_OK;
@@ -1782,26 +1806,18 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   ConsistencyManager cm(*this);
 
   MarkAccessedPageTable(vaddr, vaddr_rel, size, top_index_shift_, tt_virt_, cm);
-  MarkAspaceModified();
+  accessed_since_last_check_ = true;
 
   return ZX_OK;
 }
 
-bool ArmArchVmAspace::ActiveSinceLastCheck(bool clear) {
-  // Read whether any CPUs are presently executing.
-  bool currently_active = num_active_cpus_.load(ktl::memory_order_relaxed) != 0;
-  // Exchange the current notion of active, with the previously active information. This is the only
-  // time a |false| value can potentially be written to active_since_last_check_, and doing an
-  // exchange means we can never 'lose' a |true| value.
-  bool previously_active =
-      clear ? active_since_last_check_.exchange(currently_active, ktl::memory_order_relaxed)
-            : active_since_last_check_.load(ktl::memory_order_relaxed);
-  // Return whether we had previously been active. It is not necessary to also consider whether we
-  // are currently active, since activating would also have active_since_last_check_ to true. In the
-  // scenario where we race and currently_active is true, but we observe previously_active to be
-  // false, this means that as of the start of this function ::ContextSwitch had not completed, and
-  // so this aspace is still not actually active.
-  return previously_active;
+bool ArmArchVmAspace::AccessedSinceLastCheck(bool clear) {
+  Guard<CriticalMutex> guard{&lock_};
+  const bool accessed = accessed_since_last_check_;
+  if (clear) {
+    accessed_since_last_check_ = false;
+  }
+  return accessed;
 }
 
 zx_status_t ArmArchVmAspace::Init() {
@@ -2252,13 +2268,6 @@ void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace
     [[maybe_unused]] uint32_t prev =
         aspace->num_active_cpus_.fetch_add(1, ktl::memory_order_relaxed);
     DEBUG_ASSERT(prev < SMP_MAX_CPUS);
-    aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
-    // If we are switching to a unified aspace, we need to mark the associated shared and
-    // restricted aspaces as active since the last check as well.
-    if (aspace->IsUnified()) {
-      aspace->shared_aspace_->MarkAspaceModified();
-      aspace->restricted_aspace_->MarkAspaceModified();
-    }
   } else {
     // Switching to the null aspace, which means kernel address space only.
     // Load a null TTBR0 and disable page table walking for user space.

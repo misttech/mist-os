@@ -227,7 +227,6 @@ struct WireTypeForNaturalType<::test_typesinprotocols::Table> {
 };
 
 #ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_typesinprotocols::wire::ResourceTable, ::test_typesinprotocols::ResourceTable> {
   static ::test_typesinprotocols::ResourceTable ToNatural(::test_typesinprotocols::wire::ResourceTable src);
@@ -481,10 +480,6 @@ template <>
 struct WireTypeForNaturalType<::test_typesinprotocols::ProtocolErrorResourceResult> {
   using type = ::test_typesinprotocols::wire::ProtocolErrorResourceResult;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic>, ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>> {

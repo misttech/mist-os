@@ -18,7 +18,12 @@ pub struct Attributes {
 impl Attributes {
     /// Get the doc string from the attributes, if any.
     pub fn doc_string(&self) -> Option<&str> {
-        Some(self.attributes.get("doc")?.args.get("value")?.value.value.as_str())
+        self.get("doc")
+    }
+
+    /// Get an attribute value, if any.
+    pub fn get(&self, name: &str) -> Option<&str> {
+        Some(self.attributes.get(name)?.args.get("value")?.value.value.as_str())
     }
 }
 

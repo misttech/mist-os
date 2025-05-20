@@ -18,8 +18,8 @@
 #include <string_view>
 
 #include "allocator.h"
-#include "bootstrap.h"
 #include "posix.h"
+#include "startup-bootstrap.h"
 #include "startup-diagnostics.h"
 
 namespace ld {
@@ -67,7 +67,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
     // handling command line args for various behavior options and for the name
     // of an executable to load as if it had been executed with a PT_INTERP
     // pointing at this dynamic linker.
-    diag.FormatError("dynamic linker executed directly, not via PT_INTERP");
+    diag.SystemError("dynamic linker executed directly, not via PT_INTERP");
     __builtin_trap();
   }
 
@@ -141,6 +141,7 @@ std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData&
       StartupModule::NeededCountObserver(needed_count),
       StartupModule::PreinitObserver(preinit_array)));
   mutable_abi.preinit_array = preinit_array;
+  mutable_abi.stack_size = phdr_info->stack_size.value_or(0);
 
   return {main_executable, needed_count};
 }
@@ -202,10 +203,7 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
       DiagnosticsReport(startup),
       elfldltl::DiagnosticsPanicFlags{},
   };
-
-  BootstrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
-  BootstrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
-  CompleteBootstrapModule(self_module.module, startup.page_size);
+  StartupBootstrap bootstrap{bootstrap_diag, vdso, startup.page_size};
 
   // Check for the LD_DEBUG environment variable.
   for (char** ep = startup.envp; *ep; ++ep) {
@@ -240,8 +238,8 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
     return {};
   };
 
-  StartupModule::LinkModules(diag, scratch, initial_exec, main_executable, open_file,
-                             {vdso_module, self_module}, needed_count, startup.page_size);
+  StartupModule::LinkModules(diag, scratch, initial_exec, main_executable, open_file, bootstrap,
+                             needed_count, startup.page_size);
 
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);

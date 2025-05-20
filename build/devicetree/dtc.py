@@ -8,11 +8,9 @@ import re
 import subprocess
 import sys
 
-"""
-(filename):(line number).(starting character)-(end character)[: ](error message)
-Warnings do not have a prefix, but Errors do. This is managed by the non-capturing
-group at the front.
-"""
+# (filename):(line number).(starting character)-(end character)[: ](error message)
+# Warnings do not have a prefix, but Errors do. This is managed by the non-capturing
+# group at the front.
 TARGET_REGEX = r"(?:Error: )?(.*?):(\d+)\.(\d+)-\d+[: ]\s?(.*)$"
 LINES_OF_CONTEXT = 5
 LINENUM_WIDTH = 6  # 5 digits plus :
@@ -50,7 +48,7 @@ def print_dtc_stderr(dtc_stderr: str) -> None:
 
             src_lines = []
             try:
-                with open(dts_file, "r") as f:
+                with open(dts_file, "r", encoding="ascii") as f:
                     src_lines = f.readlines()
             except FileNotFoundError:
                 print(f"Error: '{dts_file}' not found.", file=sys.stderr)
@@ -76,7 +74,16 @@ def print_dtc_stderr(dtc_stderr: str) -> None:
     print()
 
 
-def dts_compile(args: argparse.Namespace, extra_dtc_args: list[str]) -> int:
+def dts_compile(args: argparse.Namespace, extra_dtc_args: list[str]) -> bool:
+    """Compiles a dts to a dtbo and processes any output.
+    Args:
+        args: Necessary dtc args.
+        extra_dtc_args: Additional dtc args that can be optionally provided in devicetree targets.
+
+    Returns:
+        True if there were any errors or warnings.
+        False if successful.
+    """
     # dtc [options] <input_file>
     cmd_args = [
         args.dtc_path,
@@ -87,38 +94,54 @@ def dts_compile(args: argparse.Namespace, extra_dtc_args: list[str]) -> int:
     cmd_args.extend(
         ["--include=" + line.strip() for line in args.includes_file]
     )
-    # extra_dtc_args can be optionally provided in devicetree targets
-    if extra_dtc_args:
-        cmd_args.extend(extra_dtc_args)
+    cmd_args.extend(extra_dtc_args)
     cmd_args.append(args.src_file)
 
-    command = subprocess.run(cmd_args, capture_output=True, text=True)
+    command = subprocess.run(
+        cmd_args, capture_output=True, text=True, check=False
+    )
+
     if command.returncode or command.stderr:
         print("%s" % "\r\n\t".join(command.args), file=sys.stderr)
         print_dtc_stderr(command.stderr)
+        return True
 
-    return command.returncode
+    return False
 
 
-def dtb_decompile(args: argparse.Namespace) -> int:
+def dtb_decompile(args: argparse.Namespace, extra_dtc_args: list[str]) -> bool:
+    """Decompiles dtb to dts.
+    Args:
+        args: Necessary dtc args.
+        extra_dtc_args: Additional dtc args that can be optionally provided in devicetree targets.
+
+    Returns:
+        True if there were any errors or warnings.
+        False if successful.
+    """
     cmd_args = [
         args.dtc_path,
         "--sort",
         "--in-format=dtb",
         "--out-format=dts",
         "--out=" + args.dest_file,
-        args.src_file,
     ]
+    cmd_args.extend(extra_dtc_args)
+    cmd_args.append(args.src_file)
 
-    command = subprocess.run(cmd_args, capture_output=True, text=True)
+    command = subprocess.run(
+        cmd_args, capture_output=True, text=True, check=False
+    )
     if command.returncode or command.stderr:
         print("%s" % "\r\n\t".join(command.args), file=sys.stderr)
         print_dtc_stderr(command.stderr)
+        return True
 
-    return command.returncode
+    return False
 
 
 def main() -> int:
+    """Handles argument parsing and then either compiles dts -> dtbo or decompiles dtb -> dts"""
     parser = argparse.ArgumentParser(prog="dtc.py")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -141,13 +164,9 @@ def main() -> int:
     decompile_parser.add_argument("dest_file", help="dts path")
 
     py_args, extra_dtc_args = parser.parse_known_args()
-    if py_args.command == "compile":
-        return dts_compile(py_args, extra_dtc_args)
-    elif py_args.command == "decompile":
-        return dtb_decompile(py_args)
-
-    # This should be unreachable with argparse requiring {compile, decompile}
-    return 1
+    if py_args.command == "decompile":
+        return dtb_decompile(py_args, extra_dtc_args)
+    return dts_compile(py_args, extra_dtc_args)
 
 
 if __name__ == "__main__":

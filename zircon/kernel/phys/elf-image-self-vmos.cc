@@ -7,7 +7,7 @@
 #include <lib/llvm-profdata/llvm-profdata.h>
 #include <zircon/assert.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <phys/elf-image.h>
 #include <phys/symbolize.h>
 

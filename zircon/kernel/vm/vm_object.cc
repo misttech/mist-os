@@ -18,7 +18,7 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>
@@ -369,9 +369,11 @@ void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, Ra
       VmMapping& m = *node;
       m.assert_object_lock();
       if (op == RangeChangeOp::Unmap) {
-        m.AspaceUnmapLockedObject(offset, len, false);
+        m.AspaceUnmapLockedObject(offset, len, VmMapping::UnmapOptions::kNone);
       } else if (op == RangeChangeOp::UnmapZeroPage) {
-        m.AspaceUnmapLockedObject(offset, len, true);
+        m.AspaceUnmapLockedObject(offset, len, VmMapping::UnmapOptions::OnlyHasZeroPages);
+      } else if (op == RangeChangeOp::UnmapAndHarvest) {
+        m.AspaceUnmapLockedObject(offset, len, VmMapping::UnmapOptions::Harvest);
       } else if (op == RangeChangeOp::RemoveWrite) {
         m.AspaceRemoveWriteLockedObject(offset, len);
       } else if (op == RangeChangeOp::DebugUnpin) {

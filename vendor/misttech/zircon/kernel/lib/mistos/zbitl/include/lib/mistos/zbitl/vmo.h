@@ -14,10 +14,10 @@
 
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/numeric.h>
 #include <ktl/optional.h>
-#include <ktl/pair.h>
+#include <ktl/utility.h>
 #include <ktl/string_view.h>
 #include <ktl/type_traits.h>
 

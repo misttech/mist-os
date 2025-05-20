@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::execution::notify_debugger_of_module_list;
+use crate::mm::debugger::notify_debugger_of_module_list;
 use crate::mm::{
     DesiredAddress, FutexKey, IOVecPtr, MappingName, MappingOptions, MemoryAccessorExt,
     MremapFlags, PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
@@ -21,7 +21,7 @@ use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::SyscallArg;
 use starnix_types::time::{duration_from_timespec, time_from_timespec, timespec_from_time};
 use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
-use starnix_uapi::errors::{Errno, EINTR};
+use starnix_uapi::errors::{Errno, EINTR, ENOMEM};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
@@ -159,7 +159,7 @@ where
         track_stub!(TODO("https://fxbug.dev/406377606"), "MAP_LOCKED");
     }
 
-    security::mmap_file(current_task, &file, prot_flags, options)?;
+    security::mmap_file(current_task, file.as_ref(), prot_flags, options)?;
 
     if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(CATEGORY_STARNIX_MM, c"AnonymousMmap");
@@ -200,7 +200,12 @@ pub fn sys_mprotect(
         track_stub!(TODO("https://fxbug.dev/322874672"), "mprotect parse protection", prot);
         errno!(EINVAL)
     })?;
-    current_task.mm().ok_or_else(|| errno!(EINVAL))?.protect(addr, length, prot_flags)?;
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.protect(
+        current_task,
+        addr,
+        length,
+        prot_flags,
+    )?;
     Ok(())
 }
 
@@ -250,8 +255,9 @@ pub fn sys_msync(
     // use msync as a way to probe whether a page is mapped or not.
     mm.ensure_mapped(addr, length)?;
 
-    // gvisor mlock tests rely on returning EBUSY from msync on locked ranges.
-    if flags & MS_INVALIDATE != 0 && mm.state.read().num_locked_bytes(addr..addr + length) > 0 {
+    let addr_end = (addr + length).map_err(|_| Errno::new(ENOMEM))?;
+    if flags & MS_INVALIDATE != 0 && mm.state.read().num_locked_bytes(addr..addr_end) > 0 {
+        // gvisor mlock tests rely on returning EBUSY from msync on locked ranges.
         return error!(EBUSY);
     }
 
@@ -799,10 +805,12 @@ mod arch32 {
 
     pub use super::{
         sys_futex as sys_arch32_futex, sys_madvise as sys_arch32_madvise,
-        sys_mincore as sys_arch32_mincore, sys_mlock as sys_arch32_mlock,
-        sys_mlock2 as sys_arch32_mlock2, sys_mlockall as sys_arch32_mlockall,
-        sys_mremap as sys_arch32_mremap, sys_msync as sys_arch32_msync,
-        sys_munlock as sys_arch32_munlock, sys_munlockall as sys_arch32_munlockall,
+        sys_membarrier as sys_arch32_membarrier, sys_mincore as sys_arch32_mincore,
+        sys_mlock as sys_arch32_mlock, sys_mlock2 as sys_arch32_mlock2,
+        sys_mlockall as sys_arch32_mlockall, sys_mremap as sys_arch32_mremap,
+        sys_msync as sys_arch32_msync, sys_munlock as sys_arch32_munlock,
+        sys_munlockall as sys_arch32_munlockall,
+        sys_process_mrelease as sys_arch32_process_mrelease,
         sys_process_vm_readv as sys_arch32_process_vm_readv,
         sys_userfaultfd as sys_arch32_userfaultfd,
     };
@@ -950,7 +958,12 @@ mod tests {
         let mapped_address =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert_eq!(
-            sys_munmap(&mut locked, &current_task, mapped_address + 1u64, *PAGE_SIZE as usize),
+            sys_munmap(
+                &mut locked,
+                &current_task,
+                (mapped_address + 1u64).unwrap(),
+                *PAGE_SIZE as usize
+            ),
             error!(EINVAL)
         );
 
@@ -973,7 +986,7 @@ mod tests {
         // Verify that memory can't be read in either half of the page.
         assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert_eq!(
-            current_task.read_memory_to_array::<5>(mapped_address + (*PAGE_SIZE - 2)),
+            current_task.read_memory_to_array::<5>((mapped_address + (*PAGE_SIZE - 2)).unwrap()),
             error!(EFAULT)
         );
     }
@@ -993,7 +1006,7 @@ mod tests {
         // Verify that neither page is readable.
         assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert_eq!(
-            current_task.read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64),
+            current_task.read_memory_to_array::<5>((mapped_address + (*PAGE_SIZE + 1u64)).unwrap()),
             error!(EFAULT)
         );
     }
@@ -1012,7 +1025,9 @@ mod tests {
 
         // Verify that the second page is still readable.
         assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
-        assert!(current_task.read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64).is_ok());
+        assert!(current_task
+            .read_memory_to_array::<5>((mapped_address + (*PAGE_SIZE + 1u64)).unwrap())
+            .is_ok());
     }
 
     /// Unmap the middle page of a mapping.
@@ -1026,7 +1041,7 @@ mod tests {
             sys_munmap(
                 &mut locked,
                 &current_task,
-                mapped_address + *PAGE_SIZE,
+                (mapped_address + *PAGE_SIZE).unwrap(),
                 *PAGE_SIZE as usize
             ),
             Ok(())
@@ -1034,8 +1049,13 @@ mod tests {
 
         // Verify that the first and third pages are still readable.
         assert!(current_task.read_memory_to_vec(mapped_address, 5).is_ok());
-        assert_eq!(current_task.read_memory_to_vec(mapped_address + *PAGE_SIZE, 5), error!(EFAULT));
-        assert!(current_task.read_memory_to_vec(mapped_address + (*PAGE_SIZE * 2), 5).is_ok());
+        assert_eq!(
+            current_task.read_memory_to_vec((mapped_address + *PAGE_SIZE).unwrap(), 5),
+            error!(EFAULT)
+        );
+        assert!(current_task
+            .read_memory_to_vec((mapped_address + (*PAGE_SIZE * 2)).unwrap(), 5)
+            .is_ok());
     }
 
     /// Unmap a range of pages that includes disjoint mappings.
@@ -1069,12 +1089,18 @@ mod tests {
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 3, 0), Ok(()));
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 2, 0), Ok(()));
         assert_eq!(
-            sys_msync(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE as usize * 2, 0),
+            sys_msync(
+                &mut locked,
+                &current_task,
+                (addr + *PAGE_SIZE).unwrap(),
+                *PAGE_SIZE as usize * 2,
+                0
+            ),
             Ok(())
         );
 
         // Unmap the middle page and test that ranges covering that page return ENOMEM.
-        sys_munmap(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE as usize)
+        sys_munmap(&mut locked, &current_task, (addr + *PAGE_SIZE).unwrap(), *PAGE_SIZE as usize)
             .expect("unmap middle");
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize, 0), Ok(()));
         assert_eq!(
@@ -1086,24 +1112,42 @@ mod tests {
             error!(ENOMEM)
         );
         assert_eq!(
-            sys_msync(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE as usize * 2, 0),
+            sys_msync(
+                &mut locked,
+                &current_task,
+                (addr + *PAGE_SIZE).unwrap(),
+                *PAGE_SIZE as usize * 2,
+                0
+            ),
             error!(ENOMEM)
         );
         assert_eq!(
-            sys_msync(&mut locked, &current_task, addr + *PAGE_SIZE * 2, *PAGE_SIZE as usize, 0),
+            sys_msync(
+                &mut locked,
+                &current_task,
+                (addr + (*PAGE_SIZE * 2)).unwrap(),
+                *PAGE_SIZE as usize,
+                0
+            ),
             Ok(())
         );
 
         // Map the middle page back and test that ranges covering the three pages
         // (spanning multiple ranges) return no error.
         assert_eq!(
-            map_memory(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE),
-            addr + *PAGE_SIZE
+            map_memory(&mut locked, &current_task, (addr + *PAGE_SIZE).unwrap(), *PAGE_SIZE),
+            (addr + *PAGE_SIZE).unwrap()
         );
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 3, 0), Ok(()));
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 2, 0), Ok(()));
         assert_eq!(
-            sys_msync(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE as usize * 2, 0),
+            sys_msync(
+                &mut locked,
+                &current_task,
+                (addr + *PAGE_SIZE).unwrap(),
+                *PAGE_SIZE as usize * 2,
+                0
+            ),
             Ok(())
         );
     }
@@ -1116,7 +1160,7 @@ mod tests {
         // Map 2 pages.
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
         fill_page(&current_task, addr, 'a');
-        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
+        fill_page(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
 
         // Shrink the mapping from 2 to 1 pages.
         assert_eq!(
@@ -1133,7 +1177,7 @@ mod tests {
         );
 
         check_page_eq(&current_task, addr, 'a');
-        check_unmapped(&current_task, addr + *PAGE_SIZE);
+        check_unmapped(&current_task, (addr + *PAGE_SIZE).unwrap());
     }
 
     /// Shrinks part of a range, introducing a hole in the middle.
@@ -1144,8 +1188,8 @@ mod tests {
         // Map 3 pages.
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
-        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
-        fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        fill_page(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
+        fill_page(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
 
         // Shrink the first 2 pages down to 1, creating a hole.
         assert_eq!(
@@ -1162,8 +1206,8 @@ mod tests {
         );
 
         check_page_eq(&current_task, addr, 'a');
-        check_unmapped(&current_task, addr + *PAGE_SIZE);
-        check_page_eq(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        check_unmapped(&current_task, (addr + *PAGE_SIZE).unwrap());
+        check_page_eq(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
     }
 
     /// Shrinking doesn't care if the range specified spans multiple mappings.
@@ -1175,17 +1219,22 @@ mod tests {
         // 3 contiguous mappings.
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         assert_eq!(
-            sys_munmap(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE as usize),
+            sys_munmap(
+                &mut locked,
+                &current_task,
+                (addr + *PAGE_SIZE).unwrap(),
+                *PAGE_SIZE as usize
+            ),
             Ok(())
         );
         assert_eq!(
-            map_memory(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE),
-            addr + *PAGE_SIZE
+            map_memory(&mut locked, &current_task, (addr + *PAGE_SIZE).unwrap(), *PAGE_SIZE),
+            (addr + *PAGE_SIZE).unwrap()
         );
 
         fill_page(&current_task, addr, 'a');
-        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
-        fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        fill_page(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
+        fill_page(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
 
         // Remap over all three mappings, shrinking to 1 page.
         assert_eq!(
@@ -1202,8 +1251,8 @@ mod tests {
         );
 
         check_page_eq(&current_task, addr, 'a');
-        check_unmapped(&current_task, addr + *PAGE_SIZE);
-        check_unmapped(&current_task, addr + *PAGE_SIZE * 2);
+        check_unmapped(&current_task, (addr + *PAGE_SIZE).unwrap());
+        check_unmapped(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap());
     }
 
     /// Grows a mapping in-place.
@@ -1214,10 +1263,15 @@ mod tests {
         // Map 3 pages, unmap the middle, leaving a hole.
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
-        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
-        fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        fill_page(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
+        fill_page(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
         assert_eq!(
-            sys_munmap(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE as usize),
+            sys_munmap(
+                &mut locked,
+                &current_task,
+                (addr + *PAGE_SIZE).unwrap(),
+                *PAGE_SIZE as usize
+            ),
             Ok(())
         );
 
@@ -1239,9 +1293,9 @@ mod tests {
 
         // The middle page should be new, and not just pointing to the original middle page filled
         // with 'b'.
-        check_page_ne(&current_task, addr + *PAGE_SIZE, 'b');
+        check_page_ne(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
 
-        check_page_eq(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        check_page_eq(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
     }
 
     /// Tries to grow a set of pages that cannot fit, and forces a move.
@@ -1252,8 +1306,8 @@ mod tests {
         // Map 3 pages.
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
-        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
-        fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        fill_page(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
+        fill_page(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
 
         // Grow the first two pages by 1, forcing a move.
         let new_addr = remap_memory(
@@ -1271,17 +1325,17 @@ mod tests {
 
         // The first two pages should have been moved.
         check_unmapped(&current_task, addr);
-        check_unmapped(&current_task, addr + *PAGE_SIZE);
+        check_unmapped(&current_task, (addr + *PAGE_SIZE).unwrap());
 
         // The third page should still be present.
-        check_page_eq(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        check_page_eq(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
 
         // The moved pages should have the same contents.
         check_page_eq(&current_task, new_addr, 'a');
-        check_page_eq(&current_task, new_addr + *PAGE_SIZE, 'b');
+        check_page_eq(&current_task, (new_addr + *PAGE_SIZE).unwrap(), 'b');
 
         // The newly grown page should not be the same as the original third page.
-        check_page_ne(&current_task, new_addr + *PAGE_SIZE * 2, 'c');
+        check_page_ne(&current_task, (new_addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
     }
 
     /// Shrinks a set of pages and move them to a fixed location.
@@ -1293,13 +1347,13 @@ mod tests {
         let dst_addr =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
         fill_page(&current_task, dst_addr, 'y');
-        fill_page(&current_task, dst_addr + *PAGE_SIZE, 'z');
+        fill_page(&current_task, (dst_addr + *PAGE_SIZE).unwrap(), 'z');
 
         // Map 3 pages.
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
-        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
-        fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        fill_page(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
+        fill_page(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
 
         // Shrink the first two pages and move them to overwrite the mappings at `dst_addr`.
         let new_addr = remap_memory(
@@ -1317,16 +1371,16 @@ mod tests {
 
         // The first two pages should have been moved.
         check_unmapped(&current_task, addr);
-        check_unmapped(&current_task, addr + *PAGE_SIZE);
+        check_unmapped(&current_task, (addr + *PAGE_SIZE).unwrap());
 
         // The third page should still be present.
-        check_page_eq(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        check_page_eq(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
 
         // The first moved page should have the same contents.
         check_page_eq(&current_task, new_addr, 'a');
 
         // The second page should be part of the original dst mapping.
-        check_page_eq(&current_task, new_addr + *PAGE_SIZE, 'z');
+        check_page_eq(&current_task, (new_addr + *PAGE_SIZE).unwrap(), 'z');
     }
 
     /// Clobbers the middle of an existing mapping with mremap to a fixed location.
@@ -1357,29 +1411,29 @@ mod tests {
         // Map 3 pages.
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
-        fill_page(&current_task, addr + *PAGE_SIZE, 'b');
-        fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
+        fill_page(&current_task, (addr + *PAGE_SIZE).unwrap(), 'b');
+        fill_page(&current_task, (addr + (*PAGE_SIZE * 2)).unwrap(), 'c');
 
         // Overwrite the second page of the mapping with the second page of the anonymous mapping.
         let remapped_addr = sys_mremap(
             &mut locked,
             &*current_task,
-            addr + *PAGE_SIZE,
+            (addr + *PAGE_SIZE).unwrap(),
             *PAGE_SIZE as usize,
             *PAGE_SIZE as usize,
             MREMAP_FIXED | MREMAP_MAYMOVE,
-            dst_addr + *PAGE_SIZE,
+            (dst_addr + *PAGE_SIZE).unwrap(),
         )
         .unwrap();
 
-        assert_eq!(remapped_addr, dst_addr + *PAGE_SIZE);
+        assert_eq!(remapped_addr, (dst_addr + *PAGE_SIZE).unwrap());
 
         check_page_eq(&current_task, addr, 'a');
-        check_unmapped(&current_task, addr + *PAGE_SIZE);
-        check_page_eq(&current_task, addr + 2 * *PAGE_SIZE, 'c');
+        check_unmapped(&current_task, (addr + *PAGE_SIZE).unwrap());
+        check_page_eq(&current_task, (addr + (2 * *PAGE_SIZE)).unwrap(), 'c');
 
         check_page_eq(&current_task, dst_addr, 'x');
-        check_page_eq(&current_task, dst_addr + *PAGE_SIZE, 'b');
+        check_page_eq(&current_task, (dst_addr + *PAGE_SIZE).unwrap(), 'b');
     }
 
     #[cfg(target_arch = "x86_64")]

@@ -31,8 +31,6 @@ bootstrap_user_platform_aib_names = [
 
   # Driver Framework
   "driver_framework",
-  "driver_host_cpp",
-  "driver_host_rust",
 
   # Power
   "legacy_power_framework",
@@ -120,6 +118,9 @@ bootstrap_userdebug_platform_aib_names = [
 
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
+
+  # Platform drivers.
+  "interconnect_driver",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
@@ -157,6 +158,9 @@ bootstrap_eng_platform_aib_names = [
 
   # PCI utilities
   "lspci",
+
+  # Platform drivers.
+  "ufs_driver",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -185,10 +189,10 @@ user_platform_aib_names =
       "networking_basic",
       "networking_basic_packages",
       "networking_basic_packages_gub",
+      "mdns",
 
       # The minimal feature-set-level
       "common_standard",
-      "standard_user",
 
       ###
       # Feature-level / Subsystem-level bundles
@@ -209,6 +213,7 @@ user_platform_aib_names =
       "audio_core_routing",
       "audio_core_use_adc_device",
       "audio_device_registry",
+      "audio_device_registry_demand",
       "soundplayer",
       "camera",
       "media_codecs",
@@ -310,11 +315,11 @@ user_platform_aib_names =
       "feedback_remote_device_id_provider",
       "feedback_user_config",
       "feedback_userdebug_config",
+      "cobalt_user_config",
 
       # Kernel Reclamation
       "kernel_anonymous_memory_compression",
       "kernel_anonymous_memory_compression_eager_lru",
-      "kernel_evict_continuous",
       "kernel_page_scanner_aging_fast",
       "kernel_page_table_eviction_never",
       "kernel_page_table_eviction_on_request",
@@ -346,9 +351,11 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "core_realm_development_access",
                          "core_realm_development_access_rcs_usb",
                          "core_realm_development_access_userdebug",
+                         "hvdcp_opti_support",
                          "session_manager_enable_pkg_cache",
                          "standard_userdebug",
                          "standard_userdebug_and_eng",
+                         "cobalt_userdebug_config",
                          "mdns_fuchsia_device_wired_service",
                          "nanohub_support",
                          "omaha_client_empty_eager_config",
@@ -377,6 +384,15 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
 
                          # Tracing support.
                          "tracing",
+
+                         # Recovery
+                         "recovery_android",
+
+                         # Userspace fastboot over usb support
+                         "fastbootd_usb_support",
+
+                         # Location
+                         "gnss",
                        ]
 
 userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
@@ -425,6 +441,7 @@ eng_only_platform_aib_names =
 
       # Audio development/debugging
       "audio_development_support",
+      "audio_device_registry_eager",
       "audio_driver_development_tools",
       "audio_full_stack_development_tools",
       "intel_hda",
@@ -437,10 +454,12 @@ eng_only_platform_aib_names =
 
       # Bluetooth testing support
       "bluetooth_a2dp_with_consumer",
+      "bluetooth_affordances",
       "bluetooth_pandora",
 
       # Forensics
       "feedback_upload_config",
+      "cobalt_default_config",
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names
@@ -452,7 +471,6 @@ required_user_aib_names = [
   "core_realm",
   "core_realm_user_and_userdebug",
   "driver_framework",
-  "driver_host_cpp",
   "legacy_power_framework",
   "zircon",
 ]
@@ -478,6 +496,7 @@ experimental_aib_names = [
   # Bluetooth phone calling as the Hands Free role. Currently in development.
   "bluetooth_hfp_hf",
 
+  "hvdcp_opti_support",
   "nanohub_support",
   "paravirtualization_support_bootstrap",
   "power_framework_broker",
@@ -498,6 +517,18 @@ experimental_aib_names = [
   "timekeeper_wake_alarms",
 
   "trusted_execution_environment",
+
+  # Recovery
+  "recovery_android",
+
+  # Userspace fastboot over usb
+  "fastbootd_usb_support",
+
+  # Platform drivers.
+  "interconnect_driver",
+
+  # Location
+  "gnss",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

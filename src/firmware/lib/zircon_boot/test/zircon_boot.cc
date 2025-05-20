@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/abr/data.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/android_boot_image.h>
 #include <lib/zircon_boot/test/mock_zircon_boot_ops.h>
@@ -11,6 +10,7 @@
 #include <zircon/hw/gpt.h>
 
 #include <set>
+#include <span>
 #include <vector>
 
 #include <zxtest/zxtest.h>
@@ -20,8 +20,8 @@
 
 namespace {
 
-constexpr bool operator<(const cpp20::span<const char>& lhs,
-                         const cpp20::span<const char>& rhs) noexcept {
+constexpr bool operator<(const std::span<const char>& lhs,
+                         const std::span<const char>& rhs) noexcept {
   auto l = lhs.begin();
   auto r = rhs.begin();
   for (; l != lhs.end() && r != rhs.end(); ++l, ++r) {
@@ -33,8 +33,8 @@ constexpr bool operator<(const cpp20::span<const char>& lhs,
   return (lhs.size() < rhs.size());
 }
 
-constexpr bool operator==(const cpp20::span<const char>& lhs,
-                          const cpp20::span<const char>& rhs) noexcept {
+constexpr bool operator==(const std::span<const char>& lhs,
+                          const std::span<const char>& rhs) noexcept {
   if (lhs.size() != rhs.size()) {
     return false;
   }
@@ -53,7 +53,7 @@ constexpr bool operator==(const cpp20::span<const char>& lhs,
 struct NormalizedZbiItem {
   uint32_t type;
   uint32_t extra;
-  cpp20::span<const char> payload;
+  std::span<const char> payload;
 };
 
 constexpr bool operator<(const NormalizedZbiItem& lhs, const NormalizedZbiItem& rhs) noexcept {
@@ -75,7 +75,7 @@ constexpr bool operator==(const NormalizedZbiItem& lhs, const NormalizedZbiItem&
 constexpr size_t kZirconPartitionSize = 128 * 1024;
 constexpr size_t kVbmetaPartitionSize = 64 * 1024;
 
-constexpr cpp20::span<const char> kTestCmdline = "foo=bar";
+constexpr std::span<const char> kTestCmdline = "foo=bar";
 
 void CreateMockZirconBootOps(std::unique_ptr<MockZirconBootOps>* out) {
   auto device = std::make_unique<MockZirconBootOps>();
@@ -887,8 +887,8 @@ TEST(BootTests, TestRollbackProtectionSlotless) {
   ASSERT_EQ(res.value(), 3);
 }
 
-const cpp20::span<const uint8_t> kRambootZbiOnly(kTestZirconSlotlessImage);
-const cpp20::span<const uint8_t> kRambootVbmeta(kTestVbmetaSlotlessImage);
+const std::span<const uint8_t> kRambootZbiOnly(kTestZirconSlotlessImage);
+const std::span<const uint8_t> kRambootVbmeta(kTestVbmetaSlotlessImage);
 
 std::vector<uint8_t> RambootZbiAndVbmeta() {
   std::vector<uint8_t> image(kRambootZbiOnly.begin(), kRambootZbiOnly.end());
@@ -897,7 +897,7 @@ std::vector<uint8_t> RambootZbiAndVbmeta() {
 }
 
 // Wraps the given image in an Android boot image.
-std::vector<uint8_t> AndroidBootImage(uint32_t version, cpp20::span<const uint8_t> image) {
+std::vector<uint8_t> AndroidBootImage(uint32_t version, std::span<const uint8_t> image) {
   // Header versions 3+ fix the page size at 4096.
   constexpr size_t kAndroidBootImageFixedPageSize = 4096;
 
@@ -980,7 +980,7 @@ class AndroidBootImageTest : public zxtest::TestWithParam<std::optional<uint32_t
   //          according to the test parameter.
   //
   // Returns the result of LoadFromRam().
-  ZirconBootResult TestLoadFromRam(OpsMode ops_mode, cpp20::span<const uint8_t> image) {
+  ZirconBootResult TestLoadFromRam(OpsMode ops_mode, std::span<const uint8_t> image) {
     // RAM-boot shouldn't touch any disk data, wipe the partitions to trigger
     // an error if we try to read/write.
     mock_ops_->RemoveAllPartitions();
@@ -1031,7 +1031,7 @@ class AndroidBootImageTest : public zxtest::TestWithParam<std::optional<uint32_t
 
  protected:
   // Returns the image in the format given by the test parameter.
-  std::vector<uint8_t> WrapImage(cpp20::span<const uint8_t> raw) const {
+  std::vector<uint8_t> WrapImage(std::span<const uint8_t> raw) const {
     std::optional<uint32_t> version = GetParam();
     if (!version) {
       return std::vector<uint8_t>(raw.begin(), raw.end());

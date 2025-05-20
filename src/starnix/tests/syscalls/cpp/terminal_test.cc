@@ -315,8 +315,73 @@ TEST_F(Pty, EchoModes) {
     check_input("ab\x09" "cd\n", "ab\tcd\r\n", "ab\tcd\n");
     check_input("ab\x0E" "cd\n", "ab^Ncd\r\n", "ab\x0E" "cd\n");
     check_input("ab\x0F" "cd\n", "ab^Ocd\r\n", "ab\x0F" "cd\n");
+    check_input("ab\x15" "cd\n", "ab\b \b\b \bcd\r\n", "cd\n");
     check_input("ab\x1B" "cd\n", "ab^[cd\r\n", "ab\x1B" "cd\n");
     // clang-format on
+  });
+}
+TEST_F(Pty, EchoFlags) {
+  test_helper::ForkHelper helper;
+
+  helper.RunInForkedProcess([&] {
+    // Create a new session here.
+    SAFE_SYSCALL(setsid());
+    int main_terminal = OpenMainTerminal();
+    int replica_terminal = SAFE_SYSCALL(open(ptsname(main_terminal), O_RDWR | O_NONBLOCK));
+
+    struct termios termios = {};
+    ASSERT_EQ(0, SAFE_SYSCALL(tcgetattr(main_terminal, &termios)));
+
+    auto check_input = [main_terminal, replica_terminal](unsigned int lflags, const char* input,
+                                                         const char* main_str,
+                                                         const char* replicate_str) {
+      char target_buffer[64] = {};
+
+      // Set the flags
+      struct termios termios = {};
+      ASSERT_EQ(0, SAFE_SYSCALL(tcgetattr(main_terminal, &termios)));
+      termios.c_lflag = lflags;
+      ASSERT_EQ(0, SAFE_SYSCALL(tcsetattr(main_terminal, TCSANOW, &termios)));
+
+      FullWrite(main_terminal, input, strlen(input));
+      ASSERT_EQ((ssize_t)strlen(main_str),
+                SAFE_SYSCALL(read(main_terminal, target_buffer, sizeof(target_buffer) - 1)));
+      ASSERT_STREQ(main_str, target_buffer);
+      memset(target_buffer, 0, sizeof(target_buffer));
+      ASSERT_EQ((ssize_t)strlen(replicate_str),
+                SAFE_SYSCALL(read(replica_terminal, target_buffer, sizeof(target_buffer) - 1)));
+      ASSERT_STREQ(replicate_str, target_buffer);
+    };
+
+    // Test different combinations of echo flags
+    unsigned base_lflags = ISIG | ICANON | ECHO | ECHOCTL | IEXTEN;
+
+    // Just ECHO
+    check_input(base_lflags, "abc\n", "abc\r\n", "abc\n");
+
+    // ECHO + ECHOE (erase char)
+    check_input(base_lflags | ECHOE,
+                "ab\x7F"
+                "c\n",
+                "ab\b \bc\r\n", "ac\n");
+
+    // ECHO + ECHOK (kill line)
+    check_input(base_lflags | ECHOK,
+                "ab\x15"
+                "c\n",
+                "ab^U\r\nc\r\n", "c\n");
+
+    // ECHO + ECHOE + ECHOK (erase char + kill line)
+    check_input(base_lflags | ECHOE | ECHOK,
+                "ab\x7F\x15"
+                "c\n",
+                "ab\b \b^U\r\nc\r\n", "c\n");
+
+    // ECHO + ECHOE + ECHOK + ECHOKE (erase char + kill line + kill line erase)
+    check_input(base_lflags | ECHOE | ECHOK | ECHOKE,
+                "abc\x7F\x15"
+                "d\n",
+                "abc\b \b\b \b\b \bd\r\n", "d\n");
   });
 }
 

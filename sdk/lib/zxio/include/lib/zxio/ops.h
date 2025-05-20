@@ -25,11 +25,8 @@ typedef struct zxio_ops {
   // Releases all resources held by |io|. No further ops may be called after invoking |destroy|.
   void (*destroy)(zxio_t* io);
 
-  // TODO(https://fxbug.dev/409665751): DEPRECATED. Use close2.
-  zx_status_t (*close)(zxio_t* io, bool should_wait);
-
   // See `zxio_close`.
-  zx_status_t (*close2)(zxio_t* io);
+  zx_status_t (*close)(zxio_t* io);
 
   // After |release| returns, any further ops most not be called relative to |io|,
   // except |destroy|.

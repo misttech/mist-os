@@ -8,20 +8,20 @@ use crate::fxfs::{construct_fxfs, ConstructedFxfs};
 use crate::{vbmeta, zbi};
 
 use anyhow::{anyhow, Context, Result};
+use assembled_system::AssembledSystem;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_constants::PackageDestination;
 use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, Image, VBMeta, Zbi};
-use assembly_manifest::AssemblyManifest;
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use assembly_util as util;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_assembly_args::CreateSystemArgs;
 use fuchsia_pkg::{PackageManifest, PackagePath};
+use log::info;
 use serde_json::ser;
 use std::collections::BTreeSet;
 use std::fs::File;
-use tracing::info;
 
 pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let CreateSystemArgs {
@@ -32,7 +32,6 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         base_package_name,
     } = args;
 
-    let gendir = gendir.unwrap_or_else(|| outdir.clone());
     let base_package_name =
         base_package_name.unwrap_or_else(|| PackageDestination::Base.to_string());
 
@@ -43,23 +42,22 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
 
-    let mut assembly_manifest = AssemblyManifest {
+    let mut assembled_system = AssembledSystem {
         images: Default::default(),
         board_name: image_assembly_config.board_name.clone(),
     };
     if let Some(devicetree_overlay) = &image_assembly_config.devicetree_overlay {
-        assembly_manifest.images.push(assembly_manifest::Image::Dtbo(devicetree_overlay.clone()));
+        assembled_system.images.push(assembled_system::Image::Dtbo(devicetree_overlay.clone()));
     }
-    assembly_manifest
+    assembled_system
         .images
-        .push(assembly_manifest::Image::QemuKernel(image_assembly_config.qemu_kernel.clone()));
+        .push(assembled_system::Image::QemuKernel(image_assembly_config.qemu_kernel.clone()));
 
     // Create the base package if needed.
     let base_package = if has_base_package(&image_assembly_config) {
         info!("Creating base package");
         Some(construct_base_package(
-            &mut assembly_manifest,
-            &outdir,
+            &mut assembled_system,
             &gendir,
             &base_package_name,
             &image_assembly_config,
@@ -89,10 +87,9 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         // TODO: warn if bootfs_only mode
         if let Some(base_package) = &base_package {
             construct_fvm(
-                &outdir,
                 &gendir,
                 &tools,
-                &mut assembly_manifest,
+                &mut assembled_system,
                 &image_assembly_config,
                 fvm_config.clone(),
                 compress_blobfs,
@@ -104,15 +101,14 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         info!("Constructing Fxfs image <EXPERIMENTAL!>");
         if let Some(base_package) = &base_package {
             let ConstructedFxfs { image_path, sparse_image_path, contents } =
-                construct_fxfs(&outdir, &gendir, &image_assembly_config, base_package, fxfs_config)
-                    .await?;
-            assembly_manifest.images.push(assembly_manifest::Image::Fxfs {
+                construct_fxfs(&gendir, &image_assembly_config, base_package, fxfs_config).await?;
+            assembled_system.images.push(assembled_system::Image::Fxfs {
                 path: image_path,
                 contents: contents.clone(),
             });
-            assembly_manifest
+            assembled_system
                 .images
-                .push(assembly_manifest::Image::FxfsSparse { path: sparse_image_path, contents });
+                .push(assembled_system::Image::FxfsSparse { path: sparse_image_path, contents });
         }
     } else {
         info!("Skipping fvm creation");
@@ -120,9 +116,9 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 
     // Find the first standard disk image that was generated.
     let disk_image_for_zbi: Option<Utf8PathBuf> = match &mode {
-        FilesystemImageMode::Ramdisk => assembly_manifest.images.iter().find_map(|i| match i {
-            assembly_manifest::Image::FVM(path) => Some(path.clone()),
-            assembly_manifest::Image::Fxfs { path, .. } => Some(path.clone()),
+        FilesystemImageMode::Ramdisk => assembled_system.images.iter().find_map(|i| match i {
+            assembled_system::Image::FVM(path) => Some(path.clone()),
+            assembled_system::Image::Fxfs { path, .. } => Some(path.clone()),
             _ => None,
         }),
         _ => None,
@@ -137,8 +133,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let zbi_path: Option<Utf8PathBuf> = if let Some(zbi_config) = zbi_config {
         Some(zbi::construct_zbi(
             tools.get_tool("zbi")?,
-            &mut assembly_manifest,
-            &outdir,
+            &mut assembled_system,
             &gendir,
             &image_assembly_config,
             zbi_config,
@@ -161,7 +156,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 
     if let Some(vbmeta_config) = vbmeta_config {
         info!("Creating the VBMeta image");
-        vbmeta::construct_vbmeta(&mut assembly_manifest, &outdir, vbmeta_config, &zbi_path)
+        vbmeta::construct_vbmeta(&mut assembled_system, &gendir, vbmeta_config, &zbi_path)
             .context("Creating the VBMeta image")?;
     } else {
         info!("Skipping vbmeta creation");
@@ -184,8 +179,8 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
                 let signing_tool = tools.get_tool_with_path(tool_path.into())?;
                 zbi::vendor_sign_zbi(
                     signing_tool,
-                    &mut assembly_manifest,
-                    &outdir,
+                    &mut assembled_system,
+                    &gendir,
                     zbi_config,
                     &zbi_path,
                 )
@@ -199,11 +194,11 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 
     // Write the images manifest.
     let images_json_path = outdir.join("images.json");
-    assembly_manifest.write(images_json_path).context("Creating the assembly manifest")?;
+    assembled_system.write(images_json_path).context("Creating the assembly manifest")?;
 
     // Write the packages manifest.
     create_package_manifest(
-        &outdir,
+        &gendir,
         base_package_name,
         &image_assembly_config,
         base_package.as_ref(),
@@ -219,12 +214,12 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
 }
 
 fn create_package_manifest(
-    outdir: impl AsRef<Utf8Path>,
+    gendir: impl AsRef<Utf8Path>,
     base_package_name: impl AsRef<str>,
     assembly_config: &ImageAssemblyConfig,
     base_package: Option<&BasePackage>,
 ) -> Result<()> {
-    let packages_path = outdir.as_ref().join("packages.json");
+    let packages_path = gendir.as_ref().join("packages.json");
     let packages_file = File::create(packages_path).context("Creating the packages manifest")?;
     let mut packages_manifest = UpdatePackagesManifest::V1(BTreeSet::new());
     let mut add_packages_to_update = |packages: &Vec<Utf8PathBuf>| -> Result<()> {

@@ -394,7 +394,7 @@ impl<D: QueryMut> QueryMut for FifoQueryCache<D> {
         target_sid: SecurityId,
         fs_node_class: FsNodeClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let target_class = ObjectClass::System(KernelClass::from(fs_node_class));
+        let target_class = ObjectClass::Kernel(KernelClass::from(fs_node_class));
 
         let query_args =
             AccessQueryArgs { source_sid, target_sid, target_class: target_class.clone() };

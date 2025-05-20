@@ -16,6 +16,7 @@ use fxfs::object_store::{
     StoreObjectHandle,
 };
 use fxfs_macros::ToWeakNode;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use vfs::attributes;
 use vfs::directory::entry::{EntryInfo, GetEntryInfo};
@@ -24,9 +25,13 @@ use vfs::name::Name;
 use vfs::node::Node;
 use vfs::symlink::Symlink;
 
+// We use the top-bit of `open_count` to indicate that the symlink needs to be purged.
+const TO_BE_PURGED: u64 = 1 << 63;
+
 #[derive(ToWeakNode)]
 pub struct FxSymlink {
     handle: StoreObjectHandle<FxVolume>,
+    open_count: AtomicU64,
 }
 
 impl FxSymlink {
@@ -39,6 +44,7 @@ impl FxSymlink {
                 HandleOptions::default(),
                 /* trace: */ false,
             ),
+            open_count: AtomicU64::new(0),
         }
     }
 
@@ -230,10 +236,30 @@ impl FxNode for FxSymlink {
     }
 
     fn set_parent(&self, _parent: Arc<FxDirectory>) {}
-    fn open_count_add_one(&self) {}
-    fn open_count_sub_one(self: Arc<Self>) {}
+    fn open_count_add_one(&self) {
+        self.open_count.fetch_add(1, Ordering::Relaxed);
+    }
+    fn open_count_sub_one(self: Arc<Self>) {
+        let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
+        assert!(old & !TO_BE_PURGED > 0);
+        if old == 1 | TO_BE_PURGED {
+            self.handle.owner().clone().spawn(async move {
+                let store = self.handle.store();
+                store
+                    .filesystem()
+                    .graveyard()
+                    .queue_tombstone_object(store.store_object_id(), self.object_id());
+            });
+        }
+    }
 
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::Symlink
+    }
+
+    fn mark_to_be_purged(&self) -> bool {
+        let old = self.open_count.fetch_or(TO_BE_PURGED, Ordering::Relaxed);
+        assert!(old & TO_BE_PURGED == 0);
+        old == 0
     }
 }

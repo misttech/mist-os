@@ -44,7 +44,6 @@
         },
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.kernel.RootJob",
             ],

@@ -70,7 +70,7 @@ class AutoGenerationIncrement final {
   // after all changes to the buffer are committed.
   void Release(Block* block);
 
-  cpp17::optional<uint64_t> last_gen_count_;
+  std::optional<uint64_t> last_gen_count_;
   BlockIndex target_;
   Heap* heap_;
 };
@@ -275,7 +275,7 @@ bool State::DuplicateVmo(zx::vmo* vmo) const {
                       ZX_RIGHTS_BASIC | ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY, vmo);
 }
 
-cpp17::optional<zx::vmo> State::FrozenVmoCopy() const {
+std::optional<zx::vmo> State::FrozenVmoCopy() const {
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (transaction_count_ > 0) {
@@ -1342,7 +1342,7 @@ InspectStats State::GetStats() const {
   return ret;
 }
 
-cpp17::optional<std::string> TesterLoadStringReference(const State& state, const BlockIndex index) {
+std::optional<std::string> TesterLoadStringReference(const State& state, const BlockIndex index) {
   std::lock_guard<std::mutex> lock(state.mutex_);
   const auto* const block = state.heap_->GetBlock(index);
   if (!block) {

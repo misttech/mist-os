@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
+use crate::util::cobalt_logger::log_cobalt_batch;
 use derivative::Derivative;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
@@ -12,6 +12,7 @@ use fuchsia_inspect_contrib::nodes::{BoundedListNode, LruCacheNode};
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use fuchsia_inspect_derive::Unit;
 use fuchsia_sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use strum_macros::{Display, EnumIter};
 use windowed_stats::experimental::clock::Timed;
@@ -24,13 +25,15 @@ use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    wlan_legacy_metrics_registry as metrics, zx,
+    fuchsia_async as fasync, wlan_legacy_metrics_registry as metrics, zx,
 };
 
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 10;
 const INSPECT_DISCONNECT_EVENTS_LIMIT: usize = 10;
 const INSPECT_CONNECTED_NETWORKS_ID_LIMIT: usize = 16;
 const INSPECT_DISCONNECT_SOURCES_ID_LIMIT: usize = 32;
+const SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_TIMEOUT: zx::BootDuration =
+    zx::BootDuration::from_minutes(2);
 
 #[derive(Debug, Display, EnumIter)]
 enum ConnectionState {
@@ -120,7 +123,7 @@ impl From<&fidl_sme::DisconnectSource> for InspectDisconnectSource {
         match disconnect_source {
             fidl_sme::DisconnectSource::User(reason) => Self {
                 source: "user".to_string(),
-                reason: format!("{:?}", reason),
+                reason: format!("{reason:?}"),
                 mlme_event_name: None,
             },
             fidl_sme::DisconnectSource::Ap(cause) => Self {
@@ -140,7 +143,7 @@ impl From<&fidl_sme::DisconnectSource> for InspectDisconnectSource {
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisconnectInfo {
     pub iface_id: u16,
-    pub connected_duration: zx::MonotonicDuration,
+    pub connected_duration: zx::BootDuration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
     pub original_bss_desc: Box<BssDescription>,
@@ -151,16 +154,19 @@ pub struct DisconnectInfo {
 
 pub struct ConnectDisconnectLogger {
     connection_state: Arc<Mutex<ConnectionState>>,
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     connect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     disconnect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     inspect_metadata_node: Mutex<InspectMetadataNode>,
     time_series_stats: ConnectDisconnectTimeSeries,
+    successive_connect_attempt_failures: AtomicUsize,
+    last_connect_failure_at: Arc<Mutex<Option<fasync::BootInstant>>>,
+    last_disconnect_at: Arc<Mutex<Option<fasync::MonotonicInstant>>>,
 }
 
 impl ConnectDisconnectLogger {
     pub fn new<S: InspectSender>(
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
         inspect_metadata_node: &InspectNode,
         inspect_metadata_path: &str,
@@ -170,7 +176,7 @@ impl ConnectDisconnectLogger {
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
         let this = Self {
-            cobalt_1dot1_proxy,
+            cobalt_proxy,
             connection_state: Arc::new(Mutex::new(ConnectionState::Idle(IdleState {}))),
             connect_events_node: Mutex::new(AutoPersist::new(
                 BoundedListNode::new(connect_events, INSPECT_CONNECT_EVENTS_LIMIT),
@@ -187,6 +193,9 @@ impl ConnectDisconnectLogger {
                 time_matrix_client,
                 inspect_metadata_path,
             ),
+            successive_connect_attempt_failures: AtomicUsize::new(0),
+            last_connect_failure_at: Arc::new(Mutex::new(None)),
+            last_disconnect_at: Arc::new(Mutex::new(None)),
         };
         this.log_connection_state();
         this
@@ -202,26 +211,36 @@ impl ConnectDisconnectLogger {
         self.time_series_stats.log_wlan_connectivity_state(1 << wlan_connectivity_state_id);
     }
 
-    pub fn is_connected(&self) -> bool {
-        matches!(&*self.connection_state.lock(), ConnectionState::Connected(_))
-    }
-
-    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
-    pub async fn log_connect_attempt(
+    pub async fn handle_connect_attempt(
         &self,
         result: fidl_ieee80211::StatusCode,
         bss: &BssDescription,
     ) {
-        let mut metric_events = vec![];
-        metric_events.push(MetricEvent {
-            metric_id: metrics::CONNECT_ATTEMPT_BREAKDOWN_BY_STATUS_CODE_METRIC_ID,
-            event_codes: vec![result as u32],
-            payload: MetricEventPayload::Count(1),
-        });
-
+        let mut flushed_successive_failures = None;
+        let mut downtime_duration = None;
         if result == fidl_ieee80211::StatusCode::Success {
             self.update_connection_state(ConnectionState::Connected(ConnectedState {}));
+            flushed_successive_failures =
+                Some(self.successive_connect_attempt_failures.swap(0, Ordering::SeqCst));
+            downtime_duration =
+                self.last_disconnect_at.lock().map(|t| fasync::MonotonicInstant::now() - t);
+        } else {
+            self.update_connection_state(ConnectionState::Idle(IdleState {}));
+            let _prev = self.successive_connect_attempt_failures.fetch_add(1, Ordering::SeqCst);
+            let _prev = self.last_connect_failure_at.lock().replace(fasync::BootInstant::now());
+        }
 
+        self.log_connect_attempt_inspect(result, bss);
+        self.log_connect_attempt_cobalt(result, flushed_successive_failures, downtime_duration)
+            .await;
+    }
+
+    fn log_connect_attempt_inspect(
+        &self,
+        result: fidl_ieee80211::StatusCode,
+        bss: &BssDescription,
+    ) {
+        if result == fidl_ieee80211::StatusCode::Success {
             let mut inspect_metadata_node = self.inspect_metadata_node.lock();
             let connected_network = InspectConnectedNetwork::from(bss);
             let connected_network_id =
@@ -232,20 +251,50 @@ impl ConnectDisconnectLogger {
             inspect_log!(self.connect_events_node.lock().get_mut(), {
                 network_id: connected_network_id,
             });
-        } else {
-            self.update_connection_state(ConnectionState::Idle(IdleState {}));
+        }
+    }
+
+    #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
+    async fn log_connect_attempt_cobalt(
+        &self,
+        result: fidl_ieee80211::StatusCode,
+        flushed_successive_failures: Option<usize>,
+        downtime_duration: Option<zx::MonotonicDuration>,
+    ) {
+        let mut metric_events = vec![];
+        metric_events.push(MetricEvent {
+            metric_id: metrics::CONNECT_ATTEMPT_BREAKDOWN_BY_STATUS_CODE_METRIC_ID,
+            event_codes: vec![result as u32],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        if let Some(failures) = flushed_successive_failures {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::IntegerValue(failures as i64),
+            });
         }
 
-        log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
-            &metric_events,
-            "log_connect_attempt_cobalt_metrics",
-        );
+        if let Some(duration) = downtime_duration {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::DOWNTIME_POST_DISCONNECT_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::IntegerValue(duration.into_millis()),
+            });
+        }
+
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_connect_attempt_cobalt");
     }
 
     pub async fn log_disconnect(&self, info: &DisconnectInfo) {
         self.update_connection_state(ConnectionState::Disconnected(DisconnectedState {}));
+        let _prev = self.last_disconnect_at.lock().replace(fasync::MonotonicInstant::now());
+        self.log_disconnect_inspect(info);
+        self.log_disconnect_cobalt(info).await;
+    }
 
+    fn log_disconnect_inspect(&self, info: &DisconnectInfo) {
         let mut inspect_metadata_node = self.inspect_metadata_node.lock();
         let connected_network = InspectConnectedNetwork::from(&*info.original_bss_desc);
         let connected_network_id =
@@ -264,6 +313,79 @@ impl ConnectDisconnectLogger {
 
         self.time_series_stats.log_disconnected_networks(1 << connected_network_id);
         self.time_series_stats.log_disconnect_sources(1 << disconnect_source_id);
+    }
+
+    async fn log_disconnect_cobalt(&self, info: &DisconnectInfo) {
+        let mut metric_events = vec![];
+        metric_events.push(MetricEvent {
+            metric_id: metrics::TOTAL_DISCONNECT_COUNT_METRIC_ID,
+            event_codes: vec![],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        if info.disconnect_source.should_log_for_mobile_device() {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::DISCONNECT_OCCURRENCE_FOR_MOBILE_DEVICE_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::Count(1),
+            });
+        }
+
+        metric_events.push(MetricEvent {
+            metric_id: metrics::CONNECTED_DURATION_ON_DISCONNECT_METRIC_ID,
+            event_codes: vec![],
+            payload: MetricEventPayload::IntegerValue(info.connected_duration.into_millis()),
+        });
+
+        metric_events.push(MetricEvent {
+            metric_id: metrics::DISCONNECT_BREAKDOWN_BY_REASON_CODE_METRIC_ID,
+            event_codes: vec![
+                u32::from(info.disconnect_source.cobalt_reason_code()),
+                info.disconnect_source.as_cobalt_disconnect_source() as u32,
+            ],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "log_disconnect_cobalt");
+    }
+
+    pub async fn handle_periodic_telemetry(&self) {
+        let mut metric_events = vec![];
+        let now = fasync::BootInstant::now();
+        if let Some(failed_at) = *self.last_connect_failure_at.lock() {
+            if now - failed_at >= SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_TIMEOUT {
+                let failures = self.successive_connect_attempt_failures.swap(0, Ordering::SeqCst);
+                if failures > 0 {
+                    metric_events.push(MetricEvent {
+                        metric_id: metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID,
+                        event_codes: vec![],
+                        payload: MetricEventPayload::IntegerValue(failures as i64),
+                    });
+                }
+            }
+        }
+
+        if !metric_events.is_empty() {
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_periodic_telemetry");
+        }
+    }
+
+    pub async fn handle_suspend_imminent(&self) {
+        let mut metric_events = vec![];
+
+        let flushed_successive_failures =
+            self.successive_connect_attempt_failures.swap(0, Ordering::SeqCst);
+        if flushed_successive_failures > 0 {
+            metric_events.push(MetricEvent {
+                metric_id: metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID,
+                event_codes: vec![],
+                payload: MetricEventPayload::IntegerValue(flushed_successive_failures as i64),
+            });
+        }
+
+        if !metric_events.is_empty() {
+            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_suspend_imminent");
+        }
     }
 }
 
@@ -369,6 +491,52 @@ impl ConnectDisconnectTimeSeries {
     }
 }
 
+pub trait DisconnectSourceExt {
+    fn should_log_for_mobile_device(&self) -> bool;
+    fn cobalt_reason_code(&self) -> u16;
+    fn as_cobalt_disconnect_source(
+        &self,
+    ) -> metrics::ConnectivityWlanMetricDimensionDisconnectSource;
+}
+
+impl DisconnectSourceExt for fidl_sme::DisconnectSource {
+    fn should_log_for_mobile_device(&self) -> bool {
+        match self {
+            fidl_sme::DisconnectSource::Ap(_) => true,
+            fidl_sme::DisconnectSource::Mlme(cause)
+                if cause.reason_code != fidl_ieee80211::ReasonCode::MlmeLinkFailed =>
+            {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn cobalt_reason_code(&self) -> u16 {
+        let cobalt_disconnect_reason_code = match self {
+            fidl_sme::DisconnectSource::Ap(cause) | fidl_sme::DisconnectSource::Mlme(cause) => {
+                cause.reason_code.into_primitive()
+            }
+            fidl_sme::DisconnectSource::User(reason) => *reason as u16,
+        };
+        // This `max_event_code: 1000` is set in the metrics registry, but doesn't show up in the
+        // generated bindings.
+        const REASON_CODE_MAX: u16 = 1000;
+        std::cmp::min(cobalt_disconnect_reason_code, REASON_CODE_MAX)
+    }
+
+    fn as_cobalt_disconnect_source(
+        &self,
+    ) -> metrics::ConnectivityWlanMetricDimensionDisconnectSource {
+        use metrics::ConnectivityWlanMetricDimensionDisconnectSource as DS;
+        match self {
+            fidl_sme::DisconnectSource::Ap(..) => DS::Ap,
+            fidl_sme::DisconnectSource::User(..) => DS::User,
+            fidl_sme::DisconnectSource::Mlme(..) => DS::Mlme,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,6 +549,7 @@ mod tests {
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;
     use std::pin::pin;
+    use test_case::test_case;
     use windowed_stats::experimental::serve;
     use windowed_stats::experimental::testing::TimeMatrixCall;
     use wlan_common::channel::{Cbw, Channel};
@@ -394,7 +563,7 @@ mod tests {
             harness.inspect_node.create_child("wlan_connect_disconnect"),
         );
         let logger = ConnectDisconnectLogger::new(
-            harness.cobalt_1dot1_proxy.clone(),
+            harness.cobalt_proxy.clone(),
             &harness.inspect_node,
             &harness.inspect_metadata_node,
             &harness.inspect_metadata_path,
@@ -403,7 +572,7 @@ mod tests {
         );
         let bss = random_bss_description!();
         let mut log_connect_attempt =
-            pin!(logger.log_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss));
+            pin!(logger.handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss));
         assert!(
             harness.run_until_stalled_drain_cobalt_events(&mut log_connect_attempt).is_ready(),
             "`log_connect_attempt` did not complete",
@@ -457,7 +626,7 @@ mod tests {
     fn test_log_connect_attempt_inspect() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -468,7 +637,8 @@ mod tests {
         // Log the event
         let bss_description = random_bss_description!();
         let mut test_fut =
-            pin!(logger.log_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
         assert_eq!(
             test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
             Poll::Ready(())
@@ -513,7 +683,7 @@ mod tests {
     fn test_log_connect_attempt_cobalt() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -529,7 +699,8 @@ mod tests {
 
         // Log the event
         let mut test_fut =
-            pin!(logger.log_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
         assert_eq!(
             test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
             Poll::Ready(())
@@ -547,10 +718,231 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_successive_connect_attempt_failures_cobalt_zero_failures() {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        let bss_description = random_bss_description!(Wpa2);
+        let mut test_fut =
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(0));
+    }
+
+    #[test_case(1; "one_failure")]
+    #[test_case(2; "two_failures")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_successive_connect_attempt_failures_cobalt_one_failure_then_success(n_failures: usize) {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        let bss_description = random_bss_description!(Wpa2);
+        for _i in 0..n_failures {
+            let mut test_fut = pin!(logger.handle_connect_attempt(
+                fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                &bss_description
+            ));
+            assert_eq!(
+                test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+                Poll::Ready(())
+            );
+        }
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        let mut test_fut =
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(n_failures as i64));
+
+        // Verify subsequent successes would report 0 failures
+        test_helper.clear_cobalt_events();
+        let mut test_fut =
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(0));
+    }
+
+    #[test_case(1; "one_failure")]
+    #[test_case(2; "two_failures")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_successive_connect_attempt_failures_cobalt_one_failure_then_timeout(n_failures: usize) {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        let bss_description = random_bss_description!(Wpa2);
+        for _i in 0..n_failures {
+            let mut test_fut = pin!(logger.handle_connect_attempt(
+                fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                &bss_description
+            ));
+            assert_eq!(
+                test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+                Poll::Ready(())
+            );
+        }
+
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(60_000_000_000));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Not enough time has passed, so successive_connect_attempt_failures is not flushed yet
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(120_000_000_000));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(n_failures as i64));
+
+        // Verify timeout fires only once
+        test_helper.clear_cobalt_events();
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(240_000_000_000));
+        let mut test_fut = pin!(logger.handle_periodic_telemetry());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert!(metrics.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_zero_successive_connect_attempt_failures_on_suspend() {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        let mut test_fut = pin!(logger.handle_suspend_imminent());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert!(metrics.is_empty());
+    }
+
+    #[test_case(1; "one_failure")]
+    #[test_case(2; "two_failures")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_one_or_more_successive_connect_attempt_failures_on_suspend(n_failures: usize) {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        let bss_description = random_bss_description!(Wpa2);
+        for _i in 0..n_failures {
+            let mut test_fut = pin!(logger.handle_connect_attempt(
+                fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                &bss_description
+            ));
+            assert_eq!(
+                test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+                Poll::Ready(())
+            );
+        }
+
+        let mut test_fut = pin!(logger.handle_suspend_imminent());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(n_failures as i64));
+
+        test_helper.clear_cobalt_events();
+        let mut test_fut = pin!(logger.handle_suspend_imminent());
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Count of successive failures shouldn't be logged again since it was already logged
+        let metrics =
+            test_helper.get_logged_metrics(metrics::SUCCESSIVE_CONNECT_ATTEMPT_FAILURES_METRIC_ID);
+        assert!(metrics.is_empty());
+    }
+
+    #[fuchsia::test]
     fn test_log_disconnect_inspect() {
         let mut test_helper = setup_test();
         let logger = ConnectDisconnectLogger::new(
-            test_helper.cobalt_1dot1_proxy.clone(),
+            test_helper.cobalt_proxy.clone(),
             &test_helper.inspect_node,
             &test_helper.inspect_metadata_node,
             &test_helper.inspect_metadata_path,
@@ -563,7 +955,7 @@ mod tests {
         let channel = bss_description.channel;
         let disconnect_info = DisconnectInfo {
             iface_id: 32,
-            connected_duration: zx::MonotonicDuration::from_seconds(30),
+            connected_duration: zx::BootDuration::from_seconds(30),
             is_sme_reconnecting: false,
             disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
                 mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
@@ -613,7 +1005,7 @@ mod tests {
                 disconnect_events: {
                     "0": {
                         "@time": AnyNumericProperty,
-                        connected_duration: zx::MonotonicDuration::from_seconds(30).into_nanos(),
+                        connected_duration: zx::BootDuration::from_seconds(30).into_nanos(),
                         disconnect_source_id: 0u64,
                         network_id: 0u64,
                         rssi_dbm: -30i64,
@@ -637,5 +1029,191 @@ mod tests {
             &time_matrix_calls.drain::<u64>("disconnect_sources")[..],
             &[TimeMatrixCall::Fold(Timed::now(1 << 0))]
         );
+    }
+
+    #[fuchsia::test]
+    fn test_log_disconnect_cobalt() {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        // Log the event
+        let disconnect_info = DisconnectInfo {
+            connected_duration: zx::BootDuration::from_millis(300_000),
+            disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+                mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+                reason_code: fidl_ieee80211::ReasonCode::ApInitiated,
+            }),
+            ..fake_disconnect_info()
+        };
+        let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let disconnect_count_metrics =
+            test_helper.get_logged_metrics(metrics::TOTAL_DISCONNECT_COUNT_METRIC_ID);
+        assert_eq!(disconnect_count_metrics.len(), 1);
+        assert_eq!(disconnect_count_metrics[0].payload, MetricEventPayload::Count(1));
+
+        let connected_duration_metrics =
+            test_helper.get_logged_metrics(metrics::CONNECTED_DURATION_ON_DISCONNECT_METRIC_ID);
+        assert_eq!(connected_duration_metrics.len(), 1);
+        assert_eq!(
+            connected_duration_metrics[0].payload,
+            MetricEventPayload::IntegerValue(300_000)
+        );
+
+        let disconnect_by_reason_metrics =
+            test_helper.get_logged_metrics(metrics::DISCONNECT_BREAKDOWN_BY_REASON_CODE_METRIC_ID);
+        assert_eq!(disconnect_by_reason_metrics.len(), 1);
+        assert_eq!(disconnect_by_reason_metrics[0].payload, MetricEventPayload::Count(1));
+        assert_eq!(disconnect_by_reason_metrics[0].event_codes.len(), 2);
+        assert_eq!(
+            disconnect_by_reason_metrics[0].event_codes[0],
+            fidl_ieee80211::ReasonCode::ApInitiated.into_primitive() as u32
+        );
+        assert_eq!(
+            disconnect_by_reason_metrics[0].event_codes[1],
+            metrics::ConnectivityWlanMetricDimensionDisconnectSource::Ap as u32
+        );
+    }
+
+    #[test_case(
+        fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+        }),
+        true;
+        "ap_disconnect_source"
+    )]
+    #[test_case(
+        fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+        }),
+        true;
+        "mlme_disconnect_source_not_link_failed"
+    )]
+    #[test_case(
+        fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+            mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
+            reason_code: fidl_ieee80211::ReasonCode::MlmeLinkFailed,
+        }),
+        false;
+        "mlme_link_failed"
+    )]
+    #[test_case(
+        fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown),
+        false;
+        "user_disconnect_source"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_log_disconnect_for_mobile_device_cobalt(
+        disconnect_source: fidl_sme::DisconnectSource,
+        should_log: bool,
+    ) {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        // Log the event
+        let disconnect_info = DisconnectInfo { disconnect_source, ..fake_disconnect_info() };
+        let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        let metrics = test_helper
+            .get_logged_metrics(metrics::DISCONNECT_OCCURRENCE_FOR_MOBILE_DEVICE_METRIC_ID);
+        if should_log {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
+        } else {
+            assert!(metrics.is_empty());
+        }
+    }
+
+    #[fuchsia::test]
+    fn test_log_downtime_post_disconnect_on_reconnect() {
+        let mut test_helper = setup_test();
+        let logger = ConnectDisconnectLogger::new(
+            test_helper.cobalt_proxy.clone(),
+            &test_helper.inspect_node,
+            &test_helper.inspect_metadata_node,
+            &test_helper.inspect_metadata_path,
+            test_helper.persistence_sender.clone(),
+            &test_helper.mock_time_matrix_client,
+        );
+
+        // Connect at 15th second
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(15_000_000_000));
+        let bss_description = random_bss_description!(Wpa2);
+        let mut test_fut =
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Verify no downtime metric is logged on first successful connect
+        let metrics = test_helper.get_logged_metrics(metrics::DOWNTIME_POST_DISCONNECT_METRIC_ID);
+        assert!(metrics.is_empty());
+
+        // Disconnect at 25th second
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(25_000_000_000));
+        let disconnect_info = fake_disconnect_info();
+        let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Reconnect at 60th second
+        test_helper.exec.set_fake_time(fasync::MonotonicInstant::from_nanos(60_000_000_000));
+        let mut test_fut =
+            pin!(logger
+                .handle_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
+        assert_eq!(
+            test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
+            Poll::Ready(())
+        );
+
+        // Verify that downtime metric is logged
+        let metrics = test_helper.get_logged_metrics(metrics::DOWNTIME_POST_DISCONNECT_METRIC_ID);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(35_000));
+    }
+
+    fn fake_disconnect_info() -> DisconnectInfo {
+        let bss_description = random_bss_description!(Wpa2);
+        let channel = bss_description.channel;
+        DisconnectInfo {
+            iface_id: 1,
+            connected_duration: zx::BootDuration::from_hours(6),
+            is_sme_reconnecting: false,
+            disconnect_source: fidl_sme::DisconnectSource::User(
+                fidl_sme::UserDisconnectReason::Unknown,
+            ),
+            original_bss_desc: bss_description.into(),
+            current_rssi_dbm: -30,
+            current_snr_db: 25,
+            current_channel: channel,
+        }
     }
 }

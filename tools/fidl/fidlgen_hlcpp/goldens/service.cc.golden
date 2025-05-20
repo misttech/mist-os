@@ -139,10 +139,6 @@ zx_status_t FirstProtocol_SyncProxy::MethodOnFirst() {
 }  // namespace service
 }  // namespace test
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 namespace test {
 namespace service {
 

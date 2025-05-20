@@ -129,49 +129,29 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayoutssamelibra
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-    return os << "ClientEnd<" << "test_protocollayoutssamelibrary::ComposedProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-    return os << "ServerEnd<" << "test_protocollayoutssamelibrary::ComposedProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value);
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-    return os << "ClientEnd<" << "test_protocollayoutssamelibrary::MainProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-    return os << "ServerEnd<" << "test_protocollayoutssamelibrary::MainProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol>>::Format(os, value);
-}
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value);
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::ComposedProtocol>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocollayoutssamelibrary::MainProtocol>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocollayoutssamelibrary::MainProtocol>& value);
 
 #endif  // __Fuchsia__
 

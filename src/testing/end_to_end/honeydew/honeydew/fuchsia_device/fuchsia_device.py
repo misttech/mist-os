@@ -397,7 +397,11 @@ class FuchsiaDevice(abc.ABC):
         """
 
     @abc.abstractmethod
-    def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:
+    def snapshot(
+        self,
+        directory: str,
+        snapshot_file: str | None = None,
+    ) -> str:
         """Captures the snapshot of the device.
 
         Args:

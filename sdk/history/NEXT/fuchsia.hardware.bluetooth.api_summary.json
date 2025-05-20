@@ -48,6 +48,16 @@
         "name": "fuchsia.hardware.bluetooth/AndroidVendorSupport"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.bluetooth/AudioOffloadSettings.sco_offload_index",
+        "ordinal": "1",
+        "type": "uint8"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.hardware.bluetooth/AudioOffloadSettings"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.hardware.bluetooth/BT_VENDOR_MAX_COMMAND_BUFFER_LEN",
         "type": "uint16",
@@ -1528,6 +1538,12 @@
         "name": "fuchsia.hardware.bluetooth/VendorFeatures.android_vendor_extensions",
         "ordinal": "2",
         "type": "fuchsia.hardware.bluetooth/AndroidVendorSupport"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.hardware.bluetooth/VendorFeatures.audio_offload_settings",
+        "ordinal": "3",
+        "type": "fuchsia.hardware.bluetooth/AudioOffloadSettings"
     },
     {
         "kind": "table",

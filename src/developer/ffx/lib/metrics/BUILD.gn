@@ -24,7 +24,7 @@ rustc_library("lib") {
     "//src/lib/analytics/rust:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

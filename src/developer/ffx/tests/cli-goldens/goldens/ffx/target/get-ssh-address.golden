@@ -25,7 +25,7 @@
     }
   ],
   "notes": [
-    "Return the SSH address of the default target defined in the\n`target.default` key. By default this comes from the 'User Configuration'.\n\nThe command takes a <timeout> value in seconds with a default of `1.0`\nand overrides the value in the `target.interaction.timeout` key."
+    "Return the SSH address of the default target, which can be retrieved\nwith `ffx target default get`.\n\nThe command takes a <timeout> value in seconds with a default of `1.0`\nand overrides the value in the `target.interaction.timeout` key."
   ],
   "commands": [],
   "positionals": [],

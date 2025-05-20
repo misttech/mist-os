@@ -453,155 +453,208 @@ class GnBuildArgsTest(unittest.TestCase):
     def setUp(self) -> None:
         self._td = tempfile.TemporaryDirectory()
         self._root = Path(self._td.name)
+        self._build_dir = tempfile.TemporaryDirectory()
+        self._build_root = Path(self._build_dir.name)
 
     def tearDown(self) -> None:
         self._td.cleanup()
+        self._build_dir.cleanup()
 
-    def test_find_and_read_all_build_args(self) -> None:
-        # First, a ValueError is raised if the main build is missing.
+    def test_find_all_gn_build_variables_for_bazel(self) -> None:
+        # First, a ValueError is raised if the file for main build is missing.
         with self.assertRaises(ValueError) as cm:
-            GnBuildArgs.find_and_read_all_build_args(self._root)
+            GnBuildArgs.find_all_gn_build_variables_for_bazel(
+                self._root, self._build_root
+            )
 
         self.assertEqual(
             str(cm.exception),
-            f"Missing required build arguments file: {self._root}/build/bazel/gn_build_args.txt",
+            f"Missing required build arguments file: {self._build_root}/gn_build_variables_for_bazel.json",
         )
 
-        # Second, create a main gn_build_args.txt value, and a vendor specific one.
-        main_file_path = self._root / "build/bazel/gn_build_args.txt"
-        main_file_path.parent.mkdir(parents=True)
+        # Second, create a main `gn_build_variables_for_bazel.json`` file, and
+        # a vendor-specific one.
+        main_file_path = self._build_root / "gn_build_variables_for_bazel.json"
         main_file_path.write_text("foo!")
 
+        vendor_source_path = self._root / "vendor/alice&bob"
+        vendor_source_path.mkdir(parents=True)
         vendor_file_path = (
-            self._root / "vendor/alice&bob/build/bazel/gn_build_args.txt"
+            self._build_root
+            / "vendor_alice&bob_gn_build_variables_for_bazel.json"
         )
-        vendor_file_path.parent.mkdir(parents=True)
         vendor_file_path.write_text("BAR?")
 
-        mapping, extra_ninja_inputs = GnBuildArgs.find_and_read_all_build_args(
-            self._root
+        relative_paths = GnBuildArgs.find_all_gn_build_variables_for_bazel(
+            self._root, self._build_root
         )
-        self.assertDictEqual(
-            mapping,
-            {
-                "build/bazel/gn_build_args.txt": "foo!",
-                "vendor/alice&bob/build/bazel/gn_build_args.txt": "BAR?",
-            },
-        )
-
-        self.assertSetEqual(
-            extra_ninja_inputs, {main_file_path, vendor_file_path}
+        self.assertEqual(
+            relative_paths,
+            [
+                "gn_build_variables_for_bazel.json",
+                "vendor_alice&bob_gn_build_variables_for_bazel.json",
+            ],
         )
 
     def test_generate_args_bzl(self) -> None:
-        args_json = {
-            "foo": True,
-            "bar": "some string",
-            "zoo": False,
-            "zoo2": "non-false string",
-            "ignored_list": [1, 2, 3, 4],
-        }
-
-        build_args = r"""# A COMMENT TO IGNORE
-# @LL@.IfChange
-foo: bool
-# @LL@.ThenChange(//bob.txt)
-
-# @LL@.IfChange
-bar: string
-zoo: string_or_false
-zoo2: string_or_false
-# @LL@.ThenChange(//alice.txt)
-""".replace(
-            "@LL@", "LINT"
-        )
+        gn_args_to_export = [
+            {
+                "location": "//bob.gni",
+                "name": "foo",
+                "type": "bool",
+                "value": True,
+            },
+            {
+                "location": "//alice.gni",
+                "name": "bar",
+                "type": "string",
+                "value": "some string",
+            },
+            {
+                "location": "//alice.gni",
+                "name": "zoo",
+                "type": "string_or_false",
+                "value": False,
+            },
+            {
+                "location": "//alice.gni",
+                "name": "zoo2",
+                "type": "string_or_false",
+                "value": "non-false string",
+            },
+            {
+                "location": "//build/baz.gni",
+                "name": "baz",
+                "type": "array_of_strings",
+                "value": ["1", "2", "3", "40", "fuzz"],
+            },
+            {
+                "location": "//build/fuzz.gni",
+                "name": "fuzz",
+                "type": "path",
+                "value": "//prebuilt/third_party/fuzz",
+            },
+            {
+                "location": "//build/fizz.gni",
+                "name": "absolute_fizz",
+                "type": "path",
+                "value": "/path/to/prebuilt/third_party/fuzz",
+            },
+        ]
 
         args_bzl = GnBuildArgs.generate_args_bzl(
-            args_json, build_args, "path/to/build_args.txt"
+            gn_args_to_export, Path("path/to/gn_build_variables_for_bazel.json")
         )
         self.assertEqual(
             args_bzl,
-            r"""# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
-# Variables listed from path/to/build_args.txt
+            r'''# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
+# Variables listed from path/to/gn_build_variables_for_bazel.json
 
-# From //bob.txt
+"""A subset of GN args that are needed in the Bazel build."""
+
+# From //bob.gni
 foo = True
 
-# From //alice.txt
+# From //alice.gni
 bar = "some string"
+
+# From //alice.gni
 zoo = ""
+
+# From //alice.gni
 zoo2 = "non-false string"
 
-""",
+# From //build/baz.gni
+baz = ['1', '2', '3', '40', 'fuzz']
+
+# From //build/fuzz.gni
+fuzz = "prebuilt/third_party/fuzz"
+
+# From //build/fizz.gni
+absolute_fizz = "/path/to/prebuilt/third_party/fuzz"
+''',
         )
 
     def test_record_fuchsia_build_config_dir(self) -> None:
-        args_json = {
-            "foo": True,
-            "bar": "some string",
-            "zoo": False,
-            "zoo2": "non-false string",
-            "ignored_list": [1, 2, 3, 4],
-        }
-
         generated = workspace_utils.GeneratedWorkspaceFiles()
 
-        main_args_path = self._root / "build/bazel/gn_build_args.txt"
-        main_args_path.parent.mkdir(parents=True)
-        # NOTE: We have to use formatting to avoid the static checks on Gerrit
-        # from complaining about invalid LINT statements in this file.
+        main_args_path = self._build_root / "gn_build_variables_for_bazel.json"
         main_args_path.write_text(
-            r"""# A COMMENT TO IGNORE
-# @LL@.IfChange
-foo: bool
-# @LL@.ThenChange(//main/BUILD.gn)
-""".replace(
-                "@LL@", "LINT"
+            json.dumps(
+                [
+                    {
+                        "location": "//bob.gni",
+                        "name": "foo",
+                        "type": "bool",
+                        "value": True,
+                    },
+                ]
             )
         )
 
+        vendor_source_path = self._root / "vendor/alice"
+        vendor_source_path.mkdir(parents=True)
         vendor_args_path = (
-            self._root / "vendor/alice/build/bazel/gn_build_args.txt"
+            self._build_root / "vendor_alice_gn_build_variables_for_bazel.json"
         )
-        vendor_args_path.parent.mkdir(parents=True)
         vendor_args_path.write_text(
-            r"""# ANOTHER COMMENT TO IGNORE
-# @LL@.IfChange
-bar: string
-zoo: string_or_false
-zoo2: string_or_false
-# @LL@.ThenChange(//vendor/alice/BUILD.gn)
-""".replace(
-                "@LL@", "LINT"
+            json.dumps(
+                [
+                    {
+                        "location": "//alice.gni",
+                        "name": "bar",
+                        "type": "string",
+                        "value": "some string",
+                    },
+                    {
+                        "location": "//alice.gni",
+                        "name": "zoo",
+                        "type": "string_or_false",
+                        "value": False,
+                    },
+                    {
+                        "location": "//alice.gni",
+                        "name": "zoo2",
+                        "type": "string_or_false",
+                        "value": "non-false string",
+                    },
+                ]
             )
         )
 
-        extra_ninja_inputs = GnBuildArgs.record_fuchsia_build_config_dir(
-            self._root, args_json, generated
+        GnBuildArgs.record_fuchsia_build_config_dir(
+            self._root, self._build_root, generated
         )
 
-        self.assertSetEqual(
-            extra_ninja_inputs, {main_args_path, vendor_args_path}
-        )
         generated_json = json.loads(generated.to_json())
 
-        EXPECTED_ARGS_BZL = r"""# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
-# Variables listed from build/bazel/gn_build_args.txt
+        EXPECTED_ARGS_BZL = r'''# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
+# Variables listed from {}/gn_build_variables_for_bazel.json
 
-# From //main/BUILD.gn
+"""A subset of GN args that are needed in the Bazel build."""
+
+# From //bob.gni
 foo = True
+'''.format(
+            self._build_root
+        )
 
-"""
+        EXPECTED_ALICE_ARGS_BZL = r'''# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
+# Variables listed from {}/vendor_alice_gn_build_variables_for_bazel.json
 
-        EXPECTED_ALICE_ARGS_BZL = r"""# AUTO-GENERATED BY FUCHSIA BUILD - DO NOT EDIT
-# Variables listed from vendor/alice/build/bazel/gn_build_args.txt
+"""A subset of GN args that are needed in the Bazel build."""
 
-# From //vendor/alice/BUILD.gn
+# From //alice.gni
 bar = "some string"
-zoo = ""
-zoo2 = "non-false string"
 
-"""
+# From //alice.gni
+zoo = ""
+
+# From //alice.gni
+zoo2 = "non-false string"
+'''.format(
+            self._build_root
+        )
 
         self.maxDiff = (
             None  # Ensure large dictionary differences are properly printed.
@@ -873,6 +926,154 @@ class CheckRegeneratorInputsUpdatesTest(unittest.TestCase):
         )
 
         self.assertSetEqual(updates, set())
+
+
+class RootFilesVariantGeneratorTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self._root = Path(self._td.name)
+
+    def tearDown(self) -> None:
+        self._td.cleanup()
+
+    def test_variants(self) -> None:
+        generated = workspace_utils.GeneratedWorkspaceFiles()
+        root_variants = workspace_utils.RootBazelFilesVariantsGenerator(
+            generated
+        )
+
+        self.maxDiff = None
+        self.assertEqual(
+            generated.to_json(),
+            r"""{
+  "workspace/fuchsia_build_generated/bazel_root_files": {
+    "target": "bazel_root_files.fuchsia",
+    "type": "raw_symlink"
+  }
+}""",
+        )
+
+        workspace_bazel_fuchsia = """# Example workspace
+workspace(name = "my_project")
+
+### FUCHSIA_SDK_CUTOFF
+local_repository(
+    name = "fuchsia_idk",
+    path = "ninja_build_dir/sdk/exported/bazel_in_tree_idk"
+)
+"""
+        workspace_bazel_path = self._root / "WORKSPACE.bazel"
+        workspace_bazel_path.write_text(workspace_bazel_fuchsia)
+        root_variants.add_file("WORKSPACE.bazel", workspace_bazel_path)
+
+        build_bazel_fuchsia = """# Example build file
+
+package(visibility = ["//visibility:public"])
+
+### FUCHSIA_SDK_CUTOFF
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_debug_symbols")
+
+fuchsia_debug_symbols(
+   name = "debug_symbols",
+   source_search_root = "//:BUILD.bazel",
+   build_id_dirs = [ "//:.build-id" ]
+)
+"""
+        root_variants.add_content(
+            "BUILD.bazel",
+            build_bazel_fuchsia,
+            self._root / "toplevel.BUILD.bazel",
+        )
+
+        bazelrc_template = """# A test .bazelrc file
+build --platforms=//build/bazel/platforms:{platform}
+
+### FUCHSIA_SDK_CUTOFF
+build --@rules_sdk//fuchsia:fuchsia_sdk_toolchain=@fuchsia_sdk//:fuchsia_sdk_toolchain
+"""
+        bazelrc_template_path = self._root / "template.bazelrc"
+        bazelrc_template_path.write_text(bazelrc_template)
+        root_variants.add_template_expansion(
+            ".bazelrc", bazelrc_template_path, platform="host"
+        )
+
+        entries = json.loads(generated.to_json())
+
+        def check_entry(name: str, expected: dict[str, str]) -> None:
+            self.assertDictEqual(entries[name], expected)
+
+        EXPECTED_ENTRIES = {
+            # First the root symlinks that go through the bazel_root_files symlinks.
+            "workspace/.bazelrc": {
+                "target": "fuchsia_build_generated/bazel_root_files/.bazelrc",
+                "type": "raw_symlink",
+            },
+            "workspace/BUILD.bazel": {
+                "target": "fuchsia_build_generated/bazel_root_files/BUILD.bazel",
+                "type": "raw_symlink",
+            },
+            "workspace/WORKSPACE.bazel": {
+                "target": "fuchsia_build_generated/bazel_root_files/WORKSPACE.bazel",
+                "type": "raw_symlink",
+            },
+            # Second, the bazel_root_files symlink.
+            "workspace/fuchsia_build_generated/bazel_root_files": {
+                "target": "bazel_root_files.fuchsia",
+                "type": "raw_symlink",
+            },
+            # Third, the Fuchsia-specific variants
+            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/.bazelrc": {
+                "content": """# A test .bazelrc file
+build --platforms=//build/bazel/platforms:host
+
+### FUCHSIA_SDK_CUTOFF
+build --@rules_sdk//fuchsia:fuchsia_sdk_toolchain=@fuchsia_sdk//:fuchsia_sdk_toolchain
+""",
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/BUILD.bazel": {
+                "content": build_bazel_fuchsia,
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/WORKSPACE.bazel": {
+                "target": f"{workspace_bazel_path}",
+                "type": "symlink",
+            },
+            # Fourth, the no-sdk variants.
+            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/.bazelrc": {
+                "content": """# A test .bazelrc file
+build --platforms=//build/bazel/platforms:host
+
+""",
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/BUILD.bazel": {
+                "content": """# Example build file
+
+package(visibility = ["//visibility:public"])
+
+""",
+                "type": "file",
+            },
+            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/WORKSPACE.bazel": {
+                "content": """# Example workspace
+workspace(name = "my_project")
+
+""",
+                "type": "file",
+            },
+        }
+
+        for entry_name, expected_value in EXPECTED_ENTRIES.items():
+            self.assertTrue(
+                entry_name in entries,
+                msg=f"Missing entry {entry_name}, got {entries.keys()} instead!",
+            )
+            self.assertDictEqual(
+                entries[entry_name],
+                expected_value,
+                msg=f"Invalid value for entry {entry_name}",
+            )
 
 
 if __name__ == "__main__":

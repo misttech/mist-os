@@ -35,7 +35,7 @@ go_library("build") {
   ]
 }
 
-go_test("pm_build_test") {
+go_test("host-target-testing-build-test") {
   library = ":build"
   deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 }

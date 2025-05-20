@@ -69,9 +69,6 @@ pub enum MessageReturn {
     FileCrashReport,
 
     /// There is no arg in this MessageReturn type. It only serves as an ACK.
-    SetTerminationSystemState,
-
-    /// There is no arg in this MessageReturn type. It only serves as an ACK.
     NotifyMicEnabledChanged,
 
     /// There is no arg in this MessageReturn type. It only serves as an ACK.

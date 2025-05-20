@@ -74,7 +74,7 @@ FlexibleFoo FlexibleFoo::WithI(int32_t&& val) {
 }
 
 void FlexibleFoo::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -295,7 +295,7 @@ StrictFoo StrictFoo::WithI(int32_t&& val) {
 }
 
 void StrictFoo::Encode(::fidl::Encoder* encoder, size_t offset,
-                       cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                       std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -447,7 +447,7 @@ extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictR
 const fidl_type_t* ProtocolRequestStrictResponseFlexibleRequest::FidlType = &test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
 
 void ProtocolRequestStrictResponseFlexibleRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ProtocolRequestStrictResponseFlexibleRequest>::value) {
     memcpy(_encoder->template GetPtr<ProtocolRequestStrictResponseFlexibleRequest>(_offset), this, sizeof(ProtocolRequestStrictResponseFlexibleRequest));
   } else {
@@ -474,7 +474,7 @@ extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictR
 const fidl_type_t* ProtocolRequestStrictResponseFlexibleResponse::FidlType = &test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
 
 void ProtocolRequestStrictResponseFlexibleResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ProtocolRequestStrictResponseFlexibleResponse>::value) {
     memcpy(_encoder->template GetPtr<ProtocolRequestStrictResponseFlexibleResponse>(_offset), this, sizeof(ProtocolRequestStrictResponseFlexibleResponse));
   } else {
@@ -501,7 +501,7 @@ extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibl
 const fidl_type_t* ProtocolRequestFlexibleResponseStrictRequest::FidlType = &test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
 
 void ProtocolRequestFlexibleResponseStrictRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                          std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ProtocolRequestFlexibleResponseStrictRequest>::value) {
     memcpy(_encoder->template GetPtr<ProtocolRequestFlexibleResponseStrictRequest>(_offset), this, sizeof(ProtocolRequestFlexibleResponseStrictRequest));
   } else {
@@ -528,7 +528,7 @@ extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibl
 const fidl_type_t* ProtocolRequestFlexibleResponseStrictResponse::FidlType = &test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 
 void ProtocolRequestFlexibleResponseStrictResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                                           cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                                           std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ProtocolRequestFlexibleResponseStrictResponse>::value) {
     memcpy(_encoder->template GetPtr<ProtocolRequestFlexibleResponseStrictResponse>(_offset), this, sizeof(ProtocolRequestFlexibleResponseStrictResponse));
   } else {

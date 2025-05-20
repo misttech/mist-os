@@ -86,7 +86,7 @@ std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
       std::vector<fad::ChannelAttributes> attributes;
       for (const auto& attribs : *chan_set.attributes()) {
         std::optional<uint32_t> max_channel_frequency;
-        if (attribs.max_frequency()) {
+        if (attribs.max_frequency().has_value()) {
           max_channel_frequency = std::min(*attribs.max_frequency(), max_format_rate / 2);
         }
         attributes.push_back({{
@@ -137,7 +137,7 @@ std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
     }
     // Make a copy of the frame_rates result, so we can sort it.
     std::vector<uint32_t> frame_rates = *pcm_formats.frame_rates();
-    std::sort(frame_rates.begin(), frame_rates.end());
+    std::ranges::sort(frame_rates);
 
     fad::PcmFormatSet pcm_format_set = {{
         .channel_sets = channel_sets,
@@ -159,14 +159,14 @@ bool ValidateRingBufferFormatSets(
   }
 
   for (const auto& rb_format_set : ring_buffer_format_sets) {
-    if (!rb_format_set.pcm_supported_formats()) {
+    if (!rb_format_set.pcm_supported_formats().has_value()) {
       FX_LOGS(WARNING) << "GetSupportedFormats: pcm_supported_formats is absent";
       return false;
     }
     const auto& pcm_format_set = *rb_format_set.pcm_supported_formats();
 
     // Frame rates
-    if (!pcm_format_set.frame_rates() || pcm_format_set.frame_rates()->empty()) {
+    if (!pcm_format_set.frame_rates().has_value() || pcm_format_set.frame_rates()->empty()) {
       FX_LOGS(WARNING) << "GetSupportedFormats: frame_rates[] is "
                        << (pcm_format_set.frame_rates() ? "empty" : "absent");
       return false;
@@ -191,14 +191,14 @@ bool ValidateRingBufferFormatSets(
     }
 
     // Channel sets
-    if (!pcm_format_set.channel_sets() || pcm_format_set.channel_sets()->empty()) {
+    if (!pcm_format_set.channel_sets().has_value() || pcm_format_set.channel_sets()->empty()) {
       FX_LOGS(WARNING) << "GetSupportedFormats: channel_sets[] is "
                        << (pcm_format_set.channel_sets() ? "empty" : "absent");
       return false;
     }
     auto max_allowed_frequency = max_supported_frame_rate / 2;
     for (const fha::ChannelSet& chan_set : *pcm_format_set.channel_sets()) {
-      if (!chan_set.attributes() || chan_set.attributes()->empty()) {
+      if (!chan_set.attributes().has_value() || chan_set.attributes()->empty()) {
         FX_LOGS(WARNING) << "GetSupportedFormats: ChannelSet.attributes[] is "
                          << (chan_set.attributes() ? "empty" : "absent");
         return false;
@@ -210,21 +210,22 @@ bool ValidateRingBufferFormatSets(
         return false;
       }
       for (const auto& attrib : *chan_set.attributes()) {
-        if (attrib.min_frequency()) {
+        if (attrib.min_frequency().has_value()) {
           if (*attrib.min_frequency() > max_allowed_frequency) {
             FX_LOGS(WARNING) << "GetSupportedFormats: ChannelAttributes.min_frequency ("
                              << *attrib.min_frequency() << ") out of range: "
                              << "[0, " << max_allowed_frequency << "]";
             return false;
           }
-          if (attrib.max_frequency() && *attrib.min_frequency() > *attrib.max_frequency()) {
+          if (attrib.max_frequency().has_value() &&
+              *attrib.min_frequency() > *attrib.max_frequency()) {
             FX_LOGS(WARNING) << "GetSupportedFormats: min_frequency (" << *attrib.min_frequency()
                              << ") cannot exceed max_frequency (" << *attrib.max_frequency() << ")";
             return false;
           }
         }
 
-        if (attrib.max_frequency()) {
+        if (attrib.max_frequency().has_value()) {
           if (*attrib.max_frequency() > max_allowed_frequency) {
             FX_LOGS(WARNING) << "GetSupportedFormats: ChannelAttrib.max_frequency "
                              << *attrib.max_frequency() << " will be limited to "
@@ -235,7 +236,7 @@ bool ValidateRingBufferFormatSets(
     }
 
     // Sample format
-    if (!pcm_format_set.sample_formats() || pcm_format_set.sample_formats()->empty()) {
+    if (!pcm_format_set.sample_formats().has_value() || pcm_format_set.sample_formats()->empty()) {
       FX_LOGS(WARNING) << "GetSupportedFormats: sample_formats[] is "
                        << (pcm_format_set.sample_formats() ? "empty" : "absent");
       return false;
@@ -250,7 +251,8 @@ bool ValidateRingBufferFormatSets(
     }
 
     // Bytes per sample
-    if (!pcm_format_set.bytes_per_sample() || pcm_format_set.bytes_per_sample()->empty()) {
+    if (!pcm_format_set.bytes_per_sample().has_value() ||
+        pcm_format_set.bytes_per_sample()->empty()) {
       FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample[] is "
                        << (pcm_format_set.bytes_per_sample() ? "empty" : "absent");
       return false;
@@ -288,7 +290,7 @@ bool ValidateRingBufferFormatSets(
     }
 
     // Valid bits per sample
-    if (!pcm_format_set.valid_bits_per_sample() ||
+    if (!pcm_format_set.valid_bits_per_sample().has_value() ||
         pcm_format_set.valid_bits_per_sample()->empty()) {
       FX_LOGS(WARNING) << "GetSupportedFormats: valid_bits_per_sample[] is "
                        << (pcm_format_set.valid_bits_per_sample() ? "empty" : "absent");
@@ -525,7 +527,7 @@ bool ValidateCodecFormatInfo(const fha::CodecFormatInfo& format_info) {
 bool ValidateCompositeProperties(const fha::CompositeProperties& composite_props) {
   LogCompositeProperties(composite_props);
 
-  if (!composite_props.clock_domain()) {
+  if (!composite_props.clock_domain().has_value()) {
     FX_LOGS(WARNING) << "Incomplete Composite/GetProperties response";
     return false;
   }
@@ -543,7 +545,7 @@ bool ValidatePlugState(const fha::PlugState& plug_state,
                        std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities) {
   LogPlugState(plug_state);
 
-  if (!plug_state.plugged() || !plug_state.plug_state_time()) {
+  if (!plug_state.plugged().has_value() || !plug_state.plug_state_time()) {
     FX_LOGS(WARNING) << "Incomplete Codec/WatchPlugState response: required field missing";
     return false;
   }
@@ -631,7 +633,7 @@ bool ValidateRingBufferProperties(const fha::RingBufferProperties& rb_props) {
   ADR_LOG(kLogDeviceMethods);
   LogRingBufferProperties(rb_props);
 
-  if (!rb_props.needs_cache_flush_or_invalidate()) {
+  if (!rb_props.needs_cache_flush_or_invalidate().has_value()) {
     FX_LOGS(WARNING) << "RingBufferProperties.needs_cache_flush_or_invalidate is missing";
     return false;
   }
@@ -640,7 +642,7 @@ bool ValidateRingBufferProperties(const fha::RingBufferProperties& rb_props) {
                      << ") is negative";
     return false;
   }
-  if (!rb_props.driver_transfer_bytes()) {
+  if (!rb_props.driver_transfer_bytes().has_value()) {
     FX_LOGS(WARNING) << "RingBufferProperties.driver_transfer_bytes is missing";
     return false;
   }
@@ -650,7 +652,7 @@ bool ValidateRingBufferProperties(const fha::RingBufferProperties& rb_props) {
 bool ValidateRingBufferFormat(const fha::Format& ring_buffer_format) {
   ADR_LOG(kLogDeviceMethods);
   LogRingBufferFormat(ring_buffer_format);
-  if (!ring_buffer_format.pcm_format()) {
+  if (!ring_buffer_format.pcm_format().has_value()) {
     FX_LOGS(WARNING) << "ring_buffer_format must set pcm_format";
     return false;
   }
@@ -895,9 +897,7 @@ bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
         (!std::isfinite(band_state.input_gain_db().value_or(0))) ||
         // lookahead, if present, must not be negative
         (band_state.lookahead().value_or(0) < 0)) {
-      FX_LOGS(WARNING) << "Invalid DynamicsBandState (id "
-                       << (band_state.id().has_value() ? std::to_string(*band_state.id())
-                                                       : "<none>")
+      FX_LOGS(WARNING) << "Invalid DynamicsBandState (id " << to_string(band_state.id(), "<none>")
                        << ")";
       return false;
     }
@@ -1074,9 +1074,7 @@ bool ValidateEqualizerElementState(const fhasp::ElementState& element_state,
          (*band_state.type() == fhasp::EqualizerBandType::kNotch ||
           *band_state.type() == fhasp::EqualizerBandType::kLowCut ||
           *band_state.type() == fhasp::EqualizerBandType::kHighCut))) {
-      FX_LOGS(WARNING) << "Invalid EqualizerBandState (id "
-                       << (band_state.id().has_value() ? std::to_string(*band_state.id())
-                                                       : "<none>")
+      FX_LOGS(WARNING) << "Invalid EqualizerBandState (id " << to_string(band_state.id(), "<none>")
                        << ")";
       return false;
     }
@@ -1208,9 +1206,7 @@ bool ValidateSettableEqualizerElementState(const fhasp::SettableElementState& el
          *band_state.type() == fhasp::EqualizerBandType::kHighShelf &&
          !(*element.type_specific()->equalizer()->supported_controls() &
            fhasp::EqualizerSupportedControls::kSupportsTypeHighShelf))) {
-      FX_LOGS(WARNING) << "Invalid EqualizerBandState (id "
-                       << (band_state.id().has_value() ? std::to_string(*band_state.id())
-                                                       : "<none>")
+      FX_LOGS(WARNING) << "Invalid EqualizerBandState (id " << to_string(band_state.id(), "<none>")
                        << ")";
       return false;
     }
@@ -1747,7 +1743,7 @@ bool ValidateTopology(const fhasp::Topology& topology,
   }
 
   // Check for topology "violations" based on element type.
-  return std::all_of(element_map.begin(), element_map.end(), [edge_pairs](const auto& entry) {
+  return std::ranges::all_of(element_map, [edge_pairs](const auto& entry) {
     auto id = entry.first;
 
     if (!entry.second.element.type().has_value()) {

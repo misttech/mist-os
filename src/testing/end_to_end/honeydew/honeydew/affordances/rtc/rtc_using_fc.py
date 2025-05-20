@@ -20,7 +20,7 @@ from honeydew.typing import custom_types
 CAPABILITY = "fuchsia.hardware.rtc.Service/default/device"
 
 
-class RtcUisngFc(rtc.Rtc):
+class RtcUsingFc(rtc.Rtc):
     """Affordance for the fuchsia.hardware.rtc.Device protocol."""
 
     # TODO(b/316959472) Use toolbox once RTC service lands in the toolbox realm.

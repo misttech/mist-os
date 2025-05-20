@@ -178,12 +178,15 @@ impl PowerManager {
                 &self.nodes,
             )
             .build()?,
-            "ThermalLoadDriver" => thermal_load_driver::ThermalLoadDriverBuilder::new_from_json(
-                json_data,
-                &self.nodes,
-                &structured_config,
-            )
-            .build()?,
+            "ThermalLoadDriver" => {
+                thermal_load_driver::ThermalLoadDriverBuilder::new_from_json(
+                    json_data,
+                    &self.nodes,
+                    &structured_config,
+                )
+                .build()
+                .await?
+            }
 
             // TODO(https://fxbug.dev/42062455): Remove async node creation
             "ThermalPolicy" => {

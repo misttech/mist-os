@@ -18,7 +18,7 @@
 #include <kernel/spinlock.h>
 #include <ktl/atomic.h>
 #include <ktl/limits.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/resource_dispatcher.h>
 
 // An MsiAllocation is a wrapper around an allocated block of MSI interrupts.

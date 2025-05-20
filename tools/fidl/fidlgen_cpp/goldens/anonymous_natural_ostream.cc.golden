@@ -185,7 +185,25 @@ std::ostream& fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodR
   }
   return os;
 }
+#ifdef __Fuchsia__
 
+std::ostream& fidl::ostream::Formatter<::fidl::ClientEnd<::test_anonymous::SomeProtocol>>::Format(std::ostream& os, const ::fidl::ClientEnd<::test_anonymous::SomeProtocol>& value) {
+  return os << "ClientEnd<" << "test_anonymous::SomeProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& fidl::ostream::Formatter<::fidl::ServerEnd<::test_anonymous::SomeProtocol>>::Format(std::ostream& os, const ::fidl::ServerEnd<::test_anonymous::SomeProtocol>& value) {
+  return os << "ServerEnd<" << "test_anonymous::SomeProtocol" << ">(" << value.channel().get() << ")";
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_anonymous::SomeProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_anonymous::SomeProtocol>>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_anonymous::SomeProtocol>& value) {
+  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_anonymous::SomeProtocol>>::Format(os, value);
+}
+
+#endif  // __Fuchsia__
 namespace test_anonymous {
 
 std::ostream& operator<<(std::ostream& os, const ::test_anonymous::Op& value) {

@@ -24,9 +24,13 @@
 LegacyBoot gLegacyBoot;
 
 // This populates the allocator and also collects other Multiboot information.
-void InitMemory(void* bootloader_data, AddressSpace* aspace) {
+void InitMemory(const void* bootloader_data, ktl::optional<EarlyBootZbi> zbi,
+                AddressSpace* aspace) {
   // `aspace` is ignored as we'll set up the virtual address space as we switch
   // to long mode.
+
+  // A multiboot shim should not have a ZBI encoding boot state at this point.
+  ZX_DEBUG_ASSERT(!zbi);
 
   const auto& info = *static_cast<const multiboot_info_t*>(bootloader_data);
 

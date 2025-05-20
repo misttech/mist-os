@@ -14,7 +14,7 @@ use futures::{FutureExt, StreamExt as _};
 use log::{trace, warn};
 use netstack3_core::sync::Mutex as CoreMutex;
 
-use crate::bindings::util::{NeedsDataNotifier, NeedsDataWatcher};
+use crate::bindings::util::{NeedsDataNotifier, NeedsDataWatcher, ScopeExt as _};
 
 pub(crate) use scheduled_instant::ScheduledInstant;
 
@@ -59,14 +59,20 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
     ///
     /// # Panics
     ///
-    /// Panics if this `TimerDispatcher` has already been spawned.
+    /// Panics if this `TimerDispatcher` has already been spawned. Panics if
+    /// `scope` is already cancelled when `spawn` is called.
     pub(crate) fn spawn<H: FnMut(T, UniqueTimerId<T>) + Send + Sync + 'static>(
         &self,
+        scope: &fasync::ScopeHandle,
         handler: H,
-    ) -> fasync::Task<()> {
+    ) -> fasync::JoinHandle<()> {
+        let guard = scope.active_guard().expect("scope cancelled");
         let watcher =
             self.inner.state.lock().watcher.take().expect("timer dispatcher already spawned");
-        fasync::Task::spawn(Self::worker(handler, watcher, Arc::clone(&self.inner)))
+        scope.spawn_guarded_assert_cancelled(
+            guard,
+            Self::worker(handler, watcher, Arc::clone(&self.inner)),
+        )
     }
 
     /// Creates a new timer with identifier `dispatch` on this `dispatcher`.
@@ -595,17 +601,19 @@ mod tests {
     struct TestContext {
         dispatcher: TimerDispatcher<TimerId>,
         fired: mpsc::UnboundedReceiver<TimerId>,
-        task: fasync::Task<()>,
+        scope: fasync::Scope,
     }
 
     impl TestContext {
         fn new() -> Self {
             let dispatcher = TimerDispatcher::default();
             let (sender, fired) = mpsc::unbounded();
-            let task = dispatcher.spawn(move |dispatch, _timer_id| {
-                sender.unbounded_send(dispatch).expect("failed to send fired timer")
-            });
-            Self { dispatcher, fired, task }
+            let scope = fasync::Scope::new_with_name("timer_test");
+            let _: fasync::JoinHandle<()> =
+                dispatcher.spawn(scope.as_handle(), move |dispatch, _timer_id| {
+                    sender.unbounded_send(dispatch).expect("failed to send fired timer")
+                });
+            Self { dispatcher, fired, scope }
         }
 
         fn heap_len(&self) -> usize {
@@ -617,9 +625,10 @@ mod tests {
         }
 
         async fn shutdown(self) {
-            let Self { dispatcher, fired, task } = self;
+            let Self { dispatcher, fired, scope } = self;
+            let scope = scope.cancel();
             dispatcher.stop();
-            task.await;
+            scope.await;
             assert_eq!(fired.collect::<Vec<_>>().await, vec![], "unacknowledged fired timers");
         }
 

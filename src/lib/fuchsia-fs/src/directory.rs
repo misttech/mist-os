@@ -150,11 +150,11 @@ pub fn open_directory_async(
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     parent
         .open(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -173,11 +173,11 @@ pub async fn open_directory(
 
     let flags = flags | fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION;
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     parent
         .open(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -199,11 +199,11 @@ pub async fn create_directory(
         | fio::Flags::PROTOCOL_DIRECTORY
         | fio::Flags::FLAG_SEND_REPRESENTATION;
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     parent
         .open(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -244,11 +244,11 @@ pub fn open_file_async(
 
     let flags = flags | fio::Flags::PROTOCOL_FILE;
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     parent
         .open(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -267,11 +267,11 @@ pub async fn open_file(
 
     let flags = flags | fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_SEND_REPRESENTATION;
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     parent
         .open(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -291,11 +291,11 @@ pub async fn open_node(
 
     let flags = flags | fio::Flags::FLAG_SEND_REPRESENTATION;
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     parent
         .open(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -313,11 +313,11 @@ pub fn open_async<P: ProtocolMarker>(
 ) -> Result<P::Proxy, OpenError> {
     let (client, server_end) = parent.domain().create_endpoints::<P>();
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     let () = parent
         .open(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     let () = parent
         .open3(path, flags, &fio::Options::default(), server_end.into_channel())
         .map_err(OpenError::SendOpenRequest)?;
@@ -699,11 +699,11 @@ pub async fn remove_dir_recursive(
 ) -> Result<(), EnumerateError> {
     let (dir, dir_server) = root_dir.domain().create_proxy::<fio::DirectoryMarker>();
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "27")]
     root_dir
         .open(name, DIR_FLAGS, &fio::Options::default(), dir_server.into_channel())
         .map_err(|e| EnumerateError::Fidl("open", e))?;
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     root_dir
         .open3(name, DIR_FLAGS, &fio::Options::default(), dir_server.into_channel())
         .map_err(|e| EnumerateError::Fidl("open", e))?;
@@ -729,7 +729,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
                 DirentKind::Directory => {
                     let (subdir, subdir_server) =
                         dir.domain().create_proxy::<fio::DirectoryMarker>();
-                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    #[cfg(fuchsia_api_level_at_least = "27")]
                     dir.open(
                         &dirent.name,
                         DIR_FLAGS,
@@ -737,7 +737,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
                         subdir_server.into_channel(),
                     )
                     .map_err(|e| EnumerateError::Fidl("open", e))?;
-                    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+                    #[cfg(not(fuchsia_api_level_at_least = "27"))]
                     dir.open3(
                         &dirent.name,
                         DIR_FLAGS,
@@ -1014,10 +1014,10 @@ mod tests {
                     panic!("successfully opened when expected failure, could describe: {:?}", d)
                 }
             }
-            if flags.intersects(fio::Flags::PERM_READ) {
+            if flags.intersects(fio::Flags::PERM_READ_BYTES) {
                 assert_eq!(crate::file::read_to_string(&file).await.unwrap(), file_name);
             }
-            if flags.intersects(fio::Flags::PERM_WRITE) {
+            if flags.intersects(fio::Flags::PERM_WRITE_BYTES) {
                 let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
                 let _: u64 = file
                     .write(file_name.as_bytes())
@@ -1032,10 +1032,10 @@ mod tests {
 
             match open_file(&example_dir_proxy, file_name, flags).await {
                 Ok(file) if should_succeed => {
-                    if flags.intersects(fio::Flags::PERM_READ) {
+                    if flags.intersects(fio::Flags::PERM_READ_BYTES) {
                         assert_eq!(crate::file::read_to_string(&file).await.unwrap(), file_name);
                     }
-                    if flags.intersects(fio::Flags::PERM_WRITE) {
+                    if flags.intersects(fio::Flags::PERM_WRITE_BYTES) {
                         let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
                         let _: u64 = file
                             .write(file_name.as_bytes())

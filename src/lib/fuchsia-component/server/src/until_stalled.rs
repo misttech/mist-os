@@ -83,10 +83,16 @@ impl<ServiceObjTy: ServiceObjTrait> Stream for StallableServiceFs<ServiceObjTy> 
         }
 
         // Poll the underlying service fs to handle requests.
+        //
+        // NOTE: Normally, it isn't safe to poll a stream after it returns None, but ServiceFs
+        // supports this.
         let poll_fs = this.fs.poll_next_unpin(cx);
         if let Poll::Ready(Some(request)) = poll_fs {
             // If there is some connection request, always return that to the user first.
-            return Poll::Ready(Some(Item::Request(request, this.connector.scope.active_guard())));
+            return match this.connector.scope.try_active_guard() {
+                Some(guard) => Poll::Ready(Some(Item::Request(request, guard))),
+                None => Poll::Ready(None),
+            };
         }
 
         // If we get here, the underlying service fs is either finished, or pending.
@@ -104,6 +110,13 @@ impl<ServiceObjTy: ServiceObjTrait> Stream for StallableServiceFs<ServiceObjTy> 
                     if let Poll::Ready(None) = poll_fs {
                         // The service fs finished. Return the channel if we have it.
                         *this.is_terminated = true;
+
+                        // On a multithreaded executor, it is possible that some other task took an
+                        // active guard between us polling `fs` above and here, which would mean the
+                        // scope doesn't immediately shutdown. This isn't something we need to
+                        // support so we won't worry about this.
+                        this.connector.scope.shutdown();
+
                         return Poll::Ready(
                             channel.take().map(|wait| Item::Stalled(wait.take_handle().into())),
                         );
@@ -209,10 +222,11 @@ impl<ServiceObjTy: ServiceObjTrait> StallableServiceFs<ServiceObjTy> {
         }
     }
 
-    /// Returns an [`ActiveGuard`] that will prevent the [`ServiceFs`] from shutting down until
-    /// the [`ActiveGuard`] is dropped.
-    pub fn active_guard(&self) -> ActiveGuard {
-        self.connector.scope.active_guard()
+    /// Returns an [`ActiveGuard`] that will prevent the [`ServiceFs`] from shutting down until the
+    /// [`ActiveGuard`] is dropped.  This will return None if an active guard cannot be obtained
+    /// (e.g.  if the StallableServiceFs stream has terminated, or is just about to terminate).
+    pub fn try_active_guard(&self) -> Option<ActiveGuard> {
+        self.connector.scope.try_active_guard()
     }
 }
 

@@ -54,7 +54,7 @@ struct MsgHeader {
     offset++;
   }
 
-  void WriteString(cpp17::string_view value) {
+  void WriteString(std::string_view value) {
     size_t total_chars = value.size();
     size_t written_chars = 0;
     while (written_chars < total_chars) {
@@ -77,7 +77,7 @@ struct MsgHeader {
   // number of bytes written. Returns 0 only if
   // the length of the string is 0, or if we're
   // exactly at the end of the buffer and need a reset.
-  size_t WriteStringInternal(cpp17::string_view value) {
+  size_t WriteStringInternal(std::string_view value) {
     size_t len = value.size();
     auto remaining = RemainingSpace();
     if (len > remaining) {

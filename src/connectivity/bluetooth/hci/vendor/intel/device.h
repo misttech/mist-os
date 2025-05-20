@@ -22,10 +22,7 @@
 
 namespace bt_hci_intel {
 
-class Device : public fdf::DriverBase,
-               public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
-               public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
-               public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
+class Device : public fdf::DriverBase, public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
   Device(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
@@ -38,11 +35,6 @@ class Device : public fdf::DriverBase,
   // fdf::DriverBase overrides
   void Start(fdf::StartCompleter completer) override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
-
-  void handle_unknown_event(
-      fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
-  void handle_unknown_event(
-      fidl::UnknownEventMetadata<fuchsia_driver_framework::Node> metadata) override {}
 
  private:
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations
@@ -79,8 +71,7 @@ class Device : public fdf::DriverBase,
 
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
 
-  fidl::WireClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
+  fidl::WireClient<fuchsia_driver_framework::NodeController> child_node_controller_;
   fidl::WireClient<fuchsia_driver_framework::Node> child_node_;
 
   fdf::Dispatcher hci_client_dispatcher_;

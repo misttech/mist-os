@@ -19,7 +19,9 @@ import fuchsia_controller_py as fc
 TXID_Type = int
 Ordinal = int
 
-FidlMessage = Tuple[bytearray, List[fc.Channel]]
+FidlMessage = Tuple[
+    bytes, List[fc.Channel] | List[tuple[int, int, int, int, int]]
+]
 
 # The number of bytes in a FIDL header.
 FIDL_HEADER_SIZE = 8

@@ -6,7 +6,6 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_GPT_GPT_H_
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/c/banjo.h>
@@ -73,11 +72,9 @@ using ManagerDeviceType =
 
 class PartitionManager : public ManagerDeviceType {
  public:
-  PartitionManager(
-      std::unique_ptr<GptDevice> gpt,
-      std::optional<ddk::DecodedMetadata<fuchsia_hardware_gpt_metadata::wire::GptInfo>> metadata,
-      const block_impl_protocol_t& protocol, zx_device_t* parent)
-      : ManagerDeviceType(parent), metadata_(std::move(metadata)), gpt_(std::move(gpt)) {
+  PartitionManager(std::unique_ptr<GptDevice> gpt, const block_impl_protocol_t& protocol,
+                   zx_device_t* parent)
+      : ManagerDeviceType(parent), gpt_(std::move(gpt)) {
     memcpy(&block_protocol_, &protocol, sizeof(protocol));
   }
 
@@ -124,7 +121,6 @@ class PartitionManager : public ManagerDeviceType {
       __TA_REQUIRES(lock_);
 
   block_impl_protocol_t block_protocol_;
-  std::optional<ddk::DecodedMetadata<fuchsia_hardware_gpt_metadata::wire::GptInfo>> metadata_;
   std::mutex lock_;
   std::unique_ptr<GptDevice> gpt_ __TA_GUARDED(lock_);
 };

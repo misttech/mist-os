@@ -30,7 +30,7 @@ def _get_fuchsia_source_relative_path(repo_ctx, path):
     """
     fuchsia_source_dir = repo_ctx.attr.fuchsia_source_dir
     if not fuchsia_source_dir:
-        return repo_ctx.path(Label("@//:" + path))
+        return repo_ctx.path("%s/%s" % (repo_ctx.workspace_root, path))
 
     if not fuchsia_source_dir.startswith("/"):
         fuchsia_source_dir = "%s/%s" % (repo_ctx.workspace_root, fuchsia_source_dir)
@@ -48,9 +48,9 @@ def _get_ninja_output_dir(repo_ctx):
     """
 
     # The config file at this location contains the location of the TOPDIR
-    # used by update-workspace.py, e.g. `gen/build/bazel`. This code assumes
+    # used by //build/regenerator.py, e.g. `gen/build/bazel`. This code assumes
     # that the workspace is one of its sub-directories, so compute a
-    # back-tracking path prefix by counting the number of path num_fragment
+    # back-tracking path prefix by counting the number of path fragments
     # in it.
     config_path = _get_fuchsia_source_relative_path(
         repo_ctx,

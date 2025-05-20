@@ -37,12 +37,36 @@
             availability: "transitional",
         },
         {
+            config: "fuchsia.starnix.config.container.SelinuxExceptions",
+            key: "selinux_exceptions",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 1024,
+            },
+            max_count: 1024,
+            default: [],
+
+            // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
             config: "fuchsia.time.config.WritableUTCTime",
             key: "enable_utc_time_adjustment",
             type: "bool",
             default: false,
 
             // See https://fxbug.dev/379782290 for context.
+            availability: "transitional",
+        },
+        {
+            config: "fuchsia.time.config.HasWakeAlarms",
+            key: "enable_wake_alarms",
+            type: "bool",
+
+            // TODO: b/416081776 - set to false once actual config is deployed.
+            // Current behavior is equivalent to having this set to `true`.
+            default: true,
             availability: "transitional",
         },
         {

@@ -126,8 +126,7 @@ async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
     // Avoid tainting a product bundle. They are intended to be immutable.
     let repo_path = &cmd.repo_path;
     if is_product_bundle(repo_path).await? {
-        let cmdline =
-            format!("--<your args> --product-bundle {} /path/to/existing/repo", repo_path);
+        let cmdline = format!("--<your args> --product-bundle {repo_path} /path/to/existing/repo");
         // TODO(https://fxbug.dev/371945605): This should be an error after clients are migrated.
         log::warn!(
             "The repo path {} points to a product bundle. Product bundles are immutable and so should not be published to. You probably want arguments like '{}'",
@@ -309,10 +308,10 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     }
     if let Some(blob_manifest_path) = &cmd.blob_manifest {
         let file = File::create(blob_manifest_path)
-            .with_context(|| format!("creating {}", blob_manifest_path))?;
+            .with_context(|| format!("creating {blob_manifest_path}"))?;
 
         serde_json::to_writer(std::io::BufWriter::new(file), &staged_blobs)
-            .with_context(|| format!("writing {}", blob_manifest_path))?;
+            .with_context(|| format!("writing {blob_manifest_path}"))?;
     }
 
     Ok(())

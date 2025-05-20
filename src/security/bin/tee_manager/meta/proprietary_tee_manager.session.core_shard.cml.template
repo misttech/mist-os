@@ -1,0 +1,27 @@
+{
+    children: [
+        {
+            name: "tee_manager",
+            url: "{{COMPONENT_URL}}",
+        },
+    ],
+    expose: [
+        {
+            dictionary: "tee_key_management",
+            from: "#tee_manager",
+        },
+    ],
+    offer: [
+        {
+            service: "fuchsia.hardware.tee.proprietary.Service",
+            from: "parent",
+            to: "#tee_manager",
+            availability: "same_as_target",
+        },
+        {
+            dictionary: "tee_session",
+            from: "#tee_manager",
+            to: "#session-manager",
+        },
+    ],
+}

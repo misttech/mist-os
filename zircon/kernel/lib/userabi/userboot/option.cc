@@ -7,7 +7,8 @@
 #include "option.h"
 
 #include <lib/boot-options/word-view.h>
-#include <lib/stdcompat/string_view.h>
+
+#include <string_view>
 
 #include "util.h"
 
@@ -77,7 +78,7 @@ constexpr bool ParseOption(std::string_view key, std::string_view value, Options
 
 void ParseCmdline(const zx::debuglog& log, std::string_view cmdline, Options& opts) {
   for (std::string_view opt : WordView(cmdline)) {
-    if (!cpp20::starts_with(opt, kOptPrefix)) {
+    if (!opt.starts_with(kOptPrefix)) {
       continue;
     }
 

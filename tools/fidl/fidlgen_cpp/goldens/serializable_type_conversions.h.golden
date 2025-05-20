@@ -71,9 +71,6 @@ struct WireTypeForNaturalType<::test_serializable::SerializableUnion> {
   using type = ::test_serializable::wire::SerializableUnion;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

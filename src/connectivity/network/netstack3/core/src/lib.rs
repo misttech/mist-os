@@ -54,7 +54,7 @@ pub mod device {
         MaxEthernetFrameSize, RecvEthernetFrameMeta,
     };
     pub use netstack3_device::loopback::{
-        LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
+        LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId,
     };
     pub use netstack3_device::pure_ip::{
         PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
@@ -96,9 +96,11 @@ pub mod filter {
 
     pub use netstack3_filter::{
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
-        FilterBindingsTypes, Hook, InterfaceMatcher, InterfaceProperties, IpRoutines, MarkAction,
-        NatRoutines, PacketMatcher, PortMatcher, ProofOfEgressCheck, Routine, Routines, Rule,
-        TransparentProxy, TransportProtocolMatcher, Tuple, UninstalledRoutine, ValidationError,
+        FilterBindingsTypes, FilterIpExt, Hook, InterfaceMatcher, InterfaceProperties, IpPacket,
+        IpRoutines, MarkAction, NatRoutines, PacketMatcher, PortMatcher, ProofOfEgressCheck,
+        Routine, Routines, Rule, SocketEgressFilterResult, SocketOpsFilter,
+        SocketOpsFilterBindingContext, TransparentProxy, TransportProtocolMatcher, Tuple,
+        UninstalledRoutine, ValidationError,
     };
 }
 
@@ -123,19 +125,19 @@ pub mod ip {
         mod multicast_forwarding;
         mod raw;
 
-        pub(crate) use device::{CoreCtxWithIpDeviceConfiguration, IpAddrCtxSpec};
+        pub(crate) use device::CoreCtxWithIpDeviceConfiguration;
     }
 
     // Re-exported types.
-    pub use netstack3_base::{Mark, MarkDomain, SubnetMatcher, WrapBroadcastMarker};
+    pub use netstack3_base::{Mark, MarkDomain, Marks, SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
-        CommonAddressProperties, IidGenerationConfiguration, IidSecret, IpAddressState,
-        IpDeviceConfiguration, IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate,
-        IpDeviceEvent, Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate,
-        Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate, Lifetime,
-        PreferredLifetime, SetIpAddressPropertiesError, SlaacConfiguration,
-        SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
+        CommonAddressConfig, CommonAddressProperties, IidGenerationConfiguration, IidSecret,
+        IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationAndFlags,
+        IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4AddrConfig, Ipv4DeviceConfiguration,
+        Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+        Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SetIpAddressPropertiesError,
+        SlaacConfiguration, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
         TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode};

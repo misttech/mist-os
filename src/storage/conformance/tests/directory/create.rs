@@ -107,7 +107,9 @@ async fn create_directory() {
     let dir_with_sufficient_rights = dir
         .open_node::<fio::DirectoryMarker>(
             "dir",
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE | fio::Flags::PERM_MODIFY,
+            fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::FLAG_MUST_CREATE
+                | fio::Flags::PERM_MODIFY_DIRECTORY,
             None,
         )
         .await
@@ -199,7 +201,7 @@ async fn create_directory_with_create_attributes() {
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY
                 | fio::Flags::FLAG_MUST_CREATE
-                | fio::Flags::PERM_MODIFY
+                | fio::Flags::PERM_MODIFY_DIRECTORY
                 | fio::Flags::PERM_GET_ATTRIBUTES,
             None,
         )
@@ -284,7 +286,9 @@ async fn create_file() {
     let dir_with_sufficient_rights = dir
         .open_node::<fio::DirectoryMarker>(
             "dir",
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE | fio::Flags::PERM_MODIFY,
+            fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::FLAG_MUST_CREATE
+                | fio::Flags::PERM_MODIFY_DIRECTORY,
             None,
         )
         .await
@@ -353,7 +357,7 @@ async fn create_file_with_create_attributes() {
             "dir",
             fio::Flags::PROTOCOL_DIRECTORY
                 | fio::Flags::FLAG_MUST_CREATE
-                | fio::Flags::PERM_MODIFY
+                | fio::Flags::PERM_MODIFY_DIRECTORY
                 | fio::Flags::PERM_GET_ATTRIBUTES,
             None,
         )

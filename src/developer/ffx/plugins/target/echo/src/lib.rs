@@ -126,8 +126,9 @@ mod test {
         RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
     };
     use ffx_config::environment::ExecutableKind;
+    use ffx_target::fho::FhoConnectionBehavior;
     use ffx_writer::{Format, TestBuffers};
-    use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+    use fho::{FhoEnvironment, TryFromEnv};
     use futures::FutureExt;
     use serde_json::json;
     use std::sync::Arc;
@@ -155,12 +156,12 @@ mod test {
 
     async fn run_echo_test(cmd: EchoCommand) -> String {
         let client = fdomain_local::local_client(|| Err(fidl::Status::NOT_SUPPORTED));
-        let fake_injector = FakeInjector {
+        let fake_injector = Arc::new(FakeInjector {
             remote_factory_closure_f: Box::new(move || {
                 Box::pin(setup_fake_service(Arc::clone(&client)).map(Ok))
             }),
             ..Default::default()
-        };
+        });
 
         let env = FhoEnvironment::new_with_args(
             &ffx_config::EnvironmentContext::no_context(
@@ -171,7 +172,8 @@ mod test {
             ),
             &["some", "test"],
         );
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(fake_injector));
 
         let connector = Connector::try_from_env(&env).await.expect("Could not make test connector");
         let tool = EchoTool { cmd, rcs_proxy: connector };
@@ -202,12 +204,12 @@ mod test {
     #[fuchsia::test]
     async fn test_echo_with_machine() -> Result<()> {
         let client = fdomain_local::local_client(|| Err(fidl::Status::NOT_SUPPORTED));
-        let fake_injector = FakeInjector {
+        let fake_injector = Arc::new(FakeInjector {
             remote_factory_closure_f: Box::new(move || {
                 Box::pin(setup_fake_service(Arc::clone(&client)).map(Ok))
             }),
             ..Default::default()
-        };
+        });
 
         let env = FhoEnvironment::new_with_args(
             &ffx_config::EnvironmentContext::no_context(
@@ -218,7 +220,8 @@ mod test {
             ),
             &["some", "test"],
         );
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(fake_injector));
         let connector = Connector::try_from_env(&env).await.expect("Could not make test connector");
         let cmd = EchoCommand { text: Some("test".to_string()), repeat: false };
         let tool = EchoTool { cmd, rcs_proxy: connector };
@@ -253,13 +256,11 @@ mod test {
             "expected strict commandline to create strict environment context"
         );
         let fho_env = FhoEnvironment::new(&context, &cmdline);
+        let target_env = ffx_target::fho::target_interface(&fho_env);
         let _tool = EchoTool::from_env(fho_env.clone(), EchoCommand { text: None, repeat: false })
             .await
             .unwrap();
-        assert!(matches!(
-            fho_env.behavior().await,
-            Some(FhoConnectionBehavior::DirectConnector(_))
-        ));
+        assert!(matches!(target_env.behavior(), Some(FhoConnectionBehavior::DirectConnector(_))));
     }
 
     #[fuchsia::test]
@@ -273,12 +274,10 @@ mod test {
             "expected non-strict commandline to create correct environment context"
         );
         let fho_env = FhoEnvironment::new(&context, &cmdline);
+        let target_env = ffx_target::fho::target_interface(&fho_env);
         let _tool = EchoTool::from_env(fho_env.clone(), EchoCommand { text: None, repeat: false })
             .await
             .unwrap();
-        assert!(matches!(
-            fho_env.behavior().await,
-            Some(FhoConnectionBehavior::DaemonConnector(_))
-        ));
+        assert!(matches!(target_env.behavior(), Some(FhoConnectionBehavior::DaemonConnector(_))));
     }
 }

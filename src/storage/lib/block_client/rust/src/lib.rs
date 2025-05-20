@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_hardware_block::BlockProxy;
+use fidl_fuchsia_hardware_block::{BlockProxy, MAX_TRANSFER_UNBOUNDED};
 use fidl_fuchsia_hardware_block_partition::PartitionProxy;
 use fidl_fuchsia_hardware_block_volume::VolumeProxy;
 use fuchsia_sync::Mutex;
@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::mem::MaybeUninit;
+use std::num::NonZero;
 use std::ops::{DerefMut, Range};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU16, Ordering};
@@ -346,6 +347,9 @@ pub trait BlockClient: Send + Sync {
     /// Returns the size, in blocks, of the device.
     fn block_count(&self) -> u64;
 
+    /// Returns the maximum number of blocks which can be transferred in a single request.
+    fn max_transfer_blocks(&self) -> Option<NonZero<u32>>;
+
     /// Returns the block flags reported by the device.
     fn block_flags(&self) -> BlockFlags;
 
@@ -356,6 +360,7 @@ pub trait BlockClient: Send + Sync {
 struct Common {
     block_size: u32,
     block_count: u64,
+    max_transfer_blocks: Option<NonZero<u32>>,
     block_flags: BlockFlags,
     fifo_state: FifoStateRef,
     temp_vmo: futures::lock::Mutex<zx::Vmo>,
@@ -374,6 +379,11 @@ impl Common {
         Self {
             block_size: info.block_size,
             block_count: info.block_count,
+            max_transfer_blocks: if info.max_transfer_size != MAX_TRANSFER_UNBOUNDED {
+                NonZero::new(info.max_transfer_size / info.block_size)
+            } else {
+                None
+            },
             block_flags: info.flags,
             fifo_state,
             temp_vmo: futures::lock::Mutex::new(temp_vmo),
@@ -604,6 +614,10 @@ impl Common {
         self.block_count
     }
 
+    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+        self.max_transfer_blocks.clone()
+    }
+
     fn block_flags(&self) -> BlockFlags {
         self.block_flags
     }
@@ -746,6 +760,10 @@ impl BlockClient for RemoteBlockClient {
 
     fn block_count(&self) -> u64 {
         self.common.block_count()
+    }
+
+    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+        self.common.max_transfer_blocks()
     }
 
     fn block_flags(&self) -> BlockFlags {
@@ -1349,6 +1367,7 @@ mod tests {
             async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
                 Ok(Cow::Owned(DeviceInfo::Partition(PartitionInfo {
                     device_flags: fidl_fuchsia_hardware_block::Flag::empty(),
+                    max_transfer_blocks: None,
                     block_range: Some(0..1000),
                     type_guid: [0; 16],
                     instance_guid: [0; 16],

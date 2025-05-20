@@ -1,0 +1,22 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.hardware.haptics;
+
+using zx;
+
+@discoverable(client="platform", server="external")
+open protocol Device {
+    /// Starts a vibration. Doesn't return until the vibration has completed or if `StopVibration()`
+    /// is called. Returns ZX_ERR_BAD_STATE if there is a vibration already playing.
+    flexible StartVibration() -> () error zx.Status;
+
+    /// Stops the vibration that is currently playing. Does nothing if there isn't a vibration
+    /// currently playing. All pending `StartVibration()` requests are completed immediately.
+    flexible StopVibration() -> () error zx.Status;
+};
+
+service Service {
+    device client_end:Device;
+};

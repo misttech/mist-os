@@ -30,11 +30,11 @@ if (is_host) {
       "//src/developer/ffx/plugins/emulator/engines:ffx_emulator_engines",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:regex",
       "//third_party/rust_crates:schemars",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:tracing",
     ]
 
     args_sources = [ "src/args.rs" ]
@@ -46,7 +46,7 @@ if (is_host) {
     test_deps = [
       "//build/sdk/meta:rust",
       "//src/developer/ffx/lib/writer:lib",
-      "//src/lib/assembly/assembly_manifest",
+      "//src/lib/assembly/assembled_system",
       "//src/lib/assembly/partitions_config",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:async-trait",

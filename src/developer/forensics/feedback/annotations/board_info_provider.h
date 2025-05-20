@@ -23,6 +23,9 @@ class BoardInfoProvider
  public:
   using StaticSingleFidlMethodAnnotationProvider::StaticSingleFidlMethodAnnotationProvider;
 
+  virtual ~BoardInfoProvider() = default;
+
+  static std::set<std::string> GetAnnotationKeys();
   std::set<std::string> GetKeys() const override;
 };
 

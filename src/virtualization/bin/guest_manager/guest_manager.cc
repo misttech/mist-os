@@ -19,13 +19,6 @@
 
 namespace {
 
-// This is a locally administered MAC address (first byte 0x02) mixed with the
-// Google Organizationally Unique Identifier (00:1a:11). The host gets ff:ff:ff
-// and the guest gets 00:00:00 for the last three octets.
-constexpr fuchsia::net::MacAddress kGuestMacAddress = {
-    .octets = {0x02, 0x1a, 0x11, 0x00, 0x01, 0x00},
-};
-
 uint64_t GetDefaultGuestMemory() {
   const uint64_t host_memory = zx_system_get_physmem();
   const uint64_t max_reserved_host_memory = 3 * (1ul << 30);  // 3 GiB.
@@ -122,11 +115,11 @@ void GuestManager::Launch(GuestConfig user_config,
     merged_cfg.set_cpus(GetDefaultNumCpus());
   }
 
+  // TODO(b/410037697): Re-enable networking.
   if (merged_cfg.has_default_net() && merged_cfg.default_net()) {
-    merged_cfg.mutable_net_devices()->push_back({
-        .mac_address = kGuestMacAddress,
-        .enable_bridge = true,
-    });
+    FX_LOGS(ERROR) << "b/410037697: Networking is not currently supported for guests.";
+    callback(fpromise::error(GuestManagerError::BAD_CONFIG));
+    return;
   }
 
   // Merge the command-line additions into the main kernel command-line field.

@@ -1323,7 +1323,7 @@ fn receive_ip_packet<
     trace_duration!(c"udp::receive_ip_packet");
     CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx.increment();
     trace!("received UDP packet: {:x?}", buffer.as_mut());
-    let src_ip: I::Addr = src_ip.into();
+    let src_ip: I::Addr = src_ip.into_addr();
 
     let packet = if let Ok(packet) =
         buffer.parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(src_ip, dst_ip.get()))
@@ -2712,7 +2712,9 @@ mod tests {
     use ip_test_macro::ip_test;
     use itertools::Itertools as _;
     use net_declare::{net_ip_v4 as ip_v4, net_ip_v6};
-    use net_types::ip::{IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
+    use net_types::ip::{
+        IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv4SourceAddr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
+    };
     use net_types::{
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
@@ -3268,8 +3270,8 @@ mod tests {
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
             FakeUdpBoundSocketsCtx<D>;
 
-        fn into_recv_src_addr(addr: Ipv4Addr) -> Ipv4Addr {
-            addr
+        fn into_recv_src_addr(addr: Ipv4Addr) -> Ipv4SourceAddr {
+            Ipv4SourceAddr::new(addr).unwrap_or_else(|| panic!("{addr} is not a valid source addr"))
         }
     }
 

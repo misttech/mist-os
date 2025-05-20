@@ -11,7 +11,6 @@
 #include "src/ui/lib/escher/paper/paper_renderer.h"
 #include "src/ui/lib/escher/paper/paper_renderer_static_config.h"
 #include "src/ui/lib/escher/paper/paper_scene.h"
-#include "src/ui/lib/escher/paper/paper_timestamp_graph.h"
 #include "src/ui/lib/escher/renderer/batch_gpu_uploader.h"
 #include "src/ui/lib/escher/test/common/paper_renderer_test.h"
 #include "src/ui/lib/escher/types/color.h"

@@ -4,16 +4,20 @@
 
 #![cfg(test)]
 
+use std::collections::HashSet;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::NonZeroU16;
 use std::pin::pin;
 use std::str::FromStr as _;
 
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
+use fidl_fuchsia_posix_socket::{Empty, OptionalUint32};
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as net_dhcp,
     fidl_fuchsia_net_dhcpv6 as net_dhcpv6, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_name as net_name, fidl_fuchsia_testing as ftesting,
+    fidl_fuchsia_net_name as net_name, fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
+    fidl_fuchsia_testing as ftesting,
 };
 
 use futures::future::{self, FusedFuture, Future, FutureExt as _};
@@ -43,8 +47,11 @@ use packet_formats::ip::{IpPacket as _, IpProto, Ipv6Proto};
 use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketBuilder};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use packet_formats_dhcp::v6;
-use policy_testing_common::with_netcfg_owned_device;
+use policy_testing_common::{with_netcfg_owned_device, NetcfgOwnedDeviceArgs};
+use socket_proxy_testing::{NetworkRegistry, RegistryType};
 use test_case::test_case;
+
+const DEFAULT_DNS_PORT: u16 = 53;
 
 #[netstack_test]
 #[variant(N, Netstack)]
@@ -109,7 +116,7 @@ async fn poll_lookup_admin<
     F: Unpin + FusedFuture + Future<Output = Result<component_events::events::Stopped>>,
 >(
     lookup_admin: &net_name::LookupAdminProxy,
-    expect: &[fnet::SocketAddress],
+    expect: &HashSet<fnet::SocketAddress>,
     mut wait_for_netmgr_fut: &mut F,
     poll_wait: zx::MonotonicDuration,
     retry_count: u64,
@@ -125,10 +132,12 @@ async fn poll_lookup_admin<
             }
         };
 
-        let servers = lookup_admin.get_dns_servers().await.expect("failed to get DNS servers");
+        let servers = HashSet::from_iter(
+            lookup_admin.get_dns_servers().await.expect("failed to get DNS servers"),
+        );
         println!("attempt {} got DNS servers {:?}", i, servers);
 
-        if servers == expect {
+        if servers == *expect {
             return;
         }
     }
@@ -145,7 +154,7 @@ async fn poll_dns_server_watcher<
     F: Unpin + FusedFuture + Future<Output = Result<component_events::events::Stopped>>,
 >(
     dns_server_watcher_proxy: &net_name::DnsServerWatcherProxy,
-    expect: &[fnet::SocketAddress],
+    expect: &HashSet<fnet::SocketAddress>,
     mut wait_for_netmgr_fut: &mut F,
     wait_duration: zx::MonotonicDuration,
 ) {
@@ -154,11 +163,11 @@ async fn poll_dns_server_watcher<
             servers = dns_server_watcher_proxy.watch_servers() => {
                 match servers {
                     Ok(servers) => {
-                        let servers: Vec<_> = servers
+                        let servers: HashSet<_> = servers
                             .into_iter()
                             .filter_map(|server| server.address)
                             .collect();
-                        if servers == expect {
+                        if servers == *expect {
                             return;
                         }
                     }
@@ -178,6 +187,7 @@ async fn poll_dns_server_watcher<
     }
 }
 
+#[derive(Clone)]
 enum DnsCheckType {
     LookupAdmin {
         /// Duration to sleep between polls.
@@ -212,7 +222,7 @@ impl DnsCheckType {
         self,
         realm: &netemul::TestRealm<'a>,
         mut wait_for_netmgr: &mut F,
-        expect: &[fnet::SocketAddress],
+        expect: &HashSet<fnet::SocketAddress>,
     ) {
         match self {
             DnsCheckType::LookupAdmin { poll_wait, retry_count } => {
@@ -261,16 +271,17 @@ async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str, check_type: Dns
     /// DNS server served by NDP.
     const NDP_DNS_SERVER: fnet::Ipv6Address = fidl_ip_v6!("20a::1234:5678");
 
-    const DEFAULT_DNS_PORT: u16 = 53;
-
     let name = name.to_string();
     // The device must be installed by netcfg in order to start the NDP watcher
     // on the interface.
     let _if_name = with_netcfg_owned_device::<M, N, _>(
         &name.clone(),
         ManagerConfig::Empty,
-        N::USE_OUT_OF_STACK_DHCP_CLIENT,
-        [],
+        NetcfgOwnedDeviceArgs {
+            use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
+            use_socket_proxy: false,
+            extra_known_service_providers: vec![],
+        },
         |_, network, _, client_realm, _sandbox| {
             async move {
                 // Send a Router Advertisement to an EP on the same network with DNS server
@@ -286,11 +297,11 @@ async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str, check_type: Dns
                     .expect("failed to send router advertisement");
 
                 // The list of servers we expect to observe via NDP.
-                let expect = [fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+                let expect = HashSet::from([fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
                     address: NDP_DNS_SERVER,
                     port: DEFAULT_DNS_PORT,
                     zone_index: 0,
-                })];
+                })]);
 
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
@@ -330,8 +341,11 @@ async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str, check_type: 
     let _if_name = with_netcfg_owned_device::<M, N, _>(
         &name.clone(),
         ManagerConfig::Empty,
-        N::USE_OUT_OF_STACK_DHCP_CLIENT,
-        [],
+        NetcfgOwnedDeviceArgs {
+            use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
+            use_socket_proxy: false,
+            extra_known_service_providers: vec![],
+        },
         |_, network, _, client_realm, sandbox| {
             async move {
                 let server_realm = sandbox
@@ -421,10 +435,10 @@ async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str, check_type: 
                     .expect("dhcp/Server.StartServing returned error");
 
                 // The list of servers we expect to retrieve from `fuchsia.net.name/LookupAdmin`.
-                let expect = [fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+                let expect = HashSet::from([fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
                     address: DHCP_DNS_SERVER,
                     port: DEFAULT_DNS_PORT,
-                })];
+                })]);
 
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
@@ -463,8 +477,11 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str, check_type: 
     let _if_name = with_netcfg_owned_device::<M, N, _>(
         &name.clone(),
         ManagerConfig::Dhcpv6,
-        N::USE_OUT_OF_STACK_DHCP_CLIENT,
-        [KnownServiceProvider::Dhcpv6Client],
+        NetcfgOwnedDeviceArgs {
+            use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
+            use_socket_proxy: false,
+            extra_known_service_providers: vec![KnownServiceProvider::Dhcpv6Client],
+        },
         |_, network, _, client_realm, _sandbox| {
             async move {
                 // Wait for the DHCPv6 information request.
@@ -591,11 +608,11 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str, check_type: 
                     fake_ep.write(ser.as_ref()).await.expect("failed to write to fake endpoint");
 
                 // The list of servers we expect to retrieve from `fuchsia.net.name/LookupAdmin`.
-                let expect = [fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+                let expect = HashSet::from([fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
                     address: DHCPV6_DNS_SERVER,
                     port: DEFAULT_DNS_PORT,
                     zone_index: 0,
-                })];
+                })]);
 
                 let wait_for_netmgr = wait_for_component_stopped(
                     &client_realm,
@@ -610,6 +627,310 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str, check_type: 
         },
     )
     .await;
+}
+
+async fn discovered_networks_dns_helper<M: Manager, N: Netstack, R: NetworkRegistry + Proxy>(
+    name: &str,
+    registry_type: RegistryType,
+    check_type: DnsCheckType,
+) where
+    <R as Proxy>::Protocol: DiscoverableProtocolMarker,
+{
+    const NETWORK_ID1: u32 = 1;
+    const NETWORK_ID2: u32 = 2;
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<N, _, _>(
+            format!("{}-realm", name),
+            [
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    config: ManagerConfig::EnableSocketProxy,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
+                    use_socket_proxy: true,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::SocketProxy,
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
+        )
+        .expect("create netstack realm");
+
+    let network_registry =
+        realm.connect_to_protocol::<R::Protocol>().expect("while connecting to network registry");
+
+    // Add a network and observe the DNS servers in the DNS update.
+    let info = match registry_type {
+        RegistryType::Starnix => starnix_network_info(123, 456),
+        RegistryType::Fuchsia => fuchsia_network_info(),
+    };
+    let mut network1 = fnp_socketproxy::Network {
+        network_id: Some(NETWORK_ID1),
+        info: Some(info),
+        dns_servers: Some(fnp_socketproxy::NetworkDnsServers {
+            v4: Some(vec![fidl_ip_v4!("192.0.2.1")]),
+            v6: Some(vec![]),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_matches::assert_matches!(network_registry.add(&network1).await, Ok(Ok(())));
+
+    // DNS servers from Fuchsia are only shared when there is a network in the Fuchsia
+    // network registry set as default.
+    if let RegistryType::Fuchsia = registry_type {
+        assert_matches::assert_matches!(
+            network_registry.set_default(&OptionalUint32::Value(NETWORK_ID1)).await,
+            Ok(Ok(()))
+        );
+    }
+
+    // The list of servers we expect to retrieve from the DNS update. These DNS servers
+    // can come through LookupAdmin or netcfg's instance of DnsServerWatcher since netcfg is
+    // the source of truth for both DNS protocols.
+    let expect1 = HashSet::from([fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+        address: fidl_ip_v4!("192.0.2.1"),
+        port: DEFAULT_DNS_PORT,
+    })]);
+    let wait_for_netmgr =
+        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+    let mut wait_for_netmgr = pin!(wait_for_netmgr);
+    check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect1).await;
+
+    // Perform an update and confirm the updated DNS server appears in the DNS update.
+    network1.dns_servers = Some(fnp_socketproxy::NetworkDnsServers {
+        v4: Some(vec![fidl_ip_v4!("192.0.2.2")]),
+        v6: Some(vec![]),
+        ..Default::default()
+    });
+    assert_matches::assert_matches!(network_registry.update(&network1).await, Ok(Ok(())));
+    let expect2 = HashSet::from([fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+        address: fidl_ip_v4!("192.0.2.2"),
+        port: DEFAULT_DNS_PORT,
+    })]);
+    check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect2).await;
+
+    // Add a second network and observe the DNS servers in the DNS update.
+    let info2 = match registry_type {
+        RegistryType::Starnix => starnix_network_info(456, 789),
+        RegistryType::Fuchsia => fuchsia_network_info(),
+    };
+    let network2 = fnp_socketproxy::Network {
+        network_id: Some(NETWORK_ID2),
+        info: Some(info2),
+        dns_servers: Some(fnp_socketproxy::NetworkDnsServers {
+            v4: Some(vec![]),
+            v6: Some(vec![fidl_ip_v6!("2001:db8::2222")]),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_matches::assert_matches!(network_registry.add(&network2).await, Ok(Ok(())));
+    let expect3 = HashSet::from([
+        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+            address: fidl_ip_v4!("192.0.2.2"),
+            port: DEFAULT_DNS_PORT,
+        }),
+        fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+            address: fidl_ip_v6!("2001:db8::2222"),
+            port: DEFAULT_DNS_PORT,
+            zone_index: 0,
+        }),
+    ]);
+    check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect3).await;
+
+    // To clear the available DNS servers, the networks in the Starnix
+    // registry must be fully removed and the default network in the
+    // Fuchsia registry must be unset.
+    match registry_type {
+        RegistryType::Starnix => {
+            assert_matches::assert_matches!(network_registry.remove(NETWORK_ID1).await, Ok(Ok(())));
+            assert_matches::assert_matches!(network_registry.remove(NETWORK_ID2).await, Ok(Ok(())));
+        }
+        RegistryType::Fuchsia => {
+            assert_matches::assert_matches!(
+                network_registry.set_default(&OptionalUint32::Unset(Empty)).await,
+                Ok(Ok(()))
+            );
+        }
+    }
+    check_type.evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &HashSet::new()).await;
+
+    realm.shutdown().await.expect("failed to shutdown realm");
+}
+
+fn starnix_network_info(mark: u32, handle: u64) -> fnp_socketproxy::NetworkInfo {
+    fnp_socketproxy::NetworkInfo::Starnix(fnp_socketproxy::StarnixNetworkInfo {
+        mark: Some(mark),
+        handle: Some(handle),
+        ..Default::default()
+    })
+}
+
+fn fuchsia_network_info() -> fnp_socketproxy::NetworkInfo {
+    fnp_socketproxy::NetworkInfo::Fuchsia(fnp_socketproxy::FuchsiaNetworkInfo {
+        ..Default::default()
+    })
+}
+
+#[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
+#[test_case(DnsCheckType::lookup_admin(); "lookup_admin")]
+#[test_case(DnsCheckType::dns_server_watcher(); "dns_server_watcher")]
+async fn discovered_starnix_networks_dns<M: Manager, N: Netstack>(
+    name: &str,
+    check_type: DnsCheckType,
+) {
+    discovered_networks_dns_helper::<M, N, fnp_socketproxy::StarnixNetworksProxy>(
+        name,
+        RegistryType::Starnix,
+        check_type,
+    )
+    .await
+}
+
+#[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
+#[test_case(DnsCheckType::lookup_admin(); "lookup_admin")]
+#[test_case(DnsCheckType::dns_server_watcher(); "dns_server_watcher")]
+async fn discovered_fuchsia_networks_dns<M: Manager, N: Netstack>(
+    name: &str,
+    check_type: DnsCheckType,
+) {
+    discovered_networks_dns_helper::<M, N, fnp_socketproxy::FuchsiaNetworksProxy>(
+        name,
+        RegistryType::Fuchsia,
+        check_type,
+    )
+    .await
+}
+
+#[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
+#[test_case(DnsCheckType::lookup_admin(); "lookup_admin")]
+#[test_case(DnsCheckType::dns_server_watcher(); "dns_server_watcher")]
+async fn discovered_starnix_fuchsia_networks_dns<M: Manager, N: Netstack>(
+    name: &str,
+    check_type: DnsCheckType,
+) {
+    const STARNIX_NETWORK_ID: u32 = 1;
+    const FUCHSIA_NETWORK_ID: u32 = 2;
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<N, _, _>(
+            format!("{name}-realm"),
+            [
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    config: ManagerConfig::EnableSocketProxy,
+                    use_dhcp_server: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
+                    use_socket_proxy: true,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::SocketProxy,
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
+        )
+        .expect("create netstack realm");
+    let fuchsia_networks = realm
+        .connect_to_protocol::<fnp_socketproxy::FuchsiaNetworksMarker>()
+        .expect("while connecting to FuchsiaNetworks");
+    let starnix_networks = realm
+        .connect_to_protocol::<fnp_socketproxy::StarnixNetworksMarker>()
+        .expect("while connecting to StarnixNetworks");
+
+    // Add a Starnix network to the Starnix NetworkRegistry. Since there is no
+    // default network in the Fuchsia NetworkRegistry, the network will be
+    // observed via the watcher without setting it as the default.
+    let mut starnix_network = fnp_socketproxy::Network {
+        network_id: Some(STARNIX_NETWORK_ID),
+        info: Some(starnix_network_info(123, 456)),
+        dns_servers: Some(fnp_socketproxy::NetworkDnsServers {
+            v4: Some(vec![fidl_ip_v4!("192.0.2.1")]),
+            v6: Some(vec![]),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_matches::assert_matches!(starnix_networks.add(&starnix_network).await, Ok(Ok(())));
+    let expect1 = HashSet::from([fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+        address: fidl_ip_v4!("192.0.2.1"),
+        port: DEFAULT_DNS_PORT,
+    })]);
+    let wait_for_netmgr =
+        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None).fuse();
+    let mut wait_for_netmgr = pin!(wait_for_netmgr);
+    check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect1).await;
+
+    // Add a Fuchsia network to the Fuchsia NetworkRegistry without setting it
+    // as the default. There should be no DNS update.
+    let fuchsia_network = fnp_socketproxy::Network {
+        network_id: Some(FUCHSIA_NETWORK_ID),
+        info: Some(fuchsia_network_info()),
+        dns_servers: Some(fnp_socketproxy::NetworkDnsServers {
+            v4: Some(vec![fidl_ip_v4!("192.0.2.3")]),
+            v6: Some(vec![]),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    assert_matches::assert_matches!(fuchsia_networks.add(&fuchsia_network).await, Ok(Ok(())));
+
+    // Update the Starnix network's DNS servers and wait for the update. When we
+    // observe this update, we observed there was not a Fuchsia NetworkRegistry
+    // related DNS update.
+    starnix_network.dns_servers = Some(fnp_socketproxy::NetworkDnsServers {
+        v4: Some(vec![fidl_ip_v4!("192.0.2.2")]),
+        v6: Some(vec![]),
+        ..Default::default()
+    });
+    assert_matches::assert_matches!(starnix_networks.update(&starnix_network).await, Ok(Ok(())));
+    let expect2 = HashSet::from([fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+        address: fidl_ip_v4!("192.0.2.2"),
+        port: DEFAULT_DNS_PORT,
+    })]);
+    check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect2).await;
+
+    // Set a default network in the Fuchsia NetworkRegistry. The DNS server
+    // from the Fuchsia network should be observed on the watcher.
+    assert_matches::assert_matches!(
+        fuchsia_networks.set_default(&OptionalUint32::Value(FUCHSIA_NETWORK_ID)).await,
+        Ok(Ok(()))
+    );
+    let expect3 = HashSet::from([fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+        address: fidl_ip_v4!("192.0.2.3"),
+        port: DEFAULT_DNS_PORT,
+    })]);
+    check_type.clone().evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &expect3).await;
+
+    // Remove the Starnix network from the StarnixRegistry prior to unsetting
+    // the default network in the Fuchsia NetworkRegistry. The next update
+    // should be an empty list since no remaining Starnix networks are present.
+    assert_matches::assert_matches!(starnix_networks.remove(STARNIX_NETWORK_ID).await, Ok(Ok(())));
+    assert_matches::assert_matches!(
+        fuchsia_networks.set_default(&OptionalUint32::Unset(Empty)).await,
+        Ok(Ok(()))
+    );
+    check_type.evaluate_check::<M, _>(&realm, &mut wait_for_netmgr, &HashSet::new()).await;
+
+    realm.shutdown().await.expect("failed to shutdown realm");
 }
 
 async fn mock_udp_name_server(

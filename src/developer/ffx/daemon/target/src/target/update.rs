@@ -7,6 +7,7 @@ use chrono::Utc;
 use ffx_daemon_events::TargetConnectionState;
 
 use ffx_ssh::parse::HostAddr;
+use ffx_target::UNKNOWN_TARGET_NAME;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use super::{
@@ -14,7 +15,7 @@ use super::{
     TargetTransport,
 };
 use std::net::{IpAddr, SocketAddr};
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 
 #[derive(Clone, Debug)]
 enum ConnectionKind {
@@ -70,7 +71,6 @@ pub struct TargetUpdate<'a> {
     transient_target: bool,
     enabled: Option<bool>,
     last_seen: Option<Instant>,
-    expiry: Option<SystemTime>,
     ids: &'a [u64],
 
     /// The known identity of the target.
@@ -108,11 +108,7 @@ impl<'a> TargetUpdate<'a> {
         };
 
         if self.manual_target {
-            if let Some(expiry) = self.expiry {
-                status = status.manually_added_until(expiry);
-            } else {
-                status = status.manually_added();
-            }
+            status = status.manually_added();
         }
 
         Some(status)
@@ -189,8 +185,8 @@ impl<'a> TargetUpdateBuilder<'a> {
         update = update.build_config(match (&identify.product_config, &identify.board_config) {
             (None, None) => None,
             (product, board) => Some(BuildConfig {
-                product_config: product.as_deref().unwrap_or("<unknown>").into(),
-                board_config: board.as_deref().unwrap_or("<unknown>").into(),
+                product_config: product.as_deref().unwrap_or(UNKNOWN_TARGET_NAME).into(),
+                board_config: board.as_deref().unwrap_or(UNKNOWN_TARGET_NAME).into(),
             }),
         });
 
@@ -205,9 +201,8 @@ impl<'a> TargetUpdateBuilder<'a> {
         (ret.rcs(rcs), addrs)
     }
 
-    pub fn manual_target(mut self, expiry: Option<SystemTime>) -> Self {
+    pub fn manual_target(mut self) -> Self {
         self.manual_target = true;
-        self.expiry = expiry;
         self
     }
 
@@ -364,9 +359,7 @@ impl super::Target {
                 }
                 ConnectionKind::Found { protocol, transport } => match protocol {
                     TargetProtocol::Ssh if update.manual_target => {
-                        self.update_connection_state(|_| {
-                            TargetConnectionState::Manual(update.expiry.map(|_| last_seen))
-                        });
+                        self.update_connection_state(|_| TargetConnectionState::Manual);
                     }
                     TargetProtocol::Ssh => {
                         self.update_connection_state(|_| TargetConnectionState::Mdns(last_seen));
@@ -427,7 +420,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl_fuchsia_overnet_protocol::NodeId;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_simple() {
         let target = Target::new();
 
@@ -497,7 +490,7 @@ mod tests {
         assert_eq!(*target.compatibility_status.borrow(), None);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_discovered() {
         let now = Instant::now();
 
@@ -564,14 +557,14 @@ mod tests {
 
             target.apply_update(
                 TargetUpdateBuilder::new()
-                    .manual_target(None)
+                    .manual_target()
                     .last_seen(now)
                     .discovered(TargetProtocol::Ssh, TargetTransport::Network)
                     .net_addresses(ADDRS)
                     .build(),
             );
 
-            assert_eq!(target.get_connection_state(), TargetConnectionState::Manual(None));
+            assert_eq!(target.get_connection_state(), TargetConnectionState::Manual);
             expect_addr_type(&target, TargetAddrStatus::ssh().manually_added());
         }
 
@@ -580,7 +573,7 @@ mod tests {
 
             target.apply_update(
                 TargetUpdateBuilder::new()
-                    .manual_target(None)
+                    .manual_target()
                     .last_seen(now)
                     .discovered(TargetProtocol::Fastboot, TargetTransport::Network)
                     .net_addresses(ADDRS)
@@ -594,26 +587,9 @@ mod tests {
             );
             assert!(target.is_manual());
         }
-
-        {
-            let target = Target::new();
-            let expire = SystemTime::now() + Duration::from_secs(60);
-
-            target.apply_update(
-                TargetUpdateBuilder::new()
-                    .manual_target(Some(expire))
-                    .last_seen(now)
-                    .discovered(TargetProtocol::Ssh, TargetTransport::Network)
-                    .net_addresses(ADDRS)
-                    .build(),
-            );
-
-            assert_eq!(target.get_connection_state(), TargetConnectionState::Manual(Some(now)));
-            expect_addr_type(&target, TargetAddrStatus::ssh().manually_added_until(expire));
-        }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_disconnect() {
         let now = Instant::now();
 
@@ -633,7 +609,7 @@ mod tests {
         assert_eq!(target.get_connection_state(), TargetConnectionState::Disconnected);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn update_rcs() {
         let now = Instant::now();
 
@@ -660,7 +636,7 @@ mod tests {
         assert_eq!(target.get_connection_state(), TargetConnectionState::Rcs(conn));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn from_rcs_identify() {
         use fidl_fuchsia_developer_remotecontrol as rcs;
 

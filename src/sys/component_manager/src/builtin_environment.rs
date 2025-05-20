@@ -984,15 +984,6 @@ impl BuiltinEnvironment {
             move |stream| crash_records_svc.clone().serve(stream).boxed(),
         );
 
-        // Set up OtaHealthVerification service.
-        let ota_health_verification_svc = OtaHealthVerification::new(
-            runtime_config.health_check.monikers.clone(),
-            Arc::downgrade(&top_instance),
-        );
-        root_input_builder.add_builtin_protocol_if_enabled::<fupdate::HealthVerificationMarker>(
-            move |stream| ota_health_verification_svc.clone().serve(stream).boxed(),
-        );
-
         // Set up KernelStats service.
         let info_resource_handle = system_resource_handle
             .as_ref()
@@ -1430,6 +1421,16 @@ impl BuiltinEnvironment {
 
         // Set up the Inspect sink provider.
         let inspect_sink_provider = Arc::new(InspectSinkProvider::new(inspector));
+
+        // Set up OtaHealthVerification service.
+        let ota_health_verification_svc = OtaHealthVerification::new(
+            runtime_config.health_check.monikers.clone(),
+            Arc::downgrade(&top_instance),
+            inspect_sink_provider.inspector().root().create_child("ota_health_verification"),
+        );
+        root_input_builder.add_builtin_protocol_if_enabled::<fupdate::HealthVerificationMarker>(
+            move |stream| ota_health_verification_svc.clone().serve(stream).boxed(),
+        );
 
         // Set up the event registry.
         let event_registry = {

@@ -7,19 +7,19 @@
 #ifndef ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_TYPE_TRAITS_H_
 #define ZIRCON_KERNEL_LIB_KTL_INCLUDE_KTL_TYPE_TRAITS_H_
 
-#include <lib/stdcompat/type_traits.h>
+#include <type_traits>
 
 namespace ktl {
 
 using std::add_const;
 using std::add_const_t;
 
-using cpp20::is_bounded_array;
-using cpp20::is_bounded_array_v;
-using cpp20::is_unbounded_array;
-using cpp20::is_unbounded_array_v;
 using std::is_array;
 using std::is_array_v;
+using std::is_bounded_array;
+using std::is_bounded_array_v;
+using std::is_unbounded_array;
+using std::is_unbounded_array_v;
 
 using std::false_type;
 using std::true_type;
@@ -36,7 +36,7 @@ using std::conditional_t;
 using std::decay;
 using std::decay_t;
 
-using cpp17::void_t;
+using std::void_t;
 
 using std::enable_if;
 using std::enable_if_t;
@@ -44,8 +44,8 @@ using std::enable_if_t;
 using std::has_unique_object_representations;
 using std::has_unique_object_representations_v;
 
-using cpp17::is_base_of_v;
 using std::is_base_of;
+using std::is_base_of_v;
 
 using std::is_const;
 using std::is_const_v;

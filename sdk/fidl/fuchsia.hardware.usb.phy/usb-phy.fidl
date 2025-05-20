@@ -18,3 +18,34 @@ open protocol UsbPhy {
 service Service {
     device client_end:UsbPhy;
 };
+
+type ProtocolVersion = flexible enum {
+    USB_2_0 = 2;
+    USB_3_0 = 3;
+};
+
+type Mode = flexible enum {
+    UNKNOWN = 0;
+    HOST = 1;
+    PERIPHERAL = 2;
+    OTG = 3;
+};
+
+type UsbPhyMode = table {
+    1: protocol ProtocolVersion;
+    2: dr_mode Mode;
+    3: is_otg_capable bool;
+};
+
+type AmlogicPhyType = flexible enum {
+    G12_A = 0;
+    G12_B = 1;
+};
+
+@serializable
+type Metadata = table {
+    1: usb_phy_modes vector<UsbPhyMode>:MAX;
+
+    /// Optional.
+    2: phy_type AmlogicPhyType;
+};

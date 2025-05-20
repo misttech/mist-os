@@ -80,7 +80,7 @@ impl<'a> StructuredActionContext<'a> {
         let fetcher = FileDataFetcher::new(diagnostic_data);
         let mut triage_output = TriageOutput::new(metrics.keys().cloned().collect::<Vec<String>>());
         fetcher.errors().iter().for_each(|e| {
-            triage_output.add_error(format!("[DEBUG: BAD DATA] {}", e));
+            triage_output.add_error(format!("[DEBUG: BAD DATA] {e}"));
         });
 
         StructuredActionContext {
@@ -149,7 +149,7 @@ impl StructuredActionContext<'_> {
                     "Snapshot trigger not boolean",
                     namespace,
                     name,
-                    &format!("{:?}", _reason),
+                    &format!("{_reason:?}"),
                 );
             }
             other => {
@@ -157,7 +157,7 @@ impl StructuredActionContext<'_> {
                     "Bad config: Unexpected value type (need boolean)",
                     namespace,
                     name,
-                    &format!("{}", other),
+                    &format!("{other}"),
                 );
             }
         };

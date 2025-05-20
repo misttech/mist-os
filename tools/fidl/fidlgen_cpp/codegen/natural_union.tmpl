@@ -11,10 +11,7 @@ class {{ .Name }};
 {{- end }}
 
 {{- define "Union:NaturalTypesHeader" }}
-{{ EnsureNamespace . }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType }}
 
 {{ .Docs }}
 class {{ .Name }} {
@@ -42,69 +39,33 @@ class {{ .Name }} {
   static constexpr char kSerializableName[] = "{{ .Serializable.Name }}";
   {{ end }}
 
-  {{ .Name }}({{ .Name }}&& other) noexcept
-      : {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
-    *storage_ = std::move(*other.storage_);
-  }
-  {{ .Name }}& operator=({{ .Name }}&& other) noexcept {
-    if (this != &other) {
-      *storage_ = std::move(*other.storage_);
-    }
-    return *this;
-  }
+  {{ .Name }}({{ .Name }}&& other) noexcept;
+  {{ .Name }}& operator=({{ .Name }}&& other) noexcept;
   {{- if not .IsResourceType }}
-    {{ .Name }}(const {{ .Name }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
-    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept {
-      if (this != &other) {
-        storage_ = other.CloneStorage_();
-      }
-      return *this;
-    }
-
-    bool operator==(const {{ .Name }}& other) const noexcept {
-      return *storage_ == *other.storage_;
-    }
-    bool operator!=(const {{ .Name }}& other) const noexcept {
-      return *storage_ != *other.storage_;
-    }
+    {{ .Name }}(const {{ .Name }}& other) noexcept;
+    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept;
+    bool operator==(const {{ .Name }}& other) const noexcept;
+    bool operator!=(const {{ .Name }}& other) const noexcept;
   {{- end }}
 
   {{- if .IsFlexible }}
-  constexpr bool IsUnknown() const {
-    return Which() == {{ .TagUnknown }};
-  }
+  bool IsUnknown() const;
   {{- end }}
 
-  constexpr {{ .TagEnum }} Which() const {
-    return {{ .Name }}::IndexToTag(storage_->index()).value();
-  }
+  {{ .TagEnum }} Which() const;
 
   {{- range .Members }}
-    static {{ $.Name }} With{{ .UpperCamelCaseName }}({{ .Type }} val) {
-      return {{ $.Name }}(std::make_shared<Storage_>(
-        std::in_place_index_t<{{ .NaturalIndex }}>{},
-        std::move(val)));
-    }
-
-    const ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}() const {
-      return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
-    }
-
-    ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}() {
-      return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
-    }
+    static {{ $.Name }} With{{ .UpperCamelCaseName }}({{ .Type }} val);
+    const ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}() const;
+    ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_> {{ .Name }}();
 
     // Sets the union to hold the {{ .Name }} member.
     //
     {{ .Docs }}
-    {{ $.Name }}& {{ .Name }}({{ .Type }} value) {
-      storage_->emplace<{{ .NaturalIndex }}>(std::move(value));
-      return *this;
-    }
+    {{ $.Name }}& {{ .Name }}({{ .Type }} value);
   {{- end }}
 
-  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
-      : storage_(std::make_shared<Storage_>()) {}
+  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   std::shared_ptr<Storage_> storage_;
@@ -119,46 +80,18 @@ class {{ .Name }} {
     {{- end -}}
   );
 
-  explicit {{ .Name }}(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+  explicit {{ .Name }}(std::shared_ptr<Storage_> storage);
 
-  static constexpr size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, {{ .TagEnum }} tag) {
-    switch (tag) {
-      {{- range .Members }}
-        case {{ .TagName }}: return {{ .NaturalIndex }};
-      {{- end }}
-      default: {
-        {{- if .IsStrict }}
-          decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
-        {{- end }}
-        return 0;
-      }
-    }
-  }
-
-  static constexpr std::optional<{{ .TagEnum }}> IndexToTag(size_t index) {
-    switch (index) {
-      {{- range  .Members }}
-        case {{ .NaturalIndex }}: return {{ .TagName }};
-      {{- end }}
-      {{- if .IsFlexible }}
-        default: return {{ .TagUnknown }};
-      {{- else }}
-        default: return std::nullopt;
-      {{- end }}
-    }
-  }
+  static size_t TagToIndex(::fidl::internal::NaturalDecoder* decoder, {{ .TagEnum }} tag);
+  static std::optional<{{ .TagEnum }}> IndexToTag(size_t index);
 
 };
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType }}
 {{- end }}
 
 {{- define "Union:Traits:NaturalTypesHeader" }}
-  {{ if .IsResourceType }}
-  {{- IfdefFuchsia -}}
-  {{- end }}
+  {{- IfdefFuchsiaIf .IsResourceType -}}
 
   {{ if .IsResourceType }}
   template <>
@@ -183,20 +116,79 @@ class {{ .Name }} {
   struct internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<{{ . }}> {};
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 
 {{- define "Union:NaturalTypesSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{- EnsureNamespace "" }}
 
+{{ . }}::{{ .Name }}({{ .Name }}&& other) noexcept : {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
+  *storage_ = std::move(*other.storage_);
+}
+
+{{ . }}& {{ . }}::operator=({{ .Name }}&& other) noexcept {
+  if (this != &other) {
+    *storage_ = std::move(*other.storage_);
+  }
+  return *this;
+}
+
+{{ . }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag)
+: storage_(std::make_shared<Storage_>()) {}
+
+{{ . }}::{{ .Name }}(std::shared_ptr<Storage_> storage) : storage_(std::move(storage)) {}
+
+{{ .TagEnum }} {{ .NoLeading }}::Which() const {
+  return {{ .Name }}::IndexToTag(storage_->index()).value();
+}
+
+size_t {{ .NoLeading }}::TagToIndex(::fidl::internal::NaturalDecoder* decoder, {{ .TagEnum }} tag) {
+  switch (tag) {
+    {{- range .Members }}
+      case {{ .TagName }}: return {{ .NaturalIndex }};
+    {{- end }}
+    default: {
+      {{- if .IsStrict }}
+        decoder->SetError(::fidl::internal::kCodingErrorUnknownUnionTag);
+      {{- end }}
+      return 0;
+    }
+  }
+}
+
+std::optional<{{ .TagEnum }}> {{ .NoLeading }}::IndexToTag(size_t index) {
+  switch (index) {
+    {{- range  .Members }}
+      case {{ .NaturalIndex }}: return {{ .TagName }};
+    {{- end }}
+    {{- if .IsFlexible }}
+      default: return {{ .TagUnknown }};
+    {{- else }}
+      default: return std::nullopt;
+    {{- end }}
+  }
+}
+
 {{ if not .IsResourceType }}
+  {{ . }}::{{ .Name }}(const {{ .Name }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
+
+  {{ . }}& {{ .NoLeading }}::operator=(const {{ .Name }}& other) noexcept {
+    if (this != &other) {
+      storage_ = other.CloneStorage_();
+    }
+    return *this;
+  }
+
+  bool {{ .NoLeading }}::operator==(const {{ .Name }}& other) const noexcept {
+    return *storage_ == *other.storage_;
+  }
+  bool {{ .NoLeading }}::operator!=(const {{ .Name }}& other) const noexcept {
+    return *storage_ != *other.storage_;
+  }
+
   std::shared_ptr<{{ . }}::Storage_> {{ .NoLeading }}::CloneStorage_() const {
     {{- if .Members }}
     const Storage_& storage = *storage_;
@@ -214,15 +206,38 @@ class {{ .Name }} {
   }
 {{- end }}
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{- if .IsFlexible }}
+  bool {{ .NoLeading }}::IsUnknown() const {
+    return Which() == {{ .TagUnknown }};
+  }
+{{- end }}
+
+{{- range .Members }}
+  {{ $ }} {{ $.NoLeading }}::With{{ .UpperCamelCaseName }}({{ .Type }} val) {
+    return {{ $.Name }}(std::make_shared<Storage_>(
+      std::in_place_index_t<{{ .NaturalIndex }}>{},
+      std::move(val)));
+  }
+
+  const ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, {{ $ }}::Storage_> {{ $.NoLeading }}::{{ .Name }}() const {
+    return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
+  }
+
+  ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, {{ $ }}::Storage_> {{ $.NoLeading }}::{{ .Name }}() {
+    return ::fidl::internal::UnionMemberView<{{ .NaturalIndex }}, Storage_>(storage_);
+  }
+
+  {{ $ }}& {{ $.NoLeading }}::{{ .Name }}({{ .Type }} value) {
+    storage_->emplace<{{ .NaturalIndex }}>(std::move(value));
+    return *this;
+  }
+{{- end }}
+
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Union:Traits:TypeConversionsHeader" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ $wireType := .Wire }}
 {{ $naturalType := .Unified }}
@@ -246,17 +261,11 @@ template <>
 struct WireTypeForNaturalType<{{ $naturalType }}> {
     using type = {{ $wireType }};
 };
-
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Union:Traits:TypeConversionsSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
-
+{{- IfdefFuchsiaIf .IsResourceType }}
 {{ $wireType := .Wire }}
 {{ $naturalType := .Unified }}
 {{ $naturalType }} WireNaturalConversionTraits<{{ $wireType }}, {{ $naturalType }}>::ToNatural({{ $wireType }} src) {
@@ -289,8 +298,5 @@ struct WireTypeForNaturalType<{{ $naturalType }}> {
     {{- end }}
   }
 }
-
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

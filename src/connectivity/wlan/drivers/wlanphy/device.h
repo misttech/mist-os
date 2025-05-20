@@ -52,6 +52,10 @@ class Device final : public fdf::DriverBase,
   void SetPowerSaveMode(SetPowerSaveModeRequestView request,
                         SetPowerSaveModeCompleter::Sync& completer) override;
   void GetPowerSaveMode(GetPowerSaveModeCompleter::Sync& completer) override;
+  void PowerDown(PowerDownCompleter::Sync& completer) override;
+  void PowerUp(PowerUpCompleter::Sync& completer) override;
+  void Reset(ResetCompleter::Sync& completer) override;
+  void GetPowerState(GetPowerStateCompleter::Sync& completer) override;
 
   // Function implementations in protocol fuchsia_wlan_device::Connector.
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;

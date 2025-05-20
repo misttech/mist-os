@@ -509,7 +509,6 @@ void PaperRenderer::GenerateCommandsForNoShadows(uint32_t camera_index) {
   }
 
   cmd_buf->BeginRenderPass(render_pass_info);
-  frame->AddTimestamp("started no-shadows render pass");
 
   BindSceneAndCameraUniforms(camera_index);
 
@@ -547,7 +546,6 @@ void PaperRenderer::GenerateCommandsForNoShadows(uint32_t camera_index) {
     render_queue_.GenerateCommands(cmd_buf, &context, PaperRenderQueueFlagBits::kTranslucent);
   }
   cmd_buf->EndRenderPass();
-  frame->AddTimestamp("finished no-shadows render pass");
 }
 
 void PaperRenderer::GenerateCommandsForShadowVolumes(uint32_t camera_index) {
@@ -571,7 +569,6 @@ void PaperRenderer::GenerateCommandsForShadowVolumes(uint32_t camera_index) {
   }
 
   cmd_buf->BeginRenderPass(render_pass_info);
-  frame->AddTimestamp("started shadow_volume render pass");
 
   BindSceneAndCameraUniforms(camera_index);
 
@@ -705,7 +702,6 @@ void PaperRenderer::GenerateCommandsForShadowVolumes(uint32_t camera_index) {
   render_queue_.GenerateCommands(cmd_buf, &context, PaperRenderQueueFlagBits::kTranslucent);
 
   cmd_buf->EndRenderPass();
-  frame->AddTimestamp("finished shadow_volume render pass");
 }
 
 void PaperRenderer::GenerateDebugCommands(CommandBuffer* cmd_buf) {
@@ -717,7 +713,6 @@ void PaperRenderer::GenerateDebugCommands(CommandBuffer* cmd_buf) {
   }
 
   const FramePtr& frame = frame_data_->frame;
-  frame->AddTimestamp("started debug render pass");
 
   auto& output_image = frame_data_->output_image;
   auto swapchain_layout = output_image->swapchain_layout();
@@ -761,8 +756,6 @@ void PaperRenderer::GenerateDebugCommands(CommandBuffer* cmd_buf) {
       vk::PipelineStageFlagBits::eTransfer, vk::AccessFlagBits::eTransferWrite,
       vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eTransfer,
       vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eTransferWrite);
-
-  frame->AddTimestamp("finished debug render pass");
 }
 
 // Helper for WarmPipelineAndRenderPassCaches().  Return the render-pass that should be used for

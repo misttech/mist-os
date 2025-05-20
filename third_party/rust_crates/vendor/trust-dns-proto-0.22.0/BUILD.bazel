@@ -58,7 +58,7 @@ rust_library(
     crate_root = "src/lib.rs",
     edition = "2018",
     proc_macro_deps = [
-        "//third_party/rust_crates/vendor/async-trait-0.1.71:async_trait",
+        "//third_party/rust_crates/vendor/async-trait-0.1.88:async_trait",
         "//third_party/rust_crates/vendor/enum-as-inner-0.5.1:enum_as_inner",
     ],
     rustc_flags = [

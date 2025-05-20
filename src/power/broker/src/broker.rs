@@ -1155,10 +1155,17 @@ impl Broker {
         self.in_transition.remove(element_id);
         self.update_current_level(element_id, minimum_level);
         // Remove all references of the element from the topology.
-        self.catalog.topology.remove_element(element_id);
+        let maybe_element = self.catalog.topology.remove_element(element_id);
         self.unregister_all_credentials_for_element(element_id);
-        self.current.remove(element_id);
-        self.required.remove(element_id);
+        let current_level = self.current.remove(element_id);
+        let required_level = self.required.remove(element_id);
+        if let Some(element) = maybe_element {
+            self.catalog.topology.inspect().on_remove_element(
+                element,
+                current_level.map(|level| level.level.level),
+                required_level.map(|level| level.level),
+            );
+        }
         self.lease_counter.remove(element_id);
     }
 
@@ -1895,8 +1902,8 @@ impl<K: Clone + Hash + Eq, V: Clone + PartialEq> SubscribeMap<K, V> {
         receiver
     }
 
-    fn remove(&mut self, key: &K) {
-        self.values.remove(key);
+    fn remove(&mut self, key: &K) -> Option<V> {
+        self.values.remove(key).and_then(|data| data.value)
     }
 }
 
@@ -2703,6 +2710,8 @@ mod tests {
                             element_id: *unobtanium,
                             name: "Unobtainium",
                             valid_levels: v01.clone(),
+                            current_level: OFF.level as u64,
+                            required_level: OFF.level as u64,
                         }
                     },
                 },

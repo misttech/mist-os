@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/bootfs_files_for_assembly.gni")
-import("//build/suspend/config.gni")
 
 executable("dash") {
   visibility = [
@@ -26,6 +25,8 @@ executable("dash") {
     "src/arith_yacc.c",
     "src/arith_yylex.c",
     "src/bltin/dm_fuchsia.cc",
+    "src/bltin/k_fuchsia.cc",
+    "src/bltin/power_fuchsia.cc",
     "src/bltin/printf.c",
     "src/bltin/test.c",
     "src/bltin/times.c",
@@ -76,10 +77,6 @@ executable("dash") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/third_party/ulib/linenoise",
   ]
-
-  if (enable_suspend) {
-    defines = [ "ENABLE_SUSPEND" ]
-  }
 
   # TODO(https://fxbug.dev/42179539): Remove this after fixing the leak.
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]

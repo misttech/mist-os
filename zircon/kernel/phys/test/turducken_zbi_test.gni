@@ -65,28 +65,41 @@ template("turducken_zbi_test") {
     ]
   }
 
-  zbi_input(duck) {
-    visibility = [ ":*" ]
-    testonly = true
+  if (current_toolchain == phys_toolchain) {
+    zbi_input(duck) {
+      visibility = [ ":*" ]
+      testonly = true
 
-    if (defined(invoker.type)) {
-      type = invoker.type
-    } else {
-      type = "kernel"
+      if (defined(invoker.type)) {
+        type = invoker.type
+      } else {
+        type = "kernel"
+      }
+
+      if (defined(invoker.args)) {
+        args = invoker.args
+      } else {
+        args = [ "--compressed=zstd.max" ]
+      }
+      forward_variables_from(invoker,
+                             [
+                               "data_deps",
+                               "deps",
+                               "sources",
+                             ])
     }
-
-    if (defined(invoker.args)) {
-      args = invoker.args
-    } else {
-      args = [ "--compressed=zstd.max" ]
+  } else {
+    not_needed(invoker,
+               [
+                 "data_deps",
+                 "deps",
+                 "sources",
+               ])
+    group(duck) {
+      visibility = [ ":*" ]
+      testonly = true
+      deps = [ ":$duck($phys_toolchain)" ]
     }
-
-    forward_variables_from(invoker,
-                           [
-                             "data_deps",
-                             "deps",
-                             "sources",
-                           ])
   }
 
   boot_next = false

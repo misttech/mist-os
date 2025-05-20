@@ -39,19 +39,18 @@ pub(crate) const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
 
-#[tracing::instrument(skip(conn_quit_tx, server_quit_tx))]
 fn start_signal_monitoring(
     mut conn_quit_tx: futures::channel::mpsc::Sender<()>,
     mut server_quit_tx: futures::channel::mpsc::Sender<()>,
 ) {
-    tracing::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
+    log::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
     let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
     // Can't use async here, as signals.forever() is blocking.
     std::thread::spawn(move || {
         if let Some(signal) = signals.forever().next() {
             match signal {
                 SIGINT | SIGHUP | SIGTERM => {
-                    tracing::info!("Received signal {signal}, quitting");
+                    log::info!("Received signal {signal}, quitting");
                     let _ = block_on(conn_quit_tx.send(())).ok();
                     let _ = block_on(server_quit_tx.send(())).ok();
                 }
@@ -143,7 +142,7 @@ pub async fn serve_impl_validate_args(
     if !cmd.no_device {
         let res = rcs_proxy_connector
             .try_connect(|target, err| {
-                tracing::info!(
+                log::info!(
             "Validating RCS proxy: Waiting for target '{target:?}' to return error: {err:?}"
         );
                 if target.is_none() {
@@ -182,7 +181,7 @@ pub async fn serve_impl_validate_args(
                         _ => (),
                     };
                 } else {
-                    tracing::warn!("Expected error to be downcasted to FfxError but wasn't. Maybe the Error structure changed? {e:?}");
+                    log::warn!("Expected error to be downcasted to FfxError but wasn't. Maybe the Error structure changed? {e:?}");
                 }
             }
             _ => (),
@@ -240,7 +239,7 @@ pub async fn serve_impl_validate_args(
                         .into(),
                 )]
             } else {
-                tracing::warn!("repo-path not found in env: {:?}", context.env_kind());
+                log::warn!("repo-path not found in env: {:?}", context.env_kind());
                 return_user_error!("Either --repo-path or --product-bundle need to be specified");
             }
         }
@@ -249,7 +248,7 @@ pub async fn serve_impl_validate_args(
     if let Some(package_manifest) = &cmd.auto_publish {
         if !package_manifest.exists() {
             let msg = format!("package manifest {package_manifest:?} does not exist");
-            tracing::error!("{msg}");
+            log::error!("{msg}");
             return_user_error!("{msg}");
         }
     }
@@ -368,9 +367,7 @@ pub async fn serve_impl<W: Write + 'static>(
             }
 
             if cmd.refresh_metadata {
-                tracing::warn!(
-                    "--refresh-metadata is not supported with product bundles, ignoring"
-                );
+                log::warn!("--refresh-metadata is not supported with product bundles, ignoring");
             }
 
             product_bundle
@@ -388,7 +385,7 @@ pub async fn serve_impl<W: Write + 'static>(
 
                 build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
             } else {
-                tracing::warn!("repo-path not found in env: {:?}", context.env_kind());
+                log::warn!("repo-path not found in env: {:?}", context.env_kind());
                 return_user_error!("Either --repo-path or --product-bundle need to be specified");
             };
 
@@ -458,9 +455,7 @@ pub async fn serve_impl<W: Write + 'static>(
         )
         .await
         {
-            tracing::error!(
-                "failed to write repo server instance information for {repo_name}: {e:?}"
-            );
+            log::error!("failed to write repo server instance information for {repo_name}: {e:?}");
         }
     }
 
@@ -502,7 +497,7 @@ pub async fn serve_impl<W: Write + 'static>(
 
         let auto_publisher = fasync::Task::local(async move {
             let publish_result = cmd_repo_publish(publish_cmd).await;
-            tracing::warn!("Auto-publishing exited: {publish_result:?}");
+            log::warn!("Auto-publishing exited: {publish_result:?}");
         });
 
         auto_publisher.detach();
@@ -511,7 +506,7 @@ pub async fn serve_impl<W: Write + 'static>(
     let result = if cmd.no_device {
         let s = format!("Serving repository '{repo_path}' over address '{}'.", server_addr);
         writeln!(writer, "{}", s).map_err(|e| anyhow!("Failed to write to output: {:?}", e))?;
-        tracing::info!("{}", s);
+        log::info!("{}", s);
         Ok(())
     } else {
         let r = target::main_connect_loop(
@@ -547,9 +542,10 @@ mod test {
     use assert_matches::assert_matches;
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
+    use ffx_target::fho::{target_interface, FhoConnectionBehavior};
     use ffx_target::TargetProxy;
     use ffx_writer::{Format, SimpleWriter, TestBuffer, TestBuffers};
-    use fho::{user_error, FfxMain, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
+    use fho::{user_error, FfxMain, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{
         RemoteControlState, SshHostAddrInfo, TargetAddrInfo, TargetInfo, TargetIpAddrInfo,
@@ -947,7 +943,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
@@ -970,7 +967,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
@@ -993,7 +991,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         Connector::try_from_env(&env).await.expect("Could not make RCS test connector")
     }
@@ -1184,7 +1183,11 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_serve_impl_validate_args_in_tree() {
         let build_dir = tempfile::tempdir().expect("temp dir");
-        let env = ffx_config::test_init_in_tree(build_dir.path()).await.expect("in-tree test env");
+        let env = ffx_config::test_env()
+            .in_tree(build_dir.path())
+            .build()
+            .await
+            .expect("in-tree test env");
         let cmd = StartCommand {
             repository: None,
             trusted_root: None,
@@ -1455,7 +1458,7 @@ mod test {
 
         let err = result.expect_err("Expected an error but did not get one");
 
-        let expected: String = "More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`.".into();
+        let expected: String = "More than one device/emulator found. Use `ffx target list` to list known targets and specify one with the `-t` or `--target` flag.".into();
         assert_eq!(err.to_string(), expected);
     }
 
@@ -1503,7 +1506,9 @@ mod test {
                 &test_env.context,
                 &["some", "repo", "start", "test"],
             );
-            env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+            let target_env = ffx_target::fho::target_interface(&env);
+            target_env
+                .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
             let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
 
@@ -1652,7 +1657,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
         let tmp_port_file_path = tmp_port_file.path().to_owned();
@@ -1816,7 +1822,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
@@ -1966,7 +1973,8 @@ mod test {
 
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         // Future resolves once fake target exists
         let _timeout = timeout(time::Duration::from_secs(10), async {
@@ -2143,7 +2151,8 @@ mod test {
         };
         let env =
             FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
-        env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector))).await;
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         // Prepare serving the repo without passing the trusted root, and
         // passing of the trusted root 2.root.json explicitly

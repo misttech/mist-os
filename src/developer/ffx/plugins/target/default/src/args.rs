@@ -13,14 +13,9 @@ use ffx_core::ffx_command;
     description = "Manage the default target",
     example = "For one-off overrides for the default use `--target` option:
 
-    $ ffx --target <target name> <subcommand>
-
-Or use the `--config` option:
-
-    $ ffx --config target.default=<target name> <subcommand>",
-    note = "Manages the default configured target for all operations. The default
-target is designated by a `*` next to the name. This is an alias for the
-`target.default` configuration key."
+    $ ffx --target <target name> <subcommand>",
+    note = "Manages the default configured target for all operations. In
+`ffx target list` the default target is designated by a `*` next to the name."
 )]
 pub struct TargetDefaultCommand {
     #[argh(subcommand)]
@@ -54,15 +49,14 @@ pub struct TargetDefaultGetCommand {}
     example = "To set the default target:
 
    $ ffx target default set <target name>",
-    note = "Sets the `target.default` configuration key in 'User Configuration'
-scope.
+    note = "Sets the default target in 'User Configuration' scope.
 
 After setting the default target, `ffx target list` will mark the default
 with a `*` in the output list."
 )]
 pub struct TargetDefaultSetCommand {
     #[argh(positional)]
-    /// node name of the target
+    /// the target's specifier
     pub nodename: String,
 }
 
@@ -74,8 +68,8 @@ pub struct TargetDefaultSetCommand {
     example = "To clear the default target:
 
     $ ffx target default unset",
-    note = "Clears the `target.default` configuration key on all configuration
-levels. Returns a warning if it's already unset. Returns an error if it's not
-possible to clear it."
+    note = "Unsets the default target on all configuration levels. Returns a
+warning if it's already unset. Returns an error if it's not possible to clear
+it."
 )]
 pub struct TargetDefaultUnsetCommand {}

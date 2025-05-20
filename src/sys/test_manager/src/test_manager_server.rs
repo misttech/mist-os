@@ -533,6 +533,7 @@ pub async fn run_test_manager_suite_runner_server(
                         case_filters_to_run: options.test_case_filters,
                         log_iterator: options.logs_iterator_type.map(convert),
                         log_interest: options.log_interest,
+                        break_on_failure: options.break_on_failure,
                         ..Default::default()
                     },
                     controller,

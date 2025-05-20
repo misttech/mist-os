@@ -82,14 +82,14 @@ struct callable_traits<ReturnType(ArgTypes...)> {
 };
 
 // Determines whether a type has an operator() that can be invoked.
-template <typename T, typename = cpp17::void_t<>>
+template <typename T, typename = std::void_t<>>
 struct is_callable : public std::false_type {};
 template <typename ReturnType, typename... ArgTypes>
 struct is_callable<ReturnType (*)(ArgTypes...)> : public std::true_type {};
 template <typename FunctorType, typename ReturnType, typename... ArgTypes>
 struct is_callable<ReturnType (FunctorType::*)(ArgTypes...)> : public std::true_type {};
 template <typename T>
-struct is_callable<T, cpp17::void_t<decltype(&T::operator())>> : public std::true_type {};
+struct is_callable<T, std::void_t<decltype(&T::operator())>> : public std::true_type {};
 
 namespace internal {
 
@@ -100,7 +100,7 @@ struct detector {
 };
 
 template <typename Default, template <typename...> class Op, typename... Args>
-struct detector<Default, cpp17::void_t<Op<Args...>>, Op, Args...> {
+struct detector<Default, std::void_t<Op<Args...>>, Op, Args...> {
   using value_t = std::true_type;
   using type = Op<Args...>;
 };

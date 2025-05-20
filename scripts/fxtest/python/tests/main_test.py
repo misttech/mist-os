@@ -599,7 +599,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     "//src/sys:baz_test",
                     "//src/tests/end_to_end:example_e2e_test",
                     "--default",
-                    "updates",
+                    "//build/images/updates",
                 ),
                 (
                     "fx",
@@ -687,7 +687,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     "--toolchain=//build/toolchain/host:x64",
                     "//src/tests/end_to_end:example_e2e_test",
                     "--default",
-                    "updates",
+                    "//build/images/updates",
                 ),
                 (
                     "fx",

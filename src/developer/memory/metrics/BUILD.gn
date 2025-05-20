@@ -31,6 +31,7 @@ source_set("metrics") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
+    "//src/performance/memory/scudo",
     "//third_party/rapidjson",
     "//zircon/system/public",
     "//zircon/system/ulib/task-utils",

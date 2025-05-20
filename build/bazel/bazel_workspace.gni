@@ -24,4 +24,4 @@ bazel_workspace_dir = bazel_main_top_dir + "/workspace"
 bazel_output_base = bazel_main_top_dir + "/output_base"
 
 # Location of the Bazel execroot, relative to the source root.
-bazel_execroot = bazel_output_base + "/execroot/main"
+bazel_execroot = bazel_output_base + "/execroot/_main"

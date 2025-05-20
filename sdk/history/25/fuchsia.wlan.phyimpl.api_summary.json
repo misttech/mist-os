@@ -19,7 +19,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.ClearCountry",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "7385017681971907294",
         "direction": "two_way",
         "response": "fuchsia.wlan.phyimpl/WlanPhyImpl_ClearCountry_Response",
@@ -28,7 +28,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.CreateIface",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "3653746094083836708",
         "direction": "two_way",
         "request": "fuchsia.wlan.phyimpl/WlanPhyImplCreateIfaceRequest",
@@ -38,7 +38,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.DestroyIface",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "4242398030717562286",
         "direction": "two_way",
         "request": "fuchsia.wlan.phyimpl/WlanPhyImplDestroyIfaceRequest",
@@ -48,7 +48,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.GetCountry",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "504898287153653553",
         "direction": "two_way",
         "response": "fuchsia.wlan.phyimpl/WlanPhyCountry",
@@ -57,7 +57,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.GetPowerSaveMode",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "1249843465564268342",
         "direction": "two_way",
         "response": "fuchsia.wlan.phyimpl/WlanPhyImpl_GetPowerSaveMode_Response",
@@ -66,7 +66,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.GetSupportedMacRoles",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "6537800780977121793",
         "direction": "two_way",
         "response": "fuchsia.wlan.phyimpl/WlanPhyImpl_GetSupportedMacRoles_Response",
@@ -75,7 +75,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.SetCountry",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "8612397810323877864",
         "direction": "two_way",
         "request": "fuchsia.wlan.phyimpl/WlanPhyCountry",
@@ -85,7 +85,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl.SetPowerSaveMode",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "5294377936487508532",
         "direction": "two_way",
         "request": "fuchsia.wlan.phyimpl/WlanPhyImplSetPowerSaveModeRequest",
@@ -95,7 +95,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.wlan.phyimpl/WlanPhyImpl",
-        "openness": "closed",
+        "openness": "open",
         "transport": "driver"
     },
     {

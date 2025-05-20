@@ -126,9 +126,6 @@ struct WireTypeForNaturalType<::test_doccomments::FlexibleUnion> {
   using type = ::test_doccomments::wire::FlexibleUnion;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

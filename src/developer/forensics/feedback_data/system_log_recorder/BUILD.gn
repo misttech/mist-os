@@ -24,6 +24,7 @@ source_set("main") {
     "//src/developer/forensics/feedback:redactor_factory",
     "//src/developer/forensics/feedback_data:constants",
     "//src/developer/forensics/utils/redact",
+    "//src/lib/timekeeper:system",
     "//zircon/system/ulib/trace-provider",
   ]
 
@@ -36,6 +37,8 @@ source_set("src") {
     "controller.h",
     "log_message_store.cc",
     "log_message_store.h",
+    "shutdown_message.cc",
+    "shutdown_message.h",
     "system_log_recorder.cc",
     "system_log_recorder.h",
     "writer.cc",
@@ -59,8 +62,10 @@ source_set("src") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//src/developer/forensics/feedback_data:constants",
+    "//src/developer/forensics/utils:purge_memory",
     "//src/lib/diagnostics/accessor2logger",
     "//src/lib/files",
+    "//src/lib/fxl",
     "//src/lib/fxl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",

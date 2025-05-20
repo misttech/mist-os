@@ -6,7 +6,6 @@
 
 #include <inttypes.h>
 #include <lib/arch/random.h>
-#include <lib/arch/zbi-boot.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
@@ -33,6 +32,7 @@
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 #include <phys/trampoline-boot.h>
+#include <phys/zbi.h>
 #include <pretty/cpp/sizes.h>
 
 #include "turducken.h"
@@ -434,10 +434,9 @@ int TurduckenTest::Main(Zbi::iterator kernel_item) {
   // Pick random valid memory ranges.
   uint64_t kernel_load_address =
       GetMemoryAddress(BootZbi::GetKernelAllocationSize(kernel_item), seed);
-  uint64_t data_load_address =
-      GetMemoryAddress(BootZbi::Size{.size = loaded_zbi().storage().size(),
-                                     .alignment = arch::kZbiBootDataAlignment},
-                       seed);
+  uint64_t data_load_address = GetMemoryAddress(
+      BootZbi::Size{.size = loaded_zbi().storage().size(), .alignment = kArchZbiDataAlignment},
+      seed);
 
   set_kernel_load_address(kernel_load_address);
   set_data_load_address(data_load_address);

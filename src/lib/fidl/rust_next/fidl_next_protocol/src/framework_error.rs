@@ -7,8 +7,8 @@ use core::hint::unreachable_unchecked;
 use core::mem::MaybeUninit;
 
 use fidl_next_codec::{
-    munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom, WireI32,
-    ZeroPadding,
+    munge, Decode, DecodeError, Encodable, Encode, EncodeError, EncodeRef, FromWire, FromWireRef,
+    Slot, Wire, WireI32,
 };
 
 /// An internal framework error.
@@ -26,7 +26,9 @@ pub struct WireFrameworkError {
     inner: WireI32,
 }
 
-unsafe impl ZeroPadding for WireFrameworkError {
+unsafe impl Wire for WireFrameworkError {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut MaybeUninit<Self>) {}
 }
@@ -62,7 +64,17 @@ impl Encodable for FrameworkError {
 
 unsafe impl<E: ?Sized> Encode<E> for FrameworkError {
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut E,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.encode_ref(encoder, out)
+    }
+}
+
+unsafe impl<E: ?Sized> EncodeRef<E> for FrameworkError {
+    fn encode_ref(
+        &self,
         _: &mut E,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
@@ -75,8 +87,16 @@ unsafe impl<E: ?Sized> Encode<E> for FrameworkError {
     }
 }
 
-impl TakeFrom<WireFrameworkError> for FrameworkError {
-    fn take_from(from: &WireFrameworkError) -> Self {
-        Self::from(*from)
+impl FromWire<WireFrameworkError> for FrameworkError {
+    #[inline]
+    fn from_wire(wire: WireFrameworkError) -> Self {
+        Self::from_wire_ref(&wire)
+    }
+}
+
+impl FromWireRef<WireFrameworkError> for FrameworkError {
+    #[inline]
+    fn from_wire_ref(wire: &WireFrameworkError) -> Self {
+        Self::from(*wire)
     }
 }

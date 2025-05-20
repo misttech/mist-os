@@ -11,7 +11,7 @@ use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{
     Decode, DecodeError, Decoder, DecoderExt as _, Encode, EncodeError, Encoder, EncoderExt as _,
-    Slot, WireU16, WireU32, ZeroPadding, CHUNK_SIZE,
+    Slot, Wire, WireU16, WireU32, CHUNK_SIZE,
 };
 
 #[derive(Clone, Copy)]
@@ -33,7 +33,9 @@ pub union WireEnvelope {
     decoded_out_of_line: *mut (),
 }
 
-unsafe impl ZeroPadding for WireEnvelope {
+unsafe impl Wire for WireEnvelope {
+    type Decoded<'de> = WireEnvelope;
+
     fn zero_padding(_: &mut MaybeUninit<Self>) {}
 }
 
@@ -49,7 +51,7 @@ impl WireEnvelope {
     /// Encodes a `'static` value into an envelope with an encoder.
     #[inline]
     pub fn encode_value_static<E: InternalHandleEncoder + ?Sized, T: Encode<E>>(
-        value: &mut T,
+        value: T,
         encoder: &mut E,
         out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {
@@ -95,7 +97,7 @@ impl WireEnvelope {
     /// Encodes a value into an envelope with an encoder.
     #[inline]
     pub fn encode_value<E: Encoder + ?Sized, T: Encode<E>>(
-        value: &mut T,
+        value: T,
         encoder: &mut E,
         out: &mut MaybeUninit<Self>,
     ) -> Result<(), EncodeError> {
@@ -346,14 +348,26 @@ impl WireEnvelope {
         unsafe { &*ptr }
     }
 
+    /// Returns an `Owned` to the contained `T`.
+    ///
+    /// # Safety
+    ///
+    ///  The envelope must have been successfully decoded as a `T`.
+    #[inline]
+    pub unsafe fn read_unchecked<T>(&self) -> T {
+        // SAFETY: `into_raw(this)` is guaranteed to return a pointer that is non-null, properly
+        // properly aligned, and valid for reads and writes.
+        unsafe { Self::as_ptr::<T>((self as *const Self).cast_mut()).read() }
+    }
+
     /// Clones the envelope, assuming that it contains an inline `T`.
     ///
     /// # Safety
     ///
-    /// The envelope must have been successfully decoded as a `T`.
+    /// The envelope must have been successfully decoded inline as a `T`.
     #[inline]
-    pub unsafe fn clone_unchecked<T: Clone>(&self) -> Self {
-        debug_assert_eq!(size_of::<T>(), INLINE_SIZE);
+    pub unsafe fn clone_inline_unchecked<T: Clone>(&self) -> Self {
+        debug_assert!(size_of::<T>() <= INLINE_SIZE);
 
         union ClonedToDecodedInline<T> {
             cloned: ManuallyDrop<T>,

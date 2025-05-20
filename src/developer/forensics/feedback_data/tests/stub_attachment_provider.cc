@@ -14,7 +14,7 @@ StubAttachmentProvider::StubAttachmentProvider(std::string timeout_value)
     : timeout_value_(std::move(timeout_value)) {}
 
 fpromise::promise<AttachmentValue> StubAttachmentProvider::Get(const uint64_t ticket) {
-  FX_CHECK(completers_.count(ticket) == 0) << "Ticket used twice: " << ticket;
+  FX_CHECK(!completers_.contains(ticket)) << "Ticket used twice: " << ticket;
 
   fpromise::bridge<std::string, Error> bridge;
 
@@ -54,7 +54,7 @@ void StubAttachmentProvider::CompleteSuccessfully(std::string success_value) {
 }
 
 void StubAttachmentProvider::ForceCompletion(const uint64_t ticket, const Error error) {
-  if (completers_.count(ticket) != 0 && completers_[ticket] != nullptr) {
+  if (completers_.contains(ticket) && completers_[ticket] != nullptr) {
     completers_[ticket](error);
   }
 }

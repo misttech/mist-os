@@ -7,9 +7,9 @@ use async_lock::RwLock;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_media::*;
 use fuchsia_async as fasync;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use futures::lock::Mutex;
-use futures::{select, StreamExt, TryFutureExt, TryStreamExt};
+use futures::{select, SinkExt, StreamExt, TryFutureExt, TryStreamExt};
 use log::trace;
 use std::io::Write;
 use std::sync::Arc;
@@ -480,6 +480,9 @@ struct InputWorker {
     // Last relative ring buffer byte offset.
     // This is an offset into vmo (it wraps around).
     last_ring_offset: usize,
+
+    // Optional oneshot channel to signal when audio stops playing.
+    notify_finished: Option<oneshot::Sender<()>>,
 }
 
 impl InputWorker {
@@ -517,6 +520,10 @@ impl InputWorker {
         self.inj_data.write(&data[44..])?;
         trace!("AudioFacade::InputWorker: Injecting {:?} bytes", self.inj_data.len());
         Ok(())
+    }
+
+    fn set_notify_finished(&mut self, notify_finished: oneshot::Sender<()>) {
+        self.notify_finished = Some(notify_finished);
     }
 
     // Events from the Virtual Audio Device
@@ -620,6 +627,11 @@ impl InputWorker {
             let zeroes = vec![0; next_write_pointer - self.write_pointer];
             self.write_to_vmo(&zeroes)?;
             self.write_pointer = next_write_pointer;
+
+            // Out of data, so we are done playing.
+            if let Some(tx) = self.notify_finished.take() {
+                tx.send(()).ok();
+            }
         }
 
         self.last_ring_offset = ring_offset;
@@ -651,6 +663,9 @@ impl InputWorker {
                         }
                         Some(InjectMsg::Data { data }) => {
                             self.set_data(data)?;
+                        }
+                        Some(InjectMsg::NotifyFinished { out_sender }) => {
+                            self.set_notify_finished(out_sender);
                         }
                     }
                 },
@@ -862,6 +877,7 @@ impl VirtualInput {
 enum InjectMsg {
     Flush,
     Data { data: Vec<u8> },
+    NotifyFinished { out_sender: oneshot::Sender<()> },
 }
 
 /// Perform Audio operations.
@@ -963,18 +979,36 @@ impl AudioFacade {
         }
     }
 
-    pub async fn get_output_audio(&self) -> Result<zx::Vmo, Error> {
+    pub async fn get_input_audio_size(&self, sample_index: usize) -> Result<usize, Error> {
+        self.ensure_initialized().await?;
+        Ok(self.audio_input.read().await.injection_data[sample_index].len())
+    }
+
+    pub async fn get_output_audio_vec(&self) -> Result<Vec<u8>, Error> {
         self.ensure_initialized().await?;
         let capturing = self.audio_output.read().await.capturing.clone();
         let capturing = capturing.lock().await;
         if !*capturing {
-            let a = &self.audio_output.read().await.extracted_data;
-            let vmo = zx::Vmo::create(a.len() as u64).unwrap();
-            vmo.write(a, 0)?;
-            Ok(vmo)
+            let a = self.audio_output.read().await.extracted_data.clone();
+            Ok(a)
         } else {
-            return Err(format_err!("GetOutputAudio failed, still saving."));
+            Err(format_err!("GetOutputAudio failed, still saving."))
         }
+    }
+
+    pub async fn set_notify_on_finished_playing_input(
+        &self,
+        out_sender: oneshot::Sender<()>,
+    ) -> Result<(), Error> {
+        self.ensure_initialized().await?;
+        let mut write = self.audio_input.write().await;
+        write
+            .input_sender
+            .as_mut()
+            .ok_or_else(|| anyhow!("No input sender"))?
+            .send(InjectMsg::NotifyFinished { out_sender })
+            .await?;
+        Ok(())
     }
 
     pub async fn put_input_audio(

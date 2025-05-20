@@ -81,6 +81,10 @@ pub struct IpCounters<I: IpCountersIpExt, C: CounterRepr = Counter> {
     pub unspecified_destination: C,
     /// Count of incoming IP packets with an unspecified source address.
     pub unspecified_source: C,
+    /// Count of incoming IP packets with an invalid source address.
+    /// See the definitions of [`net_types::ip::Ipv4SourceAddr`] and
+    /// [`net_types::ip::Ipv6SourceAddr`] for the exact requirements.
+    pub invalid_source: C,
     /// Count of incoming IP packets dropped.
     pub dropped: C,
     /// Number of frames rejected because they'd cause illegal loopback
@@ -98,6 +102,8 @@ pub struct IpCounters<I: IpCountersIpExt, C: CounterRepr = Counter> {
     pub invalid_cached_conntrack_entry: C,
     /// IP fragmentation counters.
     pub fragmentation: FragmentationCounters<C>,
+    /// Number of packets filtered out by the socket egress filter.
+    pub socket_egress_filter_dropped: C,
 }
 
 impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
@@ -122,16 +128,19 @@ impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
             parameter_problem,
             unspecified_destination,
             unspecified_source,
+            invalid_source,
             dropped,
             tx_illegal_loopback_address,
             version_rx,
             multicast_no_interest,
             invalid_cached_conntrack_entry,
             fragmentation,
+            socket_egress_filter_dropped,
         } = self;
         inspector.record_child("PacketTx", |inspector| {
             inspector.record_counter("Sent", send_ip_packet);
             inspector.record_counter("IllegalLoopbackAddress", tx_illegal_loopback_address);
+            inspector.record_counter("SocketEgressFilterDropped", socket_egress_filter_dropped);
         });
         inspector.record_child("PacketRx", |inspector| {
             inspector.record_counter("Received", receive_ip_packet);
@@ -140,6 +149,7 @@ impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
             inspector.record_counter("ParameterProblem", parameter_problem);
             inspector.record_counter("UnspecifiedDst", unspecified_destination);
             inspector.record_counter("UnspecifiedSrc", unspecified_source);
+            inspector.record_counter("InvalidSrc", invalid_source);
             inspector.record_counter("Dropped", dropped);
             inspector.record_counter("MulticastNoInterest", multicast_no_interest);
             inspector.record_counter("DeliveredUnicast", deliver_unicast);
@@ -205,8 +215,6 @@ pub struct Ipv6RxCounters<C: CounterRepr = Counter> {
     /// Count of incoming IPv6 packets dropped because the destination address
     /// is only tentatively assigned to the device.
     pub drop_for_tentative: C,
-    /// Count of incoming IPv6 packets dropped due to a non-unicast source address.
-    pub non_unicast_source: C,
     /// Count of incoming IPv6 packets discarded while processing extension
     /// headers.
     pub extension_header_discard: C,
@@ -217,14 +225,9 @@ pub struct Ipv6RxCounters<C: CounterRepr = Counter> {
 
 impl<C: CounterRepr> Inspectable for Ipv6RxCounters<C> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self {
-            drop_for_tentative,
-            non_unicast_source,
-            extension_header_discard,
-            drop_looped_back_dad_probe,
-        } = self;
+        let Self { drop_for_tentative, extension_header_discard, drop_looped_back_dad_probe } =
+            self;
         inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
-        inspector.record_counter("DroppedNonUnicastSrc", non_unicast_source);
         inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
         inspector.record_counter("DroppedLoopedBackDadProbe", drop_looped_back_dad_probe);
     }
@@ -247,13 +250,11 @@ pub mod testutil {
         fn from(counters: &Ipv6RxCounters) -> Ipv6RxCounters<C> {
             let Ipv6RxCounters {
                 drop_for_tentative,
-                non_unicast_source,
                 extension_header_discard,
                 drop_looped_back_dad_probe,
             } = counters;
             Ipv6RxCounters {
                 drop_for_tentative: drop_for_tentative.get().into_repr(),
-                non_unicast_source: non_unicast_source.into_repr(),
                 extension_header_discard: extension_header_discard.into_repr(),
                 drop_looped_back_dad_probe: drop_looped_back_dad_probe.into_repr(),
             }
@@ -285,12 +286,14 @@ pub mod testutil {
                 parameter_problem,
                 unspecified_destination,
                 unspecified_source,
+                invalid_source,
                 dropped,
                 tx_illegal_loopback_address,
                 version_rx,
                 multicast_no_interest,
                 invalid_cached_conntrack_entry,
                 fragmentation,
+                socket_egress_filter_dropped,
             } = counters;
             IpCounterExpectations {
                 deliver_unicast: deliver_unicast.get(),
@@ -312,12 +315,14 @@ pub mod testutil {
                 parameter_problem: parameter_problem.get(),
                 unspecified_destination: unspecified_destination.get(),
                 unspecified_source: unspecified_source.get(),
+                invalid_source: invalid_source.get(),
                 dropped: dropped.get(),
                 tx_illegal_loopback_address: tx_illegal_loopback_address.get(),
                 version_rx: version_rx.into(),
                 multicast_no_interest: multicast_no_interest.get(),
                 invalid_cached_conntrack_entry: invalid_cached_conntrack_entry.get(),
                 fragmentation: fragmentation.into(),
+                socket_egress_filter_dropped: socket_egress_filter_dropped.get(),
             }
         }
     }

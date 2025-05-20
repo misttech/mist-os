@@ -5,17 +5,16 @@
 use crate::base_package::BasePackage;
 
 use anyhow::{Context, Result};
+use assembled_system::BlobfsContents;
 use assembly_blobfs::BlobFSBuilder;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_images_config::BlobFS;
-use assembly_manifest::BlobfsContents;
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashMap;
 
 pub fn construct_blobfs(
     blobfs_tool: Box<dyn Tool>,
-    outdir: impl AsRef<Utf8Path>,
     gendir: impl AsRef<Utf8Path>,
     image_config: &ImageAssemblyConfig,
     blobfs_config: &BlobFS,
@@ -39,7 +38,7 @@ pub fn construct_blobfs(
     blobfs_builder.add_package(&base_package.manifest_path)?;
 
     // Build the blobfs and store the merkle to size map.
-    let blobfs_path = outdir.as_ref().join("blob.blk");
+    let blobfs_path = gendir.as_ref().join("blob.blk");
     let blobs_json_path =
         blobfs_builder.build(gendir, &blobfs_path).context("Failed to build the blobfs")?;
     let merkle_size_map = match blobfs_builder.read_blobs_json(blobs_json_path) {
@@ -120,7 +119,6 @@ mod tests {
         construct_blobfs(
             blobfs_tool,
             dir,
-            dir,
             &image_config,
             &blobfs_config,
             /*compress=*/ true,
@@ -197,7 +195,6 @@ mod tests {
         // Construct blobfs, and ensure no error is returned.
         construct_blobfs(
             blobfs_tool,
-            dir,
             dir,
             &image_config,
             &blobfs_config,

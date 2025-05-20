@@ -223,8 +223,8 @@ mod tests {
         correct_statistics: BlockStatistics,
     ) -> Result<(), Error> {
         let metrics = data::Scanner::try_from(buffer).map(|d| d.metrics())?;
-        assert_eq!(metrics.block_count, block_count, "Bad block_count for {}", description);
-        assert_eq!(metrics.size, size, "Bad size for {}", description);
+        assert_eq!(metrics.block_count, block_count, "Bad block_count for {description}");
+        assert_eq!(metrics.size, size, "Bad size for {description}");
         match metrics.block_statistics.get(description) {
             None => {
                 return Err(format_err!(

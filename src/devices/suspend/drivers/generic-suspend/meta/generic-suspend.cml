@@ -16,7 +16,7 @@
         colocate: "false",
     },
     capabilities: [
-        { service: "fuchsia.hardware.suspend.SuspendService" },
+        { service: "fuchsia.hardware.power.suspend.SuspendService" },
     ],
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },
@@ -25,7 +25,7 @@
     ],
     expose: [
         {
-            service: "fuchsia.hardware.suspend.SuspendService",
+            service: "fuchsia.hardware.power.suspend.SuspendService",
             from: "self",
         },
     ],

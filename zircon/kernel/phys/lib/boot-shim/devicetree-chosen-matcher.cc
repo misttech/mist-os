@@ -7,6 +7,8 @@
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/defer.h>
 
+#include <span>
+
 #include "lib/boot-shim/devicetree.h"
 
 namespace boot_shim {
@@ -225,8 +227,8 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::OnNode(
       return devicetree::ScanState::kActive;
     }
 
-    zbi_ = cpp20::span<const std::byte>(reinterpret_cast<const std::byte*>(*address_start),
-                                        static_cast<size_t>(*address_end - *address_start));
+    zbi_ = std::span<const std::byte>(reinterpret_cast<const std::byte*>(*address_start),
+                                      static_cast<size_t>(*address_end - *address_start));
   }
 
   return devicetree::ScanState::kActive;

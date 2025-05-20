@@ -27,7 +27,7 @@
 ##                            https://fuchsia.dev/fuchsia-src/reference/diagnostics/consumers/log_listener.
 ##
 ## Creates an SSH connection with a device and starts listening for logs.
-## It will listen to the device specified with `fx -d DEVICE log` or
+## It will listen to the device specified with `fx -t DEVICE log` or
 ## `fx set-device`, otherwise it will try to find a connected device.
 ##
 ## If the command hangs without printing anything, first check to make sure `fx shell`

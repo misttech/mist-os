@@ -170,6 +170,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Directory.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -194,14 +203,6 @@
         "request": "fuchsia.io/NodeGetAttributesRequest",
         "response": "fuchsia.io/NodeAttributes2",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",
@@ -323,15 +324,6 @@
         "ordinal": "1635123508515392625",
         "direction": "two_way",
         "response": "fuchsia.io/DirectoryRewindResponse"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",
@@ -792,6 +784,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/File.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/File.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -834,14 +835,6 @@
         "request": "fuchsia.io/FileGetBackingMemoryRequest",
         "response": "fuchsia.io/File_GetBackingMemory_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/File.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",
@@ -961,15 +954,6 @@
         "request": "fuchsia.io/FileSeekRequest",
         "response": "fuchsia.io/File_Seek_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/File.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",
@@ -1334,18 +1318,13 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_MODIFY",
+        "name": "fuchsia.io/Flags.PERM_MODIFY_DIRECTORY",
         "value": "256"
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_READ",
+        "name": "fuchsia.io/Flags.PERM_READ_BYTES",
         "value": "2"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_SET_ATTRIBUTES",
-        "value": "32"
     },
     {
         "kind": "bits/member",
@@ -1354,7 +1333,12 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_WRITE",
+        "name": "fuchsia.io/Flags.PERM_UPDATE_ATTRIBUTES",
+        "value": "32"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_WRITE_BYTES",
         "value": "4"
     },
     {
@@ -1405,6 +1389,12 @@
         "name": "fuchsia.io/ImmutableNodeAttributes.abilities",
         "ordinal": "2",
         "type": "fuchsia.io/Operations"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.io/ImmutableNodeAttributes.change_time",
+        "ordinal": "7",
+        "type": "uint64"
     },
     {
         "kind": "table/member",
@@ -1685,6 +1675,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Node.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Node.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -1709,14 +1708,6 @@
         "request": "fuchsia.io/NodeGetAttributesRequest",
         "response": "fuchsia.io/NodeAttributes2",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Node.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",
@@ -1786,15 +1777,6 @@
         "request": "fuchsia.io/NodeRemoveExtendedAttributeRequest",
         "response": "fuchsia.io/Node_RemoveExtendedAttribute_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Node.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",
@@ -2030,6 +2012,32 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrRequest.attributes",
+        "ordinal": "2",
+        "type": "fuchsia.io/NodeAttributes"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrRequest.flags",
+        "ordinal": "1",
+        "type": "fuchsia.io/NodeAttributeFlags"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrResponse.s",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.io/NodeDeprecatedSetFlagsRequest.flags",
         "ordinal": "1",
         "type": "fuchsia.io/OpenFlags"
@@ -2198,32 +2206,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.io/NodeRemoveExtendedAttributeRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeSetAttrRequest.attributes",
-        "ordinal": "2",
-        "type": "fuchsia.io/NodeAttributes"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeSetAttrRequest.flags",
-        "ordinal": "1",
-        "type": "fuchsia.io/NodeAttributeFlags"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/NodeSetAttrRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.io/NodeSetAttrResponse.s",
-        "ordinal": "1",
-        "type": "int32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "struct/member",
@@ -2617,6 +2599,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Symlink.DeprecatedSetAttr",
+        "strictness": "strict",
+        "ordinal": "4721673413776871238",
+        "direction": "two_way",
+        "request": "fuchsia.io/NodeDeprecatedSetAttrRequest",
+        "response": "fuchsia.io/NodeDeprecatedSetAttrResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Symlink.DeprecatedSetFlags",
         "strictness": "strict",
         "ordinal": "5950864159036794675",
@@ -2649,14 +2640,6 @@
         "request": "fuchsia.io/NodeGetAttributesRequest",
         "response": "fuchsia.io/NodeAttributes2",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Symlink.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",
@@ -2736,15 +2719,6 @@
         "request": "fuchsia.io/NodeRemoveExtendedAttributeRequest",
         "response": "fuchsia.io/Node_RemoveExtendedAttribute_Response",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Symlink.SetAttr",
-        "strictness": "strict",
-        "ordinal": "4721673413776871238",
-        "direction": "two_way",
-        "request": "fuchsia.io/NodeSetAttrRequest",
-        "response": "fuchsia.io/NodeSetAttrResponse"
     },
     {
         "kind": "protocol/member",

@@ -5,14 +5,14 @@ library fuchsia.diagnostics;
 
 //  The size bound of 100 is a reasonably low limit chosen based on observed
 //  strings used as identifiers.
-@available(replaced=NEXT)
+@available(replaced=27)
 const MAX_STRING_SELECTOR_LENGTH uint16 = 100;
 
 // Max string selector length. Must be kept in-sync
 // with sdk/fidl/fuchsia.component/constants.fidl.
 // TODO(https://fxbug.dev/400782257): just use `fuchsia.component.MAX_CHILD_NAME_LENGTH`
 // when `fuchsia.logger` doesn't depend on `fuchsia.diagnsotics`.
-@available(added=NEXT)
+@available(added=27)
 const MAX_STRING_SELECTOR_LENGTH uint16 = 1024;
 
 //  The size bound of 25 is a reasonably low limit chosen based on observed

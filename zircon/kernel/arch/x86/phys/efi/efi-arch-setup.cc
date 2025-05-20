@@ -8,4 +8,4 @@
 
 #include <phys/main.h>
 
-void ArchSetUp(void* zbi) { arch::InitializeBootCpuid(); }
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) { arch::InitializeBootCpuid(); }

@@ -56,6 +56,16 @@
         ],
     },
     {
+        tag: 'wlancfg-roam-events',
+        service_name: 'wlan',
+        max_bytes: 20000,
+        min_seconds_between_fetch: 60,
+        selectors: [
+            'INSPECT:core/wlancfg:root/client_stats/roam_events',
+            'INSPECT:core/wlancfg:root/client_stats/roam_Events:*',
+        ],
+    },
+    {
         tag: 'wlancfg-scan-events',
         service_name: 'wlan',
         max_bytes: 500,

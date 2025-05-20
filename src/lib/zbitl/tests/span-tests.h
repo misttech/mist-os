@@ -6,9 +6,9 @@
 #define SRC_LIB_ZBITL_TESTS_SPAN_TESTS_H_
 
 #include <lib/stdcompat/cstddef.h>
-#include <lib/stdcompat/span.h>
 
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -52,7 +52,7 @@ using StringTestTraits = BasicStringViewTestTraits<char>;
 
 template <typename T>
 struct SpanTestTraits {
-  using storage_type = cpp20::span<T>;
+  using storage_type = std::span<T>;
   using payload_type = storage_type;
 
   static constexpr bool kDefaultConstructedViewHasStorageError = false;
@@ -86,7 +86,7 @@ struct SpanTestTraits {
   static void Read(const storage_type& storage, payload_type payload, size_t size,
                    std::string* contents) {
     contents->resize(size);
-    auto bytes = cpp20::as_bytes(payload);
+    auto bytes = std::as_bytes(payload);
     ASSERT_LE(size, bytes.size());
     memcpy(contents->data(), bytes.data(), size);
   }

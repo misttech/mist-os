@@ -52,6 +52,8 @@ if (is_host) {
       "//src/developer/ffx/lib/netext:verify_bazel2gn",
       "//src/lib/fuchsia-async:verify_bazel2gn",
       "//src/lib/fuchsia-async-macro:verify_bazel2gn",
+      "//src/lib/fuchsia-hyper:verify_bazel2gn",
+      "//src/sys/pkg/testing/fake-omaha-client:verify_bazel2gn",
       "//tools/fidl/fidlgen_cpp:verify_bazel2gn",
       "//tools/fidl/fidlgen_cpp/codegen:verify_bazel2gn",
       "//tools/fidl/fidlgen_hlcpp:verify_bazel2gn",
@@ -130,6 +132,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//sdk:*",
     "//sdk/firmware:*",
+    "//sdk/pdk:*",
   ]
 
   # TODO(https://fxbug.dev/42174306): Remove entries when
@@ -154,6 +157,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//build/images/*",
     "//src/bringup/lib/mexec/tests/*",
+    "//src/developer/ffx/lib/profiler/tests:*",
     "//src/developer/ffx/lib/symbolize/tests:*",
     "//src/lib/elfldltl/test/*",
     "//src/security/lib/scrutiny/collector/*",
@@ -359,6 +363,9 @@ group("non_hermetic_deps") {
     "//examples/drivers/template:*",
     "//examples/drivers/transport/driver/v2:*",
   ]
+
+  # product config for boot_tests.
+  visibility += [ "//build/testing/boot_tests:product_config" ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates
@@ -387,7 +394,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//sdk/lib/fit-promise:*",
     "//sdk/lib/stdcompat:*",
     "//src/devices/block/lib/scsi:*",
-    "//src/devices/bus/lib/device-protocol-pdev:*",
     "//src/devices/bus/lib/virtio:*",
     "//src/devices/bus/testing/mock-sdio:*",
     "//src/devices/i2c/lib/device-protocol-i2c-channel:*",

@@ -102,7 +102,7 @@ pub async fn load_product_bundle(product_bundle: &Option<String>) -> Result<Load
         anyhow::bail!("No product bundle path configured, nor specified.");
     }
 
-    tracing::debug!("Loading a product bundle: {:?}", bundle_path);
+    log::debug!("Loading a product bundle: {:?}", bundle_path);
 
     if is_local_product_bundle(&bundle_path) {
         return LoadedProductBundle::try_load_from(&bundle_path);
@@ -126,11 +126,11 @@ pub async fn load_product_bundle(product_bundle: &Option<String>) -> Result<Load
 
 /// Remove prior output directory, if necessary.
 pub async fn make_way_for_output(local_dir: &Path, force: bool) -> Result<()> {
-    tracing::debug!("make_way_for_output {:?}, force {}", local_dir, force);
+    log::debug!("make_way_for_output {:?}, force {}", local_dir, force);
     if local_dir.exists() {
-        tracing::debug!("local_dir.exists {:?}", local_dir);
+        log::debug!("local_dir.exists {:?}", local_dir);
         if std::fs::read_dir(&local_dir).expect("reading dir").next().is_none() {
-            tracing::debug!("local_dir is empty (which is good) {:?}", local_dir);
+            log::debug!("local_dir is empty (which is good) {:?}", local_dir);
             return Ok(());
         } else if force {
             if local_dir == Path::new("") || local_dir == Path::new("/") {
@@ -151,7 +151,7 @@ pub async fn make_way_for_output(local_dir: &Path, force: bool) -> Result<()> {
             async_fs::remove_dir_all(&local_dir)
                 .await
                 .with_context(|| format!("removing output dir {:?}", local_dir))?;
-            tracing::debug!("Removed all of {:?}", local_dir);
+            log::debug!("Removed all of {:?}", local_dir);
         } else {
             ffx_bail!(
                 "The output directory already exists. Please provide \
@@ -161,7 +161,7 @@ pub async fn make_way_for_output(local_dir: &Path, force: bool) -> Result<()> {
             );
         }
     }
-    tracing::debug!("local_dir dir clear.");
+    log::debug!("local_dir dir clear.");
     Ok(())
 }
 
@@ -183,7 +183,7 @@ where
     F: Fn(FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface,
 {
-    tracing::debug!("string_from_url {}", product_url);
+    log::debug!("string_from_url {}", product_url);
     Ok(match product_url.scheme() {
         "http" | "https" => {
             let https_client = fuchsia_hyper::new_https_client();
@@ -219,7 +219,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_config::environment::test_init_in_tree;
+    use ffx_config::environment::test_env;
     use ffx_config::ConfigLevel;
     use std::fs::File;
     use tempfile::TempDir;
@@ -229,7 +229,7 @@ mod tests {
         let test_dir = TempDir::new().expect("output directory");
         let build_dir =
             Utf8Path::from_path(test_dir.path()).expect("cannot convert builddir to Utf8Path");
-        let _env = test_init_in_tree(&test_dir.path()).await.unwrap();
+        let _env = test_env().in_tree(&test_dir.path()).build().await.unwrap();
 
         let empty_pb: Option<String> = None;
         // If no product bundle path provided and no config return None

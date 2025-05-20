@@ -38,7 +38,7 @@
             availability: "optional",
         },
         {
-            service: "fuchsia.hardware.suspend.SuspendService",
+            service: "fuchsia.hardware.power.suspend.SuspendService",
             from: "#fake-suspend",
             to: "#system-activity-governor",
         },

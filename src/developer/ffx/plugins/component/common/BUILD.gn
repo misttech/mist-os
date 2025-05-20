@@ -11,6 +11,7 @@ rustc_library("ffx_component") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_fdomain",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/lib/fuchsia-url",
@@ -21,8 +22,10 @@ rustc_library("ffx_component") {
 
   if (is_host) {
     deps += [
+      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
       "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
       "//src/developer/ffx/lib/rcs:lib",
+      "//src/developer/ffx/lib/rcs:lib_fdomain",
     ]
   }
 

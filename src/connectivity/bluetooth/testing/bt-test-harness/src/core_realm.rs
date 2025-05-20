@@ -176,35 +176,7 @@ impl CoreRealm {
             )
             .await?;
 
-        // Route config capabilities from root to bt-init
-        builder
-            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "fuchsia.bluetooth.LegacyPairing".parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(false)),
-            }))
-            .await?;
-
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::configuration("fuchsia.bluetooth.LegacyPairing"))
-                    .from(Ref::self_())
-                    .to(&bt_init),
-            )
-            .await?;
-
-        // Add directory routing between components within CoreRealm
-        builder
-            .add_route(
-                Route::new()
-                    .capability(
-                        Capability::directory("dev-class").subdir("bt-hci").as_("dev-bt-hci"),
-                    )
-                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
-                    .to(&bt_init),
-            )
-            .await?;
-
+        crate::host_realm::add_host_routes(&builder, &bt_init).await?;
         let instance = builder.build().await?;
 
         // Start DriverTestRealm

@@ -13,7 +13,7 @@
 #include <arch/arm64/smccc.h>
 #include <dev/psci.h>
 #include <pdev/power.h>
-#include <phys/handoff.h>
+#include <vm/handoff-end.h>
 
 #define LOCAL_TRACE 0
 

@@ -23,6 +23,11 @@ type Capabilities = table {
     /// Describes if dhcpv6 prefix delegation is supported.
     /// If dhcpv6_pd is true, Openthread supports dhcpv6pd, false otherwise.
     2: dhcpv6_pd bool;
+
+    /// Describes if epskc is supported.
+    /// If epskc is true, Openthread supports epskc, false otherwise.
+    @available(added=27)
+    3: epskc bool;
 };
 
 /// Protocol for connecting to [`Capabilities`] on a LoWPAN device.

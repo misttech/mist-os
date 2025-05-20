@@ -10,7 +10,6 @@ source_set("driver_loader") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/async",
     "//sdk/lib/ld:remote",
-    "//sdk/lib/stdcompat",
     "//src/devices/lib/log",
     "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",

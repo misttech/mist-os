@@ -6,6 +6,7 @@
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyDeveloperOverridesInfo",
@@ -17,7 +18,6 @@ load(
     "FuchsiaProductImageInfo",
 )
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 # Base source for running ffx assembly create-system
 _CREATE_SYSTEM_RUNNER_SH_TEMPLATE = """
@@ -28,7 +28,8 @@ mkdir -p $FFX_ISOLATE_DIR
     assembly \
     create-system \
     --image-assembly-config $PRODUCT_ASSEMBLY_OUTDIR/image_assembly.json \
-    --outdir $OUTDIR
+    --outdir $OUTDIR \
+    --gendir $GENDIR
 """
 
 def _match_assembly_pattern_string(label, pattern):
@@ -36,7 +37,7 @@ def _match_assembly_pattern_string(label, pattern):
     assembly_pattern = pattern.removeprefix("//")
     if assembly_pattern.endswith("/*"):
         # Match any target in the package or below
-        return package.startswith(assembly_pattern.removesuffix("/*"))
+        return (package + "/").startswith(assembly_pattern.removesuffix("*"))
     elif assembly_pattern.endswith(":*"):
         # Match package exactly.
         return package == assembly_pattern.removesuffix(":*")
@@ -210,6 +211,7 @@ _fuchsia_product_assembly = rule(
 def _fuchsia_product_create_system_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
+    gen_dir = ctx.actions.declare_directory(ctx.label.name + "_gen")
 
     # Assembly create-system
     product_assembly_out = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].product_assembly_out
@@ -227,6 +229,7 @@ def _fuchsia_product_create_system_impl(ctx):
     shell_env = {
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
+        "GENDIR": gen_dir.path,
         "PRODUCT_ASSEMBLY_OUTDIR": product_assembly_out.path,
     }
 
@@ -234,6 +237,7 @@ def _fuchsia_product_create_system_impl(ctx):
         inputs = ffx_inputs,
         outputs = [
             out_dir,
+            gen_dir,
             # Isolate dirs contain useful debug files like logs, so include it
             # in outputs.
             ffx_isolate_dir,
@@ -244,13 +248,14 @@ def _fuchsia_product_create_system_impl(ctx):
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [
-        DefaultInfo(files = depset([out_dir, ffx_isolate_dir] + ffx_inputs)),
+        DefaultInfo(files = depset([out_dir, gen_dir, ffx_isolate_dir] + ffx_inputs)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
-            all_files = depset([out_dir, ffx_isolate_dir] + ffx_inputs),
+            all_files = depset([out_dir, gen_dir, ffx_isolate_dir] + ffx_inputs),
         ),
         FuchsiaProductImageInfo(
             images_out = out_dir,
+            images_intermediates = gen_dir,
             platform_aibs = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].platform_aibs,
             product_assembly_out = product_assembly_out,
             build_type = build_type,

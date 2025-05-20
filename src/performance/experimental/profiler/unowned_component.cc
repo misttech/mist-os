@@ -51,12 +51,9 @@ zx::result<> profiler::UnownedComponent::Attach(
   return zx::ok();
 }
 
-zx::result<> profiler::UnownedComponent::Start(ComponentWatcher::ComponentEventHandler on_start) {
+zx::result<> profiler::UnownedComponent::Start(fxl::WeakPtr<Sampler> notify) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  if (!on_start) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-  on_start_ = std::move(on_start);
+  on_start_ = profiler::MakeOnStartHandler(std::move(notify));
   if (zx::result res = component_watcher_.Watch(); res.is_error()) {
     return res;
   }

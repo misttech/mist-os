@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::task::{
-    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, ThreadGroup, WaitCanceler, Waiter,
+    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, ThreadGroup, ThreadGroupKey,
+    WaitCanceler, Waiter,
 };
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
@@ -12,21 +13,13 @@ use crate::vfs::{
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::pid_t;
 use starnix_uapi::vfs::FdEvents;
 use std::sync::Arc;
 use zx::{self as zx, AsHandleRef};
 
 pub struct PidFdFileObject {
-    // In principle, we need some way to designate a Task that is durable for
-    // the lifetime of the `PidFdFileObject`. In practice, we never actually
-    // reuse pids and have no mechanism for tracking which pids have been freed.
-    //
-    // For now, we designate the Task using the pid itself. If/when we start
-    // reusing pids, we'll need to reconsider this design.
-    //
-    // See `PidTable::allocate_pid` for a related comment.
-    pid: pid_t,
+    /// The key of the task represented by this file.
+    tg: ThreadGroupKey,
 
     // Receives a notification when the tracked process terminates.
     terminated_event: Arc<zx::EventPair>,
@@ -56,7 +49,7 @@ pub fn new_pidfd(current_task: &CurrentTask, proc: &ThreadGroup, flags: OpenFlag
     Anon::new_private_file(
         current_task,
         Box::new(PidFdFileObject {
-            pid: proc.leader,
+            tg: proc.into(),
             terminated_event: Arc::new(proc.drop_notifier.event()),
         }),
         flags,
@@ -69,8 +62,8 @@ impl FileOps for PidFdFileObject {
     fileops_impl_dataless!();
     fileops_impl_noop_sync!();
 
-    fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
-        Ok(self.pid)
+    fn as_thread_group_key(&self, _file: &FileObject) -> Result<ThreadGroupKey, Errno> {
+        Ok(self.tg.clone())
     }
 
     fn wait_async(
@@ -106,6 +99,7 @@ impl FileOps for PidFdFileObject {
         match self
             .terminated_event
             .wait_handle(zx::Signals::EVENTPAIR_PEER_CLOSED, zx::MonotonicInstant::ZERO)
+            .to_result()
         {
             Err(zx::Status::TIMED_OUT) => Ok(FdEvents::empty()),
             Ok(zx::Signals::EVENTPAIR_PEER_CLOSED) => Ok(FdEvents::POLLIN),

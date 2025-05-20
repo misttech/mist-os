@@ -66,7 +66,7 @@ zx::result<void *> Fastboot::GetDownloadBuffer(size_t total_download_size) {
 
 constexpr std::string_view kSlotArgs[] = {"a", "b"};
 
-cpp20::span<Fastboot::VariableEntry> Fastboot::GetVariableTable() {
+std::span<Fastboot::VariableEntry> Fastboot::GetVariableTable() {
   static VariableEntry var_entries[] = {
       {"all", VarFuncAndArgs{&Fastboot::GetVarAll}},
       // Function based variables
@@ -87,7 +87,7 @@ cpp20::span<Fastboot::VariableEntry> Fastboot::GetVariableTable() {
   return var_entries;
 }
 
-cpp20::span<Fastboot::CommandCallbackEntry> Fastboot::GetCommandCallbackTable() {
+std::span<Fastboot::CommandCallbackEntry> Fastboot::GetCommandCallbackTable() {
   static CommandCallbackEntry cmd_entries[] = {
       {"getvar", &Fastboot::GetVar},
       {"flash", &Fastboot::Flash},
@@ -207,8 +207,8 @@ zx::result<> Fastboot::GetVar(std::string_view cmd, fastboot::Transport *transpo
 //
 // Note: empty strings are not treated specially. If any input strings are empty,
 // the output will contain consecutive delimiters.
-constexpr size_t StringJoin(cpp20::span<const std::string_view> names, char delimiter,
-                            cpp20::span<char> buffer) {
+constexpr size_t StringJoin(std::span<const std::string_view> names, char delimiter,
+                            std::span<char> buffer) {
   constexpr auto len_reducer = [](size_t sum, std::string_view val) { return sum + val.size(); };
   size_t total_length = std::reduce(names.begin(), names.end(), 0, len_reducer) + names.size() - 1;
   ZX_ASSERT(total_length <= buffer.size());
@@ -237,7 +237,7 @@ class GetVarAllResponder {
 
     args_.push_back(msg);
     char buffer[fastboot::kMaxCommandPacketSize - sizeof("INFO")];
-    cpp20::span<char> buffer_span(buffer, sizeof(buffer));
+    std::span<char> buffer_span(buffer, sizeof(buffer));
     size_t payload_len = StringJoin(args_, ':', buffer_span);
     args_.pop_back();
     buffer_span = {buffer, payload_len};
@@ -613,7 +613,7 @@ void hexdump8_short(const void *ptr, size_t len, hexdump_printf_func_t *printf_f
   char line_buffer[fastboot::kMaxCommandPacketSize + 1];
 
   for (size_t count = 0; count < len; count += 16) {
-    cpp20::span<char> remaining(line_buffer);
+    std::span<char> remaining(line_buffer);
     size_t used = 0;
 
     size_t i;

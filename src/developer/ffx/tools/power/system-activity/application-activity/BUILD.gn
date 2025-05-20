@@ -62,7 +62,6 @@ if (is_host) {
 
 if (is_fuchsia && has_board) {
   files = {
-    partitions_config = "$target_out_dir/partitions/partitions_config.json"
     outdir = target_out_dir + "/fuchsia"
     images_json = "${outdir}/images.json"
   }
@@ -71,13 +70,10 @@ if (is_fuchsia && has_board) {
     testonly = true
     name = "application-activity-test"
 
-    partitions = files.partitions_config
+    partitions = ":partitions_config"
     system_a = files.images_json
 
-    deps = [
-      ":assembly",
-      ":partitions_config",
-    ]
+    deps = [ ":assembly" ]
   }
 
   assembled_system("assembly") {
@@ -92,7 +88,6 @@ if (is_fuchsia && has_board) {
 
   generated_partitions_config("partitions_config") {
     testonly = true
-    output_path = get_path_info(files.partitions_config, "dir")
     hw_revision = board_name
   }
 

@@ -6,16 +6,15 @@
 pub mod test {
     use crate::{
         link_program_dynamic, verify_program, BpfValue, CallingContext, DataWidth, EbpfHelperImpl,
-        EbpfProgramContext, FromBpfValue, FunctionSignature, MemoryId, MemoryParameterSize, NoMap,
-        NullVerifierLogger, Packet, ProgramArgument, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64,
-        BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END,
-        BPF_EXIT, BPF_FETCH, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE,
-        BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT,
-        BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH,
-        BPF_SRC_IMM, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG,
-        BPF_XOR,
+        EbpfInstruction, EbpfProgramContext, FromBpfValue, FunctionSignature, MemoryId,
+        MemoryParameterSize, NoMap, NullVerifierLogger, Packet, ProgramArgument, Type, BPF_ABS,
+        BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG,
+        BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ,
+        BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE,
+        BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL,
+        BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE,
+        BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
     };
-    use linux_uapi::bpf_insn;
     use pest::iterators::Pair;
     use pest::Parser;
     use pest_derive::Parser;
@@ -23,7 +22,7 @@ pub mod test {
     use std::str::FromStr;
     use std::sync::LazyLock;
     use test_case::test_case;
-    use zerocopy::{FromBytes, IntoBytes};
+    use zerocopy::IntoBytes;
 
     #[derive(Parser)]
     #[grammar = "../../src/starnix/lib/ebpf/src/test_grammar.pest"]
@@ -73,9 +72,9 @@ pub mod test {
             Self::parse_value(pair.into_inner().next().unwrap()).as_u64()
         }
 
-        fn parse_asm(pair: Pair<'_, Rule>) -> Vec<bpf_insn> {
+        fn parse_asm(pair: Pair<'_, Rule>) -> Vec<EbpfInstruction> {
             assert_eq!(pair.as_rule(), Rule::ASM_INSTRUCTIONS);
-            let mut result: Vec<bpf_insn> = vec![];
+            let mut result: Vec<EbpfInstruction> = vec![];
             for entry in pair.into_inner() {
                 match entry.as_rule() {
                     Rule::ASM_INSTRUCTION => {
@@ -108,7 +107,7 @@ pub mod test {
             }
         }
 
-        fn parse_mem_instruction(pair: Pair<'_, Rule>) -> Vec<bpf_insn> {
+        fn parse_mem_instruction(pair: Pair<'_, Rule>) -> Vec<EbpfInstruction> {
             assert_eq!(pair.as_rule(), Rule::MEM_INSTRUCTION);
             let mut inner = pair.into_inner();
             let op = inner.next().unwrap();
@@ -116,54 +115,49 @@ pub mod test {
                 Rule::STORE_REG_OP => {
                     let (dst_reg, offset) = Self::parse_deref(inner.next().unwrap());
                     let src_reg = Self::parse_reg(inner.next().unwrap());
-                    let mut instruction = bpf_insn::default();
-                    instruction.set_dst_reg(dst_reg);
-                    instruction.set_src_reg(src_reg);
-                    instruction.off = offset;
-                    instruction.code =
-                        BPF_MEM | BPF_STX | Self::parse_memory_size(&op.as_str()[3..]);
-                    vec![instruction]
+                    vec![EbpfInstruction::new(
+                        BPF_MEM | BPF_STX | Self::parse_memory_size(&op.as_str()[3..]),
+                        dst_reg,
+                        src_reg,
+                        offset,
+                        0,
+                    )]
                 }
                 Rule::STORE_IMM_OP => {
                     let (dst_reg, offset) = Self::parse_deref(inner.next().unwrap());
                     let imm = Self::parse_value(inner.next().unwrap()).as_i32();
-                    let mut instruction = bpf_insn::default();
-                    instruction.set_dst_reg(dst_reg);
-                    instruction.imm = imm;
-                    instruction.off = offset;
-                    instruction.code =
-                        BPF_MEM | BPF_ST | Self::parse_memory_size(&op.as_str()[2..]);
-                    vec![instruction]
+                    vec![EbpfInstruction::new(
+                        BPF_MEM | BPF_ST | Self::parse_memory_size(&op.as_str()[2..]),
+                        dst_reg,
+                        0,
+                        offset,
+                        imm,
+                    )]
                 }
                 Rule::LOAD_OP => {
                     let dst_reg = Self::parse_reg(inner.next().unwrap());
                     let (src_reg, offset) = Self::parse_deref(inner.next().unwrap());
-                    let mut instruction = bpf_insn::default();
-                    instruction.set_dst_reg(dst_reg);
-                    instruction.set_src_reg(src_reg);
-                    instruction.off = offset;
-                    instruction.code =
-                        BPF_MEM | BPF_LDX | Self::parse_memory_size(&op.as_str()[3..]);
-                    vec![instruction]
+                    vec![EbpfInstruction::new(
+                        BPF_MEM | BPF_LDX | Self::parse_memory_size(&op.as_str()[3..]),
+                        dst_reg,
+                        src_reg,
+                        offset,
+                        0,
+                    )]
                 }
                 Rule::LDDW_OP => {
-                    let mut instructions: Vec<bpf_insn> = vec![];
                     let dst_reg = Self::parse_reg(inner.next().unwrap());
                     let value = Self::parse_value(inner.next().unwrap());
                     let (low, high) = value.as_i32_pair();
-                    let mut instruction = bpf_insn::default();
-                    instruction.set_dst_reg(dst_reg);
-                    instruction.imm = low;
-                    instruction.code = BPF_IMM | BPF_LD | BPF_DW;
-                    instructions.push(instruction);
-                    let mut instruction = bpf_insn::default();
-                    instruction.imm = high;
-                    instructions.push(instruction);
-                    instructions
+                    let code = BPF_IMM | BPF_LD | BPF_DW;
+                    vec![
+                        EbpfInstruction::new(code, dst_reg, 0, 0, low),
+                        EbpfInstruction::new(0, 0, 0, 0, high),
+                    ]
                 }
                 Rule::LOAD_PACKET_OP => {
-                    let mut instructions: Vec<bpf_insn> = vec![];
-                    let mut instruction = bpf_insn::default();
+                    let code = BPF_LD | Self::parse_memory_size(&op.as_str()[3..]);
+                    let mut instruction = EbpfInstruction::new(code, 0, 0, 0, 0);
                     let mut is_ind = false;
                     while let Some(inner) = inner.next() {
                         match inner.as_rule() {
@@ -172,29 +166,25 @@ pub mod test {
                                 is_ind = true;
                             }
                             Rule::OFFSET => {
-                                instruction.imm = Self::parse_value(inner).as_i32();
+                                instruction.set_imm(Self::parse_value(inner).as_i32());
                             }
                             r @ _ => unreachable!("unexpected rule {r:?}"),
                         }
                     }
-                    instruction.code = BPF_LD | Self::parse_memory_size(&op.as_str()[3..]);
                     if is_ind {
-                        instruction.code |= BPF_IND;
+                        instruction.set_code(code | BPF_IND);
                     } else {
-                        instruction.code |= BPF_ABS;
+                        instruction.set_code(code | BPF_ABS);
                     }
-                    instructions.push(instruction);
-                    instructions
+                    vec![instruction]
                 }
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
         }
 
-        fn parse_asm_instruction(pair: Pair<'_, Rule>) -> Vec<bpf_insn> {
+        fn parse_asm_instruction(pair: Pair<'_, Rule>) -> Vec<EbpfInstruction> {
             assert_eq!(pair.as_rule(), Rule::ASM_INSTRUCTION);
             if let Some(entry) = pair.into_inner().next() {
-                let mut instruction = bpf_insn::default();
-                instruction.code = 0;
                 match entry.as_rule() {
                     Rule::ALU_INSTRUCTION => {
                         vec![Self::parse_alu_instruction(entry)]
@@ -293,43 +283,41 @@ pub mod test {
             }
         }
 
-        fn parse_src(pair: Pair<'_, Rule>, instruction: &mut bpf_insn) {
+        fn parse_src(pair: Pair<'_, Rule>, instruction: &mut EbpfInstruction) {
             match pair.as_rule() {
                 Rule::REG_NUMBER => {
                     instruction.set_src_reg(Self::parse_reg(pair));
-                    instruction.code |= BPF_SRC_REG;
+                    instruction.set_code(instruction.code() | BPF_SRC_REG);
                 }
                 Rule::IMM => {
-                    instruction.imm = Self::parse_value(pair).as_i32();
-                    instruction.code |= BPF_SRC_IMM;
+                    instruction.set_imm(Self::parse_value(pair).as_i32());
+                    instruction.set_code(instruction.code() | BPF_SRC_IMM);
                 }
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
         }
 
-        fn parse_alu_instruction(pair: Pair<'_, Rule>) -> bpf_insn {
-            let mut instruction = bpf_insn::default();
+        fn parse_alu_instruction(pair: Pair<'_, Rule>) -> EbpfInstruction {
             let mut inner = pair.into_inner();
             let op = inner.next().unwrap();
             match op.as_rule() {
                 Rule::BINARY_OP => {
-                    instruction.code = Self::parse_alu_binary_op(op.as_str());
-                    instruction.set_dst_reg(Self::parse_reg(inner.next().unwrap()));
+                    let code = Self::parse_alu_binary_op(op.as_str());
+                    let dst_reg = Self::parse_reg(inner.next().unwrap());
+                    let mut instruction = EbpfInstruction::new(code, dst_reg, 0, 0, 0);
                     Self::parse_src(inner.next().unwrap(), &mut instruction);
+                    instruction
                 }
                 Rule::UNARY_OP => {
-                    instruction.set_dst_reg(Self::parse_reg(inner.next().unwrap()));
                     let (code, imm) = Self::parse_alu_unary_op(op.as_str());
-                    instruction.code = code;
-                    instruction.imm = imm;
+                    let dst_reg = Self::parse_reg(inner.next().unwrap());
+                    EbpfInstruction::new(code, dst_reg, 0, 0, imm)
                 }
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
-            instruction
         }
 
-        fn parse_atomic_instruction(pair: Pair<'_, Rule>) -> bpf_insn {
-            let mut instruction = bpf_insn::default();
+        fn parse_atomic_instruction(pair: Pair<'_, Rule>) -> EbpfInstruction {
             let mut inner = pair.into_inner();
             let (op, fetch) = {
                 let next = inner.next().unwrap();
@@ -349,12 +337,7 @@ pub mod test {
                     (&op[..], false)
                 }
             };
-            instruction.code = BPF_ATOMIC | BPF_STX;
-            if is_32 {
-                instruction.code |= BPF_W;
-            } else {
-                instruction.code |= BPF_DW;
-            };
+            let code = BPF_ATOMIC | BPF_STX | (if is_32 { BPF_W } else { BPF_DW });
             let mut imm = match op {
                 "add" => BPF_ADD,
                 "and" => BPF_AND,
@@ -367,13 +350,10 @@ pub mod test {
             if fetch {
                 imm |= BPF_FETCH;
             }
-            instruction.imm = imm as i32;
             let (dst_reg, offset) = Self::parse_deref(inner.next().unwrap());
             let src_reg = Self::parse_reg(inner.next().unwrap());
-            instruction.set_dst_reg(dst_reg);
-            instruction.set_src_reg(src_reg);
-            instruction.off = offset;
-            instruction
+
+            EbpfInstruction::new(code, dst_reg, src_reg, offset, imm as i32)
         }
 
         fn parse_offset_or_exit(pair: Pair<'_, Rule>) -> i16 {
@@ -412,34 +392,32 @@ pub mod test {
             };
             code
         }
-        fn parse_jmp_instruction(pair: Pair<'_, Rule>) -> bpf_insn {
-            let mut instruction = bpf_insn::default();
+        fn parse_jmp_instruction(pair: Pair<'_, Rule>) -> EbpfInstruction {
             let mut inner = pair.into_inner();
             let op = inner.next().unwrap();
             match op.as_rule() {
                 Rule::JMP_CONDITIONAL => {
                     let mut inner = op.into_inner();
-                    instruction.code = Self::parse_jmp_op(inner.next().unwrap().as_str());
-                    instruction.set_dst_reg(Self::parse_reg(inner.next().unwrap()));
+                    let code = Self::parse_jmp_op(inner.next().unwrap().as_str());
+                    let dst_reg = Self::parse_reg(inner.next().unwrap());
+                    let mut instruction = EbpfInstruction::new(code, dst_reg, 0, 0, 0);
                     Self::parse_src(inner.next().unwrap(), &mut instruction);
-                    instruction.off = Self::parse_offset_or_exit(inner.next().unwrap());
+                    instruction.set_offset(Self::parse_offset_or_exit(inner.next().unwrap()));
+                    instruction
                 }
                 Rule::JMP => {
                     let mut inner = op.into_inner();
-                    instruction.code = BPF_JMP | BPF_JA;
-                    instruction.off = Self::parse_offset_or_exit(inner.next().unwrap());
+                    let offset = Self::parse_offset_or_exit(inner.next().unwrap());
+                    EbpfInstruction::new(BPF_JMP | BPF_JA, 0, 0, offset, 0)
                 }
                 Rule::CALL => {
                     let mut inner = op.into_inner();
-                    instruction.code = BPF_JMP | BPF_CALL;
-                    instruction.imm = Self::parse_value(inner.next().unwrap()).as_i32();
+                    let imm = Self::parse_value(inner.next().unwrap()).as_i32();
+                    EbpfInstruction::new(BPF_JMP | BPF_CALL, 0, 0, 0, imm)
                 }
-                Rule::EXIT => {
-                    instruction.code = BPF_JMP | BPF_EXIT;
-                }
+                Rule::EXIT => EbpfInstruction::new(BPF_JMP | BPF_EXIT, 0, 0, 0, 0),
                 r @ _ => unreachable!("unexpected rule {r:?}"),
             }
-            instruction
         }
     }
 
@@ -537,7 +515,7 @@ pub mod test {
     }
 
     struct TestCase {
-        code: Vec<bpf_insn>,
+        code: Vec<EbpfInstruction>,
         result: Option<u64>,
         memory: Option<Vec<u8>>,
     }
@@ -546,10 +524,10 @@ pub mod test {
         fn parse(content: &str) -> Option<Self> {
             let mut pairs =
                 TestGrammar::parse(Rule::rules, content).expect("Parsing must be successful");
-            let mut code: Option<Vec<bpf_insn>> = None;
+            let mut code: Option<Vec<EbpfInstruction>> = None;
             let mut result: Option<Option<u64>> = None;
             let mut memory: Option<Vec<u8>> = None;
-            let mut raw: Option<Vec<bpf_insn>> = None;
+            let mut raw: Option<Vec<EbpfInstruction>> = None;
             for entry in pairs.next().unwrap().into_inner() {
                 match entry.as_rule() {
                     Rule::ASM_INSTRUCTIONS => {
@@ -582,7 +560,7 @@ pub mod test {
                             assert_eq!(byte_str.as_rule(), Rule::RAW_VALUE);
                             let value =
                                 u64::from_str_radix(byte_str.as_str(), HEXADECIMAL_BASE).unwrap();
-                            instructions.push(bpf_insn::read_from_bytes(value.as_bytes()).unwrap());
+                            instructions.push(EbpfInstruction::from(value));
                         }
                         raw = Some(instructions);
                     }
@@ -751,7 +729,7 @@ pub mod test {
         0.into()
     }
 
-    pub fn parse_asm(data: &str) -> Vec<bpf_insn> {
+    pub fn parse_asm(data: &str) -> Vec<EbpfInstruction> {
         let mut pairs =
             TestGrammar::parse(Rule::ASM_INSTRUCTIONS, data).expect("Parsing must be successful");
         ConformanceParser::parse_asm(pairs.next().unwrap())

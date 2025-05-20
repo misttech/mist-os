@@ -97,8 +97,8 @@ struct Equal {
 
 template <typename T>
 void WriteJsonOption(rapidjson::PrettyWriter<rapidjson::FileWriteStream>& writer, const char* name,
-                     const char* type, const char* member, std::string_view doc, const T& init,
-                     const T& value) {
+                     const char* type, const char* member, std::string_view doc,
+                     std::optional<std::string_view> init_doc, const T& init, const T& value) {
   writer.StartObject();
 
   writer.Key("name");
@@ -126,6 +126,11 @@ void WriteJsonOption(rapidjson::PrettyWriter<rapidjson::FileWriteStream>& writer
   writer.Key("documentation");
   writer.String(doc.data(), static_cast<rapidjson::SizeType>(doc.size()));
 
+  if (init_doc) {
+    writer.Key("default_description");
+    writer.String(init_doc->data(), static_cast<rapidjson::SizeType>(init_doc->size()));
+  }
+
   writer.Key("default");
   WriteJsonValue<T>(writer, init);
 
@@ -149,8 +154,9 @@ void WriteJson(const BootOptions& options, const char* json_output) {
   rapidjson::PrettyWriter<rapidjson::FileWriteStream> writer(os);
 
   writer.StartObject();
-#define DEFINE_OPTION(name, type, member, init, doc) \
-  WriteJsonOption<type>(writer, name, #type, #member, doc, type init, options.member);
+#define DEFINE_OPTION(name, type, member, init, doc, ...)                            \
+  WriteJsonOption<type>(writer, name, #type, #member, doc, {__VA_ARGS__}, type init, \
+                        options.member);
 
   writer.Key("common");
   writer.StartArray();

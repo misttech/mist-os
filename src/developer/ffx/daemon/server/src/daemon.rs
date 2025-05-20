@@ -30,7 +30,6 @@ use fuchsia_async::{Task, TimeoutExt, Timer};
 use futures::channel::{mpsc, oneshot};
 use futures::executor::block_on;
 use futures::prelude::*;
-use manual_targets::{Config, ManualTargets};
 use notify::{RecursiveMode, Watcher};
 use overnet_core::ListablePeer;
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
@@ -77,17 +76,12 @@ impl DaemonEventHandler {
         Self { node, target_collection }
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer(&self, node_id: u64) {
-        tracing::debug!("Got overnet peer {node_id}");
+        log::debug!("Got overnet peer {node_id}");
         let rcs = match RcsConnection::new(Arc::clone(&self.node), &mut NodeId { id: node_id }) {
             Ok(rcs) => rcs,
             Err(e) => {
-                tracing::error!(
-                    "Target from Overnet {} failed to connect to RCS: {:?}",
-                    node_id,
-                    e
-                );
+                log::error!("Target from Overnet {} failed to connect to RCS: {:?}", node_id, e);
                 return;
             }
         };
@@ -95,11 +89,7 @@ impl DaemonEventHandler {
         let identify = match rcs.identify_host().await {
             Ok(v) => v,
             Err(err) => {
-                tracing::error!(
-                    "Target from Overnet {} could not be identified: {:?}",
-                    node_id,
-                    err
-                );
+                log::error!("Target from Overnet {} could not be identified: {:?}", node_id, err);
                 return;
             }
         };
@@ -127,13 +117,13 @@ impl DaemonEventHandler {
         ) {
             // Print out better Peer information in logs
             0 => {
-                tracing::error!(
+                log::error!(
                     "No targets match identity ['{nodename}', \
                     '{product_config}.{board_config}', {ids:?}] with node id: {node_id}"
                 );
             }
             _ => {
-                tracing::info!(
+                log::info!(
                     "Overnet peer identified as: ['{nodename}', \
                     '{product_config}.{board_config}', {ids:?}] with node id: {node_id}"
                 );
@@ -141,7 +131,6 @@ impl DaemonEventHandler {
         }
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer_lost(&self, node_id: u64) {
         self.target_collection.update_target(
             &[TargetUpdateFilter::OvernetNodeId(node_id)],
@@ -150,11 +139,10 @@ impl DaemonEventHandler {
         );
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_zedboot(&self, t: Description) {
-        tracing::trace!(
+        log::trace!(
             "Found new target via zedboot: {}",
-            t.nodename.as_deref().unwrap_or("<unknown>")
+            t.nodename.as_deref().unwrap_or(ffx_target::UNKNOWN_TARGET_NAME)
         );
 
         let addrs = t
@@ -244,11 +232,7 @@ impl DaemonProtocolProvider for Daemon {
             response.map_err(|e| {
                 anyhow!("Failed to connect to {capability_name} in {moniker}: {e:?}")
             })?;
-            tracing::debug!(
-                "Returning target and proxy for {}@{}",
-                target.nodename_str(),
-                target.id()
-            );
+            log::debug!("Returning target and proxy for {}@{}", target.nodename_str(), target.id());
             return Ok((target.as_ref().into(), client));
         }
         // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
@@ -267,7 +251,7 @@ impl DaemonProtocolProvider for Daemon {
             .map_err(|e| anyhow!("{:#?}", e))
             .context("DeprecatedOpenCapability")?;
 
-        tracing::debug!("Returning target and proxy for {}@{}", target.nodename_str(), target.id());
+        log::debug!("Returning target and proxy for {}@{}", target.nodename_str(), target.id());
         return Ok((target.as_ref().into(), client));
     }
 
@@ -283,7 +267,6 @@ impl DaemonProtocolProvider for Daemon {
         Ok(target.as_ref().into())
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
     async fn open_remote_control(
         &self,
         target_identifier: Option<String>,
@@ -310,9 +293,8 @@ impl DaemonProtocolProvider for Daemon {
 
 #[async_trait(?Send)]
 impl EventHandler<DaemonEvent> for DaemonEventHandler {
-    #[tracing::instrument(skip(self))]
     async fn on_event(&self, event: DaemonEvent) -> Result<events::Status> {
-        tracing::debug!("! DaemonEvent::{:?}", event);
+        log::debug!("! DaemonEvent::{:?}", event);
 
         match event {
             DaemonEvent::WireTraffic(traffic) => match traffic {
@@ -368,18 +350,17 @@ pub struct Daemon {
 }
 
 impl Daemon {
-    #[tracing::instrument]
     pub fn new(socket_path: PathBuf) -> Daemon {
-        tracing::debug!("About to create Daemon, starting with Target Collection");
+        log::debug!("About to create Daemon, starting with Target Collection");
         let target_collection = TargetCollection::new();
-        tracing::debug!("Wrapping TC in Rc");
+        log::debug!("Wrapping TC in Rc");
         let target_collection = Rc::new(target_collection);
-        tracing::debug!("Creating new event queue");
+        log::debug!("Creating new event queue");
         let event_queue = events::Queue::new(&target_collection);
-        tracing::debug!("Attaching event queue to TC");
+        log::debug!("Attaching event queue to TC");
         target_collection.set_event_queue(event_queue.clone());
 
-        tracing::debug!("Creating Daemon structure");
+        log::debug!("Creating Daemon structure");
         Self {
             socket_path,
             target_collection,
@@ -391,9 +372,8 @@ impl Daemon {
         }
     }
 
-    #[tracing::instrument(skip(self, node))]
     pub async fn start(&mut self, node: Arc<overnet_core::Router>) -> Result<()> {
-        tracing::debug!("starting daemon");
+        log::debug!("starting daemon");
         self.overnet_node = Some(Arc::clone(&node));
         let context =
             ffx_config::global_env_context().context("Discovering ffx environment context")?;
@@ -416,7 +396,6 @@ impl Daemon {
         self.serve(&context, node, quit_tx, quit_rx).await.context("Serving clients")
     }
 
-    #[tracing::instrument(skip(self))]
     async fn log_startup_info(&self, context: &EnvironmentContext) -> Result<()> {
         let pid = std::process::id();
         let buildid = context.daemon_version_string()?;
@@ -428,7 +407,7 @@ impl Daemon {
             .unwrap_or_else(|| "<unknown>".to_owned());
         let build_version = version_info.build_version.as_deref().unwrap_or("<unknown>");
 
-        tracing::info!(
+        log::info!(
             "Beginning daemon startup\nBuild Version: {build_version}\nCommit Timestamp: {commit_timestamp}\nCommit Hash: {commit_hash}\nBinary Build ID: {buildid}\nPID: {pid}",
         );
         add_daemon_launch_event().await;
@@ -452,11 +431,13 @@ impl Daemon {
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
         if matches!(target.get_connection_state(), TargetConnectionState::Fastboot(_)) {
-            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
+            let nodename =
+                target.nodename().unwrap_or_else(|| ffx_target::UNKNOWN_TARGET_NAME.to_string());
             bail!("Attempting to open RCS on a fastboot target: {}", nodename);
         }
         if matches!(target.get_connection_state(), TargetConnectionState::Zedboot(_)) {
-            let nodename = target.nodename().unwrap_or_else(|| "<No Nodename>".to_string());
+            let nodename =
+                target.nodename().unwrap_or_else(|| ffx_target::UNKNOWN_TARGET_NAME.to_string());
             bail!("Attempting to connect to RCS on a zedboot target: {}", nodename);
         }
         let Some(overnet_node) = self.overnet_node.as_ref() else {
@@ -469,7 +450,7 @@ impl Daemon {
             .wait_for(None, |e| e == TargetEvent::RcsActivated)
             .await
             .context("waiting for RCS activation")?;
-        tracing::debug!("RCS activated for {}@{}", target.nodename_str(), target.id());
+        log::debug!("RCS activated for {}@{}", target.nodename_str(), target.id());
         Ok(target)
     }
 
@@ -487,13 +468,12 @@ impl Daemon {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
     async fn prime_ascendd(
         &self,
         node: Arc<overnet_core::Router>,
     ) -> Result<impl FnOnce() -> Ascendd, errors::FfxError> {
         // Bind the ascendd socket but delay accepting connections until protocols are registered.
-        tracing::debug!("Priming ascendd");
+        log::debug!("Priming ascendd");
 
         let client_routing = false; // Don't route between ffx clients
         Ascendd::prime(
@@ -508,17 +488,15 @@ impl Daemon {
         .map_err(|e| ffx_error!("Error trying to start daemon socket: {e}"))
     }
 
-    #[tracing::instrument(skip(self, primed_ascendd))]
     fn start_ascendd(&mut self, primed_ascendd: impl FnOnce() -> Ascendd) {
         // Start the ascendd socket only after we have registered our protocols.
-        tracing::debug!("Starting ascendd");
+        log::debug!("Starting ascendd");
 
         let ascendd = primed_ascendd();
 
         self.ascendd.replace(Some(ascendd));
     }
 
-    #[tracing::instrument(skip(self))]
     async fn start_socket_watch(&self, quit_tx: mpsc::Sender<()>) -> Result<RecommendedWatcher> {
         let socket_path = self.socket_path.clone();
         let socket_dir = self.socket_path.parent().context("Getting parent directory of socket")?;
@@ -529,18 +507,18 @@ impl Daemon {
                 use notify::event::EventKind::Remove;
                 match res {
                     Ok(Event { kind: Remove(_), paths, .. }) if paths.contains(&socket_path) => {
-                        tracing::info!("daemon socket was deleted, triggering quit message.");
+                        log::info!("daemon socket was deleted, triggering quit message.");
                         quit_tx.send(()).await.ok();
                     }
                     Err(ref e @ notify::Error { ref kind, .. }) => {
                         match kind {
                             notify::ErrorKind::Io(ioe) => {
-                                tracing::debug!("IO error. Ignoring {ioe:?}");
+                                log::debug!("IO error. Ignoring {ioe:?}");
                             }
                             _ => {
                                 // If we get a non-spurious error, treat that as something that
                                 // should cause us to exit.
-                                tracing::warn!("exiting due to file watcher error: {e:?}");
+                                log::warn!("exiting due to file watcher error: {e:?}");
                                 quit_tx.send(()).await.ok();
                             }
                         }
@@ -566,7 +544,7 @@ impl Daemon {
             .watch(&socket_dir, RecursiveMode::NonRecursive)
             .context("Setting watcher context")?;
 
-        tracing::debug!(
+        log::debug!(
             "Watching daemon socket file at {socket_path}, will gracefully exit if it's removed.",
             socket_path = self.socket_path.display()
         );
@@ -574,16 +552,15 @@ impl Daemon {
         Ok(watcher)
     }
 
-    #[tracing::instrument(skip(self, quit_tx))]
     fn start_signal_monitoring(&self, mut quit_tx: mpsc::Sender<()>) {
-        tracing::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
+        log::debug!("Starting monitoring for SIGHUP, SIGINT, SIGTERM");
         let mut signals = Signals::new(&[SIGHUP, SIGINT, SIGTERM]).unwrap();
         // signals.forever() is blocking, so we need to spawn a thread rather than use async.
         let _signal_handle_thread = std::thread::spawn(move || {
             if let Some(signal) = signals.forever().next() {
                 match signal {
                     SIGHUP | SIGINT | SIGTERM => {
-                        tracing::info!("Received signal {signal}, quitting");
+                        log::info!("Received signal {signal}, quitting");
                         let _ = block_on(quit_tx.send(())).ok();
                     }
                     _ => unreachable!(),
@@ -601,24 +578,9 @@ impl Daemon {
         self.tasks.push(Rc::new(Task::local(async move {
             loop {
                 Timer::new(frequency).await;
-                let manual_targets = Config::default();
-
                 match target_collection.upgrade() {
                     Some(target_collection) => {
-                        let expired_addrs = target_collection.expire_targets(&overnet_node);
-                        for addr in expired_addrs {
-                            // If a manual target has been allowed to transition to the
-                            // "disconnected" state, it should be removed from the collection.
-                            match manual_targets.remove(format!("{}", addr)).await {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Unable to persist ephemeral target removal: {}",
-                                        e
-                                    );
-                                }
-                            }
-                        }
+                        target_collection.expire_targets(&overnet_node);
                     }
                     None => return,
                 }
@@ -658,7 +620,6 @@ impl Daemon {
         }
     }
 
-    #[tracing::instrument(skip(self, quit_tx, stream))]
     async fn handle_requests_from_stream(
         &self,
         quit_tx: &mpsc::Sender<()>,
@@ -670,7 +631,7 @@ impl Daemon {
             .try_for_each_concurrent_while_connected(None, |r| async {
                 let debug_req_string = format!("{:?}", r);
                 if let Err(e) = self.handle_request(quit_tx, r, info).await {
-                    tracing::error!("error while handling request `{}`: {}", debug_req_string, e);
+                    log::error!("error while handling request `{}`: {}", debug_req_string, e);
                 }
                 Ok(())
             })
@@ -690,7 +651,7 @@ impl Daemon {
                                 Self::handle_overnet_peers(&queue, known_peers, new_peers);
                         }
                         Err(err) => {
-                            tracing::info!("Overnet peer discovery failed: {}, will retry", err);
+                            log::info!("Overnet peer discovery failed: {}, will retry", err);
                             Timer::new(Duration::from_secs(1)).await;
                             // break out of the peer discovery loop on error in
                             // order to reconnect, in case the error causes the
@@ -704,13 +665,12 @@ impl Daemon {
         .detach();
     }
 
-    #[tracing::instrument(skip(queue))]
     fn handle_overnet_peers(
         queue: &events::Queue<DaemonEvent>,
         known_peers: HashSet<PeerSetElement>,
         peers: Vec<ListablePeer>,
     ) -> HashSet<PeerSetElement> {
-        tracing::debug!("Got updated peer list {peers:?}");
+        log::debug!("Got updated peer list {peers:?}");
         let mut new_peers: HashSet<PeerSetElement> = Default::default();
         for peer in peers {
             new_peers.insert(PeerSetElement(peer));
@@ -722,7 +682,7 @@ impl Daemon {
                 peer.services.contains(&RemoteControlMarker::PROTOCOL_NAME.to_string());
             if peer_has_rcs {
                 queue.push(DaemonEvent::OvernetPeer(peer.node_id.0)).unwrap_or_else(|err| {
-                    tracing::warn!(
+                    log::warn!(
                         "Overnet discovery failed to enqueue event {:?}: {}",
                         DaemonEvent::OvernetPeer(peer.node_id.0),
                         err
@@ -734,7 +694,7 @@ impl Daemon {
         for peer in known_peers.difference(&new_peers) {
             let peer = &peer.0;
             queue.push(DaemonEvent::OvernetPeerLost(peer.node_id.0)).unwrap_or_else(|err| {
-                tracing::warn!(
+                log::warn!(
                     "Overnet discovery failed to enqueue event {:?}: {}",
                     DaemonEvent::OvernetPeerLost(peer.node_id.0),
                     err
@@ -745,18 +705,17 @@ impl Daemon {
         new_peers
     }
 
-    #[tracing::instrument(skip(self))]
     async fn handle_request(
         &self,
         quit_tx: &mpsc::Sender<()>,
         req: DaemonRequest,
         info: &VersionInfo,
     ) -> Result<()> {
-        tracing::debug!("daemon received request: {:?}", req);
+        log::debug!("daemon received request: {:?}", req);
 
         match req {
             DaemonRequest::Quit { responder } => {
-                tracing::info!("Received quit request.");
+                log::info!("Received quit request.");
                 if cfg!(test) {
                     panic!("quit() should not be invoked in test code");
                 }
@@ -781,7 +740,7 @@ impl Daemon {
                 {
                     Ok(()) => responder.send(Ok(())).context("fidl response")?,
                     Err(e) => {
-                        tracing::error!("{}", e);
+                        log::error!("{}", e);
                         match e {
                             ProtocolError::NoProtocolFound(_) => {
                                 responder.send(Err(DaemonError::ProtocolNotFound))?
@@ -802,14 +761,13 @@ impl Daemon {
                 .await;
             }
             DaemonRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                tracing::warn!(ordinal, method_type = ?method_type, "Received unknown method request");
+                log::warn!(ordinal, method_type:?; "Received unknown method request");
             }
         }
 
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
     async fn serve(
         &self,
         context: &EnvironmentContext,
@@ -821,14 +779,14 @@ impl Daemon {
 
         let mut info = build_info();
         info.build_id = Some(context.daemon_version_string()?);
-        tracing::debug!("Starting daemon overnet server");
+        log::debug!("Starting daemon overnet server");
         node.register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), move |chan| {
             let _ = sender.unbounded_send(chan);
             Ok(())
         })
         .await?;
 
-        tracing::debug!("Starting daemon serve loop");
+        log::debug!("Starting daemon serve loop");
         let (break_loop_tx, mut break_loop_rx) = oneshot::channel();
         let mut break_loop_tx = Some(break_loop_tx);
 
@@ -836,7 +794,7 @@ impl Daemon {
             futures::select! {
                 req = stream.next() => match req {
                     Some(chan) => {
-                        tracing::trace!("Received protocol request for protocol");
+                        log::trace!("Received protocol request for protocol");
                         let chan =
                             fidl::AsyncChannel::from_channel(chan);
                         let daemon_clone = self.clone();
@@ -854,31 +812,31 @@ impl Daemon {
                                 ..Default::default()
                             };
                             if let Err(err) = daemon_clone.handle_requests_from_stream(&quit_tx, DaemonRequestStream::from_channel(chan), &ffx_version_info).await {
-                                tracing::error!("error handling request: {:?}", err);
+                                log::error!("error handling request: {:?}", err);
                                 quit_tx.send(()).await.expect("Failed to gracefully send quit message, aborting.");
                             }
                         })
                         .detach();
                     },
                     None => {
-                        tracing::warn!("Service was deregistered");
+                        log::warn!("Service was deregistered");
                         break;
                     }
                 },
                 _ = quit_rx.next() => {
                     if let Some(break_loop_tx) = break_loop_tx.take() {
-                        tracing::debug!("Starting graceful shutdown of daemon socket");
+                        log::debug!("Starting graceful shutdown of daemon socket");
 
                         match std::fs::remove_file(self.socket_path.clone()) {
                             Ok(()) => {}
-                            Err(e) => tracing::error!("failed to remove socket file: {}", e),
+                            Err(e) => log::error!("failed to remove socket file: {}", e),
                         }
 
                         self.protocol_register
                             .shutdown(protocols::Context::new(self.clone()))
                             .await
                             .unwrap_or_else(|e| {
-                                tracing::error!("shutting down protocol register: {:?}", e)
+                                log::error!("shutting down protocol register: {:?}", e)
                             });
 
                         add_daemon_metrics_event("quit").await;
@@ -901,16 +859,16 @@ impl Daemon {
                         })
                         .detach();
                     } else {
-                        tracing::trace!("Received quit message after shutdown was already initiated");
+                        log::trace!("Received quit message after shutdown was already initiated");
                     }
                 },
                 _ = break_loop_rx => {
-                    tracing::debug!("Breaking main daemon socket loop");
+                    log::debug!("Breaking main daemon socket loop");
                     break;
                 }
             }
         }
-        tracing::debug!("Graceful shutdown of daemon loop completed");
+        log::debug!("Graceful shutdown of daemon loop completed");
         ffx_config::logging::disable_stdio_logging();
         Ok(())
     }
@@ -936,10 +894,7 @@ impl Hash for PeerSetElement {
 #[cfg(test)]
 mod test {
     use super::*;
-    use addr::TargetAddr;
     use assert_matches::assert_matches;
-    use chrono::Utc;
-    use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus};
     use fidl_fuchsia_developer_ffx::DaemonProxy;
     use fidl_fuchsia_developer_remotecontrol::{
         IdentifyHostResponse, RemoteControlRequest, RemoteControlRequestStream,
@@ -948,7 +903,7 @@ mod test {
     use std::cell::RefCell;
     use std::collections::BTreeSet;
     use std::str::FromStr;
-    use std::time::{Instant, SystemTime};
+    use std::time::Instant;
 
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
@@ -1066,66 +1021,6 @@ mod test {
         }
 
         assert_eq!(TargetConnectionState::Disconnected, target.get_connection_state());
-    }
-
-    #[fuchsia::test]
-    async fn test_ephemeral_target_expiry() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-        let tempdir = tempfile::tempdir().expect("Creating tempdir");
-        let socket_path = tempdir.path().join("ascendd.sock");
-        let mut daemon = Daemon::new(socket_path);
-        let expiring_target = Target::new_with_addr_entries(
-            Some("goodbye-world"),
-            vec![TargetAddrEntry::new(
-                TargetAddr::from_str("127.0.0.1:8088").unwrap(),
-                Utc::now(),
-                TargetAddrStatus::ssh().manually_added_until(SystemTime::now()),
-            )]
-            .into_iter(),
-        );
-        expiring_target.set_ssh_port(Some(8022));
-
-        let persistent_target = Target::new_with_addr_entries(
-            Some("i-will-stick-around"),
-            vec![TargetAddrEntry::new(
-                TargetAddr::from_str("127.0.0.1:8089").unwrap(),
-                Utc::now(),
-                TargetAddrStatus::ssh().manually_added(),
-            )]
-            .into_iter(),
-        );
-        persistent_target.set_ssh_port(Some(8023));
-
-        let then = Instant::now() - Duration::from_secs(10);
-        expiring_target.update_connection_state(|_| TargetConnectionState::Mdns(then));
-        persistent_target.update_connection_state(|_| TargetConnectionState::Mdns(then));
-
-        assert!(daemon.target_collection.is_empty());
-
-        daemon.target_collection.merge_insert(expiring_target.clone());
-        daemon.target_collection.merge_insert(persistent_target.clone());
-
-        assert_eq!(TargetConnectionState::Mdns(then), expiring_target.get_connection_state());
-        assert_eq!(TargetConnectionState::Mdns(then), persistent_target.get_connection_state());
-
-        daemon.start_target_expiry(Duration::from_millis(1), local_node);
-
-        while expiring_target.get_connection_state() == TargetConnectionState::Mdns(then) {
-            futures_lite::future::yield_now().await
-        }
-        while persistent_target.get_connection_state() == TargetConnectionState::Mdns(then) {
-            futures_lite::future::yield_now().await
-        }
-        assert_eq!(TargetConnectionState::Disconnected, expiring_target.get_connection_state());
-        assert_matches!(
-            persistent_target.get_connection_state(),
-            TargetConnectionState::Manual(None)
-        );
-        let not_found = daemon
-            .target_collection
-            .query_single_enabled_target(&"goodbye-world".into())
-            .expect("Query should not be ambiguous");
-        assert!(not_found.is_none(), "Should've expired: {not_found:?}");
     }
 
     struct NullDaemonEventSynthesizer();

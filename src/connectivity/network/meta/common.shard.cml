@@ -55,7 +55,8 @@
         },
         {
             protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
-            from: "parent",
+            from: "parent/diagnostics-persist-capabilities",
+            as: "fuchsia.diagnostics.persist.DataPersistence",
             to: [ "#netstack" ],
         },
         {
@@ -254,6 +255,12 @@
             protocol: [ "fuchsia.net.filter.Control" ],
             from: "#netstack",
             as: "fuchsia.net.filter.Control_OnlyForStarnix",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [ "fuchsia.net.filter.SocketControl" ],
+            from: "#netstack",
+            as: "fuchsia.net.filter.SocketControl_OnlyForStarnix",
             availability: "same_as_target",
         },
         {

@@ -58,6 +58,7 @@ class PmmArena {
   void CountStates(PmmStateCount* state_count) const;
 
   vm_page_t* get_page(size_t index) { return &page_array_[index]; }
+  size_t get_index(const vm_page_t* page) { return page - page_array_; }
 
   // find a free run of contiguous pages
   vm_page_t* FindFreeContiguous(size_t count, uint8_t alignment_log2);

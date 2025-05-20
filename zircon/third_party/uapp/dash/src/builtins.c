@@ -43,6 +43,7 @@ int zxc_dump(int, char **);
 int zxc_list(int, char **);
 int zxc_msleep(int, char **);
 int zxc_dm(int, char **);
+int zxc_power(int, char **);
 int zxc_k(int, char **);
 
 const struct builtincmd builtincmd[] = {
@@ -74,6 +75,7 @@ const struct builtincmd builtincmd[] = {
 	{ "mkdir", zxc_mkdir, 8 },
 	{ "msleep", zxc_msleep, 0 },
 	{ "mv", zxc_mv_or_cp, 0 },
+	{ "power", zxc_power, 0 },
 	{ "printf", printfcmd, 0 },
 	{ "pwd", pwdcmd, 0 },
 	{ "read", readcmd, 2 },

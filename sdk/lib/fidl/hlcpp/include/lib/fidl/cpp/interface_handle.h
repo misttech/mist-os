@@ -5,7 +5,6 @@
 #ifndef LIB_FIDL_CPP_INTERFACE_HANDLE_H_
 #define LIB_FIDL_CPP_INTERFACE_HANDLE_H_
 
-#include <lib/stdcompat/optional.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
 
@@ -152,7 +151,7 @@ class InterfaceHandle final {
   void set_channel(zx::channel channel) { channel_ = std::move(channel); }
 
   void Encode(Encoder* encoder, size_t offset,
-              cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
+              std::optional<HandleInformation> maybe_handle_info = std::nullopt) {
     ZX_DEBUG_ASSERT(maybe_handle_info);
     encoder->EncodeHandle(&channel_, maybe_handle_info->object_type, maybe_handle_info->rights,
                           offset);

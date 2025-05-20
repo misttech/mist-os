@@ -24,8 +24,4 @@ std::ostream& operator<<(std::ostream& os, const ::test_structdefaultvalueenumli
 
 }  // namespace test_structdefaultvalueenumlibraryreference
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop

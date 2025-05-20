@@ -21,7 +21,6 @@ source_set("read_visitor") {
   public_deps = [
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
     "//zircon/system/ulib/inspect",
   ]
 }

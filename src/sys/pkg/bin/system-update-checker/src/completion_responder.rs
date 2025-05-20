@@ -175,13 +175,13 @@ mod tests {
                 State::InstallationDeferredByPolicy(_)
                 | State::NoUpdateAvailable
                 | State::ErrorCheckingForUpdate => {
-                    assert_eq!(result, Poll::Ready(()), "State {:?} didn't satisfy", state);
+                    assert_eq!(result, Poll::Ready(()), "State {state:?} didn't satisfy");
                 }
                 State::CheckingForUpdates
                 | State::InstallingUpdate(_)
                 | State::WaitingForReboot(_)
                 | State::InstallationError(_) => {
-                    assert_eq!(result, Poll::Pending, "State {:?} satisfied", state);
+                    assert_eq!(result, Poll::Pending, "State {state:?} satisfied");
                 }
             }
         }

@@ -68,8 +68,8 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
 
 use crate::{
     sealed, LinkLocalAddr, LinkLocalAddress, MappedAddress, MulticastAddr, MulticastAddress,
-    NonMappedAddr, Scope, ScopeableAddress, SpecifiedAddr, SpecifiedAddress, UnicastAddr,
-    UnicastAddress, Witness,
+    NonMappedAddr, NonMulticastAddr, Scope, ScopeableAddress, SpecifiedAddr, SpecifiedAddress,
+    UnicastAddr, UnicastAddress, Witness,
 };
 
 // NOTE on passing by reference vs by value: Clippy advises us to pass IPv4
@@ -1857,6 +1857,92 @@ impl Display for Ipv4Addr {
 }
 
 impl Debug for Ipv4Addr {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        Display::fmt(self, f)
+    }
+}
+
+/// The source address from an IPv4 packet.
+///
+/// An `Ipv4SourceAddr` represents the source address from an IPv4 packet which
+/// may only be either:
+///   * specified and non-multicast, or
+///   * unspecified.
+#[allow(missing_docs)]
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum Ipv4SourceAddr {
+    Specified(NonMulticastAddr<SpecifiedAddr<Ipv4Addr>>),
+    Unspecified,
+}
+
+impl crate::sealed::Sealed for Ipv4SourceAddr {}
+
+impl Ipv4SourceAddr {
+    /// Constructs a new `Ipv4SourceAddr`.
+    ///
+    /// Returns `None` if `addr` does not satisfy the properties required of an
+    /// `Ipv4SourceAddr`.
+    #[inline]
+    pub fn new(addr: Ipv4Addr) -> Option<Ipv4SourceAddr> {
+        match SpecifiedAddr::new(addr) {
+            Some(addr) => NonMulticastAddr::new(addr).map(Ipv4SourceAddr::Specified),
+            None => Some(Ipv4SourceAddr::Unspecified),
+        }
+    }
+}
+
+impl Witness<Ipv4Addr> for Ipv4SourceAddr {
+    #[inline]
+    fn new(addr: Ipv4Addr) -> Option<Ipv4SourceAddr> {
+        Ipv4SourceAddr::new(addr)
+    }
+
+    #[inline]
+    unsafe fn new_unchecked(addr: Ipv4Addr) -> Ipv4SourceAddr {
+        Ipv4SourceAddr::new(addr).unwrap()
+    }
+
+    #[inline]
+    fn into_addr(self) -> Ipv4Addr {
+        match self {
+            Ipv4SourceAddr::Specified(addr) => **addr,
+            Ipv4SourceAddr::Unspecified => Ipv4::UNSPECIFIED_ADDRESS,
+        }
+    }
+}
+
+impl From<Ipv4SourceAddr> for Ipv4Addr {
+    fn from(addr: Ipv4SourceAddr) -> Ipv4Addr {
+        addr.get()
+    }
+}
+
+impl AsRef<Ipv4Addr> for Ipv4SourceAddr {
+    fn as_ref(&self) -> &Ipv4Addr {
+        match self {
+            Ipv4SourceAddr::Specified(addr) => addr,
+            Ipv4SourceAddr::Unspecified => &Ipv4::UNSPECIFIED_ADDRESS,
+        }
+    }
+}
+
+impl Deref for Ipv4SourceAddr {
+    type Target = Ipv4Addr;
+
+    fn deref(&self) -> &Ipv4Addr {
+        self.as_ref()
+    }
+}
+
+impl Display for Ipv4SourceAddr {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.get())
+    }
+}
+
+impl Debug for Ipv4SourceAddr {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         Display::fmt(self, f)

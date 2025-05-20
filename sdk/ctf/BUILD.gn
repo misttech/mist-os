@@ -167,7 +167,10 @@ if (!is_host) {
 python_binary("summarize_fidl_methods_bin") {
   enable_mypy = true
   main_source = "summarize_fidl_methods.py"
-  deps = [ "//build/python/modules/depfile" ]
+  deps = [
+    "//build/python/modules/depfile",
+    "//scripts/lib/json_get",
+  ]
 }
 
 if (current_toolchain == default_toolchain) {

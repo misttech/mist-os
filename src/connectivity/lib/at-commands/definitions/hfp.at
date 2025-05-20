@@ -21,14 +21,8 @@ command { AT+CIND? }
 
 # Standard Indicator Update response
 # HFP 1.8 4.34.2
-response { +CIND:
-    service: BoolAsInt,
-    call: BoolAsInt,
-    callsetup: Integer,
-    callheld: Integer,
-    signal: Integer,
-    roam: BoolAsInt,
-    battchg: Integer,
+response CindRead { +CIND:
+    ordered_values: List<Integer>
 }
 
 # Standard List Current Calls command

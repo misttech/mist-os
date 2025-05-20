@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::sync_file::Handle;
 use crate::signals::RunState;
 use crate::task::CurrentTask;
 use crate::vfs::FdNumber;
@@ -20,7 +19,7 @@ use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
 use syncio::zxio::zxio_signals_t;
-use syncio::{Zxio, ZxioSignals};
+use syncio::{ZxioSignals, ZxioWeak};
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum ReadyItemKey {
@@ -110,7 +109,7 @@ impl EventHandler {
 }
 
 pub struct ZxioSignalHandler {
-    pub zxio: Arc<Zxio>,
+    pub zxio: ZxioWeak,
     pub get_events_from_zxio_signals: fn(zxio_signals_t) -> FdEvents,
 }
 
@@ -142,7 +141,11 @@ impl SignalHandler {
         let events = match inner {
             SignalHandlerInner::None => None,
             SignalHandlerInner::Zxio(ZxioSignalHandler { zxio, get_events_from_zxio_signals }) => {
-                Some(get_events_from_zxio_signals(zxio.wait_end(signals)))
+                if let Some(zxio) = zxio.upgrade() {
+                    Some(get_events_from_zxio_signals(zxio.wait_end(signals)))
+                } else {
+                    None
+                }
             }
             SignalHandlerInner::ZxHandle(get_events_from_zx_signals) => {
                 Some(get_events_from_zx_signals(signals))
@@ -181,7 +184,7 @@ struct WaitCancelerQueue {
 }
 
 struct WaitCancelerZxio {
-    zxio: Weak<Zxio>,
+    zxio: ZxioWeak,
     inner: HandleWaitCanceler,
 }
 
@@ -210,8 +213,8 @@ struct WaitCancelerVmo {
     inner: HandleWaitCanceler,
 }
 
-struct WaitCancelerSyncFile {
-    handle: Weak<Handle>,
+struct WaitCancelerCounter {
+    counter: Weak<zx::Counter>,
     inner: HandleWaitCanceler,
 }
 
@@ -223,7 +226,7 @@ enum WaitCancelerInner {
     BootTimer(WaitCancelerBootTimer),
     MonoTimer(WaitCancelerMonoTimer),
     Vmo(WaitCancelerVmo),
-    SyncFile(WaitCancelerSyncFile),
+    SyncFile(WaitCancelerCounter),
 }
 
 const WAIT_CANCELER_COMMON_SIZE: usize = 2;
@@ -247,7 +250,7 @@ impl WaitCanceler {
         Self { cancellers: Default::default() }
     }
 
-    pub fn new_zxio(zxio: Weak<Zxio>, inner: HandleWaitCanceler) -> Self {
+    pub fn new_zxio(zxio: ZxioWeak, inner: HandleWaitCanceler) -> Self {
         Self::new_inner(WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }))
     }
 
@@ -271,8 +274,8 @@ impl WaitCanceler {
         Self::new_inner(WaitCancelerInner::Vmo(WaitCancelerVmo { vmo, inner }))
     }
 
-    pub fn new_sync_file(handle: Weak<Handle>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::SyncFile(WaitCancelerSyncFile { handle, inner }))
+    pub fn new_counter(counter: Weak<zx::Counter>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::SyncFile(WaitCancelerCounter { counter, inner }))
     }
 
     /// Equivalent to `merge_unbounded`, except that it enforces that the resulting vector of
@@ -357,9 +360,9 @@ impl WaitCanceler {
                     let Some(vmo) = vmo.upgrade() else { return };
                     inner.cancel(vmo.as_handle_ref());
                 }
-                WaitCancelerInner::SyncFile(WaitCancelerSyncFile { handle, inner }) => {
-                    let Some(handle) = handle.upgrade() else { return };
-                    inner.cancel(handle.as_handle_ref());
+                WaitCancelerInner::SyncFile(WaitCancelerCounter { counter, inner }) => {
+                    let Some(counter) = counter.upgrade() else { return };
+                    inner.cancel(counter.as_handle_ref());
                 }
             }
         }

@@ -64,8 +64,12 @@ impl<'a> EventWaitGuard<'a> {
 
     /// Block the thread until either `deadline` expires, the event is notified, or the event is
     /// interrupted.
-    pub fn block_until(self, deadline: zx::MonotonicInstant) -> Result<(), WakeReason> {
-        self.event.block_until(deadline)
+    pub fn block_until(
+        self,
+        new_owner: Option<&zx::Thread>,
+        deadline: zx::MonotonicInstant,
+    ) -> Result<(), WakeReason> {
+        self.event.block_until(new_owner, deadline)
     }
 }
 
@@ -98,11 +102,15 @@ impl InterruptibleEvent {
         EventWaitGuard { event: self }
     }
 
-    fn block_until(&self, deadline: zx::MonotonicInstant) -> Result<(), WakeReason> {
+    fn block_until(
+        &self,
+        new_owner: Option<&zx::Thread>,
+        deadline: zx::MonotonicInstant,
+    ) -> Result<(), WakeReason> {
         // We need to loop around the call to zx_futex_wake because we can receive spurious
         // wakeups.
         loop {
-            match self.futex.wait(WAITING, None, deadline) {
+            match self.futex.wait(WAITING, new_owner, deadline) {
                 // The deadline expired while we were sleeping.
                 Err(zx::Status::TIMED_OUT) => {
                     self.futex.store(READY, Ordering::Relaxed);
@@ -177,6 +185,7 @@ impl InterruptibleEvent {
 #[cfg(test)]
 mod test {
     use super::*;
+    use zx::AsHandleRef;
 
     #[test]
     fn test_wait_block_and_notify() {
@@ -189,7 +198,7 @@ mod test {
             other_event.notify();
         });
 
-        guard.block_until(zx::MonotonicInstant::INFINITE).expect("failed to be notified");
+        guard.block_until(None, zx::MonotonicInstant::INFINITE).expect("failed to be notified");
         thread.join().expect("failed to join thread");
     }
 
@@ -204,7 +213,7 @@ mod test {
             other_event.interrupt();
         });
 
-        let result = guard.block_until(zx::MonotonicInstant::INFINITE);
+        let result = guard.block_until(None, zx::MonotonicInstant::INFINITE);
         assert_eq!(result, Err(WakeReason::Interrupted));
         thread.join().expect("failed to join thread");
     }
@@ -214,8 +223,64 @@ mod test {
         let event = InterruptibleEvent::new();
 
         let guard = event.begin_wait();
-        let result =
-            guard.block_until(zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(20)));
+        let result = guard
+            .block_until(None, zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(20)));
+        assert_eq!(result, Err(WakeReason::DeadlineExpired));
+    }
+
+    #[test]
+    fn futex_ownership_is_transferred() {
+        use zx::HandleBased;
+
+        let event = Arc::new(InterruptibleEvent::new());
+
+        let root_thread_handle =
+            fuchsia_runtime::thread_self().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+        let root_thread_koid = fuchsia_runtime::thread_self().get_koid().unwrap();
+
+        let event_for_blocked_thread = event.clone();
+
+        let blocked_thread = std::thread::spawn(move || {
+            let event = event_for_blocked_thread;
+            let guard = event.begin_wait();
+            guard.block_until(Some(&root_thread_handle), zx::MonotonicInstant::INFINITE).unwrap();
+        });
+
+        // Wait for the correct owner to appear. If for some reason futex PI breaks, it's likely
+        // that this test will time out rather than panicking outright. It would be nice to have
+        // a clear assertion here, but there's no existing API we can use to atomically wait for a
+        // waiter on the futex *and* see what owner they set. If we find ourselves writing a lot of
+        // tests like this we might consider setting up a fake vdso.
+        while event.futex.get_owner() != Some(root_thread_koid) {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
+        event.notify();
+        blocked_thread.join().unwrap();
+    }
+
+    #[test]
+    fn stale_pi_owner_is_noop() {
+        use zx::HandleBased;
+
+        let mut new_owner = None;
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                new_owner = Some(
+                    fuchsia_runtime::thread_self()
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .unwrap(),
+                );
+            });
+        });
+        let new_owner = new_owner.unwrap();
+
+        let event = InterruptibleEvent::new();
+        let guard = event.begin_wait();
+        let result = guard.block_until(
+            Some(&new_owner),
+            zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(20)),
+        );
         assert_eq!(result, Err(WakeReason::DeadlineExpired));
     }
 }

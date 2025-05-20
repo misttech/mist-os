@@ -11,7 +11,7 @@ mod minecraft;
 use core::mem::MaybeUninit;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use fidl_next::{DecoderExt as _, EncoderExt as _};
+use fidl_next::{DecoderExt as _, EncoderExt as _, Wire};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng as _};
 
@@ -128,19 +128,21 @@ where
     );
 }
 
-fn bench_rust_next<T, W>(c: &mut Criterion, name: &str, mut input: T, input_size: usize)
+fn bench_rust_next<T>(c: &mut Criterion, name: &str, input: T, input_size: usize)
 where
-    T: 'static + fidl_next::Encode<Vec<fidl_next::Chunk>> + fidl_next::TakeFrom<W>,
-    W: for<'a> fidl_next::Decode<&'a mut [fidl_next::Chunk]>,
+    T: 'static
+        + fidl_next::EncodeRef<Vec<fidl_next::Chunk>>
+        + for<'de> fidl_next::FromWire<<T::Encoded as Wire>::Decoded<'de>>,
+    T::Encoded: for<'a> fidl_next::Decode<&'a mut [fidl_next::Chunk]>,
 {
     let mut decode_chunks = Vec::new();
-    decode_chunks.encode_next(&mut input).unwrap();
+    decode_chunks.encode_next(&input).unwrap();
 
     c.bench_function(&format!("rust_next/{name}/encode/{input_size}x"), move |b| {
         let mut chunks = Vec::new();
         b.iter(|| {
             chunks.clear();
-            black_box(chunks.encode_next(black_box(&mut input))).unwrap();
+            black_box(chunks.encode_next(black_box(&input))).unwrap();
         });
     });
 
@@ -149,8 +151,8 @@ where
         b.iter_batched_ref(
             || decode_wire_chunks.clone(),
             |decode_chunks| {
-                let mut chunks = black_box(decode_chunks).as_mut_slice();
-                black_box((&mut chunks).decode_next::<W>()).unwrap();
+                let chunks = black_box(decode_chunks).as_mut_slice();
+                black_box(chunks.decode::<T::Encoded>()).unwrap();
             },
             criterion::BatchSize::SmallInput,
         );
@@ -160,9 +162,9 @@ where
         b.iter_batched_ref(
             || decode_chunks.clone(),
             |decode_chunks| {
-                let mut chunks = black_box(decode_chunks).as_mut_slice();
-                let value = (&mut chunks).decode_next::<W>().unwrap();
-                black_box(T::take_from(&value));
+                let chunks = black_box(decode_chunks).as_mut_slice();
+                let value = chunks.decode::<T::Encoded>().unwrap();
+                black_box(value.take::<T>());
             },
             criterion::BatchSize::SmallInput,
         );

@@ -18,6 +18,7 @@
 #include "src/developer/forensics/crash_reports/info/info_context.h"
 #include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
+#include "src/developer/forensics/testing/gpretty_printers.h"  // IWYU pragma: keep
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
@@ -249,63 +250,111 @@ TEST_F(CrashRegisterTest, GetProduct_DifferentUpsert) {
 })");
 }
 
-TEST_F(CrashRegisterTest, BuildDefaultProduct) {
-  {
-    Product actual{
-        .name = std::string("Fuchsia"),
-        .version = ErrorOrString(Error::kMissingValue),
-        .channel = ErrorOrString(Error::kMissingValue),
-    };
+using AddVersionAndChannelTest = CrashRegisterTest;
 
-    CrashRegister::AddVersionAndChannel(actual, {});
+TEST_F(AddVersionAndChannelTest, MissingVersionAndChannel) {
+  Product actual{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
 
-    const Product expected{
-        .name = std::string("Fuchsia"),
-        .version = ErrorOrString(Error::kMissingValue),
-        .channel = ErrorOrString(Error::kMissingValue),
-    };
-    EXPECT_EQ(actual, expected);
-  }
+  CrashRegister::AddVersionAndChannel(actual, {});
 
-  {
-    Product actual{
-        .name = std::string("Fuchsia"),
-        .version = ErrorOrString(Error::kMissingValue),
-        .channel = ErrorOrString(Error::kMissingValue),
-    };
+  const Product expected{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
+  EXPECT_EQ(actual, expected);
+}
 
-    CrashRegister::AddVersionAndChannel(actual, {
-                                                    {feedback::kBuildVersionKey, "some version"},
-                                                });
+TEST_F(AddVersionAndChannelTest, RequiresPlatformAndProductVersion) {
+  Product actual{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
 
-    const Product expected{
-        .name = std::string("Fuchsia"),
-        .version = ErrorOrString(std::string("some version")),
-        .channel = ErrorOrString(Error::kMissingValue),
-    };
-    EXPECT_EQ(actual, expected);
-  }
+  CrashRegister::AddVersionAndChannel(actual,
+                                      {
+                                          {feedback::kBuildProductVersionKey, "some version"},
+                                      });
 
-  {
-    Product actual{
-        .name = std::string("Fuchsia"),
-        .version = ErrorOrString(Error::kMissingValue),
-        .channel = ErrorOrString(Error::kMissingValue),
-    };
+  const Product expected{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
+  EXPECT_EQ(actual, expected);
 
-    CrashRegister::AddVersionAndChannel(
-        actual, {
-                    {feedback::kBuildVersionKey, "some version"},
-                    {feedback::kSystemUpdateChannelCurrentKey, "some channel"},
-                });
+  CrashRegister::AddVersionAndChannel(actual,
+                                      {
+                                          {feedback::kBuildPlatformVersionKey, "some version"},
+                                      });
+  EXPECT_EQ(actual, expected);
+}
 
-    const Product expected{
-        .name = std::string("Fuchsia"),
-        .version = ErrorOrString(std::string("some version")),
-        .channel = ErrorOrString(std::string("some channel")),
-    };
-    EXPECT_EQ(actual, expected);
-  }
+TEST_F(AddVersionAndChannelTest, IdenticalProductAndPlatformVersions) {
+  Product actual{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
+
+  CrashRegister::AddVersionAndChannel(actual,
+                                      {
+                                          {feedback::kBuildProductVersionKey, "some version"},
+                                          {feedback::kBuildPlatformVersionKey, "some version"},
+                                      });
+
+  const Product expected{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(std::string("some version")),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
+  EXPECT_EQ(actual, expected);
+}
+
+TEST_F(AddVersionAndChannelTest, ProductAndPlatformVersionsConcatenated) {
+  Product actual{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
+
+  CrashRegister::AddVersionAndChannel(actual,
+                                      {
+                                          {feedback::kBuildProductVersionKey, "product version"},
+                                          {feedback::kBuildPlatformVersionKey, "platform version"},
+                                      });
+
+  const Product expected{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(std::string("product version--platform version")),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
+  EXPECT_EQ(actual, expected);
+}
+
+TEST_F(AddVersionAndChannelTest, ChannelSet) {
+  Product actual{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(Error::kMissingValue),
+  };
+
+  CrashRegister::AddVersionAndChannel(
+      actual, {
+                  {feedback::kSystemUpdateChannelCurrentKey, "some channel"},
+              });
+
+  const Product expected{
+      .name = std::string("Fuchsia"),
+      .version = ErrorOrString(Error::kMissingValue),
+      .channel = ErrorOrString(std::string("some channel")),
+  };
+  EXPECT_EQ(actual, expected);
 }
 
 TEST_F(CrashRegisterTest, ReinitializesFromJson) {

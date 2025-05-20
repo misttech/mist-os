@@ -90,7 +90,7 @@ TEST(PDevTest, GetMmios) {
   constexpr uint32_t kMmioId = 5;
   constexpr zx_off_t kMmioOffset = 10;
   constexpr size_t kMmioSize = 11;
-  constexpr cpp17::string_view kMmioName = "test-name";
+  constexpr std::string_view kMmioName = "test-name";
   std::map<uint32_t, fdf_fake::Mmio> mmios;
   {
     fdf::PDev::MmioInfo mmio{
@@ -194,7 +194,7 @@ TEST(PDevTest, InvalidMmioHandle) {
 
 TEST(PDevTest, GetIrqs) {
   constexpr uint32_t kIrqId = 5;
-  constexpr cpp17::string_view kIrqName = "test-name";
+  constexpr std::string_view kIrqName = "test-name";
   std::map<uint32_t, zx::interrupt> irqs;
   {
     zx::interrupt irq;

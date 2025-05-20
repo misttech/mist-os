@@ -16,7 +16,7 @@ use crate::vfs::{
     Anon, FdFlags, FdNumber, FileObject, LookupContext, NamespaceNode, OutputBuffer,
     UserBuffersOutputBuffer,
 };
-use ebpf::MapSchema;
+use ebpf::{EbpfInstruction, MapSchema};
 use ebpf_api::{Map, MapError, MapKey};
 use smallvec::smallvec;
 use starnix_logging::{log_error, log_trace, track_stub};
@@ -41,7 +41,7 @@ use starnix_uapi::{
     bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_BIND_MAP,
     bpf_cmd_BPF_PROG_DETACH, bpf_cmd_BPF_PROG_GET_FD_BY_ID, bpf_cmd_BPF_PROG_GET_NEXT_ID,
     bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_cmd_BPF_PROG_RUN,
-    bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_cmd_BPF_TOKEN_CREATE, bpf_insn,
+    bpf_cmd_BPF_RAW_TRACEPOINT_OPEN, bpf_cmd_BPF_TASK_FD_QUERY, bpf_cmd_BPF_TOKEN_CREATE,
     bpf_map_info, bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH,
     bpf_prog_info, errno, error, BPF_F_RDONLY, BPF_F_RDONLY_PROG, BPF_F_WRONLY, PATH_MAX,
 };
@@ -197,7 +197,7 @@ pub fn sys_bpf(
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
-            let value = map.lookup(&key).ok_or_else(|| errno!(ENOENT))?;
+            let value = map.load(&key).ok_or_else(|| errno!(ENOENT))?;
             current_task.write_memory(user_value, &value)?;
 
             Ok(SUCCESS)
@@ -278,7 +278,7 @@ pub fn sys_bpf(
             log_trace!("BPF_PROG_LOAD");
             security::check_bpf_access(current_task, cmd, &prog_attr, attr_size)?;
 
-            let user_code = UserRef::<bpf_insn>::new(UserAddress::from(prog_attr.insns));
+            let user_code = UserRef::<EbpfInstruction>::new(UserAddress::from(prog_attr.insns));
             let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
 
             let mut log_buffer = if prog_attr.log_buf != 0 && prog_attr.log_size > 1 {

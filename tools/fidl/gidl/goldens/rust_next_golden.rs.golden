@@ -1,0 +1,426 @@
+
+
+#![cfg(test)]
+#![allow(unused_imports)]
+#![allow(invalid_from_utf8)]
+
+use {
+    assert_matches::assert_matches,
+    fidl_next::{Chunk, Decode, DecoderExt as _, Encode, EncoderExt as _, Owned, WireU64},
+    fidl_next::fuchsia::channel::Buffer,
+    fidl_next_test_conformance as test_conformance,
+    zerocopy::IntoBytes,
+    zx_status::Status,
+    zx_types as zx_types,
+    gidl_util::{
+        HandleDef, HandleSubtype, copy_handle, create_handles, decode_value,
+        get_handle_koid, get_info_handle_valid, repeat, select_handle_infos,
+        select_raw_handle_infos, to_zx_handle_disposition_t,
+    },
+    std::convert::TryFrom,
+};
+
+
+
+    
+        #[test]
+        fn test_golden_bool_struct_v2_encode() {
+            let mut value = test_conformance::GoldenBoolStruct { v: true };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_int_struct_v2_encode() {
+            let mut value = test_conformance::GoldenIntStruct { v: 1i16 };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_uint_struct_v2_encode() {
+            let mut value = test_conformance::GoldenUintStruct { v: 1u16 };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_float_struct_v2_encode() {
+            let mut value = test_conformance::GoldenFloatStruct { v: 0f32 };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_double_struct_v2_encode() {
+            let mut value = test_conformance::GoldenDoubleStruct { v: 0f64 };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_string_struct_v2_encode() {
+            let mut value = test_conformance::GoldenStringStruct { v: String::from("abcd") };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_nullable_string_struct_non_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableStringStruct { v: Some(String::from("abcd")) };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x61,0x62,0x63,0x64,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_nullable_string_struct_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableStringStruct { v: None };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_enum_struct_v2_encode() {
+            let mut value = test_conformance::GoldenEnumStruct { v: test_conformance::GoldenEnum::try_from(1u16).unwrap() };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_bits_struct_v2_encode() {
+            let mut value = test_conformance::GoldenBitsStruct { v: test_conformance::GoldenBits::from_bits_retain(1u16) };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_table_struct_v2_encode() {
+            let mut value = test_conformance::GoldenTableStruct { v: test_conformance::GoldenTable { v: Some(1i16), ..Default::default() } };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_union_struct_v2_encode() {
+            let mut value = test_conformance::GoldenUnionStruct { v: test_conformance::GoldenUnion::V(1i16) };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_nullable_union_struct_non_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableUnionStruct { v: Some(Box::new(test_conformance::GoldenUnion::V(1i16))) };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x01,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_nullable_union_struct_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableUnionStruct { v: None };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_byte_array_struct_v2_encode() {
+            let mut value = test_conformance::GoldenByteArrayStruct { v: [1u8, 2u8, 3u8, 4u8] };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_struct_array_struct_v2_encode() {
+            let mut value = test_conformance::GoldenStructArrayStruct { v: [test_conformance::GoldenIntStruct { v: 1i16 }, test_conformance::GoldenIntStruct { v: 2i16 }] };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_byte_vector_struct_v2_encode() {
+            let mut value = test_conformance::GoldenByteVectorStruct { v: vec![1u8, 2u8, 3u8, 4u8, 1u8, 2u8, 3u8, 4u8, 1u8, 2u8, 3u8, 4u8] };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x0c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x01,0x02,0x03,0x04,0x01,0x02,0x03,0x04,
+0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_byte_nullable_vector_struct_non_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableByteVectorStruct { v: Some(vec![1u8, 2u8, 3u8, 4u8]) };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x01,0x02,0x03,0x04,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_nullable_byte_vector_struct_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableByteVectorStruct { v: None };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_struct_vector_struct_v2_encode() {
+            let mut value = test_conformance::GoldenStructVectorStruct { v: vec![test_conformance::GoldenIntStruct { v: 1i16 }, test_conformance::GoldenIntStruct { v: 2i16 }] };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x01,0x00,0x02,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_nullable_struct_non_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableStruct { v: Some(Box::new(test_conformance::GoldenBoolStruct { v: true })) };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        #[test]
+        fn test_golden_nullable_struct_null_v2_encode() {
+            let mut value = test_conformance::GoldenNullableStruct { v: None };
+            let mut buffer = Buffer::new();
+            buffer.encode_next(&mut value).unwrap();
+            assert_eq!(&[
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+], buffer.bytes().as_slice());
+            // TODO: check handles
+            assert_eq!(buffer.handles(), &[]);
+        }
+    
+
+    
+        // TODO: golden_handle_basic_rights_struct_v2_encode
+    
+
+    
+        // TODO: golden_nullable_handle_struct_non_null_v2_encode
+    
+
+    
+        // TODO: golden_nullable_handle_struct_null_v2_encode
+    
+
+
+
+    // TODO: golden_bool_struct_v2_decode
+
+    // TODO: golden_int_struct_v2_decode
+
+    // TODO: golden_uint_struct_v2_decode
+
+    // TODO: golden_float_struct_v2_decode
+
+    // TODO: golden_double_struct_v2_decode
+
+    // TODO: golden_string_struct_v2_decode
+
+    // TODO: golden_nullable_string_struct_non_null_v2_decode
+
+    // TODO: golden_nullable_string_struct_null_v2_decode
+
+    // TODO: golden_enum_struct_v2_decode
+
+    // TODO: golden_bits_struct_v2_decode
+
+    // TODO: golden_table_struct_v2_decode
+
+    // TODO: golden_union_struct_v2_decode
+
+    // TODO: golden_nullable_union_struct_non_null_v2_decode
+
+    // TODO: golden_nullable_union_struct_null_v2_decode
+
+    // TODO: golden_byte_array_struct_v2_decode
+
+    // TODO: golden_struct_array_struct_v2_decode
+
+    // TODO: golden_byte_vector_struct_v2_decode
+
+    // TODO: golden_byte_nullable_vector_struct_non_null_v2_decode
+
+    // TODO: golden_nullable_byte_vector_struct_null_v2_decode
+
+    // TODO: golden_struct_vector_struct_v2_decode
+
+    // TODO: golden_nullable_struct_non_null_v2_decode
+
+    // TODO: golden_nullable_struct_null_v2_decode
+
+    // TODO: golden_handle_basic_rights_struct_v2_decode
+
+    // TODO: golden_nullable_handle_struct_non_null_v2_decode
+
+    // TODO: golden_nullable_handle_struct_null_v2_decode
+
+    // TODO: golden_table_unknown_dropped_v2_decode
+
+
+
+// TODO: golden_string_with_max_size2_v2_encode_failure
+
+
+
+// TODO: golden_string_struct_null_body_v2_decode_failure
+
+

@@ -31,7 +31,7 @@ class ErrorsInBase {
 
   template <typename DomainError>
   static size_t Format(FormattingBuffer& buffer,
-                       const cpp17::variant<fidl::Error, DomainError>& error) {
+                       const std::variant<fidl::Error, DomainError>& error) {
     return FormatImpl(Prelude(error), buffer, [&](char* destination, size_t capacity) {
       return std::visit(
           [&](auto&& error) { return FormatDisplayError(error, destination, capacity); }, error);
@@ -40,7 +40,7 @@ class ErrorsInBase {
 
  private:
   template <typename DomainError>
-  static const char* Prelude(const cpp17::variant<fidl::Error, DomainError>& error) {
+  static const char* Prelude(const std::variant<fidl::Error, DomainError>& error) {
     switch (error.index()) {
       case 0:
         return kFrameworkErrorPrelude;
@@ -66,22 +66,22 @@ class ErrorsInImpl : private ErrorsInBase {
   explicit ErrorsInImpl(DomainError domain_error) : error_(domain_error) {}
 
   // Check if the error is a framework error: an error from the FIDL framework.
-  bool is_framework_error() const { return cpp17::holds_alternative<fidl::Error>(error_); }
+  bool is_framework_error() const { return std::holds_alternative<fidl::Error>(error_); }
 
   // Accesses the framework error: an error from the FIDL framework.
-  const fidl::Error& framework_error() const { return cpp17::get<fidl::Error>(error_); }
+  const fidl::Error& framework_error() const { return std::get<fidl::Error>(error_); }
 
   // Accesses the framework error: an error from the FIDL framework.
-  fidl::Error& framework_error() { return cpp17::get<fidl::Error>(error_); }
+  fidl::Error& framework_error() { return std::get<fidl::Error>(error_); }
 
   // Check if the error is a domain error: an error defined in the method from the FIDL schema.
-  bool is_domain_error() const { return cpp17::holds_alternative<DomainError>(error_); }
+  bool is_domain_error() const { return std::holds_alternative<DomainError>(error_); }
 
   // Accesses the domain error: an error defined in the method from the FIDL schema.
-  const DomainError& domain_error() const { return cpp17::get<DomainError>(error_); }
+  const DomainError& domain_error() const { return std::get<DomainError>(error_); }
 
   // Accesses the domain error: an error defined in the method from the FIDL schema.
-  DomainError& domain_error() { return cpp17::get<DomainError>(error_); }
+  DomainError& domain_error() { return std::get<DomainError>(error_); }
 
   // Prints a description of the error.
   //
@@ -97,11 +97,11 @@ class ErrorsInImpl : private ErrorsInBase {
   friend std::ostream& operator<<(std::ostream& ostream, const ErrorsInImpl& any_error) {
     FormattingBuffer buffer;
     size_t length = Format(buffer, any_error.error_);
-    ostream << cpp17::string_view(&(*buffer.begin()), length);
+    ostream << std::string_view(&(*buffer.begin()), length);
     return ostream;
   }
 
-  cpp17::variant<fidl::Error, DomainError> error_;
+  std::variant<fidl::Error, DomainError> error_;
 };
 
 }  // namespace internal

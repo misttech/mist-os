@@ -170,10 +170,12 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             os.rmdir(self.test_case_path)
 
         if self._devices_not_healthy:
+            # LINT.IfChange
             message: str = (
                 "One or more FuchsiaDevice's health check failed in "
                 "teardown_test. So failing the test case..."
             )
+            # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
             _LOGGER.warning(message)
             raise signals.TestFailure(message)
 

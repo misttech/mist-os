@@ -13,6 +13,11 @@ sdk_source_set("mock-registers") {
 
   public_deps =
       [ "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp" ]
+
+  # We want internal SDK elements to have their include path similar when
+  # used through an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source
+  # code doesn't need to be changed when switching from one to the other.
+  include_base = "//"
 }
 
 test("mock-registers-test") {

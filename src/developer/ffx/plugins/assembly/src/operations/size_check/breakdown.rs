@@ -4,7 +4,7 @@
 
 use crate::operations::size_check::common::wrap_text;
 use crate::operations::size_check::diff::{BlobDiff, PackageDiff, PackageReferenceDiff, SizeDiff};
-use assembly_manifest::BlobfsContents;
+use assembled_system::BlobfsContents;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 

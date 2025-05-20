@@ -29,7 +29,8 @@ pub trait AssignedAddrIpExt: Ip {
         + Hash
         + Send
         + Sync
-        + Into<SpecifiedAddr<Self::Addr>>;
+        + Into<SpecifiedAddr<Self::Addr>>
+        + Into<IpDeviceAddr<Self::Addr>>;
 }
 
 impl AssignedAddrIpExt for Ipv4 {
@@ -190,11 +191,23 @@ impl<A: IpAddress> TryFrom<SpecifiedAddr<A>> for IpDeviceAddr<A> {
 /// crate.
 pub type Ipv4DeviceAddr = NonMulticastAddr<NonMappedAddr<SpecifiedAddr<Ipv4Addr>>>;
 
+impl From<Ipv4DeviceAddr> for IpDeviceAddr<Ipv4Addr> {
+    fn from(addr: Ipv4DeviceAddr) -> IpDeviceAddr<Ipv4Addr> {
+        IpDeviceAddr::new_from_witness(addr)
+    }
+}
+
 /// An IPv6 address that witnesses properties needed to be assigned to a device.
 ///
 /// Like [`IpDeviceAddr`] but with stricter witnesses that are permitted for
 /// IPv6 addresses.
 pub type Ipv6DeviceAddr = NonMappedAddr<UnicastAddr<Ipv6Addr>>;
+
+impl From<Ipv6DeviceAddr> for IpDeviceAddr<Ipv6Addr> {
+    fn from(addr: Ipv6DeviceAddr) -> IpDeviceAddr<Ipv6Addr> {
+        IpDeviceAddr::new_from_ipv6_device_addr(addr)
+    }
+}
 
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {

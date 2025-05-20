@@ -10,7 +10,7 @@
 
 namespace __libc_sanitizer {
 
-size_t BacktraceByFramePointer(cpp20::span<uintptr_t> pcs) {
+size_t BacktraceByFramePointer(std::span<uintptr_t> pcs) {
   struct IsOnStack {
     bool operator()(const arch::CallFrame* fp) const {
       const iovec& stack = __pthread_self()->safe_stack;
@@ -31,7 +31,7 @@ size_t BacktraceByFramePointer(cpp20::span<uintptr_t> pcs) {
 
 #if __has_feature(shadow_call_stack)
 
-size_t BacktraceByShadowCallStack(cpp20::span<uintptr_t> pcs) {
+size_t BacktraceByShadowCallStack(std::span<uintptr_t> pcs) {
   const iovec& shadow_call_stack_block = __pthread_self()->shadow_call_stack;
   return arch::StoreBacktrace(
       arch::ShadowCallStackBacktrace{

@@ -50,9 +50,6 @@ struct WireTypeForNaturalType<::test_driveroneway::OneWaySendRequest> {
   using type = ::test_driveroneway::wire::OneWaySendRequest;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

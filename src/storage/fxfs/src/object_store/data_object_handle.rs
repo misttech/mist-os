@@ -1175,14 +1175,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     // which case we don't actually need to bother zeroing out the tail. However,
                     // it's not strictly incorrect to change uninitialized data, so we skip the
                     // check and blindly do it to keep it simpler here.
-                    self.read_and_decrypt(
-                        device_offset,
-                        aligned_old_size,
-                        buf.as_mut(),
-                        *key_id,
-                        None,
-                    )
-                    .await?;
+                    self.read_and_decrypt(device_offset, aligned_old_size, buf.as_mut(), *key_id)
+                        .await?;
                     buf.as_mut_slice()[(old_size % block_size) as usize..].fill(0);
                     self.multi_write(
                         transaction,
@@ -1417,9 +1411,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         file_offset: u64,
         buffer: MutableBufferRef<'_>,
         key_id: u64,
-        block_bitmap: Option<bit_vec::BitVec>,
     ) -> Result<(), Error> {
-        self.handle.read_and_decrypt(device_offset, file_offset, buffer, key_id, block_bitmap).await
+        self.handle.read_and_decrypt(device_offset, file_offset, buffer, key_id).await
     }
 
     /// Truncates a file to a given size (growing/shrinking as required).

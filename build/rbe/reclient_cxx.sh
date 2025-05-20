@@ -79,7 +79,7 @@ esac
 
 readonly HOST_PLATFORM="$_HOST_OS-$_HOST_ARCH"
 
-readonly reclient_bindir="$exec_root/prebuilt/proprietary/third_party/reclient/$HOST_PLATFORM"
+readonly reclient_bindir="$exec_root/prebuilt/third_party/reclient/$HOST_PLATFORM"
 readonly rewrapper="$reclient_bindir"/rewrapper
 readonly cfg="$script_dir"/fuchsia-rewrapper.cfg
 readonly reproxy_wrap="$script_dir"/fuchsia-reproxy-wrap.sh
@@ -206,6 +206,17 @@ local_compile_cmd=( "$@" )
 if [[ "${#local_compile_cmd[@]}" == 0 ]]
 then exit
 fi
+
+# Check for pseudo-flags that require the Python wrapper.
+for opt in "${local_compile_cmd[@]}"
+do
+  case "$opt" in
+    --remote-flag | --remote-flag=* )
+      # use Python wrapper to wrangle such forwarding flags
+      use_py_wrapper=1
+      ;;
+  esac
+done
 
 # Only in special debug cases, fallback to the more elaborate Python wrapper.
 if [[ "$use_py_wrapper" == 1 ]]

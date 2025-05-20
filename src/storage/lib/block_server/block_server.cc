@@ -26,16 +26,9 @@ BlockServer::BlockServer(const PartitionInfo& info, Interface* interface)
                                Session(session));
                          },
                      .on_requests =
-                         [](void* context, const internal::Session* session, Request* requests,
-                            uintptr_t request_count) {
-                           // Use a union so that the destructor for session does not run.
-                           union U {
-                             U(const internal::Session* session) : session(session) {}
-                             ~U() {}
-                             Session session;
-                           } u(session);
+                         [](void* context, Request* requests, uintptr_t request_count) {
                            reinterpret_cast<BlockServer*>(context)->interface_->OnRequests(
-                               u.session, std::span<Request>(requests, request_count));
+                               std::span<Request>(requests, request_count));
                          },
                      .log =
                          [](void* context, const char* msg, size_t len) {
@@ -62,11 +55,6 @@ Session::~Session() {
 
 void Session::Run() { block_server_session_run(session_); }
 
-void Session::SendReply(RequestId request_id, TraceFlowId trace_flow_id,
-                        zx::result<> result) const {
-  block_server_send_reply(session_, request_id, trace_flow_id, result.status_value());
-}
-
 BlockServer::BlockServer(BlockServer&& other)
     : interface_(other.interface_), server_(other.server_) {
   other.interface_ = nullptr;
@@ -81,6 +69,10 @@ BlockServer::~BlockServer() {
 
 void BlockServer::Serve(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
   block_server_serve(server_, server_end.TakeChannel().release());
+}
+
+void BlockServer::SendReply(RequestId request_id, zx::result<> result) const {
+  block_server_send_reply(server_, request_id, result.status_value());
 }
 
 Request SplitRequest(Request& request, uint32_t block_offset, uint32_t block_size) {

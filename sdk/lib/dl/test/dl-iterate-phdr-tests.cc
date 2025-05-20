@@ -7,6 +7,7 @@
 #include <gmock/gmock.h>
 
 #include "dl-load-tests.h"
+#include "startup-symbols.h"
 
 namespace {
 
@@ -104,6 +105,14 @@ TYPED_TEST(DlTests, DlIteratePhdrBasic) {
     EXPECT_EQ(test_last_phdr_info, ret17_phdr_info);
     EXPECT_EQ(close_info_list.size(), initial_info_list.size() + 1);
   }
+}
+
+TYPED_TEST(DlTests, DlIteratePhdrTlsData) {
+  // This test module has only one variable in its PT_TLS segment, so that
+  // variable will always be at the start of its block.
+  auto info = GetPhdrInfoForModule(*this, "libstatic-tls-var.so");
+  EXPECT_EQ(info.tls_data(), &gStaticTlsVar)
+      << "  Both should be reative to $tp\n    Which is: " << __builtin_thread_pointer();
 }
 
 }  // namespace

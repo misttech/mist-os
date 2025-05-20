@@ -59,13 +59,8 @@ zx::result<> AmlCpuDriver::Start() {
       return zx::error(device.error_value());
     }
 
-    auto st = device->AddChild(node_);
-    if (st.is_error()) {
-      FDF_LOG(ERROR, "Failed to add child for performance domain: %s", st.status_string());
-      return st.take_error();
-    }
     fuchsia_hardware_cpu_ctrl::Service::InstanceHandler handler({
-        .device = fit::bind_member<&AmlCpuPerformanceDomain::CpuCtrlConnector>(&**device),
+        .device = device->GetHandler(dispatcher()),
     });
 
     auto result = outgoing()->AddService<fuchsia_hardware_cpu_ctrl::Service>(std::move(handler),
@@ -147,57 +142,6 @@ zx::result<std::unique_ptr<AmlCpuPerformanceDomain>> AmlCpuDriver::BuildPerforma
   device->SetCpuInfo(config.cpu_version_packed);
 
   return zx::ok(std::move(device));
-}
-
-void AmlCpuPerformanceDomain::CpuCtrlConnector(
-    fidl::ServerEnd<fuchsia_hardware_cpu_ctrl::Device> server) {
-  FDF_LOG(INFO, "Binding domain to server");
-  bindings_.AddBinding(dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure);
-}
-
-zx::result<> AmlCpuPerformanceDomain::AddChild(
-    fidl::WireSyncClient<fuchsia_driver_framework::Node>& node) {
-  fidl::Arena arena;
-
-  zx::result connector = devfs_connector_.Bind(dispatcher_);
-  if (connector.is_error()) {
-    return connector.take_error();
-  }
-
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
-                   .connector(std::move(connector.value()))
-                   .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
-                                       fuchsia_device_fs::ConnectionType::kController)
-                   .class_name("cpu-ctrl");
-
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, GetName())
-                  .devfs_args(devfs.Build())
-                  .Build();
-
-  // Create endpoints of the `NodeController` for the node.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoint: %s", endpoints.status_string());
-    return zx::error(endpoints.status_value());
-  }
-
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  if (node_endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create node endpoint: %s", node_endpoints.status_string());
-    return zx::error(node_endpoints.status_value());
-  }
-
-  auto result =
-      node->AddChild(args, std::move(endpoints->server), std::move(node_endpoints->server));
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
-    return zx::error(result.status());
-  }
-  controller_.Bind(std::move(endpoints->client));
-  node_.Bind(std::move(node_endpoints->client));
-
-  return zx::ok();
 }
 
 }  // namespace amlogic_cpu

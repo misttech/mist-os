@@ -25,11 +25,8 @@ use fxfs_platform::volumes_directory::VolumesDirectory;
 use std::sync::{Arc, Weak};
 use storage_device::fake_device::FakeDevice;
 use storage_device::DeviceHolder;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
-use vfs::path::Path;
-use vfs::ToObjectRequest;
 
 const BLOCK_SIZE: u32 = 4096; // 8KiB
 const USER_VOLUME_NAME: &str = "test_fxfs_user_volume";
@@ -130,7 +127,8 @@ async fn create_user_volume(
     inspect_node: &Mutex<fuchsia_inspect::Node>,
 ) -> Result<(), Error> {
     let remote_crypt = Arc::new(RemoteCrypt::new(crypt));
-    if let Some(vol) = mounted_volume.lock().take() {
+    let vol = mounted_volume.lock().take();
+    if let Some(vol) = vol {
         volumes_directory.lock().await.unmount(vol.store_id).await.context("unmount failed")?;
         inspect_node.lock().record_bool("mounted", false);
     }
@@ -171,7 +169,8 @@ async fn unmount_user_volume(
     mounted_volume: &Mutex<Option<MountedVolume>>,
     inspect_node: &Mutex<fuchsia_inspect::Node>,
 ) -> Result<(), Error> {
-    if let Some(vol) = mounted_volume.lock().take() {
+    let vol = mounted_volume.lock().take();
+    if let Some(vol) = vol {
         volumes_directory.lock().await.unmount(vol.store_id).await.context("unmount failed")?;
         inspect_node.lock().record_bool("mounted", false);
         Ok(())
@@ -387,11 +386,14 @@ async fn main() -> Result<(), Error> {
 
     let export_handle = fuchsia_runtime::take_startup_handle(HandleType::DirectoryRequest.into())
         .context("Missing startup handle")?;
+
     let scope = ExecutionScope::new();
-    let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-    flags
-        .to_object_request(export_handle)
-        .handle(|object_request| out_dir.open3(scope.clone(), Path::dot(), flags, object_request));
+    vfs::directory::serve_on(
+        out_dir,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
+        scope.clone(),
+        ServerEnd::new(export_handle.into()),
+    );
     scope.wait().await;
 
     Ok(())

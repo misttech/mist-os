@@ -103,7 +103,7 @@ impl RealmQuery {
                     let result = construct_namespace(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
-                fsys::RealmQueryRequest::DeprecatedOpen {
+                fsys::RealmQueryRequest::Open {
                     moniker,
                     dir_type,
                     flags,
@@ -454,11 +454,11 @@ async fn open_deprecated(
                 .ok_or(fsys::OpenError::InstanceNotRunning)?
                 .runtime_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             let result = dir
                 .deprecated_open(flags, mode, path, object)
                 .map_err(|_| fsys::OpenError::FidlError);
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             let result =
                 dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError);
 
@@ -469,12 +469,12 @@ async fn open_deprecated(
             match state.get_resolved_state_mut() {
                 Some(r) => {
                     let pkg = r.package().ok_or(fsys::OpenError::NoSuchDir)?;
-                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    #[cfg(fuchsia_api_level_at_least = "27")]
                     let result = pkg
                         .package_dir
                         .deprecated_open(flags, mode, path, object)
                         .map_err(|_| fsys::OpenError::FidlError);
-                    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+                    #[cfg(not(fuchsia_api_level_at_least = "27"))]
                     let result = pkg
                         .package_dir
                         .open(flags, mode, path, object)
@@ -515,12 +515,11 @@ async fn open_deprecated(
             let resolved_state =
                 state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
 
-            resolved_state.namespace_dir().await.map_err(|_| fsys::OpenError::NoSuchDir)?.open(
-                instance.execution_scope.clone(),
-                flags,
-                path,
-                object,
-            );
+            resolved_state
+                .namespace_dir()
+                .await
+                .map_err(|_| fsys::OpenError::NoSuchDir)?
+                .deprecated_open(instance.execution_scope.clone(), flags, path, object);
 
             Ok(())
         }
@@ -598,7 +597,7 @@ async fn open_directory(
                 resolved.namespace_dir().await.map_err(|_| fsys::OpenError::NoSuchDir)?;
             let scope: package_directory::ExecutionScope = instance.execution_scope.clone();
             namespace_dir
-                .open3(scope, path, FLAGS, &mut request)
+                .open(scope, path, FLAGS, &mut request)
                 .map_err(|_| fsys::OpenError::FidlError)
         }
         _ => Err(fsys::OpenError::BadDirType),

@@ -28,7 +28,7 @@ class TwoWayAddRequest final {
   static inline ::std::unique_ptr<TwoWayAddRequest> New() { return ::std::make_unique<TwoWayAddRequest>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TwoWayAddRequest* value, size_t _offset);
   zx_status_t Clone(TwoWayAddRequest* result) const;
 };
@@ -49,7 +49,7 @@ class TwoWayAddResponse final {
   static inline ::std::unique_ptr<TwoWayAddResponse> New() { return ::std::make_unique<TwoWayAddResponse>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TwoWayAddResponse* value, size_t _offset);
   zx_status_t Clone(TwoWayAddResponse* result) const;
 };

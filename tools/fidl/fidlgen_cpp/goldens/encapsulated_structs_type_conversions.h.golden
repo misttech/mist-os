@@ -97,10 +97,6 @@ struct WireTypeForNaturalType<::test_encapsulatedstructs::NonInlineStructTestStr
   using type = ::test_encapsulatedstructs::wire::NonInlineStructTestStruct;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_encapsulatedstructs::wire::TopLevelStruct, ::test_encapsulatedstructs::TopLevelStruct> {
   static ::test_encapsulatedstructs::TopLevelStruct ToNatural(::test_encapsulatedstructs::wire::TopLevelStruct src);
@@ -115,10 +111,6 @@ template <>
 struct WireTypeForNaturalType<::test_encapsulatedstructs::TopLevelStruct> {
   using type = ::test_encapsulatedstructs::wire::TopLevelStruct;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

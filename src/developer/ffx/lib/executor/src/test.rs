@@ -52,7 +52,7 @@ impl<'a> TestCommandLineInfo<'a> {
     ) -> Result<String, TestingError> {
         let output =
             executor.exec_ffx(&self.args).await.map_err(|e| TestingError::ExecutionError(e))?;
-        tracing::info!("Ran command {:?}, output: {}\n{}", self.args, output.stdout, output.stderr);
+        log::info!("Ran command {:?}, output: {}\n{}", self.args, output.stdout, output.stderr);
         (self.output_check)(output.clone())?;
         Ok(output.stdout)
     }

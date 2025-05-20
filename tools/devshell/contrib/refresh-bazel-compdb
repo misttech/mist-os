@@ -17,7 +17,7 @@ fi
 fx-info "Updating bazel workspace"
 source "${_script_dir}/../lib/bazel_utils.sh" || exit $?
 {
-  fx-update-bazel-workspace
+  fx-update-bazel-workspace "fuchsia"
 } &> /dev/null
 
 # We need to figure out our compilation mode to pass to bazel

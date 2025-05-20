@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
+use component_debug::dirs::{connect_to_instance_protocol, OpenDirType};
 use fidl::endpoints::ProtocolMarker;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use log::{Level, LevelFilter, Log, Metadata, Record};
@@ -69,12 +69,9 @@ impl Connector {
         moniker: &str,
     ) -> Result<P::Proxy, Error> {
         let moniker = moniker.try_into()?;
-        let proxy = connect_to_instance_protocol_at_dir_root::<P>(
-            &moniker,
-            OpenDirType::Exposed,
-            &self.realm_query,
-        )
-        .await?;
+        let proxy =
+            connect_to_instance_protocol::<P>(&moniker, OpenDirType::Exposed, &self.realm_query)
+                .await?;
         Ok(proxy)
     }
 }

@@ -20,7 +20,15 @@ import os
 import pathlib
 import sys
 
-import depfile
+_SCRIPT_DIR = pathlib.Path(__file__).parent.parent
+
+# See comment in BUILD.bazel to see why changing sys.path manually
+# is required here. Bytecode generation is also disallowed to avoid
+# polluting the Bazel execroot with .pyc files that can end up in
+# the generated TreeArtifact, resulting in issues when dependent
+# actions try to read it.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(_SCRIPT_DIR))
 import generate_idk
 
 
@@ -63,6 +71,18 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
+        "--schema-directory",
+        type=pathlib.Path,
+        help="Path containing the metadata schema files",
+        required=True,
+    )
+    parser.add_argument(
+        "--json-validator-path",
+        type=pathlib.Path,
+        help="Path containing the metadata schema files",
+        required=True,
+    )
+    parser.add_argument(
         "--target-arch",
         help="List of target architectures supported by the IDK",
         action="append",
@@ -80,7 +100,7 @@ def main() -> int:
         "--stamp-file",
         help="Path to the stamp file",
         type=pathlib.Path,
-        required=True,
+        required=False,
     )
     parser.add_argument(
         "--depfile",
@@ -100,6 +120,10 @@ def main() -> int:
         input_files |= manifest.input_files()
         merged = merged.merge_with(manifest)
 
+    schema_validator = generate_idk.AtomSchemaValidator(
+        args.schema_directory, args.json_validator_path
+    )
+
     output_dir: pathlib.Path = args.output_directory
 
     # NOTE: Delete any directory that may already be there from a
@@ -110,10 +134,26 @@ def main() -> int:
 
     # Write metadata for each atom.
     for path, meta in merged.atoms.items():
+        type = meta["type"]
+        atom_meta = meta
+        if type == "version_history":
+            # Remove "type" from version_history.json before writing the file.
+            # See https://fxbug.dev/409622622.
+            # We must ignore the type checking error about deleting the key from
+            # AtomMeta types.
+            atom_meta = meta.copy()
+            found = atom_meta.pop("type")  # type: ignore
+            assert found
+
         dest_path = output_dir / path
         dest_path.parent.mkdir(exist_ok=True, parents=True)
         with dest_path.open("w") as f:
-            json.dump(meta, f, indent=2, sort_keys=True)
+            json.dump(atom_meta, f, indent=2, sort_keys=True)
+
+        result = schema_validator.validate(dest_path, type)
+        if result != 0:
+            # A message was already printed.
+            return result
 
     # Symlink all the other files.
     for dest, src in merged.dest_to_src.items():
@@ -137,9 +177,12 @@ def main() -> int:
             sort_keys=True,
         )
 
-    args.stamp_file.touch()
+    if args.stamp_file:
+        args.stamp_file.touch()
 
     if args.depfile:
+        import depfile  # Import here to avoid importing from Bazel.
+
         depfile_path: pathlib.Path = args.depfile
         depfile_path.parent.mkdir(parents=True, exist_ok=True)
         with depfile_path.open("w") as depfile_out:

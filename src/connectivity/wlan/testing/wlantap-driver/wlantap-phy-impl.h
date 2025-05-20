@@ -45,6 +45,13 @@ class WlanPhyImplDevice : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyIm
   void SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
                         SetPowerSaveModeCompleter::Sync& completer) override;
   void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override;
+  void PowerDown(fdf::Arena& arena, PowerDownCompleter::Sync& completer) override;
+  void PowerUp(fdf::Arena& arena, PowerUpCompleter::Sync& completer) override;
+  void Reset(fdf::Arena& arena, ResetCompleter::Sync& completer) override;
+  void GetPowerState(fdf::Arena& arena, GetPowerStateCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_wlan_phyimpl::WlanPhyImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
  private:
   WlanPhyImplDevice(const std::shared_ptr<const WlantapDriverContext>& context,

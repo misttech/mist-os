@@ -23,16 +23,12 @@ source_set("chromium") {
   deps = [ "//src/lib/fxl" ]
 
   public_deps = [
-    "//sdk/lib/stdcompat",
     "//sdk/lib/syslog/cpp",
     "//src/performance/lib/perfmon",
     "//third_party/modp_b64",
     "//third_party/rapidjson",
     "//zircon/system/ulib/trace-reader",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("chromium_unittests") {
@@ -45,9 +41,6 @@ test("chromium_unittests") {
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_unittest_package("trace_converter_tests") {

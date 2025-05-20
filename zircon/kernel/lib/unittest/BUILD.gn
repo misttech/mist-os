@@ -26,7 +26,7 @@ zx_library("unittest") {
       # <lib/unittest/user_memory.h> has #include <lib/instrumentation/asan.h>.
       "//zircon/kernel/lib/instrumentation:headers",
 
-      # <lib/unittest/user_memory.h> has #include <ktl/move.h>.
+      # <lib/unittest/user_memory.h> has #include <ktl/utility.h>.
       "//zircon/kernel/lib/ktl:headers",
     ]
     deps += [ "//zircon/kernel/lib/console" ]

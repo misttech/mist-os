@@ -8,7 +8,7 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <trace.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include "../kernel_priv.h"
 

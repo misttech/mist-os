@@ -79,8 +79,8 @@ class Logger {
 
   // Begins a record, used by internal macros only.
   void BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity,
-                   cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                   cpp17::optional<cpp17::string_view> msg) const;
+                   std::optional<std::string_view> file_name, unsigned int line,
+                   std::optional<std::string_view> msg) const;
 
   // Writes a log message, used by internal macros only.
   void VLogWrite(FuchsiaLogSeverity severity, const char* tag, const char* msg, va_list args,

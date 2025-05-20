@@ -529,4 +529,32 @@ TEST(VmoTransferDataTestCase, RacyDropParent) {
   close_thread.join();
 }
 
+// Test that transferring data from an 'empty' (i.e. zeroed) vmo overwrites content in a hidden
+// parent.
+TEST(VmoTransferDataTestCase, EmptyOverwritesParentContent) {
+  // Create a VMO with some non-zero content that will become the parent.
+  zx::vmo dst_parent;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &dst_parent));
+  uint64_t data = 42;
+  EXPECT_OK(dst_parent.write(&data, 0, sizeof(data)));
+
+  // Clone the parent into a destination. This VMO itself references the parent content via
+  // copy-on-write.
+  zx::vmo dst_vmo;
+  ASSERT_OK(dst_parent.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), &dst_vmo));
+
+  EXPECT_OK(dst_vmo.read(&data, 0, sizeof(data)));
+  EXPECT_EQ(data, 42u);
+
+  // Create an empty vmo, which is implicitly zero, to transfer data from.
+  zx::vmo src_vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &src_vmo));
+
+  EXPECT_OK(dst_vmo.transfer_data(0, 0, zx_system_get_page_size(), &src_vmo, 0));
+
+  // The destination should have been zeroed and no longer see the parent content.
+  EXPECT_OK(dst_vmo.read(&data, 0, sizeof(data)));
+  EXPECT_EQ(data, 0u);
+}
+
 }  // namespace

@@ -16,8 +16,7 @@ namespace fdf_metadata::test {
 zx::result<> TestRootDriver::Start() {
   zx_status_t status = InitControllerChildNode();
   if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to initialize controller node.",
-             KV("status", zx_status_get_string(status)));
+    fdf::error("Failed to initialize controller node: {}", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -44,7 +43,7 @@ void TestRootDriver::AddMetadataSenderNode(AddMetadataSenderNodeRequest& request
 
   zx::result result = AddChild(node_name.str(), node_properties, {});
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));
+    fdf::error("Failed to add child: {}", result);
     completer.Reply(fit::error(result.status_value()));
     return;
   }
@@ -55,13 +54,13 @@ void TestRootDriver::AddMetadataSenderNode(AddMetadataSenderNodeRequest& request
 
 zx_status_t TestRootDriver::InitControllerChildNode() {
   if (controller_node_.has_value()) {
-    FDF_SLOG(ERROR, "Controller node already initialized.");
+    fdf::error("Controller node already initialized.");
     return ZX_ERR_BAD_STATE;
   }
 
   zx::result connector = devfs_connector_.Bind(dispatcher());
   if (connector.is_error()) {
-    FDF_SLOG(ERROR, "Failed to bind devfs connector.", KV("status", connector.status_string()));
+    fdf::error("Failed to bind devfs connector: {}", connector);
     return connector.status_value();
   }
 
@@ -69,7 +68,7 @@ zx_status_t TestRootDriver::InitControllerChildNode() {
 
   zx::result result = AddOwnedChild(kControllerNodeName, devfs_args);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));
+    fdf::error("Failed to add child: {}", result);
     return result.status_value();
   }
 

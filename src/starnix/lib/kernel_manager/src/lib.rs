@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 pub mod kernels;
+pub mod pager;
 pub mod proxy;
 pub mod suspend;
 
+use crate::pager::run_pager;
 use anyhow::{anyhow, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
 use fidl::{HandleBased, Peered};
@@ -26,6 +28,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
     fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner,
+    fuchsia_async as fasync,
 };
 
 /// The name of the collection that the starnix_kernel is run in.
@@ -266,6 +269,11 @@ pub async fn serve_starnix_manager(
                 if let Err(e) = responder.send() {
                     warn!("error registering power watcher: {e}");
                 }
+            }
+            fstarnixrunner::ManagerRequest::CreatePager { payload, .. } => {
+                std::thread::spawn(|| {
+                    fasync::LocalExecutor::new().run_singlethreaded(run_pager(payload));
+                });
             }
             _ => {}
         }

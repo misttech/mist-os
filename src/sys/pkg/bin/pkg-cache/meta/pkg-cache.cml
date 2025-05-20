@@ -72,7 +72,8 @@
         {
             protocol: [
                 "fuchsia.boot.Arguments",
-                "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.fxfs.BlobCreator",
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.update.CommitStatusProvider",
@@ -80,14 +81,6 @@
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
             availability: "optional",
         },
         {
@@ -99,14 +92,6 @@
             // will be executable.
             config: "fuchsia.pkgcache.AllPackagesExecutable",
             key: "all_packages_executable",
-            type: "bool",
-        },
-        {
-            // If true, then pkg-cache will use the fuchsia.fxfs.BlobCreator capability from its
-            // environment to write blobs and the BlobReader to read and execute blobs.
-            // Otherwise, pkg-cache will use the /blob directory to read and write blobs.
-            config: "fuchsia.pkgcache.UseFxblob",
-            key: "use_fxblob",
             type: "bool",
         },
         {

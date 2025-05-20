@@ -87,7 +87,7 @@ rust_library(
         "//third_party/rust_crates/vendor/bit-vec-0.6.3:bit_vec",
         "//third_party/rust_crates/vendor/bitflags-2.8.0:bitflags",
         "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
-        "//third_party/rust_crates/vendor/num-traits-0.2.18:num_traits",
+        "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",
         "//third_party/rust_crates/vendor/rand-0.8.4:rand",
         "//third_party/rust_crates/vendor/rand_chacha-0.3.1:rand_chacha",
         "//third_party/rust_crates/vendor/rand_xorshift-0.3.0:rand_xorshift",

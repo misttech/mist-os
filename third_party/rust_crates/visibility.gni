@@ -251,12 +251,8 @@ tracing_visibility = [
   "//src/tests/diagnostics:*",
 
   # At this time we are not enforcing restrictions on ffx and related libraries.
-  "//src/developer/ffx/*",
-  "//src/connectivity/overnet/lib/ascendd:*",
-  "//src/developer/fastboot:*",
-  "//src/developer/lib/credentials:*",
-  "//src/lib/fuchsia-lockfile:*",
-  "//src/lib/usb_bulk/rust:*",
+  "//src/developer/ffx/config:*",
+  "//src/developer/ffx/lib/logging/*",
 
   # At this time we are not enforcing restrictions on the below since the
   # sources are in a 3P library.
@@ -284,8 +280,8 @@ tracing_subscriber_visibility = [
   # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:tracing-subscriber' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"//\1:*",|')
   #
   # At this time we are not enforcing restrictions on ffx and related code.
-  "//src/developer/ffx/*",
-  "//tools/funnel:*",
+  "//src/developer/ffx/config:*",
+  "//src/developer/ffx/lib/logging/*",
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",

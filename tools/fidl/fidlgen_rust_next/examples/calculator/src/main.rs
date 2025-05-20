@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_next::{
-    Client, ClientEnd, ClientSender, Flexible, FlexibleResult, RequestBuffer, Responder,
-    ResponseBuffer, Server, ServerEnd, ServerSender, Transport,
+    Client, ClientEnd, ClientSender, Flexible, FlexibleResult, Request, Responder, Response,
+    Server, ServerEnd, ServerSender, Transport,
 };
 use fidl_next_examples_calculator::calculator::prelude::*;
 use fuchsia_async::{Scope, Task};
@@ -15,10 +15,9 @@ impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
     fn on_error(
         &mut self,
         sender: &ClientSender<T, Calculator>,
-        mut response: ResponseBuffer<T, calculator::OnError>,
+        response: Response<T, calculator::OnError>,
     ) {
-        let message = response.decode().unwrap();
-        assert_eq!(message.status_code, 100);
+        assert_eq!(response.status_code, 100);
 
         println!("Client received an error event, closing connection");
         sender.close();
@@ -33,63 +32,57 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
     fn add(
         &mut self,
         sender: &ServerSender<T, Calculator>,
-        mut request: RequestBuffer<T, calculator::Add>,
+        request: Request<T, calculator::Add>,
         responder: Responder<calculator::Add>,
     ) {
+        println!("{} + {} = {}", request.a, request.b, request.a + request.b);
+        let response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
+
         let sender = sender.clone();
         self.scope.spawn(async move {
-            let Ok(request) = request.decode() else { return sender.close() };
-
-            println!("{} + {} = {}", request.a, request.b, request.a + request.b);
-            let mut response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
-            if responder.respond(&sender, &mut response).unwrap().await.is_err() {
-                return sender.close();
-            };
+            if responder.respond(&sender, response).unwrap().await.is_err() {
+                sender.close();
+            }
         });
     }
 
     fn divide(
         &mut self,
         sender: &ServerSender<T, Calculator>,
-        mut request: RequestBuffer<T, calculator::Divide>,
+        request: Request<T, calculator::Divide>,
         responder: Responder<calculator::Divide>,
     ) {
+        let response = if request.divisor != 0 {
+            println!(
+                "{} / {} = {} rem {}",
+                request.dividend,
+                request.divisor,
+                request.dividend / request.divisor,
+                request.dividend % request.divisor,
+            );
+            FlexibleResult::Ok(CalculatorDivideResponse {
+                quotient: request.dividend / request.divisor,
+                remainder: request.dividend % request.divisor,
+            })
+        } else {
+            println!("{} / 0 = undefined", request.dividend);
+            FlexibleResult::Err(DivisionError::DivideByZero)
+        };
+
         let sender = sender.clone();
         self.scope.spawn(async move {
-            let Ok(request) = request.decode() else { return sender.close() };
-
-            let mut response = if request.divisor != 0 {
-                println!(
-                    "{} / {} = {} rem {}",
-                    request.dividend,
-                    request.divisor,
-                    request.dividend / request.divisor,
-                    request.dividend % request.divisor,
-                );
-                FlexibleResult::Ok(CalculatorDivideResponse {
-                    quotient: request.dividend / request.divisor,
-                    remainder: request.dividend % request.divisor,
-                })
-            } else {
-                println!("{} / 0 = undefined", request.dividend);
-                FlexibleResult::Err(DivisionError::DivideByZero)
-            };
-            if responder.respond(&sender, &mut response).unwrap().await.is_err() {
+            if responder.respond(&sender, response).unwrap().await.is_err() {
                 return sender.close();
-            };
+            }
         });
     }
 
     fn clear(&mut self, sender: &ServerSender<T, Calculator>) {
+        println!("Cleared, sending an error back to close the connection");
+
         let sender = sender.clone();
         self.scope.spawn(async move {
-            println!("Cleared, sending an error back to close the connection");
-
-            sender
-                .on_error(&mut CalculatorOnErrorRequest { status_code: 100 })
-                .unwrap()
-                .await
-                .unwrap();
+            sender.on_error(CalculatorOnErrorRequest { status_code: 100 }).unwrap().await.unwrap();
         });
     }
 }
@@ -137,38 +130,36 @@ async fn create_endpoints(
 }
 
 async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
-    let mut buffer =
-        client_sender.add(&mut CalculatorAddRequest { a: 16, b: 26 }).unwrap().await.unwrap();
-
-    let result = buffer.decode().unwrap();
-    let response = result.unwrap();
+    let result = client_sender
+        .add(CalculatorAddRequest { a: 16, b: 26 })
+        .expect("failed to encode add request")
+        .await
+        .expect("failed to send, receive, or decode response to add request");
+    let response = result.ok().expect("add request failed with an error");
 
     assert_eq!(response.sum, 42);
 }
 
 async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
     // Normal division
-    let mut buffer = client_sender
-        .divide(&mut CalculatorDivideRequest { dividend: 100, divisor: 3 })
-        .unwrap()
+    let result = client_sender
+        .divide(CalculatorDivideRequest { dividend: 100, divisor: 3 })
+        .expect("failed to encode divide request")
         .await
-        .unwrap();
-
-    let result = buffer.decode().unwrap();
-    let response = result.unwrap();
+        .expect("failed to send, receive, or decode response to divide request");
+    let response = result.ok().expect("divide request failed with an error");
 
     assert_eq!(response.quotient, 33);
     assert_eq!(response.remainder, 1);
 
     // Cause an error
-    let mut buffer = client_sender
-        .divide(&mut CalculatorDivideRequest { dividend: 42, divisor: 0 })
-        .unwrap()
+    let result = client_sender
+        .divide(CalculatorDivideRequest { dividend: 42, divisor: 0 })
+        .expect("failed to encode divide request")
         .await
-        .unwrap();
+        .expect("failed to send, receive, or decode response to divide request");
 
-    let result = buffer.decode().unwrap();
-    let error = result.unwrap_err();
+    let error = result.err().expect("divide request succeeded unexpectedly");
     assert_eq!(DivisionError::DivideByZero, (*error).into());
 }
 

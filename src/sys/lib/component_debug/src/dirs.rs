@@ -6,7 +6,7 @@
 //! and opening protocols that exist in them.
 
 use flex_client::fidl::ProtocolMarker;
-use flex_client::{Channel, ProxyHasDomain};
+use flex_client::ProxyHasDomain;
 use moniker::Moniker;
 use thiserror::Error;
 use {flex_fuchsia_io as fio, flex_fuchsia_sys2 as fsys};
@@ -21,7 +21,7 @@ pub enum OpenError {
     #[error("opening {0} requires {1} to be running")]
     InstanceNotRunning(OpenDirType, Moniker),
     #[error("component manager's open request on the directory returned a FIDL error")]
-    OpenFidlError,
+    OpenDirectoryFidlError,
     #[error("{0} does not have a {1}")]
     NoSuchDir(Moniker, OpenDirType),
     #[error("component manager could not parse moniker: {0}")]
@@ -89,7 +89,7 @@ impl From<fsys::OpenDirType> for OpenDirType {
 }
 
 /// Opens a protocol in a component instance directory, assuming it is located at the root.
-pub async fn connect_to_instance_protocol_at_dir_root<P: ProtocolMarker>(
+pub async fn connect_to_instance_protocol<P: ProtocolMarker>(
     moniker: &Moniker,
     dir_type: OpenDirType,
     realm: &fsys::RealmQueryProxy,
@@ -104,68 +104,26 @@ pub async fn connect_to_instance_protocol_at_path<P: ProtocolMarker>(
     path: &str,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<P::Proxy, OpenError> {
+    let dir_client = open_instance_directory(moniker, dir_type, realm).await?;
     let (proxy, server_end) = realm.domain().create_proxy::<P>();
-    let server_end = server_end.into_channel();
-    open_in_instance_dir(
-        &moniker,
-        dir_type,
-        fio::OpenFlags::empty(),
-        fio::ModeType::empty(),
-        path,
-        server_end,
-        realm,
-    )
-    .await?;
+    dir_client
+        .open(path, fio::Flags::PROTOCOL_SERVICE, &Default::default(), server_end.into_channel())
+        .map_err(|_| OpenError::OpenDirectoryFidlError)?;
     Ok(proxy)
 }
 
-/// Opens the root of a component instance directory with read rights.
-pub async fn open_instance_dir_root_readable(
+/// Opens the specified directory type in a component instance identified by `moniker`.
+pub async fn open_instance_directory(
     moniker: &Moniker,
     dir_type: OpenDirType,
     realm: &fsys::RealmQueryProxy,
 ) -> Result<fio::DirectoryProxy, OpenError> {
-    open_instance_subdir_readable(moniker, dir_type, ".", realm).await
-}
-
-/// Opens the subdirectory of a component instance directory with read rights.
-pub async fn open_instance_subdir_readable(
-    moniker: &Moniker,
-    dir_type: OpenDirType,
-    path: &str,
-    realm: &fsys::RealmQueryProxy,
-) -> Result<fio::DirectoryProxy, OpenError> {
-    let (root_dir, server_end) = realm.domain().create_proxy::<fio::DirectoryMarker>();
-    let server_end = server_end.into_channel();
-    open_in_instance_dir(
-        moniker,
-        dir_type,
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::ModeType::empty(),
-        path,
-        server_end,
-        realm,
-    )
-    .await?;
-    Ok(root_dir)
-}
-
-/// Opens an object in a component instance directory with the given |flags|, |mode| and |path|.
-/// Component manager will make the corresponding `fuchsia.io.Directory/Open` call on
-/// the directory.
-pub async fn open_in_instance_dir(
-    moniker: &Moniker,
-    dir_type: OpenDirType,
-    flags: fio::OpenFlags,
-    mode: fio::ModeType,
-    path: &str,
-    object: Channel,
-    realm: &fsys::RealmQueryProxy,
-) -> Result<(), OpenError> {
     let moniker_str = moniker.to_string();
+    let (dir_client, dir_server) = realm.domain().create_proxy::<fio::DirectoryMarker>();
     realm
-        .deprecated_open(&moniker_str, dir_type.clone().into(), flags, mode, path, object.into())
-        .await?
+        .open_directory(&moniker_str, dir_type.clone().into(), dir_server)
+        .await
+        .map_err(|e| OpenError::Fidl(e))?
         .map_err(|e| match e {
             fsys::OpenError::InstanceNotFound => OpenError::InstanceNotFound(moniker.clone()),
             fsys::OpenError::InstanceNotResolved => {
@@ -176,97 +134,9 @@ pub async fn open_in_instance_dir(
             }
             fsys::OpenError::NoSuchDir => OpenError::NoSuchDir(moniker.clone(), dir_type),
             fsys::OpenError::BadDirType => OpenError::BadDirType(dir_type),
-            fsys::OpenError::BadPath => OpenError::BadPath(path.to_string()),
             fsys::OpenError::BadMoniker => OpenError::BadMoniker(moniker.clone()),
-            fsys::OpenError::FidlError => OpenError::OpenFidlError,
+            fsys::OpenError::FidlError => OpenError::OpenDirectoryFidlError,
             _ => OpenError::UnknownError,
-        })
-}
-
-#[cfg(test)]
-mod tests {
-    use fidl_test_util::spawn_stream_handler;
-    use moniker::Moniker;
-    use {flex_fuchsia_io as fio, flex_fuchsia_sys2 as fsys};
-
-    use super::{
-        connect_to_instance_protocol_at_path, open_instance_dir_root_readable,
-        open_instance_subdir_readable, OpenDirType,
-    };
-
-    #[fuchsia::test]
-    async fn test_connect_to_instance_protocol_at_path() {
-        // Ensure that connect_to_instance_protocol_at_path() passes the correct arguments to RealmQuery.
-        let realm = spawn_stream_handler(move |realm_request| async move {
-            match realm_request {
-                fsys::RealmQueryRequest::DeprecatedOpen {
-                    moniker,
-                    dir_type,
-                    flags,
-                    mode: _,
-                    path,
-                    object: _,
-                    responder,
-                } => {
-                    assert_eq!(moniker, "moniker");
-                    assert_eq!(dir_type, fsys::OpenDirType::NamespaceDir);
-                    assert_eq!(flags, fio::OpenFlags::empty());
-                    assert_eq!(path, "/path");
-                    responder.send(Ok(())).unwrap();
-                }
-                _ => unreachable!(),
-            };
-        });
-
-        connect_to_instance_protocol_at_path::<fsys::RealmQueryMarker>(
-            &Moniker::parse_str("moniker").unwrap(),
-            OpenDirType::Namespace,
-            "/path",
-            &realm,
-        )
-        .await
-        .unwrap();
-    }
-
-    #[fuchsia::test]
-    async fn test_open_instance_subdir_readable() {
-        // Ensure that open_instance_subdir_readable() passes the correct arguments to RealmQuery.
-        let realm = spawn_stream_handler(move |realm_request| async move {
-            match realm_request {
-                fsys::RealmQueryRequest::DeprecatedOpen {
-                    moniker,
-                    dir_type,
-                    flags,
-                    mode: _,
-                    path,
-                    object: _,
-                    responder,
-                } => {
-                    assert_eq!(moniker, "moniker");
-                    assert_eq!(dir_type, fsys::OpenDirType::NamespaceDir);
-                    assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
-                    assert_eq!(path, ".");
-                    responder.send(Ok(())).unwrap();
-                }
-                _ => unreachable!(),
-            };
-        });
-
-        open_instance_subdir_readable(
-            &Moniker::parse_str("moniker").unwrap(),
-            OpenDirType::Namespace,
-            ".",
-            &realm,
-        )
-        .await
-        .unwrap();
-
-        open_instance_dir_root_readable(
-            &Moniker::parse_str("moniker").unwrap(),
-            OpenDirType::Namespace,
-            &realm,
-        )
-        .await
-        .unwrap();
-    }
+        })?;
+    Ok(dir_client)
 }

@@ -26,14 +26,15 @@ use selinux::{
     FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, FsNodeClass,
     InitialSid, KernelPermission, ProcessPermission, SecurityId, SecurityServer,
 };
-use starnix_logging::{track_stub, BugRef};
-use starnix_sync::Mutex;
+use starnix_logging::{bug_ref, track_stub, BugRef};
+use starnix_sync::{Mutex, MutexGuard};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
 /// Returns the set of `Permissions` on `class`, corresponding to the specified `flags`.
@@ -66,6 +67,7 @@ fn permissions_from_flags(flags: PermissionFlags, class: FsNodeClass) -> Vec<Ker
 /// `permissions` to the underlying [`crate::vfs::FsNode`].
 fn has_file_permissions(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     file: &FileObject,
     permissions: &[KernelPermission],
@@ -79,6 +81,7 @@ fn has_file_permissions(
         let audit_context = [audit_context, file.into(), node.into()];
         check_permission(
             permission_check,
+            kernel,
             subject_sid,
             file_sid,
             FdPermission::Use,
@@ -91,6 +94,7 @@ fn has_file_permissions(
         let audit_context = [audit_context, file.into()];
         has_fs_node_permissions(
             permission_check,
+            kernel,
             subject_sid,
             file.node(),
             permissions,
@@ -146,9 +150,146 @@ fn todo_has_file_permissions(
     Ok(())
 }
 
+fn has_file_ioctl_permission(
+    permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
+    subject_sid: SecurityId,
+    file: &FileObject,
+    ioctl: u16,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    // Validate that the `subject` has the "fd { use }" permission to the `file`.
+    has_file_permissions(permission_check, kernel, subject_sid, file, &[], audit_context)?;
+
+    // Validate that the `subject` has the `ioctl` permission on the underlying node,
+    // as well as the specified ioctl extended permission.
+    let fs_node = file.node().as_ref().as_ref();
+    if Anon::is_private(fs_node) {
+        return Ok(());
+    }
+    let FsNodeSidAndClass { sid: target_sid, class: target_class } =
+        fs_node_effective_sid_and_class(fs_node);
+
+    let audit_context =
+        &[audit_context, file.into(), fs_node.into(), Auditable::IoctlCommand(ioctl)];
+
+    // Check the `ioctl` permission on the underlying node.
+    //
+    // TODO(https://fxbug.dev/374832936): This permission check duplicates the `ioctl` permission
+    // check that is done as part of `todo_check_ioctl_permission` below. The `ioctl` permission
+    // check here is enforced, while the one in `todo_check_ioctl_permission` is not enforced.
+    // Remove this `check_permission` when changing the `todo_check_ioctl_permission` below to
+    // `check_ioctl_permission`, since at that point both the `ioctl` permission check and the
+    // extended permission check will be enforced by `check_ioctl_permission`.
+    check_permission(
+        permission_check,
+        kernel,
+        subject_sid,
+        target_sid,
+        CommonFsNodePermission::Ioctl.for_class(target_class.clone()),
+        audit_context.into(),
+    )?;
+
+    todo_check_ioctl_permission(
+        permission_check,
+        kernel,
+        subject_sid,
+        target_sid,
+        target_class,
+        ioctl,
+        audit_context.into(),
+    )
+}
+
+fn todo_check_ioctl_permission(
+    permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
+    subject_sid: SecurityId,
+    target_sid: SecurityId,
+    target_class: FsNodeClass,
+    ioctl: u16,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    if kernel.features.selinux_test_suite {
+        check_ioctl_permission(
+            permission_check,
+            kernel,
+            subject_sid,
+            target_sid,
+            target_class,
+            ioctl,
+            audit_context,
+        )
+    } else {
+        let ioctl_permission = CommonFsNodePermission::Ioctl.for_class(target_class);
+        let result = permission_check.has_ioctl_permission(
+            subject_sid,
+            target_sid,
+            ioctl_permission.clone(),
+            ioctl,
+        );
+
+        if result.audit {
+            audit_todo_decision(
+                bug_ref!("https://fxbug.dev/374832936"),
+                permission_check,
+                result,
+                subject_sid,
+                target_sid,
+                ioctl_permission.into(),
+                audit_context,
+            );
+        }
+
+        Ok(())
+    }
+}
+
+fn check_ioctl_permission(
+    permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
+    subject_sid: SecurityId,
+    target_sid: SecurityId,
+    target_class: FsNodeClass,
+    ioctl: u16,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    let ioctl_permission = CommonFsNodePermission::Ioctl.for_class(target_class);
+    let result = permission_check.has_ioctl_permission(
+        subject_sid,
+        target_sid,
+        ioctl_permission.clone(),
+        ioctl,
+    );
+
+    if result.audit {
+        if !result.permit {
+            kernel
+                .security_state
+                .state
+                .as_ref()
+                .unwrap()
+                .access_denial_count
+                .fetch_add(1, Ordering::Release);
+        }
+
+        audit_decision(
+            permission_check,
+            result.clone(),
+            subject_sid,
+            target_sid,
+            ioctl_permission.into(),
+            audit_context.into(),
+        );
+    }
+
+    result.permit.then_some(Ok(())).unwrap_or_else(|| error!(EACCES))
+}
+
 /// Checks that `current_task` has the specified `permissions` to the `node`.
 fn has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     fs_node: &FsNode,
     permissions: &[KernelPermission],
@@ -160,10 +301,12 @@ fn has_fs_node_permissions(
 
     let target = fs_node_effective_sid_and_class(fs_node);
 
-    let audit_context = [audit_context, fs_node.into()];
+    let fs = fs_node.fs();
+    let audit_context = [audit_context, fs_node.into(), fs.as_ref().into()];
     for permission in permissions {
         check_permission(
             permission_check,
+            kernel,
             subject_sid,
             target.sid,
             permission.clone(),
@@ -190,6 +333,8 @@ fn todo_has_fs_node_permissions(
 
     let target = fs_node_effective_sid_and_class(fs_node);
 
+    let fs = fs_node.fs();
+    let audit_context = [audit_context, fs_node.into(), fs.as_ref().into()];
     for permission in permissions {
         todo_check_permission(
             bug.clone(),
@@ -198,7 +343,7 @@ fn todo_has_fs_node_permissions(
             subject_sid,
             target.sid,
             permission.clone(),
-            audit_context,
+            (&audit_context).into(),
         )?;
     }
 
@@ -267,7 +412,14 @@ fn todo_check_permission<P: ClassPermission + Into<KernelPermission> + Clone + '
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     if kernel.features.selinux_test_suite {
-        check_permission(permission_check, source_sid, target_sid, permission, audit_context)
+        check_permission(
+            permission_check,
+            kernel,
+            source_sid,
+            target_sid,
+            permission,
+            audit_context,
+        )
     } else {
         let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
@@ -290,6 +442,7 @@ fn todo_check_permission<P: ClassPermission + Into<KernelPermission> + Clone + '
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
 fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
@@ -298,6 +451,16 @@ fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'stati
     let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
 
     if result.audit {
+        if !result.permit {
+            kernel
+                .security_state
+                .state
+                .as_ref()
+                .unwrap()
+                .access_denial_count
+                .fetch_add(1, Ordering::Release);
+        }
+
         audit_decision(
             permission_check,
             result.clone(),
@@ -314,19 +477,21 @@ fn check_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'stati
 /// Checks that `subject_sid` has the specified process `permission` on `self`.
 fn check_self_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
+    kernel: &Kernel,
     subject_sid: SecurityId,
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, subject_sid, subject_sid, permission, audit_context)
+    check_permission(permission_check, kernel, subject_sid, subject_sid, permission, audit_context)
 }
 
 /// Returns the security state structure for the kernel.
-pub(super) fn kernel_init_security(exceptions_config: String) -> KernelState {
+pub(super) fn kernel_init_security(options: String, exceptions: Vec<String>) -> KernelState {
     KernelState {
-        server: SecurityServer::new_with_exceptions(exceptions_config),
+        server: SecurityServer::new(options, exceptions),
         pending_file_systems: Mutex::default(),
         selinuxfs_null: OnceLock::default(),
+        access_denial_count: AtomicU64::new(0u64),
     }
 }
 
@@ -342,6 +507,15 @@ pub(super) struct KernelState {
     /// Stashed reference to "/sys/fs/selinux/null" used for replacing inaccessible file descriptors
     /// with a null file.
     pub(super) selinuxfs_null: OnceLock<FileHandle>,
+
+    /// Counts the number of times that an AVC denial is audit-logged.
+    pub(super) access_denial_count: AtomicU64,
+}
+
+impl KernelState {
+    pub(super) fn access_denial_count(&self) -> u64 {
+        self.access_denial_count.load(Ordering::Acquire)
+    }
 }
 
 /// The SELinux security structure for `ThreadGroup`.
@@ -349,6 +523,10 @@ pub(super) struct KernelState {
 pub(super) struct TaskAttrs {
     /// Current SID for the task.
     pub current_sid: SecurityId,
+
+    /// Effective SID for the task. This is usually equal to |current_sid|, but this may be changed
+    /// internally for the current task. This should only be accessed for the running task.
+    pub effective_sid: SecurityId,
 
     /// SID for the task upon the next execve call.
     pub exec_sid: Option<SecurityId>,
@@ -381,11 +559,114 @@ impl TaskAttrs {
     pub(super) fn for_sid(sid: SecurityId) -> Self {
         Self {
             current_sid: sid,
+            effective_sid: sid,
             previous_sid: sid,
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
             sockcreate_sid: None,
+        }
+    }
+
+    /// Sets the current SID and resets the effective SID to match.
+    pub(super) fn set_current_sid(&mut self, sid: SecurityId) {
+        self.current_sid = sid;
+        self.effective_sid = sid
+    }
+}
+
+/// Returns the effective SID of a task, i.e. the one that should be used for all checks where the
+/// task is the active entity.
+pub(in crate::security) fn task_effective_sid(current_task: &CurrentTask) -> SecurityId {
+    current_task.security_state.lock().effective_sid
+}
+
+/// Returns the SID of a task. Panics if the current and effective SID are not consistent. This
+/// should be used for operations that do not make sense under an assumed identity.
+pub(in crate::security) fn task_consistent_attrs(
+    current_task: &CurrentTask,
+) -> MutexGuard<'_, TaskAttrs> {
+    let task_attrs = current_task.security_state.lock();
+    assert_eq!(task_attrs.effective_sid, task_attrs.current_sid);
+    task_attrs
+}
+
+/// Structure defining a patch for task attributes that can be temporarily applied. The current
+/// SID cannot be modified, since it is observable by other tasks performing access checks.
+#[derive(Clone, Debug, PartialEq)]
+struct TaskAttrsOverride {
+    effective_sid: Option<SecurityId>,
+    exec_sid: Option<Option<SecurityId>>,
+    fscreate_sid: Option<Option<SecurityId>>,
+    keycreate_sid: Option<Option<SecurityId>>,
+    sockcreate_sid: Option<Option<SecurityId>>,
+}
+
+impl Default for TaskAttrsOverride {
+    fn default() -> TaskAttrsOverride {
+        TaskAttrsOverride {
+            effective_sid: None,
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            sockcreate_sid: None,
+        }
+    }
+}
+
+impl TaskAttrsOverride {
+    /// Creates a default patch.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Returns a modified patch that changes the effective SID to match `effective_sid`.
+    /// All temporary SIDs are cleared.
+    pub fn effective_sid(&self, effective_sid: SecurityId) -> Self {
+        Self {
+            effective_sid: Some(effective_sid),
+            exec_sid: Some(None),
+            fscreate_sid: Some(None),
+            keycreate_sid: Some(None),
+            sockcreate_sid: Some(None),
+        }
+    }
+
+    /// Returns a modified patch that sets the fscreate SID to create nodes with the same security
+    /// state as `fs_node`.
+    pub fn fscreate_sid(&self, fscreate_sid: SecurityId) -> Self {
+        Self { fscreate_sid: Some(Some(fscreate_sid)), ..*self }
+    }
+
+    /// Runs `f` in `current_task`, with its security attributes modified by the patch. The
+    /// security state of `current_task` is restored after the call.
+    pub fn run<R>(&self, current_task: &CurrentTask, f: impl FnOnce() -> R) -> R {
+        let saved_state;
+        {
+            let mut task_state = current_task.security_state.lock();
+            saved_state = task_state.clone();
+            self.apply(&mut *task_state);
+        }
+        let ret = f();
+        *current_task.security_state.lock() = saved_state;
+        ret
+    }
+
+    fn apply(&self, task_attrs: &mut TaskAttrs) {
+        if let Some(effective_sid) = self.effective_sid {
+            task_attrs.effective_sid = effective_sid;
+        }
+        if let Some(exec_sid) = self.exec_sid {
+            task_attrs.exec_sid = exec_sid;
+        }
+        if let Some(fscreate_sid) = self.fscreate_sid {
+            task_attrs.fscreate_sid = fscreate_sid;
+        }
+        if let Some(keycreate_sid) = self.keycreate_sid {
+            task_attrs.keycreate_sid = keycreate_sid;
+        }
+        if let Some(sockcreate_sid) = self.sockcreate_sid {
+            task_attrs.sockcreate_sid = sockcreate_sid;
         }
     }
 }
@@ -552,6 +833,13 @@ struct FsNodeSidAndClass {
     class: FsNodeClass,
 }
 
+/// Security state for a [`crate::vfs::Socket`] instance. This holds the [`selinux::SecurityId`] of
+/// the peer socket.
+#[derive(Debug, Default)]
+pub(super) struct SocketState {
+    peer_sid: Mutex<Option<SecurityId>>,
+}
+
 /// Security state for a bpf [`ebpf_api::maps::Map`] instance. This currently just holds the
 /// SID that the [`crate::task::Task`] that created the file object had.
 #[derive(Clone, Debug, PartialEq)]
@@ -609,29 +897,6 @@ fn get_cached_sid_and_class(fs_node: &FsNode) -> Option<FsNodeSidAndClass> {
         FsNodeLabel::Uninitialized => None,
     }
     .map(|sid| FsNodeSidAndClass { sid, class: state.class })
-}
-
-/// Encapsulates a temporary override of the SID with which file nodes will be created.
-/// Restores the previously used file creation SID when dropped.
-pub struct ScopedFsCreate<'a> {
-    task: &'a CurrentTask,
-    old_fscreate_sid: Option<SecurityId>,
-}
-
-pub(super) fn scoped_fs_create<'a>(
-    task: &'a CurrentTask,
-    fscreate_sid: SecurityId,
-) -> ScopedFsCreate<'a> {
-    let mut task_attrs = task.security_state.lock();
-    let old_fscreate_sid = std::mem::replace(&mut task_attrs.fscreate_sid, Some(fscreate_sid));
-    ScopedFsCreate { task, old_fscreate_sid }
-}
-
-impl Drop for ScopedFsCreate<'_> {
-    fn drop(&mut self) {
-        let mut task_attrs = self.task.security_state.lock();
-        task_attrs.fscreate_sid = self.old_fscreate_sid;
-    }
 }
 
 #[cfg(test)]

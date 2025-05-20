@@ -12,7 +12,7 @@ use crate::rtc::Rtc;
 use crate::time_source::Sample;
 use crate::time_source_manager::{KernelBootTimeProvider, TimeSourceManager};
 use crate::{Config, UtcTransform};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use chrono::prelude::*;
 use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration, UtcInstant};
 use futures::channel::mpsc;
@@ -24,6 +24,7 @@ use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::Arc;
 use time_adjust::Command;
+use time_pretty::format_duration;
 use zx::AsHandleRef;
 use {fidl_fuchsia_time as fft, fuchsia_async as fasync};
 
@@ -286,7 +287,7 @@ impl Debug for Slew {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Slew")
             .field("rate_ppm", &self.slew_rate_adjust)
-            .field("duration_ms", &self.duration.into_millis())
+            .field("duration", &format_duration(self.duration))
             .finish()
     }
 }
@@ -479,6 +480,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         adjust_decision: &UserClockAdjust,
     ) {
         let estimate_transform = self.new_clock_transform(&adjust_decision, last_proposal);
+        debug!("estimate_transform: {:#?}", estimate_transform);
         if !*clock_started {
             self.start_clock(&estimate_transform);
             *clock_started = true;
@@ -548,23 +550,53 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         }
     }
 
+    // Produces a time sample from the time source manager, possibly after a
+    // delay.
+    //
+    // # Args
+    // - `first_deadline`: if specified and nonzero, the method call
+    //   will await before attempting to sample the time source the first time that
+    //   `delayed_sample` is called.
+    // - `back_off_deadline`: the deadline until the next attempt sample the
+    //    time source in all cases where `first_deadline` does not apply.
+    // - `conn_rcv`: a notification channel that gets pinged when we get an internet
+    //   connection.
+    // - `has_connectivity`: `true` if at the time delayed_sample was called the
+    //   HTTP connectivity was operational.
     async fn delayed_sample(
         &mut self,
-        first_delay: Option<&zx::MonotonicDuration>,
-        back_off_delay: &zx::MonotonicDuration,
+        first_deadline: Option<&fasync::MonotonicInstant>,
+        back_off_deadline: &fasync::MonotonicInstant,
+        mut conn_rx: mpsc::Receiver<()>,
+        has_connectivity: bool,
     ) -> Sample {
+        // Hold sampling off if there is no connectivity, since attempting to sample
+        // an external source is useless without connectivity.
+        if !has_connectivity {
+            debug!("no connectivity, waiting before sampling.");
+            let _ignore = conn_rx.next().await;
+            debug!("connectivity acquired");
+        }
+
         // Pause before first sampling is sometimes useful. But not if no delay
         // was ordered, so as not to change the scheduling order.
-        if let Some(first_delay) = first_delay {
-            if *first_delay != zx::MonotonicDuration::ZERO {
+        let now = fasync::MonotonicInstant::now();
+        if let Some(first_deadline) = first_deadline {
+            if *first_deadline > now {
                 // This should be an uncommon setting, so log it.
-                info!("first time source sample, delaying by: {:?}", first_delay);
-                _ = fasync::Timer::new(fasync::MonotonicInstant::after(*first_delay)).await;
-                debug!("first time source sample, delay    done");
+                info!(
+                    "first time source sample, delaying by: {}",
+                    format_duration(*first_deadline - now)
+                );
+                _ = fasync::Timer::new(*first_deadline).await;
+                debug!("first time source sample, delay done");
             }
         } else {
-            info!("source sample pause, delaying by: {:?}", *back_off_delay);
-            _ = fasync::Timer::new(fasync::MonotonicInstant::after(*back_off_delay)).await;
+            info!(
+                "source sample pause, delaying by: {}",
+                format_duration(*back_off_deadline - now)
+            );
+            _ = fasync::Timer::new(*back_off_deadline).await;
         }
         debug!("manage_clock: asking for a time sample");
         self.time_source_manager.next_sample().await
@@ -586,7 +618,6 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         // timeline, which means they can pause.
         debug!("maintain_clock: function entered");
         let pull_delay = self.config.get_back_off_time_between_pull_samples();
-        let mut first_delay = Some(self.config.get_first_sampling_delay());
 
         let details = self.clock.get_details().expect("failed to get UTC clock details");
         let mut clock_started = details.backstop != details.ticks_to_synthetic.synthetic_offset;
@@ -616,11 +647,26 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             max_window_width_future: self.config.max_window_width_future(),
         };
         let mut last_proposal: Option<Sample> = None;
+        // If set, denotes whether HTTP connectivity is available for deciding
+        // when to sample external time sources. If connectivity is not used,
+        // we always sample, even if this is suboptimal.
+        let mut has_connectivity = false || !self.config.use_connectivity();
 
+        // Sets the deadlines such that other command activity does not push them
+        // out.
+        use fasync::MonotonicInstant as Mi;
+        let mut first_deadline = Some(Mi::after(self.config.get_first_sampling_delay()));
+        let mut back_off_deadline = Mi::after(back_off_delay);
         loop {
             debug!("clock_manager: waiting for command");
+            // Used to notify delayed_sample of connectivity changes.
+            let (mut conn_snd, conn_rcv) = mpsc::channel(1);
             select! {
-                sample = self.delayed_sample(first_delay.as_ref(), &back_off_delay).fuse() => {
+                sample = self.delayed_sample(
+                        first_deadline.as_ref(),
+                        &back_off_deadline, conn_rcv,
+                        has_connectivity,
+                    ).fuse() => {
                     debug!("manage_clock: `---- got a time sample: {:?}", sample);
                     self.init_or_update_estimator(sample);
 
@@ -633,6 +679,13 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                         allow_timekeeper_to_update_rtc,
                         &adjust_decision).await;
 
+                    // Don't use the initial sampling delay in next loop iterations.
+                    first_deadline.take();
+                    // Update the amount of time to back off only if we went through
+                    // the loop because we sampled a time. This ensures that command
+                    // activity does not move the back off deadline.
+                    back_off_deadline = Mi::after(back_off_delay);
+
                     // Used as a test-only hook.
                     if let Some(ref mut test_signaler) = self.sample_test_signaler {
                         if let Err(ref e) = test_signaler.send(()).await {
@@ -644,20 +697,42 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                     debug!("received command: {:?}", &command);
 
                     match command {
+                        Some(Command::Connectivity { http_available }) => {
+                            has_connectivity = http_available;
+                            debug!("HTTP connectivity: {}", http_available);
+
+                            // Note that this only unblocks `delayed_sample` above, but
+                            // will not necessarily cause it to complete. However, what it
+                            // does is to cause it to retry sampling with a potentially
+                            // expired first deadline, which is the behavior we want.
+                            //
+                            // It will be very common for this to return Err(_) in normal
+                            // operation. This is why we report the error only as debug!
+                            if let Err(e) = conn_snd.send(()).await {
+                                debug!("could not send connectivity: {:?}", e);
+                            }
+                        }
                         Some(Command::PowerManagement) => {
-                            self.record_correction(
-                                ClockCorrection::MaxErrorBound, &Default::default(), zx::BootInstant::ZERO);
+                            if clock_started {
+                                // Updating an unstarted clock without actually starting it
+                                // returns BAD_STATE.
+                                self.record_correction(
+                                    ClockCorrection::MaxErrorBound, &Default::default(), zx::BootInstant::ZERO);
+                            }
                         }
                         Some(Command::Reference{
                             boot_reference, utc_reference, mut responder
                         }) => {
-                            last_proposal = Some(Sample {
+                            let sample = Sample {
                                     reference: boot_reference,
                                     utc: utc_reference,
                                     // Don't allow user samples to be infinitely precise, there is
                                     // always *some* error involved.
                                     std_dev: USER_SAMPLE_DEFAULT_STD_DEV,
-                            });
+                            };
+                            // TODO: b/412337617 - probably want to demote this to debug! soon-ish.
+                            info!("manage_clock: got a reference time sample: {:?}", sample);
+                            last_proposal = Some(sample);
                             self.managed_clock_start(
                                 &mut clock_started,
                                 last_proposal.as_ref(),
@@ -679,15 +754,14 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                     }
                 },
             }
-            // Don't use the initial sampling delay in next loop iterations.
-            first_delay.take();
         } // loop
     }
 
     /// Starts the clock on the requested reference->utc transform, recording diagnostic events.
     fn start_clock(&mut self, estimate_transform: &UtcTransform) {
-        let mono = zx::BootInstant::get();
-        let clock_update = estimate_transform.jump_to(mono);
+        // This reading is affected by the clock injected in the current executor.
+        let boot_now = fasync::BootInstant::now();
+        let clock_update = estimate_transform.jump_to(boot_now.into());
         self.update_clock(clock_update);
 
         self.diagnostics.record(Event::StartClock {
@@ -695,7 +769,8 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             source: StartClockSource::External(self.time_source_manager.role()),
         });
 
-        let utc_chrono = Utc.timestamp_nanos(estimate_transform.synthetic(mono).into_nanos());
+        let utc_chrono =
+            Utc.timestamp_nanos(estimate_transform.synthetic(boot_now.into()).into_nanos());
         info!("started {:?} clock from external source at {}", self.track, utc_chrono);
         self.set_delayed_update_task(vec![], estimate_transform);
     }
@@ -707,11 +782,14 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         self.delayed_updates = None;
 
         let current_transform = UtcTransform::from(self.clock.as_ref());
-        let mono = zx::BootInstant::get();
+        let boot_now = fasync::BootInstant::now();
 
-        let correction =
-            ClockCorrection::for_transition(mono, &current_transform, estimate_transform);
-        self.record_correction(correction, estimate_transform, mono);
+        let correction = ClockCorrection::for_transition(
+            boot_now.into(),
+            &current_transform,
+            estimate_transform,
+        );
+        self.record_correction(correction, estimate_transform, boot_now.into());
     }
 
     /// Records this particular clock correction.
@@ -719,7 +797,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         &mut self,
         correction: ClockCorrection,
         estimate_transform: &UtcTransform,
-        mono: zx::BootInstant,
+        boot_reference: zx::BootInstant,
     ) {
         self.record_clock_correction(correction.difference(), correction.strategy());
         match correction {
@@ -746,7 +824,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 self.record_clock_update(ClockUpdateReason::TimeStep);
 
                 let utc_chrono =
-                    Utc.timestamp_nanos(estimate_transform.synthetic(mono).into_nanos());
+                    Utc.timestamp_nanos(estimate_transform.synthetic(boot_reference).into_nanos());
                 info!("stepped {:?} clock to {}", self.track, utc_chrono);
 
                 // Create a task to asynchronously increase error bound over time.
@@ -850,6 +928,16 @@ fn update_clock(clock: &Arc<UtcClock>, track: &Track, update: impl Into<UtcClock
         // Clock update errors should only be caused by an invalid clock (or potentially a
         // serious bug in the generation of a time update). There isn't anything Timekeeper
         // could do to gracefully handle them.
+        //
+        // This panic will apparently not be logged if it happens in production at very early
+        // system startup, making diagnosis challenging. One way to force it to appear would be to
+        // try restarting a crashed timekeeper manually after the fact, for example via:
+        //
+        // ```
+        // fx ffx component start core/timekeeper
+        // ```
+        //
+        // The newly started timekeeper will log its panics as expected.
         panic!("Failed to apply update to {:?} clock: {}", track, status);
     }
     // Signal any waiters that the UTC clock has been synchronized with an external
@@ -859,7 +947,8 @@ fn update_clock(clock: &Arc<UtcClock>, track: &Track, update: impl Into<UtcClock
         zx::Signals::from_bits(
             fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED | fft::SIGNAL_UTC_CLOCK_LOGGING_QUALITY,
         )
-        .unwrap(),
+        .context("while trying to signal clock start")
+        .expect("signaling clock should succeed"),
     ) {
         panic!("Failed to signal clock synchronization to {:?} clock: {}", track, status);
     }
@@ -873,7 +962,8 @@ mod tests {
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
     use crate::{
-        make_test_config, make_test_config_with_delay, make_test_config_with_fn, run_in_fake_time,
+        clone_system_time, make_test_config, make_test_config_with_delay, make_test_config_with_fn,
+        run_in_fake_time,
     };
     use assert_matches::assert_matches;
     use fidl_fuchsia_time_external::{self as ftexternal, Status};
@@ -984,28 +1074,28 @@ mod tests {
 
     #[fuchsia::test]
     fn clock_correction_for_transition_nominal_rate_slew() {
-        let mono = zx::BootInstant::get();
+        let boot_now = zx::BootInstant::get();
         // Note the initial transform has a reference point before reference and has been
         // running since then with a small rate adjustment.
         let initial_transform = create_transform(
-            mono - zx::BootDuration::from_minutes(1),
+            boot_now - zx::BootDuration::from_minutes(1),
             UtcInstant::from_nanos(
-                (mono - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
+                (boot_now - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
             ),
             BASE_RATE,
             zx::BootDuration::from_nanos(0),
         );
         let final_transform = create_transform(
-            mono,
+            boot_now,
             UtcInstant::from_nanos(
-                (mono + OFFSET + zx::BootDuration::from_millis(50)).into_nanos(),
+                (boot_now + OFFSET + zx::BootDuration::from_millis(50)).into_nanos(),
             ),
             BASE_RATE_2,
             STD_DEV,
         );
 
         let correction =
-            ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
+            ClockCorrection::for_transition(boot_now, &initial_transform, &final_transform);
         let expected_difference = zx::BootDuration::from_nanos(
             zx::BootDuration::from_minutes(1).into_nanos() * -BASE_RATE as i64 / MILLION,
         ) + zx::BootDuration::from_millis(50);
@@ -1017,8 +1107,8 @@ mod tests {
         // The values chosen for rates and offset differences mean this is a nominal rate slew.
         let expected_duration = (expected_difference * MILLION) / NOMINAL_RATE_CORRECTION_PPM;
         let expected_start_error_bound =
-            final_transform.error_bound(mono) + expected_difference.into_nanos() as u64;
-        let expected_end_error_bound = final_transform.error_bound(mono + expected_duration);
+            final_transform.error_bound(boot_now) + expected_difference.into_nanos() as u64;
+        let expected_end_error_bound = final_transform.error_bound(boot_now + expected_duration);
 
         assert_eq!(correction.strategy(), ClockCorrectionStrategy::NominalRateSlew);
         match correction {
@@ -1036,24 +1126,24 @@ mod tests {
 
     #[fuchsia::test]
     fn clock_correction_for_transition_max_duration_slew() {
-        let mono = zx::BootInstant::get();
+        let boot_now = zx::BootInstant::get();
         let initial_transform = create_transform(
-            mono,
-            UtcInstant::from_nanos((mono + OFFSET).into_nanos()),
+            boot_now,
+            UtcInstant::from_nanos((boot_now + OFFSET).into_nanos()),
             BASE_RATE,
             STD_DEV,
         );
         let final_transform = create_transform(
-            mono,
+            boot_now,
             UtcInstant::from_nanos(
-                (mono + OFFSET - zx::BootDuration::from_millis(500)).into_nanos(),
+                (boot_now + OFFSET - zx::BootDuration::from_millis(500)).into_nanos(),
             ),
             BASE_RATE,
             STD_DEV,
         );
 
         let correction =
-            ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
+            ClockCorrection::for_transition(boot_now, &initial_transform, &final_transform);
         let expected_difference = zx::BootDuration::from_millis(-500);
         // Note there is a slight loss of precision in converting from a difference to a rate for
         // a duration.
@@ -1062,9 +1152,9 @@ mod tests {
         // The value chosen for offset difference means this is a max duration slew.
         let expected_duration = zx::BootDuration::from_nanos(5376344086021);
         let expected_rate = -93;
-        let expected_start_error_bound =
-            final_transform.error_bound(mono) + correction.difference().into_nanos().abs() as u64;
-        let expected_end_error_bound = final_transform.error_bound(mono + expected_duration);
+        let expected_start_error_bound = final_transform.error_bound(boot_now)
+            + correction.difference().into_nanos().abs() as u64;
+        let expected_end_error_bound = final_transform.error_bound(boot_now + expected_duration);
 
         assert_eq!(correction.strategy(), ClockCorrectionStrategy::MaxDurationSlew);
         match correction {
@@ -1082,30 +1172,32 @@ mod tests {
 
     #[fuchsia::test]
     fn clock_correction_for_transition_step() {
-        let mono = zx::BootInstant::get();
+        let boot_now = zx::BootInstant::get();
         let initial_transform = create_transform(
-            mono - zx::BootDuration::from_minutes(1),
+            boot_now - zx::BootDuration::from_minutes(1),
             UtcInstant::from_nanos(
-                (mono - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
+                (boot_now - zx::BootDuration::from_minutes(1) + OFFSET).into_nanos(),
             ),
             0,
             zx::BootDuration::from_nanos(0),
         );
         let final_transform = create_transform(
-            mono,
-            UtcInstant::from_nanos((mono + OFFSET + zx::BootDuration::from_hours(1)).into_nanos()),
+            boot_now,
+            UtcInstant::from_nanos(
+                (boot_now + OFFSET + zx::BootDuration::from_hours(1)).into_nanos(),
+            ),
             BASE_RATE_2,
             STD_DEV,
         );
 
         let correction =
-            ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
+            ClockCorrection::for_transition(boot_now, &initial_transform, &final_transform);
         let expected_difference = UtcDuration::from_hours(1);
         assert_eq!(correction.difference(), expected_difference);
         assert_eq!(correction.strategy(), ClockCorrectionStrategy::Step);
         match correction {
             ClockCorrection::Step(step) => {
-                assert_eq!(step.clock_update(), final_transform.jump_to(mono));
+                assert_eq!(step.clock_update(), final_transform.jump_to(boot_now));
             }
             _ => panic!("incorrect clock correction type returned"),
         };
@@ -1260,7 +1352,7 @@ mod tests {
             Event::TimeSourceStatus { role: TEST_ROLE, status: Status::Ok },
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
-                reference: reference,
+                reference,
                 utc: UtcInstant::from_nanos((reference + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
@@ -1272,6 +1364,7 @@ mod tests {
     #[fuchsia::test]
     fn fail_when_no_initial_delay() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let (_, _) = clone_system_time(&mut executor);
 
         let clock = create_clock();
         let rtc = FakeRtc::valid(BACKSTOP_TIME);
@@ -1472,15 +1565,13 @@ mod tests {
     #[fuchsia::test]
     fn subsequent_updates_accepted() {
         // Start from the system time.
-        let real_boot_now = zx::MonotonicInstant::get();
-
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time((real_boot_now + zx::MonotonicDuration::from_nanos(1000)).into());
+        let (_, _) = clone_system_time(&mut executor);
         let (ts, mut tr) = mpsc::channel(2);
 
         let clock = create_clock();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let reference = zx::BootInstant::from_nanos(executor.now().into_nanos());
+        let reference: zx::BootInstant = executor.boot_now().into();
         let config = make_test_config();
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
@@ -1521,17 +1612,21 @@ mod tests {
 
         let updated_utc = clock.read().unwrap();
 
-        let reference_after = executor.boot_now();
-
         // Since we used the same covariance for the first two samples the offset in the Kalman
         // filter is roughly midway between the sample offsets, but slight closer to the second
         // because oscillator uncertainty.
-        let expected_offset = zx::BootDuration::from_nanos(1666500000080699);
+        let expected_offset_min = zx::BootDuration::from_nanos(1666500000080699);
 
         // Check that the clock has been updated. The UTC should be bounded by the expected offset
         // added to the reference window in which the calculation took place.
-        assert_geq!(updated_utc.into_nanos(), (reference_before + expected_offset).into_nanos());
-        assert_leq!(updated_utc.into_nanos(), (reference_after + expected_offset).into_nanos());
+        let expected_updated_utc = reference_before + expected_offset_min;
+        assert!(
+            updated_utc.into_nanos() >= expected_updated_utc.into_nanos(),
+            "\n\tclock_read: {:?}\n\texpected: {:?}\n\tdiff: {:?}",
+            updated_utc,
+            expected_updated_utc,
+            updated_utc.into_nanos() - expected_updated_utc.into_nanos(),
+        );
 
         // Check that the correct diagnostic events were logged.
         diagnostics.assert_events(&[
@@ -1546,7 +1641,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 reference,
-                utc: UtcInstant::from_nanos((reference + expected_offset).into_nanos()),
+                utc: UtcInstant::from_nanos((reference + expected_offset_min).into_nanos()),
                 sqrt_covariance: zx::BootDuration::from_nanos(62225396),
             },
             Event::FrequencyWindowDiscarded {
@@ -1574,8 +1669,7 @@ mod tests {
         // time. This works around validation checks in TimeSourceManager, which use actual time as
         // reference. These checks are valid at real runtime, but not at fake time.
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let actual_time = zx::MonotonicInstant::get();
-        executor.set_fake_time(actual_time.into());
+        let (_, _) = clone_system_time(&mut executor);
 
         // Calculate a small change in offset that will be corrected by slewing and is large enough
         // to require an error bound reduction. Note the tests doesn't have to actually wait this
@@ -1796,20 +1890,25 @@ mod tests {
 
     #[fuchsia::test]
     fn test_user_time_adjustment() -> Result<()> {
-        // Start from the system time. Required to work around backstop time issues.
-        let real_boot_now = zx::MonotonicInstant::get();
+        // Start from the system time. Required to work around backstop time issues,
+        // and the discrepancy between boot and monotonic times. We artificially
+        // proclaim that the boot and monotonic timeline values match, which helps
+        // us run the test in fake time.
         let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let (real_now, _) = clone_system_time(&mut executor);
 
-        let fake_now = real_boot_now + zx::MonotonicDuration::from_nanos(1000);
-        executor.set_fake_time(fake_now.into());
+        debug!("executor_boot_now: {:?}; executor_now: {:?}", executor.boot_now(), executor.now());
 
         let clock = create_clock();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let reference = zx::BootInstant::from_nanos(executor.now().into_nanos());
+        let reference = executor.boot_now();
+
+        debug!("\n\treference   : {:?}\n\treal_boot_now: {:?}", reference, real_now);
+
+        const SAMPLING_DELAY_SEC: i64 = 10;
 
         let config = make_test_config_with_fn(|mut config| {
-            config.first_sampling_delay_sec = 5;
-            config.first_sampling_delay_sec = 10;
+            config.first_sampling_delay_sec = SAMPLING_DELAY_SEC;
 
             // Don't forbid any user time adjustment.
             config.utc_max_allowed_delta_future_sec = i64::MAX;
@@ -1822,7 +1921,7 @@ mod tests {
             Arc::clone(&clock),
             vec![Sample::new(
                 UtcInstant::from_nanos((reference + OFFSET_2).into_nanos()),
-                reference,
+                reference.into(),
                 STD_DEV,
             )],
             None,
@@ -1841,7 +1940,7 @@ mod tests {
             let (responder, mut rx) = mpsc::channel(1);
             cmd_tx
                 .send(Command::Reference {
-                    boot_reference: proposed_boot,
+                    boot_reference: proposed_boot.into(),
                     utc_reference: proposed_utc,
                     responder,
                 })
@@ -1858,7 +1957,7 @@ mod tests {
             clock_manager.maintain_clock(cmd_rx, b).await;
         });
 
-        // Run in fake time to get the proposed sample, but not enough to get an actual sample.
+        debug!("Run in fake time to get the adjustment, but not an external sample.");
         let _ignore = run_in_fake_time(
             &mut executor,
             &mut run_fut,
@@ -1866,15 +1965,123 @@ mod tests {
         );
         assert_geq!(clock.read().unwrap(), proposed_utc);
 
-        // Run in fake time a little while longer, to get another sample.
+        debug!("Run in fake time a little while longer, to get an external sample.");
         let _ignore = run_in_fake_time(
             &mut executor,
             &mut run_fut,
-            fasync::MonotonicDuration::from_millis(9),
+            fasync::MonotonicDuration::from_seconds(11),
         );
-        // Verify that the time did *not* move resulting from a widely different external
-        // time sample. This means that user-provided time remains.
-        assert_leq!(clock.read().unwrap(), proposed_utc + UtcDuration::from_millis(9));
+        // Verify that the time did *not* move resulting from a widely different external time
+        // sample. This means that user-provided time remains.  `clock` is a real clock, so it will
+        // progress on its own!
+        let actual = clock.read().unwrap();
+        let expected = proposed_utc + UtcDuration::from_seconds(40);
+        assert!(
+            actual <= expected,
+            "\n\tclock_read: {:?}\n\texpected: {:?}\n\tdiff: {:?}",
+            actual,
+            expected,
+            actual - expected,
+        );
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    fn test_connectivity_startup() -> Result<()> {
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let (real_now, _) = clone_system_time(&mut executor);
+
+        let clock = create_clock();
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+        let reference = executor.boot_now();
+
+        debug!("\n\treference   : {:?}\n\treal_boot_now: {:?}", reference, real_now);
+
+        const SAMPLING_DELAY_SEC: i64 = 5;
+
+        // Configure sampling delays of about 5 seconds.
+        let config = make_test_config_with_fn(|mut config| {
+            config.first_sampling_delay_sec = SAMPLING_DELAY_SEC;
+            config.back_off_time_between_pull_samples_sec = SAMPLING_DELAY_SEC;
+            config.use_connectivity = true;
+            config
+        });
+
+        let (sample_signaler_tx, mut sample_signaler_rx) = mpsc::channel::<()>(1);
+        let clock_manager = create_clock_manager(
+            Arc::clone(&clock),
+            vec![Sample::new(
+                UtcInstant::from_nanos((reference + OFFSET_2).into_nanos()),
+                reference.into(),
+                STD_DEV,
+            )],
+            None,
+            None,
+            Arc::clone(&diagnostics),
+            config,
+            /*command_test_signaler=*/ None,
+            Some(sample_signaler_tx),
+        );
+
+        let (mut cmd_tx, cmd_rx) = mpsc::channel(2);
+        let (mut delay_tx, mut delay_rx) = mpsc::channel(1);
+        let b = new_state_for_test(false);
+
+        // Run the clock_manager coroutine, in parallel with a delayed "has connectivity"
+        // signal.  This should result in clock_manager not trying to get time samples
+        // for as long as there is no connectivity.
+        let mut run_fut = pin!(async move {
+            // Run in parallel with clock_manager below.
+            fasync::Task::local(async move {
+                debug!("Pause before reporting connectivity.");
+                // This causes us to not act on
+                // the first sampling deadline, because we don't have connectivity.
+                let _ignore = delay_rx.next().await;
+                debug!("send Command::Connectivity true");
+                cmd_tx.send(Command::Connectivity { http_available: true }).await.unwrap();
+                debug!("Command::Connectivity sent");
+            })
+            .detach();
+
+            debug!("before clock_manager.maintain_clock");
+            // This future never returns.
+            clock_manager.maintain_clock(cmd_rx, b).await;
+        });
+
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut run_fut,
+            // This is past the initial `SAMPLING_DELAY_SEC`. But since we have no connectivity
+            // yet, we won't get a sample.
+            fasync::MonotonicDuration::from_seconds(2 * SAMPLING_DELAY_SEC - 2),
+        );
+
+        // No sample arrived within the first ~9 seconds. We were supposed to
+        // sample at 5s, but missed that due to connectivity. We didn't run
+        // for long enough to get to a 2nd sample, so we get no signals that
+        // sampling completed.
+        assert_matches!(sample_signaler_rx.try_next(), Err(_));
+
+        // Allow getting a sample.
+        let mut get_sample_fut = pin!(async move {
+            delay_tx.send(()).await.unwrap();
+        });
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut get_sample_fut,
+            fasync::MonotonicDuration::from_seconds(1),
+        );
+
+        debug!("Run for some more fake time to receive a time sample");
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut run_fut,
+            fasync::MonotonicDuration::from_seconds(SAMPLING_DELAY_SEC),
+        );
+
+        // This time around, we got a sample.
+        assert_matches!(sample_signaler_rx.try_next(), Ok(_));
+
         Ok(())
     }
 }

@@ -166,14 +166,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.GetFlags",
         "strictness": "strict",
         "ordinal": "6595803110182632097",
@@ -674,14 +666,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/File.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/File.GetFlags",
         "strictness": "strict",
         "ordinal": "6595803110182632097",
@@ -1115,18 +1099,13 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_MODIFY",
+        "name": "fuchsia.io/Flags.PERM_MODIFY_DIRECTORY",
         "value": "256"
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_READ",
+        "name": "fuchsia.io/Flags.PERM_READ_BYTES",
         "value": "2"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_SET_ATTRIBUTES",
-        "value": "32"
     },
     {
         "kind": "bits/member",
@@ -1135,7 +1114,12 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_WRITE",
+        "name": "fuchsia.io/Flags.PERM_UPDATE_ATTRIBUTES",
+        "value": "32"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_WRITE_BYTES",
         "value": "4"
     },
     {
@@ -1392,14 +1376,6 @@
         "request": "fuchsia.io/NodeGetAttributesRequest",
         "response": "fuchsia.io/NodeAttributes2",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Node.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",

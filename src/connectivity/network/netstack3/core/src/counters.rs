@@ -216,6 +216,7 @@ fn inspect_arp_counters(inspector: &mut impl Inspector, counters: &ArpCounters) 
     let ArpCounters {
         rx_dropped_non_local_target,
         rx_malformed_packets,
+        rx_echoed_packets,
         rx_packets,
         rx_requests,
         rx_responses,
@@ -228,6 +229,7 @@ fn inspect_arp_counters(inspector: &mut impl Inspector, counters: &ArpCounters) 
         inspector.record_counter("Requests", rx_requests);
         inspector.record_counter("Responses", rx_responses);
         inspector.record_counter("Malformed", rx_malformed_packets);
+        inspector.record_counter("Echoed", rx_echoed_packets);
         inspector.record_counter("NonLocalDstAddr", rx_dropped_non_local_target);
     });
     inspector.record_child("Tx", |inspector| {

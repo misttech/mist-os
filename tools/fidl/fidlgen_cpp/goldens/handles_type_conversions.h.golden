@@ -37,10 +37,6 @@ struct WireTypeForNaturalType<::test_handles::Handles> {
   using type = ::test_handles::wire::Handles;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_handles::wire::FdfHandles, ::test_handles::FdfHandles> {
   static ::test_handles::FdfHandles ToNatural(::test_handles::wire::FdfHandles src);
@@ -55,10 +51,6 @@ template <>
 struct WireTypeForNaturalType<::test_handles::FdfHandles> {
   using type = ::test_handles::wire::FdfHandles;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

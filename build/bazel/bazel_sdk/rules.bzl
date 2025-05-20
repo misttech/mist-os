@@ -5,12 +5,131 @@
 """Rules used to manage IDK -> SDK conversions."""
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
+load("@fuchsia_build_info//:args.bzl", "sdk_id", "target_cpu")
 
 def _find_root_directory(files, suffix):
     for f in files:
         if f.path.endswith(suffix):
             return f.path.removesuffix(suffix)
     return None
+
+# genrule() cannot deal with TreeArtifacts inputs or outputs
+# so a custom rule is needed to invoke the idk_to_bazel_sdk
+# py_binary() target.
+def _generate_merged_idk(ctx):
+    output_dir = ctx.actions.declare_directory(ctx.label.name)
+
+    # TODO(https://fxbug.dev/413071161): Implement a solution that does not
+    # rely on dependency checking of directories, which is unsound.
+    if len(ctx.files._schema_directory) != 1:
+        fail("Unexpected number of elements in 'ctx.files._schema_directory'")
+    schema_dir_path = ctx.files._schema_directory[0].path
+    inputs = ctx.files._schema_directory
+
+    _relative_collection_build_manifest = "sdk/manifest/%s" % ctx.attr.collection_name
+
+    args = [
+        "--relative-manifest",
+        _relative_collection_build_manifest,
+        "--output-directory",
+        output_dir.path,
+        "--schema-directory",
+        schema_dir_path,
+        "--json-validator-path",
+        ctx.file.json_validator.path,
+        "--host-arch",
+        build_config.host_target_triple,
+        "--release-version",
+        sdk_id,
+    ]
+
+    for cpu in ctx.attr.buildable_cpus:
+        args += [
+            "--target-arch",
+            cpu,
+        ]
+
+    # TODO(https://fxbug.dev/413071161): Either standardize "_for_subbuilds" or
+    # allow the prefix to be specified.
+    subbuilds_dir_prefix = "idk_subbuild.%s_for_subbuilds" % ctx.attr.collection_name
+    root_build_dir = ctx.attr.ninja_root_build_dir
+    subbuild_dirs = []
+
+    for cpu in ctx.attr.buildable_cpus:
+        # Add subbuilds for the PLATFORM API level.
+        if cpu == target_cpu:
+            # There is no sub-build for the target CPU - use the collection in
+            # the main build directory.
+            subbuild_dirs.append(root_build_dir)
+        else:
+            subbuild_dirs.append("%s/%s-%s" % (root_build_dir, subbuilds_dir_prefix, cpu))
+
+        # Add subbuilds for individual API levels.
+        for api_level in ctx.attr.buildable_api_levels:
+            subbuild_dirs.append("%s/%s-api%s-%s" % (root_build_dir, subbuilds_dir_prefix, api_level, cpu))
+
+    for dir in subbuild_dirs:
+        args += [
+            "--subbuild-directory",
+            dir,
+        ]
+
+    ctx.actions.run(
+        mnemonic = "IDKMerge",
+        executable = ctx.executable._idk_merge_script,
+        arguments = args,
+        inputs = inputs,
+        outputs = [output_dir],
+        execution_requirements = {
+            # We want the generated IDK to persist.
+            "no-sandbox": "1",
+
+            # A full IDK is currently about 4.7 GiB, and this
+            # action runs in a few seconds, so avoid remoting it.
+            "no-remote": "1",
+            "no-cache": "1",
+        },
+    )
+
+    return DefaultInfo(files = depset([output_dir]))
+
+generate_merged_idk = rule(
+    doc = """Generate a merged IDK at build time from `ninja_root_build_dir`.""",
+    implementation = _generate_merged_idk,
+    attrs = {
+        "collection_name": attr.string(
+            doc = "Name of the collection to merge",
+            mandatory = True,
+        ),
+        "buildable_cpus": attr.string_list(
+            doc = "List of CPU architectures for which the IDK build will provide build-time support",
+            mandatory = True,
+        ),
+        "buildable_api_levels": attr.string_list(
+            doc = "List of API levels for which the IDK build will provide build-time support",
+            mandatory = True,
+        ),
+        "ninja_root_build_dir": attr.string(
+            doc = "Path to the Ninja build root directory",
+            mandatory = True,
+        ),
+        "json_validator": attr.label(
+            doc = "The JSON validator executable for schema validation",
+            default = "@gn_targets//build/tools/json_validator:json_validator_valico",
+            allow_single_file = True,
+        ),
+        "_schema_directory": attr.label(
+            doc = "The source directory containing the IDK schema files",
+            default = "//:build/sdk/meta",
+            allow_files = True,
+        ),
+        "_idk_merge_script": attr.label(
+            default = "//build/sdk/generate_idk:generate_idk_bazel",
+            executable = True,
+            cfg = "exec",
+        ),
+    },
+)
 
 # genrule() cannot deal with TreeArtifacts inputs or outputs
 # so a custom rule is needed to invoke the idk_to_bazel_sdk
@@ -44,6 +163,7 @@ def _generate_bazel_sdk(ctx):
         fail("Define idk_export_dir or idk_export_label when calling this rule!")
 
     ctx.actions.run(
+        mnemonic = "IDKtoBazel",
         executable = ctx.executable._idk_to_bazel_script,
         arguments = [
             "--input-idk",
@@ -79,7 +199,7 @@ generate_bazel_sdk = rule(
             allow_files = True,
         ),
         "idk_export_label": attr.label(
-            doc = "Label to a target generatinf an IDK export directory as a TreeArtifact",
+            doc = "Label to a target generating an IDK export directory as a TreeArtifact",
         ),
         "_idk_to_bazel_script": attr.label(
             default = "//build/bazel/bazel_sdk:idk_to_bazel_sdk",
@@ -126,6 +246,7 @@ def _compare_bazel_sdk_contents(ctx):
         fail("Could not find WORKSPACE.bazel from: %s" % ctx.attr.second_sdk)
 
     ctx.actions.run(
+        mnemonic = "CompareBazelSDKContents",
         executable = ctx.executable._comparison_script,
         arguments = [
             "--first-sdk",

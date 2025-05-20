@@ -179,9 +179,7 @@ def handle_package_manifest(
             {
                 "manifest_file": sdk_output_manifest_path,
                 "arch": arch,
-                "api_level": int(api_level)
-                if api_level.isdecimal()
-                else api_level,
+                "api_level": str(api_level),
                 "files": target_files,
             }
         ]

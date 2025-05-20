@@ -775,7 +775,12 @@ impl From<AvailabilityRoutingError> for ExtendedMoniker {
 // manager logs the error.
 #[async_trait]
 pub trait ErrorReporter: Clone + Send + Sync + 'static {
-    async fn report(&self, request: &RouteRequestErrorInfo, err: &RouterError);
+    async fn report(
+        &self,
+        request: &RouteRequestErrorInfo,
+        err: &RouterError,
+        route_target: Option<sandbox::WeakInstanceToken>,
+    );
 }
 
 /// What to print in an error if a route request fails.

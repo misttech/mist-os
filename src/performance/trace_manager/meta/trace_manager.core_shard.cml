@@ -15,12 +15,17 @@
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.TracingResource",
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",
             to: "#trace_manager",
         },
         {
-            storage: [ "tmp" ],
+            storage: [
+                "data",
+                "tmp",
+            ],
             from: "self",
             to: "#trace_manager",
         },

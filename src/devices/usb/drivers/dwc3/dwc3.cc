@@ -50,17 +50,6 @@ zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t 
 }
 
 zx::result<> Dwc3::Start() {
-  {  // Compat server initialization.
-    auto result = compat_.Initialize(
-        incoming(), outgoing(), node_name(), name(),
-        compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS, DEVICE_METADATA_SERIAL_NUMBER,
-                                       DEVICE_METADATA_USB_MODE}));
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "compat_.Initalize(): %s", result.status_string());
-      return result.take_error();
-    }
-  }
-
   if (zx_status_t status = AcquirePDevResources(); status != ZX_OK) {
     FDF_LOG(ERROR, "AcquirePDevResources: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -89,10 +78,12 @@ zx::result<> Dwc3::Start() {
                         bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3),
   };
 
-  auto offers = compat_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fdci::UsbDciService>());
-  offers.push_back(mac_address_metadata_server_.MakeOffer());
-  offers.push_back(serial_number_metadata_server_.MakeOffer());
+  std::vector offers = {
+      fdf::MakeOffer2<fdci::UsbDciService>(),
+      mac_address_metadata_server_.MakeOffer(),
+      serial_number_metadata_server_.MakeOffer(),
+      usb_phy_metadata_server_.MakeOffer(),
+  };
 
   auto child = AddChild(name(), props, offers);
   if (child.is_error()) {
@@ -112,8 +103,20 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
   pdev_ = fdf::PDev{std::move(pdev_client_end.value())};
 
+  // Initialize usb-phy metadata server.
+  if (zx::result result = usb_phy_metadata_server_.SetMetadataFromPDevIfExists(pdev_);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to forward usb-phy metadata: %s", result.status_string());
+    return result.status_value();
+  }
+  if (zx::result result = usb_phy_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve usb-phy address metadata: %s", result.status_string());
+    return result.status_value();
+  }
+
   // Initialize mac address metadata server.
-  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(incoming());
+  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(incoming(), "pdev");
       result.is_error()) {
     FDF_LOG(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
     return result.status_value();
@@ -125,7 +128,8 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
 
   // Initialize serial number metadata server.
-  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(incoming());
+  if (zx::result result =
+          serial_number_metadata_server_.ForwardMetadataIfExists(incoming(), "pdev");
       result.is_error()) {
     FDF_LOG(ERROR, "Failed to forward serial number metadata: %s", result.status_string());
     return result.status_value();
@@ -150,7 +154,8 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
   bti_ = std::move(*bti);
 
-  auto irq = pdev_.GetInterrupt(0, 0);
+  // TODO(https://fxbug.dev/413142699) use syscalls-next.h when available.
+  auto irq = pdev_.GetInterrupt(0, /* ZX_INTERRUPT_WAKE_VECTOR*/ ((uint32_t)0x20));
   if (irq.is_error()) {
     FDF_LOG(ERROR, "GetInterrupt failed: %s", irq.status_string());
     return irq.error_value();

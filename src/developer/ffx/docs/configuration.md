@@ -12,6 +12,9 @@ When updating, please add the value in alphabetical order.
 
     | Configuration Value                     | Documentation                      |
     | --------------------------------------- | ---------------------------------- |
+    | `connectivity.enable_usb`               | Allow ffx to use a USB connection. |
+    |                                         | Not supported on mac. Defaults to  |
+    |                                         | `false`.                           |
     | `connectivity.enable_vsock`             | Allow using a VSOCK socket to      |
     |                                         | connect to virtual machine targets |
     |                                         | where supported. Defaults to       |
@@ -29,6 +32,9 @@ When updating, please add the value in alphabetical order.
     |                                         | automatically to targets           |
     |                                         | discovered through mDNS. Defaults  |
     |                                         | to `false`                         |
+    | `discovery.mdns.enabled`                | Determines whether mDNS broadcasts |
+    |                                         | are used to discover targets.      |
+    |                                         | Default: `true`                    |
     | `discovery.timeout`                     | When doing _local_ discovery in    |
     |                                         | `ffx target list`, how long in     |
     |                                         | milliseconds to wait before        |
@@ -38,6 +44,9 @@ When updating, please add the value in alphabetical order.
     |                                         | nonzero u16). Default to `33331`   |
     | `discovery.zedboot.enabled`             | Determines if zedboot discovery is |
     |                                         | enabled. Defaults to `false`       |
+    | `doctor.record_config`                  | Determines whether ffx doctor will |
+    |                                         | record config data.  If unset, user|
+    |                                         | will be prompted.                  |
     | `emu.console.enabled`                   | The experimental flag for the      |
     |                                         | console subcommand. Defaults to    |
     |                                         | `false`.                           |
@@ -74,7 +83,7 @@ When updating, please add the value in alphabetical order.
     |                                         | interfaces before starting the     |
     |                                         | emulator.                          |
     |                                         | Defaults to `""` (the empty string)|
-    | `fastboot.devices_file`                 | Path to the fastboot devices file. |
+    | `fastboot.devices_file.path`            | Path to the fastboot devices file. |
     |                                         | Defaults to                        |
     |                                         | `${HOME}/.fastboot/devices`        |
     | `fastboot.flash.min_timeout_secs`       | The minimum flash timeout (in      |
@@ -94,13 +103,12 @@ When updating, please add the value in alphabetical order.
     |                                         | over TCP                           |
     | `fastboot.usb.disabled`                 | Disables fastboot usb discovery if |
     |                                         | set to true. Defaults to `false`   |
+    | `fidl.ir.path`                          | The path for looking up FIDL IR    |
+    |                                         | encoding/decoding FIDL messages.   |
+    |                                         | Default is unset                   |
     | `ffx.daemon_timeout`                    | How long to wait in milliseconds   |
     |                                         | when attempting to connect to the  |
     |                                         | daemon. Defaults to `15000`        |
-    | `ffx.fastboot.inline_target`            | Boolean value to signal that the   |
-    |                                         | target is in fastboot, and to      |
-    |                                         | communicate directly with it as    |
-    |                                         | opposed to doing discovery.        |
     |                                         | Defaults to `false`                |
     | `ffx.isolated`                          | "Alias" for encapsulation of       |
     |                                         | config options used to request     |
@@ -110,6 +118,28 @@ When updating, please add the value in alphabetical order.
     |                                         | `discovery.mdns.enabled`,          |
     |                                         | `discovery.mdns.autoconnect`       |
     |                                         | Defaults to `false`                |
+    | `ffx.subtool-search-paths`              | A list of paths to search for non- |
+    |                                         | SDK subtool binaries. Defaults to  |
+    |                                         | `$BUILD_DIR/host-tools`            |
+    | `ffx.target-list.local-connect`         | Specifies whether to `ffx target   |
+    |                                         | list` should try to connect to the |
+    |                                         | target when doing local discovery. |
+    |                                         | and not in strict mode.            |
+    |                                         | Default: `false`                   |
+    | `ffx.ui.mode`                           | Sets the ui mode for ffx and fx    |
+    |                                         | options are "text" and "tui",      |
+    |                                         | defaults to `text` for plaintext   |
+    |                                         | output. 'tui' enables TUI mode     |
+    |                                         | where available.                   |
+    | `ffx.ui.overrides`                      | Allows per-command overrides of the|
+    |                                         | UI mode. Commands are identified by|
+    |                                         | tool-command, e.g. `fx-use`        |
+    | `fuchsia.analytics.ffx_invoker`         | Optional string used to specify the|
+    |                                         | invoker in analytics, e.g. "fx".   |
+    |                                         | Default is to not specify an       |
+    |                                         | invoker.                           |
+    | `fuzzer.output`                         | Output directory when using `ffx   |
+    |                                         | fuzz`. No default.                 |
     | `log.dir`                               | Location for ffx and daemon logs   |
     |                                         | Defaults to first available of:    |
     |                                         |   `$FFX_LOG_DIR`                   |
@@ -138,35 +168,71 @@ When updating, please add the value in alphabetical order.
     |                                         | `error`, `warn`, `info`, `debug`,  |
     |                                         | `trace`. No components are defined |
     |                                         | by default                         |
+    | `overnet.socket`                        | Path to the overnet socket.        |
+    |                                         | Defaults to ASCENDD env variable,  |
+    |                                         | or a dynamically-calculated path if|
+    |                                         | unset.                             |
+    | `pbms.base_urls`                        | List of base URLS (of scheme file: |
+    |                                         | or gs:). Files are used directly,  |
+    |                                         | gs links are used to construct     |
+    |                                         | branch-specific GCS objects.       |
+    | `product.path`                          | Path to a product bundle. No       |
+    |                                         | default.                           |
+    | `product.reboot.use_dm`                 | Specifies whether to use `dm` over |
+    |                                         | `ssh` to reboot the product when in|
+    |                                         | product mode. Default: false       |
+    | `proxy.timeout_secs`                    | Timeout when connecting to the     |
+    |                                         | target. Also settable with `ffx    |
+    |                                         | --timeout <secs>.  Default: 1      |
+    |                                         | second.                            |
+    | `repository.connect_timeout_secs`       | Timeout when repostiroy server     |
+    |                                         | connects to the target.            |
+    |                                         | Default: 120 seconds               |
     | `repository.repositories`               |                                    |
     | `repository.registrations`              |                                    |
-    | `repository.default`                    |                                    |
+    | `repository.default`                    | Default repository name. Default to|
+    |                                         | empty string                       |
+    | `repository.process_dir`                | Path to directory containing       |
+    |                                         | package server instances. No       |
+    |                                         | default.                           |
     | `repository.server.mode`                |                                    |
     | `repository.server.enabled`             | If the repository server is        |
     |                                         | enabled. Defaults to `false`       |
     | `repository.server.listen`              |                                    |
     | `repository.server.last_used_address`   |                                    |
+    | `ssh.allow_fdomain`                     | Allow FDomain to be used as a      |
+    |                                         | remoting protocol. Defaults to     |
+    |                                         | `false` unless ffx is in "strict"  |
+    |                                         | mode.                              |
     | `ssh.auth-sock`                         | If set, the path to the            |
     |                                         | authorization socket for SSH used  |
     |                                         | by overnet. Defaults to unset      |
     | `ssh.keepalive_timeout`                 | Time for an ssh connection to wait |
     |                                         | before timing out.                 |
     |                                         | Defaults to `20` seconds.          |
-    | `target.default`                        | The default target to use if one   |
-    |                                         | is unspecified.                    |
-    |                                         | Defaults to first available of:    |
-    |                                         |   `$FUCHSIA_DEVICE_ADDR`           |
-    |                                         |   `$FUCHSIA_NODENAME`              |
     | `target.host_pipe_ssh_timeout`          | Time the target waits for an       |
     |                                         | initial response from ssh on the   |
     |                                         | target (currently, only in `ffx    |
     |                                         | target list`). Defaults to `10`    |
     |                                         | seconds.                           |
+    | `target.stateless_default_configuration`| Experimental flag to limit targets |
+    |                                         | to those explicitly specified via  |
+    |                                         | `--target` or via env variables.   |
+    |                                         | Default: false                     |
     | `targets.manual`                        | Contains the list of manual        |
     |                                         | targets. Defaults to an empty list |
-    | `ffx.subtool-search-paths`              | A list of paths to search for non- |
-    |                                         | SDK subtool binaries. Defaults to  |
-    |                                         | `$BUILD_DIR/host-tools`            |
-    | `fidl.ir.path`                          | The path for looking up FIDL IR    |
-    |                                         | encoding/decoding FIDL messages.   |
-    |                                         | Default is unset                   |
+    | `trace.category_groups`                 | List of categories on which to     |
+    |                                         | enable tracing.  Defaults to a     |
+    |                                         | large list -- use `ffx config get` |
+    |                                         | to see the default categories.     |
+    | `triage.config_paths`                   | Contains the list of default triage|
+    |                                         | configs. Must be set in out-of-tree|
+    |                                         | environments.                      |
+    | `tunnels`                               | Contains the list of tunnels as    |
+    |                                         | specified by Tunnel::ForwardPort   |
+    |                                         | requests. Default: empty           |
+    | `watchdogs.host_pipe.enabled`           | Specifies whether to run           |
+    |                                         | "watchdogs" on daemon host-pipes,  |
+    |                                         | in order to debug whether ssh      |
+    |                                         | failures are due to the Rust       |
+    |                                         | executor getting stuck.            |

@@ -25,6 +25,7 @@ group("tests") {
     "gpio:tests",
     "hrtimer:tests",
     "i2c:tests",
+    "interconnect:tests",
     "lib:tests",
     "light-sensor:tests",
     "mcu:tests",

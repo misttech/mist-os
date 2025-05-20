@@ -25,7 +25,6 @@ library_headers("headers") {
     "lib/fxt/writer_internal.h",
   ]
   public_deps = [
-    ":suppress-warning",
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//zircon/kernel/lib/special-sections",
@@ -40,17 +39,6 @@ source_set("fxt") {
   sources = []
   public_deps = [ ":headers" ]
   public_configs = [ ":config" ]
-}
-
-group("suppress-warning") {
-  public_configs = [ ":suppress-warning.config" ]
-}
-
-config("suppress-warning.config") {
-  if (!is_gcc) {
-    # Silence warning in Clang about GNU extension used in interned_string.h.
-    cflags_cc = [ "-Wno-gnu-string-literal-operator-template" ]
-  }
 }
 
 if (!is_kernel) {

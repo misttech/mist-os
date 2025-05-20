@@ -35,19 +35,14 @@ sysroot_vdso_entries = [
       include_dir = _rebased_gen_include_dir
       headers = [
         "zircon/syscalls/internal/cdecls.inc",
+
+        # cdecls-next.inc is included in the SDK, but must only be included
+        # in files that ensure the target API level is unstable.
+        "zircon/syscalls/internal/cdecls-next.inc",
+
         # Note not included in SDK: "zircon/syscalls/definitions.rs",
       ]
       deps = [ _vdso_generated_headers_dep ]
-    }
-  },
-  {
-    sdk = {
-      include_dir = _rebased_gen_include_dir
-      no_export = true  # Never export these to the SDK.
-      headers = [ "zircon/syscalls/internal/cdecls-next.inc" ]
-      if (!exclude_testonly_syscalls) {
-        headers += [ "zircon/syscalls/internal/testonly-cdecls.inc" ]
-      }
     }
   },
   {
@@ -70,3 +65,15 @@ sysroot_vdso_entries = [
     }
   },
 ]
+
+if (!exclude_testonly_syscalls) {
+  sysroot_vdso_entries += [
+    {
+      sdk = {
+        include_dir = _rebased_gen_include_dir
+        no_export = true  # Never export this to the SDK.
+        headers = [ "zircon/syscalls/internal/testonly-cdecls.inc" ]
+      }
+    },
+  ]
+}

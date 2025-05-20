@@ -86,6 +86,12 @@ class StubBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2:
         fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_);
     buffer_collection_info_builder.settings(
         fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena_)
+            .buffer_settings(fuchsia_sysmem2::wire::BufferMemorySettings::Builder(arena_)
+                                 .coherency_domain(fuchsia_sysmem2::wire::CoherencyDomain::kRam)
+                                 .is_physically_contiguous(true)
+                                 .is_secure(false)
+                                 .size_bytes(kImageSize)
+                                 .Build())
             .image_format_constraints(
                 fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena_)
                     .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)

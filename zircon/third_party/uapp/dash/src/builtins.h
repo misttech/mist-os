@@ -41,8 +41,9 @@
 #define ZXC_MSLEEP (builtincmd + 26)
 #define ZXC_MV_OR_CP (builtincmd + 9)
 #define ZXC_RM (builtincmd + 33)
+#define ZXC_POWER (builtincmd + 36)
 
-#define NUMBUILTINS 45
+#define NUMBUILTINS 46
 
 #define BUILTIN_SPECIAL 0x1
 #define BUILTIN_REGULAR 0x2

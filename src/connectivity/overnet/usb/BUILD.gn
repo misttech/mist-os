@@ -4,14 +4,6 @@
 
 import("//build/drivers.gni")
 
-fuchsia_driver_package("overnet-usb-package") {
-  package_name = "overnet-usb"
-  driver_components = [
-    "overnet-usb",
-    "overnet-usb-service",
-  ]
-}
-
 fuchsia_driver_package("usb-vsock-package") {
   package_name = "usb-vsock"
   driver_components = [
@@ -23,7 +15,6 @@ fuchsia_driver_package("usb-vsock-package") {
 group("drivers") {
   deps = [
     "overnet-usb",
-    "overnet-usb-service",
     "usb-vsock-service",
   ]
 }
@@ -32,7 +23,6 @@ group("tests") {
   testonly = true
   deps = [
     "overnet-usb:tests",
-    "overnet-usb-service:tests",
     "usb-vsock-service:tests",
   ]
 }

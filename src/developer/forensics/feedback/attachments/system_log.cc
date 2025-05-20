@@ -241,7 +241,7 @@ auto CompletesAndConsume() {
 }  // namespace
 
 ::fpromise::promise<AttachmentValue> SystemLog::Get(const uint64_t ticket) {
-  FX_CHECK(completers_.count(ticket) == 0) << "Ticket used twice: " << ticket;
+  FX_CHECK(!completers_.contains(ticket)) << "Ticket used twice: " << ticket;
 
   if (!is_active_) {
     is_active_ = true;
@@ -287,7 +287,7 @@ auto CompletesAndConsume() {
 }
 
 void SystemLog::ForceCompletion(const uint64_t ticket, const Error error) {
-  if (completers_.count(ticket) != 0) {
+  if (completers_.contains(ticket)) {
     completers_[ticket](error);
   }
 }

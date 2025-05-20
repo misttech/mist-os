@@ -15,7 +15,7 @@
     }
   ],
   "notes": [
-    "Clears the `target.default` configuration key on all configuration\nlevels. Returns a warning if it's already unset. Returns an error if it's not\npossible to clear it."
+    "Unsets the default target on all configuration levels. Returns a\nwarning if it's already unset. Returns an error if it's not possible to clear\nit."
   ],
   "commands": [],
   "positionals": [],

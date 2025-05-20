@@ -5,11 +5,11 @@
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/usb/cpp/bind.h>
+#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/usb-peripheral/usb-peripheral.h"
@@ -18,66 +18,89 @@ namespace usb_peripheral {
 
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 
-zx_status_t UsbFunction::AddDevice(const std::string& name) {
-  if (dev_added_) {
-    return ZX_ERR_ALREADY_BOUND;
+zx::result<> UsbFunction::AddChild(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent,
+                                   const std::string& child_node_name,
+                                   const std::shared_ptr<fdf::Namespace>& incoming,
+                                   const std::shared_ptr<fdf::OutgoingDirectory>& outgoing) {
+  if (child_.is_valid()) {
+    return zx::error(ZX_ERR_ALREADY_BOUND);
+  }
+
+  {
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_USB_FUNCTION] = banjo_server_.callback();
+    zx::result result = compat_server_.Initialize(
+        incoming, outgoing, std::string{UsbPeripheral::kChildNodeName}, child_node_name,
+        compat::ForwardMetadata::None(), std::move(banjo_config));
+    if (result.is_error()) {
+      fdf::error("Failed to initialize compat server: {}", result);
+      return result.take_error();
+    }
+  }
+
+  auto& mac_address_metadata_server = mac_address_metadata_server_.emplace(child_node_name);
+  if (zx::result result = mac_address_metadata_server.ForwardMetadataIfExists(incoming);
+      result.is_error()) {
+    fdf::error("Failed to forward mac address metadata: {}", result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = mac_address_metadata_server.Serve(*outgoing, dispatcher_);
+      result.is_error()) {
+    fdf::error("Failed to serve mac address metadata: {}", result);
+    return result.take_error();
+  }
+
+  auto& serial_number_metadata_server = serial_number_metadata_server_.emplace(child_node_name);
+  if (zx::result result = serial_number_metadata_server.ForwardMetadataIfExists(incoming);
+      result.is_error()) {
+    fdf::error("Failed to forward serial number metadata: {}", result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = serial_number_metadata_server.Serve(*outgoing, dispatcher_);
+      result.is_error()) {
+    fdf::error("Failed to serve serial number metadata: {}", result);
+    return result.take_error();
+  }
+
+  zx::result result = outgoing->AddService<fuchsia_hardware_usb_function::UsbFunctionService>(
+      fuchsia_hardware_usb_function::UsbFunctionService::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }),
+      child_node_name);
+  if (result.is_error()) {
+    fdf::error("Failed to add usb-function service: {}", result);
+    return result.take_error();
   }
 
   auto& desc = GetFunctionDescriptor();
 
-  zx_device_str_prop_t props[] = {
-      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb::BIND_PROTOCOL_FUNCTION),
-      ddk::MakeStrProperty(bind_fuchsia::USB_CLASS, static_cast<uint32_t>(desc.interface_class)),
-      ddk::MakeStrProperty(bind_fuchsia::USB_SUBCLASS,
-                           static_cast<uint32_t>(desc.interface_subclass)),
-      ddk::MakeStrProperty(bind_fuchsia::USB_PROTOCOL,
-                           static_cast<uint32_t>(desc.interface_protocol)),
-      ddk::MakeStrProperty(bind_fuchsia::USB_VID,
-                           static_cast<uint32_t>(peripheral_->device_desc().id_vendor)),
-      ddk::MakeStrProperty(bind_fuchsia::USB_PID,
-                           static_cast<uint32_t>(peripheral_->device_desc().id_product)),
+  std::vector props = {
+      fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_usb::BIND_PROTOCOL_FUNCTION),
+      fdf::MakeProperty2(bind_fuchsia::USB_CLASS, static_cast<uint32_t>(desc.interface_class)),
+      fdf::MakeProperty2(bind_fuchsia::USB_SUBCLASS,
+                         static_cast<uint32_t>(desc.interface_subclass)),
+      fdf::MakeProperty2(bind_fuchsia::USB_PROTOCOL,
+                         static_cast<uint32_t>(desc.interface_protocol)),
+      fdf::MakeProperty2(bind_fuchsia::USB_VID,
+                         static_cast<uint32_t>(peripheral_->device_desc().id_vendor)),
+      fdf::MakeProperty2(bind_fuchsia::USB_PID,
+                         static_cast<uint32_t>(peripheral_->device_desc().id_product)),
   };
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
-  }
-  zx_status_t status = AddService(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not add service %s", zx_status_get_string(status));
-    return status;
-  }
+  std::vector offers = compat_server_.CreateOffers2();
+  offers.push_back(
+      fdf::MakeOffer2<fuchsia_hardware_usb_function::UsbFunctionService>(child_node_name));
+  offers.push_back(mac_address_metadata_server.MakeOffer());
+  offers.push_back(serial_number_metadata_server.MakeOffer());
 
-  std::array offers = {
-      fuchsia_hardware_usb_function::UsbFunctionService::Name,
-      ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>::kFidlServiceName,
-  };
-  status = DdkAdd(
-      ddk::DeviceAddArgs(name.c_str())
-          .set_str_props(props)
-          // TODO(b/373918767): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer retrieved.
-          .forward_metadata(peripheral_->parent(), DEVICE_METADATA_MAC_ADDRESS)
-          // TODO(b/407987472): Don't forward DEVICE_METADATA_SERIAL_NUMBER once no longer
-          // retrieved.
-          .forward_metadata(peripheral_->parent(), DEVICE_METADATA_SERIAL_NUMBER)
-          .set_fidl_service_offers(offers)
-          .set_outgoing_dir(endpoints->client.TakeChannel()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "usb_dev_bind_functions add_device failed %s", zx_status_get_string(status));
-    return status;
+  zx::result child =
+      fdf::AddChild(parent, *fdf::Logger::GlobalInstance(), child_node_name, props, offers);
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {}", child);
+    return child.take_error();
   }
-  dev_added_ = true;
-  // Hold a reference while devmgr has a pointer to the function.
-  AddRef();
-  return ZX_OK;
-}
-
-void UsbFunction::DdkRelease() {
-  peripheral_->FunctionCleared();
-  // Release the reference now that devmgr no longer has a pointer to the function.
-  if (Release()) {
-    delete this;
-  }
+  child_ = std::move(child.value());
+  return zx::ok();
 }
 
 // UsbFunctionProtocol implementation.
@@ -87,11 +110,11 @@ zx_status_t UsbFunction::UsbFunctionSetInterface(
   if (!func_intf.is_valid()) {
     bool was_valid = function_intf_.is_valid();
     function_intf_.clear();
-    zxlogf(INFO, "Taking peripheral device offline until ready");
+    fdf::info("Taking peripheral device offline until ready");
     return was_valid ? peripheral_->DeviceStateChanged() : ZX_OK;
   }
   if (function_intf_.is_valid()) {
-    zxlogf(ERROR, "Function interface already bound");
+    fdf::error("Function interface already bound");
     return ZX_ERR_ALREADY_BOUND;
   }
 
@@ -101,24 +124,23 @@ zx_status_t UsbFunction::UsbFunctionSetInterface(
   fbl::AllocChecker ac;
   auto* descriptors = new (&ac) uint8_t[length];
   if (!ac.check()) {
-    zxlogf(ERROR, "UsbFunctionSetInterface failed due to no memory.");
+    fdf::error("UsbFunctionSetInterface failed due to no memory.");
     return ZX_ERR_NO_MEMORY;
   }
 
   size_t actual;
   function_intf_.GetDescriptors(descriptors, length, &actual);
   if (actual != length) {
-    zxlogf(ERROR, "UsbFunctionInterfaceClient::GetDescriptors() failed");
+    fdf::error("UsbFunctionInterfaceClient::GetDescriptors() failed");
     delete[] descriptors;
     return ZX_ERR_INTERNAL;
   }
   num_interfaces_ = 0;
 
-  auto status = peripheral_->ValidateFunction(fbl::RefPtr<UsbFunction>(this), descriptors, length,
-                                              &num_interfaces_);
+  auto status = peripheral_->ValidateFunction(index_, descriptors, length, &num_interfaces_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "UsbFunctionInterfaceClient::ValidateFunction() failed - %s",
-           zx_status_get_string(status));
+    fdf::error("UsbFunctionInterfaceClient::ValidateFunction() failed: {}",
+               zx_status_get_string(status));
     delete[] descriptors;
     return status;
   }
@@ -132,11 +154,11 @@ zx_status_t UsbFunction::UsbFunctionCancelAll(uint8_t ep_address) {
 }
 
 zx_status_t UsbFunction::UsbFunctionAllocInterface(uint8_t* out_intf_num) {
-  return peripheral_->AllocInterface(fbl::RefPtr<UsbFunction>(this), out_intf_num);
+  return peripheral_->AllocInterface(index_, out_intf_num);
 }
 
 zx_status_t UsbFunction::UsbFunctionAllocEp(uint8_t direction, uint8_t* out_address) {
-  return peripheral_->AllocEndpoint(fbl::RefPtr<UsbFunction>(this), direction, out_address);
+  return peripheral_->AllocEndpoint(index_, direction, out_address);
 }
 
 zx_status_t UsbFunction::UsbFunctionConfigEp(const usb_endpoint_descriptor_t* ep_desc,
@@ -164,9 +186,9 @@ zx_status_t UsbFunction::UsbFunctionConfigEp(const usb_endpoint_descriptor_t* ep
     auto result = peripheral_->dci_new().buffer(arena)->ConfigureEndpoint(fep_desc, fss_comp_desc);
 
     if (!result.ok()) {
-      zxlogf(DEBUG, "(framework) ConfigureEndpoint(): %s", result.status_string());
+      fdf::debug("Failed to send ConfigureEndpoint request: {}", result.status_string());
     } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
-      zxlogf(DEBUG, "ConfigureEndpoint(): %s", result.status_string());
+      fdf::debug("Failed to configure endpoint: {}", result.status_string());
     } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
       return result->error_value();
     } else {
@@ -174,7 +196,7 @@ zx_status_t UsbFunction::UsbFunctionConfigEp(const usb_endpoint_descriptor_t* ep
     }
   }
 
-  zxlogf(DEBUG, "could not ConfigureEndpoint() over FIDL, falling back to banjo");
+  fdf::debug("could not ConfigureEndpoint() over FIDL, falling back to banjo");
   return peripheral_->dci().ConfigEp(ep_desc, ss_comp_desc);
 }
 
@@ -183,16 +205,16 @@ zx_status_t UsbFunction::UsbFunctionDisableEp(uint8_t address) {
   auto result = peripheral_->dci_new().buffer(arena)->DisableEndpoint(address);
 
   if (!result.ok()) {
-    zxlogf(DEBUG, "(framework) DisableEndpoint(): %s", result.status_string());
+    fdf::debug("Failed to send DisableEndpoint request: {}", result.status_string());
   } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
-    zxlogf(DEBUG, "DisableEndpoint(): %s", result.status_string());
+    fdf::debug("Failed to disable endpoint: {}", result.status_string());
   } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
     return result->error_value();
   } else {
     return ZX_OK;
   }
 
-  zxlogf(DEBUG, "could not DisableEndpoint() over FIDL, falling back to banjo");
+  fdf::debug("could not DisableEndpoint() over FIDL, falling back to banjo");
   return peripheral_->dci().DisableEp(address);
 }
 
@@ -210,16 +232,16 @@ zx_status_t UsbFunction::UsbFunctionEpSetStall(uint8_t ep_address) {
   auto result = peripheral_->dci_new().buffer(arena)->EndpointSetStall(ep_address);
 
   if (!result.ok()) {
-    zxlogf(DEBUG, "(framework) EndpointSetStall(): %s", result.status_string());
+    fdf::debug("Failed to send EndpointSetStall request: {}", result.status_string());
   } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
-    zxlogf(DEBUG, "EndpointSetStall(): %s", result.status_string());
+    fdf::debug("Failed to set stall: {}", result.status_string());
   } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
     return result->error_value();
   } else {
     return ZX_OK;
   }
 
-  zxlogf(DEBUG, "could not EndointSetStall() over FIDL, falling back to banjo");
+  fdf::debug("could not EndointSetStall() over FIDL, falling back to banjo");
   return peripheral_->dci().EpSetStall(ep_address);
 }
 
@@ -228,16 +250,16 @@ zx_status_t UsbFunction::UsbFunctionEpClearStall(uint8_t ep_address) {
   auto result = peripheral_->dci_new().buffer(arena)->EndpointClearStall(ep_address);
 
   if (!result.ok()) {
-    zxlogf(DEBUG, "(framework) EndpointClearStall(): %s", result.status_string());
+    fdf::debug("Failed to send EndpointClearStall request: {}", result.status_string());
   } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
-    zxlogf(DEBUG, "EndpointClearStall(): %s", result.status_string());
+    fdf::debug("Failed to clear stall): {}", result.status_string());
   } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
     return result->error_value();
   } else {
     return ZX_OK;
   }
 
-  zxlogf(DEBUG, "could not EndointClearStall() over FIDL, falling back to banjo");
+  fdf::debug("could not EndointClearStall() over FIDL, falling back to banjo");
   return peripheral_->dci().EpClearStall(ep_address);
 }
 
@@ -256,19 +278,17 @@ void UsbFunction::ConnectToEndpoint(ConnectToEndpointRequest& request,
 zx_status_t UsbFunction::SetConfigured(bool configured, usb_speed_t speed) {
   if (function_intf_.is_valid()) {
     return function_intf_.SetConfigured(configured, speed);
-  } else {
-    zxlogf(ERROR, "SetConfigured failed as the interface is invalid.");
-    return ZX_ERR_BAD_STATE;
   }
+  fdf::error("SetConfigured failed as the interface is invalid.");
+  return ZX_ERR_BAD_STATE;
 }
 
 zx_status_t UsbFunction::SetInterface(uint8_t interface, uint8_t alt_setting) {
   if (function_intf_.is_valid()) {
     return function_intf_.SetInterface(interface, alt_setting);
-  } else {
-    zxlogf(ERROR, "SetInterface failed as the interface is invalid.");
-    return ZX_ERR_BAD_STATE;
   }
+  fdf::error("SetInterface failed as the interface is invalid.");
+  return ZX_ERR_BAD_STATE;
 }
 
 zx_status_t UsbFunction::Control(const usb_setup_t* setup, const void* write_buffer,
@@ -278,37 +298,9 @@ zx_status_t UsbFunction::Control(const usb_setup_t* setup, const void* write_buf
     return function_intf_.Control(setup, reinterpret_cast<const uint8_t*>(write_buffer), write_size,
                                   reinterpret_cast<uint8_t*>(read_buffer), read_size,
                                   out_read_actual);
-  } else {
-    zxlogf(ERROR, "Control failed as the interface is invalid.");
-    return ZX_ERR_BAD_STATE;
   }
-}
-
-zx::result<> UsbFunction::Init() {
-  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(parent_);
-      result.is_error()) {
-    zxlogf(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
-    return result.take_error();
-  }
-  if (zx_status_t status = mac_address_metadata_server_.Serve(
-          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to serve mac address metadata: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(parent_);
-      result.is_error()) {
-    zxlogf(ERROR, "Failed to forward serial number metadata: %s", result.status_string());
-    return result.take_error();
-  }
-  if (zx_status_t status = serial_number_metadata_server_.Serve(
-          outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to serve serial number metadata: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-  return zx::ok();
+  fdf::error("Control failed as the interface is invalid.");
+  return ZX_ERR_BAD_STATE;
 }
 
 }  // namespace usb_peripheral

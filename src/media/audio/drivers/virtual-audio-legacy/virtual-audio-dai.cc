@@ -219,8 +219,8 @@ void VirtualAudioDai::CreateRingBuffer(CreateRingBufferRequest& request,
 }
 
 void VirtualAudioDai::ResetRingBuffer() {
-  watch_delay_replied_ = 0;
-  watch_position_replied_ = false;
+  should_reply_to_delay_request_ = true;
+  should_reply_to_position_request_ = true;
   ring_buffer_vmo_fetched_ = false;
   ring_buffer_started_ = false;
   notifications_per_ring_ = 0;
@@ -336,44 +336,52 @@ void VirtualAudioDai::Stop(StopCompleter::Sync& completer) {
 
 void VirtualAudioDai::WatchClockRecoveryPositionInfo(
     WatchClockRecoveryPositionInfoCompleter::Sync& completer) {
-  if (!watch_position_replied_) {
+  if (should_reply_to_position_request_ && ring_buffer_started_ && notifications_per_ring_ > 0) {
     fuchsia_hardware_audio::RingBufferPositionInfo position_info;
     position_info.timestamp(zx::clock::get_monotonic().get());
     // TODO(https://fxbug.dev/42075676): Add support for position, now we always report 0.
     position_info.position(0);
     completer.Reply(std::move(position_info));
-    watch_position_replied_ = true;
-  } else if (!position_info_completer_) {
-    position_info_completer_.emplace(completer.ToAsync());
-  } else {
+    should_reply_to_position_request_ = false;
+    return;
+  }
+
+  if (position_info_completer_.has_value()) {
     // The client called WatchClockRecoveryPositionInfo when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR,
            "WatchClockRecoveryPositionInfo called when another hanging get was pending, unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
     position_info_completer_.reset();
-    watch_position_replied_ = false;
+    should_reply_to_position_request_ = true;
+    return;
   }
+
+  position_info_completer_.emplace(completer.ToAsync());
 }
 
 void VirtualAudioDai::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
-  if (!watch_delay_replied_) {
+  if (should_reply_to_delay_request_) {
     fuchsia_hardware_audio::DelayInfo delay_info;
     auto& ring_buffer = dai_config().ring_buffer().value();
     delay_info.internal_delay(ring_buffer.internal_delay());
     delay_info.external_delay(ring_buffer.external_delay());
     completer.Reply(std::move(delay_info));
-    watch_delay_replied_ = true;
-  } else if (!delay_info_completer_) {
-    delay_info_completer_.emplace(completer.ToAsync());
-  } else {
+    should_reply_to_delay_request_ = false;
+    return;
+  }
+
+  if (delay_info_completer_.has_value()) {
     // The client called WatchDelayInfo when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR, "WatchDelayInfo called when another hanging get was pending, unbinding");
     completer.Close(ZX_ERR_BAD_STATE);
     delay_info_completer_.reset();
-    watch_delay_replied_ = false;
+    should_reply_to_delay_request_ = true;
+    return;
   }
+
+  delay_info_completer_.emplace(completer.ToAsync());
 }
 
 void VirtualAudioDai::SetActiveChannels(

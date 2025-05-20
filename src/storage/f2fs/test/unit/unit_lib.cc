@@ -258,13 +258,8 @@ void FileTester::CheckChildrenFromReaddir(Dir *dir, std::unordered_set<std::stri
   uint8_t *buf_ptr = buf;
 
   while (len > 0 && buf_ptr < buf + kPageSize) {
-// TODO(b/293947862): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
-// as part of io2 migration.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     auto entry = reinterpret_cast<const vdirent_t *>(buf_ptr);
     size_t entry_size = entry->size + sizeof(vdirent_t);
-#pragma clang diagnostic pop
 
     std::string_view entry_name(entry->name, entry->size);
     auto iter = childs.begin();

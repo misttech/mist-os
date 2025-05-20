@@ -11,7 +11,9 @@ import dataclasses
 import filecmp
 import itertools
 import json
+import os
 import pathlib
+import subprocess
 from typing import (
     Any,
     Callable,
@@ -24,11 +26,80 @@ from typing import (
 )
 
 # version_history.json doesn't follow the same schema as other IDK metadata
-# files, so we treat it specially in a few places.
+# files, so we treat it specially.
 VERSION_HISTORY_PATH = pathlib.Path("version_history.json")
 
 
-STABLE_SUPPORTED_TYPES = ["cc_source_library", "fidl_library"]
+# These atom types include a "stable" field because they support unstable atoms.
+TYPES_SUPPORTING_UNSTABLE_ATOMS = ["cc_source_library", "fidl_library"]
+
+
+# Atom types that are treated as type "data".
+_VALID_DATA_ATOM_TYPES = [
+    # LINT.IfChange
+    "component_manifest",
+    "config",
+    # LINT.ThenChange(//build/sdk/sdk_atom.gni)
+]
+
+
+def _get_idk_manifest_type_file_for_atom_type(type: str) -> str:
+    """Returns the type string used in the IDK manifest for the atom `type`.
+
+    Args:
+        type: The atom type as used in an individual atom manifest.
+    Returns:
+        The corresponding type used in the IDK manifest.
+    """
+    if type in _VALID_DATA_ATOM_TYPES:
+        return "data"
+    else:
+        return type
+
+
+class AtomSchemaValidator:
+    """Validates atom metadata against JSON schemas."""
+
+    def __init__(
+        self, schema_directory: pathlib.Path, json_validator_path: pathlib.Path
+    ):
+        self.schema_directory = schema_directory
+        self.json_validator_path = json_validator_path
+
+    def _get_schema_filename_for_atom_type(self, type: str) -> str:
+        """Returns the filename of the schema file for the atom `type`.
+
+        Args:
+            type: The atom type as used in an individual atom manifest.
+        Returns:
+            The filename for the schema file used to validate `type`.
+        """
+        manifest_type = _get_idk_manifest_type_file_for_atom_type(type)
+        return f"{manifest_type}.json"
+
+    def validate(self, file_path: pathlib.Path, type: str) -> int:
+        """Validates that `file_path` complies with the schema for the `type`.
+
+        Deps on the schema files is covered by the collection's deps on
+        # "//build/sdk/meta".
+
+        Args:
+            file_path: The metadata file to validate.
+            type: The file's atom type as used in an individual atom manifest.
+        Returns:
+            0 if successful and non-zero otherwise.
+        """
+        schema_filename = self._get_schema_filename_for_atom_type(type)
+        schema_file = self.schema_directory / schema_filename
+
+        ret = subprocess.run([self.json_validator_path, schema_file, file_path])
+        if ret.returncode != 0:
+            print(
+                f"ERROR: Metadata schema validation failed for '{os.path.abspath(file_path)}' of type '{type}' using schema '{schema_file}'."
+            )
+            return ret.returncode
+
+        return 0
 
 
 class BuildManifestJson(TypedDict):
@@ -89,16 +160,18 @@ class LoadableModuleMeta(TypedDict):
 class UnmergableMeta(TypedDict):
     name: str
     type: (
-        Literal["cc_source_library"]
-        | Literal["dart_library"]
-        | Literal["fidl_library"]
-        | Literal["documentation"]
-        | Literal["config"]
-        | Literal["license"]
+        # LINT.IfChange
+        Literal["bind_library"]
+        | Literal["cc_source_library"]
         | Literal["component_manifest"]
-        | Literal["bind_library"]
-        | Literal["version_history"]
+        | Literal["config"]
+        | Literal["dart_library"]
+        | Literal["documentation"]
         | Literal["experimental_python_e2e_test"]
+        | Literal["fidl_library"]
+        | Literal["license"]
+        | Literal["version_history"]
+        # LINT.ThenChange(//build/sdk/generate_idk/generate_idk_unittest.py)
     )
     stable: bool
 
@@ -187,8 +260,16 @@ class PartialIDK:
                     "Atom metadata file specified multiple times: %s"
                     % meta_dest
                 )
+
+                atom_meta = json.load(f)
+                if meta_dest == VERSION_HISTORY_PATH:
+                    # version_history.json doesn't have a 'type' field, so set
+                    # it. See https://fxbug.dev/409622622.
+                    assert "type" not in atom_meta.keys()
+                    atom_meta["type"] = "version_history"
+
                 result.atoms[meta_dest] = PartialAtom(
-                    meta=json.load(f),
+                    meta=atom_meta,
                     meta_src=meta_src,
                     dest_to_src=dest_to_src,
                 )
@@ -262,24 +343,21 @@ class MergedIDK:
         in the IDK itself at `meta/manifest.json`."""
         index = []
         for meta_path, atom in self.atoms.items():
-            # Some atoms are given different "types" in the overall manifest...
-            if meta_path == VERSION_HISTORY_PATH:
-                type = "version_history"
-            elif atom["type"] in ["component_manifest", "config"]:
-                type = "data"
-            else:
-                type = atom["type"]
+            type = _get_idk_manifest_type_file_for_atom_type(atom["type"])
 
-            if type in STABLE_SUPPORTED_TYPES:
-                index.append(
-                    dict(
-                        meta=str(meta_path),
-                        type=type,
-                        stable=atom.get("stable", False),
-                    )
-                )
+            if type in TYPES_SUPPORTING_UNSTABLE_ATOMS:
+                is_stable = atom["stable"]
             else:
-                index.append(dict(meta=str(meta_path), type=type, stable=True))
+                assert "stable" not in atom.keys()
+                is_stable = True
+
+            index.append(
+                dict(
+                    meta=str(meta_path),
+                    type=type,
+                    stable=is_stable,
+                )
+            )
 
         index.sort(key=lambda a: (a["meta"], a["type"]))
 
@@ -307,19 +385,11 @@ def _merge_atoms(
         atom_b = b.get(atom_path)
 
         if atom_a and atom_b:
-            if atom_path == VERSION_HISTORY_PATH:
-                # Treat version_history.json specially, since it doesn't have a
-                # 'type' field.
-                assert (
-                    atom_a == atom_b.meta
-                ), "A and B had different 'version_history' values. Huh?"
-                result[atom_path] = atom_a
-            else:
-                # Merge atoms found in both IDKs.
-                try:
-                    result[atom_path] = _merge_atom_meta(atom_a, atom_b.meta)
-                except Exception as e:
-                    raise AtomMergeError(atom_path) from e
+            # Merge atoms found in both IDKs.
+            try:
+                result[atom_path] = _merge_atom_meta(atom_a, atom_b.meta)
+            except Exception as e:
+                raise AtomMergeError(atom_path) from e
         elif atom_a:
             result[atom_path] = atom_a
         else:
@@ -426,16 +496,18 @@ def _merge_disjoint_dicts(
 def _merge_atom_meta(a: AtomMeta, b: AtomMeta) -> AtomMeta:
     """Merge two atoms, according to type-specific rules."""
     if a["type"] in (
-        "cc_source_library",
-        "dart_library",
-        "fidl_library",
-        "documentation",
-        "config",
-        "license",
-        "component_manifest",
+        # LINT.IfChange
         "bind_library",
-        "version_history",
+        "cc_source_library",
+        "component_manifest",
+        "config",
+        "dart_library",
+        "documentation",
         "experimental_python_e2e_test",
+        "fidl_library",
+        "license",
+        "version_history",
+        # LINT.ThenChange(//build/sdk/generate_idk/generate_idk_unittest.py)
     ):
         _assert_dicts_equal(a, b, [])
         return a
@@ -488,4 +560,5 @@ def _merge_atom_meta(a: AtomMeta, b: AtomMeta) -> AtomMeta:
             a.get("variants"), b.get("variants"), lambda v: v["constraints"]
         )
         return a
+
     raise AssertionError("Unknown atom type: " + a["type"])

@@ -2,6 +2,8 @@
 
 // fidl_experiment = output_index_json
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocols/cpp/natural_messaging.h>
 #include <fidl/test.protocols/cpp/wire_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
@@ -58,8 +60,6 @@ constexpr inline uint64_t kWithAndWithoutRequestResponse_OnWithResponse_Ordinal 
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kWithAndWithoutRequestResponse_OnWithResponse_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
 
 ::fidl::internal::NaturalThenable<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse>
@@ -77,6 +77,8 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithAndWithoutRequestRespons
         return base->SendTwoWay(msg, response_context);
       });
 }
+
+::fidl::Response<::test_protocols::WithAndWithoutRequestResponse::NoRequestWithResponse>::Response(::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse v) : WithAndWithoutRequestResponseNoRequestWithResponseResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_protocols::WithAndWithoutRequestResponse::NoRequestWithResponse>
 fidl::internal::NaturalClientImpl<::test_protocols::WithAndWithoutRequestResponse>::NoRequestWithResponse() const {
@@ -110,6 +112,8 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithAndWithoutRequestRespons
         return base->SendTwoWay(msg, response_context);
       });
 }
+
+::fidl::Response<::test_protocols::WithAndWithoutRequestResponse::WithRequestWithResponse>::Response(::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse v) : WithAndWithoutRequestResponseWithRequestWithResponseResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_protocols::WithAndWithoutRequestResponse::WithRequestWithResponse>
 fidl::internal::NaturalClientImpl<::test_protocols::WithAndWithoutRequestResponse>::WithRequestWithResponse(const ::fidl::Request<::test_protocols::WithAndWithoutRequestResponse::WithRequestWithResponse>& request) const {
@@ -147,13 +151,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithAndWithoutRequestRespons
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::WithAndWithoutRequestResponse>::NoRequestEmptyResponse() {
@@ -216,9 +213,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::WithAndWithoutRequestRes
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::WithAndWithoutRequestResponse> fidl::internal::NaturalSyncClientImpl<::test_protocols::WithAndWithoutRequestResponse>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::WithAndWithoutRequestResponse>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::WithAndWithoutRequestResponse>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::WithAndWithoutRequestResponse> client_end) {
@@ -259,9 +257,10 @@ fidl::internal::NaturalEventDispatcher<::test_protocols::WithAndWithoutRequestRe
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::WithAndWithoutRequestResponse>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithAndWithoutRequestResponse>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+void fidl::AsyncEventHandler<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {}
+void fidl::AsyncEventHandler<::test_protocols::WithAndWithoutRequestResponse>::OnWithResponse(::fidl::Event<::test_protocols::WithAndWithoutRequestResponse::OnWithResponse>&) {}
 
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocols::WithAndWithoutRequestResponse>::OnEmptyResponse() {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -295,8 +294,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocols::WithAndWithoutRequestRe
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse>::Reply() {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocols::kWithAndWithoutRequestResponse_NoRequestEmptyResponse_Ordinal, ::test_protocols::kWithAndWithoutRequestResponse_NoRequestEmptyResponse_DynamicFlags};
@@ -329,7 +326,11 @@ void fidl::internal::NaturalCompleterBase<::test_protocols::WithAndWithoutReques
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::WithAndWithoutRequestResponse> fidl::Server<::test_protocols::WithAndWithoutRequestResponse>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::WithAndWithoutRequestResponse> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::WithAndWithoutRequestResponse>::entries_[] = {
     {
@@ -443,9 +444,6 @@ void fidl::Server<::test_protocols::WithAndWithoutRequestResponse>::dispatch_mes
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithAndWithoutRequestResponse>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocols {
 
 [[maybe_unused]]
@@ -471,9 +469,16 @@ constexpr inline uint64_t kWithErrorSyntax_HandleInResult_Ordinal = 137167633306
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kWithErrorSyntax_HandleInResult_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
+
+::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>::Response(::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse> v) : result(std::move(v)) {}
+::test_protocols::WithErrorSyntaxResponseAsStructResult fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::ResponseAsStruct>::IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>& m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse(std::move(m.value()));
+  }
+}
 
 ::fidl::internal::NaturalThenable<::test_protocols::WithErrorSyntax::ResponseAsStruct>
 fidl::internal::NaturalClientImpl<::test_protocols::WithErrorSyntax>::ResponseAsStruct() const {
@@ -489,6 +494,15 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithErrorSyntax>::ResponseAs
         ::fidl::OutgoingMessage msg = encoder.GetMessage();
         return base->SendTwoWay(msg, response_context);
       });
+}
+
+::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>::Response(::fit::result<uint32_t> v) : result(std::move(v)) {}
+::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>::IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>& m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse({});
+  }
 }
 
 ::fidl::internal::NaturalThenable<::test_protocols::WithErrorSyntax::ErrorAsPrimitive>
@@ -507,6 +521,15 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithErrorSyntax>::ErrorAsPri
       });
 }
 
+::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>::Response(::fit::result<::test_protocols::ErrorEnum> v) : result(std::move(v)) {}
+::test_protocols::WithErrorSyntaxErrorAsEnumResult fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::ErrorAsEnum>::IntoDomainObject(const ::fidl::Response<::test_protocols::WithErrorSyntax::ErrorAsEnum>& m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse({});
+  }
+}
+
 ::fidl::internal::NaturalThenable<::test_protocols::WithErrorSyntax::ErrorAsEnum>
 fidl::internal::NaturalClientImpl<::test_protocols::WithErrorSyntax>::ErrorAsEnum() const {
   return ::fidl::internal::NaturalThenable<::test_protocols::WithErrorSyntax::ErrorAsEnum>(
@@ -521,6 +544,15 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithErrorSyntax>::ErrorAsEnu
         ::fidl::OutgoingMessage msg = encoder.GetMessage();
         return base->SendTwoWay(msg, response_context);
       });
+}
+
+::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult>::Response(::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxHandleInResultResponse> v) : result(std::move(v)) {}
+::test_protocols::WithErrorSyntaxHandleInResultResult fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSyntax::HandleInResult>::IntoDomainObject(::fidl::Response<::test_protocols::WithErrorSyntax::HandleInResult> m) {
+  if (m.is_error()) {
+    return DomainObject::WithErr(m.error_value());
+  } else {
+    return DomainObject::WithResponse(std::move(m.value()));
+  }
 }
 
 ::fidl::internal::NaturalThenable<::test_protocols::WithErrorSyntax::HandleInResult>
@@ -538,14 +570,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithErrorSyntax>::HandleInRe
         return base->SendTwoWay(msg, response_context);
       });
 }
-
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocols::WithErrorSyntax::ResponseAsStruct>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::WithErrorSyntax>::ResponseAsStruct() {
@@ -587,9 +611,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::WithErrorSyntax>::Handle
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::WithErrorSyntax> fidl::internal::NaturalSyncClientImpl<::test_protocols::WithErrorSyntax>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::WithErrorSyntax>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::WithErrorSyntax>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::WithErrorSyntax> client_end) {
@@ -598,11 +623,8 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::WithErrorSyntax>::Handle
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::WithErrorSyntax>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithErrorSyntax>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 void fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::ResponseAsStruct>::Reply(const ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -640,7 +662,11 @@ void fidl::internal::NaturalCompleterBase<::test_protocols::WithErrorSyntax::Han
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::WithErrorSyntax> fidl::Server<::test_protocols::WithErrorSyntax>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::WithErrorSyntax> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::WithErrorSyntax>::entries_[] = {
     {
@@ -722,9 +748,6 @@ void fidl::Server<::test_protocols::WithErrorSyntax>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithErrorSyntax>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocols {
 
 [[maybe_unused]]
@@ -756,9 +779,9 @@ constexpr inline uint64_t kChannelProtocol_MutateSocket_Ordinal = 74117427884305
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kChannelProtocol_MutateSocket_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
+
+::fidl::Response<::test_protocols::ChannelProtocol::MethodB>::Response(::test_protocols::ChannelProtocolMethodBResponse v) : ChannelProtocolMethodBResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_protocols::ChannelProtocol::MethodB>
 fidl::internal::NaturalClientImpl<::test_protocols::ChannelProtocol>::MethodB(const ::fidl::Request<::test_protocols::ChannelProtocol::MethodB>& request) const {
@@ -794,6 +817,8 @@ fidl::internal::NaturalClientImpl<::test_protocols::ChannelProtocol>::TakeHandle
       });
 }
 
+::fidl::Response<::test_protocols::ChannelProtocol::MutateSocket>::Response(::test_protocols::ChannelProtocolMutateSocketResponse v) : ChannelProtocolMutateSocketResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_protocols::ChannelProtocol::MutateSocket>
 fidl::internal::NaturalClientImpl<::test_protocols::ChannelProtocol>::MutateSocket(::fidl::Request<::test_protocols::ChannelProtocol::MutateSocket> request) const {
   return ::fidl::internal::NaturalThenable<::test_protocols::ChannelProtocol::MutateSocket>(
@@ -821,13 +846,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::ChannelProtocol>::MethodA(co
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocols::ChannelProtocol::MethodB>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::ChannelProtocol>::MethodB(const ::fidl::Request<::test_protocols::ChannelProtocol::MethodB>& request) {
@@ -872,9 +890,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::ChannelProtocol>::Method
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::ChannelProtocol> fidl::internal::NaturalSyncClientImpl<::test_protocols::ChannelProtocol>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::ChannelProtocol>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::ChannelProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::ChannelProtocol> client_end) {
@@ -904,9 +923,9 @@ fidl::internal::NaturalEventDispatcher<::test_protocols::ChannelProtocol>::Dispa
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::ChannelProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ChannelProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+void fidl::AsyncEventHandler<::test_protocols::ChannelProtocol>::EventA(::fidl::Event<::test_protocols::ChannelProtocol::EventA>&) {}
 
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocols::ChannelProtocol>::EventA(const ::test_protocols::ChannelProtocolEventARequest& payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -924,8 +943,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocols::ChannelProtocol>::Dispa
   _encoded_message.Write(_transport());
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
-
-#endif  // __Fuchsia__
 
 void fidl::internal::NaturalCompleterBase<::test_protocols::ChannelProtocol::MethodB>::Reply(const ::fidl::Response<::test_protocols::ChannelProtocol::MethodB>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -952,7 +969,11 @@ void fidl::internal::NaturalCompleterBase<::test_protocols::ChannelProtocol::Mut
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::ChannelProtocol> fidl::Server<::test_protocols::ChannelProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::ChannelProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::ChannelProtocol>::entries_[] = {
     {
@@ -1034,9 +1055,6 @@ void fidl::Server<::test_protocols::ChannelProtocol>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::ChannelProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocols {
 
 [[maybe_unused]]
@@ -1044,8 +1062,6 @@ constexpr inline uint64_t kDiscoverableProtocol_Method_Ordinal = 345587304808273
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kDiscoverableProtocol_Method_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
 
 ::fit::result<::fidl::OneWayError>
@@ -1056,13 +1072,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::DiscoverableProtocol>::Metho
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::DiscoverableProtocol>::Method() {
@@ -1073,9 +1082,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::DiscoverableProtocol>::M
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::DiscoverableProtocol> fidl::internal::NaturalSyncClientImpl<::test_protocols::DiscoverableProtocol>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::DiscoverableProtocol>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::DiscoverableProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::DiscoverableProtocol> client_end) {
@@ -1084,13 +1094,14 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::DiscoverableProtocol>::M
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
 
-#endif  // __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::DiscoverableProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::DiscoverableProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::DiscoverableProtocol> fidl::Server<::test_protocols::DiscoverableProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::DiscoverableProtocol>::entries_[] = {
     {
@@ -1125,17 +1136,10 @@ void fidl::Server<::test_protocols::DiscoverableProtocol>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::DiscoverableProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::AnotherDiscoverableProtocol> fidl::internal::NaturalSyncClientImpl<::test_protocols::AnotherDiscoverableProtocol>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::AnotherDiscoverableProtocol>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::AnotherDiscoverableProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::AnotherDiscoverableProtocol> client_end) {
@@ -1144,13 +1148,14 @@ void fidl::Server<::test_protocols::DiscoverableProtocol>::dispatch_message(
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
 
-#endif  // __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::AnotherDiscoverableProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::AnotherDiscoverableProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::AnotherDiscoverableProtocol> fidl::Server<::test_protocols::AnotherDiscoverableProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::AnotherDiscoverableProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::AnotherDiscoverableProtocol>::entries_[] = {};
 
@@ -1168,17 +1173,10 @@ void fidl::Server<::test_protocols::AnotherDiscoverableProtocol>::dispatch_messa
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::AnotherDiscoverableProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::PlatformServer> fidl::internal::NaturalSyncClientImpl<::test_protocols::PlatformServer>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::PlatformServer>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::PlatformServer>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::PlatformServer> client_end) {
@@ -1187,13 +1185,14 @@ void fidl::Server<::test_protocols::AnotherDiscoverableProtocol>::dispatch_messa
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
 
-#endif  // __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::PlatformServer>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::PlatformServer>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::PlatformServer> fidl::Server<::test_protocols::PlatformServer>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::PlatformServer> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::PlatformServer>::entries_[] = {};
 
@@ -1210,9 +1209,6 @@ void fidl::Server<::test_protocols::PlatformServer>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::PlatformServer>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocols {
 
 [[maybe_unused]]
@@ -1232,9 +1228,9 @@ constexpr inline uint64_t kHandleRightsProtocol_AnEvent_Ordinal = 47672763135549
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kHandleRightsProtocol_AnEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
+
+::fidl::Response<::test_protocols::HandleRightsProtocol::ResponseMethod>::Response(::test_protocols::HandleRightsProtocolResponseMethodResponse v) : HandleRightsProtocolResponseMethodResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_protocols::HandleRightsProtocol::ResponseMethod>
 fidl::internal::NaturalClientImpl<::test_protocols::HandleRightsProtocol>::ResponseMethod(::fidl::Request<::test_protocols::HandleRightsProtocol::ResponseMethod> request) const {
@@ -1263,13 +1259,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::HandleRightsProtocol>::NoRes
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocols::HandleRightsProtocol::ResponseMethod>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::HandleRightsProtocol>::ResponseMethod(::fidl::Request<::test_protocols::HandleRightsProtocol::ResponseMethod> request) {
@@ -1292,9 +1281,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::HandleRightsProtocol>::N
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::HandleRightsProtocol> fidl::internal::NaturalSyncClientImpl<::test_protocols::HandleRightsProtocol>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::HandleRightsProtocol>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::HandleRightsProtocol>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::HandleRightsProtocol> client_end) {
@@ -1324,9 +1314,9 @@ fidl::internal::NaturalEventDispatcher<::test_protocols::HandleRightsProtocol>::
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::HandleRightsProtocol>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::HandleRightsProtocol>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
+void fidl::AsyncEventHandler<::test_protocols::HandleRightsProtocol>::AnEvent(::fidl::Event<::test_protocols::HandleRightsProtocol::AnEvent>&) {}
 
 ::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_protocols::HandleRightsProtocol>::AnEvent(::test_protocols::HandleRightsProtocolAnEventRequest payload) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -1345,8 +1335,6 @@ fidl::internal::NaturalEventDispatcher<::test_protocols::HandleRightsProtocol>::
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
-#endif  // __Fuchsia__
-
 void fidl::internal::NaturalCompleterBase<::test_protocols::HandleRightsProtocol::ResponseMethod>::Reply(::fidl::Response<::test_protocols::HandleRightsProtocol::ResponseMethod> response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_protocols::kHandleRightsProtocol_ResponseMethod_Ordinal, ::test_protocols::kHandleRightsProtocol_ResponseMethod_DynamicFlags};
@@ -1356,7 +1344,11 @@ void fidl::internal::NaturalCompleterBase<::test_protocols::HandleRightsProtocol
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::HandleRightsProtocol> fidl::Server<::test_protocols::HandleRightsProtocol>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::HandleRightsProtocol> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::HandleRightsProtocol>::entries_[] = {
     {
@@ -1406,9 +1398,6 @@ void fidl::Server<::test_protocols::HandleRightsProtocol>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::HandleRightsProtocol>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocols {
 
 [[maybe_unused]]
@@ -1428,9 +1417,9 @@ constexpr inline uint64_t kWithProtocolEnds_StructContainingEnds_Ordinal = 40768
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kWithProtocolEnds_StructContainingEnds_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
+
+::fidl::Response<::test_protocols::WithProtocolEnds::ClientEnds>::Response(::test_protocols::WithProtocolEndsClientEndsResponse v) : WithProtocolEndsClientEndsResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_protocols::WithProtocolEnds::ClientEnds>
 fidl::internal::NaturalClientImpl<::test_protocols::WithProtocolEnds>::ClientEnds(::fidl::Request<::test_protocols::WithProtocolEnds::ClientEnds> request) const {
@@ -1449,6 +1438,8 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithProtocolEnds>::ClientEnd
       });
 }
 
+::fidl::Response<::test_protocols::WithProtocolEnds::ServerEnds>::Response(::test_protocols::WithProtocolEndsServerEndsResponse v) : WithProtocolEndsServerEndsResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_protocols::WithProtocolEnds::ServerEnds>
 fidl::internal::NaturalClientImpl<::test_protocols::WithProtocolEnds>::ServerEnds(::fidl::Request<::test_protocols::WithProtocolEnds::ServerEnds> request) const {
   return ::fidl::internal::NaturalThenable<::test_protocols::WithProtocolEnds::ServerEnds>(
@@ -1466,6 +1457,8 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithProtocolEnds>::ServerEnd
       });
 }
 
+::fidl::Response<::test_protocols::WithProtocolEnds::StructContainingEnds>::Response(::test_protocols::WithProtocolEndsStructContainingEndsResponse v) : WithProtocolEndsStructContainingEndsResponse(std::move(v)) {}
+
 ::fidl::internal::NaturalThenable<::test_protocols::WithProtocolEnds::StructContainingEnds>
 fidl::internal::NaturalClientImpl<::test_protocols::WithProtocolEnds>::StructContainingEnds(::fidl::Request<::test_protocols::WithProtocolEnds::StructContainingEnds> request) const {
   return ::fidl::internal::NaturalThenable<::test_protocols::WithProtocolEnds::StructContainingEnds>(
@@ -1482,14 +1475,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::WithProtocolEnds>::StructCon
         return base->SendTwoWay(msg, response_context);
       });
 }
-
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
 
 ::fidl::Result<::test_protocols::WithProtocolEnds::ClientEnds>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::WithProtocolEnds>::ClientEnds(::fidl::Request<::test_protocols::WithProtocolEnds::ClientEnds> request) {
@@ -1524,9 +1509,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::WithProtocolEnds>::Struc
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::WithProtocolEnds> fidl::internal::NaturalSyncClientImpl<::test_protocols::WithProtocolEnds>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::WithProtocolEnds>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::WithProtocolEnds>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::WithProtocolEnds> client_end) {
@@ -1535,11 +1521,8 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::WithProtocolEnds>::Struc
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::WithProtocolEnds>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::WithProtocolEnds>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 void fidl::internal::NaturalCompleterBase<::test_protocols::WithProtocolEnds::ClientEnds>::Reply(::fidl::Response<::test_protocols::WithProtocolEnds::ClientEnds> response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -1568,7 +1551,11 @@ void fidl::internal::NaturalCompleterBase<::test_protocols::WithProtocolEnds::St
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::WithProtocolEnds> fidl::Server<::test_protocols::WithProtocolEnds>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::WithProtocolEnds> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::WithProtocolEnds>::entries_[] = {
     {
@@ -1634,9 +1621,6 @@ void fidl::Server<::test_protocols::WithProtocolEnds>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::WithProtocolEnds>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocols {
 
 [[maybe_unused]]
@@ -1644,8 +1628,6 @@ constexpr inline uint64_t kManyParameters_Fifteen_Ordinal = 6423043252952467815l
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kManyParameters_Fifteen_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
 
 ::fit::result<::fidl::OneWayError>
@@ -1658,13 +1640,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::ManyParameters>::Fifteen(con
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
   return ::fidl::internal::ToFitxResult(status);
 }
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
 
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::ManyParameters>::Fifteen(const ::fidl::Request<::test_protocols::ManyParameters::Fifteen>& request) {
@@ -1676,9 +1651,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::ManyParameters>::Fifteen
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::ManyParameters> fidl::internal::NaturalSyncClientImpl<::test_protocols::ManyParameters>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::ManyParameters>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::ManyParameters>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::ManyParameters> client_end) {
@@ -1687,13 +1663,14 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::ManyParameters>::Fifteen
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
 
-#endif  // __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::ManyParameters>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::ManyParameters>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::ManyParameters> fidl::Server<::test_protocols::ManyParameters>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::ManyParameters> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::ManyParameters>::entries_[] = {
     {
@@ -1727,9 +1704,6 @@ void fidl::Server<::test_protocols::ManyParameters>::dispatch_message(
     ::fidl::internal::MessageStorageViewBase* storage_view) {
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::ManyParameters>::Dispatch(this, std::move(msg), storage_view, txn);
 }
-
-#endif  // __Fuchsia__
-
 namespace test_protocols {
 
 [[maybe_unused]]
@@ -1737,9 +1711,9 @@ constexpr inline uint64_t kMethodWithUnion_UnionMethod_Ordinal = 412487433826664
 
 [[maybe_unused]]
 constexpr inline ::fidl::MessageDynamicFlags kMethodWithUnion_UnionMethod_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-#ifdef __Fuchsia__
 }  // namespace test_protocols
+
+::fidl::Response<::test_protocols::MethodWithUnion::UnionMethod>::Response(::test_protocols::MethodWithUnionUnionMethodResponse v) : MethodWithUnionUnionMethodResponse(std::move(v)) {}
 
 ::fidl::internal::NaturalThenable<::test_protocols::MethodWithUnion::UnionMethod>
 fidl::internal::NaturalClientImpl<::test_protocols::MethodWithUnion>::UnionMethod(const ::fidl::Request<::test_protocols::MethodWithUnion::UnionMethod>& request) const {
@@ -1758,14 +1732,6 @@ fidl::internal::NaturalClientImpl<::test_protocols::MethodWithUnion>::UnionMetho
       });
 }
 
-namespace test_protocols {
-
-#endif  // __Fuchsia__
-
-}  // namespace test_protocols
-
-#ifdef __Fuchsia__
-
 ::fidl::Result<::test_protocols::MethodWithUnion::UnionMethod>
 fidl::internal::NaturalSyncClientImpl<::test_protocols::MethodWithUnion>::UnionMethod(const ::fidl::Request<::test_protocols::MethodWithUnion::UnionMethod>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -1777,9 +1743,10 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::MethodWithUnion>::UnionM
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
+::fidl::UnownedClientEnd<::test_protocols::MethodWithUnion> fidl::internal::NaturalSyncClientImpl<::test_protocols::MethodWithUnion>::_client_end() const {
+  return ::fidl::UnownedClientEnd<::test_protocols::MethodWithUnion>(
+      _transport().get<::fidl::internal::ChannelTransport>());
+}
 
 ::fidl::Status fidl::SyncEventHandler<::test_protocols::MethodWithUnion>::HandleOneEvent(
     ::fidl::UnownedClientEnd<::test_protocols::MethodWithUnion> client_end) {
@@ -1788,11 +1755,8 @@ fidl::internal::NaturalSyncClientImpl<::test_protocols::MethodWithUnion>::UnionM
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
+::fidl::internal::NaturalEventDispatcher<::test_protocols::MethodWithUnion>::NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocols::MethodWithUnion>* event_handler)
+    : IncomingEventDispatcher(event_handler) {}
 
 void fidl::internal::NaturalCompleterBase<::test_protocols::MethodWithUnion::UnionMethod>::Reply(const ::fidl::Response<::test_protocols::MethodWithUnion::UnionMethod>& response) {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -1803,7 +1767,11 @@ void fidl::internal::NaturalCompleterBase<::test_protocols::MethodWithUnion::Uni
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
 
-#ifdef __Fuchsia__
+::fidl::ProtocolHandler<::test_protocols::MethodWithUnion> fidl::Server<::test_protocols::MethodWithUnion>::bind_handler(async_dispatcher_t* dispatcher) {
+  return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocols::MethodWithUnion> request) {
+    (void)::fidl::BindServer(dispatcher, std::move(request), impl);
+  };
+}
 
 constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<::test_protocols::MethodWithUnion>::entries_[] = {
     {
@@ -1838,6 +1806,6 @@ void fidl::Server<::test_protocols::MethodWithUnion>::dispatch_message(
   ::fidl::internal::NaturalServerDispatcher<::test_protocols::MethodWithUnion>::Dispatch(this, std::move(msg), storage_view, txn);
 }
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

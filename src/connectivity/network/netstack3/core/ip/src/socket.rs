@@ -18,7 +18,8 @@ use netstack3_base::{
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
-    self as filter, FilterBindingsContext, FilterHandler as _, InterfaceProperties, RawIpBody,
+    self as filter, FilterBindingsContext, FilterHandler as _, FilterIpExt, InterfaceProperties,
+    RawIpBody, SocketEgressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext,
     TransportPacketSerializer,
 };
 use netstack3_trace::trace_duration;
@@ -39,7 +40,7 @@ use crate::internal::types::{InternalForwarding, ResolvedRoute, RoutableIpAddr};
 use crate::{HopLimits, NextHop};
 
 /// An execution context defining a type of IP socket.
-pub trait IpSocketHandler<I: IpExt, BC: TxMetadataBindingsTypes>:
+pub trait IpSocketHandler<I: IpExt + FilterIpExt, BC: TxMetadataBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
     /// Constructs a new [`IpSock`].
@@ -364,12 +365,17 @@ impl<I: IpExt, D> IpSock<I, D> {
 // raw IP sockets once we support those.
 
 /// The bindings execution context for IP sockets.
-pub trait IpSocketBindingsContext:
-    InstantContext + FilterBindingsContext + TxMetadataBindingsTypes
+pub trait IpSocketBindingsContext<D: StrongDeviceIdentifier>:
+    InstantContext + FilterBindingsContext + TxMetadataBindingsTypes + SocketOpsFilterBindingContext<D>
 {
 }
-impl<BC: InstantContext + FilterBindingsContext + TxMetadataBindingsTypes> IpSocketBindingsContext
-    for BC
+impl<
+        D: StrongDeviceIdentifier,
+        BC: InstantContext
+            + FilterBindingsContext
+            + TxMetadataBindingsTypes
+            + SocketOpsFilterBindingContext<D>,
+    > IpSocketBindingsContext<D> for BC
 {
 }
 
@@ -377,11 +383,12 @@ impl<BC: InstantContext + FilterBindingsContext + TxMetadataBindingsTypes> IpSoc
 ///
 /// Blanket impls of `IpSocketHandler` are provided in terms of
 /// `IpSocketContext`.
-pub trait IpSocketContext<I, BC: IpSocketBindingsContext>:
+pub trait IpSocketContext<I, BC>:
     DeviceIdContext<AnyDevice, DeviceId: InterfaceProperties<BC::DeviceClass>>
     + FilterHandlerProvider<I, BC>
 where
-    I: IpDeviceStateIpExt + IpExt,
+    I: IpDeviceStateIpExt + IpExt + FilterIpExt,
+    BC: IpSocketBindingsContext<Self::DeviceId>,
 {
     /// Returns a route for a socket.
     ///
@@ -434,7 +441,7 @@ pub trait UseIpSocketHandlerBlanket {}
 impl<I, BC, CC> IpSocketHandler<I, BC> for CC
 where
     I: IpLayerIpExt + IpDeviceStateIpExt,
-    BC: IpSocketBindingsContext,
+    BC: IpSocketBindingsContext<Self::DeviceId>,
     CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>> + UseIpSocketHandlerBlanket,
     CC::DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
 {
@@ -793,11 +800,11 @@ fn send_ip_packet<I, S, BC, CC, O>(
     tx_metadata: BC::TxMetadata,
 ) -> Result<(), IpSockSendError>
 where
-    I: IpExt + IpDeviceStateIpExt,
+    I: IpExt + IpDeviceStateIpExt + FilterIpExt,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
-    BC: IpSocketBindingsContext,
-    CC: IpSocketContext<I, BC>,
+    BC: IpSocketBindingsContext<CC::DeviceId>,
+    CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>>,
     CC::DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
     O: SendOptions<I> + RouteResolutionOptions<I>,
 {
@@ -806,9 +813,9 @@ where
     // Extracted to a function without the serializer parameter to ease code
     // generation.
     fn resolve<
-        I: IpExt + IpDeviceStateIpExt,
+        I: IpExt + IpDeviceStateIpExt + FilterIpExt,
         CC: IpSocketContext<I, BC>,
-        BC: IpSocketBindingsContext,
+        BC: IpSocketBindingsContext<CC::DeviceId>,
     >(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
@@ -937,6 +944,22 @@ where
         InternalForwarding::NotUsed => {}
     }
 
+    let egress_filter_result = bindings_ctx.socket_ops_filter().on_egress(
+        &packet,
+        &egress_device,
+        packet_metadata.tx_metadata(),
+        packet_metadata.marks(),
+    );
+    // TODO(https://fxbug.dev/412426836): Implement congestion signal handling.
+    match egress_filter_result {
+        SocketEgressFilterResult::Pass { congestion: _ } => (),
+        SocketEgressFilterResult::Drop { congestion: _ } => {
+            core_ctx.counters().socket_egress_filter_dropped.increment();
+            packet_metadata.acknowledge_drop();
+            return Ok(());
+        }
+    };
+
     // The packet needs to be delivered locally if it's sent to a broadcast
     // or multicast address. For multicast packets this feature can be disabled
     // with IP_MULTICAST_LOOP.
@@ -1012,7 +1035,7 @@ pub trait UseDeviceIpSocketHandlerBlanket {}
 impl<I, BC, CC> DeviceIpSocketHandler<I, BC> for CC
 where
     I: IpLayerIpExt + IpDeviceStateIpExt,
-    BC: IpSocketBindingsContext,
+    BC: IpSocketBindingsContext<CC::DeviceId>,
     CC: IpDeviceMtuContext<I> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
 {
     fn get_mms<O: RouteResolutionOptions<I>>(
@@ -1532,7 +1555,7 @@ pub(crate) mod testutil {
 
     impl<I, State, D, Meta, BC> IpSocketHandler<I, BC> for FakeCoreCtx<State, Meta, D>
     where
-        I: IpExt,
+        I: IpExt + FilterIpExt,
         State: InnerFakeIpSocketCtx<I, D>,
         D: FakeStrongDeviceId,
         BC: TxMetadataBindingsTypes,
@@ -1630,7 +1653,7 @@ pub(crate) mod testutil {
 
     impl<I, BC, D, State, Meta> BaseTransportIpContext<I, BC> for FakeCoreCtx<State, Meta, D>
     where
-        I: IpExt,
+        I: IpExt + FilterIpExt,
         D: FakeStrongDeviceId,
         State: InnerFakeIpSocketCtx<I, D>,
         BC: TxMetadataBindingsTypes,

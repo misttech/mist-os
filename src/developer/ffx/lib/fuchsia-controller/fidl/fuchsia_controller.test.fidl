@@ -56,6 +56,10 @@ closed protocol Noop {
         v vector<string:255>:255;
     }) -> ();
 
+    strict DoArrayNoop(struct {
+        a array<int32, 4>;
+    }) -> ();
+
     strict DoBitsNoop(struct {
         b SomeBits;
     }) -> ();
@@ -93,6 +97,10 @@ open protocol Testing {
     strict ReturnOtherComposedProtocol() -> (resource struct {
         client_thing client_end:OtherComposedProtocol;
     });
+
+    strict ReturnSocketOrError() -> (resource struct {
+        reader_thing zx.Handle:SOCKET;
+    }) error zx.Status;
 };
 
 @discoverable

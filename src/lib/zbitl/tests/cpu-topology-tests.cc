@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/stdcompat/span.h>
 #include <lib/zbitl/items/cpu-topology.h>
 #include <lib/zbitl/storage-traits.h>
 
 #include <algorithm>
 #include <iterator>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -20,29 +20,29 @@ namespace {
 
 class CpuTopologyPayload {
  public:
-  explicit CpuTopologyPayload(cpp20::span<const zbi_topology_node_t> nodes) : nodes_(nodes) {}
+  explicit CpuTopologyPayload(std::span<const zbi_topology_node_t> nodes) : nodes_(nodes) {}
 
-  cpp20::span<const std::byte> as_bytes() const { return cpp20::as_bytes(nodes_); }
+  std::span<const std::byte> as_bytes() const { return std::as_bytes(nodes_); }
 
  private:
-  cpp20::span<const zbi_topology_node_t> nodes_;
+  std::span<const zbi_topology_node_t> nodes_;
 };
 
 class CpuTopologyV1Payload {
  public:
-  explicit CpuTopologyV1Payload(cpp20::span<const zbi_cpu_cluster_t> clusters) {
+  explicit CpuTopologyV1Payload(std::span<const zbi_cpu_cluster_t> clusters) {
     const zbi_cpu_config_t config = {
         .cluster_count = static_cast<uint32_t>(clusters.size()),
     };
-    for (cpp20::span<const std::byte> chunk : {
-             cpp20::as_bytes(cpp20::span(&config, 1)),
-             cpp20::as_bytes(clusters),
+    for (std::span<const std::byte> chunk : {
+             std::as_bytes(std::span(&config, 1)),
+             std::as_bytes(clusters),
          }) {
       data_.insert(data_.end(), chunk.begin(), chunk.end());
     }
   }
 
-  cpp20::span<const std::byte> as_bytes() const { return {data_}; }
+  std::span<const std::byte> as_bytes() const { return {data_}; }
 
  private:
   std::vector<std::byte> data_;
@@ -50,12 +50,12 @@ class CpuTopologyV1Payload {
 
 class CpuTopologyV2Payload {
  public:
-  explicit CpuTopologyV2Payload(cpp20::span<const zbi_topology_node_v2_t> nodes) : nodes_(nodes) {}
+  explicit CpuTopologyV2Payload(std::span<const zbi_topology_node_v2_t> nodes) : nodes_(nodes) {}
 
-  cpp20::span<const std::byte> as_bytes() const { return cpp20::as_bytes(nodes_); }
+  std::span<const std::byte> as_bytes() const { return std::as_bytes(nodes_); }
 
  private:
-  cpp20::span<const zbi_topology_node_v2_t> nodes_;
+  std::span<const zbi_topology_node_v2_t> nodes_;
 };
 
 void ExpectArmNodesAreEqual(const zbi_topology_node_t& expected_node,
@@ -102,7 +102,7 @@ void ExpectArmNodesAreEqual(const zbi_topology_node_t& expected_node,
 }
 
 void ExpectTableHasArmNodes(const zbitl::CpuTopologyTable& table,
-                            cpp20::span<const zbi_topology_node_t> nodes) {
+                            std::span<const zbi_topology_node_t> nodes) {
   EXPECT_EQ(table.size(), nodes.size());
   EXPECT_EQ(table.size(), static_cast<size_t>(std::distance(table.begin(), table.end())));
   auto it = table.begin();

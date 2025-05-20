@@ -35,9 +35,6 @@ struct WireTypeForNaturalType<::test_vectors::ExampleUseOfVectors> {
   using type = ::test_vectors::wire::ExampleUseOfVectors;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

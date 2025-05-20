@@ -9,6 +9,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "src/developer/forensics/crash_reports/report_id.h"
 

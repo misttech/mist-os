@@ -24,7 +24,7 @@
 #include <kernel/koid.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/dispatcher.h>
 #include <object/handle.h>
 #include <object/io_buffer_dispatcher.h>

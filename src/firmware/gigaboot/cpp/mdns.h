@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_MDNS_H_
 #define SRC_FIRMWARE_GIGABOOT_CPP_MDNS_H_
 
@@ -169,7 +170,7 @@ class MdnsPacket {
   // Lazily serialize the packet using the passed in time to live value.
   //
   // Return a span describing the serialized packet on success, EFI_BUFFER_TOO_SMALL on error.
-  fit::result<efi_status, cpp20::span<const uint8_t>> Serialize(zx::duration time_to_live);
+  fit::result<efi_status, std::span<const uint8_t>> Serialize(zx::duration time_to_live);
 
   // Reset the payload end pointer and cached time-to-live.
   // Does NOT blank the payload contents and does NOT reset any headers.
@@ -185,7 +186,7 @@ class MdnsPacket {
   // Update the UDP checksum.
   // Returns a span on the contiguous span of bytes that is the
   // serialized representation of the packet.
-  cpp20::span<const uint8_t> Finalize();
+  std::span<const uint8_t> Finalize();
 
   DnsPayload::iterator CurrentEnd() const { return payload_end_; }
 
@@ -211,7 +212,7 @@ class MdnsPacket {
 
   // Write a stream of bytes to the payload.
   // Return true if the payload wasn't full and the write succeeded, false otherwise.
-  bool WriteBytes(cpp20::span<const uint8_t> b);
+  bool WriteBytes(std::span<const uint8_t> b);
 
   // Inner container for the serialized data.
   // The headers don't need complicated logic to set up, for the most part.

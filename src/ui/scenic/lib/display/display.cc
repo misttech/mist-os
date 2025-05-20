@@ -11,6 +11,8 @@
 #include <lib/trace/event.h>
 #include <zircon/syscalls.h>
 
+#include "src/ui/scenic/lib/utils/logging.h"
+
 namespace scenic_impl {
 namespace display {
 
@@ -51,12 +53,7 @@ void Display::OnVsync(zx::time timestamp,
   // Estimate current vsync interval. Need to include a maximum to mitigate any
   // potential issues during long breaks.
   const zx::duration time_since_last_vsync = timestamp - vsync_timing_->last_vsync_time();
-  if (time_since_last_vsync >= kMaximumVsyncInterval) {
-    FX_LOGS(WARNING) << "Display::OnVsync()  computed interval " << time_since_last_vsync.to_msecs()
-                     << "ms exceeds maximum of " << kMaximumVsyncInterval.to_msecs()
-                     << "ms.  Keeping existing interval: "
-                     << vsync_timing_->vsync_interval().to_msecs() << "ms.";
-  } else {
+  if (time_since_last_vsync < kMaximumVsyncInterval) {
     vsync_timing_->set_vsync_interval(std::max(kMinimumVsyncInterval, time_since_last_vsync));
   }
 
@@ -66,6 +63,10 @@ void Display::OnVsync(zx::time timestamp,
                 "Vsync interval", vsync_timing_->vsync_interval().get());
 
   if (vsync_callback_) {
+    FLATLAND_VERBOSE_LOG << "Display::OnVsync(): display_id=" << display_id_.value
+                         << "  timestamp=" << timestamp.get()
+                         << "  applied_config_stamp=" << applied_config_stamp.value
+                         << "  ... invoking vsync callback";
     vsync_callback_(timestamp, applied_config_stamp);
   }
 }

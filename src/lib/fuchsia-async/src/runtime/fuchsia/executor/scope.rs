@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::super::task::JoinHandle;
-use super::atomic_future::{AtomicFutureHandle, CancelAndDetachResult};
+use super::atomic_future::{AbortAndDetachResult, AtomicFutureHandle};
 use super::common::{Executor, TaskHandle};
 use crate::condition::{Condition, ConditionGuard, WakerEntry};
 use crate::EHandle;
@@ -11,7 +11,7 @@ use fuchsia_sync::Mutex;
 use futures::Stream;
 use pin_project_lite::pin_project;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use state::{JoinResult, ScopeState, ScopeWaker, Status};
+use state::{JoinResult, ScopeState, ScopeWaker, Status, WakeVec};
 use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
@@ -29,12 +29,12 @@ use std::{fmt, hash};
 // # Public API
 //
 
-/// A scope for managing async tasks. This scope is cancelled when dropped.
+/// A scope for managing async tasks. This scope is aborted when dropped.
 ///
 /// Scopes are how fuchsia-async implements [structured concurrency][sc]. Every
 /// task is spawned on a scope, and runs until either the task completes or the
-/// scope is cancelled. In addition to owning tasks, scopes may own child
-/// scopes, forming a nested structure.
+/// scope is cancelled or aborted. In addition to owning tasks, scopes may own
+/// child scopes, forming a nested structure.
 ///
 /// Scopes are usually joined or cancelled when the owning code is done with
 /// them. This makes it easier to reason about when a background task might
@@ -53,8 +53,10 @@ use std::{fmt, hash};
 /// closed when one of the following happens:
 ///
 /// 1. When [`close()`][Scope::close] is called.
-/// 2. When the scope is cancelled or dropped, the scope is closed immediately.
-/// 3. When the scope is joined and all tasks complete, the scope is closed
+/// 2. When the scope is aborted or dropped, the scope is closed immediately.
+/// 3. When the scope is cancelled, the scope is closed when all active guards
+///    are dropped.
+/// 4. When the scope is joined and all tasks complete, the scope is closed
 ///    before the join future resolves.
 ///
 /// When a scope is closed it no longer accepts tasks. Tasks spawned on the
@@ -73,6 +75,12 @@ pub struct Scope {
     // LINT.IfChange
     inner: ScopeHandle,
     // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Scope {
@@ -96,8 +104,8 @@ impl Scope {
     ///
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
-    pub fn new_with_name(name: &str) -> Scope {
-        ScopeHandle::with_current(|handle| handle.new_child_with_name(name))
+    pub fn new_with_name(name: impl Into<String>) -> Scope {
+        ScopeHandle::with_current(|handle| handle.new_child_with_name(name.into()))
     }
 
     /// Get the scope of the current task, or the global scope if there is no task
@@ -137,8 +145,8 @@ impl Scope {
     }
 
     /// Create a child scope with a name.
-    pub fn new_child_with_name(&self, name: &str) -> Scope {
-        self.inner.new_child_with_name(name)
+    pub fn new_child_with_name(&self, name: impl Into<String>) -> Scope {
+        self.inner.new_child_with_name(name.into())
     }
 
     /// Returns the name of the scope.
@@ -186,21 +194,44 @@ impl Scope {
         Join::new(self)
     }
 
-    /// Cancel all tasks in the scope and its children recursively.
+    /// Cancel all tasks cooperatively in the scope and its children
+    /// recursively.
+    ///
+    /// `cancel` first gives a chance to all child tasks (including tasks of
+    /// child scopes) to shutdown cleanly if they're holding on to a
+    /// [`ScopeActiveGuard`]. Once no child tasks are holding on to guards, then
+    /// `cancel` behaves like [`Scope::abort`], dropping all tasks and stopping
+    /// them from running at the next yield point. A [`ScopeActiveGuard`]
+    /// provides a cooperative cancellation signal that is triggered by this
+    /// call, see its documentation for more details.
     ///
     /// Once the returned future resolves, no task on the scope will be polled
     /// again.
     ///
-    /// When a scope is cancelled it immediately stops accepting tasks. Handles
-    /// of tasks spawned on the scope will pend forever.
+    /// Cancelling a scope _does not_ immediately prevent new tasks from being
+    /// accepted. New tasks are accepted as long as there are
+    /// `ScopeActiveGuard`s for this scope.
+    pub fn cancel(self) -> Join {
+        self.inner.cancel_all_tasks();
+        Join::new(self)
+    }
+
+    /// Cancel all tasks in the scope and its children recursively.
+    ///
+    /// Once the returned future resolves, no task on the scope will be polled
+    /// again. Unlike [`Scope::cancel`], this doesn't send a cooperative
+    /// cancellation signal to tasks or child scopes.
+    ///
+    /// When a scope is aborted it immediately stops accepting tasks. Handles of
+    /// tasks spawned on the scope will pend forever.
     ///
     /// Dropping the `Scope` object is equivalent to calling this method and
     /// discarding the returned future. Awaiting the future is preferred because
     /// it eliminates the possibility of a task poll completing on another
     /// thread after the scope object has been dropped, which can sometimes
     /// result in surprising behavior.
-    pub fn cancel(self) -> impl Future<Output = ()> {
-        self.inner.cancel_all_tasks();
+    pub fn abort(self) -> impl Future<Output = ()> {
+        self.inner.abort_all_tasks();
         Join::new(self)
     }
 
@@ -219,11 +250,11 @@ impl Scope {
     }
 }
 
-/// Cancel the scope and all of its tasks. Prefer using the [`Scope::cancel`]
+/// Abort the scope and all of its tasks. Prefer using the [`Scope::abort`]
 /// or [`Scope::join`] methods.
 impl Drop for Scope {
     fn drop(&mut self) {
-        // Cancel all tasks in the scope. Each task has a strong reference to the ScopeState,
+        // Abort all tasks in the scope. Each task has a strong reference to the ScopeState,
         // which will be dropped after all the tasks in the scope are dropped.
 
         // TODO(https://fxbug.dev/340638625): Ideally we would drop all tasks
@@ -231,7 +262,7 @@ impl Drop for Scope {
         // - Sync drop support in AtomicFuture, or
         // - The ability to reparent tasks, which requires atomic_arc or
         //   acquiring a mutex during polling.
-        self.inner.cancel_all_tasks();
+        self.inner.abort_all_tasks();
     }
 }
 
@@ -252,7 +283,7 @@ impl Deref for Scope {
 
 impl Borrow<ScopeHandle> for Scope {
     fn borrow(&self) -> &ScopeHandle {
-        &*self
+        self
     }
 }
 
@@ -281,13 +312,22 @@ impl<S> Join<S> {
     }
 }
 
-impl Join {
+impl<S: Borrow<ScopeHandle>> Join<S> {
+    /// Aborts the scope. The future will resolve when all tasks have finished
+    /// polling.
+    ///
+    /// See [`Scope::abort`] for more details.
+    pub fn abort(self: Pin<&mut Self>) -> impl Future<Output = ()> + '_ {
+        self.scope.borrow().abort_all_tasks();
+        self
+    }
+
     /// Cancel the scope. The future will resolve when all tasks have finished
     /// polling.
     ///
     /// See [`Scope::cancel`] for more details.
     pub fn cancel(self: Pin<&mut Self>) -> impl Future<Output = ()> + '_ {
-        self.scope.inner.cancel_all_tasks();
+        self.scope.borrow().cancel_all_tasks();
         self
     }
 }
@@ -352,35 +392,25 @@ pub struct ScopeHandle {
 impl ScopeHandle {
     /// Create a child scope.
     pub fn new_child(&self) -> Scope {
-        let mut state = self.lock();
-        let child = ScopeHandle {
-            inner: Arc::new(ScopeInner {
-                executor: self.inner.executor.clone(),
-                state: Condition::new(ScopeState::new(
-                    Some(self.clone()),
-                    state.status(),
-                    JoinResults::default().into(),
-                )),
-                name: String::new(),
-            }),
-        };
-        let weak = child.downgrade();
-        state.insert_child(weak);
-        Scope { inner: child }
+        self.new_child_inner(String::new())
     }
 
     /// Create a child scope.
-    pub fn new_child_with_name(&self, name: &str) -> Scope {
+    pub fn new_child_with_name(&self, name: impl Into<String>) -> Scope {
+        self.new_child_inner(name.into())
+    }
+
+    fn new_child_inner(&self, name: String) -> Scope {
         let mut state = self.lock();
         let child = ScopeHandle {
             inner: Arc::new(ScopeInner {
                 executor: self.inner.executor.clone(),
-                state: Condition::new(ScopeState::new(
-                    Some(self.clone()),
-                    state.status(),
+                state: Condition::new(ScopeState::new_child(
+                    self.clone(),
+                    &state,
                     JoinResults::default().into(),
                 )),
-                name: name.to_string(),
+                name,
             }),
         };
         let weak = child.downgrade();
@@ -444,11 +474,7 @@ impl ScopeHandle {
         ScopeHandle {
             inner: Arc::new(ScopeInner {
                 executor,
-                state: Condition::new(ScopeState::new(
-                    None,
-                    Status::default(),
-                    JoinResults::default().into(),
-                )),
+                state: Condition::new(ScopeState::new_root(JoinResults::default().into())),
                 name: "root".to_string(),
             }),
         }
@@ -469,9 +495,40 @@ impl ScopeHandle {
     ///
     /// Note that if this is called from within a task running on the scope, the
     /// task will not resume from the next await point.
-    pub fn cancel(self) -> impl Future<Output = ()> {
+    pub fn cancel(self) -> Join<Self> {
         self.cancel_all_tasks();
         Join::new(self)
+    }
+
+    /// Aborts all the scope's tasks.
+    ///
+    /// Note that if this is called from within a task running on the scope, the
+    /// task will not resume from the next await point.
+    pub fn abort(self) -> impl Future<Output = ()> {
+        self.abort_all_tasks();
+        Join::new(self)
+    }
+
+    /// Retrieves a [`ScopeActiveGuard`] for this scope.
+    ///
+    /// Note that this may fail if cancellation has already started for this
+    /// scope. In that case, the caller must assume any tasks from this scope
+    /// may be dropped at any yield point.
+    ///
+    /// Creating a [`ScopeActiveGuard`] is substantially more expensive than
+    /// just polling it, so callers should maintain the returned guard when
+    /// success is observed from this call for best performance.
+    ///
+    /// See [`Scope::cancel`] for details on cooperative cancellation behavior.
+    #[must_use]
+    pub fn active_guard(&self) -> Option<ScopeActiveGuard> {
+        ScopeActiveGuard::new(self)
+    }
+
+    /// Returns true if the scope has been signaled to exit via
+    /// [`Scope::cancel`] or [`Scope::abort`].
+    pub fn is_cancelled(&self) -> bool {
+        self.lock().status().is_cancelled()
     }
 
     // Joining the scope could be allowed from a ScopeHandle, but the use case
@@ -487,9 +544,24 @@ impl ScopeHandle {
             .await;
     }
 
+    /// Wait for there to be no tasks and no guards. This is racy: as soon as this returns it is
+    /// possible for another task to have been spawned on this scope, or for there to be guards.
+    pub async fn on_no_tasks_and_guards(&self) {
+        self.inner
+            .state
+            .when(|state| {
+                if state.has_tasks() || state.guards() > 0 {
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            })
+            .await;
+    }
+
     /// Wake all the scope's tasks so their futures will be polled again.
-    pub fn wake_all(&self) {
-        self.lock().wake_all();
+    pub fn wake_all_with_active_guard(&self) {
+        self.lock().wake_all_with_active_guard();
     }
 
     /// Creates a new task associated with this scope.  This does not spawn it on the executor.
@@ -566,7 +638,7 @@ impl<R: Send + 'static> ScopeStream<R> {
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
     pub fn new() -> (Self, ScopeStreamHandle<R>) {
-        Self::new_with_name(String::new())
+        Self::new_inner(String::new())
     }
 
     /// Creates a new scope stream with a name.
@@ -577,16 +649,20 @@ impl<R: Send + 'static> ScopeStream<R> {
     ///
     /// May panic if not called in the context of an executor (e.g. within a
     /// call to [`run`][crate::SendExecutor::run]).
-    pub fn new_with_name(name: String) -> (Self, ScopeStreamHandle<R>) {
+    pub fn new_with_name(name: impl Into<String>) -> (Self, ScopeStreamHandle<R>) {
+        Self::new_inner(name.into())
+    }
+
+    fn new_inner(name: String) -> (Self, ScopeStreamHandle<R>) {
         let this = ScopeHandle::with_current(|handle| {
             let mut state = handle.lock();
             let stream = Arc::default();
             let child = ScopeHandle {
                 inner: Arc::new(ScopeInner {
                     executor: handle.executor().clone(),
-                    state: Condition::new(ScopeState::new(
-                        Some(handle.clone()),
-                        state.status(),
+                    state: Condition::new(ScopeState::new_child(
+                        handle.clone(),
+                        &state,
                         Box::new(ResultsStream { inner: Arc::clone(&stream) }),
                     )),
                     name,
@@ -611,7 +687,7 @@ impl<R> Drop for ScopeStream<R> {
         // - Sync drop support in AtomicFuture, or
         // - The ability to reparent tasks, which requires atomic_arc or
         //   acquiring a mutex during polling.
-        self.inner.cancel_all_tasks();
+        self.inner.abort_all_tasks();
     }
 }
 
@@ -653,7 +729,7 @@ impl<R> Deref for ScopeStream<R> {
 
 impl<R> Borrow<ScopeHandle> for ScopeStream<R> {
     fn borrow(&self) -> &ScopeHandle {
-        &*self
+        self
     }
 }
 
@@ -674,6 +750,73 @@ pub struct ScopeStreamHandle<R>(ScopeHandle, PhantomData<R>);
 impl<R: Send> ScopeStreamHandle<R> {
     pub fn push(&self, future: impl Spawnable<Output = R>) {
         self.0.insert_task(future.into_task(self.0.clone()), true);
+    }
+}
+
+/// Holds a guard on the creating scope, holding off cancelation.
+///
+/// `ScopeActiveGuard` allows [`Scope`]s to perform cooperative cancellation.
+/// [`ScopeActiveGuard::on_cancel`] returns a future that resolves when
+/// [`Scope::cancel`] and [`ScopeHandle::cancel`] are called. That is the signal
+/// sent to cooperative tasks to stop doing work and finish.
+///
+/// A `ScopeActiveGuard` is obtained via [`ScopeHandle::active_guard`].
+/// `ScopeActiveGuard` releases the guard on the originating scope on drop.
+#[derive(Debug)]
+#[must_use]
+pub struct ScopeActiveGuard(ScopeHandle);
+
+impl Deref for ScopeActiveGuard {
+    type Target = ScopeHandle;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Drop for ScopeActiveGuard {
+    fn drop(&mut self) {
+        let Self(scope) = self;
+        scope.release_cancel_guard();
+    }
+}
+
+impl Clone for ScopeActiveGuard {
+    fn clone(&self) -> Self {
+        self.0.lock().acquire_cancel_guard(1);
+        Self(self.0.clone())
+    }
+}
+
+impl ScopeActiveGuard {
+    /// Returns a borrow of the scope handle associated with this guard.
+    pub fn as_handle(&self) -> &ScopeHandle {
+        &self.0
+    }
+
+    /// Returns a clone of the scope handle associated with this guard.
+    pub fn to_handle(&self) -> ScopeHandle {
+        self.0.clone()
+    }
+
+    /// Retrieves a future from this guard that can be polled on for
+    /// cancellation.
+    ///
+    /// The returned future resolves when the scope is cancelled. Callers should
+    /// perform teardown and drop the guard when done.
+    pub async fn on_cancel(&self) {
+        self.0
+            .inner
+            .state
+            .when(|s| if s.status().is_cancelled() { Poll::Ready(()) } else { Poll::Pending })
+            .await
+    }
+
+    fn new(scope: &ScopeHandle) -> Option<Self> {
+        if scope.lock().acquire_cancel_guard_if_not_finished() {
+            Some(Self(scope.clone()))
+        } else {
+            None
+        }
     }
 }
 
@@ -725,6 +868,8 @@ mod state {
         /// The number of children that transitively contain tasks, plus one for
         /// this scope if it directly contains tasks.
         subscopes_with_tasks: u32,
+        can_spawn: bool,
+        guards: u32,
         status: Status,
         /// Wakers/results for joining each task.
         pub results: Box<dyn Results>,
@@ -739,43 +884,56 @@ mod state {
     #[derive(Default, Debug, Clone, Copy)]
     pub enum Status {
         #[default]
-        /// The scope is accepting new tasks.
-        Open,
-        /// The scope is no longer accepting new tasks.
-        Closed,
-        /// The scope is not accepting new tasks and all tasks have completed.
-        ///
-        /// This is purely an optimization; it is not guaranteed to be set.
+        /// The scope is active.
+        Active,
+        /// The scope has been signalled to cancel and is waiting for all guards
+        /// to be released.
+        PendingCancellation,
+        /// The scope is not accepting new tasks and all tasks have been
+        /// scheduled to be dropped.
         Finished,
     }
 
     impl Status {
-        pub fn can_spawn(&self) -> bool {
+        /// Returns whether this records a cancelled state.
+        pub fn is_cancelled(&self) -> bool {
             match self {
-                Status::Open => true,
-                Status::Closed | Status::Finished => false,
-            }
-        }
-
-        pub fn might_have_running_tasks(&self) -> bool {
-            match self {
-                Status::Open | Status::Closed => true,
-                Status::Finished => false,
+                Self::Active => false,
+                Self::PendingCancellation | Self::Finished => true,
             }
         }
     }
 
     impl ScopeState {
-        pub fn new(
-            parent: Option<ScopeHandle>,
-            status: Status,
-            results: Box<impl Results>,
-        ) -> Self {
+        pub fn new_root(results: Box<impl Results>) -> Self {
             Self {
-                parent,
+                parent: None,
                 children: Default::default(),
                 all_tasks: Default::default(),
                 subscopes_with_tasks: 0,
+                can_spawn: true,
+                guards: 0,
+                status: Default::default(),
+                results,
+            }
+        }
+
+        pub fn new_child(
+            parent_handle: ScopeHandle,
+            parent_state: &Self,
+            results: Box<impl Results>,
+        ) -> Self {
+            let (status, can_spawn) = match parent_state.status {
+                Status::Active => (Status::Active, parent_state.can_spawn),
+                Status::Finished | Status::PendingCancellation => (Status::Finished, false),
+            };
+            Self {
+                parent: Some(parent_handle),
+                children: Default::default(),
+                all_tasks: Default::default(),
+                subscopes_with_tasks: 0,
+                can_spawn,
+                guards: 0,
                 status,
                 results,
             }
@@ -790,7 +948,7 @@ mod state {
         /// Attempts to add a task to the scope. Returns the task if the scope cannot accept a task
         /// (since it isn't safe to drop the task whilst the lock is held).
         pub fn insert_task(&mut self, task: TaskHandle, for_stream: bool) -> Option<TaskHandle> {
-            if !self.status.can_spawn() || (!for_stream && !self.results.can_spawn()) {
+            if !self.can_spawn || (!for_stream && !self.results.can_spawn()) {
                 return Some(task);
             }
             if self.all_tasks.is_empty() && !self.register_first_task() {
@@ -820,11 +978,16 @@ mod state {
             self.status
         }
 
+        pub fn guards(&self) -> u32 {
+            self.guards
+        }
+
         pub fn close(&mut self) {
-            self.status = Status::Closed;
+            self.can_spawn = false;
         }
 
         pub fn mark_finished(&mut self) {
+            self.can_spawn = false;
             self.status = Status::Finished;
         }
 
@@ -832,10 +995,33 @@ mod state {
             self.subscopes_with_tasks > 0
         }
 
-        pub fn wake_all(&self) {
+        pub fn wake_all_with_active_guard(&mut self) {
+            let mut count = 0;
             for task in &self.all_tasks {
-                task.wake();
+                if task.wake_with_active_guard() {
+                    count += 1;
+                }
             }
+            self.acquire_cancel_guard(count);
+        }
+
+        pub fn abort_tasks_and_mark_finished(&mut self) {
+            for task in self.all_tasks() {
+                if task.abort() {
+                    task.scope().executor().ready_tasks.push(task.clone());
+                }
+                // Don't bother dropping tasks that are finished; the entire
+                // scope is going to be dropped soon anyway.
+            }
+            self.mark_finished();
+        }
+
+        pub fn wake_wakers_and_mark_pending(
+            this: &mut ConditionGuard<'_, ScopeState>,
+            wakers: &mut Vec<Waker>,
+        ) {
+            wakers.extend(this.drain_wakers());
+            this.status = Status::PendingCancellation;
         }
 
         /// Registers our first task with the parent scope.
@@ -843,7 +1029,7 @@ mod state {
         /// Returns false if the scope is not allowed to accept a task.
         #[must_use]
         fn register_first_task(&mut self) -> bool {
-            if !self.status.can_spawn() {
+            if !self.can_spawn {
                 return false;
             }
             let can_spawn = match &self.parent {
@@ -885,10 +1071,65 @@ mod state {
             };
             wakers.extend(this.drain_wakers());
         }
+
+        /// Acquires a cancel guard IFF we're not in the finished state.
+        ///
+        /// Returns `true` if a guard was acquired.
+        pub fn acquire_cancel_guard_if_not_finished(&mut self) -> bool {
+            match self.status {
+                Status::Active | Status::PendingCancellation => {
+                    self.acquire_cancel_guard(1);
+                    true
+                }
+                Status::Finished => false,
+            }
+        }
+
+        pub fn acquire_cancel_guard(&mut self, count: u32) {
+            if count == 0 {
+                return;
+            }
+            if self.guards == 0 {
+                if let Some(parent) = self.parent.as_ref() {
+                    parent.acquire_cancel_guard();
+                }
+            }
+            self.guards += count;
+        }
+
+        pub fn release_cancel_guard(
+            this: &mut ConditionGuard<'_, Self>,
+            wake_vec: &mut WakeVec,
+            mut waker_count: usize,
+        ) {
+            this.guards = this.guards.checked_sub(1).expect("released non-acquired guard");
+            if this.guards == 0 {
+                waker_count += this.waker_count();
+                this.on_zero_guards(wake_vec, waker_count);
+                wake_vec.0.extend(this.drain_wakers())
+            } else {
+                wake_vec.0.reserve_exact(waker_count);
+            }
+        }
+
+        fn on_zero_guards(&mut self, wake_vec: &mut WakeVec, waker_count: usize) {
+            match self.status {
+                Status::Active => {}
+                Status::PendingCancellation => {
+                    self.abort_tasks_and_mark_finished();
+                }
+                // Acquiring and releasing guards post finished state is a
+                // no-op.
+                Status::Finished => {}
+            }
+            if let Some(parent) = &self.parent {
+                ScopeState::release_cancel_guard(&mut parent.lock(), wake_vec, waker_count);
+            }
+        }
     }
 
     #[derive(Default)]
-    struct WakeVec(Vec<Waker>);
+    pub struct WakeVec(Vec<Waker>);
 
     impl Drop for WakeVec {
         fn drop(&mut self) {
@@ -944,6 +1185,11 @@ mod state {
                 ScopeState::on_last_task_removed(&mut self.0, num_wakers_hint, &mut self.1 .0)
             }
         }
+
+        pub fn wake_wakers_and_mark_pending(&mut self) {
+            let Self(state, wakers) = self;
+            ScopeState::wake_wakers_and_mark_pending(state, &mut wakers.0)
+        }
     }
 
     impl<'a> Deref for ScopeWaker<'a> {
@@ -974,8 +1220,13 @@ impl Drop for ScopeInner {
         // HashSet::remove because the implementations of Hash and Eq match
         // between PtrKey and WeakScopeHandle.
         let key = unsafe { &*(self as *const _ as *const PtrKey) };
-        if let Some(parent) = &self.state.lock().parent {
+        let state = self.state.lock();
+        if let Some(parent) = &state.parent {
+            let mut wake_vec = WakeVec::default();
             let mut parent_state = parent.lock();
+            if state.guards() != 0 {
+                ScopeState::release_cancel_guard(&mut parent_state, &mut wake_vec, 0);
+            }
             parent_state.remove_child(key);
         }
     }
@@ -1013,38 +1264,38 @@ impl ScopeHandle {
         };
     }
 
-    /// Cancels the task.
+    /// Aborts the task.
     ///
     /// # Safety
     ///
     /// The caller must guarantee that `R` is the correct type.
-    pub(crate) unsafe fn cancel_task<R>(&self, task_id: usize) -> Option<R> {
+    pub(crate) unsafe fn abort_task<R>(&self, task_id: usize) -> Option<R> {
         let mut state = self.lock();
         if let Some(task) = state.results.detach(task_id) {
             drop(state);
             return task.take_result();
         }
         state.all_tasks().get(&task_id).and_then(|task| {
-            if task.cancel() {
+            if task.abort() {
                 self.inner.executor.ready_tasks.push(task.clone());
             }
             task.take_result()
         })
     }
 
-    /// Cancels and detaches the task.
-    pub(crate) fn cancel_and_detach(&self, task_id: usize) {
+    /// Aborts and detaches the task.
+    pub(crate) fn abort_and_detach(&self, task_id: usize) {
         let _tasks = {
             let mut state = ScopeWaker::from(self.lock());
             let maybe_task1 = state.results.detach(task_id);
             let mut maybe_task2 = None;
             if let Some(task) = state.all_tasks().get(&task_id) {
-                match task.cancel_and_detach() {
-                    CancelAndDetachResult::Done => maybe_task2 = state.take_task(task_id),
-                    CancelAndDetachResult::AddToRunQueue => {
+                match task.abort_and_detach() {
+                    AbortAndDetachResult::Done => maybe_task2 = state.take_task(task_id),
+                    AbortAndDetachResult::AddToRunQueue => {
                         self.inner.executor.ready_tasks.push(task.clone());
                     }
-                    CancelAndDetachResult::Pending => {}
+                    AbortAndDetachResult::Pending => {}
                 }
             }
             (maybe_task1, maybe_task2)
@@ -1065,14 +1316,14 @@ impl ScopeHandle {
         match task.take_result() {
             Some(result) => Poll::Ready(result),
             None => {
-                // The task has been cancelled so all we can do is forever return pending.
+                // The task has been aborted so all we can do is forever return pending.
                 Poll::Pending
             }
         }
     }
 
-    /// Polls for the task to be cancelled.
-    pub(crate) unsafe fn poll_cancelled<R>(
+    /// Polls for the task to be aborted.
+    pub(crate) unsafe fn poll_aborted<R>(
         &self,
         task_id: usize,
         cx: &mut Context<'_>,
@@ -1109,26 +1360,62 @@ impl ScopeHandle {
         state.task_did_finish(id);
     }
 
-    /// Cancels tasks in this scope and all child scopes.
-    fn cancel_all_tasks(&self) {
+    /// Visits scopes by state. If the callback returns `true`, children will
+    /// be visited.
+    fn visit_scopes_locked(&self, callback: impl Fn(&mut ScopeWaker<'_>) -> bool) {
         let mut scopes = vec![self.clone()];
         while let Some(scope) = scopes.pop() {
-            let mut state = scope.lock();
-            if !state.status().might_have_running_tasks() {
-                // Already cancelled or closed.
-                continue;
+            let mut scope_waker = ScopeWaker::from(scope.lock());
+            if callback(&mut scope_waker) {
+                scopes.extend(scope_waker.children().iter().filter_map(|child| child.upgrade()));
             }
-            for task in state.all_tasks() {
-                if task.cancel() {
-                    task.scope().executor().ready_tasks.push(task.clone());
-                }
-                // Don't bother dropping tasks that are finished; the entire
-                // scope is going to be dropped soon anyway.
-            }
-            // Copy children to a vec so we don't hold the lock for too long.
-            scopes.extend(state.children().iter().filter_map(|child| child.upgrade()));
-            state.mark_finished();
         }
+    }
+
+    fn acquire_cancel_guard(&self) {
+        self.lock().acquire_cancel_guard(1)
+    }
+
+    pub(crate) fn release_cancel_guard(&self) {
+        let mut wake_vec = WakeVec::default();
+        ScopeState::release_cancel_guard(&mut self.lock(), &mut wake_vec, 0);
+    }
+
+    /// Cancels tasks in this scope and all child scopes.
+    fn cancel_all_tasks(&self) {
+        self.visit_scopes_locked(|state| {
+            match state.status() {
+                Status::Active => {
+                    if state.guards() == 0 {
+                        state.abort_tasks_and_mark_finished();
+                    } else {
+                        state.wake_wakers_and_mark_pending();
+                    }
+                    true
+                }
+                Status::PendingCancellation => {
+                    // If we're already pending cancellation, don't wake all
+                    // tasks. A single wake should be enough here. More
+                    // wakes on further calls probably hides bugs.
+                    true
+                }
+                Status::Finished => {
+                    // Already finished.
+                    false
+                }
+            }
+        });
+    }
+
+    /// Aborts tasks in this scope and all child scopes.
+    fn abort_all_tasks(&self) {
+        self.visit_scopes_locked(|state| match state.status() {
+            Status::Active | Status::PendingCancellation => {
+                state.abort_tasks_and_mark_finished();
+                true
+            }
+            Status::Finished => false,
+        });
     }
 
     /// Drops tasks in this scope and all child scopes.
@@ -1168,7 +1455,7 @@ impl Borrow<PtrKey> for WeakScopeHandle {
 
 impl PartialEq for PtrKey {
     fn eq(&self, other: &Self) -> bool {
-        self as *const _ == other as *const _
+        std::ptr::eq(self, other)
     }
 }
 
@@ -1311,14 +1598,17 @@ impl<R: Send + 'static> Results for ResultsStream<R> {
 
 #[cfg(test)]
 mod tests {
+    // NOTE: Tests that work on both the fuchsia and portable runtimes should be placed in
+    // runtime/scope.rs.
+
     use super::*;
-    use crate::{EHandle, LocalExecutor, SendExecutor, SpawnableFuture, Task, TestExecutor, Timer};
-    use assert_matches::assert_matches;
+    use crate::{
+        yield_now, EHandle, LocalExecutor, SendExecutor, SpawnableFuture, Task, TestExecutor, Timer,
+    };
     use fuchsia_sync::{Condvar, Mutex};
     use futures::channel::mpsc;
-    use futures::future::join_all;
     use futures::{FutureExt, StreamExt};
-    use std::future::{pending, poll_fn};
+    use std::future::pending;
     use std::pin::{pin, Pin};
     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1361,7 +1651,10 @@ mod tests {
 
         fn as_future(self: &Arc<Self>) -> impl Future<Output = ()> {
             let this = Arc::clone(self);
-            async move { (&*this).await }
+            #[allow(clippy::redundant_async_block)] // Allow returning `&*this` out of this fn.
+            async move {
+                (&*this).await
+            }
         }
     }
 
@@ -1463,8 +1756,8 @@ mod tests {
 
         // Running the executor after cancelling the task isn't currently
         // necessary, but we might decide to do async cleanup in the future.
-        assert_eq!(task1.cancel().now_or_never(), None);
-        assert_eq!(task2.cancel().now_or_never(), Some(Some(())));
+        assert_eq!(task1.abort().now_or_never(), None);
+        assert_eq!(task2.abort().now_or_never(), Some(Some(())));
 
         assert_eq!(executor.run_until_stalled(&mut pending::<()>()), Poll::Pending);
         assert_eq!(scope.lock().all_tasks().len(), 0);
@@ -1490,7 +1783,7 @@ mod tests {
         let mut join = pin!(scope.join().fuse());
         let _ = executor.run_until_stalled(&mut join);
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
-        let _ = task2.cancel();
+        drop(task2.abort());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
     }
 
@@ -1503,13 +1796,13 @@ mod tests {
         let outstanding_task = scope.spawn(pending::<()>());
         let cancelled_task = scope.spawn(pending::<()>());
         assert_eq!(
-            executor.run_until_stalled(&mut pin!(cancelled_task.cancel())),
+            executor.run_until_stalled(&mut pin!(cancelled_task.abort())),
             Poll::Ready(None)
         );
         let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
         assert_eq!(
-            executor.run_until_stalled(&mut pin!(outstanding_task.cancel())),
+            executor.run_until_stalled(&mut pin!(outstanding_task.abort())),
             Poll::Ready(None)
         );
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
@@ -1877,57 +2170,58 @@ mod tests {
     }
 
     #[test]
-    fn on_no_tasks() {
-        let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
-        let _task1 = scope.spawn(std::future::ready(()));
-        let task2 = scope.spawn(pending::<()>());
+    fn wake_all_with_active_guard_on_send_executor() {
+        let mut executor = SendExecutor::new(2);
+        let scope = executor.root_scope().new_child();
 
-        let mut on_no_tasks = pin!(scope.on_no_tasks());
+        let (tx, mut rx) = mpsc::unbounded();
+        // Bottom 32 bits are the poll count. Top 32 bits are when to signal.
+        let state = Arc::new(AtomicU64::new(0));
 
-        assert!(executor.run_until_stalled(&mut on_no_tasks).is_pending());
-
-        let _ = task2.cancel();
-
-        let on_no_tasks2 = pin!(scope.on_no_tasks());
-        let on_no_tasks3 = pin!(scope.on_no_tasks());
-
-        assert_matches!(
-            executor.run_until_stalled(&mut join_all([on_no_tasks, on_no_tasks2, on_no_tasks3])),
-            Poll::Ready(_)
-        );
-    }
-
-    #[test]
-    fn wake_all() {
-        let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
-
-        let poll_count = Arc::new(AtomicU64::new(0));
-
-        struct PollCounter(Arc<AtomicU64>);
+        struct PollCounter(Arc<AtomicU64>, mpsc::UnboundedSender<()>);
 
         impl Future for PollCounter {
             type Output = ();
             fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
-                self.0.fetch_add(1, Ordering::Relaxed);
+                let old = self.0.fetch_add(1, Ordering::Relaxed);
+                if old >> 32 == (old + 1) & u32::MAX as u64 {
+                    let _ = self.1.unbounded_send(());
+                }
                 Poll::Pending
             }
         }
 
-        scope.spawn(PollCounter(poll_count.clone()));
-        scope.spawn(PollCounter(poll_count.clone()));
+        scope.spawn(PollCounter(state.clone(), tx.clone()));
+        scope.spawn(PollCounter(state.clone(), tx.clone()));
 
-        let _ = executor.run_until_stalled(&mut pending::<()>());
+        executor.run(async move {
+            let mut wait_for_poll_count = async |count| {
+                let old = state.fetch_or(count << 32, Ordering::Relaxed);
+                if old & u32::MAX as u64 != count {
+                    rx.next().await.unwrap();
+                }
+                state.fetch_and(u32::MAX as u64, Ordering::Relaxed);
+            };
 
-        let mut start_count = poll_count.load(Ordering::Relaxed);
+            // We must assume the executor will only poll the two tasks once each.
+            wait_for_poll_count(2).await;
 
-        for _ in 0..2 {
-            scope.wake_all();
-            let _ = executor.run_until_stalled(&mut pending::<()>());
-            assert_eq!(poll_count.load(Ordering::Relaxed), start_count + 2);
-            start_count += 2;
-        }
+            let mut start_count = 2;
+            for _ in 0..2 {
+                scope.wake_all_with_active_guard();
+
+                wait_for_poll_count(start_count + 2).await;
+                start_count += 2;
+            }
+
+            // Wake, then cancel the scope and verify the tasks still get polled.
+            scope.wake_all_with_active_guard();
+            let done = scope.cancel();
+
+            wait_for_poll_count(start_count + 2).await;
+
+            done.await;
+        });
     }
 
     #[test]
@@ -1951,20 +2245,6 @@ mod tests {
         }
     }
 
-    async fn yield_to_executor() {
-        let mut done = false;
-        poll_fn(|cx| {
-            if done {
-                Poll::Ready(())
-            } else {
-                done = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        })
-        .await;
-    }
-
     #[test]
     fn test_detach() {
         let mut e = LocalExecutor::new();
@@ -1975,7 +2255,7 @@ mod tests {
                 let counter = counter.clone();
                 Task::spawn(async move {
                     for _ in 0..5 {
-                        yield_to_executor().await;
+                        yield_now().await;
                         counter.fetch_add(1, Ordering::Relaxed);
                     }
                 })
@@ -1983,7 +2263,7 @@ mod tests {
             }
 
             while counter.load(Ordering::Relaxed) != 5 {
-                yield_to_executor().await;
+                yield_now().await;
             }
         });
 
@@ -1998,14 +2278,14 @@ mod tests {
             // First, just drop the task.
             {
                 let ref_count = ref_count.clone();
-                let _ = Task::spawn(async move {
+                drop(Task::spawn(async move {
                     let _ref_count = ref_count;
                     let _: () = std::future::pending().await;
-                });
+                }));
             }
 
             while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
+                yield_now().await;
             }
 
             // Now try explicitly cancelling.
@@ -2017,9 +2297,9 @@ mod tests {
                 })
             };
 
-            assert_eq!(task.cancel().await, None);
+            assert_eq!(task.abort().await, None);
             while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
+                yield_now().await;
             }
 
             // Now cancel a task that has already finished.
@@ -2032,10 +2312,10 @@ mod tests {
 
             // Wait for it to finish.
             while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
+                yield_now().await;
             }
 
-            assert_eq!(task.cancel().await, Some(()));
+            assert_eq!(task.abort().await, Some(()));
         });
 
         assert!(e.ehandle.root_scope.lock().results.is_empty());
@@ -2062,7 +2342,7 @@ mod tests {
                     running.1.wait(&mut guard);
                 }
             }
-            assert_eq!(task.cancel().await, Some("foo"));
+            assert_eq!(task.abort().await, Some("foo"));
             assert!(!*running.0.lock());
         });
     }
@@ -2114,9 +2394,9 @@ mod tests {
     #[test]
     fn test_dropped_cancel_cleans_up() {
         test_clean_up(|task| {
-            let cancel_fut = std::pin::pin!(task.cancel());
+            let abort_fut = std::pin::pin!(task.abort());
             let waker = futures::task::noop_waker();
-            assert!(cancel_fut.poll(&mut Context::from_waker(&waker)).is_pending());
+            assert!(abort_fut.poll(&mut Context::from_waker(&waker)).is_pending());
         });
     }
 
@@ -2228,12 +2508,170 @@ mod tests {
     fn test_scope_stream_collect() {
         let mut executor = SendExecutor::new(2);
         executor.run(async move {
-            let stream: ScopeStream<_> = (0..10).into_iter().map(|i| async move { i }).collect();
+            let stream: ScopeStream<_> = (0..10).map(|i| async move { i }).collect();
             assert_eq!(stream.collect::<HashSet<u32>>().await, HashSet::from_iter(0..10));
 
             let stream: ScopeStream<_> =
-                (0..10).into_iter().map(|i| SpawnableFuture::new(async move { i })).collect();
+                (0..10).map(|i| SpawnableFuture::new(async move { i })).collect();
             assert_eq!(stream.collect::<HashSet<u32>>().await, HashSet::from_iter(0..10));
         });
+    }
+
+    struct DropSignal(Arc<AtomicBool>);
+
+    impl Drop for DropSignal {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    struct DropChecker(Arc<AtomicBool>);
+
+    impl DropChecker {
+        fn new() -> (Self, DropSignal) {
+            let inner = Arc::new(AtomicBool::new(false));
+            (Self(inner.clone()), DropSignal(inner))
+        }
+
+        fn is_dropped(&self) -> bool {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    #[test]
+    fn child_finished_when_parent_pending() {
+        let mut executor = LocalExecutor::new();
+        executor.run_singlethreaded(async {
+            let scope = Scope::new();
+            let _guard = scope.active_guard().expect("acquire guard");
+            let cancel = scope.to_handle().cancel();
+            let child = scope.new_child();
+            let (checker, signal) = DropChecker::new();
+            child.spawn(async move {
+                let _signal = signal;
+                futures::future::pending::<()>().await
+            });
+            assert!(checker.is_dropped());
+            assert!(child.active_guard().is_none());
+            cancel.await;
+        })
+    }
+
+    #[test]
+    fn guarded_scopes_observe_closed() {
+        let mut executor = LocalExecutor::new();
+        executor.run_singlethreaded(async {
+            let scope = Scope::new();
+            let handle = scope.to_handle();
+            let _guard = scope.active_guard().expect("acquire guard");
+            handle.close();
+            let (checker, signal) = DropChecker::new();
+            handle.spawn(async move {
+                let _signal = signal;
+                futures::future::pending::<()>().await
+            });
+            assert!(checker.is_dropped());
+            let (checker, signal) = DropChecker::new();
+            let cancel = handle.clone().cancel();
+            handle.spawn(async move {
+                let _signal = signal;
+                futures::future::pending::<()>().await
+            });
+            assert!(checker.is_dropped());
+            scope.join().await;
+            cancel.await;
+        })
+    }
+
+    #[test]
+    fn child_guard_holds_parent_cancellation() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.global_scope().new_child();
+        let child = scope.new_child();
+        let guard = child.active_guard().expect("acquire guard");
+        scope.spawn(futures::future::pending());
+        let mut join = pin!(scope.cancel());
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
+        drop(guard);
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
+    }
+
+    #[test]
+    fn active_guard_on_cancel() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.global_scope().new_child();
+        let child1 = scope.new_child();
+        let child2 = scope.new_child();
+        let guard = child1.active_guard().expect("acquire guard");
+        let guard_for_right_scope = guard.clone();
+        let guard_for_wrong_scope = guard.clone();
+        child1.spawn(async move { guard_for_right_scope.on_cancel().await });
+        child2.spawn(async move {
+            guard_for_wrong_scope.on_cancel().await;
+        });
+
+        let handle = scope.to_handle();
+        let mut join = pin!(scope.join());
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
+        let cancel: Join<_> = handle.cancel();
+        drop(cancel);
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
+    }
+
+    #[test]
+    fn abort_join() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.global_scope().new_child();
+        let child = scope.new_child();
+        let _guard = child.active_guard().expect("acquire guard");
+
+        let (checker1, signal) = DropChecker::new();
+        scope.spawn(async move {
+            let _signal = signal;
+            futures::future::pending::<()>().await
+        });
+        let (checker2, signal) = DropChecker::new();
+        scope.spawn(async move {
+            let _signal = signal;
+            futures::future::pending::<()>().await
+        });
+
+        let mut join = pin!(scope.cancel());
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
+        assert!(!checker1.is_dropped());
+        assert!(!checker2.is_dropped());
+
+        let mut join = join.abort();
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
+        assert!(checker1.is_dropped());
+        assert!(checker2.is_dropped());
+    }
+
+    #[test]
+    fn child_without_guard_aborts_immediately_on_cancel() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.global_scope().new_child();
+        let child = scope.new_child();
+        let guard = scope.active_guard().expect("acquire guard");
+
+        let (checker_scope, signal) = DropChecker::new();
+        scope.spawn(async move {
+            let _signal = signal;
+            futures::future::pending::<()>().await
+        });
+        let (checker_child, signal) = DropChecker::new();
+        child.spawn(async move {
+            let _signal = signal;
+            futures::future::pending::<()>().await
+        });
+
+        let mut join = pin!(scope.cancel());
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
+        assert!(!checker_scope.is_dropped());
+        assert!(checker_child.is_dropped());
+
+        drop(guard);
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
+        assert!(checker_child.is_dropped());
     }
 }

@@ -7,9 +7,10 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_X86_DESCRIPTOR_H_
 #define ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_X86_DESCRIPTOR_H_
 
-#include <lib/stdcompat/span.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include <span>
 
 #include <hwreg/bitfields.h>
 
@@ -235,7 +236,7 @@ struct SegmentSelector {
 // [amd/vol2]: Figure 4-8. GDTR and IDTR Format-Long Mode.
 struct GdtRegister64 {
   template <typename T, size_t N>
-  static GdtRegister64 Make(cpp20::span<T, N> entries) {
+  static GdtRegister64 Make(std::span<T, N> entries) {
     return {
         .limit = static_cast<uint16_t>(entries.size_bytes() - 1),
         .base = reinterpret_cast<uintptr_t>(entries.data()),

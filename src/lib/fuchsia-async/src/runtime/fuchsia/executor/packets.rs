@@ -83,7 +83,7 @@ where
 
     /// The internal `PacketReceiver`.
     pub fn receiver(&self) -> &T {
-        &*self.receiver
+        &self.receiver
     }
 
     /// The `zx::Port` on which packets destined for this `PacketReceiver` should be queued.

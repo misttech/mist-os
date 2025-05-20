@@ -66,14 +66,13 @@ class ThreadRef<RefType::kInline> {
   Koid process_;
   Koid thread_;
 };
-#if __cplusplus >= 201703L
+
 ThreadRef(zx_koid_t, zx_koid_t) -> ThreadRef<RefType::kInline>;
 
 ThreadRef(Koid, Koid) -> ThreadRef<RefType::kInline>;
 
 template <typename T, EnableIfConvertibleToThreadRef<T, RefType::kInline> = true>
 ThreadRef(const T&) -> ThreadRef<RefType::kInline>;
-#endif
 
 template <>
 class ThreadRef<RefType::kId> {
@@ -101,12 +100,10 @@ class ThreadRef<RefType::kId> {
 
   uint8_t id_;
 };
-#if __cplusplus >= 201703L
 ThreadRef(uint8_t) -> ThreadRef<RefType::kId>;
 
 template <typename T, EnableIfConvertibleToThreadRef<T, RefType::kId> = true>
 ThreadRef(const T&) -> ThreadRef<RefType::kId>;
-#endif
 
 }  // namespace fxt
 

@@ -71,7 +71,7 @@ impl Cache<crate::storage::Config> {
 
 /// Invalidate the cache. Call this if you do anything that might make a cached config go stale
 /// in a critical way, like changing the environment.
-pub(crate) async fn invalidate<T>(cache: &Cache<T>) {
+pub(crate) fn invalidate<T>(cache: &Cache<T>) {
     *cache.locker.write().expect("config write guard") = None;
 }
 
@@ -123,7 +123,7 @@ fn load_config_with_instant<T>(
 mod test {
     use super::*;
 
-    async fn load(now: Instant, cache: &Cache<usize>) {
+    fn load(now: Instant, cache: &Cache<usize>) {
         let tests = 25;
         let mut result = Vec::new();
         for x in 0..tests {
@@ -135,7 +135,7 @@ mod test {
         });
     }
 
-    async fn load_and_test(
+    fn load_and_test(
         now: Instant,
         expected_before: bool,
         expected_after: bool,
@@ -145,28 +145,28 @@ mod test {
             let read_guard = cache.locker.read().expect("config read guard");
             assert_eq!(expected_before, (*read_guard).is_some());
         }
-        load(now, cache).await;
+        load(now, cache);
         {
             let read_guard = cache.locker.read().expect("config read guard");
             assert_eq!(expected_after, (*read_guard).is_some());
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_config_timeout() {
+    #[fuchsia::test]
+    fn test_config_timeout() {
         let now = Instant::now();
         let cache = Cache::default();
-        load_and_test(now, false, true, &cache).await;
+        load_and_test(now, false, true, &cache);
         let timeout = now.checked_add(CONFIG_CACHE_TIMEOUT).expect("timeout should not overflow");
         let after_timeout = timeout
             .checked_add(Duration::from_millis(1))
             .expect("after timeout should not overflow");
-        load_and_test(timeout, true, true, &cache).await;
-        load_and_test(after_timeout, true, true, &cache).await;
+        load_and_test(timeout, true, true, &cache);
+        load_and_test(after_timeout, true, true, &cache);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_expiration_check_does_not_panic() -> Result<()> {
+    #[fuchsia::test]
+    fn test_expiration_check_does_not_panic() -> Result<()> {
         let now = Instant::now();
         let later = now.checked_add(Duration::from_millis(1)).expect("timeout should not overflow");
         let item = CacheItem { created: later, config: Arc::new(RwLock::new(1)) };

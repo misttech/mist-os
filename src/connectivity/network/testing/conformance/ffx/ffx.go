@@ -8,11 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
@@ -31,7 +33,73 @@ type FfxInstance struct {
 		isClosed bool
 		sync.Mutex
 	}
-	*ffxutil.FFXInstance
+	ffx *ffxutil.FFXInstance
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) GetSshAuthorizedKeys() string {
+	return f.ffx.GetSshAuthorizedKeys()
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) GetSshPrivateKey() string {
+	return f.ffx.GetSshPrivateKey()
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) ConfigSet(ctx context.Context, key, value string) error {
+	return f.ffx.ConfigSet(ctx, key, value)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) SetStdoutStderr(stdout, stderr io.Writer) {
+	f.ffx.SetStdoutStderr(stdout, stderr)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) RunAndGetOutput(ctx context.Context, args ...string) (string, error) {
+	return f.ffx.RunAndGetOutput(ctx, args...)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) RunWithTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
+	return f.ffx.RunWithTimeout(ctx, timeout, args...)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) RunWithTarget(ctx context.Context, args ...string) error {
+	return f.ffx.RunWithTarget(ctx, args...)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
+	return f.ffx.RunWithTargetAndTimeout(ctx, timeout, args...)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) WaitForDaemon(ctx context.Context) error {
+	return f.ffx.WaitForDaemon(ctx)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) TargetWait(ctx context.Context, args ...string) error {
+	return f.ffx.TargetWait(ctx, args...)
+}
+
+// This method is relied upon in third_party/network-conformance and changing
+// the definition requires a soft transition.
+func (f *FfxInstance) Stop() error {
+	return f.ffx.Stop()
 }
 
 // Options for creating an FfxInstance.
@@ -128,9 +196,9 @@ func NewFfxInstance(
 	if err != nil {
 		return nil, fmt.Errorf("ffxutil.NewFFXInstance(..) = %w", err)
 	}
-	wrapperFfxInstance.FFXInstance = ffxInstance
+	wrapperFfxInstance.ffx = ffxInstance
 
-	if err := wrapperFfxInstance.SetLogLevel(ctx, ffxutil.Warn); err != nil {
+	if err := wrapperFfxInstance.ffx.SetLogLevel(ctx, ffxutil.Warn); err != nil {
 		return nil, fmt.Errorf("wrapperFfxInstance.SetLogLevel(%q) = %w", ffxutil.Warn, err)
 	}
 
@@ -168,7 +236,7 @@ func (f *FfxInstance) Close() error {
 const ffxIsolateDirKey = "FFX_ISOLATE_DIR="
 
 func (f *FfxInstance) FfxIsolateDir() (string, error) {
-	for _, envPair := range f.Env() {
+	for _, envPair := range f.ffx.Env() {
 		if strings.HasPrefix(envPair, ffxIsolateDirKey) {
 			return envPair[len(ffxIsolateDirKey):], nil
 		}

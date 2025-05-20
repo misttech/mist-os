@@ -7,6 +7,7 @@
 #include "src/developer/debug/zxdb/common/curl.h"
 #include "src/developer/debug/zxdb/console/format_name.h"
 #include "tools/symbolizer/command_line_options.h"
+#include "tools/symbolizer/symbolizer.h"
 #include "tools/symbolizer/symbolizer_impl.h"
 
 extern "C" {
@@ -20,6 +21,10 @@ symbolizer::SymbolizerImpl* symbolizer_new() {
 }
 void symbolizer_free(symbolizer::SymbolizerImpl* symbolizer) { delete symbolizer; }
 
+void symbolizer_reset(symbolizer::SymbolizerImpl* symbolizer) {
+  symbolizer::Symbolizer::ResetType type_t = symbolizer::Symbolizer::ResetType::kUnknown;
+  symbolizer->Reset(false, type_t);
+}
 void symbolizer_add_module(symbolizer::SymbolizerImpl* symbolizer, uint64_t id, const char* name,
                            size_t name_len, const char* build_id, size_t build_id_len) {
   symbolizer->Module(id, std::string_view(name, name_len),

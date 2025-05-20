@@ -63,7 +63,7 @@ Inspector::Inspector(zx::vmo vmo)
   *root_ = state_->CreateRootNode();
 }
 
-cpp17::optional<zx::vmo> Inspector::FrozenVmoCopy() const {
+std::optional<zx::vmo> Inspector::FrozenVmoCopy() const {
   if (!state_) {
     return {};
   }
@@ -81,7 +81,7 @@ zx::vmo Inspector::DuplicateVmo() const {
   return ret;
 }
 
-cpp17::optional<zx::vmo> Inspector::CopyVmo() const {
+std::optional<zx::vmo> Inspector::CopyVmo() const {
   zx::vmo ret;
 
   if (!state_->Copy(&ret)) {
@@ -91,7 +91,7 @@ cpp17::optional<zx::vmo> Inspector::CopyVmo() const {
   return {std::move(ret)};
 }
 
-cpp17::optional<std::vector<uint8_t>> Inspector::CopyBytes() const {
+std::optional<std::vector<uint8_t>> Inspector::CopyBytes() const {
   std::vector<uint8_t> ret;
   if (!state_->CopyBytes(&ret)) {
     return {};

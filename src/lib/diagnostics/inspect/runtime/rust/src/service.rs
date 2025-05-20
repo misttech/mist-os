@@ -14,69 +14,90 @@ use fidl_fuchsia_mem::Buffer;
 use fuchsia_async as fasync;
 use fuchsia_inspect::reader::ReadableTree;
 use fuchsia_inspect::Inspector;
-use futures::{FutureExt, TryStreamExt};
+use futures::{FutureExt, TryFutureExt, TryStreamExt};
 use log::warn;
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 
 /// Runs a server for the `fuchsia.inspect.Tree` protocol. This protocol returns the VMO
 /// associated with the given tree on `get_content` and allows to open linked trees (lazy nodes).
-pub async fn handle_request_stream(
+#[allow(clippy::manual_async_fn)] // required because of recursion
+pub fn handle_request_stream(
     inspector: Inspector,
     settings: TreeServerSendPreference,
     mut stream: TreeRequestStream,
     scope: fasync::Scope,
-) -> Result<(), Error> {
-    while let Some(request) = stream.try_next().await? {
-        match request {
-            TreeRequest::GetContent { responder } => {
-                // If freezing fails, full snapshot algo needed on live duplicate
-                let vmo = match settings {
-                    TreeServerSendPreference::DeepCopy => inspector.copy_vmo(),
-                    TreeServerSendPreference::Live => inspector.duplicate_vmo(),
-                    TreeServerSendPreference::Frozen { ref on_failure } => {
-                        inspector.frozen_vmo_copy().or_else(|| match **on_failure {
-                            TreeServerSendPreference::DeepCopy => inspector.copy_vmo(),
-                            TreeServerSendPreference::Live => inspector.duplicate_vmo(),
-                            _ => None,
-                        })
-                    }
-                };
+) -> impl futures::Future<Output = Result<(), Error>> + Send {
+    async move {
+        while let Some(request) = stream.try_next().await? {
+            match request {
+                TreeRequest::GetContent { responder } => {
+                    // If freezing fails, full snapshot algo needed on live duplicate
+                    let vmo = match settings {
+                        TreeServerSendPreference::DeepCopy => inspector.copy_vmo(),
+                        TreeServerSendPreference::Live => inspector.duplicate_vmo(),
+                        TreeServerSendPreference::Frozen { ref on_failure } => {
+                            inspector.frozen_vmo_copy().or_else(|| match **on_failure {
+                                TreeServerSendPreference::DeepCopy => inspector.copy_vmo(),
+                                TreeServerSendPreference::Live => inspector.duplicate_vmo(),
+                                _ => None,
+                            })
+                        }
+                    };
 
-                let buffer_data = vmo.and_then(|vmo| vmo.get_size().ok().map(|size| (vmo, size)));
-                let content = TreeContent {
-                    buffer: buffer_data.map(|data| Buffer { vmo: data.0, size: data.1 }),
-                    ..Default::default()
-                };
-                responder.send(content)?;
-            }
-            TreeRequest::ListChildNames { tree_iterator, .. } => {
-                let values = inspector.tree_names().await?;
-                let request_stream = tree_iterator.into_stream();
-                scope.spawn(run_tree_name_iterator_server(values, request_stream).map(|e| {
-                    e.unwrap_or_else(
-                        |err: Error| warn!(err:?; "failed to run tree name iterator server"),
-                    )
-                }));
-            }
-            TreeRequest::OpenChild { child_name, tree, .. } => {
-                if let Ok(inspector) = inspector.read_tree(&child_name).await {
-                    spawn_tree_server_with_stream(
-                        inspector,
-                        settings.clone(),
-                        tree.into_stream(),
-                        scope.as_handle(),
-                    );
+                    let buffer_data =
+                        vmo.and_then(|vmo| vmo.get_size().ok().map(|size| (vmo, size)));
+                    let content = TreeContent {
+                        buffer: buffer_data.map(|data| Buffer { vmo: data.0, size: data.1 }),
+                        ..Default::default()
+                    };
+                    responder.send(content)?;
+                }
+                TreeRequest::ListChildNames { tree_iterator, .. } => {
+                    let request_stream = tree_iterator.into_stream();
+                    let inspector = inspector.clone();
+                    scope.spawn(async move {
+                        inspector
+                            .tree_names()
+                            .map_err(|e| anyhow::anyhow!("{e:?}"))
+                            .and_then(|values| {
+                                run_tree_name_iterator_server(values, request_stream)
+                            })
+                            .map_err(|err| {
+                                warn!(err:?; "failed to run tree name iterator server");
+                            })
+                            .map(|_| {})
+                            .await
+                    });
+                }
+                TreeRequest::OpenChild { child_name, tree, .. } => {
+                    let nested = scope.new_child_with_name("nested_tree_server");
+                    let inspector = inspector.clone();
+                    let settings = settings.clone();
+                    let stream = tree.into_stream();
+                    scope.spawn(async move {
+                        inspector
+                            .read_tree(&child_name)
+                            .map_err(|e| anyhow::anyhow!("{e:?}"))
+                            .and_then(|inspector| {
+                                handle_request_stream(inspector, settings, stream, nested)
+                            })
+                            .map_err(|err| {
+                                warn!(err:?; "failed to run `fuchsia.inspect.Tree` server");
+                            })
+                            .map(|_| {})
+                            .await
+                    });
+                }
+                TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                    warn!(ordinal, method_type:?; "Unknown request");
                 }
             }
-            TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                warn!(ordinal, method_type:?; "Unknown request");
-            }
         }
+
+        scope.join().await;
+
+        Ok(())
     }
-
-    scope.join().await;
-
-    Ok(())
 }
 
 /// Spawns a server for the `fuchsia.inspect.Tree` protocol. This protocol returns the VMO
@@ -289,6 +310,15 @@ mod tests {
             .boxed()
         });
 
+        root.record_lazy_values("lazy-node-doesnt-hang", || {
+            async move {
+                let inspector = Inspector::default();
+                inspector.root().record_string("from", "non-hanging");
+                Ok(inspector)
+            }
+            .boxed()
+        });
+
         root.record_int("int", 3);
 
         let (_server, proxy) = spawn_server_proxy(inspector, TreeServerSendPreference::default());
@@ -296,6 +326,7 @@ mod tests {
         assert_json_diff!(result, root: {
             child: "value",
             int: 3i64,
+            from: "non-hanging",
         });
 
         Ok(())

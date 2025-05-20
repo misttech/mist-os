@@ -98,7 +98,6 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
   };
   VerifyNodes(kNodeMonikers);
 
-  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/cpu-ctrl", 2));
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/thermal", 2));
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/adc", 4));
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForClassDeviceCount("class/temperature", 3));

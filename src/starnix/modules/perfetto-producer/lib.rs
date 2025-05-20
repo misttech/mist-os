@@ -12,7 +12,7 @@ use perfetto_protos::perfetto::protos::{
 };
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::socket::{
-    new_socket_file, resolve_unix_socket_address, Socket, SocketDomain, SocketPeer, SocketProtocol,
+    resolve_unix_socket_address, Socket, SocketDomain, SocketFile, SocketPeer, SocketProtocol,
     SocketType,
 };
 use starnix_core::vfs::FsString;
@@ -185,7 +185,7 @@ where
     loop {
         // This seems bad, is there a way to actually wait for the socket to appear and be ready?
         std::thread::sleep(std::time::Duration::from_secs(5));
-        let Ok(conn_file) = new_socket_file(
+        let Ok(conn_file) = SocketFile::new_socket(
             locked,
             current_task,
             SocketDomain::Unix,

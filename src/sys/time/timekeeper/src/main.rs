@@ -11,6 +11,7 @@ mod diagnostics;
 mod enums;
 mod estimator;
 mod power_topology_integration;
+mod reachability;
 mod rtc;
 mod rtc_testing;
 mod time_source;
@@ -44,8 +45,9 @@ use time_adjust::Command;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use zx::BootTimeline;
 use {
-    fidl_fuchsia_time as ftime, fidl_fuchsia_time_alarms as fta,
-    fidl_fuchsia_time_external as ffte, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync,
+    fidl_fuchsia_net_reachability as ffnr, fidl_fuchsia_time as ftime,
+    fidl_fuchsia_time_alarms as fta, fidl_fuchsia_time_external as ffte,
+    fidl_fuchsia_time_test as fftt, fuchsia_async as fasync,
 };
 
 type UtcTransform = time_util::Transform<BootTimeline, UtcTimeline>;
@@ -135,8 +137,6 @@ impl Config {
         self.source_config.early_exit
     }
 
-    // TODO: b/295537795 - remove annotation once used.
-    #[allow(dead_code)]
     fn power_topology_integration_enabled(&self) -> bool {
         self.source_config.power_topology_integration_enabled
     }
@@ -169,6 +169,10 @@ impl Config {
     fn max_window_width_future(&self) -> UtcDuration {
         assert!(self.source_config.utc_max_allowed_delta_future_sec >= 0);
         UtcDuration::from_seconds(self.source_config.utc_max_allowed_delta_future_sec)
+    }
+
+    fn use_connectivity(&self) -> bool {
+        self.source_config.use_connectivity
     }
 }
 
@@ -294,6 +298,7 @@ async fn main() -> Result<()> {
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
+    let use_connectivity = config.use_connectivity();
     let ps = persistent_state.clone();
 
     if config.has_always_on_counter() {
@@ -400,6 +405,23 @@ async fn main() -> Result<()> {
     } else {
         None
     });
+
+    if use_connectivity {
+        // Start the connectivity monitor loop. The loop may fail, in which case,
+        // we will effectively be disabling reachability and external time sync.
+        if let Ok(proxy) = fuchsia_component::client::connect_to_protocol::<ffnr::MonitorMarker>() {
+            let cmd = cmd_send.clone();
+            let mut monitor = reachability::Monitor::new(cmd);
+            fasync::Task::local(async move {
+                if let Err(result) = monitor.serve(proxy).await {
+                    error!("error on fuchsia.net.reachability/Monitor: {:?}", &result);
+                }
+            })
+            .detach();
+        } else {
+            warn!("no connection to fuchsia.net.reachability/Monitor: sampling time sources is turned off.");
+        }
+    }
 
     // fuchsia::main can only return () or Result<()>.
     let result = fs
@@ -697,7 +719,8 @@ async fn maintain_utc<R: Rtc, D: 'static>(
 // Reexport test config creation to be used in other tests.
 #[cfg(test)]
 use tests::{
-    make_test_config, make_test_config_with_delay, make_test_config_with_fn, run_in_fake_time,
+    clone_system_time, make_test_config, make_test_config_with_delay, make_test_config_with_fn,
+    run_in_fake_time,
 };
 
 #[cfg(test)]
@@ -727,6 +750,30 @@ mod tests {
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
+    }
+
+    // Sets up the given `executor` to the current system time.
+    //
+    // Most importantly, handles possible discrepancy between the boot and monotonic
+    // timelines, which can make a difference in the case of timekeeping tests.
+    //
+    // # Returns
+    // - The applied monotonic and boot instants as a tuple, in that order.
+    pub fn clone_system_time(
+        executor: &mut fasync::TestExecutor,
+    ) -> (zx::MonotonicInstant, zx::BootInstant) {
+        let real_now = zx::MonotonicInstant::get();
+        let real_boot_now = zx::BootInstant::get();
+        let offset_nanos = real_boot_now.into_nanos() - real_now.into_nanos();
+
+        // Offset is nonnegative by definition, since the boot time reading is at least
+        // the monotonic time reading.
+        assert!(offset_nanos >= 0, "offset can not be negative: {:?}", offset_nanos);
+
+        executor.set_fake_time(real_now.into());
+        let offset = zx::BootDuration::from_nanos(offset_nanos);
+        executor.set_fake_boot_to_mono_offset(offset);
+        (real_now, real_boot_now)
     }
 
     // Run the future `main_fut` in fake time.  The fake time is being advanced
@@ -813,6 +860,7 @@ mod tests {
             utc_max_allowed_delta_future_sec: 0,
             utc_max_allowed_delta_past_sec: 0,
             serve_test_protocols: false,
+            use_connectivity: false,
         };
         Arc::new(Config::from(adjust_fn(config)))
     }
@@ -1029,12 +1077,10 @@ mod tests {
 
     #[fuchsia::test]
     fn fail_when_no_delays() {
-        let actual_now = zx::MonotonicInstant::get();
-
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         // Ensure that we don't hit hard limitations such as backstop but that
         // we still run in fake time.
-        executor.set_fake_time(actual_now.into());
+        clone_system_time(&mut executor);
 
         let (primary_clock, primary_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
@@ -1087,7 +1133,9 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_invalid_rtc() {
-        let mut executor = fasync::TestExecutor::new();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        clone_system_time(&mut executor);
+
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
@@ -1111,14 +1159,19 @@ mod tests {
             r,
             b,
         ));
-        let _ = executor.run_until_stalled(&mut fut);
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut fut,
+            // Only run long enough to drain `time_source` above.
+            fasync::MonotonicDuration::from_millis(1),
+        );
 
         // Checking that the clock has not been updated yet
         assert_eq!(initial_update_ticks, clock.get_details().unwrap().last_value_update_ticks);
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::NotSet },
             Event::InitializeRtc {
                 outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
@@ -1130,10 +1183,8 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_invalid_rtc_force_start() {
-        let real_boot_now = zx::MonotonicInstant::get();
-
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time((real_boot_now + zx::MonotonicDuration::from_nanos(1000)).into());
+        clone_system_time(&mut executor);
 
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(INVALID_RTC_TIME);
@@ -1170,7 +1221,7 @@ mod tests {
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::NotSet },
             // RTC time was invalid...
             Event::InitializeRtc {
@@ -1189,7 +1240,10 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_valid_rtc() {
-        let mut executor = fasync::TestExecutor::new();
+        // Start from the system time. Required to work around backstop time issues.
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        clone_system_time(&mut executor);
+
         let (clock, initial_update_ticks) = create_clock();
         let rtc = FakeRtc::valid(VALID_RTC_TIME);
         let diagnostics = Arc::new(FakeDiagnostics::new());
@@ -1213,7 +1267,8 @@ mod tests {
             r,
             b,
         ));
-        let _ = executor.run_until_stalled(&mut fut);
+        let _ignore =
+            run_in_fake_time(&mut executor, &mut fut, fasync::MonotonicDuration::from_millis(1));
 
         // Checking that the clock was updated to use the valid RTC time.
         assert!(clock.get_details().unwrap().last_value_update_ticks > initial_update_ticks);
@@ -1221,7 +1276,7 @@ mod tests {
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::NotSet },
             Event::InitializeRtc {
                 outcome: InitializeRtcOutcome::Succeeded,
@@ -1234,7 +1289,8 @@ mod tests {
 
     #[fuchsia::test]
     fn no_update_clock_already_running() {
-        let mut executor = fasync::TestExecutor::new();
+        let mut executor = fasync::TestExecutor::new_with_fake_time();
+        let (_, _) = clone_system_time(&mut executor);
 
         // Create a clock and set it slightly after backstop
         let (clock, _) = create_clock();
@@ -1268,14 +1324,20 @@ mod tests {
             r,
             b,
         ));
-        let _ = executor.run_until_stalled(&mut fut);
+        let _ignore = run_in_fake_time(
+            &mut executor,
+            &mut fut,
+            // Only run long enough to drain the single sample from `time_source`.
+            fasync::MonotonicDuration::from_millis(1),
+        );
 
         // Checking that neither the clock nor the RTC were updated.
         assert_eq!(clock.get_details().unwrap().last_value_update_ticks, initial_update_ticks);
         assert_eq!(rtc.last_set(), None);
 
         // Checking that the correct diagnostic events were logged.
-        diagnostics.assert_events(&[
+        // After these events, we expect a number of bogus status reports.
+        diagnostics.assert_events_prefix(&[
             Event::Initialized { clock_state: InitialClockState::PreviouslySet },
             Event::InitializeRtc { outcome: InitializeRtcOutcome::ReadNotAttempted, time: None },
             Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Network },

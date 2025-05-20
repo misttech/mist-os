@@ -6,15 +6,14 @@
 
 #include <lib/mistos/zx/vmo.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
-#include <phys/handoff.h>
 
 namespace {
 HandoffEnd gEnd;
 }  // namespace
 
-void mistos_init(HandoffEnd handoff_end) { gEnd = ktl::move(handoff_end); }
+void mistos_init(HandoffEnd handoff_end) { gEnd = std::move(handoff_end); }
 
 zx::unowned_vmo GetZbi() {
   fbl::AllocChecker ac;

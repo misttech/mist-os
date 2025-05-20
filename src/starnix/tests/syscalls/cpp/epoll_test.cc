@@ -168,6 +168,39 @@ TEST(EpollTest, CloseAfterAdd) {
   EXPECT_EQ(0, result) << errno;
 }
 
+TEST(EpollTest, CtlModUpdatesData) {
+  int sockets[2];
+  int result = socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
+  ASSERT_EQ(0, result);
+
+  fbl::unique_fd epfd(epoll_create(2));
+  ASSERT_TRUE(epfd.is_valid());
+
+  struct epoll_event event;
+  event.events = EPOLLIN;
+  event.data.u32 = 1;
+  result = epoll_ctl(epfd.get(), EPOLL_CTL_ADD, sockets[1], &event);
+  ASSERT_EQ(result, 0);
+  ASSERT_EQ(1, HANDLE_EINTR(write(sockets[0], "a", 1)));
+
+  event.data.u32 = 0;
+  result = epoll_wait(epfd.get(), &event, 1, 1);
+  uint32_t first_read_data = event.data.u32;
+  EXPECT_EQ(first_read_data, 1u);
+  EXPECT_EQ(1, result) << errno;
+
+  event.data.u32 = 2;
+  result = epoll_ctl(epfd.get(), EPOLL_CTL_MOD, sockets[1], &event);
+
+  ASSERT_EQ(1, HANDLE_EINTR(write(sockets[0], "a", 1)));
+
+  event.data.u32 = 0;
+  result = epoll_wait(epfd.get(), &event, 1, 1);
+  uint32_t second_read_data = event.data.u32;
+  EXPECT_EQ(second_read_data, 2u);
+  EXPECT_EQ(1, result) << errno;
+}
+
 TEST(EpollTest, InvalidCreateSize) {
   errno = 0;
   EXPECT_EQ(-1, epoll_create(0));

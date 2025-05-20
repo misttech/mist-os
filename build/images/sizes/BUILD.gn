@@ -16,11 +16,11 @@ labels = {
 
 files = {
   outdir = get_label_info(labels.images, "target_out_dir") + "/fuchsia"
-  gendir = "${outdir}/gen"
+  gendir = "${outdir}_gen"
 
-  zbi = "${outdir}/fuchsia.zbi"
-  blobfs = "${outdir}/blob.blk"
-  fvm_sparse = "${outdir}/fvm.sparse.blk"
+  zbi = "${gendir}/fuchsia.zbi"
+  blobfs = "${gendir}/blob.blk"
+  fvm_sparse = "${gendir}/fvm.sparse.blk"
   blobs_json = "${gendir}/blobs.json"
 
   extracted_zbi_json = "$target_out_dir/fuchsia.zbi.json"

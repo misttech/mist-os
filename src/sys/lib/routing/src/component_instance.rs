@@ -271,7 +271,7 @@ impl<C: ComponentInstanceInterface> WeakComponentInstanceInterface<C> {
 
     /// Returns a new weak component instance that will always fail to upgrade.
     pub fn invalid() -> Self {
-        Self { inner: Weak::new(), moniker: Moniker::new(vec![]) }
+        Self { inner: Weak::new(), moniker: Moniker::new(&[]) }
     }
 
     /// Attempts to upgrade this `WeakComponentInterface<C>` into an `Arc<C>`, if the

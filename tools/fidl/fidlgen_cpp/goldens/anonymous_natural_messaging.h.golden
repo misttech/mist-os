@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.anonymous/cpp/markers.h>
 #include <fidl/test.anonymous/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -15,10 +17,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-namespace fidl {
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::SomeMethod> {
@@ -32,13 +30,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::Some
   using DomainError = ::test_anonymous::SomeProtocolSomeMethodError;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod> final : public ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse> {
  public:
   using ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse>::result;
-  Response(::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse> v);
   Response() = delete;
 };
 template <>
@@ -46,13 +42,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_anonymous::SomeProtocol:
   using DomainObject = ::test_anonymous::SomeProtocolSomeMethodResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod>& m);
 };
 
 template <>
@@ -71,10 +61,6 @@ class ::fidl::internal::NaturalClientImpl<::test_anonymous::SomeProtocol> final 
   ::fidl::internal::NaturalThenable<::test_anonymous::SomeProtocol::SomeMethod> SomeMethod(const ::fidl::Request<::test_anonymous::SomeProtocol::SomeMethod>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol>> {
@@ -82,15 +68,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_anonymous::SomeProtocol> fi
   ::fidl::Result<::test_anonymous::SomeProtocol::SomeMethod> SomeMethod(const ::fidl::Request<::test_anonymous::SomeProtocol::SomeMethod>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_anonymous::SomeProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_anonymous::SomeProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_anonymous::SomeProtocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_anonymous::SomeProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -122,13 +101,9 @@ class ::fidl::SyncEventHandler<::test_anonymous::SomeProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_anonymous::SomeProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_anonymous::SomeProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_anonymous::SomeProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_anonymous::SomeProtocol>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_anonymous::SomeProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -141,8 +116,6 @@ class ::fidl::internal::NaturalEventSender<::test_anonymous::SomeProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_anonymous::SomeProtocol::SomeMethod> : public ::fidl::CompleterBase {
@@ -177,19 +150,13 @@ class ::fidl::Server<::test_anonymous::SomeProtocol> : public ::fidl::internal::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_anonymous::SomeProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_anonymous::SomeProtocol> final {
@@ -205,6 +172,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_anonymous::SomeProtocol>
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

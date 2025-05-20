@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 library fuchsia.developer.ffx;
-using fuchsia.hwinfo;
 using fuchsia.net;
 using fuchsia.buildinfo;
 using fuchsia.developer.remotecontrol as rc;
@@ -94,6 +93,8 @@ type TargetInfo = table {
     11: ssh_host_address SshHostAddrInfo;
     /// Compatibility status between host tools and target.
     12: compatibility rc.CompatibilityInfo;
+    /// Whether the target was added manually.
+    13: is_manual bool;
 };
 
 type TargetRebootError = strict enum {
@@ -135,9 +136,9 @@ closed protocol TargetCollectionReader {
 /// targets that have been seen on the network.
 type TargetQuery = table {
     /// A string matcher is something that can match either the:
-    /// - Target nodename (partial matches okay).
+    /// - Target nodename
     /// - Target IP (any that have been seen).
-    /// - Serial number (partial matches okay).
+    /// - Serial number
     ///
     /// IPv6 and IPv4 addresses are both acceptable queries. If the address being
     /// queried is ipv6 and includes a port number, the address (and
@@ -245,7 +246,7 @@ closed protocol TargetCollection {
     /// is one that has responded over the network recently.
     ///
     /// An optional query string can be passed that will limit results to only
-    /// targets whose metadata matches. Matching is limited to partial string
+    /// targets whose metadata matches. Matching is limited to string
     /// matches via the target's nodename, serial number, or IP address.
     ///
     /// The client receives updates by handling calls to `Next` in the
@@ -289,14 +290,6 @@ closed protocol TargetCollection {
         add_target_responder client_end:AddTargetResponder;
     });
 
-    /// Manually adds a target that cannot be discovered via mDNS. This target
-    /// will be retained in the target collection until it establishes an RCS
-    /// connection, or until the associated connection timeout has elapsed.
-    strict AddEphemeralTarget(struct {
-        ip TargetAddrInfo;
-        connect_timeout_seconds uint64;
-    }) -> ();
-
     /// Manually remove a target from the target list.
     ///
     /// If the target_id doesn't match a device name, the daaemon will attempt
@@ -306,12 +299,6 @@ closed protocol TargetCollection {
     }) -> (struct {
         removed bool;
     });
-
-    /// Manually adds a temporary fastboot target at runtime.
-    /// The target is removed after execution.
-    strict AddInlineFastbootTarget(struct {
-        serial_number string:fuchsia.hwinfo.MAX_VALUE_SIZE;
-    }) -> ();
 };
 
 /// This is a handle to a target received from the target collection.

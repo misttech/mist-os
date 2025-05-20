@@ -4,21 +4,23 @@
 
 use core::fmt;
 use core::marker::PhantomData;
-use core::mem::MaybeUninit;
+use core::mem::{ManuallyDrop, MaybeUninit};
 
 use crate::{
-    munge, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, RawWireUnion,
-    Slot, TakeFrom, ZeroPadding,
+    munge, Chunk, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
+    RawWireUnion, Slot, Wire,
 };
 
 /// A FIDL result union.
 #[repr(transparent)]
-pub struct WireResult<T, E> {
+pub struct WireResult<'de, T, E> {
     raw: RawWireUnion,
-    _phantom: PhantomData<(T, E)>,
+    _phantom: PhantomData<(&'de mut [Chunk], T, E)>,
 }
 
-unsafe impl<T, E> ZeroPadding for WireResult<T, E> {
+unsafe impl<T: Wire, E: Wire> Wire for WireResult<'static, T, E> {
+    type Decoded<'de> = WireResult<'de, T::Decoded<'de>, E::Decoded<'de>>;
+
     #[inline]
     fn zero_padding(out: &mut MaybeUninit<Self>) {
         munge!(let Self { raw, _phantom: _ } = out);
@@ -29,7 +31,7 @@ unsafe impl<T, E> ZeroPadding for WireResult<T, E> {
 const ORD_OK: u64 = 1;
 const ORD_ERR: u64 = 2;
 
-impl<T, E> WireResult<T, E> {
+impl<T, E> WireResult<'_, T, E> {
     /// Returns whether the result is `Ok`.
     pub fn is_ok(&self) -> bool {
         self.raw.ordinal() == ORD_OK
@@ -72,9 +74,19 @@ impl<T, E> WireResult<T, E> {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
+
+    /// Returns a `Result` of the owned value or error.
+    pub fn into_result(self) -> Result<T, E> {
+        let raw = ManuallyDrop::new(self.raw);
+        match raw.ordinal() {
+            ORD_OK => unsafe { Ok(raw.get().read_unchecked()) },
+            ORD_ERR => unsafe { Err(raw.get().read_unchecked()) },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
-impl<T, E> fmt::Debug for WireResult<T, E>
+impl<T, E> fmt::Debug for WireResult<'_, T, E>
 where
     T: fmt::Debug,
     E: fmt::Debug,
@@ -84,7 +96,7 @@ where
     }
 }
 
-unsafe impl<D, T, E> Decode<D> for WireResult<T, E>
+unsafe impl<D, T, E> Decode<D> for WireResult<'static, T, E>
 where
     D: Decoder + ?Sized,
     T: Decode<D>,
@@ -108,7 +120,7 @@ where
     T: Encodable,
     E: Encodable,
 {
-    type Encoded = WireResult<T::Encoded, E::Encoded>;
+    type Encoded = WireResult<'static, T::Encoded, E::Encoded>;
 }
 
 unsafe impl<Enc, T, E> Encode<Enc> for Result<T, E>
@@ -118,7 +130,7 @@ where
     E: Encode<Enc>,
 {
     fn encode(
-        &mut self,
+        self,
         encoder: &mut Enc,
         out: &mut MaybeUninit<Self::Encoded>,
     ) -> Result<(), EncodeError> {
@@ -133,15 +145,31 @@ where
     }
 }
 
-impl<T, E, WT, WE> TakeFrom<WireResult<WT, WE>> for Result<T, E>
+unsafe impl<Enc, T, E> EncodeRef<Enc> for Result<T, E>
 where
-    T: TakeFrom<WT>,
-    E: TakeFrom<WE>,
+    Enc: Encoder + ?Sized,
+    T: EncodeRef<Enc>,
+    E: EncodeRef<Enc>,
 {
-    fn take_from(from: &WireResult<WT, WE>) -> Self {
-        match from.as_ref() {
-            Ok(value) => Ok(T::take_from(value)),
-            Err(error) => Err(E::take_from(error)),
+    fn encode_ref(
+        &self,
+        encoder: &mut Enc,
+        out: &mut MaybeUninit<Self::Encoded>,
+    ) -> Result<(), EncodeError> {
+        self.as_ref().encode(encoder, out)
+    }
+}
+
+impl<T, E, WT, WE> From<WireResult<'_, WT, WE>> for Result<T, E>
+where
+    T: From<WT>,
+    E: From<WE>,
+{
+    #[inline]
+    fn from(from: WireResult<'_, WT, WE>) -> Self {
+        match from.into_result() {
+            Ok(value) => Ok(value.into()),
+            Err(error) => Err(error.into()),
         }
     }
 }

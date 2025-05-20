@@ -11,7 +11,7 @@ use super::symbols::{
 };
 use super::{ClassId, ParsedPolicy, RoleId, TypeId};
 
-use crate::{ClassPermission as _, FileClass, FsNodeClass, NullessByteStr};
+use crate::{ClassPermission as _, NullessByteStr};
 use std::collections::HashMap;
 
 /// The [`SecurityContext`] and [`FsUseType`] derived from some `fs_use_*` line of the policy.
@@ -29,9 +29,12 @@ pub struct FsUseLabelAndType {
 /// collection of classes where the "process" class resides.
 #[derive(Debug)]
 pub(super) struct PolicyIndex<PS: ParseStrategy> {
-    /// Map from well-known classes to their offsets in the associate policy's
-    /// [`crate::symbols::Classes`] collection.
-    classes: HashMap<crate::KernelClass, usize>,
+    /// Map from object class Ids to their offset in the associate policy's
+    /// [`crate::symbols::Classes`] collection. The map includes mappings from both the Ids used
+    /// internally for kernel object classes, and from the policy-defined Id for each policy-
+    /// defined class - if an object class is not found in this map then it is not defined by the
+    /// policy.
+    classes: HashMap<crate::ObjectClass, usize>,
     /// Map from well-known permissions to their class's associated [`crate::symbols::Permissions`]
     /// collection.
     permissions: HashMap<crate::KernelPermission, PermissionIndex>,
@@ -52,13 +55,18 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let policy_classes = parsed_policy.classes();
         let common_symbols = parsed_policy.common_symbols();
 
-        // Accumulate classes indexed by `crate::KernelClass`. If the policy defines that unknown
-        // classes should cause rejection then return an error describing the missing element.
-        let mut classes = HashMap::new();
-        for known_class in crate::KernelClass::all_variants().into_iter() {
+        // Accumulate classes indexed by `crate::ObjectClass`. Capacity for twice as many entries as
+        // the policy defines allows each class to be indexed by policy-defined Id, and also by the
+        // kernel object class enum Id.
+        let mut classes = HashMap::with_capacity(policy_classes.len() * 2);
+
+        // Insert elements for each kernel object class. If the policy defines that unknown
+        // kernel classes should cause rejection then return an error describing the missing
+        // element.
+        for known_class in crate::KernelClass::all_variants() {
             match get_class_index_by_name(policy_classes, known_class.name()) {
                 Some(class_index) => {
-                    classes.insert(known_class, class_index);
+                    classes.insert(known_class.into(), class_index);
                 }
                 None => {
                     if parsed_policy.handle_unknown() == HandleUnknown::Reject {
@@ -68,12 +76,23 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             }
         }
 
-        // Accumulate permissions indexed by `crate::Permission`. If the policy defines that unknown
-        // classes should cause rejection then return an error describing the missing element.
-        let mut permissions = HashMap::new();
-        for known_permission in crate::KernelPermission::all_variants().into_iter() {
+        // Insert an element for each class, by its policy-defined Id.
+        for index in 0..policy_classes.len() {
+            let class = &policy_classes[index];
+            classes.insert(class.id().into(), index);
+        }
+
+        // Allow unused space in the classes map to be released.
+        classes.shrink_to_fit();
+
+        // Accumulate permissions indexed by kernel permission enum. If the policy defines that
+        // unknown permissions or classes should cause rejection then return an error describing the
+        // missing element.
+        let mut permissions =
+            HashMap::with_capacity(crate::KernelPermission::all_variants().count());
+        for known_permission in crate::KernelPermission::all_variants() {
             let object_class = known_permission.class();
-            if let Some(class_index) = classes.get(&object_class) {
+            if let Some(class_index) = classes.get(&object_class.into()) {
                 let class = &policy_classes[*class_index];
                 if let Some(permission_index) =
                     get_permission_index_by_name(common_symbols, class, known_permission.name())
@@ -88,6 +107,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                 }
             }
         }
+        permissions.shrink_to_fit();
 
         // Locate the "object_r" role.
         let cached_object_r_role = parsed_policy
@@ -98,8 +118,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let index = Self { classes, permissions, parsed_policy, cached_object_r_role };
 
         // Verify that the initial Security Contexts are all defined, and valid.
-        for id in crate::InitialSid::all_variants() {
-            index.resolve_initial_context(id);
+        for initial_sids in crate::InitialSid::all_variants() {
+            index.resolve_initial_context(*initial_sids);
         }
 
         // Validate the contexts used in fs_use statements.
@@ -110,15 +130,19 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         Ok(index)
     }
 
-    pub fn class<'a>(&'a self, object_class: &crate::KernelClass) -> Option<&'a Class<PS>> {
-        self.classes.get(object_class).map(|offset| &self.parsed_policy.classes()[*offset])
+    /// Returns the policy entry for a class identified either by its well-known kernel object class
+    /// enum value, or its policy-defined Id.
+    pub fn class<'a>(&'a self, object_class: crate::ObjectClass) -> Option<&'a Class<PS>> {
+        let index = self.classes.get(&object_class)?;
+        Some(&self.parsed_policy.classes()[*index])
     }
 
+    /// Returns the policy entry for a well-known kernel object class permission.
     pub fn permission<'a>(
         &'a self,
         permission: &crate::KernelPermission,
     ) -> Option<&'a Permission<PS>> {
-        let target_class = self.class(&permission.class())?;
+        let target_class = self.class(permission.class().into())?;
         self.permissions.get(permission).map(|p| match p {
             PermissionIndex::Class { permission_index } => {
                 &target_class.permissions()[*permission_index]
@@ -130,54 +154,21 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         })
     }
 
-    /// Returns the security context that should be applied to a newly created file-like SELinux
+    /// Returns the security context that should be applied to a newly created SELinux
     /// object according to `source` and `target` security contexts, as well as the new object's
-    /// `class`. This context should be used only if no filename-transition match is found, via
-    /// [`new_file_security_context_by_name()`].
-    pub fn new_file_security_context(
+    /// `class`.
+    ///
+    /// If no filename-transition rule matches the supplied arguments then `None` is returned, and
+    /// the caller should fall-back to filename-independent labeling via
+    /// [`compute_create_context()`]
+    pub fn compute_create_context_with_name(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &crate::FsNodeClass,
-    ) -> SecurityContext {
-        let object_class = crate::KernelClass::from(class.clone());
-        let default_role = match class {
-            // Sockets and pipes use the source role as default role, as observed in SELinux.
-            FsNodeClass::Socket(_) => source.role(),
-            FsNodeClass::File(file) if *file == FileClass::Fifo => source.role(),
-            // The SELinux notebook states the role component defaults to the object_r role for
-            // files.
-            FsNodeClass::File(_) => self.cached_object_r_role,
-        };
-        self.new_security_context(
-            source,
-            target,
-            &object_class,
-            default_role,
-            // The SELinux notebook states the type component defaults to the type of the parent
-            // directory.
-            target.type_(),
-            // The SELinux notebook states the range/level component defaults to the low/current
-            // level of the creating process.
-            source.low_level(),
-            None,
-        )
-    }
-
-    /// Returns the security context that should be applied to a newly created file-like SELinux
-    /// object according to `source` and `target` security contexts, as well as the new object's
-    /// `class` and `name`. If no filename-transition rule matches the supplied arguments then
-    /// `None` is returned, and the caller should fall-back to filename-independent labeling
-    /// via [`new_file_security_context()`]
-    pub fn new_file_security_context_by_name(
-        &self,
-        source: &SecurityContext,
-        target: &SecurityContext,
-        class: &crate::FsNodeClass,
+        class: crate::ObjectClass,
         name: NullessByteStr<'_>,
     ) -> Option<SecurityContext> {
-        let object_class = crate::KernelClass::from(class.clone());
-        let policy_class = self.class(&object_class)?;
+        let policy_class = self.class(class)?;
         let type_id = self.type_transition_new_type_with_name(
             source.type_(),
             target.type_(),
@@ -187,152 +178,124 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         Some(self.new_security_context_internal(
             source,
             target,
-            &object_class,
-            // The SELinux notebook states the role component defaults to the object_r role.
-            self.cached_object_r_role,
-            // The SELinux notebook states the type component defaults to the type of the parent
-            // directory.
-            target.type_(),
-            // The SELinux notebook states the range/level component defaults to the low/current
-            // level of the creating process.
-            source.low_level(),
-            None,
+            class,
             // Override the "type" with the value specified by the filename-transition rules.
             Some(type_id),
         ))
     }
 
-    /// Calculates a new security context, as follows:
+    /// Returns the security context that should be applied to a newly created SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class`.
     ///
-    /// - user: the `source` user, unless the policy contains a default_user statement for `class`.
-    /// - role:
-    ///     - if the policy contains a role_transition from the `source` role to the `target` type,
-    ///       use the transition role
-    ///     - otherwise, if the policy contains a default_role for `class`, use that default role
-    ///     - lastly, if the policy does not contain either, use `default_role`.
-    /// - type:
-    ///     - if the policy contains a type_transition from the `source` type to the `target` type,
-    ///       use the transition type
-    ///     - otherwise, if the policy contains a default_type for `class`, use that default type
-    ///     - lastly, if the policy does not contain either, use `default_type`.
-    /// - range
-    ///     - if the policy contains a range_transition from the `source` type to the `target` type,
-    ///       use the transition range
-    ///     - otherwise, if the policy contains a default_range for `class`, use that default range
-    ///     - lastly, if the policy does not contain either, use the `default_low_level` -
-    ///       `default_high_level` range.
-    pub fn new_security_context(
+    /// Computation follows the "create" algorithm for labeling newly created objects:
+    /// - user is taken from the `source`.
+    /// - role, type and range are taken from the matching transition rules, if any.
+    /// - role, type and range fall-back to the `source` or `target` values according to policy.
+    ///
+    /// If no transitions apply, and the policy does not explicitly specify defaults then the
+    /// role, type and range values have defaults chosen based on the `class`:
+    /// - For "process", and socket-like classes, role, type and range are taken from the `source`.
+    /// - Otherwise role is "object_r", type is taken from `target` and range is set to the
+    ///   low level of the `source` range.
+    pub fn compute_create_context(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &crate::KernelClass,
-        default_role: RoleId,
-        default_type: TypeId,
-        default_low_level: &SecurityLevel,
-        default_high_level: Option<&SecurityLevel>,
+        class: crate::ObjectClass,
     ) -> SecurityContext {
-        self.new_security_context_internal(
-            source,
-            target,
-            class,
-            default_role,
-            default_type,
-            default_low_level,
-            default_high_level,
-            None,
-        )
+        self.new_security_context_internal(source, target, class, None)
     }
 
-    /// Internal implementation used by `new_file_security_context_by_name()` and
-    /// `new_security_context()` to implement the policy transition calculations.
+    /// Internal implementation used by `compute_create_context_with_name()` and
+    /// `compute_create_context()` to implement the policy transition calculations.
     /// If `override_type` is specified then the supplied value will be applied rather than a value
-    /// being calculated based on the policy; this is used by `new_file_security_context_by_name()`
+    /// being calculated based on the policy; this is used by `compute_create_context_with_name()`
     /// to shortcut the default `type_transition` lookup.
     fn new_security_context_internal(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &crate::KernelClass,
-        default_role: RoleId,
-        default_type: TypeId,
-        default_low_level: &SecurityLevel,
-        default_high_level: Option<&SecurityLevel>,
+        target_class: crate::ObjectClass,
         override_type: Option<TypeId>,
     ) -> SecurityContext {
-        let (user, role, type_, low_level, high_level) = if let Some(policy_class) =
-            self.class(&class)
-        {
-            let class_defaults = policy_class.defaults();
-
-            let user = match class_defaults.user() {
-                ClassDefault::Source => source.user(),
-                ClassDefault::Target => target.user(),
-                _ => source.user(),
-            };
-
-            let role =
-                match self.role_transition_new_role(source.role(), target.type_(), policy_class) {
-                    Some(new_role) => new_role,
-                    None => match class_defaults.role() {
-                        ClassDefault::Source => source.role(),
-                        ClassDefault::Target => target.role(),
-                        _ => default_role,
-                    },
-                };
-
-            let type_ = override_type.unwrap_or_else(|| {
-                match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
-                    Some(new_type) => new_type,
-                    None => match class_defaults.type_() {
-                        ClassDefault::Source => source.type_(),
-                        ClassDefault::Target => target.type_(),
-                        _ => default_type,
-                    },
-                }
-            });
-
-            let (low_level, high_level) =
-                match self.range_transition_new_range(source.type_(), target.type_(), policy_class)
-                {
-                    Some((low_level, high_level)) => (low_level, high_level),
-                    None => match class_defaults.range() {
-                        ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
-                        ClassDefaultRange::SourceHigh => (
-                            source.high_level().unwrap_or_else(|| source.low_level()).clone(),
-                            None,
-                        ),
-                        ClassDefaultRange::SourceLowHigh => {
-                            (source.low_level().clone(), source.high_level().map(Clone::clone))
-                        }
-                        ClassDefaultRange::TargetLow => (target.low_level().clone(), None),
-                        ClassDefaultRange::TargetHigh => (
-                            target.high_level().unwrap_or_else(|| target.low_level()).clone(),
-                            None,
-                        ),
-                        ClassDefaultRange::TargetLowHigh => {
-                            (target.low_level().clone(), target.high_level().map(Clone::clone))
-                        }
-                        _ => (default_low_level.clone(), default_high_level.map(Clone::clone)),
-                    },
-                };
-
-            (user, role, type_, low_level, high_level)
-        } else {
-            // If the class is not defined in the policy then there can be no transitions, nor class-defined choice of
-            // defaults, so the caller-supplied defaults (effectively "unspecified") should be used.
-            (
+        let Some(policy_class) = self.class(target_class) else {
+            // If the class is not defined in the policy then there can be no transitions, nor
+            // class-defined choice of defaults, so default to the non-process-or-socket behaviour.
+            // TODO: https://fxbug.dev/361552580 - For `KernelClass`es, apply the kernel's notion
+            // of whether the class is "process", or socket-like?
+            return SecurityContext::new(
                 source.user(),
-                default_role,
-                default_type,
-                default_low_level.clone(),
-                default_high_level.map(Clone::clone),
-            )
+                self.cached_object_r_role,
+                target.type_(),
+                source.low_level().clone(),
+                None,
+            );
         };
 
-        // `new()` may fail if the resulting combination of user, role etc is not permitted by the policy.
-        SecurityContext::new(user, role, type_, low_level, high_level)
+        let is_process_or_socket = policy_class.name_bytes() == b"process"
+            || policy_class.common_name_bytes() == b"socket";
+        let (unspecified_role, unspecified_type, unspecified_low, unspecified_high) =
+            if is_process_or_socket {
+                (source.role(), source.type_(), source.low_level(), source.high_level())
+            } else {
+                (self.cached_object_r_role, target.type_(), source.low_level(), None)
+            };
+        let class_defaults = policy_class.defaults();
+
+        let user = match class_defaults.user() {
+            ClassDefault::Source => source.user(),
+            ClassDefault::Target => target.user(),
+            ClassDefault::Unspecified => source.user(),
+        };
+
+        let role = match self.role_transition_new_role(source.role(), target.type_(), policy_class)
+        {
+            Some(new_role) => new_role,
+            None => match class_defaults.role() {
+                ClassDefault::Source => source.role(),
+                ClassDefault::Target => target.role(),
+                ClassDefault::Unspecified => unspecified_role,
+            },
+        };
+
+        let type_ = override_type.unwrap_or_else(|| {
+            match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
+                Some(new_type) => new_type,
+                None => match class_defaults.type_() {
+                    ClassDefault::Source => source.type_(),
+                    ClassDefault::Target => target.type_(),
+                    ClassDefault::Unspecified => unspecified_type,
+                },
+            }
+        });
+
+        let (low_level, high_level) =
+            match self.range_transition_new_range(source.type_(), target.type_(), policy_class) {
+                Some((low_level, high_level)) => (low_level, high_level),
+                None => match class_defaults.range() {
+                    ClassDefaultRange::SourceLow => (source.low_level().clone(), None),
+                    ClassDefaultRange::SourceHigh => {
+                        (source.high_level().unwrap_or_else(|| source.low_level()).clone(), None)
+                    }
+                    ClassDefaultRange::SourceLowHigh => {
+                        (source.low_level().clone(), source.high_level().cloned())
+                    }
+                    ClassDefaultRange::TargetLow => (target.low_level().clone(), None),
+                    ClassDefaultRange::TargetHigh => {
+                        (target.high_level().unwrap_or_else(|| target.low_level()).clone(), None)
+                    }
+                    ClassDefaultRange::TargetLowHigh => {
+                        (target.low_level().clone(), target.high_level().cloned())
+                    }
+                    ClassDefaultRange::Unspecified => {
+                        (unspecified_low.clone(), unspecified_high.cloned())
+                    }
+                },
+            };
 
         // TODO(http://b/334968228): Validate domain & role transitions are allowed?
+        SecurityContext::new(user, role, type_, low_level, high_level)
     }
 
     /// Returns the Id of the "object_r" role within the `parsed_policy`, for use when validating

@@ -100,55 +100,6 @@ pub fn fuchsia_network_monitor_fs(
         .clone())
 }
 
-// TODO(https://fxbug.dev/399181238): Remove Nmfs once the system has migrated to using
-// the updated `fuchsia_network_monitor_fs` name.
-pub struct Nmfs;
-impl Nmfs {
-    pub fn new_fs(
-        kernel: &Arc<Kernel>,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, Nmfs, options)?;
-
-        let node = FsNode::new_root(NetworkDirectoryNode::new());
-        fs.set_root_node(node);
-        Ok(fs)
-    }
-}
-
-const NMFS_NAME: &[u8; 4] = b"nmfs";
-const NMFS_MAGIC: u32 = u32::from_be_bytes(*NMFS_NAME);
-
-impl FileSystemOps for Nmfs {
-    fn statfs(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _fs: &FileSystem,
-        _current_task: &CurrentTask,
-    ) -> Result<statfs, Errno> {
-        Ok(default_statfs(NMFS_MAGIC))
-    }
-
-    fn name(&self) -> &'static FsStr {
-        NMFS_NAME.into()
-    }
-}
-
-pub fn nmfs(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    options: FileSystemOptions,
-) -> Result<FileSystemHandle, Errno> {
-    struct NmfsHandle(FileSystemHandle);
-
-    let kernel = current_task.kernel();
-    Ok(kernel
-        .expando
-        .get_or_try_init(|| Nmfs::new_fs(kernel, options).map(|fs| NmfsHandle(fs)))?
-        .0
-        .clone())
-}
-
 pub struct NetworkDirectoryNode;
 
 impl NetworkDirectoryNode {

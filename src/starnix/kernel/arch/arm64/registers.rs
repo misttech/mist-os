@@ -17,7 +17,7 @@ const SYSCALL_THUMBS_INSTRUCTION_SIZE_BYTES: u64 = 2;
 ///
 /// Implements [`std::ops::Deref`] and [`std::ops::DerefMut`] as a way to get at the underlying
 /// [`zx::sys::zx_thread_state_general_regs_t`] that this type wraps.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
 pub struct RegisterState {
     real_registers: zx::sys::zx_thread_state_general_regs_t,
 
@@ -98,6 +98,9 @@ impl RegisterState {
         } else {
             SYSCALL_ARM_INSTRUCTION_SIZE_BYTES
         };
+        if self.is_arch32() {
+            self.real_registers.r[15] -= instruction_size;
+        }
         self.real_registers.pc -= instruction_size;
     }
 
@@ -210,6 +213,16 @@ impl RegisterState {
             return error!(EINVAL);
         };
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for RegisterState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RegisterState")
+            .field("real_registers", &self.real_registers)
+            .field("orig_x0", &format_args!("{:#x}", &self.orig_x0))
+            .field("elr", &format_args!("{:#x}", &self.elr))
+            .finish()
     }
 }
 

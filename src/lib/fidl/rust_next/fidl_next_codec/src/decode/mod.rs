@@ -8,19 +8,19 @@ mod error;
 
 pub use self::error::*;
 
-use crate::{Slot, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16, WireU32, WireU64};
+use crate::{Slot, Wire, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16, WireU32, WireU64};
 
 /// Decodes a value from the given slot.
 ///
 /// # Safety
 ///
-/// If `decode` returns `Ok`, then the provided `slot` must now contain a valid
-/// value of the implementing type.
-pub unsafe trait Decode<D: ?Sized> {
+/// If `decode` returns `Ok`, then the provided `slot` will contain a valid decoded value after the
+/// decoder is committed.
+pub unsafe trait Decode<D: ?Sized>: Wire {
     /// Decodes a value into a slot using a decoder.
     ///
-    /// If decoding succeeds, `slot` will contain a valid value. If decoding fails, an error will be
-    /// returned.
+    /// If decoding succeeds, `slot` will contain a valid decoded value after the decoder is
+    /// committed. If decoding fails, an error will be returned.
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError>;
 }
 
@@ -155,11 +155,11 @@ mod tests {
 
     #[test]
     fn decode_box() {
-        assert_decoded::<WireBox<WireU64>>(
+        assert_decoded::<WireBox<'_, WireU64>>(
             &mut chunks![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
             |x| assert_eq!(x.as_ref(), None),
         );
-        assert_decoded::<WireBox<WireU64>>(
+        assert_decoded::<WireBox<'_, WireU64>>(
             &mut chunks![
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56,
                 0x34, 0x12,
@@ -170,21 +170,21 @@ mod tests {
 
     #[test]
     fn decode_vec() {
-        assert_decoded::<WireOptionalVector<WireU32>>(
+        assert_decoded::<WireOptionalVector<'_, WireU32>>(
             &mut chunks![
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00,
             ],
             |x| assert!(x.as_ref().is_none()),
         );
-        assert_decoded::<WireVector<WireU32>>(
+        assert_decoded::<WireVector<'_, WireU32>>(
             &mut chunks![
                 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0x78, 0x56, 0x34, 0x12, 0xf0, 0xde, 0xbc, 0x9a,
             ],
             |x| assert_eq!(x.as_slice(), [0x12345678, 0x9abcdef0].as_slice(),),
         );
-        assert_decoded::<WireVector<WireU32>>(
+        assert_decoded::<WireVector<'_, WireU32>>(
             &mut chunks![
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff,
@@ -195,21 +195,21 @@ mod tests {
 
     #[test]
     fn decode_string() {
-        assert_decoded::<WireOptionalString>(
+        assert_decoded::<WireOptionalString<'_>>(
             &mut chunks![
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00,
             ],
             |x| assert!(x.is_none()),
         );
-        assert_decoded::<WireString>(
+        assert_decoded::<WireString<'_>>(
             &mut chunks![
                 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0x30, 0x31, 0x32, 0x33, 0x00, 0x00, 0x00, 0x00,
             ],
             |x| assert_eq!(x.as_str(), "0123"),
         );
-        assert_decoded::<WireString>(
+        assert_decoded::<WireString<'_>>(
             &mut chunks![
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff,

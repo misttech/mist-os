@@ -27,8 +27,6 @@ zx_library("zbitl") {
     "//zircon/third_party/ulib/cksum",
   ]
   public_deps = [
-    "//sdk/lib/stdcompat",
-
     # Many files have #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
 

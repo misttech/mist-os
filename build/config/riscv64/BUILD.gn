@@ -38,6 +38,7 @@ config("lto-workarounds") {
   # TODO(https://fxbug.dev/42086180): These workarounds can be safely removed
   # once our toolchains handle passing riscv target features in LTO.
   riscv64_extra_mattr = [
+    "+a",
     "+c",
     "+f",
     "+d",

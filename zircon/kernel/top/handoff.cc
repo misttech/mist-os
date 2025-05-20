@@ -15,14 +15,15 @@
 
 #include <fbl/ref_ptr.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/span.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <object/handle.h>
 #include <object/vm_object_dispatcher.h>
 #include <phys/handoff.h>
 #include <platform/boot_timestamps.h>
 #include <platform/timer.h>
+#include <vm/handoff-end.h>
 #include <vm/physmap.h>
 #include <vm/vm_object_paged.h>
 
@@ -153,6 +154,26 @@ HandleOwner CreateStubVmoHandle() {
   return CreateHandle(ktl::move(vmo), 0);
 }
 
+#if 0
+HandoffEnd::Elf CreatePhysElf(const PhysElfImage& image) {
+  ZX_DEBUG_ASSERT(image.vmar.base == 0);
+  HandoffEnd::Elf elf = {
+      .vmo = CreatePhysVmo(image.vmo),
+      .content_size = image.vmo.content_size,
+      .vmar_size = image.vmar.size,
+      .info = image.info,
+  };
+  fbl::AllocChecker ac;
+  elf.mappings.reserve(image.vmar.mappings.size(), &ac);
+  ZX_ASSERT_MSG(ac.check(), "no kernel heap space for ELF %zu mappings in %s",
+                image.vmar.mappings.size(), image.vmo.name.data());
+  for (const PhysMapping& mapping : image.vmar.mappings.get()) {
+    elf.mappings.push_back(mapping, &ac);
+    ZX_ASSERT(ac.check());
+  }
+  return elf;
+}
+#endif
 }  // namespace
 
 template <>

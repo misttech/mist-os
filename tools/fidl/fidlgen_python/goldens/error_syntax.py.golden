@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -250,7 +248,7 @@ class ExampleUseOfErrorSyntaxServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_composed_call_which_may_fail: typing.TypeAlias = typing.Union[
+    ComposedCallWhichMayFailResponse: typing.TypeAlias = typing.Union[
         DomainError,
         fidl_test_errorsyntax_parent.ParentUsesErrorSyntaxComposedCallWhichMayFailResponse,
     ]
@@ -261,13 +259,13 @@ class ExampleUseOfErrorSyntaxServer(ServerBase, ABC):
         request: fidl_test_errorsyntax_parent.ParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_composed_call_which_may_fail
+            typing.Any, typing.Any, ComposedCallWhichMayFailResponse
         ]
-        | _MethodResponse_composed_call_which_may_fail
+        | ComposedCallWhichMayFailResponse
     ):
         ...
 
-    _MethodResponse_call_which_may_fail: typing.TypeAlias = typing.Union[
+    CallWhichMayFailResponse: typing.TypeAlias = typing.Union[
         DomainError,
         ExampleUseOfErrorSyntaxCallWhichMayFailResponse,
     ]
@@ -277,10 +275,8 @@ class ExampleUseOfErrorSyntaxServer(ServerBase, ABC):
         self,
         request: ExampleUseOfErrorSyntaxCallWhichMayFailRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_which_may_fail
-        ]
-        | _MethodResponse_call_which_may_fail
+        typing.Coroutine[typing.Any, typing.Any, CallWhichMayFailResponse]
+        | CallWhichMayFailResponse
     ):
         ...
 

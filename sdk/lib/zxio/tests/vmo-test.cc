@@ -31,7 +31,7 @@ TEST(Vmo, Create) {
   EXPECT_EQ(ZXIO_OBJECT_TYPE_VMO, attr.object_type);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_attr_set(io, &attr));
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 class VmoTest : public zxtest::Test {
@@ -47,7 +47,7 @@ class VmoTest : public zxtest::Test {
     io = &storage.io;
   }
 
-  void TearDown() override { ASSERT_OK(zxio_close(io, /*should_wait=*/true)); }
+  void TearDown() override { zxio_destroy(io); }
 
  protected:
   zx::vmo backing;
@@ -93,8 +93,8 @@ TEST_F(VmoTest, Basic) {
 
   uint64_t flags = 0u;
   ASSERT_STATUS(ZX_OK, zxio_flags_get(io, &flags));
-  EXPECT_TRUE((flags & uint64_t{fuchsia_io::wire::Flags::kPermRead}) != 0);
-  EXPECT_TRUE((flags & uint64_t{fuchsia_io::wire::Flags::kPermWrite}) != 0);
+  EXPECT_TRUE((flags & uint64_t{fuchsia_io::wire::Flags::kPermReadBytes}) != 0);
+  EXPECT_TRUE((flags & uint64_t{fuchsia_io::wire::Flags::kPermWriteBytes}) != 0);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_flags_set(io, flags));
 
   uint32_t deprecated_flags = 0u;
@@ -195,7 +195,7 @@ class HugeVmoTest : public zxtest::Test {
     io = &storage.io;
   }
 
-  void TearDown() override { ASSERT_OK(zxio_close(io, /*should_wait=*/true)); }
+  void TearDown() override { zxio_destroy(io); }
 
  protected:
   zx::vmo backing;
@@ -249,7 +249,7 @@ TEST_F(VmoCloseTest, UseAfterClose) {
   ASSERT_OK(zxio_read_at(io, 0, buffer, 6, 0, &actual));
   EXPECT_EQ(actual, 6);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
   actual = 0;
   ASSERT_STATUS(zxio_read_at(io, 0, buffer, 6, 0, &actual), ZX_ERR_BAD_HANDLE);
   EXPECT_EQ(actual, 0);

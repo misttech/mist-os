@@ -4,6 +4,7 @@
 
 mod controller;
 mod conversion;
+pub mod socket_filters;
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ use std::num::NonZeroUsize;
 use std::pin::pin;
 use std::sync::Arc;
 
-use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
+use fidl::endpoints::{ControlHandle as _, RequestStream as _};
 use futures::channel::mpsc;
 use futures::future::FusedFuture as _;
 use futures::lock::Mutex;
@@ -19,11 +20,13 @@ use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use log::{debug, error, info, warn};
 use thiserror::Error;
+
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_root as fnet_root, fuchsia_async as fasync,
 };
 
+use crate::bindings::util::{ErrorLogExt, ScopeExt as _};
 use controller::{CommitResult, Controller};
 
 // The maximum number of events a client for the `fuchsia.net.filter/Watcher` is
@@ -32,7 +35,7 @@ use controller::{CommitResult, Controller};
 // arbitrary) so that we don't artificially truncate the allowed batch size.
 const MAX_PENDING_EVENTS: usize = (fnet_filter::MAX_BATCH_SIZE * 5) as usize;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct UpdateDispatcher(Arc<Mutex<UpdateDispatcherInner>>);
 
 #[derive(Default)]
@@ -334,26 +337,20 @@ impl Watcher {
 }
 
 pub(crate) async fn serve_state(
-    stream: fnet_filter::StateRequestStream,
-    dispatcher: &UpdateDispatcher,
+    mut stream: fnet_filter::StateRequestStream,
+    dispatcher: UpdateDispatcher,
 ) -> Result<(), fidl::Error> {
-    stream
-        .try_for_each_concurrent(None, |request| async {
-            match request {
-                fnet_filter::StateRequest::GetWatcher {
-                    options: _,
-                    request,
-                    control_handle: _,
-                } => {
-                    let requests = request.into_stream();
-                    serve_watcher(requests, dispatcher).await.unwrap_or_else(|e| {
-                        warn!("error serving {}: {e:?}", fnet_filter::WatcherMarker::DEBUG_NAME)
-                    });
-                }
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            fnet_filter::StateRequest::GetWatcher { options: _, request, control_handle: _ } => {
+                let requests = request.into_stream();
+                fasync::Scope::current().spawn_request_stream_handler(requests, |requests| {
+                    serve_watcher(requests, dispatcher.clone())
+                })
             }
-            Ok(())
-        })
-        .await
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -366,18 +363,33 @@ enum ServeWatcherError {
     PreviousPendingWatch,
     #[error("the client was canceled")]
     Canceled,
+    #[error("the service scope was canceled")]
+    ScopeCanceled,
+}
+
+impl ErrorLogExt for ServeWatcherError {
+    fn log_level(&self) -> log::Level {
+        match self {
+            Self::ErrorInStream(fidl) | Self::FailedToRespond(fidl) => fidl.log_level(),
+            Self::Canceled | Self::ScopeCanceled | Self::PreviousPendingWatch => log::Level::Warn,
+        }
+    }
 }
 
 async fn serve_watcher(
     stream: fnet_filter::WatcherRequestStream,
-    UpdateDispatcher(dispatcher): &UpdateDispatcher,
+    dispatcher: UpdateDispatcher,
 ) -> Result<(), ServeWatcherError> {
+    let scope_guard =
+        fasync::Scope::current().active_guard().ok_or(ServeWatcherError::ScopeCanceled)?;
+    let UpdateDispatcher(dispatcher) = &dispatcher;
     let mut watcher = dispatcher.lock().await.connect_new_client();
     let canceled_fut = watcher.canceled.wait();
 
     let result = {
         let mut request_stream = stream.map_err(ServeWatcherError::ErrorInStream).fuse();
         let mut canceled_fut = pin!(canceled_fut);
+        let mut scope_canceled_fut = pin!(scope_guard.on_cancel().fuse());
         let mut hanging_get = futures::future::OptionFuture::default();
         loop {
             hanging_get = futures::select! {
@@ -408,87 +420,94 @@ async fn serve_watcher(
                     }
                 },
                 () = canceled_fut => break Err(ServeWatcherError::Canceled),
+                () = scope_canceled_fut => break Err(ServeWatcherError::ScopeCanceled),
             };
         }
     };
 
     dispatcher.lock().await.disconnect_client(watcher);
+    // Only drop the scope guard after we've disconnected from the dispatcher,
+    // so that we ensure the watcher sink always has a valid sender.
+    drop(scope_guard);
 
     result
 }
 
 pub(crate) async fn serve_root(
-    stream: fnet_root::FilterRequestStream,
-    dispatcher: &UpdateDispatcher,
-    ctx: &crate::bindings::Ctx,
+    mut stream: fnet_root::FilterRequestStream,
+    dispatcher: UpdateDispatcher,
+    ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_root::FilterRequest;
 
-    stream
-        .try_for_each_concurrent(None, |request| async {
-            match request {
-                FilterRequest::OpenController { id, request, control_handle: _ } => {
-                    let UpdateDispatcher(inner) = dispatcher;
-                    let id = fnet_filter_ext::ControllerId(id);
-                    inner.lock().await.connect_or_create_new_controller(id.clone());
-
-                    let (stream, control_handle) = request.into_stream_and_control_handle();
-                    serve_controller(&id, stream, control_handle, dispatcher, ctx.clone())
-                        .await
-                        .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
-
-                    // NB: we do not remove the controller on channel closure, because this is a
-                    // connection made through fuchsia.net.root/Filter, so it has auto-detach
-                    // behavior.
-                    Ok(())
-                }
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            FilterRequest::OpenController { id, request, control_handle: _ } => {
+                let dispatcher = dispatcher.clone();
+                let ctx = ctx.clone();
+                let UpdateDispatcher(inner) = &dispatcher;
+                let id = fnet_filter_ext::ControllerId(id);
+                inner.lock().await.connect_or_create_new_controller(id.clone());
+                let stream = request.into_stream();
+                fasync::Scope::current().spawn_request_stream_handler(stream, |stream| async move {
+                    serve_controller(&id, stream, &dispatcher, ctx).await
+                })
             }
-        })
-        .await
+        }
+    }
+    // NB: we do not remove the controller on channel closure, because this is a
+    // connection made through fuchsia.net.root/Filter, so it has auto-detach
+    // behavior.
+    Ok(())
 }
 
 pub(crate) async fn serve_control(
-    stream: fnet_filter::ControlRequestStream,
-    dispatcher: &UpdateDispatcher,
-    ctx: &crate::bindings::Ctx,
+    mut stream: fnet_filter::ControlRequestStream,
+    dispatcher: UpdateDispatcher,
+    ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_filter::ControlRequest;
 
-    stream
-        .try_for_each_concurrent(None, |request| async {
-            match request {
-                ControlRequest::OpenController { id, request, control_handle: _ } => {
-                    let UpdateDispatcher(inner) = dispatcher;
-                    let final_id =
-                        inner.lock().await.new_controller(fnet_filter_ext::ControllerId(id));
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            ControlRequest::OpenController { id, request, control_handle: _ } => {
+                let dispatcher = dispatcher.clone();
+                let UpdateDispatcher(inner) = &dispatcher;
+                let final_id = inner.lock().await.new_controller(fnet_filter_ext::ControllerId(id));
 
-                    let (stream, control_handle) = request.into_stream_and_control_handle();
+                let stream = request.into_stream();
+                let ctx = ctx.clone();
 
-                    serve_controller(&final_id, stream, control_handle, dispatcher, ctx.clone())
-                        .await
-                        .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
+                fasync::Scope::current().spawn_request_stream_handler(
+                    stream,
+                    |stream| async move {
+                        let result =
+                            serve_controller(&final_id, stream, &dispatcher, ctx.clone()).await;
 
-                    inner.lock().await.remove_controller(&final_id, ctx.clone());
-                }
-                ControlRequest::ReopenDetachedController { key: _, request: _, control_handle } => {
-                    error!("TODO(https://fxbug.dev/42182623): detaching is not implemented");
-                    control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
-                }
+                        let UpdateDispatcher(inner) = &dispatcher;
+                        inner.lock().await.remove_controller(&final_id, ctx);
+                        result
+                    },
+                );
             }
-            Ok(())
-        })
-        .await
+            ControlRequest::ReopenDetachedController { key: _, request: _, control_handle } => {
+                error!("TODO(https://fxbug.dev/42182623): detaching is not implemented");
+                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn serve_controller(
     id: &fnet_filter_ext::ControllerId,
     mut stream: fnet_filter::NamespaceControllerRequestStream,
-    control_handle: fnet_filter::NamespaceControllerControlHandle,
     UpdateDispatcher(dispatcher): &UpdateDispatcher,
     mut ctx: crate::bindings::Ctx,
 ) -> Result<(), fidl::Error> {
     use fnet_filter::NamespaceControllerRequest;
 
+    let control_handle = stream.control_handle();
     control_handle.send_on_id_assigned(&id.0)?;
 
     let mut pending_changes = Vec::new();

@@ -28,14 +28,54 @@ impl ::fidl_next::Encodable for {{ name }} {
     type Encoded = {{ wire_name }};
 }
 
+{%- if enm.is_strict %}
+impl ::std::convert::TryFrom<{{ natural_int }}> for {{ name }} {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: {{ natural_int }}) -> Result<Self, Self::Error> {
+        match value {
+            {% for member in enm.members -%}
+                {{ member.value.value }} => Ok(Self::{{ member.name.camel()|ident }}),
+            {% endfor %}
+            _ => Err(Self::Error::new(value.into())),
+        }
+
+    }
+}
+{%- else %}
+impl ::std::convert::From<{{ natural_int }}> for {{ name }} {
+    fn from(value: {{ natural_int }}) -> Self {
+        match value {
+            {% for member in enm.members -%}
+              {{ member.value.value }} => Self::{{ member.name.camel()|ident }},
+            {% endfor %}
+            _ => Self::UnknownOrdinal_(value),
+        }
+    }
+}
+{%- endif %}
+
 unsafe impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ?Sized,
 {
     #[inline]
     fn encode(
-        &mut self,
-        _: &mut ___E,
+        self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::EncodeRef::encode_ref(&self, encoder, out)
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for {{ name }}
+where
+    ___E: ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let {{ wire_name }} { value } = out);
@@ -67,10 +107,17 @@ impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
     }
 }
 
-impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+impl ::fidl_next::FromWire<{{ wire_name }}> for {{ name }} {
     #[inline]
-    fn take_from(from: &{{ wire_name }}) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: {{ wire_name }}) -> Self {
+        Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<{{ wire_name }}> for {{ name }} {
+    #[inline]
+    fn from_wire_ref(wire: &{{ wire_name }}) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -89,7 +136,9 @@ pub struct {{ wire_name }} {
     value: {{ wire_int }},
 }
 
-unsafe impl ::fidl_next::ZeroPadding for {{ wire_name }} {
+unsafe impl ::fidl_next::Wire for {{ wire_name }} {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding

@@ -4,7 +4,7 @@
 
 #include "../generic-suspend.h"
 
-#include <fidl/fuchsia.hardware.suspend/cpp/markers.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/markers.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
@@ -91,7 +91,7 @@ class GenericSuspendTestFixture : public ::testing::Test {
     zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
     zx::result connect_result =
-        driver_test().Connect<fuchsia_hardware_suspend::SuspendService::Suspender>();
+        driver_test().Connect<fuchsia_hardware_power_suspend::SuspendService::Suspender>();
     EXPECT_EQ(ZX_OK, connect_result.status_value());
     client_.Bind(std::move(connect_result.value()));
   }
@@ -99,7 +99,7 @@ class GenericSuspendTestFixture : public ::testing::Test {
     zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
-  fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender>& client() { return client_; }
+  fidl::WireSyncClient<fuchsia_hardware_power_suspend::Suspender>& client() { return client_; }
 
   fdf_testing::BackgroundDriverTest<GenericSuspendTestConfiguration>& driver_test() {
     return driver_test_;
@@ -107,7 +107,7 @@ class GenericSuspendTestFixture : public ::testing::Test {
 
  private:
   fdf_testing::BackgroundDriverTest<GenericSuspendTestConfiguration> driver_test_;
-  fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender> client_;
+  fidl::WireSyncClient<fuchsia_hardware_power_suspend::Suspender> client_;
 };
 
 TEST_F(GenericSuspendTestFixture, TrivialGetSuspendStates) {
@@ -122,7 +122,7 @@ TEST_F(GenericSuspendTestFixture, TrivialGetSuspendStates) {
 
 TEST_F(GenericSuspendTestFixture, TrivialSuspend) {
   fidl::Arena arena;
-  auto request = fuchsia_hardware_suspend::wire::SuspenderSuspendRequest::Builder(arena)
+  auto request = fuchsia_hardware_power_suspend::wire::SuspenderSuspendRequest::Builder(arena)
                      .state_index(0)
                      .Build();
   auto result = client()->Suspend(request);

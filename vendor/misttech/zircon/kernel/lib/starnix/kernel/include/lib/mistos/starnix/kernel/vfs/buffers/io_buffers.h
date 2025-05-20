@@ -20,7 +20,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/span.h>
 
 namespace unit_testing {

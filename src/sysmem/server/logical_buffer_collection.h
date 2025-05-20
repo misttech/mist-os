@@ -319,6 +319,15 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   void VLogClientError(Location location, const NodeProperties* node_properties, const char* format,
                        va_list args) const;
 
+  // start buffering log output into log_buffer_ instead of logging immediately
+  void LogBufferEnable();
+  // flush (output) log_buffer_ and stop buffering further log output
+  void LogBufferFlushAndDisable();
+  // discard (drop) log_buffer_ and stop buffering further log output
+  //
+  // when is_verbose_logging() true, we attenuate the log_buffer_ to INFO but still output it
+  void LogBufferDiscardAndDisable();
+
   Sysmem* parent_sysmem() const { return parent_sysmem_; }
 
   // For tests.
@@ -451,8 +460,15 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   void LogWarn(Location location, const char* format, ...) const __PRINTFLIKE(3, 4);
   void LogError(Location location, const char* format, ...) const __PRINTFLIKE(3, 4);
+
+  // Don't call these directly; use LogInfo, LogWarn, LogError, or in rare cases
+  // LogErrorStatic.
   void VLogWarn(Location location, const char* format, va_list args) const;
   void VLogError(Location location, const char* format, va_list args) const;
+  void LogBuffered(fuchsia_logging::LogSeverity log_severity, Location location, const char* format,
+                   ...) const __PRINTFLIKE(4, 5);
+  void vLogBuffered(fuchsia_logging::LogSeverity severity, const char* file, int line,
+                    const char* prefix, const char* format, va_list args) const;
 
   void ResetGroupChildSelection(std::vector<NodeProperties*>& groups_by_priority);
   void InitGroupChildSelection(std::vector<NodeProperties*>& groups_by_priority);
@@ -954,6 +970,39 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   uint32_t strong_parent_vmo_count_ = 0;
 
   const zx::time create_time_monotonic_ = zx::time::infinite_past();
+
+  class BufferedLogEntry {
+   public:
+    BufferedLogEntry() = delete;
+    BufferedLogEntry(fuchsia_logging::LogSeverity severity, const char* file, int line,
+                     std::string formatted_str)
+        : severity_(severity), file_(file), line_(line), formatted_str_(std::move(formatted_str)) {}
+    // move-only
+    BufferedLogEntry(const BufferedLogEntry& to_copy) = delete;
+    BufferedLogEntry& operator=(const BufferedLogEntry& to_copy) = delete;
+    BufferedLogEntry(BufferedLogEntry&& to_move) = default;
+    BufferedLogEntry& operator=(BufferedLogEntry&& to_move) = default;
+    fuchsia_logging::LogSeverity severity() { return severity_; }
+    const char* file() { return file_; }
+    int line() { return line_; }
+    const std::string& formatted_str() { return formatted_str_; }
+
+   private:
+    fuchsia_logging::LogSeverity severity_ = fuchsia_logging::LogSeverity::Trace;
+    const char* file_ = nullptr;
+    int line_ = 0;
+    std::string formatted_str_;
+  };
+  std::optional<std::vector<BufferedLogEntry>> log_buffer_;
+  const LogCallback maybe_buffer_log_ = [this](fuchsia_logging::LogSeverity severity,
+                                               const char* file, int line,
+                                               const char* formatted_str) {
+    if (log_buffer_.has_value()) {
+      log_buffer_->emplace_back(BufferedLogEntry{severity, file, line, formatted_str});
+      return;
+    }
+    GetDefaultLogCallback()(severity, file, line, formatted_str);
+  };
 };
 
 }  // namespace sysmem_service

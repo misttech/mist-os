@@ -116,6 +116,8 @@ cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DLINUX_riscv64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/ubuntu20.04 \
+  -DLINUX_armv7-unknown-linux-gnueabihf_SYSROOT=${SYSROOT_DIR}/linux \
+  -DLINUX_i386-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DFUCHSIA_SDK=${IDK_DIR} \
   -DCMAKE_INSTALL_PREFIX= \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia-stage2.cmake \
@@ -131,12 +133,6 @@ If the above fails with an error related to Ninja, then you may need to add
 the Fuchsia build assumes some libraries are stripped so `ninja
 install-toolchain-distribution-stripped` is necessary.
 
-Caution: Due to a [bug in Clang](https://bugs.llvm.org/show_bug.cgi?id=44097),
-builds with assertions enabled might crash while building Fuchsia. As a
-workaround, you can disable Clang assertions by setting
-`-DLLVM_ENABLE_ASSERTIONS=OFF` or using a release build
-(`-DCMAKE_BUILD_TYPE=Release`).
-
 ### Two-Stage Build Fuchsia Configuration {#two-stage-build}
 
 This is roughly equivalent to what is run on the prod builders and used to build
@@ -149,6 +145,8 @@ cmake -GNinja \
   -DSTAGE2_LINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DSTAGE2_LINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DSTAGE2_LINUX_riscv64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/ubuntu20.04 \
+  -DSTAGE2_LINUX_armv7-unknown-linux-gnueabihf_SYSROOT=${SYSROOT_DIR}/linux \
+  -DSTAGE2_LINUX_i386-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DSTAGE2_FUCHSIA_SDK=${IDK_DIR} \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia.cmake \
   ${LLVM_SRCDIR}/llvm
@@ -199,6 +197,8 @@ cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DLINUX_riscv64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/ubuntu20.04 \
+  -DLINUX_armv7-unknown-linux-gnueabihf_SYSROOT=${SYSROOT_DIR}/linux \
+  -DLINUX_i386-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
   -DFUCHSIA_SDK=${IDK_DIR} \
   -DCMAKE_INSTALL_PREFIX= \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia-stage2.cmake \

@@ -208,4 +208,4 @@ static int cmd_mem(int argc, const cmd_args* argv, uint32_t flags) {
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("mem", "memory commands", &cmd_mem, CMD_AVAIL_NORMAL)
-STATIC_COMMAND_END(pmm)
+STATIC_COMMAND_END(mem_cmd)

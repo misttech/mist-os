@@ -19,8 +19,8 @@
 #include <fbl/vector.h>
 #include <ktl/array.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
-#include <ktl/pair.h>
+#include <ktl/utility.h>
+#include <ktl/utility.h>
 #include <ktl/span.h>
 
 using namespace starnix_uapi;

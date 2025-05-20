@@ -20,7 +20,7 @@ main_product_bundle_name = "${build_info_product}.${build_info_board}"
 #     [string] The name of the product bundle.
 #
 #   partitions (required)
-#     [path] The path to the partitions config.
+#     [label] The label to the partitions config.
 #
 #   system_a (optional)
 #     [path] The path to the images manifest that describes images intended
@@ -95,6 +95,10 @@ template("product_bundle") {
     vd_dir = "${outdir}/virtual_devices"
     transfer_manifest = "$target_out_dir/${product_name}.transfer.json"
     tuf_keys = "//src/sys/pkg/repositories/devhost/keys"
+
+    partitions_dir = get_label_info(invoker.partitions, "target_out_dir") +
+                     "/" + get_label_info(invoker.partitions, "name")
+    partitions_json = "$partitions_dir/partitions_config.json"
   }
 
   bundle_deps = []
@@ -142,17 +146,18 @@ template("product_bundle") {
         "//build/assembly/scripts:hermetic_inputs_from_assembly_outputs"
 
     depfile = files.hermetic_inputs_depfile
-    inputs = [ invoker.partitions ]
+    inputs = [ files.partitions_json ]
     outputs = [ files.hermetic_inputs ]
 
     args = [
       "--partitions",
-      rebase_path(invoker.partitions, root_build_dir),
+      rebase_path(files.partitions_json, root_build_dir),
       "--output",
       rebase_path(files.hermetic_inputs, root_build_dir),
       "--depfile",
       rebase_path(files.hermetic_inputs_depfile, root_build_dir),
     ]
+    deps += [ invoker.partitions ]
 
     if (defined(invoker.system_a) || defined(invoker.system_b) ||
         defined(invoker.system_r)) {
@@ -226,7 +231,7 @@ template("product_bundle") {
       "--product-name",
       product_name,
       "--partitions",
-      rebase_path(invoker.partitions, root_build_dir),
+      rebase_path(files.partitions_dir, root_build_dir),
       "--out-dir",
       rebase_path(files.outdir, root_build_dir),
       "--tuf-keys",
@@ -235,12 +240,13 @@ template("product_bundle") {
 
     outputs += [ files.product_bundle_manifest ]
     inputs = [
-      invoker.partitions,
+      files.partitions_json,
       "${files.tuf_keys}/root.json",
       "${files.tuf_keys}/snapshot.json",
       "${files.tuf_keys}/targets.json",
       "${files.tuf_keys}/timestamp.json",
     ]
+    deps += [ invoker.partitions ]
     outputs += [
       "${files.outdir}/keys/root.json",
       "${files.outdir}/keys/targets.json",

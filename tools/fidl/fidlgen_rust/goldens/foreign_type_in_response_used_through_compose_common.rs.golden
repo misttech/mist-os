@@ -10,6 +10,10 @@ use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
 
+pub mod top_ordinals {
+    pub const GET_FOO: u64 = 0x401a9ffa95a4c333;
+}
+
 mod internal {
     use super::*;
 }

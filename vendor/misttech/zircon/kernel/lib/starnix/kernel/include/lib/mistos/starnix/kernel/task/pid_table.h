@@ -15,7 +15,7 @@
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/optional.h>
 #include <ktl/unique_ptr.h>
 #include <ktl/variant.h>

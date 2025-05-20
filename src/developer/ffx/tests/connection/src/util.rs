@@ -107,7 +107,8 @@ async fn launch(
     let moniker = format!("/core/ffx-laboratory:{}", name);
 
     let env_context = isolate.env_context().clone();
-    let create_output = isolate.ffx(&["component", "create", &moniker, STRESSOR_URL]).await?;
+    let create_output =
+        isolate.ffx(&["-t", nodename, "component", "create", &moniker, STRESSOR_URL]).await?;
     if !create_output.status.success() {
         return Err(anyhow!("Failed to create component: {:?}", create_output));
     }
@@ -115,7 +116,7 @@ async fn launch(
     let component = LaunchedComponent { moniker: moniker.clone() };
 
     let start_and_launch_result = async move {
-        let output = isolate.ffx(&["component", "start", &moniker]).await?;
+        let output = isolate.ffx(&["-t", nodename, "component", "start", &moniker]).await?;
         if !output.status.success() {
             Err(anyhow!("Failed to start component: {:?}", output))
         } else {
@@ -192,7 +193,6 @@ where
     let nodename = std::env::var("FUCHSIA_NODENAME").unwrap();
 
     isolate.ffx(&["target", "add", &addr]).await.expect("add target");
-    isolate.ffx(&["target", "default", "set", &nodename]).await.expect("add target");
 
     let (launched_component, component_connector) =
         launch(case_name, &nodename, node, &isolate).await.expect("launch component");
@@ -220,7 +220,7 @@ where
         (Err(test_err), Ok(())) => std::panic::resume_unwind(test_err),
         (Ok(()), Err(destroy_err)) => panic!("{}", destroy_err),
         (Err(test_err), Err(destroy_err)) => {
-            tracing::error!("Destroy failed: {}", destroy_err);
+            log::error!("Destroy failed: {}", destroy_err);
             std::panic::resume_unwind(test_err);
         }
     }

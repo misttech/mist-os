@@ -7,4 +7,15 @@
         binary: "driver/libmsd_intel_test.so",
         bind: "meta/bind/msd_intel_test_bind.bindbc",
     },
+    capabilities: [
+        {
+            service: [ "fuchsia.gpu.magma.TestService" ],
+        },
+    ],
+    expose: [
+        {
+            service: [ "fuchsia.gpu.magma.TestService" ],
+            from: "self",
+        },
+    ],
 }

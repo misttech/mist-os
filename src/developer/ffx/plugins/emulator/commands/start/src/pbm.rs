@@ -61,12 +61,12 @@ pub(crate) async fn make_configs(
                     arch @ _ => bail!("CPU architecture {} is currently unsupported with (U)EFI", arch),
                 }).map_err(|e| bug!("cannot locate ovmf code in SDK: {e}"))?;
 
-            tracing::info!("Found ovmf code at {:?}", &emu_config.guest.ovmf_code);
+            log::info!("Found ovmf code at {:?}", &emu_config.guest.ovmf_code);
 
             // Non-fatal error since infra may not always supply the file if it is not needed for the
             // tests being run.
             if !emu_config.guest.ovmf_code.exists() {
-                tracing::warn!("cannot find OVMF code at {:?}", emu_config.guest.ovmf_code);
+                log::warn!("cannot find OVMF code at {:?}", emu_config.guest.ovmf_code);
             }
 
             // vars is in the same directory with the same basename prefix. ARM64 and x64 have different
@@ -80,13 +80,13 @@ pub(crate) async fn make_configs(
                     arch @ _ => bail!("CPU architecture {} is currently unsupported with (U)EFI", arch),
                 }
             } else {
-                tracing::warn!("unrecognized OVMF code file name {:?}", emu_config.guest.ovmf_code);
+                log::warn!("unrecognized OVMF code file name {:?}", emu_config.guest.ovmf_code);
                 "OVMF_VARS.fd".to_string()
             };
             let vars =
                 emu_config.guest.ovmf_code.parent().expect("ovmf has parent dir").join(vars_filename);
             if !vars.exists() {
-                tracing::warn!("cannot find OVMF vars at {vars:?}");
+                log::warn!("cannot find OVMF vars at {vars:?}");
             }
             emu_config.guest.ovmf_vars = vars;
 
@@ -97,7 +97,7 @@ pub(crate) async fn make_configs(
                 if p.exists() {
                     emu_config.guest.vbmeta_key_file = Some(p);
                 } else {
-                    tracing::warn!("cannot find PEM file at {p:?}");
+                    log::warn!("cannot find PEM file at {p:?}");
                 }
             }
             let vbmeta_metadata_filename = cmd.vbmeta_key_metadata()?.unwrap_or_default();
@@ -106,7 +106,7 @@ pub(crate) async fn make_configs(
                 if p.exists() {
                     emu_config.guest.vbmeta_key_metadata_file = Some(p);
                 } else {
-                    tracing::warn!("cannot find key metadata file at {p:?}");
+                    log::warn!("cannot find key metadata file at {p:?}");
                 }
             }
         }
@@ -163,7 +163,7 @@ async fn apply_command_line_options(
                     match std::fs::OpenOptions::new().write(true).open(&path) {
                         Err(e) => match e.kind() {
                             std::io::ErrorKind::PermissionDenied => {
-                                tracing::warn!(
+                                log::warn!(
                                     "No write permission on {}. Running without acceleration.",
                                     path
                                 );
@@ -180,7 +180,7 @@ async fn apply_command_line_options(
                                 );
                             }
                             std::io::ErrorKind::NotFound => {
-                                tracing::info!(
+                                log::info!(
                                     "KVM path {} does not exist. Running without acceleration.",
                                     path
                                 );
@@ -218,7 +218,7 @@ async fn apply_command_line_options(
                 https://fuchsia.dev/fuchsia-src/development/build/emulator#networking"
             );
         } else {
-            tracing::debug!(
+            log::debug!(
                 "Falling back on user-mode networking: {}",
                 available.as_ref().unwrap_err()
             );
@@ -332,7 +332,7 @@ fn parse_host_port_maps(
             }
             let mapping = mapping.unwrap();
             if mapping.host.is_some() {
-                tracing::warn!(
+                log::warn!(
                     "Command line attempts to set the '{}' port more than once. This may \
                     lead to unexpected behavior. The previous entry will be discarded.",
                     name
@@ -349,7 +349,7 @@ fn parse_host_port_maps(
         }
     }
 
-    tracing::debug!("Port map parsed: {:?}\n", emu_config.host.port_map);
+    log::debug!("Port map parsed: {:?}\n", emu_config.host.port_map);
 
     Ok(())
 }

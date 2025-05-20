@@ -81,5 +81,5 @@ examples:
       g-tx-fifo-size = <128 4 128 16>;
       turnaround-time = <9>;
       dma-burst-len = <5>;
-      boot-metadata = <0x43414D6D 0>; /*DEVICE_METADATA_MAC_ADDRESS MACADDR_WIFI*/
+      boot-metadata = <0x43414D6D 0>; /*ZBI_TYPE_DRV_MAC_ADDRESS MACADDR_WIFI*/
     };

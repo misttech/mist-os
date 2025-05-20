@@ -17,10 +17,10 @@
 #include <fbl/algorithm.h>
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/ref.h>
 #include <ktl/type_traits.h>
+#include <ktl/utility.h>
 #include <phys/stdio.h>
 #include <phys/uart.h>
 

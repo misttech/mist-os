@@ -1,13 +1,15 @@
-// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::bin::Bin;
 use anyhow::{anyhow, Error};
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
+use fidl_fuchsia_hardware_block::MAX_TRANSFER_UNBOUNDED;
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
 use fuchsia_sync::Mutex;
 use futures::{Future, FutureExt as _, TryStreamExt as _};
+use slab::Slab;
 use std::borrow::Cow;
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::num::NonZero;
 use std::ops::Range;
@@ -20,7 +22,12 @@ use {
 };
 
 pub mod async_interface;
+mod bin;
 pub mod c_interface;
+
+pub(crate) const FIFO_MAX_REQUESTS: usize = 64;
+
+type TraceFlowId = Option<NonZero<u64>>;
 
 #[derive(Clone)]
 pub enum DeviceInfo {
@@ -28,11 +35,40 @@ pub enum DeviceInfo {
     Partition(PartitionInfo),
 }
 
+impl DeviceInfo {
+    fn block_count(&self) -> Option<u64> {
+        match self {
+            Self::Block(BlockInfo { block_count, .. }) => Some(*block_count),
+            Self::Partition(PartitionInfo { block_range, .. }) => {
+                block_range.as_ref().map(|range| range.end - range.start)
+            }
+        }
+    }
+
+    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+        match self {
+            Self::Block(BlockInfo { max_transfer_blocks, .. }) => max_transfer_blocks.clone(),
+            Self::Partition(PartitionInfo { max_transfer_blocks, .. }) => {
+                max_transfer_blocks.clone()
+            }
+        }
+    }
+
+    fn max_transfer_size(&self, block_size: u32) -> u32 {
+        if let Some(max_blocks) = self.max_transfer_blocks() {
+            max_blocks.get() * block_size
+        } else {
+            MAX_TRANSFER_UNBOUNDED
+        }
+    }
+}
+
 /// Information associated with non-partition block devices.
 #[derive(Clone)]
 pub struct BlockInfo {
     pub device_flags: fblock::Flag,
     pub block_count: u64,
+    pub max_transfer_blocks: Option<NonZero<u32>>,
 }
 
 /// Information associated with a block device that is also a partition.
@@ -40,6 +76,7 @@ pub struct BlockInfo {
 pub struct PartitionInfo {
     /// The device flags reported by the underlying device.
     pub device_flags: fblock::Flag,
+    pub max_transfer_blocks: Option<NonZero<u32>>,
     /// If `block_range` is None, the partition is a volume and may not be contiguous.
     /// In this case, the server will use the `get_volume_info` method to get the count of assigned
     /// slices and use that (along with the slice and block sizes) to determine the block count.
@@ -50,62 +87,98 @@ pub struct PartitionInfo {
     pub flags: u64,
 }
 
-// Multiple Block I/O request may be sent as a group.
-// Notes:
-// - the group is identified by the group id in the request
-// - if using groups, a response will not be sent unless `BlockIoFlag::GROUP_LAST`
-//   flag is set.
-// - when processing a request of a group fails, subsequent requests of that
-//   group will not be processed.
-//
-// Refer to sdk/fidl/fuchsia.hardware.block.driver/block.fidl for details.
-//
-// FifoMessageGroup keeps track of the relevant BlockFifoResponse field for
-// a group requests. Only `status` and `count` needs to be updated.
-struct FifoMessageGroup {
+/// We internally keep track of active requests, so that when the server is torn down, we can
+/// deallocate all of the resources for pending requests.
+struct ActiveRequest<S> {
+    session: S,
+    group_or_request: GroupOrRequest,
+    trace_flow_id: TraceFlowId,
+    vmo_bin_key: Option<usize>,
     status: zx::Status,
     count: u32,
     req_id: Option<u32>,
 }
 
-impl FifoMessageGroup {
-    fn new() -> Self {
-        FifoMessageGroup { status: zx::Status::OK, count: 0, req_id: None }
+pub struct ActiveRequests<S>(Mutex<ActiveRequestsInner<S>>);
+
+impl<S> Default for ActiveRequests<S> {
+    fn default() -> Self {
+        Self(Mutex::new(ActiveRequestsInner { requests: Slab::default(), vmo_bin: Bin::new() }))
     }
 }
 
-#[derive(Default)]
-struct FifoMessageGroups(Mutex<BTreeMap<u16, FifoMessageGroup>>);
+impl<S> ActiveRequests<S> {
+    fn complete_and_take_response(
+        &self,
+        request_id: RequestId,
+        status: zx::Status,
+    ) -> Option<(S, BlockFifoResponse)> {
+        self.0.lock().complete_and_take_response(request_id, status)
+    }
+}
 
-// Keeps track of all the group requests that are currently being processed
-impl FifoMessageGroups {
-    /// Completes a request and returns a response to be sent if it's the last outstanding request
-    /// for this group.
-    fn complete(&self, group_id: u16, status: zx::Status) -> Option<BlockFifoResponse> {
-        let mut map = self.0.lock();
-        let Entry::Occupied(mut o) = map.entry(group_id) else { unreachable!() };
-        let group = o.get_mut();
-        if group.count == 1 {
-            if let Some(reqid) = group.req_id {
-                let status =
-                    if group.status != zx::Status::OK { group.status } else { status }.into_raw();
+struct ActiveRequestsInner<S> {
+    requests: Slab<ActiveRequest<S>>,
+    vmo_bin: Bin<Arc<zx::Vmo>>,
+}
 
-                o.remove();
-
-                return Some(BlockFifoResponse {
-                    status,
-                    reqid,
-                    group: group_id,
-                    ..Default::default()
-                });
-            }
-        }
+// Keeps track of all the requests that are currently being processed
+impl<S> ActiveRequestsInner<S> {
+    /// Completes a request.
+    fn complete(&mut self, request_id: RequestId, status: zx::Status) {
+        let group = &mut self.requests[request_id.0];
 
         group.count = group.count.checked_sub(1).unwrap();
         if status != zx::Status::OK && group.status == zx::Status::OK {
             group.status = status
         }
-        None
+
+        fuchsia_trace::duration!(
+            c"storage",
+            c"block_server::finish_transaction",
+            "request_id" => request_id.0,
+            "group_completed" => group.count == 0,
+            "status" => status.into_raw());
+        if let Some(trace_flow_id) = group.trace_flow_id {
+            fuchsia_trace::flow_step!(
+                c"storage",
+                c"block_server::finish_request",
+                trace_flow_id.get().into()
+            );
+        }
+    }
+
+    /// Takes the response if all requests are finished.
+    fn take_response(&mut self, request_id: RequestId) -> Option<(S, BlockFifoResponse)> {
+        let group = &self.requests[request_id.0];
+        match group.req_id {
+            Some(reqid) if group.count == 0 => {
+                let group = self.requests.remove(request_id.0);
+                if let Some(vmo_bin_key) = group.vmo_bin_key {
+                    self.vmo_bin.release(vmo_bin_key);
+                }
+                Some((
+                    group.session,
+                    BlockFifoResponse {
+                        status: group.status.into_raw(),
+                        reqid,
+                        group: group.group_or_request.group_id().unwrap_or(0),
+                        ..Default::default()
+                    },
+                ))
+            }
+            _ => None,
+        }
+    }
+
+    /// Competes the request and returns a response if the request group is finished.
+    fn complete_and_take_response(
+        &mut self,
+        request_id: RequestId,
+        status: zx::Status,
+    ) -> Option<(S, BlockFifoResponse)> {
+        self.complete(request_id, status);
+        self.take_response(request_id)
     }
 }
 
@@ -117,10 +190,18 @@ pub struct BlockServer<SM> {
 }
 
 /// A single entry in `[OffsetMap]`.
+#[derive(Debug)]
 pub struct BlockOffsetMapping {
     source_block_offset: u64,
     target_block_offset: u64,
     length: u64,
+}
+
+impl BlockOffsetMapping {
+    fn are_blocks_within_source_range(&self, blocks: (u64, u32)) -> bool {
+        blocks.0 >= self.source_block_offset
+            && blocks.0 + blocks.1 as u64 - self.source_block_offset <= self.length
+    }
 }
 
 impl std::convert::TryFrom<fblock::BlockOffsetMapping> for BlockOffsetMapping {
@@ -137,40 +218,45 @@ impl std::convert::TryFrom<fblock::BlockOffsetMapping> for BlockOffsetMapping {
     }
 }
 
-/// Remaps the offset of block requests based on an internal map.
+/// Remaps the offset of block requests based on an internal map, and truncates long requests.
 /// TODO(https://fxbug.dev/402515764): For now, this just supports a single entry in the map, which
 /// is all that is required for GPT partitions.  If we want to support this for FVM, we will need
 /// to support multiple entries, which requires changing the block server to support request
 /// splitting.
 pub struct OffsetMap {
-    mapping: BlockOffsetMapping,
+    mapping: Option<BlockOffsetMapping>,
+    max_transfer_blocks: Option<NonZero<u32>>,
 }
 
 impl OffsetMap {
-    pub fn new(mapping: BlockOffsetMapping) -> Self {
-        Self { mapping }
+    /// An OffsetMap that remaps requests.
+    pub fn new(mapping: BlockOffsetMapping, max_transfer_blocks: Option<NonZero<u32>>) -> Self {
+        Self { mapping: Some(mapping), max_transfer_blocks }
     }
 
-    /// Adjusts the requested range, returning the new dev_offset.
-    /// Returns false if the request would exceed the range known to OffsetMap.
-    pub fn adjust_request(&self, dev_offset: u64, length: u64) -> Option<u64> {
-        if length == 0 {
-            return None;
-        }
-        let end = dev_offset.checked_add(length)?;
-        if self.mapping.source_block_offset > dev_offset
-            || end > self.mapping.source_block_offset + self.mapping.length
-        {
-            return None;
-        }
-        let delta = dev_offset - self.mapping.source_block_offset;
-        Some(self.mapping.target_block_offset + delta)
+    /// An OffsetMap that just enforces maximum request sizes.
+    pub fn empty(max_transfer_blocks: Option<NonZero<u32>>) -> Self {
+        Self { mapping: None, max_transfer_blocks }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.mapping.is_some()
+    }
+
+    fn mapping(&self) -> Option<&BlockOffsetMapping> {
+        self.mapping.as_ref()
+    }
+
+    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+        self.max_transfer_blocks
     }
 }
 
 // Methods take Arc<Self> rather than &self because of
 // https://github.com/rust-lang/rust/issues/42940.
 pub trait SessionManager: 'static {
+    type Session;
+
     fn on_attach_vmo(
         self: Arc<Self>,
         vmo: &Arc<zx::Vmo>,
@@ -179,11 +265,11 @@ pub trait SessionManager: 'static {
     /// Creates a new session to handle `stream`.
     /// The returned future should run until the session completes, for example when the client end
     /// closes.
-    /// If `offset_map` is set, it will be used to remap the dev_offset of FIFO requests.
+    /// `offset_map`, will be used to adjust the block offset/length of FIFO requests.
     fn open_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> impl Future<Output = Result<(), Error>> + Send;
 
@@ -223,6 +309,9 @@ pub trait SessionManager: 'static {
     ) -> impl Future<Output = Result<(), zx::Status>> + Send {
         async { Err(zx::Status::NOT_SUPPORTED) }
     }
+
+    /// Returns the active requests.
+    fn active_requests(&self) -> &ActiveRequests<Self::Session>;
 }
 
 pub trait IntoSessionManager {
@@ -260,8 +349,9 @@ impl<SM: SessionManager> BlockServer<SM> {
         match request {
             fvolume::VolumeRequest::GetInfo { responder } => match self.device_info().await {
                 Ok(info) => {
+                    let max_transfer_size = info.max_transfer_size(self.block_size);
                     let (block_count, flags) = match info.as_ref() {
-                        DeviceInfo::Block(BlockInfo { block_count, device_flags }) => {
+                        DeviceInfo::Block(BlockInfo { block_count, device_flags, .. }) => {
                             (*block_count, *device_flags)
                         }
                         DeviceInfo::Partition(partition_info) => {
@@ -280,7 +370,7 @@ impl<SM: SessionManager> BlockServer<SM> {
                     responder.send(Ok(&fblock::BlockInfo {
                         block_count,
                         block_size: self.block_size,
-                        max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
+                        max_transfer_size,
                         flags,
                     }))?;
                 }
@@ -291,39 +381,55 @@ impl<SM: SessionManager> BlockServer<SM> {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fvolume::VolumeRequest::OpenSession { session, control_handle: _ } => {
-                return Ok(Some(self.session_manager.clone().open_session(
-                    session.into_stream(),
-                    None,
-                    self.block_size,
-                )));
+                match self.device_info().await {
+                    Ok(info) => {
+                        return Ok(Some(self.session_manager.clone().open_session(
+                            session.into_stream(),
+                            OffsetMap::empty(info.max_transfer_blocks()),
+                            self.block_size,
+                        )));
+                    }
+                    Err(status) => session.close_with_epitaph(status)?,
+                }
             }
             fvolume::VolumeRequest::OpenSessionWithOffsetMap {
                 session,
                 offset_map,
                 initial_mappings,
                 control_handle: _,
-            } => {
-                if offset_map.is_some() || initial_mappings.as_ref().is_none_or(|m| m.len() != 1) {
-                    // TODO(https://fxbug.dev/402515764): Support multiple mappings and
-                    // dynamic querying for FVM as needed.  A single static map is
-                    // sufficient for GPT.
-                    session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
-                    return Ok(None);
-                }
-                let initial_mapping = match initial_mappings.unwrap().pop().unwrap().try_into() {
-                    Ok(m) => m,
-                    Err(status) => {
-                        session.close_with_epitaph(status)?;
+            } => match self.device_info().await {
+                Ok(info) => {
+                    if offset_map.is_some()
+                        || initial_mappings.as_ref().is_none_or(|m| m.len() != 1)
+                    {
+                        // TODO(https://fxbug.dev/402515764): Support multiple mappings and
+                        // dynamic querying for FVM as needed.  A single static map is
+                        // sufficient for GPT.
+                        session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
                         return Ok(None);
                     }
-                };
-                let offset_map = OffsetMap::new(initial_mapping);
-                return Ok(Some(self.session_manager.clone().open_session(
-                    session.into_stream(),
-                    Some(offset_map),
-                    self.block_size,
-                )));
-            }
+                    let initial_mapping: BlockOffsetMapping =
+                        match initial_mappings.unwrap().pop().unwrap().try_into() {
+                            Ok(m) => m,
+                            Err(status) => {
+                                session.close_with_epitaph(status)?;
+                                return Ok(None);
+                            }
+                        };
+                    if let Some(max) = info.block_count() {
+                        if initial_mapping.target_block_offset + initial_mapping.length > max {
+                            session.close_with_epitaph(zx::Status::INVALID_ARGS)?;
+                            return Ok(None);
+                        }
+                    }
+                    return Ok(Some(self.session_manager.clone().open_session(
+                        session.into_stream(),
+                        OffsetMap::new(initial_mapping, info.max_transfer_blocks()),
+                        self.block_size,
+                    )));
+                }
+                Err(status) => session.close_with_epitaph(status)?,
+            },
             fvolume::VolumeRequest::GetTypeGuid { responder } => match self.device_info().await {
                 Ok(info) => {
                     if let DeviceInfo::Partition(partition_info) = info.as_ref() {
@@ -448,29 +554,21 @@ impl<SM: SessionManager> BlockServer<SM> {
 
 struct SessionHelper<SM: SessionManager> {
     session_manager: Arc<SM>,
-    offset_map: Option<OffsetMap>,
+    offset_map: OffsetMap,
     block_size: u32,
     peer_fifo: zx::Fifo<BlockFifoResponse, BlockFifoRequest>,
     vmos: Mutex<BTreeMap<u16, Arc<zx::Vmo>>>,
-    message_groups: FifoMessageGroups,
 }
 
 impl<SM: SessionManager> SessionHelper<SM> {
     fn new(
         session_manager: Arc<SM>,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> Result<(Self, zx::Fifo<BlockFifoRequest, BlockFifoResponse>), zx::Status> {
         let (peer_fifo, fifo) = zx::Fifo::create(16)?;
         Ok((
-            Self {
-                session_manager,
-                offset_map,
-                block_size,
-                peer_fifo,
-                vmos: Mutex::default(),
-                message_groups: FifoMessageGroups::default(),
-            },
+            Self { session_manager, offset_map, block_size, peer_fifo, vmos: Mutex::default() },
             fifo,
         ))
     }
@@ -528,206 +626,247 @@ impl<SM: SessionManager> SessionHelper<SM> {
         }
     }
 
-    fn finish_fifo_request(
+    /// Decodes `request`.
+    fn decode_fifo_request(
         &self,
-        request: RequestTracking,
-        status: zx::Status,
-    ) -> Option<BlockFifoResponse> {
-        match request.group_or_request {
-            GroupOrRequest::Group(group_id) => {
-                let response = self.message_groups.complete(group_id, status);
-                fuchsia_trace::duration!(
-                    c"storage",
-                    c"block_server::finish_transaction_in_group",
-                    "group" => u32::from(group_id),
-                    "group_completed" => response.is_some(),
-                    "status" => status.into_raw());
-                if let Some(trace_flow_id) = request.trace_flow_id {
-                    fuchsia_trace::flow_step!(
-                        c"storage",
-                        c"block_server::finish_transaction",
-                        trace_flow_id.get().into()
-                    );
-                }
-                response
-            }
-            GroupOrRequest::Request(reqid) => {
-                fuchsia_trace::duration!(
-                    c"storage", c"block_server::finish_transaction", "status" => status.into_raw());
-                if let Some(trace_flow_id) = request.trace_flow_id {
-                    fuchsia_trace::flow_step!(
-                        c"storage",
-                        c"block_server::finish_transaction",
-                        trace_flow_id.get().into()
-                    );
-                }
-                Some(BlockFifoResponse { status: status.into_raw(), reqid, ..Default::default() })
-            }
-        }
-    }
-
-    fn decode_fifo_request(&self, request: &BlockFifoRequest) -> Option<DecodedRequest> {
+        session: SM::Session,
+        request: &BlockFifoRequest,
+    ) -> Result<DecodedRequest, Option<BlockFifoResponse>> {
         let flags = BlockIoFlag::from_bits_truncate(request.command.flags);
-        let is_group = flags.contains(BlockIoFlag::GROUP_ITEM);
-        let last_in_group = flags.contains(BlockIoFlag::GROUP_LAST);
-        let mut op_code =
-            BlockOpcode::from_primitive(request.command.opcode).ok_or(zx::Status::INVALID_ARGS);
+        let mut operation = BlockOpcode::from_primitive(request.command.opcode)
+            .ok_or(zx::Status::INVALID_ARGS)
+            .and_then(|code| {
+                if matches!(code, BlockOpcode::Read | BlockOpcode::Write | BlockOpcode::Trim) {
+                    if request.length == 0 {
+                        return Err(zx::Status::INVALID_ARGS);
+                    }
+                    // Make sure the end offsets won't wrap.
+                    if request.dev_offset.checked_add(request.length as u64).is_none()
+                        || (code != BlockOpcode::Trim
+                            && (request.length as u64 * self.block_size as u64)
+                                .checked_add(request.vmo_offset)
+                                .is_none())
+                    {
+                        return Err(zx::Status::OUT_OF_RANGE);
+                    }
+                }
+                Ok(match code {
+                    BlockOpcode::Read => Operation::Read {
+                        device_block_offset: request.dev_offset,
+                        block_count: request.length,
+                        _unused: 0,
+                        vmo_offset: request
+                            .vmo_offset
+                            .checked_mul(self.block_size as u64)
+                            .ok_or(zx::Status::OUT_OF_RANGE)?,
+                    },
+                    BlockOpcode::Write => Operation::Write {
+                        device_block_offset: request.dev_offset,
+                        block_count: request.length,
+                        options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
+                            WriteOptions::FORCE_ACCESS
+                        } else {
+                            WriteOptions::empty()
+                        },
+                        vmo_offset: request
+                            .vmo_offset
+                            .checked_mul(self.block_size as u64)
+                            .ok_or(zx::Status::OUT_OF_RANGE)?,
+                    },
+                    BlockOpcode::Flush => Operation::Flush,
+                    BlockOpcode::Trim => Operation::Trim {
+                        device_block_offset: request.dev_offset,
+                        block_count: request.length,
+                    },
+                    BlockOpcode::CloseVmo => Operation::CloseVmo,
+                })
+            });
 
-        let group_or_request = if is_group {
-            let mut groups = self.message_groups.0.lock();
-            let group = groups.entry(request.group).or_insert_with(|| FifoMessageGroup::new());
-            if group.req_id.is_some() {
-                // We have already received a request tagged as last.
-                if group.status == zx::Status::OK {
-                    group.status = zx::Status::INVALID_ARGS;
-                }
-                return None;
-            }
-            if last_in_group {
-                group.req_id = Some(request.reqid);
-                // If the group has had an error, there is no point trying to issue this request.
-                if group.status != zx::Status::OK {
-                    op_code = Err(group.status);
-                }
-            } else if group.status != zx::Status::OK {
-                // The group has already encountered an error, so there is no point trying to issue
-                // this request.
-                return None;
-            }
-            group.count += 1;
+        let group_or_request = if flags.contains(BlockIoFlag::GROUP_ITEM) {
             GroupOrRequest::Group(request.group)
         } else {
             GroupOrRequest::Request(request.reqid)
         };
 
-        let mut vmo_offset = 0;
-        let vmo = match op_code {
-            Ok(BlockOpcode::Read) | Ok(BlockOpcode::Write) => (|| {
-                if request.length == 0 {
-                    return Err(zx::Status::INVALID_ARGS);
-                }
-                vmo_offset = request
-                    .vmo_offset
-                    .checked_mul(self.block_size as u64)
-                    .ok_or(zx::Status::OUT_OF_RANGE)?;
-                self.vmos
-                    .lock()
-                    .get(&request.vmoid)
-                    .cloned()
-                    .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo)))
-            })(),
-            Ok(BlockOpcode::CloseVmo) => self
-                .vmos
-                .lock()
-                .remove(&request.vmoid)
-                .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo))),
-            _ => Ok(None),
-        }
-        .unwrap_or_else(|e| {
-            op_code = Err(e);
-            None
-        });
+        let mut active_requests = self.session_manager.active_requests().0.lock();
+        let mut request_id = None;
 
-        let operation = op_code.map(|code| match code {
-            BlockOpcode::Read => Operation::Read {
-                device_block_offset: request.dev_offset,
-                block_count: request.length,
-                _unused: 0,
-                vmo_offset,
-            },
-            BlockOpcode::Write => Operation::Write {
-                device_block_offset: request.dev_offset,
-                block_count: request.length,
-                options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
-                    WriteOptions::FORCE_ACCESS
-                } else {
-                    WriteOptions::empty()
-                },
-                vmo_offset,
-            },
-            BlockOpcode::Flush => Operation::Flush,
-            BlockOpcode::Trim => Operation::Trim {
-                device_block_offset: request.dev_offset,
-                block_count: request.length,
-            },
-            BlockOpcode::CloseVmo => Operation::CloseVmo,
-        });
-        if let Ok(operation) = operation.as_ref() {
-            use fuchsia_trace::ArgValue;
-            static CACHE: AtomicU64 = AtomicU64::new(0);
-            if let Some(context) =
-                fuchsia_trace::TraceCategoryContext::acquire_cached(c"storage", &CACHE)
-            {
-                let trace_args_with_group = [
-                    ArgValue::of("group", u32::from(group_or_request.group_id())),
-                    ArgValue::of("opcode", operation.trace_label()),
-                ];
-                let trace_args = [ArgValue::of("opcode", operation.trace_label())];
-                let _scope = if group_or_request.is_group() {
-                    fuchsia_trace::duration(
-                        c"storage",
-                        c"block_server::start_transaction",
-                        &trace_args_with_group,
-                    )
-                } else {
-                    fuchsia_trace::duration(
-                        c"storage",
-                        c"block_server::start_transaction",
-                        &trace_args,
-                    )
-                };
-                let trace_flow_id = NonZero::new(request.trace_flow_id);
-                if let Some(trace_flow_id) = trace_flow_id.clone() {
-                    fuchsia_trace::flow_step(
-                        &context,
-                        c"block_server::start_trnsaction",
-                        trace_flow_id.get().into(),
-                        &[],
-                    );
+        // Multiple Block I/O request may be sent as a group.
+        // Notes:
+        // - the group is identified by the group id in the request
+        // - if using groups, a response will not be sent unless `BlockIoFlag::GROUP_LAST`
+        //   flag is set.
+        // - when processing a request of a group fails, subsequent requests of that
+        //   group will not be processed.
+        //
+        // Refer to sdk/fidl/fuchsia.hardware.block.driver/block.fidl for details.
+        if group_or_request.is_group() {
+            // Search for an existing entry that matches this group.  NOTE: This is a potentially
+            // expensive way to find a group (it's iterating over all slots in the active-requests
+            // slab).  This can be optimised easily should we need to.
+            for (key, group) in &mut active_requests.requests {
+                if group.group_or_request == group_or_request {
+                    if group.req_id.is_some() {
+                        // We have already received a request tagged as last.
+                        if group.status == zx::Status::OK {
+                            group.status = zx::Status::INVALID_ARGS;
+                        }
+                        // Ignore this request.
+                        return Err(None);
+                    }
+                    if flags.contains(BlockIoFlag::GROUP_LAST) {
+                        group.req_id = Some(request.reqid);
+                        // If the group has had an error, there is no point trying to issue this
+                        // request.
+                        if group.status != zx::Status::OK {
+                            operation = Err(group.status);
+                        }
+                    } else if group.status != zx::Status::OK {
+                        // The group has already encountered an error, so there is no point trying
+                        // to issue this request.
+                        return Err(None);
+                    }
+                    request_id = Some(RequestId(key));
+                    group.count += 1;
+                    break;
                 }
             }
         }
-        Some(DecodedRequest::new(
-            RequestTracking {
+
+        let mut retain_vmo = false;
+        let vmo = match &operation {
+            Ok(Operation::Read { .. } | Operation::Write { .. }) => {
+                self.vmos.lock().get(&request.vmoid).cloned().map_or(Err(zx::Status::IO), |vmo| {
+                    retain_vmo = true;
+                    Ok(Some(vmo))
+                })
+            }
+            Ok(Operation::CloseVmo) => {
+                self.vmos.lock().remove(&request.vmoid).map_or(Err(zx::Status::IO), |vmo| {
+                    active_requests.vmo_bin.add(vmo.clone());
+                    Ok(Some(vmo))
+                })
+            }
+            _ => Ok(None),
+        }
+        .unwrap_or_else(|e| {
+            operation = Err(e);
+            None
+        });
+
+        let trace_flow_id = NonZero::new(request.trace_flow_id);
+        let request_id = request_id.unwrap_or_else(|| {
+            let vmo_bin_key =
+                if retain_vmo { Some(active_requests.vmo_bin.retain()) } else { None };
+            RequestId(active_requests.requests.insert(ActiveRequest {
+                session,
                 group_or_request,
-                trace_flow_id: NonZero::new(request.trace_flow_id),
-            },
-            operation,
+                trace_flow_id,
+                vmo_bin_key,
+                status: zx::Status::OK,
+                count: 1,
+                req_id: if !flags.contains(BlockIoFlag::GROUP_ITEM)
+                    || flags.contains(BlockIoFlag::GROUP_LAST)
+                {
+                    Some(request.reqid)
+                } else {
+                    None
+                },
+            }))
+        });
+
+        Ok(DecodedRequest {
+            request_id,
+            trace_flow_id,
+            operation: operation.map_err(|status| {
+                active_requests.complete_and_take_response(request_id, status).map(|(_, r)| r)
+            })?,
             vmo,
-            self.offset_map.as_ref(),
-        ))
+        })
     }
 
     fn take_vmos(&self) -> BTreeMap<u16, Arc<zx::Vmo>> {
         std::mem::take(&mut *self.vmos.lock())
     }
-}
 
-#[derive(Debug)]
-struct DecodedRequest {
-    request_tracking: RequestTracking,
-    operation: Result<Operation, zx::Status>,
-    vmo: Option<Arc<zx::Vmo>>,
-}
-
-impl DecodedRequest {
-    fn new(
-        request_tracking: RequestTracking,
-        operation: Result<Operation, zx::Status>,
-        vmo: Option<Arc<zx::Vmo>>,
-        offset_map: Option<&OffsetMap>,
-    ) -> Self {
-        let operation =
-            operation.and_then(|operation| operation.validate_and_adjust_range(offset_map));
-        Self { request_tracking, operation, vmo }
+    /// Maps the request and returns the mapped request with an optional remainder.
+    fn map_request(
+        &self,
+        mut request: DecodedRequest,
+    ) -> Result<(DecodedRequest, Option<DecodedRequest>), Option<BlockFifoResponse>> {
+        let mut active_requests = self.session_manager.active_requests().0.lock();
+        let active_request = &mut active_requests.requests[request.request_id.0];
+        if active_request.status != zx::Status::OK {
+            return Err(active_requests
+                .complete_and_take_response(request.request_id, zx::Status::BAD_STATE)
+                .map(|(_, r)| r));
+        }
+        let mapping = self.offset_map.mapping();
+        match (mapping, request.operation.blocks()) {
+            (Some(mapping), Some(blocks)) if !mapping.are_blocks_within_source_range(blocks) => {
+                return Err(active_requests
+                    .complete_and_take_response(request.request_id, zx::Status::OUT_OF_RANGE)
+                    .map(|(_, r)| r));
+            }
+            _ => {}
+        }
+        let remainder = request.operation.map(
+            self.offset_map.mapping(),
+            self.offset_map.max_transfer_blocks(),
+            self.block_size,
+        );
+        if remainder.is_some() {
+            active_request.count += 1;
+        }
+        static CACHE: AtomicU64 = AtomicU64::new(0);
+        if let Some(context) =
+            fuchsia_trace::TraceCategoryContext::acquire_cached(c"storage", &CACHE)
+        {
+            use fuchsia_trace::ArgValue;
+            let trace_args = [
+                ArgValue::of("request_id", request.request_id.0),
+                ArgValue::of("opcode", request.operation.trace_label()),
+            ];
+            let _scope = fuchsia_trace::duration(
+                c"storage",
+                c"block_server::start_transaction",
+                &trace_args,
+            );
+            if let Some(trace_flow_id) = active_request.trace_flow_id {
+                fuchsia_trace::flow_step(
+                    &context,
+                    c"block_server::start_transaction",
+                    trace_flow_id.get().into(),
+                    &[],
+                );
+            }
+        }
+        let remainder = remainder.map(|operation| DecodedRequest { operation, ..request.clone() });
+        Ok((request, remainder))
     }
+
+    fn drop_active_requests(&self, pred: impl Fn(&SM::Session) -> bool) {
+        self.session_manager.active_requests().0.lock().requests.retain(|_, r| !pred(&r.session));
+    }
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct RequestId(usize);
+
+#[derive(Clone, Debug)]
+struct DecodedRequest {
+    request_id: RequestId,
+    trace_flow_id: TraceFlowId,
+    operation: Operation,
+    vmo: Option<Arc<zx::Vmo>>,
 }
 
 /// cbindgen:no-export
 pub type WriteOptions = block_protocol::WriteOptions;
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Operation {
     // NOTE: On the C++ side, this ends up as a union and, for efficiency reasons, there is code
     // that assumes that some fields for reads and writes (and possibly trim) line-up (e.g. common
@@ -755,37 +894,6 @@ pub enum Operation {
 }
 
 impl Operation {
-    // Adjusts the operation's block range via `OffsetMap`.  If the request would exceed the range
-    // known to the map, or is otherwise invalid, returns an error.
-    fn validate_and_adjust_range(
-        mut self,
-        offset_map: Option<&OffsetMap>,
-    ) -> Result<Operation, zx::Status> {
-        let adjust_offset = |dev_offset, length| {
-            // For compatibility with the C++ server, always ensure the length is nonzero
-            if length == 0 {
-                return Err(zx::Status::INVALID_ARGS);
-            }
-            if let Some(offset_map) = offset_map {
-                offset_map.adjust_request(dev_offset, length as u64).ok_or(zx::Status::OUT_OF_RANGE)
-            } else {
-                Ok(dev_offset)
-            }
-        };
-        match &mut self {
-            Operation::Read { device_block_offset, block_count, .. } => {
-                *device_block_offset = adjust_offset(*device_block_offset, *block_count)?;
-            }
-            Operation::Write { device_block_offset, block_count, .. } => {
-                *device_block_offset = adjust_offset(*device_block_offset, *block_count)?;
-            }
-            Operation::Trim { device_block_offset, block_count, .. } => {
-                *device_block_offset = adjust_offset(*device_block_offset, *block_count)?;
-            }
-            _ => {}
-        }
-        Ok(self)
-    }
     fn trace_label(&self) -> &'static str {
         match self {
             Operation::Read { .. } => "read",
@@ -795,15 +903,94 @@ impl Operation {
             Operation::CloseVmo { .. } => "close_vmo",
         }
     }
+
+    /// Returns (offset, length).
+    fn blocks(&self) -> Option<(u64, u32)> {
+        match self {
+            Operation::Read { device_block_offset, block_count, .. }
+            | Operation::Write { device_block_offset, block_count, .. }
+            | Operation::Trim { device_block_offset, block_count, .. } => {
+                Some((*device_block_offset, *block_count))
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns mutable references to (offset, length).
+    fn blocks_mut(&mut self) -> Option<(&mut u64, &mut u32)> {
+        match self {
+            Operation::Read { device_block_offset, block_count, .. }
+            | Operation::Write { device_block_offset, block_count, .. }
+            | Operation::Trim { device_block_offset, block_count, .. } => {
+                Some((device_block_offset, block_count))
+            }
+            _ => None,
+        }
+    }
+
+    /// Maps the operation using `mapping` and returns the remainder.  `mapping` *must* overlap the
+    /// start of the operation.
+    fn map(
+        &mut self,
+        mapping: Option<&BlockOffsetMapping>,
+        max_blocks: Option<NonZero<u32>>,
+        block_size: u32,
+    ) -> Option<Self> {
+        let mut max = match self {
+            Operation::Read { .. } | Operation::Write { .. } => max_blocks.map(|m| m.get() as u64),
+            _ => None,
+        };
+        let (offset, length) = self.blocks_mut()?;
+        if let Some(mapping) = mapping {
+            let delta = *offset - mapping.source_block_offset;
+            debug_assert!(*offset - mapping.source_block_offset < mapping.length);
+            *offset = mapping.target_block_offset + delta;
+            let mapping_max = mapping.target_block_offset + mapping.length - *offset;
+            max = match max {
+                None => Some(mapping_max),
+                Some(m) => Some(std::cmp::min(m, mapping_max)),
+            };
+        };
+        if let Some(max) = max {
+            if *length as u64 > max {
+                let rem = (*length as u64 - max) as u32;
+                *length = max as u32;
+                return Some(match self {
+                    Operation::Read {
+                        device_block_offset,
+                        block_count: _,
+                        vmo_offset,
+                        _unused,
+                    } => Operation::Read {
+                        device_block_offset: *device_block_offset + max,
+                        block_count: rem,
+                        vmo_offset: *vmo_offset + max * block_size as u64,
+                        _unused: *_unused,
+                    },
+                    Operation::Write {
+                        device_block_offset,
+                        block_count: _,
+                        vmo_offset,
+                        options,
+                    } => Operation::Write {
+                        device_block_offset: *device_block_offset + max,
+                        block_count: rem,
+                        vmo_offset: *vmo_offset + max * block_size as u64,
+                        options: *options,
+                    },
+                    Operation::Trim { device_block_offset, block_count: _ } => Operation::Trim {
+                        device_block_offset: *device_block_offset,
+                        block_count: rem,
+                    },
+                    _ => unreachable!(),
+                });
+            }
+        }
+        None
+    }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct RequestTracking {
-    group_or_request: GroupOrRequest,
-    trace_flow_id: Option<NonZero<u64>>,
-}
-
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum GroupOrRequest {
     Group(u16),
     Request(u32),
@@ -811,65 +998,20 @@ pub enum GroupOrRequest {
 
 impl GroupOrRequest {
     fn is_group(&self) -> bool {
-        if let Self::Group(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Group(_))
     }
 
-    fn group_id(&self) -> u16 {
+    fn group_id(&self) -> Option<u16> {
         match self {
-            Self::Group(id) => *id,
-            Self::Request(_) => 0,
-        }
-    }
-}
-
-/// cbindgen:ignore
-const IS_GROUP: u64 = 0x8000_0000_0000_0000;
-/// cbindgen:ignore
-const USED_VMO: u64 = 0x4000_0000_0000_0000;
-#[repr(transparent)]
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
-pub struct RequestId(u64);
-
-impl RequestId {
-    /// Marks the request as having used a VMO, so that we keep the VMO alive until
-    /// the request has finished.
-    fn with_vmo(self) -> Self {
-        Self(self.0 | USED_VMO)
-    }
-
-    /// Returns whether the request ID indicates a VMO was used.
-    fn did_have_vmo(&self) -> bool {
-        self.0 & USED_VMO != 0
-    }
-}
-
-impl From<GroupOrRequest> for RequestId {
-    fn from(value: GroupOrRequest) -> Self {
-        match value {
-            GroupOrRequest::Group(group) => RequestId(group as u64 | IS_GROUP),
-            GroupOrRequest::Request(request) => RequestId(request as u64),
-        }
-    }
-}
-
-impl From<RequestId> for GroupOrRequest {
-    fn from(value: RequestId) -> Self {
-        if value.0 & IS_GROUP == 0 {
-            GroupOrRequest::Request(value.0 as u32)
-        } else {
-            GroupOrRequest::Group(value.0 as u16)
+            Self::Group(id) => Some(*id),
+            Self::Request(_) => None,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockServer, DeviceInfo, PartitionInfo};
-    use crate::async_interface::FIFO_MAX_REQUESTS;
+    use super::{BlockServer, DeviceInfo, PartitionInfo, TraceFlowId, FIFO_MAX_REQUESTS};
     use assert_matches::assert_matches;
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
@@ -879,7 +1021,6 @@ mod tests {
     use futures::FutureExt as _;
     use std::borrow::Cow;
     use std::future::poll_fn;
-    use std::num::NonZero;
     use std::pin::pin;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
@@ -916,7 +1057,7 @@ mod tests {
             block_count: u32,
             vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
-            _trace_flow_id: Option<NonZero<u64>>,
+            _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
             if let Some(read_hook) = &self.read_hook {
                 read_hook(device_block_offset, block_count, vmo, vmo_offset).await
@@ -932,12 +1073,12 @@ mod tests {
             _vmo: &Arc<zx::Vmo>,
             _vmo_offset: u64,
             _opts: WriteOptions,
-            _trace_flow_id: Option<NonZero<u64>>,
+            _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
             unreachable!();
         }
 
-        async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
+        async fn flush(&self, _trace_flow_id: TraceFlowId) -> Result<(), zx::Status> {
             unreachable!();
         }
 
@@ -945,7 +1086,7 @@ mod tests {
             &self,
             _device_block_offset: u64,
             _block_count: u32,
-            _trace_flow_id: Option<NonZero<u64>>,
+            _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
             unreachable!();
         }
@@ -964,7 +1105,8 @@ mod tests {
     fn test_device_info() -> DeviceInfo {
         DeviceInfo::Partition(PartitionInfo {
             device_flags: fblock::Flag::READONLY,
-            block_range: Some(12..34),
+            max_transfer_blocks: None,
+            block_range: Some(0..100),
             type_guid: [1; 16],
             instance_guid: [2; 16],
             name: "foo".to_string(),
@@ -1196,7 +1338,7 @@ mod tests {
             block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
-            _trace_flow_id: Option<NonZero<u64>>,
+            _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::INTERNAL)
@@ -1220,7 +1362,7 @@ mod tests {
             _vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
             _opts: WriteOptions,
-            _trace_flow_id: Option<NonZero<u64>>,
+            _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NOT_SUPPORTED)
@@ -1237,7 +1379,7 @@ mod tests {
             }
         }
 
-        async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
+        async fn flush(&self, _trace_flow_id: TraceFlowId) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NO_RESOURCES)
             } else {
@@ -1252,7 +1394,7 @@ mod tests {
             &self,
             device_block_offset: u64,
             block_count: u32,
-            _trace_flow_id: Option<NonZero<u64>>,
+            _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NO_MEMORY)
@@ -1543,6 +1685,7 @@ mod tests {
                         opcode: BlockOpcode::Read.into_primitive(),
                         ..Default::default()
                     },
+                    length: 1,
                     vmoid: vmo_id.id,
                     ..Default::default()
                 };
@@ -1553,7 +1696,7 @@ mod tests {
                         BlockFifoRequest { vmoid: vmo_id.id + 1, ..good_read_request() }
                     )
                     .await,
-                    Err(zx::Status::INVALID_ARGS)
+                    Err(zx::Status::IO)
                 );
 
                 assert_eq!(
@@ -1565,6 +1708,11 @@ mod tests {
                         }
                     )
                     .await,
+                    Err(zx::Status::OUT_OF_RANGE)
+                );
+
+                assert_eq!(
+                    test(&mut fifo, BlockFifoRequest { length: 0, ..good_read_request() }).await,
                     Err(zx::Status::INVALID_ARGS)
                 );
 
@@ -1575,6 +1723,7 @@ mod tests {
                         opcode: BlockOpcode::Write.into_primitive(),
                         ..Default::default()
                     },
+                    length: 1,
                     vmoid: vmo_id.id,
                     ..Default::default()
                 };
@@ -1585,7 +1734,7 @@ mod tests {
                         BlockFifoRequest { vmoid: vmo_id.id + 1, ..good_write_request() }
                     )
                     .await,
-                    Err(zx::Status::INVALID_ARGS)
+                    Err(zx::Status::IO)
                 );
 
                 assert_eq!(
@@ -1597,6 +1746,11 @@ mod tests {
                         }
                     )
                     .await,
+                    Err(zx::Status::OUT_OF_RANGE)
+                );
+
+                assert_eq!(
+                    test(&mut fifo, BlockFifoRequest { length: 0, ..good_write_request() }).await,
                     Err(zx::Status::INVALID_ARGS)
                 );
 

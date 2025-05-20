@@ -1065,8 +1065,8 @@ void LogicalBufferCollection::LogAndFailRootNode(Location location, Error error,
   ZX_DEBUG_ASSERT(format);
   va_list args;
   va_start(args, format);
-  vLog(fuchsia_logging::LogSeverity::Warn, location.file(), location.line(),
-       "LogicalBufferCollection", format, args);
+  vLogBuffered(fuchsia_logging::LogSeverity::Warn, location.file(), location.line(),
+               "LogicalBufferCollection", format, args);
   va_end(args);
   FailRootNode(error);
 }
@@ -1086,9 +1086,10 @@ void LogicalBufferCollection::LogAndFailDownFrom(Location location, NodeProperti
   va_list args;
   va_start(args, format);
   bool is_root = (tree_to_fail == root_.get());
-  vLog(fuchsia_logging::LogSeverity::Info, location.file(), location.line(),
-       is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
-       format, args);
+  vLogBuffered(
+      fuchsia_logging::LogSeverity::Info, location.file(), location.line(),
+      is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
+      format, args);
   va_end(args);
   FailDownFrom(tree_to_fail, error);
 }
@@ -1130,9 +1131,10 @@ void LogicalBufferCollection::LogAndFailNode(Location location, NodeProperties* 
   va_list args;
   va_start(args, format);
   bool is_root = (tree_to_fail == root_.get());
-  vLog(fuchsia_logging::LogSeverity::Info, location.file(), location.line(),
-       is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
-       format, args);
+  vLogBuffered(
+      fuchsia_logging::LogSeverity::Info, location.file(), location.line(),
+      is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
+      format, args);
   va_end(args);
   FailDownFrom(tree_to_fail, error);
 }
@@ -1142,18 +1144,21 @@ void LogicalBufferCollection::FailNode(NodeProperties* member_node, Error error)
   FailDownFrom(tree_to_fail, error);
 }
 
-namespace {
-
-void Log(fuchsia_logging::LogSeverity log_severity, Location location, const char* format, ...) {
+void LogicalBufferCollection::LogBuffered(fuchsia_logging::LogSeverity log_severity,
+                                          Location location, const char* format, ...) const {
   va_list args;
   va_start(args, format);
 
-  vLog(log_severity, location.file(), location.line(), nullptr, format, args);
+  vLogBuffered(log_severity, location.file(), location.line(), nullptr, format, args);
 
   va_end(args);
 }
 
-}  // namespace
+void LogicalBufferCollection::vLogBuffered(fuchsia_logging::LogSeverity severity, const char* file,
+                                           int line, const char* prefix, const char* format,
+                                           va_list args) const {
+  vLogToCallback(severity, file, line, prefix, format, args, maybe_buffer_log_);
+}
 
 void LogicalBufferCollection::LogInfo(Location location, const char* format, ...) const {
   va_list args;
@@ -1166,7 +1171,7 @@ void LogicalBufferCollection::LogInfo(Location location, const char* format, ...
     severity = fuchsia_logging::LogSeverity::Debug;
   }
 
-  vLog(severity, location.file(), location.line(), nullptr, format, args);
+  vLogBuffered(severity, location.file(), location.line(), nullptr, format, args);
 
   va_end(args);
 }
@@ -1183,7 +1188,8 @@ void LogicalBufferCollection::LogErrorStatic(Location location,
 
     formatted = fbl::String::Concat({formatted, client_name});
   }
-  Log(fuchsia_logging::LogSeverity::Error, location, "%s", formatted.c_str());
+  ::sysmem_service::Log(fuchsia_logging::LogSeverity::Error, location.file(), location.line(),
+                        nullptr, "%s", formatted.c_str());
   va_end(args);
 }
 
@@ -1232,7 +1238,7 @@ void LogicalBufferCollection::VLogClient(LogicalBufferCollection::LogSeverity lo
 
   auto fuchsia_log_severity = LogSeverityToFuchsiaLogSeverity(log_severity);
 
-  Log(fuchsia_log_severity, location, "%s", formatted.c_str());
+  LogBuffered(fuchsia_log_severity, location, "%s", formatted.c_str());
 }
 
 void LogicalBufferCollection::LogClientInfo(Location location,
@@ -1300,6 +1306,31 @@ void LogicalBufferCollection::VLogWarn(Location location, const char* format, va
 
 void LogicalBufferCollection::VLogError(Location location, const char* format, va_list args) const {
   VLogClientError(location, current_node_properties_, format, args);
+}
+
+void LogicalBufferCollection::LogBufferEnable() {
+  ZX_DEBUG_ASSERT(!log_buffer_.has_value());
+  log_buffer_.emplace();
+}
+
+void LogicalBufferCollection::LogBufferFlushAndDisable() {
+  ZX_DEBUG_ASSERT(log_buffer_.has_value());
+  for (auto& log_entry : *log_buffer_) {
+    GetDefaultLogCallback()(log_entry.severity(), log_entry.file(), log_entry.line(),
+                            log_entry.formatted_str().c_str());
+  }
+  log_buffer_.reset();
+}
+
+void LogicalBufferCollection::LogBufferDiscardAndDisable() {
+  ZX_DEBUG_ASSERT(log_buffer_.has_value());
+  if (is_verbose_logging()) {
+    for (auto& log_entry : *log_buffer_) {
+      GetDefaultLogCallback()(fuchsia_logging::LogSeverity::Info, log_entry.file(),
+                              log_entry.line(), log_entry.formatted_str().c_str());
+    }
+  }
+  log_buffer_.reset();
 }
 
 void LogicalBufferCollection::InitializeConstraintSnapshots(
@@ -1475,8 +1506,7 @@ void LogicalBufferCollection::MaybeAllocate() {
     // We may have failed the root.  The caller is keeping "this" alive, so we can still check
     // root_.
     if (!root_) {
-      LogError(FROM_HERE,
-               "Root node was failed due to sub-tree having zero clients remaining. (1)");
+      LogInfo(FROM_HERE, "Root node was failed due to sub-tree having zero clients remaining. (1)");
       return;
     }
 
@@ -1496,6 +1526,36 @@ void LogicalBufferCollection::MaybeAllocate() {
                  "Root node was failed due to sub-tree having zero clients remaining. (2)");
         return;
       }
+
+      // By default, aggregation failure, unless we get a more immediate failure or success.
+      std::optional<Error> maybe_subtree_error = Error::kConstraintsIntersectionEmpty;
+
+      // Buffer log output from LogInfo, LogWarn, LogError into log_buffer_. We'll discard
+      // log_buffer_ if allocation is successful in the end. If allocation is not successful, we'll
+      // FlushAndClearProvisional which will output log_buffer_ to the log. This way, if a group
+      // child selection doesn't work ("all pixel_format(s) eliminated" or similar), but a later
+      // group child selection does work, we won't log anything for the overall successful
+      // allocation.
+      //
+      // This is mainly for cases like trying to include display's constraints along with gpu, but
+      // falling back to gpu without display. This case can come up often, so we need this mechanism
+      // to avoid log spam from the initial failure to aggregate constraints when display is
+      // included.
+      //
+      // When is_verbose_logging(), instead of discarding log_buffer_ on success, we instead
+      // attenuate the log severity to INFO if the overall allocation succeeds. The use of
+      // SetVerboseLogging is limited to local debugging, and when SetVerboseLogging is used, we do
+      // want to see all the log output, though it can be INFO if allocation succeeds overall.
+      LogBufferEnable();
+      // Unless this is cancelled, we'll flush the log output, in order, with relevant severity.
+      // In the success case, we call LogBufferDiscardAndDisable.
+      auto cleanup_log_buffer = fit::defer([this, &maybe_subtree_error] {
+        if (maybe_subtree_error.has_value()) {
+          LogBufferFlushAndDisable();
+          return;
+        }
+        LogBufferDiscardAndDisable();
+      });
 
       // Group 0 is highest priority (most important), with decreasing priority after that.
       std::vector<NodeProperties*> groups_by_priority =
@@ -1538,8 +1598,6 @@ void LogicalBufferCollection::MaybeAllocate() {
       ZX_DEBUG_ASSERT(is_allocate_attempted_ || eligible_subtrees.size() == 1);
 
       bool was_allocate_attempted = is_allocate_attempted_;
-      // By default, aggregation failure, unless we get a more immediate failure or success.
-      std::optional<Error> maybe_subtree_error = Error::kConstraintsIntersectionEmpty;
       uint32_t combination_ordinal = 0;
       bool done_with_subtree;
       for (done_with_subtree = false, InitGroupChildSelection(groups_by_priority);
@@ -1625,6 +1683,7 @@ void LogicalBufferCollection::MaybeAllocate() {
         maybe_subtree_error.reset();
         done_with_subtree = true;
         is_allocate_attempted_ = true;
+
         // Succeed portion of pruned subtree indicated by current group child selections; fail
         // rest of pruned subtree nodes with ZX_ERR_NOT_SUPPORTED as if they failed aggregation.
         //
@@ -1645,7 +1704,7 @@ void LogicalBufferCollection::MaybeAllocate() {
       // The subtree_status can still be ZX_ERR_NOT_SUPPORTED if we never got any more immediate
       // failure and never got success, or this can be some other more immediate failure (still
       // needs to be handled/propagated here), or this can be ZX_OK if we already handled success,
-      // or can be ZX_ERR_SHOULD_WAIT if not all secure allocators are ready yet.
+      // or can be Error::kPending if not all secure allocators are ready yet.
       did_something = did_something ||
                       (!maybe_subtree_error.has_value() || *maybe_subtree_error != Error::kPending);
       if (maybe_subtree_error.has_value()) {

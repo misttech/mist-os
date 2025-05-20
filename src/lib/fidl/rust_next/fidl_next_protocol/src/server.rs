@@ -28,11 +28,7 @@ impl<T: Transport> ServerSender<T> {
     }
 
     /// Send an event.
-    pub fn send_event<M>(
-        &self,
-        ordinal: u64,
-        event: &mut M,
-    ) -> Result<SendFuture<'_, T>, EncodeError>
+    pub fn send_event<M>(&self, ordinal: u64, event: M) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,
     {
@@ -47,7 +43,7 @@ impl<T: Transport> ServerSender<T> {
         &self,
         responder: Responder,
         ordinal: u64,
-        response: &mut M,
+        response: M,
     ) -> Result<SendFuture<'_, T>, EncodeError>
     where
         M: Encode<T::SendBuffer>,

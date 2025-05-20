@@ -12,27 +12,6 @@ if (is_host) {
   }
 }
 
-group("formatjson5") {
-  testonly = true
-  public_deps = [
-    "//build/tools/formatjson5:formatjson5_test($host_toolchain)",
-    "//build/tools/formatjson5:install",
-  ]
-}
-
-group("json_merge") {
-  testonly = true
-  public_deps = [
-    "//build/tools/json_merge:install",
-    "//build/tools/json_merge:json_merge_test($host_toolchain)",
-  ]
-}
-
-group("json_validator") {
-  testonly = true
-  public_deps = [ "//build/tools/json_validator:install" ]
-}
-
 group("tests") {
   testonly = true
   deps = [ ":generate_sdk_package_content_checklist_test($host_toolchain)" ]

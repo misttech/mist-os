@@ -23,7 +23,7 @@ source_set("common") {
     "rndis_function.cc",
     "rndis_function.h",
   ]
-  deps = [ "//src/lib/ddk:ddk_metadata" ]
+  deps = [ "//sdk/lib/driver/metadata/cpp" ]
   public_deps = [
     ":rndis_function_bind",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
@@ -31,6 +31,7 @@ source_set("common") {
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/lib/async",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
@@ -77,6 +78,8 @@ test("rndis-function-test") {
   sources = [ "rndis_function_test.cc" ]
   deps = [
     ":common",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

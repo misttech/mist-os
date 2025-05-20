@@ -20,7 +20,6 @@ executable("bin") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fdio",
-    "//sdk/lib/stdcompat",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/vfs/cpp",
     "//src/tests/fidl/compatibility/fidl:fidl_service_cpp",

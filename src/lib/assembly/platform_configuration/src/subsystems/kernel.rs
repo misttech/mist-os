@@ -18,7 +18,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         kernel_config: &PlatformKernelConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        match (&context.build_type, &kernel_config.oom_behavior) {
+        match (&context.build_type, &kernel_config.oom.behavior) {
             (_, OOMBehavior::Reboot { timeout: OOMRebootTimeout::Normal }) => {}
             (&BuildType::Eng, OOMBehavior::Reboot { timeout: OOMRebootTimeout::Low }) => {
                 builder.platform_bundle("kernel_oom_reboot_timeout_low")
@@ -30,24 +30,48 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 builder.platform_bundle("kernel_oom_behavior_disable")
             }
             (&BuildType::UserDebug | &BuildType::User, _) => {
-                anyhow::bail!("'kernel.oom_behavior' can only be set on 'build_type=\"eng\"");
+                anyhow::bail!("'kernel.oom.behavior' can only be set on 'build_type=\"eng\"");
             }
         }
+        if let Some(eviction_delay_ms) = kernel_config.oom.eviction_delay_ms {
+            builder.kernel_arg(KernelArg::OomEvictionDelayMs(eviction_delay_ms));
+        }
+        if !kernel_config.oom.evict_with_min_target {
+            // the default is true
+            builder.kernel_arg(KernelArg::OomEvictWithMinTarget(false));
+        }
+        if let Some(eviction_delta_at_oom_mb) = kernel_config.oom.eviction_delta_at_oom_mb {
+            builder.kernel_arg(KernelArg::OomEvictionDeltaAtOomMib(eviction_delta_at_oom_mb));
+        }
+        if kernel_config.oom.evict_at_warning {
+            builder.kernel_arg(KernelArg::OomEvictAtWarning(true));
+        }
+        if kernel_config.oom.evict_continuous {
+            builder.kernel_arg(KernelArg::OomEvictContinuous(true));
+        }
+        if let Some(outofmemory_mb) = kernel_config.oom.out_of_memory_mb {
+            builder.kernel_arg(KernelArg::OomOutOfMemoryMib(outofmemory_mb));
+        }
+        if let Some(critical_mb) = kernel_config.oom.critical_mb {
+            builder.kernel_arg(KernelArg::OomCriticalMib(critical_mb));
+        }
+        if let Some(warning_mb) = kernel_config.oom.warning_mb {
+            builder.kernel_arg(KernelArg::OomWarningMib(warning_mb));
+        }
         match (&context.board_info.kernel.serial_mode, &context.build_type) {
-            (SerialMode::NoOutput, _) => {}
-            (SerialMode::Legacy, &BuildType::UserDebug | &BuildType::User) => {
-                println!("Serial cannot be enabled on user or userdebug builds. Not enabling.");
+            (SerialMode::NoOutput, &BuildType::User) => {
+                builder.kernel_arg(KernelArg::Serial("none".to_string()))
             }
             (SerialMode::Legacy, &BuildType::Eng) => {
                 builder.platform_bundle("kernel_serial_legacy")
             }
+            (SerialMode::NoOutput, &BuildType::UserDebug | &BuildType::Eng) => {}
+            (SerialMode::Legacy, &BuildType::UserDebug | &BuildType::User) => {}
         }
 
         if let Some(serial) = &context.board_info.kernel.serial {
             if context.build_type == &BuildType::Eng {
                 builder.kernel_arg(KernelArg::Serial(serial.to_string()));
-            } else {
-                println!("'kernel.serial' can only be enabled in 'eng' builds. Not enabling.")
             }
         }
 
@@ -59,9 +83,6 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         }
         if kernel_config.lru_memory_compression {
             builder.platform_bundle("kernel_anonymous_memory_compression_eager_lru");
-        }
-        if kernel_config.continuous_eviction {
-            builder.platform_bundle("kernel_evict_continuous");
         }
 
         // If the board supports the PMM checker, and this is an eng build-type
@@ -99,24 +120,6 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 "'quiet_early_boot' can only be enabled in 'eng' builds"
             );
             builder.kernel_arg(KernelArg::PhysVerbose(false))
-        }
-
-        if let Some(oom) = &context.board_info.kernel.oom {
-            if oom.evict_at_warning {
-                builder.kernel_arg(KernelArg::OomEvictAtWarning(true));
-            }
-            if oom.evict_continuous {
-                builder.kernel_arg(KernelArg::OomEvictContinuous(true));
-            }
-            if let Some(outofmemory_mb) = oom.out_of_memory_mb {
-                builder.kernel_arg(KernelArg::OomOutOfMemoryMib(outofmemory_mb));
-            }
-            if let Some(critical_mb) = oom.critical_mb {
-                builder.kernel_arg(KernelArg::OomCriticalMib(critical_mb));
-            }
-            if let Some(warning_mb) = oom.warning_mb {
-                builder.kernel_arg(KernelArg::OomWarningMib(warning_mb));
-            }
         }
 
         match kernel_config.memory_reclamation_strategy {
@@ -180,6 +183,10 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.kernel_arg(KernelArg::MemoryLimitMib(memory_limit_mb));
         }
 
+        if let Some(ktrace_bufsize) = kernel_config.ktrace.bufsize {
+            builder.kernel_arg(KernelArg::KtraceBufsize(ktrace_bufsize));
+        }
+
         for thread_roles_file in &context.board_info.configuration.thread_roles {
             let filename = thread_roles_file
                 .file_name()
@@ -193,7 +200,7 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                     source: thread_roles_file.clone(),
                     destination: BootfsDestination::ThreadRoles(filename),
                 })
-                .with_context(|| format!("Adding thread roles file: {}", thread_roles_file))?;
+                .with_context(|| format!("Adding thread roles file: {thread_roles_file}"))?;
         }
 
         Ok(())
@@ -210,7 +217,7 @@ mod test {
         platform_kernel_config: PlatformKernelConfig,
     ) -> CompletedConfiguration {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
+            feature_set_level: &FeatureSetLevel::Standard,
             build_type: &BuildType::Eng,
             board_info: &Default::default(),
             gendir: Default::default(),

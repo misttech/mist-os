@@ -10,10 +10,12 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_media::{AudioRenderUsage2, AudioSampleFormat, AudioStreamType};
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
-use fidl_fuchsia_test_audio_recording::{AudioRecordingControlMarker, AudioRecordingControlProxy};
+use fidl_fuchsia_test_audio::{CaptureMarker, CaptureProxy, InjectionMarker, InjectionProxy};
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::lock::Mutex;
-use log::info;
+use futures::{AsyncReadExt, AsyncWriteExt};
+use log::{error, info};
 use serde_json::{to_value, Value};
 
 #[async_trait(?Send)]
@@ -33,7 +35,8 @@ impl Facade for AudioFacade {
 
 #[derive(Debug)]
 pub struct AudioFacade {
-    audio_proxy: AudioRecordingControlProxy,
+    injection_proxy: InjectionProxy,
+    capture_proxy: CaptureProxy,
     player_proxy: PlayerProxy,
     sound_buffer_id: Mutex<u32>,
 }
@@ -41,11 +44,17 @@ pub struct AudioFacade {
 impl AudioFacade {
     pub fn new() -> Result<AudioFacade, Error> {
         info!("Launching audio_recording component");
-        let audio_proxy = connect_to_protocol::<AudioRecordingControlMarker>()?;
+        let injection_proxy = connect_to_protocol::<InjectionMarker>()?;
+        let recording_proxy = connect_to_protocol::<CaptureMarker>()?;
         let player_proxy = connect_to_protocol::<PlayerMarker>()?;
         let sound_buffer_id = Mutex::new(0u32);
 
-        Ok(AudioFacade { audio_proxy, player_proxy, sound_buffer_id })
+        Ok(AudioFacade {
+            injection_proxy,
+            capture_proxy: recording_proxy,
+            player_proxy,
+            sound_buffer_id,
+        })
     }
 
     pub async fn put_input_audio(&self, args: Value) -> Result<Value, Error> {
@@ -54,28 +63,39 @@ impl AudioFacade {
             data.as_str().ok_or_else(|| format_err!("PutInputAudio failed, data not string"))?;
 
         let wave_data_vec = BASE64_STANDARD.decode(data)?;
-        let max_buffer_bytes = 8192;
-        let wave_data_iter: Vec<&[u8]> = wave_data_vec.chunks(max_buffer_bytes).collect();
 
-        let mut byte_cnt = 0;
         let sample_index =
             args["index"].as_u64().ok_or_else(|| format_err!("index not a number"))?;
         let sample_index = sample_index.try_into()?;
 
         let _ = self
-            .audio_proxy
+            .injection_proxy
             .clear_input_audio(sample_index)
             .await
-            .context("Error calling put_input_audio")?;
+            .context("Error calling clear_input_audio")?;
 
-        for chunk in wave_data_iter {
-            byte_cnt += self
-                .audio_proxy
-                .put_input_audio(sample_index, &chunk)
-                .await
-                .context("Error calling put_input_audio")?;
+        let (tx, rx) = zx::Socket::create_stream();
+        tx.half_close().expect("prevent writes on other side");
+        self.injection_proxy.write_input_audio(sample_index, rx)?;
+
+        let mut tx = fasync::Socket::from_socket(tx);
+        if let Err(e) = tx.write_all(&wave_data_vec).await {
+            error!("Failed to write audio data to socket: {:?}", e);
+            return Err(e.into());
         }
-        Ok(to_value(byte_cnt)?)
+        std::mem::drop(tx); // close socket to prevent hang
+
+        let byte_count = self
+            .injection_proxy
+            .get_input_audio_size(sample_index)
+            .await
+            .context("Error calling get_input_audio_size")?
+            .map_err(|e| anyhow!("get_input_audio_size failed: {:?}", e))?;
+        if byte_count != wave_data_vec.len() as u64 {
+            bail!("Expected to write {} bytes, found {} bytes", wave_data_vec.len(), byte_count);
+        }
+
+        Ok(to_value(byte_count)?)
     }
 
     pub async fn start_input_injection(&self, args: Value) -> Result<Value, Error> {
@@ -83,10 +103,10 @@ impl AudioFacade {
             args["index"].as_u64().ok_or_else(|| format_err!("index not a number"))?;
         let sample_index = sample_index.try_into()?;
         let status = self
-            .audio_proxy
+            .injection_proxy
             .start_input_injection(sample_index)
             .await
-            .context("Error calling put_input_audio")?;
+            .context("Error calling start_input_injection")?;
         match status {
             Ok(_) => return Ok(to_value(true)?),
             Err(_) => return Ok(to_value(false)?),
@@ -95,7 +115,7 @@ impl AudioFacade {
 
     pub async fn stop_input_injection(&self) -> Result<Value, Error> {
         let status = self
-            .audio_proxy
+            .injection_proxy
             .stop_input_injection()
             .await
             .context("Error calling stop_input_injection")?;
@@ -107,8 +127,8 @@ impl AudioFacade {
 
     pub async fn start_output_save(&self) -> Result<Value, Error> {
         let status = self
-            .audio_proxy
-            .start_output_save()
+            .capture_proxy
+            .start_output_capture()
             .await
             .context("Error calling start_output_save")?;
         match status {
@@ -118,8 +138,11 @@ impl AudioFacade {
     }
 
     pub async fn stop_output_save(&self) -> Result<Value, Error> {
-        let status =
-            self.audio_proxy.stop_output_save().await.context("Error calling stop_output_save")?;
+        let status = self
+            .capture_proxy
+            .stop_output_capture()
+            .await
+            .context("Error calling stop_output_save")?;
         match status {
             Ok(_) => return Ok(to_value(true)?),
             Err(_) => return Ok(to_value(false)?),
@@ -127,15 +150,27 @@ impl AudioFacade {
     }
 
     pub async fn get_output_audio(&self) -> Result<Value, Error> {
-        let result =
-            self.audio_proxy.get_output_audio().await.context("Error calling get_output_audio")?;
-        let buffer_size = result.get_size()?;
-        let mut buffer = vec![0; buffer_size.try_into().unwrap()];
-        result.read(&mut buffer, 0)?;
+        let mut rx_socket = fasync::Socket::from_socket(
+            match self
+                .capture_proxy
+                .get_output_audio()
+                .await
+                .context("Error calling get_output_audio")?
+            {
+                Ok(socket) => socket,
+                Err(e) => {
+                    bail!("Failure: {:?}", e);
+                }
+            },
+        );
+
+        let mut buffer = Vec::new();
+        rx_socket.read_to_end(&mut buffer).await?;
         Ok(to_value(BASE64_STANDARD.encode(&buffer))?)
     }
 
-    // This will play a 399 Hz sine wave to the default sound device.
+    // This will play a 1-second 399-Hz sine wave at volume 0.1, to the default audio
+    // output device, using the standard `PlaySound2` client playback API.
     pub async fn play_sine_wave(&self) -> Result<Value, Error> {
         let mut id = self.sound_buffer_id.lock().await;
         *(id) += 1;

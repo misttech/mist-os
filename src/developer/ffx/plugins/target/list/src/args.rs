@@ -7,7 +7,7 @@ use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Default)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq, Default)]
 #[argh(
     subcommand,
     name = "list",
@@ -89,7 +89,7 @@ pub enum AddressTypes {
     None,
 }
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum Format {
     #[default]
     Tabular,

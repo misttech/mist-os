@@ -138,6 +138,12 @@ impl<T> WakerEntry<T> {
     }
 }
 
+impl<T> Default for WakerEntry<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Drop for WakerEntry<T> {
     fn drop(&mut self) {
         if let Some(list) = &self.list {

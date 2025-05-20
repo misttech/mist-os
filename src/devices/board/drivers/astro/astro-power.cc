@@ -78,23 +78,23 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
       }},
   };
 
-  const std::vector<fuchsia_driver_framework::BindRule> kPwmRules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_pwm::SERVICE,
-                              bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D2_PWM_AO_D))};
-  const std::vector<fuchsia_driver_framework::NodeProperty> kPwmProps = {
-      fdf::MakeProperty(bind_fuchsia_hardware_pwm::SERVICE,
-                        bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty(bind_fuchsia_amlogic_platform::PWM_ID,
-                        bind_fuchsia_amlogic_platform::PWM_ID_AO_D)};
-  const std::vector<fdf::ParentSpec> kParents = {fdf::ParentSpec{{kPwmRules, kPwmProps}}};
+  const std::vector<fuchsia_driver_framework::BindRule2> kPwmRules = {
+      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
+                               bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::PWM_ID, static_cast<uint32_t>(S905D2_PWM_AO_D))};
+  const std::vector<fuchsia_driver_framework::NodeProperty2> kPwmProps = {
+      fdf::MakeProperty2(bind_fuchsia_hardware_pwm::SERVICE,
+                         bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty2(bind_fuchsia_amlogic_platform::PWM_ID,
+                         bind_fuchsia_amlogic_platform::PWM_ID_AO_D)};
+  const std::vector<fdf::ParentSpec2> kParents = {fdf::ParentSpec2{{kPwmRules, kPwmProps}}};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('POWR');
   fdf::WireUnownedResult result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = "aml-power-impl-composite", .parents = kParents}}));
+                                   {.name = "aml-power-impl-composite", .parents2 = kParents}}));
 
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());

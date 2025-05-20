@@ -81,7 +81,6 @@ rustc_binary("fshost") {
     "//src/storage/lib/fs_management/c",
   ]
   test_deps = [
-    "testing:test_zxcrypt_config",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-sync",

@@ -50,7 +50,7 @@ KernelLog::KernelLog(async_dispatcher_t* dispatcher,
 }
 
 ::fpromise::promise<AttachmentValue> KernelLog::Get(const uint64_t ticket) {
-  FX_CHECK(completers_.count(ticket) == 0) << "Ticket used twice: " << ticket;
+  FX_CHECK(!completers_.contains(ticket)) << "Ticket used twice: " << ticket;
 
   if (!read_only_log_.is_bound()) {
     return ::fpromise::make_ok_promise(AttachmentValue(Error::kConnectionError));
@@ -120,7 +120,7 @@ KernelLog::KernelLog(async_dispatcher_t* dispatcher,
 }
 
 void KernelLog::ForceCompletion(const uint64_t ticket, const Error error) {
-  if (completers_.count(ticket) != 0 && completers_[ticket] != nullptr) {
+  if (completers_.contains(ticket) && completers_[ticket] != nullptr) {
     completers_[ticket](error);
   }
 }

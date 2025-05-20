@@ -7,4 +7,15 @@
         binary: "driver/msd_arm_test.so",
         bind: "meta/bind/msd_arm_bind.bindbc",
     },
+    capabilities: [
+        {
+            service: [ "fuchsia.gpu.magma.TestService" ],
+        },
+    ],
+    expose: [
+        {
+            service: [ "fuchsia.gpu.magma.TestService" ],
+            from: "self",
+        },
+    ],
 }

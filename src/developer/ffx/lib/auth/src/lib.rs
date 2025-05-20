@@ -39,7 +39,7 @@ pub async fn mint_new_access_token<I>(auth_flow: &AuthFlowChoice, ui: &I) -> Res
 where
     I: structured_ui::Interface,
 {
-    tracing::debug!("mint_new_access_token");
+    log::debug!("mint_new_access_token");
     let credentials = Credentials::load_or_new().await;
 
     match auth::new_access_token(&credentials.gcs_credentials()).await {

@@ -7,8 +7,6 @@
 
 #include <align.h>
 #include <debug.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <trace.h>
 
@@ -23,7 +21,7 @@
 
 // assert that the context switch frame is a multiple of 16 to maintain
 // stack alignment requirements per ABI
-static_assert(sizeof(arm64_context_switch_frame) % 16 == 0, "");
+static_assert(sizeof(arm64_context_switch_frame) % 16 == 0);
 
 void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
   // zero out the entire arch state
@@ -87,25 +85,27 @@ __NO_SAFESTACK void arch_thread_construct_first(Thread* t) {
   arch_set_current_thread(t);
 }
 
-static void arm64_tpidr_save_state(Thread* thread) {
+namespace {
+
+void arm64_tpidr_save_state(Thread* thread) {
   thread->arch().tpidr_el0 = __arm_rsr64("tpidr_el0");
   thread->arch().tpidrro_el0 = __arm_rsr64("tpidrro_el0");
 }
 
-static void arm64_tpidr_restore_state(Thread* thread) {
+void arm64_tpidr_restore_state(Thread* thread) {
   __arm_wsr64("tpidr_el0", thread->arch().tpidr_el0);
   __arm_wsr64("tpidrro_el0", thread->arch().tpidrro_el0);
 }
 
-static void arm64_debug_restore_state(Thread* thread) {
+void arm64_debug_restore_state(Thread* thread) {
   // If the thread has debug state, then install it, replacing the current contents.
   if (unlikely(thread->arch().track_debug_state)) {
     arm64_write_hw_debug_regs(&thread->arch().debug_state);
   }
 }
 
-static void arm64_context_switch_spec_mitigations(Thread* oldthread,
-                                                  Thread* newthread) TA_NO_THREAD_SAFETY_ANALYSIS {
+void arm64_context_switch_spec_mitigations(Thread* oldthread,
+                                           Thread* newthread) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Spectre V2: Flush Indirect Branch Predictor State, if:
   // 0) Speculative Execution infoleak mitigations are enabled AND
   // 1) The current CPU requires Spectre V2 mitigations AND
@@ -117,6 +117,8 @@ static void arm64_context_switch_spec_mitigations(Thread* oldthread,
     arm64_uarch_do_spectre_v2_mitigation();
   }
 }
+
+}  // anonymous namespace
 
 void arch_context_switch(Thread* oldthread, Thread* newthread)
     TA_REQ(oldthread->get_lock(), newthread->get_lock()) {

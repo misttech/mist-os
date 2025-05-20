@@ -547,9 +547,10 @@ class View {
   //
   // This method is not available if zbitl::StorageTraits<storage_type>
   // doesn't support mutation.
-  template <typename T = Traits, typename = std::enable_if_t<T::CanWrite()>>
   fit::result<typename Traits::error_type> EditHeader(const iterator& item,
-                                                      const zbi_header_t& header) {
+                                                      const zbi_header_t& header)
+    requires(Traits::CanWrite())
+  {
     item.Assert(__func__);
     if (auto result = WriteHeader(header, item.item_offset(), item.value_.header->length);
         result.error_value()) {
@@ -561,8 +562,9 @@ class View {
   // When the iterator is mutable and not a temporary, make the next
   // operator*() consistent with the new header if it worked.  For kReference
   // storage types, the change is reflected intrinsically.
-  template <typename T = Traits, typename = std::enable_if_t<T::CanWrite()>>
-  fit::result<typename Traits::error_type> EditHeader(iterator& item, const zbi_header_t& header) {
+  fit::result<typename Traits::error_type> EditHeader(iterator& item, const zbi_header_t& header)
+    requires(Traits::CanWrite())
+  {
     item.Assert(__func__);
     auto result = WriteHeader(header, item.item_offset(), item.value_.header->length);
     if constexpr (header_type::kCopy) {
@@ -816,8 +818,9 @@ class View {
     return CopyStorageItem(std::forward<CopyStorage>(to), it, decompress::DefaultAllocator);
   }
 
-  template <typename T = Traits, typename = std::enable_if_t<T::CanCreate()>>
-  auto CopyStorageItem(const iterator& it) {
+  auto CopyStorageItem(const iterator& it)
+    requires(Traits::CanCreate())
+  {
     return CopyStorageItem(it, decompress::DefaultAllocator);
   }
 

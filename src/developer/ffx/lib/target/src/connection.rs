@@ -60,7 +60,6 @@ impl Connection {
     ///
     /// This function will only ever return a `ConnectionStartError` or `InternalError`, both of
     /// which are considered fatal (e.g. there is no means to reattempt connecting to the device).
-    #[tracing::instrument(level = "debug")]
     pub async fn new(connector: impl TargetConnector + 'static) -> Result<Self, ConnectionError> {
         let connector_debug_string = format!("{connector:?}");
         let (fidl_pipe, node, client) = FidlPipe::start_internal(connector).await.map_err(|e| {
@@ -173,7 +172,7 @@ impl Connection {
                 &fio_f::Options::default(),
                 server.into(),
             ) {
-                tracing::debug!(?error, "Could not open svc folder in toolbox namespace");
+                log::debug!("Could not open svc folder in toolbox namespace: {}", error);
             };
             Ok(client)
         }))

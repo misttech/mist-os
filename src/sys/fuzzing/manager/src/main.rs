@@ -23,11 +23,11 @@ enum IncomingService {
     FuzzManager(fuzz::ManagerRequestStream),
 }
 
-struct RunBuilderEndpoint {}
+struct SuiteRunnerEndpoint {}
 
-impl manager::FidlEndpoint<test_manager::RunBuilderMarker> for RunBuilderEndpoint {
-    fn create_proxy(&self) -> Result<test_manager::RunBuilderProxy, Error> {
-        connect_to_protocol::<test_manager::RunBuilderMarker>()
+impl manager::FidlEndpoint<test_manager::SuiteRunnerMarker> for SuiteRunnerEndpoint {
+    fn create_proxy(&self) -> Result<test_manager::SuiteRunnerProxy, Error> {
+        connect_to_protocol::<test_manager::SuiteRunnerMarker>()
     }
 }
 
@@ -36,8 +36,8 @@ async fn main() -> Result<()> {
     let (sender, receiver) = mpsc::unbounded::<fuzz::ManagerRequest>();
     let registry = connect_to_protocol::<fuzz::RegistryMarker>()
         .context("failed to connect to fuchsia.fuzzing.Registry")?;
-    let run_builder = RunBuilderEndpoint {};
-    let manager = Manager::new(registry, run_builder);
+    let suite_runner = SuiteRunnerEndpoint {};
+    let manager = Manager::new(registry, suite_runner);
     let results = try_join!(multiplex_requests(sender), manager.serve(receiver));
     results.and(Ok(()))
 }

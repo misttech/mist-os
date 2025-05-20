@@ -139,7 +139,7 @@ void InspectCollector::Run() {
 }  // namespace
 
 ::fpromise::promise<AttachmentValue> Inspect::Get(const uint64_t ticket) {
-  FX_CHECK(completers_.count(ticket) == 0) << "Ticket used twice: " << ticket;
+  FX_CHECK(!completers_.contains(ticket)) << "Ticket used twice: " << ticket;
 
   if (!archive_accessor_.is_bound()) {
     return ::fpromise::make_ok_promise(AttachmentValue(Error::kConnectionError));
@@ -185,7 +185,7 @@ void InspectCollector::Run() {
   // Keep |collector| alive until Inspect collection has completed (for any reason).
   return consume.then([self, ticket, collector = std::move(collector)](
                           const ::fpromise::result<void, Error>& result) mutable
-                      -> ::fpromise::result<AttachmentValue> {
+                          -> ::fpromise::result<AttachmentValue> {
     auto& inspect = collector->Inspect();
     if (inspect.empty()) {
       FX_LOGS(WARNING) << "Inspect data was empty";
@@ -210,7 +210,7 @@ void InspectCollector::Run() {
 }
 
 void Inspect::ForceCompletion(const uint64_t ticket, const Error error) {
-  if (completers_.count(ticket) != 0 && completers_[ticket] != nullptr) {
+  if (completers_.contains(ticket) && completers_[ticket] != nullptr) {
     completers_[ticket](error);
   }
 }

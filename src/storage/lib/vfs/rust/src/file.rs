@@ -6,7 +6,7 @@
 
 use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
-use crate::object_request::ObjectRequestRef;
+use crate::object_request::{ObjectRequestRef, ToObjectRequest as _};
 use crate::protocols::ProtocolsExt;
 use fidl_fuchsia_io as fio;
 use std::future::{ready, Future};
@@ -19,8 +19,6 @@ pub mod vmo;
 
 #[cfg(not(target_os = "fuchsia"))]
 pub mod simple;
-
-pub mod test_utils;
 
 mod common;
 
@@ -230,12 +228,6 @@ pub trait File: Node {
     /// the call returns. It merely guarantees that any changes to the file have been propagated
     /// to the next layer in the storage stack.
     fn sync(&self, mode: SyncMode) -> impl Future<Output = Result<(), Status>> + Send;
-
-    /// Returns an optional event for the file which signals `fuchsia.io2.FileSignal` events to
-    /// clients (e.g. when a file becomes readable).  See `fuchsia.io2.File.Describe`.
-    fn event(&self) -> Result<Option<fidl::Event>, Status> {
-        Ok(None)
-    }
 }
 
 // Trait for handling reads and writes to a file. Files that support Streams should handle reads and
@@ -334,4 +326,12 @@ pub fn serve(
     } else {
         file.open(scope, protocols.to_file_options()?, object_request)
     }
+}
+
+/// Serve the provided file object on a new execution scope with `flags`.
+pub fn serve_proxy(file: Arc<impl FileLike>, flags: fio::Flags) -> fio::FileProxy {
+    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+    let request = flags.to_object_request(server);
+    request.handle(|request| serve(file, ExecutionScope::new(), &flags, request));
+    proxy
 }

@@ -11,7 +11,9 @@ use summary::MemorySummary;
 
 pub mod digest;
 pub mod kernel_statistics;
+mod name;
 pub mod summary;
+pub use name::ZXName;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct PrincipalIdentifier(pub u64);
@@ -80,7 +82,7 @@ impl Into<fplugin::PrincipalType> for PrincipalType {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 /// A Principal, that can use and claim memory.
 pub struct Principal {
     // These fields are initialized from [fplugin::Principal].
@@ -187,7 +189,7 @@ pub struct Claim {
     claim_type: ClaimType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Resource {
     pub koid: u64,
     pub name_index: usize,
@@ -234,9 +236,6 @@ impl InflatedResource {
             fplugin::ResourceType::Job(job) => {
                 let mut r: Vec<u64> = job.child_jobs.iter().flatten().map(|k| *k).collect();
                 r.extend(job.processes.iter().flatten().map(|k| *k));
-                if r.len() == 0 {
-                    eprintln!("{} has no processes", self.resource.koid);
-                }
                 r
             }
             fplugin::ResourceType::Process(process) => {
@@ -415,12 +414,39 @@ impl Into<fplugin::ResourceReference> for ResourceReference {
 pub struct AttributionData {
     pub principals_vec: Vec<Principal>,
     pub resources_vec: Vec<Resource>,
-    pub resource_names: Vec<String>,
+    pub resource_names: Vec<ZXName>,
     pub attributions: Vec<Attribution>,
 }
 
+// TODO(b/411121120): Use zx::Koid when available on host code.
+/// The post-order traversal of the Jobs->Process->VMOs tree guarantees that when
+/// a visitor processes a Process, it has already seen its associated VMOs.
+pub trait ResourcesVisitor {
+    fn on_job(
+        &mut self,
+        job_koid: zx_types::zx_koid_t,
+        job_name: &ZXName,
+        job: fplugin::Job,
+    ) -> Result<(), zx_status::Status>;
+    fn on_process(
+        &mut self,
+        process_koid: zx_types::zx_koid_t,
+        process_name: &ZXName,
+        process: fplugin::Process,
+    ) -> Result<(), zx_status::Status>;
+    fn on_vmo(
+        &mut self,
+        vmo_koid: zx_types::zx_koid_t,
+        vmo_name: &ZXName,
+        vmo: fplugin::Vmo,
+    ) -> Result<(), zx_status::Status>;
+}
+
 pub trait AttributionDataProvider: Send + Sync + 'static {
+    /// Collects and returns a structure with all memory resources and attribution specifications.
     fn get_attribution_data(&self) -> BoxFuture<'_, Result<AttributionData, anyhow::Error>>;
+    /// Enumerates Jobs, Processes and VMOs and call back the visitor.
+    fn for_each_resource(&self, visitor: &mut impl ResourcesVisitor) -> Result<(), anyhow::Error>;
 }
 
 /// Processed snapshot of the memory usage of a device, with attribution of memory resources to
@@ -428,14 +454,14 @@ pub trait AttributionDataProvider: Send + Sync + 'static {
 pub struct ProcessedAttributionData {
     principals: HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
     resources: HashMap<u64, RefCell<InflatedResource>>,
-    resource_names: Vec<String>,
+    resource_names: Vec<ZXName>,
 }
 
 impl ProcessedAttributionData {
     fn new(
         principals: HashMap<PrincipalIdentifier, RefCell<InflatedPrincipal>>,
         resources: HashMap<u64, RefCell<InflatedResource>>,
-        resource_names: Vec<String>,
+        resource_names: Vec<ZXName>,
     ) -> Self {
         Self { principals, resources, resource_names }
     }
@@ -558,7 +584,6 @@ pub fn attribute_vmos(attribution_data: AttributionData) -> ProcessedAttribution
                     // This can happen if a resource is created or disappears while we were
                     // collecting information about all the resources in the system. This should
                     // remain a rare event.
-                    println!("Resource {} not found", child);
                     continue;
                 }
             };
@@ -580,9 +605,49 @@ pub fn attribute_vmos(attribution_data: AttributionData) -> ProcessedAttribution
     // actually holding memory. We also keep track of the process to display its name in the output.
     for (resource_id, resource_refcell) in &resources {
         let resource = resource_refcell.borrow();
-        if let fplugin::ResourceType::Vmo(_) = &resource.resource.resource_type {
+        if let fplugin::ResourceType::Vmo(vmo) = &resource.resource.resource_type {
+            let mut ancestors = vec![*resource_id];
+            // VMOs created by reference don't behave like COW-clones; their byte count is always
+            // zero, and all pages are attributed to their parent. This is not what we want here,
+            // as we prefer to acknowledge that the pages are shared between the parent and its
+            // children. We currently don't have a way to formally distinguish between VMOs created
+            // by reference and the other VMOs, so we use the heuristic of checking that they
+            // report they are always empty.
+            if vmo.total_populated_bytes.unwrap_or_default() == 0 {
+                let mut current_parent = vmo.parent;
+                // Add the parents of a VMO as "Child" claims. This is done so that slices of VMOs,
+                // with possibly no memory of their own, get attributed the resources of their
+                // parent.
+                while let Some(parent_koid) = current_parent {
+                    if parent_koid == 0 {
+                        panic!("Parent is not None but 0.");
+                    }
+                    ancestors.push(parent_koid);
+                    let mut current_resource = match resources.get(&parent_koid) {
+                        Some(res) => res.borrow_mut(),
+                        None => break,
+                    };
+                    current_resource.claims.extend(resource.claims.iter().map(|c| Claim {
+                        subject: c.subject,
+                        source: c.source,
+                        claim_type: ClaimType::Child,
+                    }));
+                    current_parent = match &current_resource.resource.resource_type {
+                        fplugin::ResourceType::Job(_) => panic!("This should not happen"),
+                        fplugin::ResourceType::Process(_) => panic!("This should not happen"),
+                        fplugin::ResourceType::Vmo(current_vmo) => current_vmo.parent,
+                        _ => unimplemented!(),
+                    };
+                }
+            }
+
             for claim in &resource.claims {
-                principals.get(&claim.subject).unwrap().borrow_mut().resources.insert(*resource_id);
+                principals
+                    .get(&claim.subject)
+                    .unwrap()
+                    .borrow_mut()
+                    .resources
+                    .extend(ancestors.iter());
             }
         } else if let fplugin::ResourceType::Process(_) = &resource.resource.resource_type {
             for claim in &resource.claims {
@@ -599,12 +664,77 @@ pub fn attribute_vmos(attribution_data: AttributionData) -> ProcessedAttribution
     ProcessedAttributionData::new(principals, resources, attribution_data.resource_names)
 }
 
+pub mod testing {
+    use crate::{AttributionData, AttributionDataProvider, Resource, ResourcesVisitor};
+    use fidl_fuchsia_memory_attribution_plugin::ResourceType;
+    use futures::future::{ready, BoxFuture};
+
+    pub struct FakeAttributionDataProvider {
+        pub attribution_data: AttributionData,
+    }
+
+    impl AttributionDataProvider for FakeAttributionDataProvider {
+        fn get_attribution_data(&self) -> BoxFuture<'_, Result<AttributionData, anyhow::Error>> {
+            Box::pin(ready(Ok(AttributionData {
+                principals_vec: self.attribution_data.principals_vec.clone(),
+                resources_vec: self.attribution_data.resources_vec.clone(),
+                resource_names: self.attribution_data.resource_names.clone(),
+                attributions: self.attribution_data.attributions.clone(),
+            })))
+        }
+
+        fn for_each_resource(
+            &self,
+            visitor: &mut impl ResourcesVisitor,
+        ) -> Result<(), anyhow::Error> {
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid, name_index, resource_type: ResourceType::Vmo(vmo), ..
+                } = resource
+                {
+                    visitor.on_vmo(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        vmo.clone(),
+                    )?;
+                }
+            }
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid,
+                    name_index,
+                    resource_type: ResourceType::Process(process),
+                    ..
+                } = resource
+                {
+                    visitor.on_process(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        process.clone(),
+                    )?;
+                }
+            }
+            for resource in &self.attribution_data.resources_vec {
+                if let Resource {
+                    koid, name_index, resource_type: ResourceType::Job(job), ..
+                } = resource
+                {
+                    visitor.on_job(
+                        *koid,
+                        &self.attribution_data.resource_names[*name_index],
+                        job.clone(),
+                    )?;
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use super::*;
-    use fidl_fuchsia_memory_attribution_plugin as fplugin;
+    use std::collections::HashMap;
     use summary::{PrincipalSummary, VmoSummary};
 
     #[test]
@@ -633,20 +763,20 @@ mod tests {
         // And an additional parent VMO for 2_vmo, 2_vmo_parent (1011).
 
         let resource_names = vec![
-            "root_job".to_owned(),
-            "root_process".to_owned(),
-            "root_vmo".to_owned(),
-            "shared_vmo".to_owned(),
-            "runner_job".to_owned(),
-            "runner_process".to_owned(),
-            "runner_vmo".to_owned(),
-            "component_vmo".to_owned(),
-            "component_2_job".to_owned(),
-            "2_process".to_owned(),
-            "2_vmo".to_owned(),
-            "2_vmo_parent".to_owned(),
-            "component_vmo_mapped".to_owned(),
-            "component_vmo_mapped2".to_owned(),
+            ZXName::from_string_lossy("root_job"),
+            ZXName::from_string_lossy("root_process"),
+            ZXName::from_string_lossy("root_vmo"),
+            ZXName::from_string_lossy("shared_vmo"),
+            ZXName::from_string_lossy("runner_job"),
+            ZXName::from_string_lossy("runner_process"),
+            ZXName::from_string_lossy("runner_vmo"),
+            ZXName::from_string_lossy("component_vmo"),
+            ZXName::from_string_lossy("component_2_job"),
+            ZXName::from_string_lossy("2_process"),
+            ZXName::from_string_lossy("2_vmo"),
+            ZXName::from_string_lossy("2_vmo_parent"),
+            ZXName::from_string_lossy("component_vmo_mapped"),
+            ZXName::from_string_lossy("component_vmo_mapped2"),
         ];
 
         let attributions = vec![
@@ -954,7 +1084,7 @@ mod tests {
                 processes: vec!["root_process (1001)".to_owned()],
                 vmos: vec![
                     (
-                        "root_vmo".to_owned(),
+                        ZXName::from_string_lossy("root_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -967,7 +1097,7 @@ mod tests {
                         }
                     ),
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -1000,7 +1130,7 @@ mod tests {
                 attributor: Some("root".to_owned()),
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![(
-                    "runner_vmo".to_owned(),
+                    ZXName::from_string_lossy("runner_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,
@@ -1033,7 +1163,7 @@ mod tests {
                 processes: vec!["2_process (1009)".to_owned()],
                 vmos: vec![
                     (
-                        "shared_vmo".to_owned(),
+                        ZXName::from_string_lossy("shared_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 0,
@@ -1046,7 +1176,7 @@ mod tests {
                         }
                     ),
                     (
-                        "2_vmo".to_owned(),
+                        ZXName::from_string_lossy("2_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -1080,7 +1210,7 @@ mod tests {
                 processes: vec!["runner_process (1005)".to_owned()],
                 vmos: vec![
                     (
-                        "component_vmo".to_owned(),
+                        ZXName::from_string_lossy("component_vmo"),
                         VmoSummary {
                             count: 1,
                             committed_private: 128,
@@ -1093,7 +1223,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -1106,7 +1236,7 @@ mod tests {
                         }
                     ),
                     (
-                        "component_vmo_mapped2".to_owned(),
+                        ZXName::from_string_lossy("component_vmo_mapped2"),
                         VmoSummary {
                             count: 1,
                             committed_private: 1024,
@@ -1141,10 +1271,10 @@ mod tests {
         // In this scenario, component 1 reattributes component_job to component 2 entirely.
 
         let resource_names = vec![
-            "root_job".to_owned(),
-            "component_job".to_owned(),
-            "component_process".to_owned(),
-            "component_vmo".to_owned(),
+            ZXName::from_string_lossy("root_job"),
+            ZXName::from_string_lossy("component_job"),
+            ZXName::from_string_lossy("component_process"),
+            ZXName::from_string_lossy("component_vmo"),
         ];
         let attributions = vec![
             fplugin::Attribution {
@@ -1311,7 +1441,7 @@ mod tests {
                 attributor: Some("component 1".to_owned()),
                 processes: vec!["component_process (1002)".to_owned()],
                 vmos: vec![(
-                    "component_vmo".to_owned(),
+                    ZXName::from_string_lossy("component_vmo"),
                     VmoSummary {
                         count: 1,
                         committed_private: 1024,
@@ -1410,5 +1540,210 @@ mod tests {
             data_resources.into_iter().map(|r| r.into()).collect();
 
         assert_eq!(plugin_resources, actual_resources);
+    }
+
+    #[test]
+    fn test_vmo_reference() {
+        // Create a fake snapshot with 3 principals:
+        // root (0)
+        //  - component 1 (1)
+        //
+        // and the following job/process/vmo hierarchy:
+        // root_job (1000)
+        //  - component_job (1001)
+        //    * component_process (1002)
+        //      . component_vmo (1003)
+        // component_vmo_parent (1004)
+        //
+        // In this scenario, component_vmo is a reference to component_vmo_parent and should get
+        // shared attribution of its pages.
+
+        let resource_names = vec![
+            name::ZXName::from_string_lossy("root_job"),
+            name::ZXName::from_string_lossy("component_job"),
+            name::ZXName::from_string_lossy("component_process"),
+            name::ZXName::from_string_lossy("component_vmo"),
+            name::ZXName::from_string_lossy("component_vmo_parent"),
+        ];
+        let attributions = vec![
+            fplugin::Attribution {
+                source: Some(fplugin::PrincipalIdentifier { id: 0 }),
+                subject: Some(fplugin::PrincipalIdentifier { id: 0 }),
+                resources: Some(vec![fplugin::ResourceReference::KernelObject(1000)]),
+                ..Default::default()
+            },
+            fplugin::Attribution {
+                source: Some(fplugin::PrincipalIdentifier { id: 0 }),
+                subject: Some(fplugin::PrincipalIdentifier { id: 1 }),
+                resources: Some(vec![fplugin::ResourceReference::KernelObject(1001)]),
+                ..Default::default()
+            },
+        ]
+        .into_iter()
+        .map(|a| a.into())
+        .collect();
+        let principals = vec![
+            fplugin::Principal {
+                identifier: Some(fplugin::PrincipalIdentifier { id: 0 }),
+                description: Some(fplugin::Description::Component("root".to_owned())),
+                principal_type: Some(fplugin::PrincipalType::Runnable),
+                parent: None,
+                ..Default::default()
+            },
+            fplugin::Principal {
+                identifier: Some(fplugin::PrincipalIdentifier { id: 1 }),
+                description: Some(fplugin::Description::Component("component 1".to_owned())),
+                principal_type: Some(fplugin::PrincipalType::Runnable),
+                parent: Some(fplugin::PrincipalIdentifier { id: 0 }),
+                ..Default::default()
+            },
+        ]
+        .into_iter()
+        .map(|p| p.into())
+        .collect();
+
+        let resources = vec![
+            fplugin::Resource {
+                koid: Some(1000),
+                name_index: Some(0),
+                resource_type: Some(fplugin::ResourceType::Job(fplugin::Job {
+                    child_jobs: Some(vec![1001]),
+                    processes: Some(vec![]),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            },
+            fplugin::Resource {
+                koid: Some(1001),
+                name_index: Some(1),
+                resource_type: Some(fplugin::ResourceType::Job(fplugin::Job {
+                    child_jobs: Some(vec![]),
+                    processes: Some(vec![1002]),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            },
+            fplugin::Resource {
+                koid: Some(1002),
+                name_index: Some(2),
+                resource_type: Some(fplugin::ResourceType::Process(fplugin::Process {
+                    vmos: Some(vec![1003]),
+                    mappings: None,
+                    ..Default::default()
+                })),
+                ..Default::default()
+            },
+            fplugin::Resource {
+                koid: Some(1003),
+                name_index: Some(3),
+                resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
+                    parent: Some(1004),
+                    private_committed_bytes: Some(0),
+                    private_populated_bytes: Some(0),
+                    scaled_committed_bytes: Some(0),
+                    scaled_populated_bytes: Some(0),
+                    total_committed_bytes: Some(0),
+                    total_populated_bytes: Some(0),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            },
+            fplugin::Resource {
+                koid: Some(1004),
+                name_index: Some(4),
+                resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
+                    private_committed_bytes: Some(1024),
+                    private_populated_bytes: Some(2048),
+                    scaled_committed_bytes: Some(1024),
+                    scaled_populated_bytes: Some(2048),
+                    total_committed_bytes: Some(1024),
+                    total_populated_bytes: Some(2048),
+                    ..Default::default()
+                })),
+                ..Default::default()
+            },
+        ]
+        .into_iter()
+        .map(|r| r.into())
+        .collect();
+
+        let output = attribute_vmos(AttributionData {
+            principals_vec: principals,
+            resources_vec: resources,
+            resource_names,
+            attributions,
+        })
+        .summary();
+
+        assert_eq!(output.undigested, 0);
+        assert_eq!(output.principals.len(), 2);
+
+        let principals: HashMap<u64, PrincipalSummary> =
+            output.principals.into_iter().map(|p| (p.id, p)).collect();
+
+        assert_eq!(
+            principals.get(&0).unwrap(),
+            &PrincipalSummary {
+                id: 0,
+                name: "root".to_owned(),
+                principal_type: "R".to_owned(),
+                committed_private: 0,
+                committed_scaled: 0.0,
+                committed_total: 0,
+                populated_private: 0,
+                populated_scaled: 0.0,
+                populated_total: 0,
+                attributor: None,
+                processes: vec![],
+                vmos: vec![].into_iter().collect(),
+            }
+        );
+
+        assert_eq!(
+            principals.get(&1).unwrap(),
+            &PrincipalSummary {
+                id: 1,
+                name: "component 1".to_owned(),
+                principal_type: "R".to_owned(),
+                committed_private: 1024,
+                committed_scaled: 1024.0,
+                committed_total: 1024,
+                populated_private: 2048,
+                populated_scaled: 2048.0,
+                populated_total: 2048,
+                attributor: Some("root".to_owned()),
+                processes: vec!["component_process (1002)".to_owned()],
+                vmos: vec![
+                    (
+                        name::ZXName::from_string_lossy("component_vmo"),
+                        VmoSummary {
+                            count: 1,
+                            committed_private: 0,
+                            committed_scaled: 0.0,
+                            committed_total: 0,
+                            populated_private: 0,
+                            populated_scaled: 0.0,
+                            populated_total: 0,
+                            ..Default::default()
+                        }
+                    ),
+                    (
+                        name::ZXName::from_string_lossy("component_vmo_parent"),
+                        VmoSummary {
+                            count: 1,
+                            committed_private: 1024,
+                            committed_scaled: 1024.0,
+                            committed_total: 1024,
+                            populated_private: 2048,
+                            populated_scaled: 2048.0,
+                            populated_total: 2048,
+                            ..Default::default()
+                        }
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            }
+        );
     }
 }

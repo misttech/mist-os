@@ -11,8 +11,8 @@ impl DefineSubsystemConfiguration<()> for ThermalSubsystem {
         _: &(),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if (*context.feature_set_level == FeatureSupportLevel::Utility
-            || *context.feature_set_level == FeatureSupportLevel::Standard)
+        if (*context.feature_set_level == FeatureSetLevel::Utility
+            || *context.feature_set_level == FeatureSetLevel::Standard)
             && context.board_info.provides_feature("fuchsia::fan")
         {
             builder.platform_bundle("fan");

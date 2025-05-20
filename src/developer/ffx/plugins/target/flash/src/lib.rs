@@ -13,14 +13,14 @@ use discovery::{
 use errors::ffx_bail;
 use fastboot_file_discovery::FASTBOOT_FILE_PATH;
 use ffx_config::EnvironmentContext;
-use ffx_fastboot::common::cmd::OemFile;
-use ffx_fastboot::common::fastboot::{
-    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
-};
 use ffx_fastboot::common::from_manifest;
 use ffx_fastboot::util::{Event, UnlockEvent};
+use ffx_fastboot_connection_factory::{
+    tcp_proxy, udp_proxy, usb_proxy, FastbootNetworkConnectionConfig,
+};
 use ffx_fastboot_interface::fastboot_interface::UploadProgress;
 use ffx_flash_args::FlashCommand;
+use ffx_flash_manifest::OemFile;
 use ffx_ssh::SshKeyFiles;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{deferred, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
@@ -86,6 +86,7 @@ fho::embedded_plugin!(FlashTool);
 #[derive(Debug, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum FlashMessage {
+    Preflight { message: String },
     Progress(FlashProgress),
     Finished { success: bool, error_message: String },
 }
@@ -115,7 +116,7 @@ impl FfxMain for FlashTool {
         preflight_checks(&self.cmd, &mut writer)?;
 
         // Massage FlashCommand
-        let cmd = preprocess_flash_cmd(&self.cmd).await?;
+        let cmd = preprocess_flash_cmd(&mut writer, &self.cmd).await?;
 
         self.flash_plugin_impl(cmd, &mut writer).await
     }
@@ -134,7 +135,10 @@ fn preflight_checks<W: Write>(cmd: &FlashCommand, mut writer: W) -> Result<()> {
     Ok(())
 }
 
-async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
+async fn preprocess_flash_cmd(
+    writer: &mut VerifiedMachineWriter<FlashMessage>,
+    i_cmd: &FlashCommand,
+) -> Result<FlashCommand> {
     let cmd: &mut FlashCommand = &mut i_cmd.clone();
     match cmd.authorized_keys.as_ref() {
         Some(ssh) => {
@@ -161,7 +165,7 @@ async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
         None => {
             if !cmd.oem_stage.iter().any(|f| f.command() == SSH_OEM_COMMAND) {
                 if cmd.skip_authorized_keys {
-                    tracing::warn!("Skipping uploading authorized keys");
+                    log::warn!("Skipping uploading authorized keys");
                 } else {
                     let ssh_keys = SshKeyFiles::load(None)
                         .await
@@ -169,7 +173,7 @@ async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
                     ssh_keys.create_keys_if_needed(false).context("creating ssh keys if needed")?;
                     if ssh_keys.authorized_keys.exists() {
                         let k = ssh_keys.authorized_keys.display().to_string();
-                        tracing::debug!("No `--authorized-keys` flag, using {}", k);
+                        log::debug!("No `--authorized-keys` flag, using {}", k);
                         cmd.oem_stage.push(OemFile::new(SSH_OEM_COMMAND.to_string(), k));
                     } else {
                         // Since the key will be initialized, this should never happen.
@@ -195,10 +199,13 @@ async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
 
     if cmd.product_bundle.is_none() && cmd.manifest_path.is_none() && cmd.manifest.is_none() {
         let product_path: String = ffx_config::get("product.path")?;
-        tracing::debug!(
+        let message = format!(
             "No product bundle or manifest passed. Inferring product bundle path from config: {}",
             product_path
         );
+        log::debug!("{}", message);
+        writer.machine_or(&FlashMessage::Preflight { message: message.clone() }, message)?;
+
         cmd.product_bundle = Some(product_path);
     }
 
@@ -215,7 +222,7 @@ async fn preprocess_flash_cmd(i_cmd: &FlashCommand) -> Result<FlashCommand> {
             .strip_suffix('"')
             .unwrap()
             .to_string();
-        tracing::debug!(
+        log::debug!(
             "Passed product bundle was wrapped in quotes, trimming it to: {}",
             cleaned_product_bundle
         );
@@ -251,7 +258,7 @@ async fn rediscover_target(
     let c_clone = criteria.clone();
 
     let filter_target = move |handle: &TargetHandle| {
-        tracing::debug!("Considering handle: {:#?}", handle);
+        log::debug!("Considering handle: {:#?}", handle);
         match &handle.state {
             discovery::TargetState::Fastboot(fts)
                 if Some(fts.serial_number.clone()) == c_clone.serial =>
@@ -259,7 +266,7 @@ async fn rediscover_target(
                 true
             }
             _ => {
-                tracing::debug!("Skipping handle: {:#?}", handle);
+                log::debug!("Skipping handle: {:#?}", handle);
                 false
             }
         }
@@ -284,7 +291,7 @@ async fn rediscover_target(
                             match &h.state {
                                 discovery::TargetState::Fastboot(fts) => match c_clone.serial {
                                     Some(c) if c == fts.serial_number => {
-                                        tracing::debug!("Found the target, firing signal");
+                                        log::debug!("Found the target, firing signal");
                                         found_ev.signal();
                                     }
                                     _ => {}
@@ -336,7 +343,7 @@ async fn reboot_target_to_bootloader_and_rediscover(
     let info = device_proxy.get_info().await.bug_context("Getting target device info")?;
 
     // Tell the target to reboot to the bootloader
-    tracing::debug!("Target in Product state. Rebooting to bootloader...",);
+    log::debug!("Target in Product state. Rebooting to bootloader...",);
 
     // These calls erroring is fine...
     match power_proxy.reboot_to_bootloader().await {
@@ -356,7 +363,7 @@ impl FlashTool {
         let target_state = match &self.target_info.target_state {
             Some(FidlTargetState::Fastboot) => {
                 // Nothing to do
-                tracing::debug!("Target already in Fastboot state");
+                log::debug!("Target already in Fastboot state");
                 let s: discovery::TargetHandle = (*self.target_info).clone().try_into()?;
                 s.state
             }
@@ -387,7 +394,7 @@ Reboot the Target to the bootloader and re-run this command."
                 ffx_bail!("Bootloader operations not supported with Zedboot");
             }
             Some(FidlTargetState::Disconnected) => {
-                tracing::info!("Target: {:#?} not connected bailing", self.target_info);
+                log::info!("Target: {:#?} not connected bailing", self.target_info);
                 ffx_bail!("Target is disconnected...");
             }
             None => {
@@ -527,15 +534,15 @@ fn handle_fidl_connection_err(e: Error) -> fho::Result<()> {
             // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
             // then we can be more confident that target reboot/shutdown has succeeded.
             if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
-                tracing::info!("Target reboot succeeded.");
+                log::info!("Target reboot succeeded.");
             } else {
-                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+                log::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
             }
-            tracing::debug!("{:?}", e);
+            log::debug!("{:?}", e);
             Ok(())
         }
         _ => {
-            tracing::error!("Target communication error: {:?}", e);
+            log::error!("Target communication error: {:?}", e);
             return_bug!("Target communication error: {:?}", e)
         }
     }
@@ -568,7 +575,7 @@ async fn handle_event(
                         writer.machine_or_write(&machine, message)?;
                     }
                     UploadProgress::OnProgress { bytes_written } => {
-                        tracing::trace!("Made progres, wrote: {}", bytes_written);
+                        log::trace!("Made progres, wrote: {}", bytes_written);
                     }
                     UploadProgress::OnFinished => {
                         let (machine, message) = (
@@ -636,7 +643,7 @@ async fn handle_event(
                         FlashMessage::Progress(FlashProgress::OemCommand {
                             oem_command: oem_command.clone(),
                         }),
-                        format!("Sendinge command: \"{}\"", oem_command),
+                        format!("Sending command: \"{}\"", oem_command),
                     );
                     writer.machine_or(&machine, message)?;
                 }
@@ -655,7 +662,7 @@ async fn handle_event(
                     writer.machine_or(&machine, message)?;
                 }
                 Event::Variable(variable) => {
-                    tracing::trace!("got variable {:#?}", variable);
+                    log::trace!("got variable {:#?}", variable);
                     let (machine, message) = (
                         FlashMessage::Progress(FlashProgress::GotVariable),
                         "variable".to_string(),
@@ -683,7 +690,7 @@ async fn handle_event(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_writer::Format;
+    use ffx_writer::{Format, TestBuffers};
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;
@@ -697,17 +704,26 @@ mod test {
             .set("foo".into())
             .await
             .expect("creating temp product.path");
-        let cmd = preprocess_flash_cmd(&FlashCommand { ..Default::default() }).await.unwrap();
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        let cmd = preprocess_flash_cmd(&mut writer, &FlashCommand { ..Default::default() })
+            .await
+            .unwrap();
         assert_eq!(cmd.product_bundle, Some("foo".to_string()));
     }
 
     #[fuchsia::test]
     async fn test_nonexistent_file_throws_err() {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        assert!(preprocess_flash_cmd(&FlashCommand {
-            manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
-            ..Default::default()
-        })
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        assert!(preprocess_flash_cmd(
+            &mut writer,
+            &FlashCommand {
+                manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
+                ..Default::default()
+            }
+        )
         .await
         .is_err())
     }
@@ -722,11 +738,17 @@ mod test {
         let ssh_tmp_file = NamedTempFile::new().expect("tmp access failed");
         let ssh_tmp_file_name = ssh_tmp_file.path().to_string_lossy().to_string();
 
-        let cmd = preprocess_flash_cmd(&FlashCommand {
-            product_bundle: Some(wrapped_pb_tmp_file_name),
-            authorized_keys: Some(ssh_tmp_file_name),
-            ..Default::default()
-        })
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+
+        let cmd = preprocess_flash_cmd(
+            &mut writer,
+            &FlashCommand {
+                product_bundle: Some(wrapped_pb_tmp_file_name),
+                authorized_keys: Some(ssh_tmp_file_name),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
         assert_eq!(Some(pb_tmp_file_name), cmd.product_bundle);
@@ -737,11 +759,17 @@ mod test {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        assert!(preprocess_flash_cmd(&FlashCommand {
-            manifest_path: Some(PathBuf::from(tmp_file_name)),
-            authorized_keys: Some("ssh_does_not_exist".to_string()),
-            ..Default::default()
-        },)
+
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        assert!(preprocess_flash_cmd(
+            &mut writer,
+            &FlashCommand {
+                manifest_path: Some(PathBuf::from(tmp_file_name)),
+                authorized_keys: Some("ssh_does_not_exist".to_string()),
+                ..Default::default()
+            },
+        )
         .await
         .is_err())
     }
@@ -751,7 +779,8 @@ mod test {
         let _env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let tmp_file = NamedTempFile::new().expect("tmp access failed");
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
-        let mut writer = VerifiedMachineWriter::<FlashMessage>::new(Some(Format::Json));
+        let buffers = TestBuffers::default();
+        let mut writer = <FlashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
         assert!(preflight_checks(
             &FlashCommand {
                 manifest: Some(PathBuf::from(tmp_file_name.clone())),

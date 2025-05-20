@@ -20,7 +20,7 @@ use netstack3_base::{
     RemoveResourceResultWithContext, ResourceCounterContext, StrongDeviceIdentifier,
     TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
-use netstack3_filter::RawIpBody;
+use netstack3_filter::{FilterIpExt, RawIpBody};
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::icmp;
 use packet_formats::ip::{DscpAndEcn, IpPacket};
@@ -74,7 +74,7 @@ impl<I: Ip, C> RawIpSocketApi<I, C> {
     }
 }
 
-impl<I: IpExt + DualStackIpExt, C> RawIpSocketApi<I, C>
+impl<I: IpExt + DualStackIpExt + FilterIpExt, C> RawIpSocketApi<I, C>
 where
     C: ContextPair,
     C::BindingsContext: RawIpSocketsBindingsTypes + ReferenceNotifiers + 'static,
@@ -517,7 +517,7 @@ type RawIpApiSocketId<I, C> = RawIpSocketId<
 /// Provides access to the [`RawIpSocketLockedState`] for a raw IP socket.
 ///
 /// Implementations must ensure a proper lock ordering is adhered to.
-pub trait RawIpSocketStateContext<I: IpExt, BT: RawIpSocketsBindingsTypes>:
+pub trait RawIpSocketStateContext<I: IpExt + FilterIpExt, BT: RawIpSocketsBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
     /// The implementation of `IpSocketHandler` available after having locked
@@ -636,7 +636,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSock
 }
 
 /// A type that provides access to the `RawIpSocketMap` used by the system.
-pub trait RawIpSocketMapContext<I: IpExt, BT: RawIpSocketsBindingsTypes>:
+pub trait RawIpSocketMapContext<I: IpExt + FilterIpExt, BT: RawIpSocketsBindingsTypes>:
     DeviceIdContext<AnyDevice>
 {
     /// The implementation of `RawIpSocketStateContext` available after having
@@ -672,7 +672,7 @@ pub trait RawIpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
 impl<I, BC, CC> RawIpSocketHandler<I, BC> for CC
 where
-    I: IpExt,
+    I: IpExt + FilterIpExt,
     BC: RawIpSocketsBindingsContext<I, CC::DeviceId>,
     CC: RawIpSocketMapContext<I, BC>,
 {
@@ -935,8 +935,8 @@ mod test {
         }
     }
 
-    impl<I: IpExt, D: FakeStrongDeviceId> RawIpSocketStateContext<I, FakeBindingsCtx<D>>
-        for FakeCoreCtx<I, D>
+    impl<I: IpExt + FilterIpExt, D: FakeStrongDeviceId>
+        RawIpSocketStateContext<I, FakeBindingsCtx<D>> for FakeCoreCtx<I, D>
     {
         type SocketHandler<'a> = FakeCoreCtx<I, D>;
         fn with_locked_state<O, F: FnOnce(&RawIpSocketLockedState<I, D::Weak>) -> O>(
@@ -991,7 +991,7 @@ mod test {
         }
     }
 
-    impl<I: IpExt, D: FakeStrongDeviceId> RawIpSocketMapContext<I, FakeBindingsCtx<D>>
+    impl<I: IpExt + FilterIpExt, D: FakeStrongDeviceId> RawIpSocketMapContext<I, FakeBindingsCtx<D>>
         for FakeCoreCtx<I, D>
     {
         type StateCtx<'a> = FakeCoreCtx<I, D>;
@@ -1097,14 +1097,14 @@ mod test {
     #[ip_test(I)]
     #[test_case(IpProto::Udp; "UDP")]
     #[test_case(IpProto::Reserved; "IPPROTO_RAW")]
-    fn create_and_close<I: IpExt + DualStackIpExt + TestIpExt>(proto: IpProto) {
+    fn create_and_close<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>(proto: IpProto) {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(proto.into()), Default::default());
         let FakeExternalSocketState { received_packets: _ } = api.close(sock).into_removed();
     }
 
     #[ip_test(I)]
-    fn set_device<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn set_device<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -1121,7 +1121,7 @@ mod test {
     }
 
     #[ip_test(I)]
-    fn set_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn set_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
         let filter1 = RawIpSocketIcmpFilter::<I>::new([123; 32]);
         let filter2 = RawIpSocketIcmpFilter::<I>::new([234; 32]);
         let mut api = new_raw_ip_socket_api::<I>();
@@ -1145,7 +1145,7 @@ mod test {
     }
 
     #[ip_test(I)]
-    fn set_unicast_hop_limits<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn set_unicast_hop_limits<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -1162,7 +1162,7 @@ mod test {
     }
 
     #[ip_test(I)]
-    fn set_multicast_hop_limit<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn set_multicast_hop_limit<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -1179,7 +1179,7 @@ mod test {
     }
 
     #[ip_test(I)]
-    fn set_multicast_loop<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn set_multicast_loop<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::new(IpProto::Udp.into()), Default::default());
 
@@ -1192,7 +1192,7 @@ mod test {
     }
 
     #[ip_test(I)]
-    fn receive_ip_packet<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn receive_ip_packet<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
 
         // Create two sockets with the right protocol, and one socket with the
@@ -1240,7 +1240,9 @@ mod test {
     // Verify that sockets created with `RawIpSocketProtocol::Raw` cannot
     // receive packets
     #[ip_test(I)]
-    fn cannot_receive_ip_packet_with_proto_raw<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn cannot_receive_ip_packet_with_proto_raw<
+        I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt,
+    >() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
 
@@ -1268,7 +1270,7 @@ mod test {
     #[test_case(MultipleDevicesId::A, None, true; "no_bound_device")]
     #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::A), true; "bound_same_device")]
     #[test_case(MultipleDevicesId::A, Some(MultipleDevicesId::B), false; "bound_diff_device")]
-    fn receive_ip_packet_with_bound_device<I: IpExt + DualStackIpExt + TestIpExt>(
+    fn receive_ip_packet_with_bound_device<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>(
         send_dev: MultipleDevicesId,
         bound_dev: Option<MultipleDevicesId>,
         should_deliver: bool,
@@ -1307,7 +1309,7 @@ mod test {
     #[test_case(None, true; "no_filter")]
     #[test_case(Some(RawIpSocketIcmpFilter::<I>::ALLOW_ALL), true; "allow_all")]
     #[test_case(Some(RawIpSocketIcmpFilter::<I>::DENY_ALL), false; "deny_all")]
-    fn receive_ip_packet_with_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt>(
+    fn receive_ip_packet_with_icmp_filter<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>(
         filter: Option<RawIpSocketIcmpFilter<I>>,
         should_deliver: bool,
     ) {
@@ -1392,7 +1394,7 @@ mod test {
     #[test_case(None, None; "default_send")]
     #[test_case(Some(MultipleDevicesId::A), None; "with_bound_dev")]
     #[test_case(None, Some(123); "with_hop_limit")]
-    fn send_to<I: IpExt + DualStackIpExt + TestIpExt>(
+    fn send_to<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>(
         bound_dev: Option<MultipleDevicesId>,
         hop_limit: Option<u8>,
     ) {
@@ -1431,7 +1433,7 @@ mod test {
     }
 
     #[ip_test(I)]
-    fn send_to_disallows_raw_protocol<I: IpExt + DualStackIpExt + TestIpExt>() {
+    fn send_to_disallows_raw_protocol<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
         let mut api = new_raw_ip_socket_api::<I>();
         let sock = api.create(RawIpSocketProtocol::Raw, Default::default());
         assert_matches!(
@@ -1517,7 +1519,7 @@ mod test {
         [MarkDomain::Mark1, MarkDomain::Mark2],
         [None, Some(0), Some(1)]
     )]
-    fn raw_ip_socket_marks<I: TestIpExt + DualStackIpExt + IpExt>(
+    fn raw_ip_socket_marks<I: TestIpExt + DualStackIpExt + IpExt + FilterIpExt>(
         domain: MarkDomain,
         mark: Option<u32>,
     ) {

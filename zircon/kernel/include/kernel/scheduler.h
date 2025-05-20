@@ -52,8 +52,9 @@ using SchedPerformanceScale = ffl::Fixed<int64_t, 31>;
 // Converts a userspace CPU performance scale to a SchedPerformanceScale value.
 constexpr SchedPerformanceScale ToSchedPerformanceScale(zx_cpu_performance_scale_t value) {
   const size_t FractionaBits = sizeof(value.fractional_part) * 8;
-  return ffl::FromRaw<FractionaBits>(uint64_t{value.integral_part} << FractionaBits |
-                                     value.fractional_part);
+  const SchedPerformanceScale performance_scale = ffl::FromRaw<FractionaBits>(
+      uint64_t{value.integral_part} << FractionaBits | value.fractional_part);
+  return ktl::min(performance_scale, SchedPerformanceScale{1});
 }
 
 // Converts a SchedPerformanceScale value to a userspace CPU performance scale.

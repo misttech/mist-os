@@ -34,6 +34,28 @@ pub async fn connect_accessor<P: DiscoverableProtocolMarker>(
     Ok(proxy)
 }
 
+async fn list_accessors(
+    realm: &fsys2::RealmQueryProxy,
+    moniker: &Moniker,
+) -> Option<Vec<fuchsia_fs::directory::DirEntry>> {
+    let Ok(exposed_dir) = open_instance_directory(moniker, OpenDirType::Exposed, realm).await
+    else {
+        return None;
+    };
+
+    let (dir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    exposed_dir
+        .open(
+            ACCESSORS_DICTIONARY,
+            fio::PERM_READABLE,
+            &Default::default(),
+            server_end.into_channel(),
+        )
+        .expect("Open call failed!");
+
+    directory::readdir(&dir_proxy).await.ok()
+}
+
 async fn fuzzy_search(
     query: &str,
     realm_query: &fsys2::RealmQueryProxy,
@@ -77,7 +99,7 @@ pub async fn process_fuzzy_inputs<P: DiagnosticsProvider>(
                     //   A) Be a component that isn't running; therefore the selector being
                     //      right or wrong is irrelevant
                     //   B) Already be sanitized by the caller
-                    let selector_string = format!("{}:root", value);
+                    let selector_string = format!("{value}:root");
                     results.push(
                         selectors::parse_verbose(&selector_string)
                             .map_err(|e| Error::ParseSelector(selector_string, e.into()))?,
@@ -149,8 +171,7 @@ fn add_tree_name(selector: &mut Selector, tree_name: String) -> Result<(), Error
             TreeNames::__SourceBreaking { unknown_ordinal } => {
                 let unknown_ordinal = *unknown_ordinal;
                 return Err(Error::InvalidSelector(format!(
-                    "selector had invalid TreeNames variant {unknown_ordinal}: {:?}",
-                    selector,
+                    "selector had invalid TreeNames variant {unknown_ordinal}: {selector:?}",
                 )));
             }
         },
@@ -214,18 +235,7 @@ pub async fn get_accessor_selectors(
                         continue;
                     }
 
-                    let Ok(dir_proxy) = open_instance_subdir_readable(
-                        &instance.moniker,
-                        OpenDirType::Exposed,
-                        ACCESSORS_DICTIONARY,
-                        realm_query,
-                    )
-                    .await
-                    else {
-                        continue;
-                    };
-
-                    let Ok(entries) = directory::readdir(&dir_proxy).await else {
+                    let Some(entries) = list_accessors(realm_query, &instance.moniker).await else {
                         continue;
                     };
 

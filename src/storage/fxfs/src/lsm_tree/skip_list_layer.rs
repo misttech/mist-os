@@ -175,8 +175,11 @@ impl<K, V> SkipListLayer<K, V> {
     }
 
     // Frees and then returns the next node in the chain.
+    // TODO(https://fxbug.dev/414761492): document or remove this `#[allow]`
+    #[allow(clippy::mut_from_ref)]
     fn free_node(&self, node: &mut SkipListNode<K, V>) -> Option<&mut SkipListNode<K, V>> {
         self.allocated.fetch_sub(1, atomic::Ordering::Relaxed);
+        // TODO(https://fxbug.dev/414760817): document unsafe usage
         unsafe { Box::from_raw(node).pointers.get_mut(0) }
     }
 }

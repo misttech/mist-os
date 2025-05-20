@@ -215,11 +215,5 @@ template("fshost_component_and_config") {
       ":$_component_target",
       ":$_config_target",
     ]
-
-    # If testonly, use a null key source.  This will affect all components
-    # in the same package.
-    if (invoker.testonly) {
-      deps += [ "//src/storage/fshost/testing:test_zxcrypt_config" ]
-    }
   }
 }

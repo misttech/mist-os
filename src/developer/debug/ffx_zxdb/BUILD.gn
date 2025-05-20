@@ -25,6 +25,8 @@ rustc_library("ffx_zxdb") {
     "//third_party/rust_crates:tokio",
   ]
 
+  data_deps = [ "//src/developer/debug/zxdb:zxdb_host_tool" ]
+
   sources = [
     "src/background.rs",
     "src/command_builder.rs",

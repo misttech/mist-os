@@ -52,12 +52,12 @@ open protocol LogPuppet {
         /// Required.
         1: message LogMessage;
 
-        @available(replaced=NEXT)
+        @available(replaced=27)
         2: severity fuchsia.diagnostics.Severity;
 
         /// The severity of this log.
         /// Required.
-        @available(added=NEXT)
+        @available(added=27)
         2: severity fuchsia.diagnostics.types.Severity;
 
         /// Hardcode the time at which log is emitted.
@@ -69,10 +69,10 @@ open protocol LogPuppet {
     /// Messages are lost if they are emitted using LogPuppet.Log before the
     /// puppet has observed the the interest change.
     flexible WaitForInterestChange() -> (table {
-        @available(replaced=NEXT)
+        @available(replaced=27)
         1: severity fuchsia.diagnostics.Severity;
         /// The new log interest observed by this component.
-        @available(added=NEXT)
+        @available(added=27)
         1: severity fuchsia.diagnostics.types.Severity;
     });
 };

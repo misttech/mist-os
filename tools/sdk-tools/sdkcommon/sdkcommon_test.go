@@ -1477,8 +1477,6 @@ func fakeFfxTarget(args []string) {
 	expectedListArgs := []string{"--machine", "json", "target", "list"}
 	expectedGetSSHAddressArgs := []string{"--target", "*", "target", "get-ssh-address"}
 	expectedGetDefaultTarget := []string{"target", "default", "get"}
-	expectedSetDefaultTarget := []string{"target", "default", "set", "new-device-name"}
-	expectedUnsetDefaultTarget := []string{"target", "default", "unset"}
 	if strings.Contains(argsStr, "target list") {
 		expected = expectedListArgs
 		if os.Getenv("TEST_FFX_TARGET_LIST_OUTPUT") != "" {
@@ -1501,10 +1499,6 @@ func fakeFfxTarget(args []string) {
 			} else {
 				fmt.Println("")
 			}
-		} else if args[2] == "set" {
-			expected = expectedSetDefaultTarget
-		} else if args[2] == "unset" {
-			expected = expectedUnsetDefaultTarget
 		}
 	}
 	ok := len(expected) == len(args)

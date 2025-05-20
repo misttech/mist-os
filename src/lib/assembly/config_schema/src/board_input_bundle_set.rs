@@ -4,6 +4,7 @@
 
 #![deny(missing_docs)]
 
+use crate::release_info::ReleaseInfo;
 use assembly_container::{assembly_container, AssemblyContainer, DirectoryPathBuf, WalkPaths};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -35,11 +36,18 @@ pub struct BoardInputBundleSet {
     pub board_input_bundles: BTreeMap<String, BoardInputBundleEntry>,
 
     /// Release version that this board input bundle set corresponds to.
-    /// TODO(https://fxbug.dev/397489730) - Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
+    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
+    /// repositories start using release_info below.
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release_version: Option<String>,
+
+    /// Release information about this assembly container artifact.
+    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_info: Option<ReleaseInfo>,
 }
 
 /// A single BIB in the BIB set.

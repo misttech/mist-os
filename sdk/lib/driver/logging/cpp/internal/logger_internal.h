@@ -9,11 +9,11 @@
 
 namespace fdf_internal {
 
-static inline cpp17::optional<cpp17::string_view> FromCString(const char* value) {
+static inline std::optional<std::string_view> FromCString(const char* value) {
   if (value) {
-    return cpp17::optional(value);
+    return std::optional(value);
   }
-  return cpp17::nullopt;
+  return std::nullopt;
 }
 
 template <typename... Args>

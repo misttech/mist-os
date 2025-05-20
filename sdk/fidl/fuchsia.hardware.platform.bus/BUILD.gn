@@ -9,7 +9,10 @@ fidl("fuchsia.hardware.platform.bus") {
   sdk_category = "partner"
   stable = false
   sdk_area = "Drivers"
-  sources = [ "platform-bus.fidl" ]
+  sources = [
+    "observability.fidl",
+    "platform-bus.fidl",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.driver.framework",
     "//sdk/fidl/fuchsia.hardware.power",

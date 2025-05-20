@@ -64,7 +64,8 @@ use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
 use netstack3_icmp_echo::{IcmpSocketTxMetadata, IcmpSockets};
 use netstack3_tcp::{
-    self as tcp, TcpCountersWithSocket, TcpCountersWithoutSocket, TcpState, TcpTimerId,
+    self as tcp, TcpCountersWithSocket, TcpCountersWithoutSocket, TcpSocketTxMetadata, TcpState,
+    TcpTimerId,
 };
 use netstack3_udp::{
     UdpCountersWithSocket, UdpCountersWithoutSocket, UdpSocketTxMetadata, UdpState,
@@ -198,6 +199,10 @@ enum TxMetadataInner<BT: BindingsTypes> {
     Icmpv4(IcmpSocketTxMetadata<Ipv4, WeakDeviceId<BT>, BT>),
     #[derivative(Debug = "transparent")]
     Icmpv6(IcmpSocketTxMetadata<Ipv6, WeakDeviceId<BT>, BT>),
+    #[derivative(Debug = "transparent")]
+    Tcpv4(TcpSocketTxMetadata<Ipv4, WeakDeviceId<BT>, BT>),
+    #[derivative(Debug = "transparent")]
+    Tcpv6(TcpSocketTxMetadata<Ipv6, WeakDeviceId<BT>, BT>),
 }
 
 impl<I: IpExt, L, BT: BindingsTypes>
@@ -220,5 +225,16 @@ impl<I: IpExt, L, BT: BindingsTypes>
         tx_meta: IcmpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
     ) -> TxMetadata<BT> {
         TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Icmpv4, TxMetadataInner::Icmpv6))
+    }
+}
+
+impl<I: IpExt, L, BT: BindingsTypes>
+    CoreTxMetadataContext<TcpSocketTxMetadata<I, WeakDeviceId<BT>, BT>, BT> for CoreCtx<'_, BT, L>
+{
+    fn convert_tx_meta(
+        &self,
+        tx_meta: TcpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
+    ) -> TxMetadata<BT> {
+        TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Tcpv4, TxMetadataInner::Tcpv6))
     }
 }

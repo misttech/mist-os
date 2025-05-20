@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 
 #include "bootfs.h"
@@ -42,7 +43,7 @@ zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& 
       diag, file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
   ZX_ASSERT(headers);
   auto& [ehdr, phdrs_result] = *headers;
-  cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
+  std::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
 
   std::optional<size_t> stack;
   std::optional<elfldltl::Elf<>::Phdr> interp;
@@ -169,13 +170,13 @@ zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx
 zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& bootfs, std::string_view root,
                            const zx::process& proc, const zx::vmar& vmar, const zx::thread& thread,
                            std::string_view filename, const zx::channel& to_child,
-                           size_t* stack_size, zx::channel* loader_svc) {
+                           zx::vmar* segments_vmar, size_t* stack_size, zx::channel* loader_svc) {
   zx::vmo vmo = bootfs.Open(root, filename, "program");
 
   uintptr_t interp_off = 0;
   size_t interp_len = 0;
   zx_vaddr_t entry =
-      load(log, filename, vmar, vmo, &interp_off, &interp_len, NULL, stack_size, true);
+      load(log, filename, vmar, vmo, &interp_off, &interp_len, segments_vmar, stack_size, true);
   if (interp_len > 0) {
     // While PT_INTERP names can be arbitrarily large, bootfs entries
     // have names of bounded length.

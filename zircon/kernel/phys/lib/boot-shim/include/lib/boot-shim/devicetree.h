@@ -16,9 +16,6 @@
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/source_location.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/cpu.h>
 #include <lib/zbi-format/driver-config.h>
@@ -33,8 +30,11 @@
 #include <zircon/errors.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <optional>
+#include <source_location>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -165,7 +165,7 @@ class ArmDevicetreePsciItem
       public SingleOptionalItem<zbi_dcfg_arm_psci_driver_t, ZBI_TYPE_KERNEL_DRIVER,
                                 ZBI_KERNEL_DRIVER_ARM_PSCI> {
  public:
-  static constexpr auto kCompatibleDevices = cpp20::to_array<std::string_view>({
+  static constexpr auto kCompatibleDevices = std::to_array<std::string_view>({
       // PSCI 0.1 : Not Supported.
       // "arm,psci",
       "arm,psci-0.2",
@@ -203,7 +203,7 @@ class ArmDevicetreeGicItem
       public SingleVariantItemBase<ArmDevicetreeGicItem, zbi_dcfg_arm_gic_v2_driver_t,
                                    zbi_dcfg_arm_gic_v3_driver_t> {
  public:
-  static constexpr auto kGicV2CompatibleDevices = cpp20::to_array<std::string_view>({
+  static constexpr auto kGicV2CompatibleDevices = std::to_array<std::string_view>({
       "arm,gic-400",
       "arm,cortex-a15-gic",
       "arm,cortex-a9-gic",
@@ -215,7 +215,7 @@ class ArmDevicetreeGicItem
       "qcom,msm-qgic2",
   });
 
-  static constexpr auto kGicV3CompatibleDevices = cpp20::to_array<std::string_view>({"arm,gic-v3"});
+  static constexpr auto kGicV3CompatibleDevices = std::to_array<std::string_view>({"arm,gic-v3"});
 
   // Boot Shim Item API.
   template <typename Shim>
@@ -411,7 +411,7 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
  public:
   // Matcher API.
   constexpr DevicetreeMemoryMatcher(const char* shim_name, FILE* log,
-                                    cpp20::span<memalloc::Range> storage)
+                                    std::span<memalloc::Range> storage)
       : DevicetreeItemBase(shim_name, log), ranges_(storage) {}
 
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
@@ -421,9 +421,9 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
   // Memory Item API for the bootshim to initialize the memory layout.
   // An empty set of memory ranges indicates an error while parsing the devicetree
   // memory ranges.
-  constexpr cpp20::span<const memalloc::Range> ranges() const {
+  constexpr std::span<const memalloc::Range> ranges() const {
     if (ranges_count_ <= ranges_.size()) {
-      return cpp20::span{ranges_.data(), ranges_count_};
+      return std::span{ranges_.data(), ranges_count_};
     }
     return {};
   }
@@ -462,7 +462,7 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
   devicetree::ScanState HandleReservedMemoryNode(const devicetree::NodePath& path,
                                                  const devicetree::PropertyDecoder& decoder);
 
-  cpp20::span<memalloc::Range> ranges_;
+  std::span<memalloc::Range> ranges_;
   size_t ranges_count_ = 0;
   std::optional<zbi_nvram_t> nvram_;
 };
@@ -485,7 +485,7 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
 // the intended exclusions - is the product itself of a 'chosen' matcher.
 template <typename Callback>
 bool ForEachDevicetreeMemoryReservation(const devicetree::Devicetree& fdt,
-                                        cpp20::span<const memalloc::Range> exclusions,
+                                        std::span<const memalloc::Range> exclusions,
                                         Callback&& cb) {
   using Reservation = devicetree::MemoryReservation;
   static_assert(std::is_invocable_r_v<bool, Callback, Reservation>);
@@ -573,7 +573,7 @@ class RiscvDevicetreePlicItem
       public SingleOptionalItem<zbi_dcfg_riscv_plic_driver_t, ZBI_TYPE_KERNEL_DRIVER,
                                 ZBI_KERNEL_DRIVER_RISCV_PLIC> {
  public:
-  static constexpr auto kCompatibleDevices = cpp20::to_array({"sifive,plic-1.0.0", "riscv,plic0"});
+  static constexpr auto kCompatibleDevices = std::to_array({"sifive,plic-1.0.0", "riscv,plic0"});
 
   // Matcher API.
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
@@ -630,7 +630,7 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
     devicetree::Properties properties;
   };
 
-  cpp20::span<const CpuEntry> cpu_entries() const { return cpu_entries_; }
+  std::span<const CpuEntry> cpu_entries() const { return cpu_entries_; }
 
   // Callback used during matching for checking architecture-specific processor
   // information. The returned boolean indicates whether matching should
@@ -654,9 +654,8 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
   }
 
   template <typename T>
-  cpp20::span<T> Allocate(
-      size_t count, fbl::AllocChecker& ac,
-      cpp20::source_location location = cpp20::source_location::current()) const {
+  std::span<T> Allocate(size_t count, fbl::AllocChecker& ac,
+                        std::source_location location = std::source_location::current()) const {
     size_t alloc_size = sizeof(T) * count;
     auto* alloc = static_cast<T*>((*allocator_)(alloc_size, alignof(T), ac));
     if (!alloc) {
@@ -668,12 +667,12 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
       count = 0;
     }
     memset(alloc, 0, alloc_size);
-    return cpp20::span<T>(alloc, count);
+    return std::span<T>(alloc, count);
   }
 
   template <typename T>
   T* Allocate(fbl::AllocChecker& ac,
-              cpp20::source_location location = cpp20::source_location::current()) const {
+              std::source_location location = std::source_location::current()) const {
     return Allocate<T>(1, ac, location).data();
   }
 
@@ -721,7 +720,7 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
                                              const devicetree::PropertyDecoder& decoder);
 
   static constexpr bool IsCpuMapNode(std::string_view node_name, std::string_view prefix) {
-    if (!cpp20::starts_with(node_name, prefix)) {
+    if (!node_name.starts_with(prefix)) {
       return false;
     }
     // Must match prefix[0-9].
@@ -739,10 +738,10 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
 
   // Recalculates performance class based on CPU capacity related properties.
   fit::result<ItemBase::DataZbi::Error> CalculateClusterPerformanceClass(
-      cpp20::span<zbi_topology_node_t> nodes) const;
+      std::span<zbi_topology_node_t> nodes) const;
 
   // Flattened 'cpu-map'.
-  cpp20::span<CpuMapEntry> map_entries_;
+  std::span<CpuMapEntry> map_entries_;
   uint32_t map_entry_index_ = 0;
   uint32_t map_entry_count_ = 0;
   bool has_cpu_map_ = false;
@@ -752,7 +751,7 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
   std::optional<uint32_t> current_cluster_;
   std::optional<uint32_t> current_core_;
 
-  cpp20::span<CpuEntry> cpu_entries_;
+  std::span<CpuEntry> cpu_entries_;
   uint32_t cpu_entry_count_ = 0;
   uint32_t cpu_entry_index_ = 0;
   uint32_t cluster_count_ = 0;
@@ -854,7 +853,7 @@ class RiscvDevicetreeCpuTopologyItemBase : public DevicetreeCpuTopologyItem,
   };
 
   uint64_t boot_hart_id_;
-  cpp20::span<char> isa_strtab_;
+  std::span<char> isa_strtab_;
   fbl::HashTable<uint64_t, IsaStrtabIndex*> id_to_index_;
 };
 
@@ -963,8 +962,7 @@ class ArmDevicetreeTimerItem
       public SingleOptionalItem<zbi_dcfg_arm_generic_timer_driver_t, ZBI_TYPE_KERNEL_DRIVER,
                                 ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER> {
  public:
-  static constexpr auto kCompatibleDevices =
-      cpp20::to_array({"arm,armv7-timer", "arm,armv8-timer"});
+  static constexpr auto kCompatibleDevices = std::to_array({"arm,armv7-timer", "arm,armv8-timer"});
 
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
@@ -1076,6 +1074,34 @@ class DevicetreeSerialNumberItem : public DevicetreeItemBase<DevicetreeSerialNum
 
  private:
   std::string_view cmdline_;
+};
+
+// Extracts randomness from the bootloader provided bytes in the devicetree.
+//
+// `/chosen` may contain two properties that provide random bytes:
+//    * 'kaslr-seed` see
+//    https://github.com/devicetree-org/dt-schema/blob/main/dtschema/schemas/chosen.yaml#L35
+//    * `rng-seed` see
+//    https://github.com/devicetree-org/dt-schema/blob/main/dtschema/schemas/chosen.yaml#L55C1-L56C1
+//
+// When extracted, the devicetree bytes are cleared.
+class DevicetreeSecureEntropyItem : public DevicetreeItemBase<DevicetreeSecureEntropyItem, 1>,
+                                    public ItemBase {
+ public:
+  static constexpr uint8_t kFillPattern = 0xAD;
+
+  size_t size_bytes() const {
+    return ItemSize(rng_bytes_.size_bytes()) + ItemSize(kaslr_bytes_.size_bytes());
+  }
+
+  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi);
+
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+ private:
+  std::span<std::byte> rng_bytes_;
+  std::span<std::byte> kaslr_bytes_;
 };
 
 }  // namespace boot_shim

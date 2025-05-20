@@ -5,7 +5,7 @@
 use super::errors::Errno;
 use super::math::round_up_to_increment;
 use super::uapi;
-use crate::{errno, uref};
+use crate::{error, uref};
 use std::marker::PhantomData;
 use std::{fmt, mem, ops};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -128,63 +128,61 @@ impl TryFrom<UserAddress> for uapi::uaddr32 {
     }
 }
 
-impl ops::Add<u32> for UserAddress {
-    type Output = UserAddress;
+impl range_map::Gap for UserAddress {
+    fn measure_gap(&self, other: &Self) -> u64 {
+        if self.0 > other.0 {
+            self.0 - other.0
+        } else {
+            other.0 - self.0
+        }
+    }
+}
 
-    fn add(self, rhs: u32) -> UserAddress {
-        UserAddress(self.0 + (rhs as u64))
+impl ops::Add<u32> for UserAddress {
+    type Output = Result<UserAddress, Errno>;
+
+    fn add(self, rhs: u32) -> Result<UserAddress, Errno> {
+        self.checked_add(rhs as usize).map_or_else(|| error!(EFAULT), |res| Ok(res))
     }
 }
 
 impl ops::Add<u64> for UserAddress {
-    type Output = UserAddress;
+    type Output = Result<UserAddress, Errno>;
 
-    fn add(self, rhs: u64) -> UserAddress {
-        UserAddress(self.0 + rhs)
+    fn add(self, rhs: u64) -> Result<UserAddress, Errno> {
+        self.checked_add(rhs as usize).map_or_else(|| error!(EFAULT), |res| Ok(res))
     }
 }
 
 impl ops::Add<usize> for UserAddress {
-    type Output = UserAddress;
+    type Output = Result<UserAddress, Errno>;
 
-    fn add(self, rhs: usize) -> UserAddress {
-        UserAddress(self.0 + (rhs as u64))
+    fn add(self, rhs: usize) -> Result<UserAddress, Errno> {
+        self.checked_add(rhs).map_or_else(|| error!(EFAULT), |res| Ok(res))
     }
 }
 
 impl ops::Sub<u32> for UserAddress {
-    type Output = UserAddress;
+    type Output = Result<UserAddress, Errno>;
 
-    fn sub(self, rhs: u32) -> UserAddress {
-        UserAddress(self.0 - (rhs as u64))
+    fn sub(self, rhs: u32) -> Result<UserAddress, Errno> {
+        self.checked_sub(rhs as usize).map_or_else(|| error!(EFAULT), |res| Ok(res))
     }
 }
 
 impl ops::Sub<u64> for UserAddress {
-    type Output = UserAddress;
+    type Output = Result<UserAddress, Errno>;
 
-    fn sub(self, rhs: u64) -> UserAddress {
-        UserAddress(self.0 - rhs)
+    fn sub(self, rhs: u64) -> Result<UserAddress, Errno> {
+        self.checked_sub(rhs as usize).map_or_else(|| error!(EFAULT), |res| Ok(res))
     }
 }
 
 impl ops::Sub<usize> for UserAddress {
-    type Output = UserAddress;
+    type Output = Result<UserAddress, Errno>;
 
-    fn sub(self, rhs: usize) -> UserAddress {
-        UserAddress(self.0 - (rhs as u64))
-    }
-}
-
-impl ops::AddAssign<usize> for UserAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = *self + rhs;
-    }
-}
-
-impl ops::SubAssign<usize> for UserAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = *self - rhs;
+    fn sub(self, rhs: usize) -> Result<UserAddress, Errno> {
+        self.checked_sub(rhs).map_or_else(|| error!(EFAULT), |res| Ok(res))
     }
 }
 
@@ -237,7 +235,10 @@ impl From<u32> for UserAddress32 {
 impl TryFrom<UserAddress> for UserAddress32 {
     type Error = Errno;
     fn try_from(value: UserAddress) -> Result<Self, Self::Error> {
-        Ok(UserAddress32(u32::try_from(value.0).map_err(|_| errno!(EFAULT))?))
+        match u32::try_from(value.0) {
+            Ok(address_value) => Ok(UserAddress32(address_value)),
+            Err(_) => error!(EFAULT),
+        }
     }
 }
 
@@ -247,7 +248,7 @@ impl From<UserAddress32> for UserAddress {
     }
 }
 
-#[derive(Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Default, Eq, PartialEq, Hash, Ord, PartialOrd)]
 #[repr(transparent)]
 pub struct UserRef<T> {
     addr: UserAddress,
@@ -263,12 +264,15 @@ impl<T> UserRef<T> {
         self.addr
     }
 
-    pub fn next(&self) -> UserRef<T> {
-        Self::new(self.addr() + mem::size_of::<T>())
+    pub fn next(&self) -> Result<UserRef<T>, Errno> {
+        self.addr()
+            .checked_add(mem::size_of::<T>())
+            .map_or_else(|| error!(EFAULT), |res| Ok(Self::new(res)))
     }
 
-    pub fn at(&self, index: usize) -> Self {
-        UserRef::<T>::new(self.addr() + index * mem::size_of::<T>())
+    pub fn at(&self, index: usize) -> Result<Self, Errno> {
+        let mem_offset = index * mem::size_of::<T>();
+        self.addr().checked_add(mem_offset).map_or_else(|| error!(EFAULT), |res| Ok(Self::new(res)))
     }
 
     pub fn cast<S>(&self) -> UserRef<S> {
@@ -319,6 +323,12 @@ impl<T> ops::Deref for UserRef<T> {
 impl<T> fmt::Display for UserRef<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.addr().fmt(f)
+    }
+}
+
+impl<T> fmt::Debug for UserRef<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UserRef<{}>({:#x})", std::any::type_name::<T>(), self.addr().ptr())
     }
 }
 
@@ -445,12 +455,17 @@ impl<T, T64: FromBytes, T32: FromBytes> MappingMultiArchUserRef<T, T64, T32> {
         }
     }
 
-    pub fn next(&self) -> Self {
-        Self::new(self, self.addr() + self.size_of_object())
+    pub fn next(&self) -> Result<Self, Errno> {
+        self.addr()
+            .checked_add(self.size_of_object())
+            .map_or_else(|| error!(EFAULT), |res| Ok(Self::new(self, res)))
     }
 
-    pub fn at(&self, index: usize) -> Self {
-        Self::new(self, self.addr() + index * self.size_of_object())
+    pub fn at(&self, index: usize) -> Result<Self, Errno> {
+        let mem_offset = index * self.size_of_object();
+        self.addr()
+            .checked_add(mem_offset)
+            .map_or_else(|| error!(EFAULT), |res| Ok(Self::new(self, res)))
     }
 }
 
@@ -473,13 +488,15 @@ impl<T, T64, T32>
         MappingMultiArchUserRef<T, T64, T32>,
     >
 {
-    pub fn next(&self) -> Self {
+    pub fn next(&self) -> Result<Self, Errno> {
         let offset = if self.is_arch32() {
             std::mem::size_of::<UserAddress32>()
         } else {
             std::mem::size_of::<UserAddress>()
         };
-        Self::new(self, self.addr() + offset)
+        self.addr()
+            .checked_add(offset)
+            .map_or_else(|| error!(EFAULT), |user_address| Ok(Self::new(self, user_address)))
     }
 }
 

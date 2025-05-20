@@ -60,6 +60,20 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionRGBA_1026) {
   ASSERT_TRUE(Exec(VK_FORMAT_R8G8B8A8_UNORM, 1026, 64, GetParam(), false));
 }
 
+TEST_P(VulkanImageExtensionTest, BufferCollectionRGBA_1010102) {
+  ASSERT_TRUE(Initialize());
+  if (!SupportsSysmemA2B10G10R10())
+    GTEST_SKIP();
+  ASSERT_TRUE(Exec(VK_FORMAT_A2B10G10R10_UNORM_PACK32, 64, 64, GetParam(), false));
+}
+
+TEST_P(VulkanImageExtensionTest, BufferCollectionRGBA_1010102_1026) {
+  ASSERT_TRUE(Initialize());
+  if (!SupportsSysmemA2B10G10R10())
+    GTEST_SKIP();
+  ASSERT_TRUE(Exec(VK_FORMAT_A2B10G10R10_UNORM_PACK32, 1026, 64, GetParam(), false));
+}
+
 TEST_P(VulkanImageExtensionTest, BufferCollectionNV12) {
   ASSERT_TRUE(Initialize());
   // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are

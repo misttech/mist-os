@@ -11,8 +11,8 @@ use core::sync::atomic::Ordering;
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6Scope};
 use net_types::{
-    MulticastAddr, MulticastAddress as _, NonMappedAddr, ScopeableAddress as _, SpecifiedAddr,
-    SpecifiedAddress as _, UnicastAddr,
+    MulticastAddr, NonMappedAddr, NonMulticastAddr, ScopeableAddress as _, SpecifiedAddr,
+    UnicastAddr,
 };
 use netstack3_base::{
     AtomicInstant, Inspectable, InspectableValue, Inspector, InspectorDeviceExt,
@@ -30,7 +30,7 @@ use netstack3_base::{
 /// used.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Ipv4SourceAddr {
-    addr: Ipv4Addr,
+    addr: NonMulticastAddr<SpecifiedAddr<Ipv4Addr>>,
 }
 
 impl Ipv4SourceAddr {
@@ -38,20 +38,17 @@ impl Ipv4SourceAddr {
     ///
     /// `None` if the provided address does not have the required properties.
     fn new(addr: Ipv4Addr) -> Option<Self> {
-        if addr.is_specified()
-            && !addr.is_multicast()
-            && !Ipv4::LINK_LOCAL_UNICAST_SUBNET.contains(&addr)
-        {
-            Some(Ipv4SourceAddr { addr })
-        } else {
-            None
+        if Ipv4::LINK_LOCAL_UNICAST_SUBNET.contains(&addr) {
+            return None;
         }
+
+        Some(Ipv4SourceAddr { addr: NonMulticastAddr::new(SpecifiedAddr::new(addr)?)? })
     }
 }
 
-impl From<Ipv4SourceAddr> for Ipv4Addr {
+impl From<Ipv4SourceAddr> for net_types::ip::Ipv4SourceAddr {
     fn from(addr: Ipv4SourceAddr) -> Self {
-        addr.addr
+        net_types::ip::Ipv4SourceAddr::Specified(addr.addr)
     }
 }
 
@@ -213,7 +210,7 @@ impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
 
     /// Returns the source address, stripped of all its witnesses.
     pub fn src_addr(&self) -> I::Addr {
-        I::map_ip(self, |key| key.src_addr.addr, |key| **key.src_addr.addr)
+        I::map_ip(self, |key| **key.src_addr.addr, |key| **key.src_addr.addr)
     }
 
     /// Returns the destination address, stripped of all its witnesses.

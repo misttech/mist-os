@@ -25,9 +25,9 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <kernel/spinlock.h>
-#include <ktl/move.h>
 #include <ktl/type_traits.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <object/dispatcher.h>
 #include <object/handle.h>
 #include <object/signal_observer.h>

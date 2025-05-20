@@ -8,7 +8,7 @@
 #include <zircon/assert.h>
 
 #include <fbl/alloc_checker.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 namespace util {
 

@@ -85,8 +85,8 @@ Realm& Realm::AddLocalChildImpl(const std::string& child_name, LocalComponentKin
 // implementation that supports the deprecated type.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (cpp17::holds_alternative<LocalComponent*>(local_impl)) {
-    ZX_SYS_ASSERT_NOT_NULL(cpp17::get<LocalComponent*>(local_impl));
+  if (std::holds_alternative<LocalComponent*>(local_impl)) {
+    ZX_SYS_ASSERT_NOT_NULL(std::get<LocalComponent*>(local_impl));
   }
 #pragma clang diagnostic pop
 #endif
@@ -281,7 +281,7 @@ std::string Realm::GetResolvedName(const std::string& child_name) {
 // Implementation methods for RealmBuilder.
 
 RealmBuilder RealmBuilder::Create(std::shared_ptr<sys::ServiceDirectory> svc) {
-  return CreateImpl(cpp17::nullopt, std::move(svc));
+  return CreateImpl(std::nullopt, std::move(svc));
 }
 
 RealmBuilder RealmBuilder::CreateFromRelativeUrl(std::string_view fragment_only_url,
@@ -289,7 +289,7 @@ RealmBuilder RealmBuilder::CreateFromRelativeUrl(std::string_view fragment_only_
   return CreateImpl(fragment_only_url, std::move(svc));
 }
 
-RealmBuilder RealmBuilder::CreateImpl(cpp17::optional<std::string_view> fragment_only_url,
+RealmBuilder RealmBuilder::CreateImpl(std::optional<std::string_view> fragment_only_url,
                                       std::shared_ptr<sys::ServiceDirectory> svc) {
   if (svc == nullptr) {
     svc = sys::ServiceDirectory::CreateFromNamespace();

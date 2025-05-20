@@ -201,14 +201,20 @@ async fn add_del_route(ip_version: IpVersion) {
 
     let metric = 111;
 
+    let table_id = match ip_version {
+        IpVersion::V4 => 0,
+        IpVersion::V6 => 1,
+    };
+
     let route_record = serde_json::json!({
-        "destination": serde_json::json!({
+        "destination": {
             "addr": destination,
             "prefix_len": prefix_len,
-        }),
+        },
         "gateway": gateway,
         "metric": metric,
         "nicid": nicid,
+        "table_id": table_id,
     });
 
     assert!(

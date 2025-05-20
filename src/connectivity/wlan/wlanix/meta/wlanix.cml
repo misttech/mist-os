@@ -22,7 +22,7 @@
         },
         {
             protocol: [
-                "fuchsia.diagnostics.persist.DataPersistence-wlan",
+                "fuchsia.diagnostics.persist.DataPersistence",
                 "fuchsia.metrics.MetricEventLoggerFactory",
             ],
         },

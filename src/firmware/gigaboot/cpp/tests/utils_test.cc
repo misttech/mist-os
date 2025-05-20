@@ -1,6 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include "utils.h"
 
 #include <algorithm>
@@ -396,7 +397,7 @@ INSTANTIATE_TEST_SUITE_P(BadDashLocation, EfiGuidStrTest,
 
 TEST(EfiGuidTest, Endianness) {
   const efi_guid guid{0x03020100, 0x0504, 0x0706, {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}};
-  cpp20::span<const uint8_t> buf(reinterpret_cast<const uint8_t*>(&guid), sizeof(guid));
+  std::span<const uint8_t> buf(reinterpret_cast<const uint8_t*>(&guid), sizeof(guid));
 
   for (size_t i = 0; i < sizeof(guid); i++) {
     EXPECT_EQ(buf[i], i);

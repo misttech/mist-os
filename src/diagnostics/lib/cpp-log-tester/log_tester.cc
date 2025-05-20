@@ -175,8 +175,6 @@ std::vector<fuchsia::logger::LogMessage> RetrieveLogsAsLogMessage(zx::channel re
             diagnostics::accessor2logger::ConvertFormattedFXTToLogMessages(data.get(), size, false)
                 .take_value();
         for (auto& msg : messages) {
-          // TODO(b/409318971): Remove this.
-          msg.value().tags.insert(msg.value().tags.begin(), "test_moniker");
           ret.push_back(msg.take_value());
         }
       });

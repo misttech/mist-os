@@ -10,7 +10,6 @@
                 "binaries": {
                     "additionalProperties": false,
                     "description": "The binary files for the module, per architecture",
-                    "maxProperties": 2,
                     "minProperties": 1,
                     "properties": {
                         "arm64": {

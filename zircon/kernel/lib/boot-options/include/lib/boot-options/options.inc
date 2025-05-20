@@ -6,12 +6,16 @@
 
 // This file is #include'd multiple times with the DEFINE_OPTION macro defined.
 //
-// #define DEFINE_OPTION(name, type, member, {init}, docstring) ...
+// #define DEFINE_OPTION(name, type, member, {init}, docstring, ...) ...
 // #include "options.inc"
 // #undef DEFINE_OPTION
 //
 // See boot-options.h for admonitions about what kinds of types can be used, as
 // well as test-optons.inc for basic examples.
+//
+// The final `, ...` matches the optional "default-description" string that can
+// come after the "docstring".  If omitted, the default is just described by
+// the string corresponding to the "init" expression given the type.
 
 DEFINE_OPTION("aslr.disable", bool, aslr_disabled, {false}, R"""(
 If this option is set, the system will not use Address Space Layout
@@ -273,6 +277,26 @@ keep the system out of memory pressure, as opposed to triggering one-shot evicti
 memory pressure state transitions.
 )""")
 
+DEFINE_OPTION("kernel.oom.eviction-delay-ms", uint64_t, oom_eviction_delay_ms, {5000}, R"""(
+This option specifies the duration (in milliseconds) by which the kernel delays eviction when
+eviction is required by a change in memory pressure state. This delay allows userspace components
+responding to memory pressure to reclaim memory first, avoiding thrash due to interference with
+kernel eviction.
+)""")
+
+DEFINE_OPTION("kernel.oom.evict-with-min-target", bool, oom_evict_with_min_target, {true}, R"""(
+This option specifies whether the kernel should also evict a minimum amount of memory along with
+trying to meet the target free memory goal. If userspace also frees memory in response to memory
+pressure, this ensures some fairness by having kernel eviction share the load.
+)""")
+
+DEFINE_OPTION("kernel.oom.eviction-delta-at-oom-mb", uint64_t, oom_eviction_delta_at_oom_mb, {10},
+              R"""(
+This option specifies the granularity (in MB) at which the kernel will try to synchronously evict
+memory to avoid entering the out-of-memory state. Note that this value is independent of the
+kernel.oom.evict-with-min-target, and they do not influence each other.
+)""")
+
 DEFINE_OPTION("kernel.oom.hysteresis-seconds", uint64_t, oom_hysteresis_seconds, {10}, R"""(
 This option specifies the hysteresis interval (in seconds) between memory
 pressure state transitions. Note that hysteresis is only applicable for
@@ -365,19 +389,30 @@ appended to the generated crashlog during a kernel panic to assist in debugging.
 )""")
 
 DEFINE_OPTION("kernel.serial", uart::all::Config<>, serial, {}, R"""(
-This controls what serial port is used.  If provided, it overrides the serial
-port described by the system's bootdata.  The kernel debug serial port is
+This controls what serial port is used.  The kernel debug serial port is
 a reserved resource and may not be used outside of the kernel.
 
-If set to "none", the kernel debug serial port will be disabled and will not
+If set to `none`, the kernel debug serial port will be disabled and will not
 be reserved, allowing the default serial port to be used outside the kernel.
 
+If there is no explicit setting of this option, then an equivalent value is
+derived from the last ZBI item of type `ZBI_TYPE_KERNEL_DRIVER` with one of the
+`ZBI_KERNEL_DRIVER_*_UART` subtypes, either one provided in the original ZBI or
+one appended by the boot loader (or boot shim).  An explicit boot option always
+overrides the ZBI item, even `none`.  (The order of `ZBI_TYPE_CMDLINE` items
+with respect to `ZBI_TYPE_KERNEL_DRIVER` items does not matter.)
+
 The configuration string format is as follows:
-  For MMIO UART:
-      "kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS"
-  For PIO UART:
-      "kernel.serial=UART_MODEL,IOPORT,IRQ"
-)""")
+  * For MMIO UART:
+    - `kernel.serial=UART_MODEL,MMIO_ADDR,IRQ,FLAGS`
+  * For PIO UART:
+    - `kernel.serial=UART_MODEL,IOPORT,IRQ`
+  * For the default used in common QEMU virtual machines on this architecture:
+    - `qemu`
+  * For the traditional `COM1` setting on x86:
+    - `legacy`
+)""",
+              "_from ZBI item_")
 
 DEFINE_OPTION("kernel.vdso.always_use_next", bool, always_use_next_vdso, {false}, R"""(
 If this option is set, the kernel will supply userspace with the "next" vDSO
@@ -680,6 +715,7 @@ DEFINE_OPTION("kernel.compression.storage-strategy", CompressionStorageStrategy,
 Supported compression storage strategies are:
 - `none`
 - `tri_page`
+- `slot`
 
 This option selects the desired storage strategy to be used for storing data that has been
 compressed. If `none` is set then `kernel.compression.strategy` must also be `none`.
@@ -764,6 +800,19 @@ of the waiting paths without needing to put the system into a low memory state. 
 enable this option if the kernel is not built with debugging assertions enabled.
 )""")
 
+DEFINE_OPTION("kernel.stack.canary-percent-free", uint64_t, stack_canary_percent_free, {0},
+              R"""(
+This controls the offset at which a canary will be placed on the kernel stacks. If the canary is
+corrupted this indicates that the stack reached at least that depth during usage, and this can be
+used as an early warning for stack usage nearing the limit. The offset is defined using a
+percentage to account for the variability of kernel stack sizes. e.g. a value of 0 will place the
+canary at the very end of the stack, meaning it will get corrupted at the same time as the stack
+overflows.
+
+Canary detection is performed on stack free, i.e. thread termination, and will generate a kernel
+OOPS if the canary is corrupted.
+)""")
+
 DEFINE_OPTION("kernel.portobserver.reserve-pages", uint64_t, port_observer_reserve_pages, {8},
               R"""(
 Specifies the number of pages per CPU to reserve for port observer (async
@@ -833,6 +882,15 @@ before they impact the system.
 
 DEFINE_OPTION("kernel.select", SmallString, select, {"zircon"}, R"""(
 The name of the kernel package to boot from the STORAGE_KERNEL item in the ZBI.
+)""")
+
+DEFINE_OPTION("kernel.select.userboot", SmallString, userboot, {"userboot"},
+              R"""(
+Program to run in the first (and only) user process the kernel creates: an ELF
+static PIE file inside the package chosen by `kernel.select`.  The first user
+process starts with a handle to a channel on which it receives a single message
+containing initial handles holding all the privileged and essential
+capabilities for the initial process itself and for the system.
 )""")
 
 DEFINE_OPTION("kernel.scheduler.prefer-little-cpus", bool, scheduler_prefer_little_cpus, {false},

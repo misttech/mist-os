@@ -124,5 +124,12 @@
             instance_id: "c05b4ae75b8453016b45861d4cce75d804ac6a5f76b52070042847a33bf902bf",
             moniker: "/core/timekeeper",
         },
+
+        // trace_manager uses persistent storage to buffer traces before sending them back to the
+        // host.
+        {
+            instance_id: "2e76933b4eb7ff47b2fd4abbd7c1aa5ec0ada042d88aa880d819cc9461e31572",
+            moniker: "/core/trace_manager",
+        },
     ],
 }

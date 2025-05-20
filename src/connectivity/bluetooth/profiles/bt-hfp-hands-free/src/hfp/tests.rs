@@ -9,10 +9,13 @@
 use anyhow::Result;
 use async_test_helpers::run_while;
 use async_utils::PollExt;
+use bt_hfp::{audio, sco};
+use fidl::endpoints::ServerEnd;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use profile_client::ProfileClient;
+use std::collections::HashSet;
 use std::future::Future;
 use std::pin::{pin, Pin};
 use std::task::Poll;
@@ -54,10 +57,16 @@ fn hfp_future(
 ) -> (HfpRunFuture, mpsc::Sender<fidl_hfp::HandsFreeRequestStream>) {
     let (fidl_connection_sender, fidl_connection_receiver) = mpsc::channel(0);
 
+    let controller_codecs = HashSet::new();
+    let sco_connector = sco::Connector::build(profile_proxy.clone(), controller_codecs);
+    let audio_control: Box<dyn audio::Control> = Box::new(audio::TestControl::default());
+
     let hfp = Hfp::new(
         HandsFreeFeatureSupport::default(),
         profile_client,
         profile_proxy,
+        sco_connector,
+        audio_control,
         fidl_connection_receiver,
     );
 
@@ -120,7 +129,7 @@ fn expect_no_requests(
     };
 }
 
-fn expect_connect(
+fn expect_rfcomm_connect(
     exec: &mut fasync::TestExecutor,
     test_profile_server: &mut TestProfileServer,
 ) -> Channel {
@@ -132,6 +141,20 @@ fn expect_connect(
         exec.run_until_stalled(&mut expect_connect_fut).expect("Pending while expecting connect");
 
     near
+}
+
+fn expect_sco_connect(
+    exec: &mut fasync::TestExecutor,
+    test_profile_server: &mut TestProfileServer,
+    initiator: bool,
+) -> ServerEnd<bredr::ScoConnectionMarker> {
+    let expect_connect_fut = test_profile_server.expect_sco_connect(initiator);
+    let mut expect_connect_fut = pin!(expect_connect_fut);
+
+    let server_end =
+        exec.run_until_stalled(&mut expect_connect_fut).expect("Pending while expecting connect");
+
+    server_end
 }
 
 fn expect_channel_closed(exec: &mut fasync::TestExecutor, channel: &Channel) {
@@ -175,8 +198,9 @@ fn hfp_connected_starts_task() {
     // Let HFP handle the connection.
     run_hfp(&mut exec, &mut hfp_fut);
 
-    // The peer should send no requests.
-    expect_no_requests(&mut exec, &mut profile_server);
+    // The peer should await an incoming SCO connection.
+    let _sco_connection_server_end =
+        expect_sco_connect(&mut exec, &mut profile_server, /* initiator = */ false);
 
     // And the task should not have exited,
     expect_channel_still_open(&mut exec, &near);
@@ -213,7 +237,7 @@ fn search_result_connects_channel_and_starts_task_after_delay() {
     run_hfp(&mut exec, &mut hfp_fut);
 
     // After the delay, the peer should connect a channel.
-    let near = expect_connect(&mut exec, &mut profile_server);
+    let near = expect_rfcomm_connect(&mut exec, &mut profile_server);
     run_hfp(&mut exec, &mut hfp_fut);
 
     // And the task should not have exited,
@@ -239,8 +263,12 @@ fn peer_connected_then_search_result_starts_task_and_does_not_connect() {
     // Send PeerConnectedEvent to peer.
     let near = send_peer_connected(&mut profile_server);
 
-    // The peer should send no requests.
-    expect_no_requests(&mut exec, &mut profile_server);
+    // Handle the peer connected event.
+    run_hfp(&mut exec, &mut hfp_fut);
+
+    // The peer should await an incoming SCO connection.
+    let _sco_connection_server_end =
+        expect_sco_connect(&mut exec, &mut profile_server, /* initiator = */ false);
 
     // And the task should not have exited,
     expect_channel_still_open(&mut exec, &near);
@@ -291,8 +319,9 @@ fn search_result_then_peer_connected_before_delay_starts_task_and_does_not_conne
     // Handle the peer connected event.
     run_hfp(&mut exec, &mut hfp_fut);
 
-    // The peer should send no requests.
-    expect_no_requests(&mut exec, &mut profile_server);
+    // The peer should await an incoming SCO connection.
+    let _sco_connection_server_end =
+        expect_sco_connect(&mut exec, &mut profile_server, /* initiator = */ false);
 
     // And the task should not have exited,
     expect_channel_still_open(&mut exec, &near);
@@ -339,7 +368,7 @@ fn search_result_then_peer_connected_after_delay_starts_task_and_connects() {
     run_hfp(&mut exec, &mut hfp_fut);
 
     // After the delay, the peer should connect a channel.
-    let near_received = expect_connect(&mut exec, &mut profile_server);
+    let near_received = expect_rfcomm_connect(&mut exec, &mut profile_server);
     run_hfp(&mut exec, &mut hfp_fut);
 
     // Send PeerConnectedEvent to peer.
@@ -348,8 +377,9 @@ fn search_result_then_peer_connected_after_delay_starts_task_and_connects() {
     // Handle the peer connected event.
     run_hfp(&mut exec, &mut hfp_fut);
 
-    // The peer should send no requests.
-    expect_no_requests(&mut exec, &mut profile_server);
+    // The peer should await an incoming SCO connection.
+    let _sco_connection_server_end =
+        expect_sco_connect(&mut exec, &mut profile_server, /* initiator = */ false);
 
     // The task should have dropped the channel it sent us.
     expect_channel_closed(&mut exec, &near_received);

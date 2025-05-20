@@ -22,6 +22,8 @@ Those libraries should not define business logic types or protocols, and we
 do not support them in the bindings. */}}
 {{- if not .SingleComponentLibraryName }}
 
+{{- IfdefFuchsia }}
+
 #include <{{ .Library | Filename "driver/WireMessagingHeader" }}>
 
 #include <lib/fidl_driver/cpp/unknown_interactions.h>
@@ -31,15 +33,14 @@ do not support them in the bindings. */}}
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-{{ "" }}
-
-
-
-{{- range (call .ProtocolsForTransport "Driver") }}
+{{ range (call .ProtocolsForTransport "Driver") }}
   {{ template "Protocol:WireMessagingSource" . }}
   {{ template "Protocol:EventSender:driver/WireMessagingSource" . }}
 {{ end }}
 #pragma clang diagnostic pop
+
+{{- EndifFuchsia }}
+
 {{ end }}{{/* if not SingleComponentLibraryName */}}
 
 {{ UnsetTransport -}}

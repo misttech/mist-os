@@ -31,8 +31,8 @@ ffx_plugin("ffx_product_download") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-fs",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:url",
   ]
 

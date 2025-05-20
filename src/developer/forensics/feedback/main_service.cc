@@ -56,7 +56,11 @@ MainService::MainService(
       redactor_(RedactorFromConfig(inspect_root, options.build_type_config)),
       inspect_node_manager_(inspect_root),
       annotations_(dispatcher_, services_,
-                   options.feedback_data_options.config.annotation_allowlist, startup_annotations,
+                   // TODO(https://fxbug.dev/413747327): subtract product exclusion list from
+                   // default list.
+                   options.feedback_data_options.config.default_annotations,
+                   // TODO(https://fxbug.dev/413747327): pass actual exclusion list.
+                   /*product_exclude_list=*/{}, startup_annotations,
                    MakeDeviceIdProvider(options.local_device_id_path, dispatcher_, services_)),
       network_watcher_(dispatcher, *services),
       feedback_data_(dispatcher_, services_, clock_, inspect_root_, cobalt_, redactor_.get(),

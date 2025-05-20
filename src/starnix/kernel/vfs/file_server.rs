@@ -73,7 +73,12 @@ pub fn serve_file_at(
                 };
                 StarnixNodeConnection::new(Arc::downgrade(&kernel), file)
             };
-            starnix_file.open(scope.clone(), open_flags.into_fidl(), path::Path::dot(), server_end);
+            starnix_file.deprecated_open(
+                scope.clone(),
+                open_flags.into_fidl(),
+                path::Path::dot(),
+                server_end,
+            );
             scope.wait().await;
         }
     });
@@ -454,7 +459,7 @@ impl directory::entry::GetEntryInfo for StarnixNodeConnection {
 }
 
 impl directory::entry_container::Directory for StarnixNodeConnection {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         scope: execution_scope::ExecutionScope,
         flags: fio::OpenFlags,
@@ -466,7 +471,7 @@ impl directory::entry_container::Directory for StarnixNodeConnection {
             .handle(|object_request| self.directory_entry_open(scope, flags, path, object_request));
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: execution_scope::ExecutionScope,
         path: path::Path,
@@ -866,7 +871,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn open3() {
+    async fn open() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let fs = TmpFs::new_fs(&kernel);
 
@@ -884,7 +889,7 @@ mod tests {
                 root_zxio
                     .open(
                         "foo",
-                        fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
                         ZxioOpenOptions::default()
                     )
                     .expect_err("open3 passed unexpectedly"),
@@ -894,8 +899,8 @@ mod tests {
                 .open(
                     "foo",
                     fio::Flags::PROTOCOL_FILE
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::FLAG_MUST_CREATE,
                     ZxioOpenOptions::default(),
                 )
@@ -907,8 +912,8 @@ mod tests {
                     .open(
                         "bar/baz",
                         fio::Flags::PROTOCOL_DIRECTORY
-                            | fio::Flags::PERM_READ
-                            | fio::Flags::PERM_WRITE
+                            | fio::PERM_READABLE
+                            | fio::PERM_WRITABLE
                             | fio::Flags::FLAG_MUST_CREATE,
                         ZxioOpenOptions::default()
                     )
@@ -919,8 +924,8 @@ mod tests {
                 .open(
                     "bar",
                     fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::FLAG_MUST_CREATE,
                     ZxioOpenOptions::default(),
                 )
@@ -929,8 +934,8 @@ mod tests {
                 .open(
                     "bar/baz",
                     fio::Flags::PROTOCOL_DIRECTORY
-                        | fio::Flags::PERM_READ
-                        | fio::Flags::PERM_WRITE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
                         | fio::Flags::FLAG_MUST_CREATE,
                     ZxioOpenOptions::default(),
                 )

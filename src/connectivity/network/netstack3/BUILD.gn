@@ -17,6 +17,7 @@ import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 common_deps = [
   ":config_lib",
   "fidl:fuchsia.netstack.persistence_rust",
+  "//sdk/fidl/fuchsia.ebpf:fuchsia.ebpf_rust",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
   "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
   "//sdk/fidl/fuchsia.net.debug:fuchsia.net.debug_rust",
@@ -38,6 +39,7 @@ common_deps = [
   "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
   "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+  "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
   "//sdk/rust/zx",
   "//src/connectivity/lib/fidl_fuchsia_net_neighbor_ext",
   "//src/connectivity/lib/net-declare",
@@ -51,6 +53,7 @@ common_deps = [
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/diagnostics/log/rust",
   "//src/lib/fidl/rust/fidl",
+  "//src/lib/fidl_table_validation",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-component",
   "//src/lib/fuchsia-runtime",
@@ -76,6 +79,7 @@ common_deps = [
   "//third_party/rust_crates:log",
   "//third_party/rust_crates:once_cell",
   "//third_party/rust_crates:rand",
+  "//third_party/rust_crates:scopeguard",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:zerocopy",
 
@@ -118,6 +122,7 @@ common_sources = [
   "src/bindings/filter/conversion.rs",
   "src/bindings/filter/conversion/actions.rs",
   "src/bindings/filter/conversion/matchers.rs",
+  "src/bindings/filter/socket_filters.rs",
   "src/bindings/health_check_worker.rs",
   "src/bindings/inspect.rs",
   "src/bindings/integration_tests.rs",
@@ -130,6 +135,7 @@ common_sources = [
   "src/bindings/netdevice_worker.rs",
   "src/bindings/persistence.rs",
   "src/bindings/power.rs",
+  "src/bindings/reference_notifier.rs",
   "src/bindings/resource_removal.rs",
   "src/bindings/root_fidl_worker.rs",
   "src/bindings/routes.rs",
@@ -153,6 +159,7 @@ common_sources = [
   "src/bindings/timers.rs",
   "src/bindings/util.rs",
   "src/bindings/util/result_ext.rs",
+  "src/bindings/util/scope_ext.rs",
   "src/main.rs",
 ]
 
@@ -204,7 +211,7 @@ config("compiler_profile") {
 }
 
 config("netstack3_configs") {
-  if (!is_debug && !is_host) {
+  if (is_release && !is_host) {
     configs = [
       # Always optimize speed, even if it increases size.
       "//build/config:optimize_speed",
@@ -318,6 +325,15 @@ ns3_test_component("component-debug") {
   component_name = "netstack3-debug"
   manifest = "meta/netstack3_debug.cml"
   config_values_source = "config/test-debug.json5"
+  deps = [ ":bin-instrumented" ]
+}
+
+# A stand-in for :component-debug to use for tests that need to avoid logging as
+# verbosely to avoid timing out in infra.
+ns3_test_component("component-debug-less-logs") {
+  component_name = "netstack3-debug"
+  manifest = "meta/netstack3_debug.cml"
+  config_values_source = "config/test.json5"
   deps = [ ":bin-instrumented" ]
 }
 

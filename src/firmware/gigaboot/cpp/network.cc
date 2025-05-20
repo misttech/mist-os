@@ -84,9 +84,9 @@ Ip6Header::Ip6Header(uint16_t len, uint8_t next_hdr, const Ip6Addr& src, const I
       source(src),
       dest(dst) {}
 
-uint16_t CalculateChecksum(cpp20::span<const uint8_t> data, uint64_t start) {
-  cpp20::span<const uint16_t> tmp(reinterpret_cast<const uint16_t*>(data.data()),
-                                  data.size() / sizeof(uint16_t));
+uint16_t CalculateChecksum(std::span<const uint8_t> data, uint64_t start) {
+  std::span<const uint16_t> tmp(reinterpret_cast<const uint16_t*>(data.data()),
+                                data.size() / sizeof(uint16_t));
   // The start and result are wider than a u16 to properly hold the overflow bits
   // from 1s complement addition.
   uint64_t sum = std::reduce(tmp.begin(), tmp.end(), start);
@@ -119,7 +119,7 @@ fit::result<efi_status, EthernetAgent> EthernetAgent::Create() {
 }
 
 fit::result<efi_status> EthernetAgent::SendV6LocalFrame(
-    MacAddr dst, cpp20::span<const uint8_t> data, efi_event callback,
+    MacAddr dst, std::span<const uint8_t> data, efi_event callback,
     efi_managed_network_sync_completion_token* token) {
   if (!token) {
     return fit::error(EFI_INVALID_PARAMETER);

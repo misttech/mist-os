@@ -283,7 +283,7 @@ impl Archivist {
             servers_scope_handle.close();
             logs_repository.stop_accepting_new_log_sinks();
             debug!("Close any new connections to FIDL servers");
-            svc_task.cancel().await;
+            svc_task.abort().await;
             pipeline_manager.cancel().await;
             debug!("Stop allowing new connections through the incoming namespace.");
             logs_repository.wait_for_termination().await;

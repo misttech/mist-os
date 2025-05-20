@@ -52,7 +52,7 @@ void DataRegister::Upsert(fuchsia::feedback::ComponentData data, UpsertCallback 
     return;
   }
 
-  if (data.has_namespace() && disallowed_annotation_namespaces_.count(data.namespace_()) != 0) {
+  if (data.has_namespace() && disallowed_annotation_namespaces_.contains(data.namespace_())) {
     FX_LOGS(WARNING) << fxl::StringPrintf(
         "Ignoring non-platform annotations, %s is a reserved namespace", data.namespace_().c_str());
 

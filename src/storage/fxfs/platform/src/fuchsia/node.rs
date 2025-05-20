@@ -11,6 +11,7 @@ use fxfs_macros::ToWeakNode;
 use std::any::TypeId;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::mem::ManuallyDrop;
 use std::sync::{Arc, Weak};
 use std::task::{Poll, Waker};
@@ -24,6 +25,11 @@ pub trait FxNode: IntoAny + ToWeakNode + Send + Sync + 'static {
     fn open_count_add_one(&self);
     fn open_count_sub_one(self: Arc<Self>);
     fn object_descriptor(&self) -> ObjectDescriptor;
+
+    /// Marks the object to be purged.  Returns true if the object can be immediately tombstoned.
+    fn mark_to_be_purged(&self) -> bool {
+        panic!("Unexpected call to mark_to_be_purged");
+    }
 
     /// Called when the filesystem is shutting down. Implementations should break any strong
     /// reference cycles that would prevent the node from being dropped.
@@ -54,6 +60,15 @@ impl FxNode for Placeholder {
 
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::File
+    }
+}
+
+impl fmt::Debug for dyn FxNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FxNode")
+            .field("id", &self.object_id())
+            .field("descriptor", &self.object_descriptor())
+            .finish()
     }
 }
 
@@ -292,12 +307,18 @@ impl NodeCache {
     }
 
     pub fn terminate(&self) {
-        let nodes = std::mem::take(&mut self.0.lock().map);
-        for (_, node) in nodes {
-            if let Some(node) = upgrade_node(&node) {
-                node.terminate();
+        let _drop_list = {
+            let this = self.0.lock();
+            let mut drop_list = Vec::with_capacity(this.map.len());
+            for (_, node) in &this.map {
+                if let Some(node) = upgrade_node(&node) {
+                    node.terminate();
+                    // We must drop later when we're not holding the lock.
+                    drop_list.push(node);
+                }
             }
-        }
+            drop_list
+        };
     }
 
     fn commit(&self, node: &Arc<dyn FxNode>) {

@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_structdefaultvalueenumlibraryreference_FooTabl
 const fidl_type_t* Foo::FidlType = &test_structdefaultvalueenumlibraryreference_FooTable;
 
 void Foo::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Foo>::value) {
     memcpy(_encoder->template GetPtr<Foo>(_offset), this, sizeof(Foo));
   } else {

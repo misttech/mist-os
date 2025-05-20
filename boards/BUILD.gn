@@ -14,6 +14,7 @@ if (target_cpu == "x64") {
     deps = [
       "//boards/pkvm:x64",
       "//boards/x64",
+      "//boards/x64:reduced_perf_variation",
       "//boards/x64:x64_bibs",
     ]
   }

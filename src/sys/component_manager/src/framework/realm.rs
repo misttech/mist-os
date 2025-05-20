@@ -26,8 +26,8 @@ use vfs::path::Path;
 use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync,
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
 };
 
 lazy_static! {
@@ -148,6 +148,10 @@ impl RealmCapabilityProvider {
             }
             fcomponent::RealmRequest::GetResolvedInfo { responder } => {
                 let res = Self::get_resolved_info(component).await;
+                responder.send(res)?;
+            }
+            fcomponent::RealmRequest::GetChildOutputDictionary { responder, child } => {
+                let res = Self::get_child_output_dictionary(component, child).await;
                 responder.send(res)?;
             }
         }
@@ -348,6 +352,26 @@ impl RealmCapabilityProvider {
             .map_err(|_| fcomponent::Error::InstanceCannotResolve)?;
         Ok((&resolved_state.resolved_component).into())
     }
+
+    async fn get_child_output_dictionary(
+        component: &WeakComponentInstance,
+        child: fdecl::ChildRef,
+    ) -> Result<fsandbox::DictionaryRef, fcomponent::Error> {
+        match Self::get_child(component, child.clone()).await? {
+            Some(child) => Ok(child
+                .lock_resolved_state()
+                .await
+                .map_err(|_| fcomponent::Error::InstanceCannotResolve)?
+                .sandbox
+                .component_output
+                .capabilities()
+                .into()),
+            None => {
+                debug!(child:?; "get_child_output_dictionary() failed: instance not found");
+                Err(fcomponent::Error::InstanceNotFound)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -469,7 +493,7 @@ mod tests {
                 // Eagerly launched so it needs a definition
                 ("b", ComponentDeclBuilder::new().build()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -556,7 +580,7 @@ mod tests {
                         .build(),
                 ),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -883,7 +907,7 @@ mod tests {
                 ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
         let collection_ref = fdecl::CollectionRef { name: "coll".into() };
@@ -908,7 +932,7 @@ mod tests {
                 ("a", component_decl_with_exposed_binder()),
                 ("b", component_decl_with_exposed_binder()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1010,7 +1034,7 @@ mod tests {
                 ("root", ComponentDeclBuilder::new().child_default("system").build()),
                 ("system", ComponentDeclBuilder::new().collection_default("coll").build()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1066,7 +1090,7 @@ mod tests {
                 ),
                 ("a", component_decl_with_test_runner()),
             ],
-            vec!["system"].try_into().unwrap(),
+            ["system"].try_into().unwrap(),
         )
         .await;
 
@@ -1418,6 +1442,45 @@ mod tests {
         assert_eq!(
             fidl_resolved_info.decl.and_then(read_buffer),
             internal_resolved_info.decl.and_then(read_buffer),
+        );
+    }
+
+    #[fuchsia::test]
+    async fn get_child_output() {
+        let test = RealmCapabilityTest::new(
+            vec![
+                ("root", ComponentDeclBuilder::new().child_default("system").build()),
+                (
+                    "system",
+                    ComponentDeclBuilder::new()
+                        .protocol_default("fidl.examples.Echo")
+                        .expose(
+                            ExposeBuilder::protocol()
+                                .name("fidl.examples.Echo")
+                                .source(ExposeSource::Self_),
+                        )
+                        .build(),
+                ),
+            ],
+            Moniker::root(),
+        )
+        .await;
+
+        let child_output_dictionary_ref = test
+            .realm_proxy
+            .get_child_output_dictionary(&fdecl::ChildRef {
+                name: "system".to_string(),
+                collection: None,
+            })
+            .await
+            .expect("fidl call failed")
+            .expect("get_child_output() failed");
+
+        let child_output_dictionary: sandbox::Dict =
+            child_output_dictionary_ref.try_into().unwrap();
+        assert_eq!(
+            vec!["fidl.examples.Echo".to_string()],
+            child_output_dictionary.keys().map(|k| k.to_string()).collect::<Vec<_>>(),
         );
     }
 }

@@ -59,7 +59,7 @@ pub trait FfxExecutor {
         Box::pin(async move {
             let mut cmd =
                 self.make_ffx_cmd(args).map_err(ExecutionError::CommandConstructionError)?;
-            tracing::info!("Executing ffx command: {args:?}");
+            log::info!("Executing ffx command: {args:?}");
             fuchsia_async::unblock(move || {
                 let out = cmd.output().map_err(ExecutionError::IoError)?;
                 let stdout = String::from_utf8_lossy(&out.stdout).to_string();

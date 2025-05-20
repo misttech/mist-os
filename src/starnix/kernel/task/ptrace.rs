@@ -566,14 +566,15 @@ impl ZombiePtraces {
     /// zombie.
     pub fn get_waitable_entry(
         &mut self,
-        selector: ProcessSelector,
+        selector: &ProcessSelector,
         options: &WaitingOptions,
     ) -> Option<(ZombieProcess, Option<(WeakRef<ThreadGroup>, OwnedRef<ZombieProcess>)>)> {
         // The zombies whose pid matches the pid selector queried.
-        let zombie_matches_pid_selector = |zombie: &ZombieProcess| match selector {
+        let zombie_matches_pid_selector = |zombie: &ZombieProcess| match *selector {
             ProcessSelector::Any => true,
             ProcessSelector::Pid(pid) => zombie.pid == pid,
             ProcessSelector::Pgid(pgid) => zombie.pgid == pgid,
+            ProcessSelector::Process(ref key) => key.pid() == zombie.pid,
         };
 
         // The zombies whose exit signal matches the waiting options queried.
@@ -1240,7 +1241,7 @@ pub fn ptrace_getregset(
                     current_task.write_multi_arch_object(reg_ptr, val as u64)?;
                 }
                 i += reg_ptr.size_of_object();
-                reg_ptr = reg_ptr.next();
+                reg_ptr = reg_ptr.next()?;
             }
             Ok(())
         }

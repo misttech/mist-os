@@ -36,7 +36,7 @@ class PDev {
   zx::result<fdf::MmioBuffer> MapMmio(
       uint32_t index, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
   zx::result<fdf::MmioBuffer> MapMmio(
-      cpp17::string_view name, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
+      std::string_view name, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
 
   // Retrieves metadata from the platform device associated with the id |metadata_id| and unpersists
   // it into |FidlType|. |FidlType| must be persistable. Assumes that the metadata from the platform
@@ -71,10 +71,10 @@ class PDev {
     zx::vmo vmo;
   };
   zx::result<MmioInfo> GetMmio(uint32_t index) const;
-  zx::result<MmioInfo> GetMmio(cpp17::string_view name) const;
+  zx::result<MmioInfo> GetMmio(std::string_view name) const;
 
   zx::result<zx::interrupt> GetInterrupt(uint32_t index, uint32_t flags = 0) const;
-  zx::result<zx::interrupt> GetInterrupt(cpp17::string_view name, uint32_t flags = 0) const;
+  zx::result<zx::interrupt> GetInterrupt(std::string_view name, uint32_t flags = 0) const;
   zx::result<zx::bti> GetBti(uint32_t index) const;
   zx::result<zx::resource> GetSmc(uint32_t index) const;
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use ffx_e2e_emu::IsolatedEmulator;
-use tracing::info;
+use log::info;
 
 #[fuchsia::test]
 async fn cat_file_from_package_and_subpackages_using_full_resolver() {

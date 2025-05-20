@@ -7,7 +7,10 @@
 use anyhow::{Context as _, Error};
 use fidl::endpoints::{ClientEnd, ProtocolMarker, Proxy as _};
 use fidl_fuchsia_net::{self as fnet, MarkDomain};
-use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
+use fidl_fuchsia_posix_socket::{
+    self as fposix_socket, OptionalUint32, ProviderDatagramSocketResponse,
+    ProviderDatagramSocketWithOptionsResponse,
+};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect_derive::{IValue, Inspect, Unit};
 use futures::lock::Mutex;
@@ -209,10 +212,7 @@ impl SocketProvider {
                         let mut metrics_lock = self.metrics.lock().await;
                         let mut metrics = metrics_lock.as_mut();
                         metrics.sockets += 1;
-                        use fposix_socket::{
-                            ProviderDatagramSocketResponse, ProviderDatagramSocketWithOptionsResponse,
-                        };
-                        let response = inner_provider
+                        let datagram_socket = inner_provider
                             .datagram_socket_with_options(domain, proto, &fposix_socket::SocketCreationOptions {
                                 marks: Some(marks.into()),
                                 ..Default::default()
@@ -222,16 +222,20 @@ impl SocketProvider {
                                 match response {
                                 ProviderDatagramSocketWithOptionsResponse::DatagramSocket(client_end)
                                 => {
+                                    metrics.datagram.track(marks);
                                     ProviderDatagramSocketResponse::DatagramSocket(client_end)
                                 }
                                 ProviderDatagramSocketWithOptionsResponse::SynchronousDatagramSocket(
                                     client_end,
-                                ) => ProviderDatagramSocketResponse::SynchronousDatagramSocket(
+                                ) => {
+                                    metrics.synchronous_datagram.track(marks);
+                                    ProviderDatagramSocketResponse::SynchronousDatagramSocket(
                                     client_end,
-                                ),
+                                    )
+                                },
                             }
                             });
-                        responder.send(response)?
+                        responder.send(datagram_socket)?
                     }
                     fposix_socket::ProviderRequest::DatagramSocketWithOptions {
                         domain,
@@ -251,14 +255,25 @@ impl SocketProvider {
                                 marks
                             );
                         }
-                        responder.send(
-                            inner_provider
+                        let datagram_socket = inner_provider
                                 .datagram_socket_with_options(domain, proto, &fposix_socket::SocketCreationOptions {
                                     marks: Some(marks.into()),
                                     ..opts
                                 })
-                                .await?,
-                        )?
+                                .await?
+                            .map(|response| {
+                                match response {
+                                ProviderDatagramSocketWithOptionsResponse::DatagramSocket(_)
+                                => {
+                                    metrics.datagram.track(marks);
+                                }
+                                ProviderDatagramSocketWithOptionsResponse::SynchronousDatagramSocket(_) => {
+                                    metrics.synchronous_datagram.track(marks);
+                                },
+                                };
+                                response
+                            });
+                        responder.send(datagram_socket)?
                     }
                     fposix_socket::ProviderRequest::InterfaceIndexToName { index, responder } => {
                         let name = inner_provider.interface_index_to_name(index).await?;

@@ -111,7 +111,7 @@ void Endpoint::ControlRequestQueue(usb::RequestVariant request) {
   TransferRing::State transaction;
   TRB* setup;
   zx_status_t status = transfer_ring_.AllocateTRB(&setup, &transaction);
-  auto rollback_transaction = [=]() __TA_NO_THREAD_SAFETY_ANALYSIS {
+  auto rollback_transaction = [=, this]() __TA_NO_THREAD_SAFETY_ANALYSIS {
     transfer_ring_.Restore(transaction);
   };
   if (status != ZX_OK) {

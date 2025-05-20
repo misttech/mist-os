@@ -33,9 +33,7 @@ class Environment : public fdf_testing::Environment {
         pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
     EXPECT_TRUE(result.is_ok());
 
-    device_server_.Initialize(component::kDefaultInstance);
-    return zx::make_result(
-        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &directory));
+    return zx::ok();
   }
 
   ddk_fake::FakeMmioRegRegion& reg_region() { return reg_region_; }
@@ -46,7 +44,6 @@ class Environment : public fdf_testing::Environment {
   static constexpr size_t kRegCount = kMmioRegionSize / kRegSize;
 
   fdf_fake::FakePDev pdev_;
-  compat::DeviceServer device_server_;
   ddk_fake::FakeMmioRegRegion reg_region_{kRegSize, kRegCount};
 };
 

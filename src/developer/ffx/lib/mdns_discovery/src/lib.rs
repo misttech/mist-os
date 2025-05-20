@@ -57,7 +57,11 @@ impl CachedTarget {
 impl Hash for CachedTarget {
     fn hash<H: Hasher>(&self, state: &mut H) {
         #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
-        self.target.nodename.as_ref().unwrap_or(&"<unknown>".to_string()).hash(state);
+        self.target
+            .nodename
+            .as_ref()
+            .unwrap_or(&target_errors::UNKNOWN_TARGET_NAME.to_string())
+            .hash(state);
     }
 }
 
@@ -220,11 +224,11 @@ where
                     }
                 }
                 _ => {
-                    tracing::warn!("Got an mdns event, but it wasnt a TargetFound so skipping it");
+                    log::warn!("Got an mdns event, but it wasnt a TargetFound so skipping it");
                 }
             },
             Err(e) => {
-                tracing::warn!("Got error receiving items");
+                log::warn!("Got error receiving items");
                 return Err(anyhow!("Got error receiving mDNS events: {}", e));
             }
         }
@@ -301,7 +305,7 @@ where
     }
 }
 
-pub fn recommended_watcher<F>(event_handler: F) -> Result<MdnsWatcher>
+pub fn recommended_watcher<F>(event_handler: F) -> MdnsWatcher
 where
     F: MdnsEventHandler,
 {
@@ -321,7 +325,7 @@ impl MdnsWatcher {
         discovery_interval: Duration,
         query_interval: Duration,
         ttl: u32,
-    ) -> Result<Self>
+    ) -> Self
     where
         F: MdnsEventHandler,
     {
@@ -347,7 +351,7 @@ impl MdnsWatcher {
 
         res.drain_task.replace(Task::local(handle_events_loop(receiver, events_out)));
 
-        Ok(res)
+        res
     }
 }
 
@@ -395,6 +399,9 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
     let checker_strong = Rc::new(checker);
     let checker = Rc::downgrade(&checker_strong);
 
+    let mut recv_ipv4_task: Option<Task<()>> = None;
+    let mut recv_ipv6_task: Option<Task<()>> = None;
+
     loop {
         let should_wait = match checker.upgrade() {
             Some(c) => !c.enabled().await,
@@ -417,12 +424,17 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                     let _ = propagate_bind_event(&sock, &mdns_protocol).await;
                     let sock = Rc::new(sock);
                     v4_listen_socket = Rc::downgrade(&sock);
-                    Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone())).detach();
+                    let rcv_task =
+                        Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone()));
+                    if recv_ipv4_task.is_some() {
+                        log::warn!("the IpV4 listen socket was none but we had a task receiving data on it. Replacing the old task")
+                    }
+                    recv_ipv4_task.replace(rcv_task);
                     should_log_v4_listen_error = true;
                 }
                 Err(err) => {
                     if should_log_v4_listen_error {
-                        tracing::error!(
+                        log::error!(
                             "unable to bind IPv4 listen socket: {}. Discovery may fail.",
                             err
                         );
@@ -432,19 +444,24 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
             }
         }
 
-        if v6_listen_socket.upgrade().is_none() {
+        if v6_listen_socket.upgrade().is_none() && recv_ipv6_task.is_none() {
             match make_listen_socket((MDNS_MCAST_V6, mdns_port).into())
                 .context("make_listen_socket for IPv6")
             {
                 Ok(sock) => {
                     let sock = Rc::new(sock);
                     v6_listen_socket = Rc::downgrade(&sock);
-                    Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone())).detach();
+                    let rcv_task =
+                        Task::local(recv_loop(sock, mdns_protocol.clone(), checker.clone()));
+                    if recv_ipv6_task.is_some() {
+                        log::warn!("the IpV6 listen socket was none but we had a task receiving data on it. Replacing the old task")
+                    }
+                    recv_ipv6_task.replace(rcv_task);
                     should_log_v6_listen_error = true;
                 }
                 Err(err) => {
                     if should_log_v6_listen_error {
-                        tracing::error!(
+                        log::error!(
                             "unable to bind IPv6 listen socket: {}. Discovery may fail.",
                             err
                         );
@@ -471,7 +488,7 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("{}", err);
+                    log::warn!("{}", err);
                 }
             }
 
@@ -510,7 +527,7 @@ pub async fn discovery_loop(config: DiscoveryConfig, checker: impl MdnsEnabledCh
                             // Because this function is a discovery loop, we retry automatically
                             // and we eventually bind once the avahi service successfully registers
                             // the address.
-                            tracing::debug!("mdns: failed to bind {}: {}", &addr, err);
+                            log::debug!("mdns: failed to bind {}: {}", &addr, err);
                             None
                         }
                     })
@@ -550,6 +567,7 @@ fn make_target<B: SplitByteSlice + Copy>(
     msg: dns::Message<B>,
 ) -> Option<(ffx::TargetInfo, u32)> {
     let mut nodename = String::new();
+    let mut serial = None;
     let mut ttl = 0u32;
     let mut ssh_port: u16 = 0;
     let mut ssh_address = None;
@@ -569,6 +587,7 @@ fn make_target<B: SplitByteSlice + Copy>(
             dns::Type::Txt => {
                 if let Some(data) = record.rdata.bytes() {
                     let txt_lines: Vec<String> = decode_txt_rdata(data).unwrap_or_default();
+                    log::debug!("found text lines: {:#?}", txt_lines);
                     let mut ip_addr: Option<IpAddress> = None;
                     for txt in &txt_lines {
                         if let Some((name, value)) = txt.split_once(':') {
@@ -590,6 +609,14 @@ fn make_target<B: SplitByteSlice + Copy>(
                                 _ => {}
                             };
                         }
+                        if let Some((name, value)) = txt.split_once('=') {
+                            match name {
+                                "serial" => {
+                                    serial = Some(value.to_string());
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                     if let Some(ip) = ip_addr {
                         ssh_address = Some(ffx::TargetIpAddrInfo::IpPort(ffx::TargetIpPort {
@@ -598,9 +625,9 @@ fn make_target<B: SplitByteSlice + Copy>(
                             port: ssh_port,
                         }));
                     }
-                    tracing::debug!("emulator mdns txt {:?} {:?}", &txt_lines, record.domain);
+                    log::debug!("emulator mdns txt {:?} {:?}", &txt_lines, record.domain);
                 } else {
-                    tracing::debug!("no data in txt record {:?}", record.domain);
+                    log::debug!("no data in txt record {:?}", record.domain);
                 }
             }
             dns::Type::A | dns::Type::Aaaa => {
@@ -616,11 +643,12 @@ fn make_target<B: SplitByteSlice + Copy>(
         };
     }
 
-    tracing::debug!(
-        "Making target from message. nodename: {} address: {:#?} fastboot_interface: {:#?}",
+    log::debug!(
+        "Making target from message. nodename: {} address: {:#?} fastboot_interface: {:#?} serial: {:#?}",
         nodename,
         src,
-        fastboot_interface
+        fastboot_interface,
+        serial,
     );
 
     if nodename.is_empty() || ttl == 0 {
@@ -630,6 +658,7 @@ fn make_target<B: SplitByteSlice + Copy>(
         ffx::TargetInfo {
             nodename: Some(nodename),
             addresses: Some(vec![src]),
+            serial_number: serial,
             target_state: fastboot_interface.map(|_| ffx::TargetState::Fastboot),
             fastboot_interface,
             ssh_address,
@@ -682,7 +711,7 @@ async fn recv_loop(
                 addr
             }
             Err(err) => {
-                tracing::error!("listen socket recv error: {}, mdns listener closed", err);
+                log::error!("listen socket recv error: {}, mdns listener closed", err);
                 return;
             }
         };
@@ -695,7 +724,7 @@ async fn recv_loop(
         let msg = match buf.parse::<dns::Message<_>>() {
             Ok(msg) => msg,
             Err(e) => {
-                tracing::trace!(
+                log::trace!(
                     "unable to parse message received on {} from {}: {:?}",
                     sock.local_addr()
                         .map(|s| s.to_string())
@@ -707,31 +736,28 @@ async fn recv_loop(
             }
         };
 
-        tracing::debug!("Socket: {:#?} received message", sock);
+        log::trace!("Socket: {:#?} received message", sock);
 
         // Only interested in fuchsia services or fastboot.
         if !is_fuchsia_response(&msg) && is_fastboot_response(&msg).is_none() {
-            tracing::debug!(
-                "Socket: {:#?} skipping message: as it is not fuchsia or fastboot",
-                sock
-            );
+            log::trace!("Socket: {:#?} skipping message: as it is not fuchsia or fastboot", sock);
             continue;
         }
         // Source addresses need to be present in the response, or be a TXT record which
         // contains address information about user mode networking being used by an emulator
         // instance.
         if !contains_source_address(&addr, &msg) && !contains_txt_response(&msg) {
-            tracing::debug!("Socket: {:#?} skipping message as it does not contain source address {} or does not contain txt resposne", sock, addr);
+            log::debug!("Socket: {:#?} skipping message as it does not contain source address {} or does not contain txt resposne", sock, addr);
             continue;
         }
 
         if let Some(mdns_protocol) = mdns_protocol.upgrade() {
             #[allow(clippy::or_fun_call)] // TODO(https://fxbug.dev/379717780)
             if let Some((t, ttl)) = make_target(addr, msg) {
-                tracing::trace!(
+                log::trace!(
                     "packet from {} ({}) on {}",
                     addr,
-                    t.nodename.as_ref().unwrap_or(&"<unknown>".to_string()),
+                    t.nodename.as_ref().unwrap_or(&target_errors::UNKNOWN_TARGET_NAME.to_string()),
                     sock.local_addr().unwrap()
                 );
                 mdns_protocol.handle_target(t, ttl).await;
@@ -772,7 +798,7 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration, mdns_port: u16) {
         Ok(SocketAddr::V4(_)) => (MDNS_MCAST_V4, mdns_port).into(),
         Ok(SocketAddr::V6(_)) => (MDNS_MCAST_V6, mdns_port).into(),
         Err(err) => {
-            tracing::error!("resolving local socket addr failed with: {}", err);
+            log::error!("resolving local socket addr failed with: {}", err);
             return;
         }
     };
@@ -786,7 +812,7 @@ async fn query_loop(sock: Rc<UdpSocket>, interval: Duration, mdns_port: u16) {
                 // But the premise is that we see this during suspend / resume cycle of the host
                 // because the mDNS services for the relevant address and interface are not ready
                 // yet.
-                tracing::debug!(
+                log::debug!(
                     "mdns query failed from {}: {}",
                     sock.local_addr()
                         .map(|a| a.to_string())
@@ -816,12 +842,12 @@ async fn query_recv_loop(
     let addr = match sock.local_addr() {
         Ok(addr) => addr,
         Err(err) => {
-            tracing::error!("mdns: failed to shutdown: {:?}", err);
+            log::error!("mdns: failed to shutdown: {:?}", err);
             return;
         }
     };
 
-    tracing::debug!("mdns: started query socket {}", &addr);
+    log::debug!("mdns: started query socket {}", &addr);
 
     futures::select!(
         _ = recv => {},
@@ -834,7 +860,7 @@ async fn query_recv_loop(
     if let Some(a) = tasks.lock().await.remove(&addr.ip()) {
         drop(a)
     }
-    tracing::debug!("mdns: shut down query socket {}", &addr);
+    log::debug!("mdns: shut down query socket {}", &addr);
 }
 
 // Exclude any mdns packets received where the source address of the packet does not appear in any
@@ -860,7 +886,7 @@ fn contains_source_address<B: zerocopy::SplitByteSlice + Copy>(
     // There is nothing actionable for the user.
     // This warning is most obvious when launching an emulator in user mode (which is the default)
     // and causes a lot of noise in the logs.
-    tracing::debug!(
+    log::debug!(
         "Dubious mdns from: {:?} does not contain an answer that includes the source address, therefore it is ignored.",
         addr
     );
@@ -1008,6 +1034,42 @@ mod tests {
             })
         );
         assert_eq!(t.nodename.unwrap(), "foo._fuchsia._udp");
+    }
+
+    #[test]
+    fn test_make_target_with_serial() -> Result<()> {
+        let nodename = DomainBuilder::from_str("foo._fuchsia._udp.local").unwrap();
+        let mut txt_data: Vec<u8> = vec![];
+        let txt_strings = ["foo=bar", "serial=1234990"];
+        for d in txt_strings {
+            txt_data.write_all(&[d.len() as u8])?;
+            txt_data.write_all(d.as_bytes())?;
+        }
+        let record =
+            RecordBuilder::new(nodename.clone(), Type::A, Class::Any, true, 4500, &[8, 8, 8, 8]);
+        let text_record =
+            RecordBuilder::new(nodename, Type::Txt, Class::Any, true, 4500, &txt_data);
+        let mut message = MessageBuilder::new(0, true);
+        message.add_additional(record);
+        message.add_additional(text_record);
+        let mut msg_bytes = message
+            .into_serializer()
+            .serialize_vec_outer()
+            .unwrap_or_else(|_| panic!("failed to serialize"));
+        let parsed = msg_bytes.parse::<Message<_>>().expect("failed to parse");
+        let addr: SocketAddr = (MDNS_MCAST_V4, 12).into();
+        let (t, ttl) = make_target(addr, parsed).unwrap();
+        assert_eq!(ttl, 4500);
+        assert_eq!(
+            t.addresses.as_ref().unwrap()[0],
+            ffx::TargetAddrInfo::Ip(ffx::TargetIp {
+                ip: IpAddress::Ipv4(Ipv4Address { addr: MDNS_MCAST_V4.octets() }),
+                scope_id: 0
+            })
+        );
+        assert_eq!(t.nodename.unwrap(), "foo._fuchsia._udp");
+        assert_eq!(t.serial_number.unwrap(), "1234990");
+        Ok(())
     }
 
     #[test]

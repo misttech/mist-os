@@ -190,7 +190,7 @@ pub async fn serve(
         req_stream: req_stream.fuse(),
         update_sender,
         saved_networks_manager,
-        telemetry_sender,
+        telemetry_sender: telemetry_sender.clone(),
         iface_id,
         defect_sender,
         roam_manager,
@@ -208,9 +208,19 @@ pub async fn serve(
                     iface_id,),
             }
         }
-        removal_watcher = removal_watcher.fuse() => if let Err(e) = removal_watcher {
-            info!("Error reading from Client SME channel of iface #{}: {:?}",
-                iface_id, e);
+        removal_watcher = removal_watcher.fuse() => {
+            match removal_watcher {
+                Ok(()) => {
+                    info!("Device was unexpectedly removed.");
+                }
+                Err(e) => {
+                    info!("Error reading from Client SME channel of iface #{}: {:?}",
+                        iface_id, e);
+                }
+            }
+
+            telemetry_sender
+                .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info: None });
         },
     }
 
@@ -1115,7 +1125,7 @@ async fn log_disconnect_to_telemetry(
     };
     common_options
         .telemetry_sender
-        .send(TelemetryEvent::Disconnected { track_subsequent_downtime, info });
+        .send(TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) });
 }
 
 async fn log_disconnect_to_config_manager(
@@ -2191,7 +2201,7 @@ mod tests {
 
         // Disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
+            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
                 assert!(!track_subsequent_downtime);
                 assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
                     assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
@@ -2309,7 +2319,7 @@ mod tests {
 
         // Disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
+            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
                 assert!(track_subsequent_downtime);
                 assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
                     assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
@@ -2399,7 +2409,7 @@ mod tests {
 
         // Disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
+            assert_variant!(event, TelemetryEvent::Disconnected { info: Some(info), .. } => {
                 assert_eq!(info.connected_duration, zx::MonotonicDuration::from_hours(12));
             });
         });
@@ -2430,7 +2440,7 @@ mod tests {
         // Another disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.connected_duration, zx::MonotonicDuration::from_hours(2));
+                assert_eq!(info.unwrap().connected_duration, zx::MonotonicDuration::from_hours(2));
             });
         });
     }
@@ -2692,7 +2702,7 @@ mod tests {
 
         // Disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
+            assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info: Some(info) } => {
                 assert!(!track_subsequent_downtime);
                 assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
                     assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
@@ -3181,7 +3191,7 @@ mod tests {
         // Verify telemetry event
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.ap_state.tracked.channel.primary, 10);
+                assert_eq!(info.unwrap().ap_state.tracked.channel.primary, 10);
             });
         });
     }
@@ -3561,7 +3571,7 @@ mod tests {
         // Verify telemetry event for disconnect
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.disconnect_source, disconnect_info.disconnect_source);
+                assert_eq!(info.unwrap().disconnect_source, disconnect_info.disconnect_source);
             });
         });
 
@@ -3677,7 +3687,7 @@ mod tests {
         // Verify a disconnect event was logged to telemetry
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
+                assert_eq!(info.unwrap().disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
             });
         });
 
@@ -3771,7 +3781,7 @@ mod tests {
         // Verify a disconnect event was logged to telemetry
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
+                assert_eq!(info.unwrap().disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
             });
         });
 
@@ -3890,7 +3900,7 @@ mod tests {
         // Verify a disconnect event was logged to telemetry
         assert_variant!(test_values.telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
+                assert_eq!(info.unwrap().disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::Unknown));
             });
         });
 
@@ -4104,7 +4114,7 @@ mod tests {
     #[fuchsia::test]
     fn serve_loop_handles_sme_disappearance() {
         let mut exec = fasync::TestExecutor::new();
-        let test_values = test_setup();
+        let mut test_values = test_setup();
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
 
         // Make our own SME proxy for this test
@@ -4154,6 +4164,17 @@ mod tests {
 
         // Ensure the state machine has no further actions and is exited
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+
+        // Verify that a disconnect event was logged on exit.
+        let mut telemetry_events = Vec::new();
+        while let Ok(Some(event)) = test_values.telemetry_receiver.try_next() {
+            telemetry_events.push(event)
+        }
+
+        assert_variant!(
+            telemetry_events.last(),
+            Some(&TelemetryEvent::Disconnected { track_subsequent_downtime: false, info: None })
+        );
     }
 
     #[fuchsia::test]

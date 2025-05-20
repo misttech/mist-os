@@ -20,13 +20,21 @@ import build_tests_json
 
 _SCRIPT_DIR = Path(__file__).parent
 
-# The directory that contains helper python modules for this script.
+# The directory that contains helper Python modules for this script.
 _BUILD_BAZEL_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "bazel" / "scripts"
+# The root directory of Bazel build scripts.
+_BUILD_BAZEL_DIR = _SCRIPT_DIR / ".." / "build" / "bazel"
+# The directory that contains Python modules related to the IDK.
+_BUILD_SDK_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "sdk"
 sys.path.insert(0, str(_BUILD_BAZEL_SCRIPTS))
+sys.path.insert(0, str(_BUILD_BAZEL_DIR))
+sys.path.insert(0, str(_BUILD_SDK_SCRIPTS))
 
 import compute_content_hash
 import remote_services_utils
 import workspace_utils
+from fuchsia_idk import generate_repository
+from generate_prebuild_idk import generate_prebuild_idk
 
 _DEFAULT_HOST_TAG = "linux-x64"
 
@@ -306,6 +314,69 @@ def main() -> int:
         # on the next fx build. This is because build.ninja has been patched
         # and build.ninja.stamp will be deleted upon error.
 
+        log(
+            "Generating IDK export directory for Bazel in-tree SDK from GN prebuild metadata."
+        )
+
+        with Path(
+            # LINT.IfChange
+            f"{build_dir}/sdk/prebuild/in_tree_collection.json"
+            # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
+        ).open() as f:
+            prebuild_manifest = json.load(f)
+
+        idk_generator = generate_prebuild_idk.IdkGenerator(
+            prebuild_manifest, build_dir, fuchsia_dir
+        )
+
+        result = idk_generator.GenerateMetaFileContents()
+        if result != 0:
+            print(
+                "ERROR: Failed to generate in-tree IDK meta file contents from prebuild metadata!",
+                file=sys.stderr,
+            )
+            return result
+
+        idk_export_dir_path = Path(
+            f"{build_dir}/regenerator_outputs/bazel_in_tree_idk"
+        )
+        result = idk_generator.WriteIdkContentsToDirectory(idk_export_dir_path)
+        if result != 0:
+            print(
+                "ERROR: Failed to generate in-tree IDK export directory from prebuild metadata!",
+                file=sys.stderr,
+            )
+            return result
+
+        log("Generating @fuchsia_in_tree_idk repository content.")
+        # LINT.IfChange
+        _idk_repository_name = "fuchsia_in_tree_idk"
+        idk_repository_path = Path(
+            f"{build_dir}/regenerator_outputs/fuchsia_in_tree_idk"
+        )
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        generate_repository.GenerateIdkRepository(
+            _idk_repository_name,
+            idk_repository_path,
+            idk_export_dir_path,
+            build_dir,
+        )
+
+        with (idk_repository_path / "WORKSPACE.bazel").open("wt") as f:
+            f.write(f'workspace(name = "{_idk_repository_name}")\n')
+        with (idk_repository_path / "MODULE.bazel").open("wt") as f:
+            f.write(f'module(name = "{_idk_repository_name}", version = "1")\n')
+
+        ninja_idk_export_dir_symlink_path = (
+            idk_repository_path / "ninja_idk_export_dir_symlink"
+        )
+        if (
+            ninja_idk_export_dir_symlink_path.exists()
+            or ninja_idk_export_dir_symlink_path.is_symlink()
+        ):
+            os.remove(ninja_idk_export_dir_symlink_path)
+        os.symlink(idk_export_dir_path, ninja_idk_export_dir_symlink_path)
+
         # The list of extra inputs to add to the Ninja build plan.
         extra_ninja_build_inputs: T.Set[Path] = set()
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
@@ -380,13 +451,13 @@ def main() -> int:
         )
 
         # Generate the content of the @fuchsia_build_info directory.
+        # `extra_ninja_inputs` does not need to be updated because the content
+        # is derived from GN args, and any changes would cause GN gen to run.
         log("Generating @fuchsia_build_info content")
-        extra_ninja_build_inputs |= (
-            workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
-                fuchsia_dir=fuchsia_dir,
-                build_dir=build_dir,
-                repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
-            )
+        workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
+            fuchsia_dir=fuchsia_dir,
+            build_dir=build_dir,
+            repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
         )
 
         # Generate the bazel launcher and Bazel workspace files.
@@ -471,7 +542,11 @@ def main() -> int:
         # but using different build directories.
 
         # These symlinks are useful for IDEs.
-        for artifact in ("compile_commands.json", "rust-project.json"):
+        for artifact in [
+            "compile_commands.json",
+            "rust-project.json",
+            "pyrightconfig.base.json",
+        ]:
             if (build_dir / artifact).exists():
                 make_relative_symlink(
                     fuchsia_dir / artifact, build_dir / artifact
@@ -507,6 +582,23 @@ def main() -> int:
             return result
 
     create_convenience_symlinks()
+
+    # These symlinks point out/default to the active build directory for
+    # developer convenience
+    if build_dir.name != "default":
+        out_default = fuchsia_dir / "out" / "default"
+        # if out/default was previously a hard directory
+        if out_default.exists() and not out_default.is_symlink():
+            old_dir = out_default
+            new_dir = old_dir.parent / (old_dir.name + "-migrated")
+            counter = 1
+            while os.path.exists(new_dir):
+                new_dir = old_dir.parent / f"{old_dir.name}-migrated{counter}"
+                counter += 1
+            old_dir.rename(new_dir)
+            print(f"[INFO] Moved out/default to out/{new_dir.name}")
+        # make out/dir a symlink of the buildDir for backwards compatibility
+        make_relative_symlink(out_default, build_dir)
 
     log("Done.")
     return 0

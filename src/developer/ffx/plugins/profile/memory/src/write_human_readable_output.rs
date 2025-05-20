@@ -199,6 +199,7 @@ pub fn write_human_readable_output<'a, W: Write>(
         ProfileMemoryOutput::ProcessDigest(processes_digest) => {
             print_processes_digest(w, processes_digest.process_data, size_to_string_formatter)
         }
+        ProfileMemoryOutput::ComponentDigest(_) => errors::ffx_bail!("Not supported"),
     }
 }
 

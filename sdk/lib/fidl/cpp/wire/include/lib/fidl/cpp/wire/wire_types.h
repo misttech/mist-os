@@ -278,7 +278,7 @@ class OwnedEncodeResult {
   }
 
   template <typename T, typename... Args>
-  explicit OwnedEncodeResult(cpp17::in_place_type_t<T> tag, Args&&... args)
+  explicit OwnedEncodeResult(std::in_place_type_t<T> tag, Args&&... args)
       : result_(tag, std::forward<Args>(args)...) {}
 
  private:
@@ -335,7 +335,7 @@ OwnedEncodeResult StandaloneEncode(FidlType& value) {
     ::fidl::internal::UnownedEncodedMessage<FidlType, internal::ChannelTransport> message_;
   };
 
-  return OwnedEncodeResult(cpp17::in_place_type_t<Encoded>{}, &value);
+  return OwnedEncodeResult(std::in_place_type_t<Encoded>{}, &value);
 }
 
 // |StandaloneInplaceDecode| decodes the |message| to a wire domain

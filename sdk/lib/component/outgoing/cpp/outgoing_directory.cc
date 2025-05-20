@@ -96,12 +96,12 @@ zx::result<> OutgoingDirectory::ServeFromStartupInfo() {
   return Serve(std::move(directory_request));
 }
 
-zx::result<> OutgoingDirectory::AddUnmanagedProtocol(AnyHandler handler, cpp17::string_view name) {
+zx::result<> OutgoingDirectory::AddUnmanagedProtocol(AnyHandler handler, std::string_view name) {
   return AddUnmanagedProtocolAt(std::move(handler), kServiceDirectory, name);
 }
 
-zx::result<> OutgoingDirectory::AddUnmanagedProtocolAt(AnyHandler handler, cpp17::string_view path,
-                                                       cpp17::string_view name) {
+zx::result<> OutgoingDirectory::AddUnmanagedProtocolAt(AnyHandler handler, std::string_view path,
+                                                       std::string_view name) {
   std::lock_guard guard(inner().checker_);
 
   // More thorough path validation is done in |svc_add_service|.
@@ -137,13 +137,13 @@ zx::result<> OutgoingDirectory::AddUnmanagedProtocolAt(AnyHandler handler, cpp17
 }
 
 zx::result<> OutgoingDirectory::AddDirectory(fidl::ClientEnd<fuchsia_io::Directory> remote_dir,
-                                             cpp17::string_view directory_name) {
+                                             std::string_view directory_name) {
   return AddDirectoryAt(std::move(remote_dir), /*path=*/"", directory_name);
 }
 
 zx::result<> OutgoingDirectory::AddDirectoryAt(fidl::ClientEnd<fuchsia_io::Directory> remote_dir,
-                                               cpp17::string_view path,
-                                               cpp17::string_view directory_name) {
+                                               std::string_view path,
+                                               std::string_view directory_name) {
   std::lock_guard guard(inner().checker_);
 
   if (!remote_dir.is_valid()) {
@@ -158,15 +158,13 @@ zx::result<> OutgoingDirectory::AddDirectoryAt(fidl::ClientEnd<fuchsia_io::Direc
                                                      remote_dir.TakeChannel().release()));
 }
 
-zx::result<> OutgoingDirectory::AddService(ServiceInstanceHandler handler,
-                                           cpp17::string_view service,
-                                           cpp17::string_view instance) {
+zx::result<> OutgoingDirectory::AddService(ServiceInstanceHandler handler, std::string_view service,
+                                           std::string_view instance) {
   return AddServiceAt(std::move(handler), kServiceDirectory, service, instance);
 }
 
-zx::result<> OutgoingDirectory::AddServiceAt(ServiceInstanceHandler handler,
-                                             cpp17::string_view path, cpp17::string_view service,
-                                             cpp17::string_view instance) {
+zx::result<> OutgoingDirectory::AddServiceAt(ServiceInstanceHandler handler, std::string_view path,
+                                             std::string_view service, std::string_view instance) {
   if (service.empty() || instance.empty()) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -190,12 +188,12 @@ zx::result<> OutgoingDirectory::AddServiceAt(ServiceInstanceHandler handler,
   return zx::ok();
 }
 
-zx::result<> OutgoingDirectory::RemoveProtocol(cpp17::string_view name) {
+zx::result<> OutgoingDirectory::RemoveProtocol(std::string_view name) {
   return RemoveProtocolAt(kServiceDirectory, name);
 }
 
-zx::result<> OutgoingDirectory::RemoveProtocolAt(cpp17::string_view directory,
-                                                 cpp17::string_view name) {
+zx::result<> OutgoingDirectory::RemoveProtocolAt(std::string_view directory,
+                                                 std::string_view name) {
   std::lock_guard guard(inner().checker_);
 
   std::string key(directory);
@@ -229,13 +227,12 @@ zx::result<> OutgoingDirectory::RemoveProtocolAt(cpp17::string_view directory,
   return zx::ok();
 }
 
-zx::result<> OutgoingDirectory::RemoveService(cpp17::string_view service,
-                                              cpp17::string_view instance) {
+zx::result<> OutgoingDirectory::RemoveService(std::string_view service, std::string_view instance) {
   return RemoveServiceAt(kServiceDirectory, service, instance);
 }
 
-zx::result<> OutgoingDirectory::RemoveServiceAt(cpp17::string_view path, cpp17::string_view service,
-                                                cpp17::string_view instance) {
+zx::result<> OutgoingDirectory::RemoveServiceAt(std::string_view path, std::string_view service,
+                                                std::string_view instance) {
   std::lock_guard guard(inner().checker_);
 
   std::string fullpath = MakePath({path, service, instance});
@@ -259,12 +256,12 @@ zx::result<> OutgoingDirectory::RemoveServiceAt(cpp17::string_view path, cpp17::
   return zx::ok();
 }
 
-zx::result<> OutgoingDirectory::RemoveDirectory(cpp17::string_view directory_name) {
+zx::result<> OutgoingDirectory::RemoveDirectory(std::string_view directory_name) {
   return RemoveDirectoryAt(/*path=*/"", directory_name);
 }
 
-zx::result<> OutgoingDirectory::RemoveDirectoryAt(cpp17::string_view path,
-                                                  cpp17::string_view directory_name) {
+zx::result<> OutgoingDirectory::RemoveDirectoryAt(std::string_view path,
+                                                  std::string_view directory_name) {
   std::lock_guard guard(inner().checker_);
 
   if (directory_name.empty()) {
@@ -286,7 +283,7 @@ void OutgoingDirectory::AppendUnbindConnectionCallback(UnbindCallbackMap* unbind
   (*unbind_protocol_callbacks)[name].emplace_back(std::move(callback));
 }
 
-void OutgoingDirectory::UnbindAllConnections(cpp17::string_view name) {
+void OutgoingDirectory::UnbindAllConnections(std::string_view name) {
   auto key = std::string(name);
   auto iterator = inner().unbind_protocol_callbacks_.find(key);
   if (iterator != inner().unbind_protocol_callbacks_.end()) {

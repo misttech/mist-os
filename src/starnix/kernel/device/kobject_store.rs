@@ -11,6 +11,7 @@ use crate::fs::sysfs::{
     SYSFS_CLASS, SYSFS_DEV, SYSFS_DEVICES,
 };
 use crate::vfs::{FsNodeOps, FsStr, FsString};
+use std::sync::Weak;
 
 /// The owner of all the KObjects in sysfs.
 ///
@@ -88,6 +89,11 @@ impl KObjectStore {
         self.get_or_create_class("mem".into(), self.virtual_bus())
     }
 
+    /// The device class used for virtual net devices.
+    pub fn net_class(&self) -> Class {
+        self.get_or_create_class("net".into(), self.virtual_bus())
+    }
+
     /// The device class used for virtual misc devices.
     pub fn misc_class(&self) -> Class {
         self.get_or_create_class("misc".into(), self.virtual_bus())
@@ -124,6 +130,24 @@ impl KObjectStore {
     pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
         let collection =
             Collection::new(self.class.get_or_create_child(name, KObjectSymlinkDirectory::new));
+        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
+    }
+
+    /// Get a class by name.
+    ///
+    /// If the bus does not exist, this function will create it.
+    pub fn get_or_create_class_with_ops<F, N>(
+        &self,
+        name: &FsStr,
+        bus: Bus,
+        create_class_sysfs_ops: F,
+    ) -> Class
+    where
+        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+    {
+        let collection =
+            Collection::new(self.class.get_or_create_child(name, create_class_sysfs_ops));
         Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
     }
 

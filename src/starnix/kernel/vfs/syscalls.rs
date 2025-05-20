@@ -29,6 +29,7 @@ use crate::vfs::{
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::ownership::TempRef;
 use starnix_types::time::{
     duration_from_poll_timeout, duration_from_timespec, time_from_timespec, timespec_from_duration,
 };
@@ -82,11 +83,77 @@ use std::sync::{atomic, Arc};
 use std::usize;
 use zerocopy::{Immutable, IntoBytes};
 
+uapi::check_arch_independent_layout! {
+    pollfd {
+        fd,
+        events,
+        revents,
+    }
+
+    io_event {
+        data,
+        obj,
+        res,
+        res2,
+    }
+
+    iocb {
+        aio_data,
+        aio_key,
+        aio_rw_flags,
+        aio_lio_opcode,
+        aio_reqprio,
+        aio_fildes,
+        aio_buf,
+        aio_nbytes,
+        aio_offset,
+        aio_reserved2,
+        aio_flags,
+        aio_resfd,
+    }
+
+    statx_timestamp {
+        tv_sec,
+        tv_nsec,
+    }
+
+    statx {
+        stx_mask,
+        stx_blksize,
+        stx_attributes,
+        stx_nlink,
+        stx_uid,
+        stx_gid,
+        stx_mode,
+        stx_ino,
+        stx_size,
+        stx_blocks,
+        stx_attributes_mask,
+        stx_atime,
+        stx_btime,
+        stx_ctime,
+        stx_mtime,
+        stx_rdev_major,
+        stx_rdev_minor,
+        stx_dev_major,
+        stx_dev_minor,
+        stx_mnt_id,
+        stx_dio_mem_align,
+        stx_dio_offset_align,
+        stx_subvol,
+        stx_atomic_write_unit_min,
+        stx_atomic_write_unit_max,
+        stx_atomic_write_segments_max,
+    }
+}
+
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
 const UTIME_OMIT: i64 = 0x3ffffffe;
 
 pub type OffsetPtr = MultiArchUserRef<uapi::off_t, uapi::arch32::off_t>;
+pub type IocbPtr = MultiArchUserRef<iocb, iocb>;
+pub type IocbPtrPtr = MultiArchUserRef<IocbPtr, IocbPtr>;
 
 pub fn sys_read(
     locked: &mut Locked<'_, Unlocked>,
@@ -772,7 +839,7 @@ pub fn sys_openat2(
     while pos < size {
         let length = std::cmp::min(size - pos, *PAGE_SIZE as usize);
         let extra_bytes =
-            current_task.read_buffer(&UserBuffer { address: how_ref.addr() + pos, length })?;
+            current_task.read_buffer(&UserBuffer { address: (how_ref.addr() + pos)?, length })?;
         for b in extra_bytes {
             if b != 0 {
                 return error!(E2BIG);
@@ -1575,7 +1642,7 @@ pub fn sys_pipe2(
     log_trace!("pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
 
     current_task.write_object(user_pipe, &fd_read)?;
-    let user_pipe = user_pipe.next();
+    let user_pipe = user_pipe.next()?;
     current_task.write_object(user_pipe, &fd_write)?;
 
     Ok(())
@@ -1985,8 +2052,9 @@ pub fn sys_pidfd_getfd(
     }
 
     let file = current_task.files.get(pidfd)?;
-    let task = current_task.get_task(file.as_pid()?);
-    let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
+    let tg = file.as_thread_group_key()?;
+    let tg = tg.upgrade().ok_or_else(|| errno!(ESRCH))?;
+    let task = TempRef::into_static(tg.read().tasks().next().ok_or_else(|| errno!(ESRCH))?);
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &task)?;
 
@@ -2536,7 +2604,7 @@ pub fn poll(
     let waiter = FileWaiter::<usize>::default();
 
     for (index, poll_descriptor) in pollfds.iter_mut().enumerate() {
-        *poll_descriptor = current_task.read_object(user_pollfds.at(index))?;
+        *poll_descriptor = current_task.read_object(user_pollfds.at(index)?)?;
         poll_descriptor.revents = 0;
         if poll_descriptor.fd < 0 {
             continue;
@@ -2571,7 +2639,7 @@ pub fn poll(
     }
 
     for (index, poll_descriptor) in pollfds.iter().enumerate() {
-        current_task.write_object(user_pollfds.at(index), poll_descriptor)?;
+        current_task.write_object(user_pollfds.at(index)?, poll_descriptor)?;
     }
 
     Ok(unique_ready_items.into_iter().filter(Clone::clone).count())
@@ -2582,7 +2650,7 @@ pub fn sys_ppoll(
     current_task: &mut CurrentTask,
     user_fds: UserRef<pollfd>,
     num_fds: i32,
-    user_timespec: UserRef<timespec>,
+    user_timespec: TimeSpecPtr,
     user_mask: UserRef<SigSet>,
     sigset_size: usize,
 ) -> Result<usize, Errno> {
@@ -2592,7 +2660,7 @@ pub fn sys_ppoll(
         // Passing -1 to poll is equivalent to an infinite timeout.
         -1
     } else {
-        let ts = current_task.read_object(user_timespec)?;
+        let ts = current_task.read_multi_arch_object(user_timespec)?;
         duration_from_timespec::<zx::MonotonicTimeline>(ts)?.into_millis() as i32
     };
 
@@ -2622,7 +2690,7 @@ pub fn sys_ppoll(
     // handled by the application (i.e. returns ERESTARTNOHAND). However, if
     // [copy out] failed, then the restarted ppoll would use the wrong timeout, so the
     // error should be left as EINTR."
-    match (current_task.write_object(user_timespec, &remaining_timespec), poll_result) {
+    match (current_task.write_multi_arch_object(user_timespec, remaining_timespec), poll_result) {
         // If write was ok, and poll was ok, return poll result.
         (Ok(_), Ok(num_events)) => Ok(num_events),
         (Ok(_), Err(e)) if e == EINTR => {
@@ -2965,7 +3033,7 @@ pub fn sys_io_setup(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_nr_events: UserValue<u32>,
-    user_ctx_idp: UserRef<aio_context_t>,
+    user_ctx_idp: MultiArchUserRef<uapi::aio_context_t, uapi::arch32::aio_context_t>,
 ) -> Result<(), Errno> {
     // From https://man7.org/linux/man-pages/man2/io_setup.2.html:
     //
@@ -2976,11 +3044,11 @@ pub fn sys_io_setup(
     // TODO: Determine what "internal limits" means.
     let max_operations =
         user_nr_events.validate(0..(i32::MAX as u32)).ok_or_else(|| errno!(EINVAL))? as usize;
-    if current_task.read_object(user_ctx_idp)? != 0 {
+    if current_task.read_multi_arch_object(user_ctx_idp)? != 0 {
         return error!(EINVAL);
     }
     let ctx_id = AioContext::create(current_task, max_operations)?;
-    current_task.write_object(user_ctx_idp, &ctx_id).map_err(|e| {
+    current_task.write_multi_arch_object(user_ctx_idp, ctx_id).map_err(|e| {
         let _ = current_task
             .mm()
             .expect("previous sys_io_setup code verified mm exists")
@@ -2995,7 +3063,7 @@ pub fn sys_io_submit(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     user_nr: UserValue<i32>,
-    mut iocb_addrs: UserRef<UserAddress>,
+    mut iocb_addrs: IocbPtrPtr,
 ) -> Result<i32, Errno> {
     let nr = user_nr.validate(0..i32::MAX).ok_or_else(|| errno!(EINVAL))?;
     if nr == 0 {
@@ -3010,11 +3078,10 @@ pub fn sys_io_submit(
     // `iocbpp` is an array of addresses to iocb's.
     let mut num_submitted: i32 = 0;
     loop {
-        let iocb_addr = current_task.read_object(iocb_addrs)?;
-        let iocb_ref = UserRef::<iocb>::new(iocb_addr.clone());
-        let control_block = current_task.read_object(iocb_ref)?;
+        let iocb_ref = current_task.read_multi_arch_ptr(iocb_addrs)?;
+        let control_block = current_task.read_multi_arch_object(iocb_ref)?;
 
-        match (num_submitted, ctx.submit(current_task, control_block, iocb_addr)) {
+        match (num_submitted, ctx.submit(current_task, control_block, iocb_ref)) {
             (0, Err(e)) => return Err(e),
             (_, Err(_)) => break,
             (_, Ok(())) => {
@@ -3025,7 +3092,7 @@ pub fn sys_io_submit(
             }
         };
 
-        iocb_addrs = iocb_addrs.next();
+        iocb_addrs = iocb_addrs.next()?;
     }
 
     Ok(num_submitted)
@@ -3062,10 +3129,10 @@ pub fn sys_io_cancel(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
-    user_iocb: UserRef<iocb>,
+    user_iocb: IocbPtr,
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
-    let _iocb = current_task.read_object(user_iocb)?;
+    let _iocb = current_task.read_multi_arch_object(user_iocb)?;
     let _ctx = current_task
         .mm()
         .ok_or_else(|| errno!(EINVAL))?
@@ -3547,23 +3614,63 @@ mod arch32 {
         super::statfs(locked, current_task, user_path, user_buf)
     }
 
+    pub fn sys_arch32_arm_fadvise64_64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        advice: u32,
+        offset_low: u64,
+        offset_high: u64,
+        len_low: u64,
+        len_high: u64,
+    ) -> Result<(), Errno> {
+        let offset =
+            off_t::try_from(offset_low | (offset_high << 32)).map_err(|_| errno!(EINVAL))?;
+        let len = off_t::try_from(len_low | (len_high << 32)).map_err(|_| errno!(EINVAL))?;
+        super::sys_fadvise64(locked, current_task, fd, offset, len, advice)
+    }
+
+    pub fn sys_arch32_sendfile64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        out_fd: FdNumber,
+        in_fd: FdNumber,
+        user_offset: UserRef<uapi::off_t>,
+        count: i32,
+    ) -> Result<usize, Errno> {
+        super::sys_sendfile(locked, current_task, out_fd, in_fd, user_offset.into(), count)
+    }
+
     pub use super::{
         sys_chdir as sys_arch32_chdir, sys_chroot as sys_arch32_chroot,
-        sys_dup3 as sys_arch32_dup3, sys_epoll_create1 as sys_arch32_epoll_create1,
-        sys_epoll_ctl as sys_arch32_epoll_ctl, sys_epoll_pwait as sys_arch32_epoll_pwait,
-        sys_epoll_pwait2 as sys_arch32_epoll_pwait2, sys_eventfd2 as sys_arch32_eventfd2,
-        sys_fchmod as sys_arch32_fchmod, sys_fchown as sys_arch32_fchown32,
-        sys_fchown as sys_arch32_fchown, sys_fstatat64 as sys_arch32_fstatat64,
-        sys_fstatfs as sys_arch32_fstatfs, sys_ftruncate as sys_arch32_ftruncate,
+        sys_copy_file_range as sys_arch32_copy_file_range, sys_dup3 as sys_arch32_dup3,
+        sys_epoll_create1 as sys_arch32_epoll_create1, sys_epoll_ctl as sys_arch32_epoll_ctl,
+        sys_epoll_pwait as sys_arch32_epoll_pwait, sys_epoll_pwait2 as sys_arch32_epoll_pwait2,
+        sys_eventfd2 as sys_arch32_eventfd2, sys_fallocate as sys_arch32_fallocate,
+        sys_fchmod as sys_arch32_fchmod, sys_fchmodat as sys_arch32_fchmodat,
+        sys_fchown as sys_arch32_fchown32, sys_fchown as sys_arch32_fchown,
+        sys_fchownat as sys_arch32_fchownat, sys_fdatasync as sys_arch32_fdatasync,
+        sys_flock as sys_arch32_flock, sys_fsetxattr as sys_arch32_fsetxattr,
+        sys_fstatat64 as sys_arch32_fstatat64, sys_fstatfs as sys_arch32_fstatfs,
+        sys_fsync as sys_arch32_fsync, sys_ftruncate as sys_arch32_ftruncate,
         sys_inotify_add_watch as sys_arch32_inotify_add_watch,
         sys_inotify_init1 as sys_arch32_inotify_init1,
-        sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_linkat as sys_arch32_linkat,
+        sys_inotify_rm_watch as sys_arch32_inotify_rm_watch, sys_io_cancel as sys_arch32_io_cancel,
+        sys_io_destroy as sys_arch32_io_destroy, sys_io_getevents as sys_arch32_io_getevents,
+        sys_io_setup as sys_arch32_io_setup, sys_io_submit as sys_arch32_io_submit,
+        sys_lgetxattr as sys_arch32_lgetxattr, sys_linkat as sys_arch32_linkat,
+        sys_listxattr as sys_arch32_listxattr, sys_llistxattr as sys_arch32_llistxattr,
+        sys_lsetxattr as sys_arch32_lsetxattr, sys_mkdirat as sys_arch32_mkdirat,
         sys_mknodat as sys_arch32_mknodat, sys_pidfd_getfd as sys_arch32_pidfd_getfd,
-        sys_pidfd_open as sys_arch32_pidfd_open, sys_preadv as sys_arch32_preadv,
-        sys_pselect6 as sys_arch32_pselect6, sys_readv as sys_arch32_readv,
+        sys_pidfd_open as sys_arch32_pidfd_open, sys_ppoll as sys_arch32_ppoll,
+        sys_preadv as sys_arch32_preadv, sys_pselect6 as sys_arch32_pselect6,
+        sys_readv as sys_arch32_readv, sys_removexattr as sys_arch32_removexattr,
         sys_renameat2 as sys_arch32_renameat2, sys_select as sys_arch32__newselect,
+        sys_sendfile as sys_arch32_sendfile, sys_setxattr as sys_arch32_setxattr,
         sys_splice as sys_arch32_splice, sys_statfs as sys_arch32_statfs,
-        sys_tee as sys_arch32_tee, sys_timerfd_create as sys_arch32_timerfd_create,
+        sys_statx as sys_arch32_statx, sys_symlinkat as sys_arch32_symlinkat,
+        sys_sync as sys_arch32_sync, sys_tee as sys_arch32_tee,
+        sys_timerfd_create as sys_arch32_timerfd_create,
         sys_timerfd_settime as sys_arch32_timerfd_settime, sys_truncate as sys_arch32_truncate,
         sys_umask as sys_arch32_umask, sys_utimensat as sys_arch32_utimensat,
         sys_vmsplice as sys_arch32_vmsplice,
@@ -3704,7 +3811,8 @@ mod tests {
         let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
-        let user_stat = UserRef::new(path_addr + file_path.len());
+        let memory_len = (path_addr + file_path.len()).expect("OOB memory allocation!");
+        let user_stat = UserRef::new(memory_len);
         current_task.write_object(user_stat, &default_statfs(0)).expect("failed to clear struct");
 
         let user_path = UserCString::new(&current_task, path_addr);

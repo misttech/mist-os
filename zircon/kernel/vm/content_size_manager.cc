@@ -7,7 +7,7 @@
 #include "vm/content_size_manager.h"
 
 #include <ktl/limits.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 // static
 zx::result<fbl::RefPtr<ContentSizeManager>> ContentSizeManager::Create(uint64_t content_size) {

@@ -336,7 +336,7 @@ impl RemoteControlService {
             return Err(rcs::ConnectCapabilityError::NoMatchingComponent);
         };
 
-        let dir = component_debug::dirs::open_instance_dir_root_readable(
+        let dir = component_debug::dirs::open_instance_directory(
             &moniker,
             fsys::OpenDirType::NamespaceDir.into(),
             &query,
@@ -378,7 +378,7 @@ async fn connect_to_capability_at_moniker(
         })
         .await?;
 
-    let dir = open_instance_dir_root_readable(&moniker, capability_set.into(), &query)
+    let dir = open_instance_directory(&moniker, capability_set.into(), &query)
         .map_err(|err| {
             error!(err:?; "error opening exposed dir");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
@@ -718,25 +718,6 @@ mod tests {
     fn setup_fake_realm_query(capability_set: fsys::OpenDirType) -> fsys::RealmQueryProxy {
         fidl_test_util::spawn_stream_handler(move |request: fsys::RealmQueryRequest| async move {
             match request {
-                fsys::RealmQueryRequest::DeprecatedOpen {
-                    moniker,
-                    dir_type,
-                    flags,
-                    mode,
-                    path,
-                    object,
-                    responder,
-                } => {
-                    assert_eq!(moniker, "core/my_component");
-                    assert_eq!(dir_type, capability_set);
-                    assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
-                    assert_eq!(mode, fio::ModeType::empty());
-                    assert_eq!(path, ".");
-
-                    setup_exposed_dir(object.into_channel().into());
-
-                    responder.send(Ok(())).unwrap()
-                }
                 fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
                     assert_eq!(moniker, "core/my_component");
                     assert_eq!(dir_type, capability_set);

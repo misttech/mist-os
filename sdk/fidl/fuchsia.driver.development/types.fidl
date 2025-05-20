@@ -81,7 +81,7 @@ type CompositeNodeInfo = table {
 };
 
 /// Contains information for a thread.
-@available(added=NEXT)
+@available(added=27)
 type ThreadInfo = table {
     /// The koid for the thread.
     1: koid zx.Koid;
@@ -94,7 +94,7 @@ type ThreadInfo = table {
 };
 
 /// Contains information for a dispatcher.
-@available(added=NEXT)
+@available(added=27)
 type DispatcherInfo = table {
     /// The driver which created this dispatcher.
     1: driver fuchsia.url.Url;
@@ -110,7 +110,7 @@ type DispatcherInfo = table {
 };
 
 /// Contains information for a driver host.
-@available(added=NEXT)
+@available(added=27)
 type DriverHostInfo = table {
     /// The process KOID of the driver host.
     1: process_koid zx.Koid;

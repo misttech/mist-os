@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.versions/cpp/markers.h>
 #include <fidl/test.versions/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -16,38 +18,19 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-#ifdef __Fuchsia__
-}  // namespace fidl
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_versions::OtherProtocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
 };
-namespace fidl {
-
-#endif  // __Fuchsia__
-
-}  // namespace fidl
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_versions::OtherProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_versions::OtherProtocol>> {
  public:
  private:
-  ::fidl::UnownedClientEnd<::test_versions::OtherProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_versions::OtherProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_versions::OtherProtocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_versions::OtherProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -79,13 +62,9 @@ class ::fidl::SyncEventHandler<::test_versions::OtherProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_versions::OtherProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_versions::OtherProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_versions::OtherProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_versions::OtherProtocol>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_versions::OtherProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -98,8 +77,6 @@ class ::fidl::internal::NaturalEventSender<::test_versions::OtherProtocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_versions::OtherProtocol> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -119,19 +96,13 @@ class ::fidl::Server<::test_versions::OtherProtocol> : public ::fidl::internal::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_versions::OtherProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_versions::OtherProtocol> final {
@@ -147,14 +118,10 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_versions::OtherProtocol>
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_versions::Protocol::Foo> {
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_versions::Protocol> final : public ::fidl::internal::NaturalClientBase {
@@ -163,10 +130,6 @@ class ::fidl::internal::NaturalClientImpl<::test_versions::Protocol> final : pub
   ::fit::result<::fidl::OneWayError> Foo() const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol>> {
@@ -174,15 +137,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol> final
   ::fit::result<::fidl::OneWayError> Foo();
 
  private:
-  ::fidl::UnownedClientEnd<::test_versions::Protocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_versions::Protocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_versions::Protocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_versions::Protocol> {
@@ -214,16 +170,12 @@ class ::fidl::SyncEventHandler<::test_versions::Protocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_versions::Protocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_versions::Protocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -236,8 +188,6 @@ class ::fidl::internal::NaturalEventSender<::test_versions::Protocol>
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_versions::Protocol> : public ::fidl::internal::IncomingMessageDispatcher, public ::fidl::UnknownMethodHandler<::test_versions::Protocol> {
@@ -262,19 +212,13 @@ class ::fidl::Server<::test_versions::Protocol> : public ::fidl::internal::Incom
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_versions::Protocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_versions::Protocol> final {
@@ -289,6 +233,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_versions::Protocol> fina
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

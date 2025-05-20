@@ -25,6 +25,9 @@ class CurrentChannelProvider : public StaticSingleFidlMethodAnnotationProvider<
  public:
   using StaticSingleFidlMethodAnnotationProvider::StaticSingleFidlMethodAnnotationProvider;
 
+  virtual ~CurrentChannelProvider() = default;
+
+  static std::set<std::string> GetAnnotationKeys();
   std::set<std::string> GetKeys() const override;
 };
 

@@ -67,15 +67,15 @@ class FileState(object):
         self._cipd_names = cipd_names
         self._exclude_suffixes = tuple(exclude_suffixes)
         self._git_binary = git_binary
-        self._input_files: T.Set[Path] = set()
-        self._sorted_input_files: T.Optional[T.List[str]] = None
+        self._input_files: set[Path] = set()
+        self._sorted_input_files: T.Optional[list[str]] = None
         self._hstate = hashlib.new(_HASH)
 
     def hash_source_path(self, source_path: Path) -> None:
         """Process and hash a given source file, updating internal state."""
         self._hstate.update(self.process_source_path(source_path).encode())
 
-    def find_directory_files(self, source_path: Path) -> T.Set[Path]:
+    def find_directory_files(self, source_path: Path) -> set[Path]:
         source_path.is_dir(), f"Input source path is not a directory: {source_path}"
 
         if self._cipd_names:
@@ -87,7 +87,7 @@ class FileState(object):
                     return set([clang_version_file])
 
         # Find all files in direcrory.
-        dir_files: T.Set[Path] = set()
+        dir_files: set[Path] = set()
         for dirpath, dirnames, filenames in os.walk(source_path):
             for filename in filenames:
                 if filename.endswith(self._exclude_suffixes):
@@ -136,7 +136,7 @@ class FileState(object):
                     return self.process_source_path(clang_version_file)
 
         # Get the list of files relative to the source directory.
-        dir_files: T.List[str] = [
+        dir_files: list[str] = [
             os.path.relpath(f, source_path)
             for f in self.find_directory_files(source_path)
         ]
@@ -155,7 +155,7 @@ class FileState(object):
         return self._hstate.hexdigest()
 
     @property
-    def sorted_input_files(self) -> T.List[str]:
+    def sorted_input_files(self) -> list[str]:
         """Return the list of input files used by this instance."""
         if self._sorted_input_files is None:
             self._sorted_input_files = sorted(
@@ -163,7 +163,7 @@ class FileState(object):
             )
         return self._sorted_input_files
 
-    def get_input_file_paths(self) -> T.Set[Path]:
+    def get_input_file_paths(self) -> set[Path]:
         """Return the set of input file Path values used by this instance."""
         return self._input_files
 

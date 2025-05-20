@@ -53,6 +53,10 @@ conformance_golden_items = [
     language = "rust_codec"
     extension = "rs"
   },
+  {
+    language = "rust_next"
+    extension = "rs"
+  },
 ]
 
 foreach(item, conformance_golden_items) {

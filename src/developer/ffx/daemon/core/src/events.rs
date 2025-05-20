@@ -36,12 +36,11 @@ pub trait EventSynthesizer<T: EventTrait> {
 /// Leaves a log for debugging.
 #[async_trait(?Send)]
 impl<T: EventTrait> EventSynthesizer<T> for Weak<dyn EventSynthesizer<T>> {
-    #[tracing::instrument(skip(self))]
     async fn synthesize_events(&self) -> Vec<T> {
         let this = match self.upgrade() {
             Some(t) => t,
             None => {
-                tracing::info!("event synthesizer parent Rc<_> lost");
+                log::info!("event synthesizer parent Rc<_> lost");
                 return Vec::new();
             }
         };
@@ -77,7 +76,6 @@ struct Dispatcher<T: EventTrait + 'static> {
 }
 
 impl<T: EventTrait + 'static> Dispatcher<T> {
-    #[tracing::instrument(skip(inner))]
     async fn handler_helper(
         event: T,
         inner: Rc<DispatcherInner<T>>,
@@ -108,7 +106,6 @@ impl<T: EventTrait + 'static> Dispatcher<T> {
             .await
     }
 
-    #[tracing::instrument(skip(handler))]
     fn new(handler: impl EventHandler<T> + 'static) -> Self {
         let (event_in, queue) = unbounded_channel::<T>();
         let inner = Rc::new(DispatcherInner { handler: Box::new(handler), event_in });
@@ -123,7 +120,7 @@ impl<T: EventTrait + 'static> Dispatcher<T> {
                     .await
                     .unwrap_or_else(|e| {
                         if let Err(e) = e {
-                            tracing::warn!("dispatcher failed in detached task: {:#?}", e)
+                            log::warn!("dispatcher failed in detached task: {:#?}", e)
                         }
                     });
             }),
@@ -257,7 +254,6 @@ impl<T: 'static + EventTrait> Queue<T> {
     /// Before this happens, though, the event dispatcher associated with this
     /// `EventHandler<_>` will send a list of synthesized events to the handler
     /// derived from the internal state.
-    #[tracing::instrument(skip(self, handler))]
     pub async fn add_handler(&self, handler: impl EventHandler<T> + 'static) {
         // Locks the handlers so that they cannot receive events, then obtains
         // the state as it will (hopefully) not have had any updates after
@@ -278,7 +274,7 @@ impl<T: 'static + EventTrait> Queue<T> {
             {
                 Ok(_) => (),
                 Err(e) => {
-                    tracing::warn!("{}", e);
+                    log::warn!("{}", e);
                     return;
                 }
             }
@@ -301,7 +297,6 @@ impl<T: 'static + EventTrait> Queue<T> {
     }
 
     /// The async version of `wait_for` (See: `wait_for`).
-    #[tracing::instrument(skip(self, predicate))]
     pub async fn wait_for_async<F1>(
         &self,
         timeout_opt: Option<Duration>,
@@ -318,7 +313,7 @@ impl<T: 'static + EventTrait> Queue<T> {
             handler_done
                 .next()
                 .await
-                .unwrap_or_else(|| tracing::warn!("unable to get 'done' signal from handler."));
+                .unwrap_or_else(|| log::warn!("unable to get 'done' signal from handler."));
             Result::<()>::Ok(())
         };
         self.add_handler(handler).await;
@@ -341,7 +336,6 @@ impl<T> Processor<T>
 where
     T: EventTrait + 'static,
 {
-    #[tracing::instrument(skip(self))]
     async fn dispatch(&self, event: T) {
         let mut handlers = self.handlers.lock().await;
 
@@ -350,7 +344,7 @@ where
             match dispatcher.push(event.clone()).await {
                 Ok(()) => new_handlers.push(dispatcher),
                 Err(e) => {
-                    tracing::debug!("dispatcher closed. reason: {:#}", e);
+                    log::debug!("dispatcher closed. reason: {:#}", e);
                 }
             }
         }
@@ -358,13 +352,12 @@ where
     }
 
     /// Consumes the processor and then runs until all instances of the Queue are closed.
-    #[tracing::instrument(skip(self))]
     async fn process(mut self) {
         if let Some(rx) = self.inner_rx.take() {
             let rx = UnboundedReceiverStream::new(rx);
             rx.for_each(|event| self.dispatch(event)).await;
         } else {
-            tracing::warn!("process should only ever be called once");
+            log::warn!("process should only ever be called once");
         }
     }
 }

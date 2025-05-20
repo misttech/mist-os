@@ -680,37 +680,43 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
 
     // The client should successfully renew without ever removing the address.
     let mut request_stream = address_state_provider.into_stream();
+    let mut watch_fut = pin!(config_stream.try_for_each(|_config| ready(Ok(()))).fuse());
 
-    {
+    let mut renewal_fut = pin!({
         let request_stream = &mut request_stream;
-        let mut request_stream = pin!(request_stream);
-        let request = request_stream
-            .try_next()
-            .await
-            .expect("should succeed")
-            .expect("should not have ended");
-        let (responder, valid_lifetime_end) = assert_matches!(
-            request,
-            fnet_interfaces_admin::AddressStateProviderRequest::UpdateAddressProperties {
-                address_properties: fnet_interfaces_admin::AddressProperties {
-                    valid_lifetime_end: Some(valid_lifetime_end),
-                    ..
-                },
-                responder,
-            } => (responder, valid_lifetime_end),
-            "client should successfully renew and update the address's valid lifetime"
-        );
-        assert!(
-            valid_lifetime_end > initial_valid_lifetime_end,
-            "valid lifetime should be extended"
-        );
-        responder.send().expect("responding to UpdateAddressProperties should succeed");
+        async move {
+            let mut request_stream = pin!(request_stream);
+            let request = request_stream
+                .try_next()
+                .await
+                .expect("should succeed")
+                .expect("should not have ended");
+            let (responder, valid_lifetime_end) = assert_matches!(
+                request,
+                fnet_interfaces_admin::AddressStateProviderRequest::UpdateAddressProperties {
+                    address_properties: fnet_interfaces_admin::AddressProperties {
+                        valid_lifetime_end: Some(valid_lifetime_end),
+                        ..
+                    },
+                    responder,
+                } => (responder, valid_lifetime_end),
+                "client should successfully renew and update the address's valid lifetime"
+            );
+            assert!(
+                valid_lifetime_end > initial_valid_lifetime_end,
+                "valid lifetime should be extended"
+            );
+            responder.send().expect("responding to UpdateAddressProperties should succeed");
+        }
+    }
+    .fuse());
+
+    futures::select! {
+        result = watch_fut => panic!("watch should not complete: {result:?}"),
+        () = renewal_fut => (),
     }
 
     let shutdown_fut = assert_client_shutdown(client, request_stream);
-    // We still need to drive the client's event loop while shutting it down.
-    let watch_fut = config_stream.try_for_each(|_config| ready(Ok(())));
-
     let (watch_result, ()) = join!(watch_fut, shutdown_fut);
     assert_matches!(
         watch_result,

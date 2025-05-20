@@ -36,7 +36,7 @@ const RANDOM_PORT_RANGE: std::ops::Range<u32> = 32768..u32::MAX;
 
 /// Watches the usb devfs for new devices.
 async fn listen_for_usb_devices(host: Weak<UsbVsockHost>) -> Result<(), usb_rs::Error> {
-    tracing::info!("Listening for USB devices");
+    log::info!("Listening for USB devices");
     let mut stream = usb_rs::wait_for_devices(true, false)?;
     while let Some(device) = stream.next().await.transpose()? {
         let usb_rs::DeviceEvent::Added(device) = device else {
@@ -44,14 +44,14 @@ async fn listen_for_usb_devices(host: Weak<UsbVsockHost>) -> Result<(), usb_rs::
         };
 
         let Some(host) = host.upgrade() else {
-            tracing::debug!("USB listening task observed host disappeared");
+            log::debug!("USB listening task observed host disappeared");
             return Ok(());
         };
 
         host.add_device(device);
     }
 
-    tracing::warn!("USB listening stopped unexpectedly");
+    log::warn!("USB listening stopped unexpectedly");
     Ok(())
 }
 
@@ -117,7 +117,7 @@ async fn wait_for_magic(
     out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
     loop {
         let size = {
-            tracing::trace!(device = debug_name, "Reading from in endpoint for magic string");
+            log::trace!(device:? = debug_name; "Reading from in endpoint for magic string");
             let read_fut = in_ep.read(&mut buf);
             let read_fut = pin!(read_fut);
             match select(read_fut, &mut magic_timer).await {
@@ -136,7 +136,7 @@ async fn wait_for_magic(
         let mut packets = VsockPacketIterator::new(&buf);
         while let Some(packet) = packets.next() {
             let Ok(packet) = packet else {
-                tracing::warn!(device = debug_name, "Packet failed to parse, ignoring.");
+                log::warn!(device:? = debug_name; "Packet failed to parse, ignoring.");
                 break;
             };
             match packet.header.packet_type {
@@ -147,16 +147,16 @@ async fn wait_for_magic(
                         return Ok(packet.header.device_cid.get());
                     }
 
-                    tracing::warn!(
-                        device = debug_name,
+                    log::warn!(
+                        device:? = debug_name;
                         "Invalid USB magic string (len = {}) received, ignoring and re-attempting sync",
                         packet.header.payload_len
                     );
                     out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
                 }
                 PacketType::Echo => {
-                    tracing::debug!(
-                        device = debug_name,
+                    log::debug!(
+                        device:? = debug_name;
                         "received echo packet while waiting for sync, responding."
                     );
                     out_ep
@@ -165,8 +165,8 @@ async fn wait_for_magic(
                         .map_err(SyncError::Send)?;
                 }
                 ty => {
-                    tracing::warn!(
-                        device = debug_name,
+                    log::warn!(
+                        device:? = debug_name;
                         "Unexpected packet type '{ty:?}' waiting for packet synchronization, ignoring and re-attempting sync"
                     );
                     out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
@@ -203,7 +203,7 @@ async fn run_usb_link(
     interface: usb_rs::Interface,
     cid_out: &mut Option<u32>,
 ) -> Result<(), LinkError> {
-    tracing::info!("Setting up USB link for {debug_name}");
+    log::info!("Setting up USB link for {debug_name}");
     let debug_name = debug_name.as_str();
 
     let mut in_ep = None;
@@ -213,14 +213,14 @@ async fn run_usb_link(
         match endpoint {
             usb_rs::Endpoint::BulkIn(endpoint) => {
                 if in_ep.is_some() {
-                    tracing::warn!(device = debug_name, "Multiple bulk in endpoints on interface");
+                    log::warn!(device:? = debug_name; "Multiple bulk in endpoints on interface");
                 } else {
                     in_ep = Some(endpoint)
                 }
             }
             usb_rs::Endpoint::BulkOut(endpoint) => {
                 if out_ep.is_some() {
-                    tracing::warn!(device = debug_name, "Multiple bulk out endpoints on interface");
+                    log::warn!(device:? = debug_name; "Multiple bulk out endpoints on interface");
                 } else {
                     out_ep = Some(endpoint)
                 }
@@ -262,10 +262,7 @@ async fn run_usb_link(
 
         cid
     } else {
-        tracing::warn!(
-            device = debug_name,
-            "Host object disappeared before connection established"
-        );
+        log::warn!(device:? = debug_name; "Host object disappeared before connection established");
         return Ok(());
     };
 
@@ -306,19 +303,19 @@ async fn run_usb_link(
     match select(tx, rx).await {
         Either::Left((e, _)) => {
             if let Result::<(), LinkError>::Err(e) = e {
-                tracing::warn!(usb_device = debug_name, "Transmit failed: {:?}", e);
+                log::warn!(usb_device:? = debug_name; "Transmit failed: {:?}", e);
                 Err(e)
             } else {
-                tracing::debug!(usb_device = debug_name, "Transmit closed");
+                log::debug!(usb_device:? = debug_name; "Transmit closed");
                 Ok(())
             }
         }
         Either::Right((e, _)) => {
             if let Result::<(), LinkError>::Err(e) = e {
-                tracing::warn!(usb_device = debug_name, "Receive failed: {:?}", e);
+                log::warn!(usb_device:? = debug_name; "Receive failed: {:?}", e);
                 Err(e)
             } else {
-                tracing::debug!(usb_device = debug_name, "Receive closed");
+                log::debug!(usb_device:? = debug_name; "Receive closed");
                 Ok(())
             }
         }
@@ -504,7 +501,7 @@ impl UsbVsockHost {
                     // Make sure we're out of Arc::new_cyclic before this future gets polled.
                     let _ = rx.await;
                     if let Err(e) = listen_for_usb_devices(weak_self).await {
-                        tracing::warn!(error = ?e, "USB listening encountered an unexpected error");
+                        log::warn!(error:? = e; "USB listening encountered an unexpected error");
                     }
                 });
             }
@@ -670,7 +667,7 @@ impl UsbVsockHost {
                 return false;
             }
             Err(e) => {
-                tracing::warn!(device = device.debug_name().as_str(), error = ?e,
+                log::warn!(device = device.debug_name().as_str(), error:? = e;
                                "Error scanning USB device");
                 return false;
             }
@@ -682,9 +679,9 @@ impl UsbVsockHost {
             if let Err(e) =
                 run_usb_link(weak_this.clone(), device.debug_name(), interface, &mut cid).await
             {
-                tracing::warn!("USB link terminated with error: {:?}", e)
+                log::warn!("USB link terminated with error: {:?}", e)
             } else {
-                tracing::info!("Shut down USB link for {}", device.debug_name())
+                log::info!("Shut down USB link for {}", device.debug_name())
             }
 
             if let (Some(this), Some(cid)) = (weak_this.upgrade(), cid) {
@@ -729,14 +726,14 @@ impl UsbVsockHost {
         self.scope.spawn(async move {
             while let Some(incoming) = incoming_requests.next().await {
                 let Some(this) = weak_this.upgrade() else {
-                    tracing::debug!("Host disappeared before incoming request task terminated");
+                    log::debug!("Host disappeared before incoming request task terminated");
                     break;
                 };
 
                 let (accept_channel, connection) = {
                     let mut inner = this.inner.lock().unwrap();
                     let Some(state) = inner.conns.get_mut(&cid) else {
-                        tracing::debug!("Connection state removed before request task terminated");
+                        log::debug!("Connection state removed before request task terminated");
                         break;
                     };
                     let connection = Arc::clone(&state.connection);
@@ -745,10 +742,10 @@ impl UsbVsockHost {
                         *incoming.address();
 
                     let accept_channel = if host_cid != CID_HOST {
-                        tracing::warn!("USB device usb:cid:{cid} tried to connect to non-host cid {host_cid}");
+                        log::warn!("USB device usb:cid:{cid} tried to connect to non-host cid {host_cid}");
                         None
                     } else if device_cid != cid {
-                        tracing::warn!("USB device usb:cid:{cid} tried to relay a connection from {device_cid}");
+                        log::warn!("USB device usb:cid:{cid} tried to relay a connection from {device_cid}");
                         None
                     } else {
                         let ret = if let Some(PortState::Listening(ch)) = inner.port_states.get(&host_port) {
@@ -763,7 +760,7 @@ impl UsbVsockHost {
                             None
                         };
                         if ret.is_none() {
-                            tracing::debug!("USB device usb:cid:{cid} tried to connect to closed port {host_port}");
+                            log::debug!("USB device usb:cid:{cid} tried to connect to closed port {host_port}");
                         }
                         ret
                     };
@@ -779,16 +776,16 @@ impl UsbVsockHost {
                     match connection.accept(incoming, other_end).await {
                         Ok(state) => {
                             if let Err(e) = accept_channel.send((socket, state)).await {
-                                tracing::warn!(cid, error = ?e, "Listener disappeared while accepting connection");
+                                log::warn!(cid, error:? = e; "Listener disappeared while accepting connection");
                             }
                         }
                         Err(e) => {
-                            tracing::warn!(cid, error = ?e, "Accepting connection request failed")
+                            log::warn!(cid, error:? = e; "Accepting connection request failed")
                         }
                     }
                 } else {
                     if let Err(e) = connection.reject(incoming).await {
-                        tracing::warn!(cid, error = ?e, "Rejecting connection request failed");
+                        log::warn!(cid, error:? = e; "Rejecting connection request failed");
                     }
                 }
             }

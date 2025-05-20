@@ -90,7 +90,7 @@ async fn io2_link() {
 
         let (status, token) = dir.get_token().await.unwrap();
         let status = zx::Status::ok(status);
-        if rights.contains(fio::Flags::PERM_MODIFY) {
+        if rights.contains(fio::Flags::PERM_MODIFY_DIRECTORY) {
             status.expect("get_token failed");
 
             let status = zx::Status::ok(

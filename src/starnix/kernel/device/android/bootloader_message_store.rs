@@ -93,6 +93,10 @@ impl AndroidBootloaderMessageStore {
     }
 }
 
+/// If a remote block device named "misc" is created, keep track of it; this is used by Android
+/// to pass boot parameters to the bootloader.  Since Starnix is acting as a de-facto bootloader
+/// for Android, we need to be able to peek into these messages.
+/// Note that this might never be initialized (if the "misc" device never gets registered).
 pub fn android_bootloader_message_store_init(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -104,10 +108,9 @@ pub fn android_bootloader_message_store_init(
                 log_info!(
                     "'misc' remote block device detected; setting as bootloader message store"
                 );
-                kernel
-                    .bootloader_message_store
-                    .set(AndroidBootloaderMessageStore::new(device))
-                    .expect("Already initialized");
+                kernel.expando.get_or_init::<AndroidBootloaderMessageStore>(|| {
+                    AndroidBootloaderMessageStore::new(device)
+                });
             }
         },
     ));

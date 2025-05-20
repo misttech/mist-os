@@ -23,7 +23,7 @@ constexpr std::string_view kBadSize = "ZBI_TYPE_DEBUGDATA item too large for enc
 
 }  // namespace
 
-fit::result<std::string_view> Debugdata::Init(cpp20::span<const std::byte> payload) {
+fit::result<std::string_view> Debugdata::Init(std::span<const std::byte> payload) {
   if (payload.size_bytes() < sizeof(zbi_debugdata_t)) {
     return fit::error{kBadTrailer};
   }

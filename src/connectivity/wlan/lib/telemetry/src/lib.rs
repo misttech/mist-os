@@ -10,21 +10,20 @@ use std::boxed::Box;
 use windowed_stats::experimental::serve::serve_time_matrix_inspection;
 use wlan_common::bss::BssDescription;
 use {
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
-    fuchsia_inspect_auto_persist as auto_persist, wlan_legacy_metrics_registry as metrics,
+    fidl_fuchsia_power_battery as fidl_battery, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fuchsia_async as fasync, fuchsia_inspect_auto_persist as auto_persist,
+    wlan_legacy_metrics_registry as metrics,
 };
 
 mod processors;
 pub(crate) mod util;
 pub use crate::processors::connect_disconnect::DisconnectInfo;
 pub use crate::processors::power::{IfacePowerLevel, UnclearPowerDemand};
+pub use crate::processors::scan::ScanResult;
 pub use crate::processors::toggle_events::ClientConnectionsToggleEvent;
 pub use util::sender::TelemetrySender;
 #[cfg(test)]
 mod testing;
-
-// Service name to persist Inspect data across boots
-const PERSISTENCE_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.persist.DataPersistence-wlan";
 
 #[derive(Debug)]
 pub enum TelemetryEvent {
@@ -46,6 +45,10 @@ pub enum TelemetryEvent {
     ClientIfaceDestroyed {
         iface_id: u16,
     },
+    ScanStart,
+    ScanResult {
+        result: ScanResult,
+    },
     IfacePowerLevelChanged {
         iface_power_level: IfacePowerLevel,
         iface_id: u16,
@@ -54,17 +57,18 @@ pub enum TelemetryEvent {
     SuspendImminent,
     /// Unclear power level requested by policy layer
     UnclearPowerDemand(UnclearPowerDemand),
+    BatteryChargeStatus(fidl_battery::ChargeStatus),
 }
 
 /// Attempts to connect to the Cobalt service.
 pub async fn setup_cobalt_proxy(
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, anyhow::Error> {
-    let cobalt_1dot1_svc = fuchsia_component::client::connect_to_protocol::<
+    let cobalt_svc = fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
     >()
     .context("failed to connect to metrics service")?;
 
-    let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
+    let (cobalt_proxy, cobalt_server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
@@ -73,8 +77,8 @@ pub async fn setup_cobalt_proxy(
         ..Default::default()
     };
 
-    match cobalt_1dot1_svc.create_metric_event_logger(&project_spec, cobalt_1dot1_server).await {
-        Ok(_) => Ok(cobalt_1dot1_proxy),
+    match cobalt_svc.create_metric_event_logger(&project_spec, cobalt_server).await {
+        Ok(_) => Ok(cobalt_proxy),
         Err(err) => Err(format_err!("failed to create metrics event logger: {:?}", err)),
     }
 }
@@ -89,9 +93,9 @@ pub fn setup_disconnected_cobalt_proxy(
 
 pub fn setup_persistence_req_sender(
 ) -> Result<(auto_persist::PersistenceReqSender, impl Future<Output = ()>), anyhow::Error> {
-    fuchsia_component::client::connect_to_protocol_at_path::<
+    fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
-    >(PERSISTENCE_SERVICE_PATH)
+    >()
     .map(auto_persist::create_persistence_req_sender)
 }
 
@@ -110,7 +114,7 @@ pub fn setup_disconnected_persistence_req_sender() -> auto_persist::PersistenceR
 const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 pub fn serve_telemetry(
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     inspect_node: InspectNode,
     inspect_path: &str,
@@ -138,20 +142,21 @@ pub fn serve_telemetry(
 
     // Create and initialize modules
     let connect_disconnect = processors::connect_disconnect::ConnectDisconnectLogger::new(
-        cobalt_1dot1_proxy.clone(),
+        cobalt_proxy.clone(),
         &inspect_node,
         &inspect_metadata_node,
         &format!("{inspect_path}/{METADATA_NODE_NAME}"),
         persistence_req_sender,
         &time_matrix_client,
     );
-    let power_logger =
-        processors::power::PowerLogger::new(cobalt_1dot1_proxy.clone(), &inspect_node);
+    let power_logger = processors::power::PowerLogger::new(cobalt_proxy.clone(), &inspect_node);
+    let mut scan_logger = processors::scan::ScanLogger::new(cobalt_proxy.clone());
     let mut toggle_logger =
-        processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy, &inspect_node);
+        processors::toggle_events::ToggleLogger::new(cobalt_proxy.clone(), &inspect_node);
 
     let client_iface_counters_logger =
         processors::client_iface_counters::ClientIfaceCountersLogger::new(
+            cobalt_proxy,
             monitor_svc_proxy,
             &time_matrix_client,
             driver_counters_time_series_client,
@@ -175,14 +180,14 @@ pub fn serve_telemetry(
                     use TelemetryEvent::*;
                     match event {
                         ConnectResult { result, bss } => {
-                            connect_disconnect.log_connect_attempt(result, &bss).await;
+                            connect_disconnect.handle_connect_attempt(result, &bss).await;
                         }
                         Disconnect { info } => {
                             connect_disconnect.log_disconnect(&info).await;
                             power_logger.handle_iface_disconnect(info.iface_id).await;
                         }
                         ClientConnectionsToggle { event } => {
-                            toggle_logger.log_toggle_event(event).await;
+                            toggle_logger.handle_toggle_event(event).await;
                         }
                         ClientIfaceCreated { iface_id } => {
                             client_iface_counters_logger.handle_iface_created(iface_id).await;
@@ -191,6 +196,12 @@ pub fn serve_telemetry(
                             client_iface_counters_logger.handle_iface_destroyed(iface_id).await;
                             power_logger.handle_iface_destroyed(iface_id).await;
                         }
+                        ScanStart => {
+                            scan_logger.handle_scan_start().await;
+                        }
+                        ScanResult { result } => {
+                            scan_logger.handle_scan_result(result).await;
+                        }
                         IfacePowerLevelChanged { iface_power_level, iface_id } => {
                             power_logger.log_iface_power_event(iface_power_level, iface_id).await;
                         }
@@ -198,15 +209,20 @@ pub fn serve_telemetry(
                         // or plumb this from callers once suspend mechanisms are integrated
                         SuspendImminent => {
                             power_logger.handle_suspend_imminent().await;
+                            connect_disconnect.handle_suspend_imminent().await;
                         }
                         UnclearPowerDemand(demand) => {
                             power_logger.handle_unclear_power_demand(demand).await;
                         }
-
+                        BatteryChargeStatus(charge_status) => {
+                            scan_logger.handle_battery_charge_status(charge_status).await;
+                            toggle_logger.handle_battery_charge_status(charge_status).await;
+                        }
                     }
                 }
                 _ = telemetry_interval.next() => {
-                    client_iface_counters_logger.handle_periodic_telemetry(connect_disconnect.is_connected()).await;
+                    connect_disconnect.handle_periodic_telemetry().await;
+                    client_iface_counters_logger.handle_periodic_telemetry().await;
                 }
             }
         }

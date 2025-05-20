@@ -393,7 +393,7 @@ where
                         for (relative_url, hash) in subpackages.subpackages() {
                             let subpackage = match subpackage {
                                 None => Some(relative_url.to_string()),
-                                Some(p) => Some(format!("{}/{}", p, relative_url)),
+                                Some(p) => Some(format!("{p}/{relative_url}")),
                             };
                             entries.extend(
                                 self.walk_meta_package(

@@ -237,6 +237,8 @@ class ElfLib {
   // links, e.g., musl, don't.
   uint64_t MappedAddressToOffset(uint64_t mapped_address);
 
+  bool Is64Bit() { return header_.getFileClass() == ELFCLASS64; }
+
   const AddressMode address_mode_;
   const uint64_t load_address_;
   bool did_load_dynamic_symbols_ = false;

@@ -11,7 +11,7 @@ static UNIQUE_NAME_SUFFIX: AtomicUsize = AtomicUsize::new(0);
 /// by the given `prefix`.
 pub fn unique_name(prefix: &str) -> String {
     let suffix = UNIQUE_NAME_SUFFIX.fetch_add(1, Ordering::Relaxed);
-    format!("{}{}", prefix, suffix)
+    format!("{prefix}{suffix}")
 }
 
 #[cfg(test)]

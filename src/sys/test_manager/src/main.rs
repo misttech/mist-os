@@ -195,11 +195,11 @@ async fn main() -> Result<(), Error> {
             LifecycleRequest::Stop { control_handle: c } => {
                 info!("Received request to stop. Shutting down.");
 
-                // Cancel servicing outgoing directory. This will drop any current requests in
+                // Abort servicing outgoing directory. This will drop any current requests in
                 // flight, should not be directly used in prod code. It works here because
                 // this line is only executed when all of test manager clients go away when used as
                 // nested test manager in some tests.
-                fs_task.cancel().await;
+                fs_task.abort().await;
 
                 // Complete all running tasks.
                 server_scope.join().await;

@@ -12,7 +12,7 @@
 #include <lib/mistos/util/error.h>
 
 #include <fbl/ref_ptr.h>
-#include <ktl/pair.h>
+#include <ktl/utility.h>
 
 namespace starnix {
 

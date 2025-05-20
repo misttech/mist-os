@@ -28,7 +28,7 @@ class Simple final {
   static inline ::std::unique_ptr<Simple> New() { return ::std::make_unique<Simple>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Simple* value, size_t _offset);
   zx_status_t Clone(Simple* result) const;
 };
@@ -51,7 +51,7 @@ class BasicStruct final {
   static inline ::std::unique_ptr<BasicStruct> New() { return ::std::make_unique<BasicStruct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, BasicStruct* value, size_t _offset);
   zx_status_t Clone(BasicStruct* result) const;
 };

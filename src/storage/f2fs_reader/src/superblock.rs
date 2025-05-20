@@ -26,7 +26,7 @@ pub fn f2fs_crc32(mut seed: u32, buf: &[u8]) -> u32 {
 }
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, Immutable, IntoBytes, KnownLayout)]
+#[derive(Copy, Clone, Debug, PartialEq, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct SuperBlock {
     pub magic: u32,                 // F2FS_MAGIC
     pub major_ver: u16,             // Major Version
@@ -95,7 +95,7 @@ const SUPPORTED_FEATURES: u32 = FEATURE_ENCRYPT
     | FEATURE_CASEFOLD;
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, Immutable, IntoBytes, KnownLayout)]
+#[derive(Copy, Clone, Debug, PartialEq, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct Device {
     pub path: [u8; 64],
     pub total_segments: u32,

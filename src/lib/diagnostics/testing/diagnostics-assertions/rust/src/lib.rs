@@ -281,8 +281,8 @@ pub struct Diff(Changeset);
 
 impl Diff {
     fn new(expected: &dyn Debug, actual: &dyn Debug) -> Self {
-        let expected = format!("{:#?}", expected);
-        let actual = format!("{:#?}", actual);
+        let expected = format!("{expected:#?}");
+        let actual = format!("{actual:#?}");
         Self::from_text(&expected, &actual)
     }
 
@@ -302,7 +302,7 @@ impl Display for Diff {
                 Difference::Rem(removed) => ("- ", removed),
             };
             for line in contents.split("\n") {
-                writeln!(f, "{}{}", prefix, line)?;
+                writeln!(f, "{prefix}{line}")?;
             }
         }
         Ok(())

@@ -8,7 +8,7 @@ use async_utils::async_once::Once;
 use ffx_daemon_events::TargetConnectionState;
 use ffx_daemon_target::target::Target;
 use ffx_daemon_target::zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery};
-use ffx_fastboot::common::fastboot::{
+use ffx_fastboot_connection_factory::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
 use ffx_fastboot_interface::fastboot_interface::RebootEvent;
@@ -104,7 +104,6 @@ impl RebootController {
         return Ok(proxy);
     }
 
-    #[tracing::instrument(skip(self))]
     pub(crate) async fn reboot(
         &self,
         state: TargetRebootState,
@@ -154,7 +153,7 @@ impl RebootController {
                     match fastboot_interface.reboot().await {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
-                            tracing::error!("Fastboot communication error: {:?}", e);
+                            log::error!("Fastboot communication error: {:?}", e);
                             responder
                                 .send(Err(TargetRebootError::FastbootCommunication))
                                 .map_err(Into::into)
@@ -208,7 +207,7 @@ impl RebootController {
                     match fastboot_interface.reboot_bootloader(reboot_client).await {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
-                            tracing::error!("Fastboot communication error: {:?}", e);
+                            log::error!("Fastboot communication error: {:?}", e);
                             responder
                                 .send(Err(TargetRebootError::FastbootCommunication))
                                 .map_err(Into::into)
@@ -223,18 +222,18 @@ impl RebootController {
                 let response = if let Some(addr) = self.target.netsvc_address() {
                     match state {
                         TargetRebootState::Product => reboot(addr).await.map(|_| ()).map_err(|e| {
-                            tracing::error!("zedboot reboot failed {:?}", e);
+                            log::error!("zedboot reboot failed {:?}", e);
                             TargetRebootError::NetsvcCommunication
                         }),
                         TargetRebootState::Bootloader => {
                             reboot_to_bootloader(addr).await.map(|_| ()).map_err(|e| {
-                                tracing::error!("zedboot reboot to bootloader failed {:?}", e);
+                                log::error!("zedboot reboot to bootloader failed {:?}", e);
                                 TargetRebootError::NetsvcCommunication
                             })
                         }
                         TargetRebootState::Recovery => {
                             reboot_to_recovery(addr).await.map(|_| ()).map_err(|e| {
-                                tracing::error!("zedboot reboot to recovery failed {:?}", e);
+                                log::error!("zedboot reboot to recovery failed {:?}", e);
                                 TargetRebootError::NetsvcCommunication
                             })
                         }
@@ -255,7 +254,7 @@ impl RebootController {
                     match res {
                         Ok(_) => responder.send(Ok(())).map_err(Into::into),
                         Err(e) => {
-                            tracing::error!("Target communication error when rebooting: {:?}", e);
+                            log::error!("Target communication error when rebooting: {:?}", e);
                             responder
                                 .send(Err(TargetRebootError::TargetCommunication))
                                 .map_err(Into::into)
@@ -265,11 +264,11 @@ impl RebootController {
                     let admin_proxy = match self
                         .get_admin_proxy()
                         .map_err(|e| {
-                            tracing::warn!("error getting admin proxy: {}", e);
+                            log::warn!("error getting admin proxy: {}", e);
                             TargetRebootError::TargetCommunication
                         })
                         .on_timeout(Duration::from_secs(5), || {
-                            tracing::warn!("timed out getting admin proxy");
+                            log::warn!("timed out getting admin proxy");
                             Err(TargetRebootError::TargetCommunication)
                         })
                         .await
@@ -315,7 +314,6 @@ impl RebootController {
     }
 }
 
-#[tracing::instrument]
 pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootResponder) -> Result<()> {
     match e {
         Error::ClientChannelClosed { protocol_name, .. } => {
@@ -326,28 +324,27 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
             // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
             // then we can be more confident that target reboot/shutdown has succeeded.
             if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
-                tracing::info!("Target reboot succeeded.");
+                log::info!("Target reboot succeeded.");
             } else {
-                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+                log::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
             }
-            tracing::debug!("{:?}", e);
+            log::debug!("{:?}", e);
             responder.send(Ok(()))?;
         }
         _ => {
-            tracing::error!("Target communication error: {:?}", e);
+            log::error!("Target communication error: {:?}", e);
             responder.send(Err(TargetRebootError::TargetCommunication))?;
         }
     }
     Ok(())
 }
 
-#[tracing::instrument]
 async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Result<()> {
     let t =
         target.upgrade().ok_or_else(|| anyhow!("Could not upgrade Target to build ssh command"))?;
     let addr = t.ssh_address().ok_or_else(|| anyhow!("Could not get ssh address for target"))?;
     let mut cmd = build_ssh_command_local(addr.into(), state).await?;
-    tracing::debug!("About to run command on target to reboot: {:?}", cmd);
+    log::debug!("About to run command on target to reboot: {:?}", cmd);
     let ssh = cmd.spawn()?;
     let output = ssh.wait_with_output()?;
     match output.status.success() {
@@ -359,7 +356,7 @@ async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Resu
                 Ok(())
             } else {
                 let stdout = output.stdout;
-                tracing::error!(
+                log::error!(
                     "Error rebooting. Error code: {:?}. Output from ssh command: {:?}",
                     output.status.code(),
                     stdout
@@ -370,7 +367,6 @@ async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Resu
     }
 }
 
-#[tracing::instrument]
 async fn build_ssh_command_local(
     addr: TargetIpAddr,
     desired_state: TargetRebootState,
@@ -380,7 +376,7 @@ async fn build_ssh_command_local(
         TargetRebootState::Recovery => vec!["dm", "reboot-recovery"],
         TargetRebootState::Product => vec!["dm", "reboot"],
     };
-    Ok(build_ssh_command(addr.into(), device_command).await?)
+    Ok(build_ssh_command(netext::ScopedSocketAddr::from_socket_addr(addr.into())?, device_command)?)
 }
 
 // END BLOCK
@@ -390,7 +386,7 @@ mod tests {
     use super::*;
     use anyhow::anyhow;
     use assert_matches::assert_matches;
-    use ffx_fastboot::test::setup_connection_factory;
+    use ffx_fastboot_connection_factory::test::setup_connection_factory;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream};
     use fidl_fuchsia_developer_ffx::{TargetMarker, TargetProxy, TargetRequest};
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};

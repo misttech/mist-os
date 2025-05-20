@@ -14,63 +14,9 @@ static int print_dm_help() {
   printf(
       "poweroff             - power off the system\n"
       "shutdown             - power off the system\n"
-      "suspend              - suspend the system to RAM\n"
       "reboot               - reboot the system\n"
       "reboot-bootloader/rb - reboot the system into bootloader\n"
-      "reboot-recovery/rr   - reboot the system into recovery\n"
-      "kerneldebug          - send a command to the kernel\n"
-      "ktraceoff            - stop kernel tracing\n"
-      "ktraceon             - start kernel tracing\n");
-  return 0;
-}
-
-static int send_kernel_debug_command(const char* command, size_t length) {
-  if (length > fuchsia_kernel::wire::kDebugCommandMax) {
-    fprintf(stderr, "error: kernel debug command longer than %u bytes: '%.*s'\n",
-            fuchsia_kernel::wire::kDebugCommandMax, (int)length, command);
-    return -1;
-  }
-
-  auto client_end = component::Connect<fuchsia_kernel::DebugBroker>();
-  if (client_end.is_error()) {
-    return client_end.status_value();
-  }
-
-  auto result = fidl::WireSyncClient(std::move(*client_end))
-                    ->SendDebugCommand(fidl::StringView::FromExternal(command, length));
-  const zx_status_t fidl_status = result.status();
-  if (fidl_status != ZX_OK) {
-    fprintf(stderr,
-            "error: unable to send kernel debug command (%s), is kernel debugging disabled?\n",
-            zx_status_get_string(fidl_status));
-    return -1;
-  }
-
-  // We got a reply.
-  const zx_status_t command_status = result->status;
-  if (command_status != ZX_OK) {
-    // If the command status was ZX_ERR_NOT_SUPPORTED, then the kernel probably has debugging
-    // syscalls disabled.
-    const char* hint =
-        (command_status == ZX_ERR_NOT_SUPPORTED) ? ", is kernel debugging disabled?" : "";
-    fprintf(stderr, "error: %s%s\n", zx_status_get_string(command_status), hint);
-    return -1;
-  }
-
-  return 0;
-}
-
-static int send_kernel_tracing_enabled(bool enabled) {
-  auto client_end = component::Connect<fuchsia_kernel::DebugBroker>();
-  if (client_end.is_error()) {
-    return client_end.status_value();
-  }
-
-  auto result = fidl::WireSyncClient(std::move(*client_end))->SetTracingEnabled(enabled);
-  if (result.status() != ZX_OK || result->status != ZX_OK) {
-    return -1;
-  }
-
+      "reboot-recovery/rr   - reboot the system into recovery\n");
   return 0;
 }
 
@@ -129,28 +75,8 @@ int zxc_dm(int argc, char** argv) {
 
   // Handle service backed commands.
   int command_length = 0;
-  if (command_cmp("kerneldebug", NULL, argv[1], &command_length)) {
-    return send_kernel_debug_command(argv[1] + command_length, strlen(argv[1]) - command_length);
-  } else if (command_cmp("ktraceon", NULL, argv[1], &command_length)) {
-    return send_kernel_tracing_enabled(true);
-
-  } else if (command_cmp("ktraceoff", NULL, argv[1], &command_length)) {
-    return send_kernel_tracing_enabled(false);
-
-  } else if (command_cmp("help", NULL, argv[1], &command_length)) {
+  if (command_cmp("help", NULL, argv[1], &command_length)) {
     return print_dm_help();
-
-  } else if (command_cmp("dump", NULL, argv[1], &command_length)) {
-    printf("`dm dump` is deprecated. Please use `driver dump` instead\n");
-    return -1;
-
-  } else if (command_cmp("drivers", NULL, argv[1], &command_length)) {
-    printf("`dm drivers` is deprecated. Please use `driver list --verbose` instead\n");
-    return -1;
-
-  } else if (command_cmp("devprops", NULL, argv[1], &command_length)) {
-    printf("`dm devprops` is deprecated. Please use `driver list-devices --verbose` instead\n");
-    return -1;
 
   } else if (command_cmp("reboot", NULL, argv[1], &command_length)) {
     return send_statecontrol_admin_command(
@@ -177,18 +103,6 @@ int zxc_dm(int argc, char** argv) {
         [](fidl::WireSyncClient<fuchsia_hardware_power_statecontrol::Admin> client) {
           return client->RebootToRecovery();
         });
-
-  } else if (command_cmp("suspend", NULL, argv[1], &command_length)) {
-#ifdef ENABLE_SUSPEND
-    return send_statecontrol_admin_command(
-        [](fidl::WireSyncClient<fuchsia_hardware_power_statecontrol::Admin> client) {
-          return client->SuspendToRam();
-        });
-#else
-    printf("Suspend is not supported on this device\n");
-    return -1;
-#endif
-
   } else if (command_cmp("poweroff", NULL, argv[1], &command_length) ||
              command_cmp("shutdown", NULL, argv[1], &command_length)) {
     return send_statecontrol_admin_command(
@@ -203,51 +117,5 @@ int zxc_dm(int argc, char** argv) {
   }
 
   return -1;
-}
-__END_CDECLS
-
-static char* join(char* buffer, size_t buffer_length, int argc, char** argv) {
-  size_t total_length = 0u;
-  for (int i = 0; i < argc; ++i) {
-    if (i > 0) {
-      if (total_length + 1 > buffer_length)
-        return NULL;
-      buffer[total_length++] = ' ';
-    }
-    const char* arg = argv[i];
-    size_t arg_length = strlen(arg);
-    if (total_length + arg_length + 1 > buffer_length)
-      return NULL;
-    strncpy(buffer + total_length, arg, buffer_length - total_length - 1);
-    total_length += arg_length;
-  }
-  return buffer + total_length;
-}
-
-__BEGIN_CDECLS
-int zxc_k(int argc, char** argv) {
-  if (argc <= 1) {
-    printf("usage: k <command>\n");
-    return -1;
-  }
-
-  char buffer[256];
-  size_t command_length = 0u;
-
-  // If we detect someone trying to use the LK poweroff/reboot,
-  // divert it to devmgr backed one instead.
-  if (!strcmp(argv[1], "poweroff") || !strcmp(argv[1], "reboot") ||
-      !strcmp(argv[1], "reboot-bootloader")) {
-    return zxc_dm(argc, argv);
-  }
-
-  char* command_end = join(buffer, sizeof(buffer), argc - 1, &argv[1]);
-  if (!command_end) {
-    fprintf(stderr, "error: kernel debug command too long\n");
-    return -1;
-  }
-  command_length = command_end - buffer;
-
-  return send_kernel_debug_command(buffer, command_length);
 }
 __END_CDECLS

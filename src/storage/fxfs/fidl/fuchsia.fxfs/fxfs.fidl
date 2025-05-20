@@ -171,7 +171,9 @@ type CreateBlobError = strict enum {
 @discoverable
 closed protocol BlobCreator {
     /// Creates a blob with the merkle root `hash`. If `allow_existing` is true, the server will
-    /// overwrite the existing blob if there is one. The client will truncate the blob with
+    /// overwrite the existing blob if there is one. The server may fail this request with
+    /// `[CreateBlobError.ALREADY_EXISTS]` if there is already an inflight `BlobWriter` for the same
+    /// hash which has not been closed or completed. The client will truncate the blob with
     /// [BlobWriter.GetVmo] and get a handle to a vmo in return. The client will then write blob
     /// contents into the vmo and call [BlobWriter.BytesReady] on the 'writer` to signal to the
     /// server that some number of bytes has been written to the vmo.

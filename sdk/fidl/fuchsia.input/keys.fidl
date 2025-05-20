@@ -423,7 +423,7 @@ type Key = flexible enum : uint32 {
     POWER = 0xffff0002;
 
     /// Sleep Button.
-    @available(added=NEXT)
+    @available(added=27)
     SLEEP = 0xffff0003;
 
     /// Warning: following keycodes maybe changed in the future, please don't use!!!

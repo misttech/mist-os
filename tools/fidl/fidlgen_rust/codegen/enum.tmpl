@@ -51,11 +51,6 @@ impl {{ .Name }} {
         self as {{ .UnderlyingType }}
     }
 
-    #[deprecated = "Strict enums should not use `is_unknown`"]
-    #[inline]
-    pub fn is_unknown(&self) -> bool {
-        false
-    }
     {{- else }}
     #[inline]
     pub fn from_primitive_allow_unknown(prim: {{ .UnderlyingType }}) -> Self {

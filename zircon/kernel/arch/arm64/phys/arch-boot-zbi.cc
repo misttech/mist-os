@@ -4,11 +4,28 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/arch/zbi-boot.h>
-#include <lib/arch/zbi.h>
+#include <lib/arch/cache.h>
 
 #include <phys/boot-zbi.h>
 
-void BootZbi::ZbiBoot(arch::ZbiKernelImage* kernel, void* arg) { arch::ZbiBoot(kernel, arg); }
-
-void BootZbi::ZbiBootRaw(uintptr_t entry, void* data) { arch::ZbiBootRaw(entry, data); }
+void BootZbi::ZbiBoot(uintptr_t entry, void* data) const {
+  arch::DisableLocalCachesAndMmu();
+  // Clear the stack and frame pointers and the link register so no misleading
+  // breadcrumbs are left.
+  __asm__ volatile(
+      R"""(
+      mov x0, %[zbi]
+      mov x29, xzr
+      mov x30, xzr
+      mov sp, x29
+      br %[entry]
+      )"""
+      :
+      : [entry] "r"(entry), [zbi] "r"(data)
+      // The compiler gets unhappy if x29 (fp) is a clobber.  It's never going
+      // to be the register used for %[entry] anyway.  The memory clobber is
+      // probably unnecessary, but it expresses that this constitutes access to
+      // the memory kernel and zbi point to.
+      : "x0", "x30", "memory");
+  __builtin_unreachable();
+}

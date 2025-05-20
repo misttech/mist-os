@@ -16,9 +16,7 @@ go_library("botanist_lib") {
   deps = [
     ":constants",
     ":repo",
-    "//third_party/golibs:cloud.google.com/go/storage",
     "//tools/build",
-    "//tools/lib/gcsutil",
     "//tools/lib/logger",
     "//tools/lib/osmisc",
     "//tools/lib/retry",

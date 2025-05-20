@@ -21,12 +21,12 @@ class MapPinTest : public ::testing::Test {
 
   static ::vmo_store::Options DefaultMapOptions() {
     return ::vmo_store::Options{
-        ::vmo_store::MapOptions{ZX_VM_PERM_WRITE | ZX_VM_PERM_READ, nullptr}, cpp17::nullopt};
+        ::vmo_store::MapOptions{ZX_VM_PERM_WRITE | ZX_VM_PERM_READ, nullptr}, std::nullopt};
   }
 
   ::vmo_store::Options DefaultPinOptions() {
     return ::vmo_store::Options{
-        cpp17::nullopt,
+        std::nullopt,
         ::vmo_store::PinOptions{GetBti(), ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, true}};
   }
 
@@ -178,7 +178,7 @@ TEST_F(MapPinTest, PinSingleRegion) {
 }
 
 TEST_F(MapPinTest, NoMapOrPin) {
-  VmoStore store(Options{cpp17::nullopt, cpp17::nullopt});
+  VmoStore store(Options{std::nullopt, std::nullopt});
   zx::result result = CreateAndRegister(store);
   ASSERT_OK(result.status_value());
   size_t key = result.value();

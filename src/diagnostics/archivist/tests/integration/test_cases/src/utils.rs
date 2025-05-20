@@ -58,7 +58,7 @@ async fn connect_accessor_protocol<P: DiscoverableProtocolMarker>(
         Cow::Owned(format!("{}.{}", P::PROTOCOL_NAME, pipeline_name))
     };
     realm_proxy
-        .connect_to_named_protocol::<P>(&format!("diagnostics-accessors/{}", accessor_name))
+        .connect_to_named_protocol::<P>(&format!("diagnostics-accessors/{accessor_name}"))
         .await
         .expect("connect to archive accessor")
 }

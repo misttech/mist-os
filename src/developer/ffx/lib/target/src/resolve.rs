@@ -16,7 +16,7 @@ use fuchsia_async::TimeoutExt;
 use futures::future::{join_all, LocalBoxFuture};
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use itertools::Itertools;
-use netext::IsLocalAddr;
+use netext::{IsLocalAddr, ScopedSocketAddr};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -28,7 +28,7 @@ use target_errors::FfxTargetError;
 
 use crate::connection::Connection;
 use crate::ssh_connector::SshConnector;
-use crate::UNSPECIFIED_TARGET_NAME;
+use crate::{get_target_specifier, UNSPECIFIED_TARGET_NAME};
 
 const CONFIG_TARGET_SSH_TIMEOUT: &str = "target.host_pipe_ssh_timeout";
 const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
@@ -47,9 +47,9 @@ pub async fn maybe_locally_resolve_target_spec(
     if crate::is_discovery_enabled(env_context).await {
         Ok(target_spec)
     } else {
-        tracing::warn!("crate::is_discovery_enabled is false - using local target resolution. is_usb_discovery_disabled is {}, is_mdns_discovery_disabled is {}",
-        ffx_config::is_usb_discovery_disabled(env_context).await,
-        ffx_config::is_mdns_discovery_disabled(env_context).await);
+        log::warn!("crate::is_discovery_enabled is false - using local target resolution. is_usb_discovery_disabled is {}, is_mdns_discovery_disabled is {}",
+        ffx_config::is_usb_discovery_disabled(env_context),
+        ffx_config::is_mdns_discovery_disabled(env_context));
 
         locally_resolve_target_spec(target_spec, &QueryResolver::default(), env_context).await
     }
@@ -80,10 +80,7 @@ async fn locally_resolve_target_spec<T: QueryResolverT>(
         TargetInfoQuery::Serial(sn) => format!("serial:{sn}"),
         _ => {
             let resolution = resolver.resolve_single_target(&target_spec, env_context).await?;
-            tracing::debug!(
-                "Locally resolved target '{target_spec:?}' to {:?}",
-                resolution.discovered
-            );
+            log::debug!("Locally resolved target '{target_spec:?}' to {:?}", resolution.discovered);
             resolution.target.to_spec()
         }
     };
@@ -117,8 +114,9 @@ trait QueryResolverT {
             return Ok(Resolution::from_addr(a));
         }
         let res = self.resolve_single_target(&target_spec, ctx).await?;
-        let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
-        tracing::debug!("resolved target spec {target_spec_info} to address {:?}", res.addr());
+        let target_spec_info =
+            target_spec.clone().unwrap_or_else(|| crate::UNSPECIFIED_TARGET_NAME.to_owned());
+        log::debug!("resolved target spec {target_spec_info} to address {:?}", res.addr());
         Ok(res)
     }
 
@@ -141,7 +139,7 @@ trait QueryResolverT {
                 select! {
                     mtr = manual_target_fut => match mtr {
                         Err(e) => {
-                            tracing::debug!("Failed to resolve target {s} as manual target: {e:?}");
+                            log::debug!("Failed to resolve target {s} as manual target: {e:?}");
                             // Keep going, waiting for the discovery to complete
                         }
                         Ok(Some(res)) => return Ok(res), // We found a manual target, so we're done
@@ -218,7 +216,7 @@ struct RetrievedTargetInfo {
     rcs_state: ffx::RemoteControlState,
     product_config: Option<String>,
     board_config: Option<String>,
-    ssh_address: Option<SocketAddr>,
+    ssh_address: Option<ScopedSocketAddr>,
 }
 
 impl Default for RetrievedTargetInfo {
@@ -233,10 +231,10 @@ impl Default for RetrievedTargetInfo {
 }
 
 async fn try_get_target_info(
-    addr: SocketAddr,
+    addr: &ScopedSocketAddr,
     context: &EnvironmentContext,
 ) -> Result<(Option<String>, Option<String>), crate::KnockError> {
-    let connector = SshConnector::new(addr, context).await.context("making ssh connector")?;
+    let connector = SshConnector::new(addr.clone(), context).context("making ssh connector")?;
     let conn = Connection::new(connector).await.context("making direct connection")?;
     let rcs = conn.rcs_proxy().await.context("getting RCS proxy")?;
     let (pc, bc) = match rcs.identify_host().await {
@@ -256,10 +254,10 @@ impl RetrievedTargetInfo {
                 continue;
             };
             // Ensure there's a port
-            let addr = replace_default_port(addr);
-            tracing::debug!("Trying to make a connection to {addr:?}");
+            let addr = ScopedSocketAddr::from_socket_addr(replace_default_port(addr))?;
+            log::debug!("Trying to make a connection to {addr:?}");
 
-            match try_get_target_info(addr, context)
+            match try_get_target_info(&addr, context)
                 .on_timeout(ssh_timeout, || {
                     Err(crate::KnockError::NonCriticalError(anyhow::anyhow!(
                         "knock_rcs() timed out"
@@ -276,11 +274,11 @@ impl RetrievedTargetInfo {
                     });
                 }
                 Err(crate::KnockError::NonCriticalError(e)) => {
-                    tracing::debug!("Could not connect to {addr:?}: {e:?}");
+                    log::debug!("Could not connect to {addr:?}: {e:?}");
                     continue;
                 }
                 e => {
-                    tracing::debug!("Got error {e:?} when trying to connect to {addr:?}");
+                    log::debug!("Got error {e:?} when trying to connect to {addr:?}");
                     return Ok(Self {
                         rcs_state: ffx::RemoteControlState::Unknown,
                         product_config: None,
@@ -306,7 +304,10 @@ async fn get_handle_info(
     let mut serial_number = None;
     let (target_state, fastboot_interface, addresses) = match handle.state {
         TargetState::Unknown => (ffx::TargetState::Unknown, None, None),
-        TargetState::Product(target_addrs) => (ffx::TargetState::Product, None, Some(target_addrs)),
+        TargetState::Product { addrs: target_addrs, serial } => {
+            serial_number = serial;
+            (ffx::TargetState::Product, None, Some(target_addrs))
+        }
         TargetState::Fastboot(state) => {
             serial_number.replace(state.serial_number);
             let (fastboot_connection, addresses) = match state.connection_state {
@@ -339,7 +340,7 @@ async fn get_handle_info(
         product_config,
         serial_number,
         fastboot_interface,
-        ssh_address: ssh_address.map(|a| TargetIpAddr::from(a).into()),
+        ssh_address: ssh_address.map(|a| TargetIpAddr::from(*a).into()),
         ..Default::default()
     })
 }
@@ -376,7 +377,7 @@ async fn resolve_target_query_with_sources(
     ctx: &EnvironmentContext,
     sources: DiscoverySources,
 ) -> Result<Vec<TargetHandle>> {
-    tracing::debug!("Resolving query: {:#?} with sources: {:#?}", query, sources);
+    log::debug!("Resolving query: {:#?} with sources: {:#?}", query, sources);
     // Get nodename, in case we're trying to find an exact match
     QueryResolver::new(sources).resolve_target_query(query, ctx).await
 }
@@ -489,7 +490,7 @@ impl QueryResolver {
                                 None
                             } else {
                                 if query_matches_handle(&q_clone, h) {
-                                    tracing::debug!(
+                                    log::debug!(
                                         "Signaling early as discovered target matches query"
                                     );
                                     found_ev.signal();
@@ -530,7 +531,7 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
             }
         }
         TargetInfoQuery::Addr(ref sa) => {
-            if let TargetState::Product(addrs) = &h.state {
+            if let TargetState::Product { addrs, .. } = &h.state {
                 return addrs.iter().any(|a| a.ip() == Some(sa.ip()));
             } else if let TargetState::Fastboot(fts) = &h.state {
                 match &fts.connection_state {
@@ -542,14 +543,14 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
             }
         }
         TargetInfoQuery::VSock(cid) => {
-            if let TargetState::Product(addrs) = &h.state {
+            if let TargetState::Product { addrs, .. } = &h.state {
                 if addrs.iter().any(|a| a.cid_vsock() == Some(*cid)) {
                     return true;
                 }
             }
         }
         TargetInfoQuery::Usb(cid) => {
-            if let TargetState::Product(addrs) = &h.state {
+            if let TargetState::Product { addrs, .. } = &h.state {
                 if addrs.iter().any(|a| a.cid_usb() == Some(*cid)) {
                     return true;
                 }
@@ -563,7 +564,7 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
 // Descriptions are used for matching against a TargetInfoQuery
 fn handle_to_description(handle: &TargetHandle) -> Description {
     let (addresses, serial) = match &handle.state {
-        TargetState::Product(target_addr) => (target_addr.clone(), None),
+        TargetState::Product { addrs: target_addr, .. } => (target_addr.clone(), None),
         TargetState::Fastboot(discovery::FastbootTargetState {
             serial_number: sn,
             connection_state,
@@ -590,7 +591,7 @@ impl QueryResolverT for QueryResolver {
     ) -> Result<Vec<TargetHandle>> {
         let results: Vec<Result<_>> = self.get_discovery_stream(query, ctx).await?.collect().await;
         // Fail if any results are Err
-        tracing::debug!("target events results: {results:?}");
+        log::debug!("target events results: {results:?}");
         // If any of the results in the stream are Err, cause the whole thing to
         // be an Err.
         results.into_iter().collect()
@@ -666,7 +667,7 @@ impl ResolutionTarget {
     // target, and return it.
     fn from_target_handle(target: &TargetHandle) -> Result<ResolutionTarget> {
         match &target.state {
-            TargetState::Product(addresses) => {
+            TargetState::Product { addrs: addresses, .. } => {
                 let sock = choose_socketaddr_from_addresses(
                     &target,
                     &addresses.into_iter().filter_map(|x| x.try_into().ok()).collect(),
@@ -751,7 +752,10 @@ impl Resolution {
 
     pub async fn get_connection(&mut self, context: &EnvironmentContext) -> Result<&Connection> {
         if self.connection.is_none() {
-            let connector = SshConnector::new(self.addr()?, context).await?;
+            let connector = SshConnector::new(
+                netext::ScopedSocketAddr::from_socket_addr(self.addr()?)?,
+                context,
+            )?;
             let conn = Connection::new(connector)
                 .await
                 .map_err(|e| crate::KnockError::CriticalError(e.into()))?;
@@ -794,7 +798,7 @@ impl TryFromEnvContext for Resolution {
     ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
         Box::pin(async {
             let unspecified_target = UNSPECIFIED_TARGET_NAME.to_owned();
-            let target_spec = Option::<String>::try_from_env_context(env).await?;
+            let target_spec = get_target_specifier(env).await?;
             let target_spec_unwrapped = if env.is_strict() {
                 target_spec.as_ref().ok_or(user_error!(
                     "You must specify a target via `-t <target_name>` before any command arguments"
@@ -802,7 +806,7 @@ impl TryFromEnvContext for Resolution {
             } else {
                 target_spec.as_ref().unwrap_or(&unspecified_target)
             };
-            tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
+            log::trace!("resolving target spec address from {}", target_spec_unwrapped);
             let resolution = resolve_target_address(&target_spec, env)
                 .await
                 .map_err(|e| ffx_command_error::Error::User(NonFatalError(e.into()).into()))?;
@@ -917,8 +921,8 @@ mod test {
         // A DNS name will satisfy the resolution request
         let name_spec = Some("foobar".to_string());
         let sa = addr.parse::<SocketAddr>().unwrap();
-        let state = TargetState::Product(vec![sa.into()]);
-        let th = TargetHandle { node_name: name_spec.clone(), state };
+        let state = TargetState::Product { addrs: vec![sa.into()], serial: None };
+        let th = TargetHandle { node_name: name_spec.clone(), state, manual: false };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
         resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
         let target_spec =
@@ -935,6 +939,7 @@ mod test {
                 serial_number: sn.clone(),
                 connection_state: discovery::FastbootConnectionState::Usb,
             }),
+            manual: false,
         };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
         resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
@@ -949,10 +954,10 @@ mod test {
         let mut resolver = MockQueryResolverT::new();
         let name_spec = Some("foobar".to_string());
         let sa = addr.parse::<SocketAddr>().unwrap();
-        let ts1 = TargetState::Product(vec![sa.into(), sa.into()]);
-        let ts2 = TargetState::Product(vec![sa.into(), sa.into()]);
-        let th1 = TargetHandle { node_name: name_spec.clone(), state: ts1 };
-        let th2 = TargetHandle { node_name: name_spec.clone(), state: ts2 };
+        let ts1 = TargetState::Product { addrs: vec![sa.into(), sa.into()], serial: None };
+        let ts2 = TargetState::Product { addrs: vec![sa.into(), sa.into()], serial: None };
+        let th1 = TargetHandle { node_name: name_spec.clone(), state: ts1, manual: false };
+        let th2 = TargetHandle { node_name: name_spec.clone(), state: ts2, manual: false };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th1, th2]));
         resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
         let target_spec_res =

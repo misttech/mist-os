@@ -59,8 +59,8 @@ mod test {
     use assert_matches::assert_matches;
     use errors::ffx_error;
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_downcast_injector_error() {
+    #[fuchsia::test]
+    fn test_downcast_injector_error() {
         assert_matches!(
             downcast_injector_error::<()>(Err(ffx_error!("test error").into())),
             Err(FfxInjectorError::UnknownError(_))

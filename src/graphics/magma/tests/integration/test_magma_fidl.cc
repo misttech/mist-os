@@ -344,42 +344,6 @@ TEST_F(TestMagmaFidl, ImportReleaseSemaphore) {
   }
 }
 
-TEST_F(TestMagmaFidl, ImportReleaseVmoSemaphore) {
-  uint64_t event_id;
-
-  {
-    zx::vmo vmo;
-    ASSERT_EQ(ZX_OK, zx::vmo::create(4096, 0 /*options*/, &vmo));
-    event_id = fsl::GetKoid(vmo.get());
-
-    fidl::Arena allocator;
-    auto builder = fuchsia_gpu_magma::wire::PrimaryImportObjectRequest::Builder(allocator);
-    builder.object(fuchsia_gpu_magma::wire::Object::WithVmoSemaphore(std::move(vmo)))
-        .object_id(event_id)
-        .object_type(fuchsia_gpu_magma::wire::ObjectType::kSemaphore)
-        .flags(fuchsia_gpu_magma::ImportFlags::kSemaphoreOneShot);
-
-    auto wire_result = primary_->ImportObject(builder.Build());
-    EXPECT_TRUE(wire_result.ok());
-    EXPECT_FALSE(CheckForUnbind());
-  }
-
-  {
-    auto wire_result =
-        primary_->ReleaseObject(event_id, fuchsia_gpu_magma::wire::ObjectType::kSemaphore);
-    EXPECT_TRUE(wire_result.ok());
-    EXPECT_FALSE(CheckForUnbind());
-  }
-
-  {
-    uint64_t kBadId = event_id + 1;
-    auto wire_result =
-        primary_->ReleaseObject(kBadId, fuchsia_gpu_magma::wire::ObjectType::kSemaphore);
-    EXPECT_TRUE(wire_result.ok());
-    EXPECT_TRUE(CheckForUnbind());
-  }
-}
-
 TEST_F(TestMagmaFidl, ImportReleaseCounterSemaphore) {
   uint64_t event_id;
 

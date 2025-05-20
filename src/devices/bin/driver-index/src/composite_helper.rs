@@ -24,7 +24,7 @@ pub struct BindRuleCondition {
 }
 
 pub fn find_composite_driver_match<'a>(
-    parents: &'a Vec<fdf::ParentSpec>,
+    parents: &'a Vec<fdf::ParentSpec2>,
     composite_drivers: &Vec<&ResolvedDriver>,
 ) -> Option<fdf::CompositeDriverMatch> {
     for composite_driver in composite_drivers {
@@ -37,7 +37,7 @@ pub fn find_composite_driver_match<'a>(
 }
 
 pub fn node_matches_composite_driver(
-    node: &fdf::ParentSpec,
+    node: &fdf::ParentSpec2,
     bind_rules_node: &Vec<u8>,
     symbol_table: &HashMap<u32, String>,
 ) -> bool {
@@ -51,7 +51,7 @@ pub fn node_matches_composite_driver(
 }
 
 pub fn convert_fidl_to_bind_rules(
-    fidl_bind_rules: &Vec<fdf::BindRule>,
+    fidl_bind_rules: &Vec<fdf::BindRule2>,
 ) -> Result<BindRules, zx_status_t> {
     if fidl_bind_rules.is_empty() {
         return Err(Status::INVALID_ARGS.into_raw());
@@ -59,13 +59,7 @@ pub fn convert_fidl_to_bind_rules(
 
     let mut bind_rules = BTreeMap::new();
     for fidl_rule in fidl_bind_rules {
-        let key = match &fidl_rule.key {
-            fdf::NodePropertyKey::IntValue(i) => {
-                log::warn!("Found unsupported integer-based key {} in composite node spec", i);
-                Err(Status::NOT_SUPPORTED.into_raw())
-            }
-            fdf::NodePropertyKey::StringValue(s) => Ok(PropertyKey::StringKey(s.clone())),
-        }?;
+        let key = PropertyKey::StringKey(fidl_rule.key.clone());
 
         // Check if the properties contain duplicate keys.
         if bind_rules.contains_key(&key) {
@@ -165,7 +159,7 @@ pub fn match_node(bind_rules: &BindRules, device_properties: &DeviceProperties) 
 
 pub fn match_composite_properties<'a>(
     composite_driver: &'a ResolvedDriver,
-    parents: &'a Vec<fdf::ParentSpec>,
+    parents: &'a Vec<fdf::ParentSpec2>,
 ) -> Result<Option<fdf::CompositeDriverMatch>, i32> {
     // The spec must have at least 1 node to match a composite driver.
     if parents.len() < 1 {

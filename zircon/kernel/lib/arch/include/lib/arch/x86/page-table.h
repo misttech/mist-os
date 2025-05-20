@@ -10,12 +10,12 @@
 #include <inttypes.h>
 #include <lib/arch/paging.h>
 #include <lib/arch/x86/cpuid.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 #include <fbl/bits.h>
 #include <hwreg/bitfields.h>
@@ -102,11 +102,11 @@ struct X86PagingTraitsBase {
 };
 
 struct X86FourLevelPagingTraits : public X86PagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
+  static constexpr auto kLevels = std::span{kAllLevels}.subspan(1);
 };
 
 struct X86FiveLevelPagingTraits : public X86PagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels};
+  static constexpr auto kLevels = std::span{kAllLevels};
 };
 
 // [intel/vol3]: Figure 4-11. Formats of CR3 and Paging-Structure Entries with 4-Level Paging and

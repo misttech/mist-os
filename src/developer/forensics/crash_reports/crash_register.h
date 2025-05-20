@@ -34,6 +34,10 @@ class CrashRegister : public fuchsia::feedback::CrashReportingProductRegister {
   Product GetProduct(const std::string& program_name) const;
 
   // Adds the version and channel in |annotations| to |product|, if they exist.
+  //
+  // Note: the version applied will be a concatenation of the product and platform versions using a
+  // double dash, i.e. product_version--platform_version. If the two versions are identical, no
+  // concatenation will occur.
   static void AddVersionAndChannel(Product& product, const AnnotationMap& annotations);
 
  private:

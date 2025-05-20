@@ -8,7 +8,7 @@
 #include <lib/mistos/util/testing/unittest.h>
 #include <lib/unittest/unittest.h>
 
-#include <ktl/pair.h>
+#include <ktl/utility.h>
 
 namespace unit_testing {
 

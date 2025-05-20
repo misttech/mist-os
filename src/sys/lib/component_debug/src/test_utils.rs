@@ -148,34 +148,18 @@ pub fn serve_realm_query(
                     let iterator = serve_instance_iterator(instances);
                     responder.send(Ok(iterator)).unwrap();
                 }
-                fsys::RealmQueryRequest::DeprecatedOpen {
-                    moniker,
-                    dir_type,
-                    flags: deprecated_flags,
-                    mode: _,
-                    path,
-                    object,
-                    responder,
-                } => {
-                    let mut flags = fio::Flags::empty();
-                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
-                        flags |= fio::PERM_READABLE
-                    }
-                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-                        flags |= fio::PERM_WRITABLE
-                    }
-                    if deprecated_flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
-                        flags |= fio::PERM_EXECUTABLE
-                    }
-                    eprintln!(
-                        "Open call for {} for {:?} at path '{}' with deprecated flags {:?} (open3 flags {:?})",
-                        moniker, dir_type, path, deprecated_flags, flags
-                    );
+                fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
                     let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                     if let Some(dir) = dirs.get(&(moniker, dir_type)) {
-                        let path = dir.path().join(path).display().to_string();
+                        let path = dir.path().display().to_string();
                         let namespace = fdio::Namespace::installed().unwrap();
-                        namespace.open(&path, flags, object.into_channel()).unwrap();
+                        namespace
+                            .open(
+                                &path,
+                                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                                object.into_channel(),
+                            )
+                            .unwrap();
                         responder.send(Ok(())).unwrap();
                     } else {
                         responder.send(Err(fsys::OpenError::NoSuchDir)).unwrap();

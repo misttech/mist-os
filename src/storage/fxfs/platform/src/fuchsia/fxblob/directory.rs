@@ -7,7 +7,7 @@
 
 use crate::fuchsia::component::map_to_raw_status;
 use crate::fuchsia::directory::FxDirectory;
-use crate::fuchsia::fxblob::blob::FxBlob;
+use crate::fuchsia::fxblob::blob::{CompressionInfo, FxBlob};
 use crate::fuchsia::fxblob::writer::DeliveryBlobWriter;
 use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
 use crate::fuchsia::volume::{FxVolume, RootDir};
@@ -122,23 +122,34 @@ impl BlobDirectory {
     }
 
     /// Attempt to lookup and cache the blob with `id` in this directory.
-    ///
-    /// *WARNING*: Use caution when performing operations on the returned node handle. Unlike
-    /// [`Self::open_blob`], this function doesn't modify the node's open count, so the underlying
-    /// node can still be purged/unlinked even if there are still references to the node.
     pub(crate) async fn lookup_blob(self: &Arc<Self>, hash: Hash) -> Result<Arc<FxBlob>, Error> {
         // For simplify lookup logic, we re-use `open_blob` just decrement the open count before
         // returning the node handle.
         self.open_blob(&hash.into()).await?.ok_or_else(|| FxfsError::NotFound.into()).map(|blob| {
-            let node = blob.take();
-            node.clone().open_count_sub_one();
-            node
+            // Downgrade from an OpenedNode<Node> to a Node.
+            blob.clone()
         })
     }
 
-    /// Attempt to open and cache the blob with `id` in this directory. Returns `Ok(None)` if no
-    /// blob matching `id` was found.
-    pub(crate) async fn open_blob(
+    /// Open blob and get the child vmo. This allows the creation of the child vmo to be atomic with
+    /// the open.
+    pub(crate) async fn open_blob_get_vmo(
+        self: &Arc<Self>,
+        id: &Identifier,
+    ) -> Result<(Arc<FxBlob>, zx::Vmo), Error> {
+        let store = self.store();
+        let fs = store.filesystem();
+        let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
+        // A lock needs to be held over searching the directory and incrementing the open count.
+        let _guard = fs.lock_manager().read_lock(keys.clone()).await;
+        let blob = self.open_blob_locked(id).await?.ok_or(FxfsError::NotFound)?;
+        let vmo = blob.create_child_vmo()?;
+        // Downgrade from an OpenedNode<Node> to a Node.
+        Ok((blob.clone(), vmo))
+    }
+
+    /// Wraps ['open_blob_locked'] while taking the locks.
+    async fn open_blob(
         self: &Arc<Self>,
         id: &Identifier,
     ) -> Result<Option<OpenedNode<FxBlob>>, Error> {
@@ -147,7 +158,16 @@ impl BlobDirectory {
         let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
         // A lock needs to be held over searching the directory and incrementing the open count.
         let _guard = fs.lock_manager().read_lock(keys.clone()).await;
+        self.open_blob_locked(id).await
+    }
 
+    /// Attempt to open and cache the blob with `id` in this directory. Returns `Ok(None)` if no
+    /// blob matching `id` was found. Requires holding locks for at least the object store and
+    /// directory object.
+    async fn open_blob_locked(
+        self: &Arc<Self>,
+        id: &Identifier,
+    ) -> Result<Option<OpenedNode<FxBlob>>, Error> {
         let node = match self
             .directory
             .directory()
@@ -245,13 +265,13 @@ impl BlobDirectory {
                     }
                 };
 
+                let uncompressed_size = metadata.uncompressed_size;
                 let node = FxBlob::new(
                     object,
                     tree,
-                    metadata.chunk_size,
-                    metadata.compressed_offsets,
-                    metadata.uncompressed_size,
-                )? as Arc<dyn FxNode>;
+                    CompressionInfo::from_metadata(metadata)?,
+                    uncompressed_size,
+                ) as Arc<dyn FxNode>;
                 placeholder.commit(&node);
                 Ok(node)
             }
@@ -264,6 +284,7 @@ impl BlobDirectory {
     async fn create_blob_writer(
         self: &Arc<Self>,
         hash: Hash,
+        allow_existing: bool,
     ) -> Result<ClientEnd<BlobWriterMarker>, CreateBlobError> {
         let id = hash.into();
         let blob_exists = self
@@ -274,7 +295,7 @@ impl BlobDirectory {
                 CreateBlobError::Internal
             })?
             .is_some();
-        if blob_exists {
+        if blob_exists && !allow_existing {
             return Err(CreateBlobError::AlreadyExists);
         }
         let (client_end, request_stream) = create_request_stream::<BlobWriterMarker>();
@@ -293,12 +314,12 @@ impl BlobDirectory {
     async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
             match request {
-                BlobCreatorRequest::Create { responder, hash, .. } => {
-                    responder.send(self.create_blob_writer(Hash::from(hash)).await).unwrap_or_else(
-                        |error| {
+                BlobCreatorRequest::Create { responder, hash, allow_existing } => {
+                    responder
+                        .send(self.create_blob_writer(Hash::from(hash), allow_existing).await)
+                        .unwrap_or_else(|error| {
                             log::error!(error:?; "failed to send Create response");
-                        },
-                    );
+                        });
                 }
             }
         }
@@ -409,7 +430,7 @@ impl vfs::node::Node for BlobDirectory {
 
 /// Implements VFS entry container trait for directories, allowing manipulation of their contents.
 impl VfsDirectory for BlobDirectory {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -421,7 +442,7 @@ impl VfsDirectory for BlobDirectory {
         ));
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -434,7 +455,7 @@ impl VfsDirectory for BlobDirectory {
         Ok(())
     }
 
-    async fn open3_async(
+    async fn open_async(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,

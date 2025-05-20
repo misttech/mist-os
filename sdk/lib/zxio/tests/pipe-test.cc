@@ -27,7 +27,7 @@ TEST(Pipe, Create) {
   EXPECT_EQ(ZXIO_OBJECT_TYPE_PIPE, attr.object_type);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_attr_set(io, &attr));
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 TEST(Pipe, CreateWithAllocator) {
@@ -46,7 +46,7 @@ TEST(Pipe, CreateWithAllocator) {
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* io = &storage->io;
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 TEST(Pipe, FlagsGetDefault) {
@@ -61,8 +61,8 @@ TEST(Pipe, FlagsGetDefault) {
   uint64_t raw_flags{};
   ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
-  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermRead);
-  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermWrite);
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermReadBytes);
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermWriteBytes);
 }
 
 TEST(Pipe, FlagsGetReadOnly) {
@@ -78,8 +78,8 @@ TEST(Pipe, FlagsGetReadOnly) {
   uint64_t raw_flags{};
   ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
-  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermRead);
-  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWrite);
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermReadBytes);
+  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWriteBytes);
 }
 
 TEST(Pipe, FlagsGetNoIO) {
@@ -95,8 +95,8 @@ TEST(Pipe, FlagsGetNoIO) {
   uint64_t raw_flags{};
   ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
-  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermRead);
-  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWrite);
+  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermReadBytes);
+  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWriteBytes);
 }
 
 TEST(Pipe, FlagsSetWithValidInputFlags) {
@@ -108,7 +108,7 @@ TEST(Pipe, FlagsSetWithValidInputFlags) {
   zxio_t* io = &storage.io;
 
   fuchsia_io::wire::Flags flags =
-      fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
+      fuchsia_io::wire::Flags::kPermReadBytes | fuchsia_io::wire::Flags::kPermWriteBytes;
   ASSERT_OK(zxio_flags_set(io, uint64_t{flags}));
 }
 
@@ -123,7 +123,7 @@ TEST(Pipe, FlagsSetWithInvalidInputFlagsIsError) {
   zxio_t* io = &storage.io;
 
   fuchsia_io::wire::Flags flags =
-      fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
+      fuchsia_io::wire::Flags::kPermReadBytes | fuchsia_io::wire::Flags::kPermWriteBytes;
   EXPECT_STATUS(zxio_flags_set(io, uint64_t{flags}), ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -224,7 +224,7 @@ TEST(Pipe, Basic) {
   EXPECT_EQ(actual, sizeof(buffer));
   EXPECT_EQ(buffer, data);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 TEST(Pipe, GetReadBufferAvailable) {
@@ -255,7 +255,7 @@ TEST(Pipe, GetReadBufferAvailable) {
   ASSERT_OK(zxio_get_read_buffer_available(io, &available));
   EXPECT_EQ(0u, available);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 // Test that after shutting a pipe endpoint down for reading that reading from
@@ -296,7 +296,7 @@ TEST(Pipe, ShutdownRead) {
   EXPECT_EQ(actual, 0u);
   actual = 0u;
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 // Test that after shutting a pipe endpoint down for writing that writing to
@@ -325,7 +325,7 @@ TEST(Pipe, ShutdownWrite) {
   EXPECT_STATUS(zxio_write(io, &data, sizeof(data), 0u, &actual), ZX_ERR_BAD_STATE);
   EXPECT_EQ(actual, 0u);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 // Test that after shutting a pipe endpoint down for reading and writing that
@@ -372,7 +372,7 @@ TEST(Pipe, ShutdownReadWrite) {
   EXPECT_STATUS(zxio_write(io, &data, sizeof(data), 0u, &actual), ZX_ERR_BAD_STATE);
   EXPECT_EQ(actual, 0u);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 }  // namespace

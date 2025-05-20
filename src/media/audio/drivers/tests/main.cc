@@ -82,32 +82,37 @@ int main(int argc, char** argv) {
   builder.WithTags({command_line.argv0()}).BuildAndInitialize();
   testing::InitGoogleTest(&argc, argv);
 
+  // The default configuration for all six of the cmdline options is FALSE.
+
+  // Options that filter which drivers are validated.
+  //
   // --no-bluetooth: Only detect+test devices in devfs; don't add+test the Bluetooth audio library.
   bool no_bluetooth = command_line.HasOption(kNoBluetoothOption);
-
+  //
   // --no-virtual: Don't automatically create+test virtual_audio instances for StreamConfig, Dai,
   //   Codec and Composite (using default settings). When this flag is enabled, any _preexisting_
   //   virtual_audio instances are allowed and detected+tested like any other devfs device.
   bool no_virtual_audio = command_line.HasOption(kNoVirtualAudioOption);
 
+  // Options that filter which tests are executed.
+  //
   // --basic: Validate commands that do not require exclusive access, such as SetFormat.
   bool enable_basic_tests = command_line.HasOption(kRunBasicTestsOption);
-
+  //
   // --admin: Run tests that require exclusive access to the driver (AdminTest cases).
   //   TODO(https://fxbug.dev/42175212): Auto-detect whether a service is already connected to the
   //   driver, and eliminate the 'basic ' and 'admin' flags.
   bool enable_admin_tests = command_line.HasOption(kRunAdminTestsOption);
-
+  //
   // --position: Include audio position test cases (requires realtime capable system).
   bool enable_position_tests = command_line.HasOption(kRunPositionTestsOption);
-
-  // Currently, only used for local eng testing.
+  //
+  // --all: basic+admin+position (currently used only for testing on eng desktop.
   if (command_line.HasOption(kRunAllTestsOption)) {
     enable_basic_tests = enable_admin_tests = enable_position_tests = true;
   }
 
   media::audio::drivers::test::DeviceHost device_host;
-  // The default configuration for each of these booleans is FALSE.
   device_host.AddDevices(no_bluetooth, no_virtual_audio);
   device_host.RegisterTests(enable_basic_tests, enable_admin_tests, enable_position_tests);
 

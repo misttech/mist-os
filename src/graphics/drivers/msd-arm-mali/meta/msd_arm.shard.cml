@@ -15,8 +15,10 @@
     capabilities: [
         {
             service: [
+                "fuchsia.gpu.magma.DependencyInjectionService",
+                "fuchsia.gpu.magma.PerformanceCounterService",
                 "fuchsia.gpu.magma.Service",
-                "fuchsia.hardware.gpu.mali.UtilsService",
+                "fuchsia.gpu.magma.TrustedService",
             ],
         },
     ],
@@ -49,8 +51,10 @@
     expose: [
         {
             service: [
+                "fuchsia.gpu.magma.DependencyInjectionService",
+                "fuchsia.gpu.magma.PerformanceCounterService",
                 "fuchsia.gpu.magma.Service",
-                "fuchsia.hardware.gpu.mali.UtilsService",
+                "fuchsia.gpu.magma.TrustedService",
             ],
             from: "self",
         },

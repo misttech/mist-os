@@ -20,22 +20,22 @@ function help_global_options {
   cat <<END
 
 Global fx options: fx [OPTION] ${cmd} ...
-  --dir=BUILD_DIR           Path to the build directory to use when running COMMAND.
-  -d=DEVICE[:SSH_PORT]      Target a specific device.
-                            DEVICE may be a Fuchsia device name to be resolved using
-                            ffx or an IP address.
-                            An IPv4 address must be specified directly, while an IPv6
-                            need to be surrounded by brackets.
-                            SSH_PORT, if specified, will be used for all commands
-                            that rely on SSH to connect to the device instead of the
-                            default SSH port (22).
-                            Note: See "fx help set-device" for more help and to set
-                            the default device for a BUILD_DIR.
-  -i                        Iterative mode.  Repeat the command whenever a file is
-                            modified under your Fuchsia directory, not including
-                            out/.
-  -x                        Print commands and their arguments as they are executed.
-  -xx                       Print extra logging of the fx tool itself (implies -x)
+  --dir=BUILD_DIR                  Path to the build directory to use when running COMMAND.
+  -t|--target DEVICE[:SSH_PORT]    Target a specific device.
+                                   DEVICE may be a Fuchsia device name to be resolved using
+                                   ffx or an IP address.
+                                   An IPv4 address must be specified directly, while an IPv6
+                                   need to be surrounded by brackets.
+                                   SSH_PORT, if specified, will be used for all commands
+                                   that rely on SSH to connect to the device instead of the
+                                   default SSH port (22).
+                                   Note: See "fx help set-device" for more help and to set
+                                   the default device for a BUILD_DIR.
+  -i                               Iterative mode. Repeat the command whenever a file is
+                                   modified under your Fuchsia directory, not including
+                                   out/.
+  -x                               Print commands and their arguments as they are executed.
+  -xx                              Print extra logging of the fx tool itself (implies -x)
 END
   if [[ -n "$(list_optional_features)" ]]; then
     echo "  --enable|disable=FEATURE  Enable or disable a feature (non-persistent). Valid features:"
@@ -125,7 +125,7 @@ configure and build
 use the emulator
   ffx emu start             Emulate a device and interact with it
   ffx emu start --headless  Run without a graphic terminal
-  shell dm shutdown         Shut down Fuchsia on the emulator
+  shell power shutdown      Shut down Fuchsia on the emulator
   ffx emu --help            Show emu help
 
 test
@@ -166,7 +166,7 @@ END
 
 function usage {
   cat <<END
-usage: fx [--dir BUILD_DIR] [-d DEVICE_NAME] [-i] [-x] COMMAND [...]
+usage: fx [--dir BUILD_DIR] [-t DEVICE_NAME] [-i] [-x] COMMAND [...]
 END
   shorthelp
 }
@@ -240,9 +240,11 @@ source "${cmd_locator_sh}" || exit $?
 declare -r features_sh="${fuchsia_dir}/tools/devshell/lib/fx-optional-features.sh"
 source "${features_sh}" || exit $?
 
+declare -r suggest_py="${fuchsia_dir}/tools/devshell/lib/fx-cmd-suggestions.py"
+
 while [[ $# -ne 0 ]]; do
   case $1 in
-    --dir=*|-d=*|--disable=*|--enable=*)
+    --dir=*|-d=*|-t=*|--target=*|--disable=*|--enable=*)
       # Turn --switch=value into --switch value.
       arg="$1"
       shift
@@ -301,17 +303,26 @@ while [[ $# -ne 0 ]]; do
       env_name="$(get_disable_feature_env_name "${feature}")"
       export ${env_name}=0
       ;;
-    -d)
+    -d|-t|--target)
       if [[ $# -lt 2 ]]; then
         usage
-        fx-error "Missing device name for -d argument"
+        fx-error "Missing device name for $1 argument"
         exit 1
       fi
-      shift # removes -d
+      if [[ "$1" == "-d" ]]; then
+        fx-warn "\`fx -d\` will be deprecated and will go away soon."
+        fx-warn "Please use \`fx -t $2 ...\` or \`fx --target $2 ...\` instead."
+      fi
+      shift # removes -t|--target
       if ! is-valid-device "$1"; then
         fx-error "Invalid device: $1. See valid values in 'fx help set-device'"
         exit 1
       fi
+      # $FUCHSIA_DEVICE_ADDR can shadow $FUCHSIA_NODENAME which we use to
+      # effectuate `-t|--target`, so we unset it here.
+      # The precedence of these environment variables is defined by
+      # //src/developer/ffx/data/config.json
+      unset FUCHSIA_DEVICE_ADDR
       # This name needs to be coordinated with ffx default configuration
       # LINT.IfChange
       export FUCHSIA_NODENAME="$1"
@@ -368,10 +379,10 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
-# Check that the $FUCHSIA_NODENAME applied by `-d` is not overridden by ffx
+# Check that the $FUCHSIA_NODENAME applied by `-t` is not overridden by ffx
 # user-level configuration.
 if [[ "$_check_default_target" == "true" ]]; then
-  fx-build-dir-if-present && fx-check-default-target || exit 1
+  fx-build-dir-if-present && fx-check-ffx-default-target --error || exit 1
 fi
 
 command_name="$1"
@@ -381,9 +392,22 @@ if [[ $? -ne 0 || ! -x "${command_path[0]}" ]]; then
   if [[ -n "${command_path}" ]]; then
     _path_message=" in the expected location $(_relative "${command_path}")"
   fi
-  fx-error "Cannot find executable for ${command_name}${_path_message}."\
+
+  _commands=$(commands)
+  _host_tools=$(find_host_tools)
+
+  # If the command is not found look for suggestions to help direct to the correct command.
+  _suggestion=$(echo "${_commands}\n${_host_tools}" | "${suggest_py}" ${command_name})
+
+  # If no suggestions are found fall back to the old error message.
+  if [ -z "$_suggestion" ]; then
+    fx-error "Cannot find executable for ${command_name}${_path_message}."\
     "If this is a tool produced by the build, make sure your"\
     "\`fx set\` config produces it in the $(_relative "$(get_host_tools_dir)") directory."
+  else
+    fx-error "${_suggestion}"
+  fi
+
   exit 1
 fi
 

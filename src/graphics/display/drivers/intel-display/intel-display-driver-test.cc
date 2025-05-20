@@ -289,34 +289,30 @@ void IntegrationTest::SetUpEnvironment() {
 
 struct DeviceNode {
   std::string name;
-  std::vector<fuchsia_driver_framework::NodeProperty> properties;
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties;
 };
 
 bool IsDisplayEngineBanjoNode(const DeviceNode& node) {
-  const std::vector<fuchsia_driver_framework::NodeProperty>& properties = node.properties;
+  const std::vector<fuchsia_driver_framework::NodeProperty2>& properties = node.properties;
   return properties.end() !=
          std::find_if(properties.begin(), properties.end(),
-                      [](const fuchsia_driver_framework::NodeProperty& property) {
-                        if (!property.key().string_value().has_value())
-                          return false;
+                      [](const fuchsia_driver_framework::NodeProperty2& property) {
                         if (!property.value().int_value().has_value())
                           return false;
-                        return property.key().string_value().value() == bind_fuchsia::PROTOCOL &&
+                        return property.key() == bind_fuchsia::PROTOCOL &&
                                property.value().int_value().value() ==
                                    bind_fuchsia_display::BIND_PROTOCOL_ENGINE;
                       });
 }
 
 bool IsIntelGpuCoreNode(const DeviceNode& node) {
-  const std::vector<fuchsia_driver_framework::NodeProperty>& properties = node.properties;
+  const std::vector<fuchsia_driver_framework::NodeProperty2>& properties = node.properties;
   return properties.end() !=
          std::find_if(properties.begin(), properties.end(),
-                      [](const fuchsia_driver_framework::NodeProperty& property) {
-                        if (!property.key().string_value().has_value())
-                          return false;
+                      [](const fuchsia_driver_framework::NodeProperty2& property) {
                         if (!property.value().int_value().has_value())
                           return false;
-                        return property.key().string_value().value() == bind_fuchsia::PROTOCOL &&
+                        return property.key() == bind_fuchsia::PROTOCOL &&
                                property.value().int_value().value() ==
                                    bind_fuchsia_intel_platform_gpucore::BIND_PROTOCOL_DEVICE;
                       });

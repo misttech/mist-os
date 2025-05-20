@@ -22,11 +22,11 @@
 #include <ktl/array.h>
 #include <ktl/byte.h>
 #include <ktl/initializer_list.h>
-#include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
 #include <ktl/type_traits.h>
+#include <ktl/utility.h>
 
 #include "address-space.h"
 #include "allocation.h"
@@ -35,11 +35,12 @@ class ElfImage {
  public:
   static constexpr ktl::string_view kImageName = "image.elf";
 
-  static constexpr size_t kMaxLoad = 4;  // RODATA, CODE, RELRO, DATA
+  static constexpr size_t kMaxLoad = 5;  // RODATA, CODE, RELRO, DATA, BSS
 
   static constexpr size_t kMaxBuildIdLen = 32;
 
-  using LoadInfo = elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StaticVector<kMaxLoad>::Container,
+  using Elf = elfldltl::Elf<>;
+  using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StaticVector<kMaxLoad>::Container,
                                       elfldltl::PhdrLoadPolicy::kContiguous>;
 
   using BootfsDir = zbitl::BootfsView<ktl::span<ktl::byte>>;
@@ -56,6 +57,12 @@ class ElfImage {
   // singleton file will be treated as the image with no patches to apply.
   fit::result<Error> Init(BootfsDir dir, ktl::string_view name, bool relocated);
 
+  // This does the same with a singleton file already located in the BootfsDir.
+  fit::result<Error> InitFromFile(BootfsDir::iterator file, bool relocated);
+
+  // This does the same with an ELF image subdirectory already located.
+  fit::result<Error> InitFromDir(BootfsDir subdir, ktl::string_view name, bool relocated);
+
   ktl::string_view name() const { return name_; }
 
   LoadInfo& load_info() { return load_info_; }
@@ -68,9 +75,20 @@ class ElfImage {
 
   // Return the memory image within the current address space. Must be called
   // after Init().
-  cpp20::span<const std::byte> memory_image() const { return image_.image(); }
+  ktl::span<const ktl::byte> memory_image() const { return image_.image(); }
+
+  // This aligns the size up to include the page-alignment padding always
+  // present in the filesystem image.
+  ktl::span<const ktl::byte> aligned_memory_image() const {
+    return {
+        image_.image().data(),
+        ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes()),
+    };
+  }
 
   uint64_t entry() const { return entry_ + load_bias(); }
+
+  ktl::optional<size_t> stack_size() const { return stack_size_; }
 
   ktl::optional<ktl::string_view> interp() const { return interp_; }
 
@@ -112,6 +130,12 @@ class ElfImage {
   bool CanLoadInPlace() const {
     return load_info_.vaddr_size() <= ZBI_BOOTFS_PAGE_ALIGN(image_.image().size_bytes());
   }
+
+  // Rewrite the load_info().segments() list after Init() so that each
+  // DataWithZeroFillSegment is replaced with a separate DataSegment and
+  // ZeroFillSegment.  Any partial page after the filesz is zero-filled in
+  // place in the file image.
+  fit::result<Error> SeparateZeroFill();
 
   // Load in place if possible, or else copy into a new Allocation
   // A virtual load address at which relocation is expected to occur may be
@@ -161,8 +185,7 @@ class ElfImage {
 
   // Set up state to describe the running phys executable.
   void InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, uintptr_t load_bias,
-                const elfldltl::Elf<>::Phdr& load_segment,
-                ktl::span<const ktl::byte> build_id_note);
+                const Elf::Phdr& load_segment, ktl::span<const ktl::byte> build_id_note);
 
   // This uses the symbolizer_markup::Writer API to emit the contextual
   // elements describing this ELF module.  The ID number should be unique among
@@ -201,6 +224,11 @@ class ElfImage {
   // instrumentation data.
   void OnHandoff() { publish_self_ = PublishSelf; }
 
+  // Describes the file before ": " and then does printf.
+  [[gnu::format(printf, 2, 3)]] void Printf(const char* fmt, ...) const;
+  void Printf() const;  // Same as Printf("").
+  void Printf(Error error) const;
+
  private:
   // PublishSelf takes one of these for each particular kind of per-module
   // instrumentation VMO supported.  The callback knows what kind of data it's
@@ -232,14 +260,16 @@ class ElfImage {
                   ktl::initializer_list<ktl::string_view> strings) const;
 
   ktl::string_view name_;
+  ktl::string_view package_;
   elfldltl::DirectMemory image_{{}};
   LoadInfo load_info_;
   uint64_t entry_ = 0;
-  ktl::span<const elfldltl::Elf<>::Dyn> dynamic_;
+  ktl::span<const Elf::Dyn> dynamic_;
   ktl::optional<elfldltl::ElfNote> build_id_;
   ktl::optional<ktl::string_view> interp_;
   code_patching::Patcher patcher_;
   ktl::optional<uintptr_t> load_bias_;
+  ktl::optional<Elf::size_type> stack_size_;
   decltype(PublishSelf)* publish_self_ = nullptr;
 };
 

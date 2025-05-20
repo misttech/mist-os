@@ -6,7 +6,7 @@
 /// and log a warning when the status is not Ok.
 // TODO(339221340): remove these allows once the skeleton has a few uses
 #[allow(unused)]
-macro_rules! log_cobalt_1dot1 {
+macro_rules! log_cobalt {
     ($cobalt_proxy:expr, $method_name:ident, $metric_id:expr, $value:expr, $event_codes:expr $(,)?) => {{
         let status = $cobalt_proxy.$method_name($metric_id, $value, $event_codes).await;
         match status {
@@ -17,7 +17,7 @@ macro_rules! log_cobalt_1dot1 {
     }};
 }
 
-macro_rules! log_cobalt_1dot1_batch {
+macro_rules! log_cobalt_batch {
     ($cobalt_proxy:expr, $events:expr, $context:expr $(,)?) => {{
         let status = $cobalt_proxy.log_metric_events($events).await;
         match status {
@@ -34,4 +34,4 @@ macro_rules! log_cobalt_1dot1_batch {
 
 // TODO(339221340): remove these allows once the skeleton has a few uses
 #[allow(unused)]
-pub(crate) use {log_cobalt_1dot1, log_cobalt_1dot1_batch};
+pub(crate) use {log_cobalt, log_cobalt_batch};

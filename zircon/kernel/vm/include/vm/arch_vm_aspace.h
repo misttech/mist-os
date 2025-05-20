@@ -34,6 +34,10 @@ const uint ARCH_MMU_FLAG_INVALID = (1u << 7);  // Indicates that flags are not s
 const uint ARCH_ASPACE_FLAG_KERNEL = (1u << 0);
 const uint ARCH_ASPACE_FLAG_GUEST = (1u << 1);
 
+constexpr bool arch_mmu_flags_uncached(uint mmu_flags) {
+  return (mmu_flags & (ARCH_MMU_FLAG_UNCACHED | ARCH_MMU_FLAG_UNCACHED_DEVICE)) != 0;
+}
+
 // per arch base class api to encapsulate the mmu routines on an aspace
 //
 // Beyond construction/destruction lifetimes users of this object must ensure that none of the
@@ -123,15 +127,20 @@ class ArchVmAspaceInterface {
   virtual zx_status_t Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
                           ExistingEntryAction existing_action, size_t* mapped) = 0;
 
-  // Unmap the given virtual address range.
-  // EnlargeOperation controls whether the unmap region can be extended to be larger, or if only the
-  // exact region may be unmapped. The unmap region might be extended, even if only temporarily, if
-  // large pages need to be split.
-  enum EnlargeOperation : bool {
-    Yes = true,
-    No = false,
+  // Options for unmapping the given virtual address range.
+  // ArchUnmapOptions::Enlarge controls whether the unmap region can be extended to be larger, or if
+  // only the exact region may be unmapped. The unmap region might be extended, even if only
+  // temporarily, if large pages need to be split.
+  //
+  // ArchUnmapOptions::Harvest requests that the accessed bit be harvested, and the page queues
+  // updated.
+  enum class ArchUnmapOptions : uint8_t {
+    None = 0,
+    Enlarge = (1u << 0),
+    Harvest = (1u << 1),
   };
-  virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, EnlargeOperation enlarge,
+
+  virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
                             size_t* unmapped) = 0;
 
   // Returns whether or not an unmap might need to enlarge an operation for reasons other than being
@@ -145,11 +154,11 @@ class ArchVmAspaceInterface {
   // a large page and the next level page table allocation fails. In
   // this case, mappings in the input range may be a mix of the old and
   // new flags.
-  // EnlargeOperation controls whether the a larger range than requested is permitted to experience
+  // ArchUnmapOptions controls whether the a larger range than requested is permitted to experience
   // a temporary permissions change. A temporary change may be required if a break-before-make style
   // unmap -> remap of the large page is required.
   virtual zx_status_t Protect(vaddr_t vaddr, size_t count, uint mmu_flags,
-                              EnlargeOperation enlarge) = 0;
+                              ArchUnmapOptions enlarge) = 0;
 
   virtual zx_status_t Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) = 0;
 
@@ -182,20 +191,21 @@ class ArchVmAspaceInterface {
   // Marks any pages in the given virtual address range as being accessed.
   virtual zx_status_t MarkAccessed(vaddr_t vaddr, size_t count) = 0;
 
-  // Returns whether or not this aspace has been active since the last time this method was called
-  // with clear=true.
+  // Returns whether or not this aspace might have additional accessed information since the last
+  // time this method was called with clear=true. If this returns |false| then, modulo races,
+  // HarvestAccessed is defined to not find any set bits and not call PageQueues::MarkAccessed.
   //
   // This is intended for use by the harvester to avoid scanning for any accessed or dirty bits if
-  // the aspace has not been active in the mmu, since an aspace that has not been active cannot
-  // generate new information.
+  // the aspace has not been accessed at all.
   //
-  // Note that restricted and shared ArchVmAspace's will report that they have been active if an
-  // associated unified ArchVmAspace has been run. However, the reverse is not true; the unified
-  // ArchVmAspace will not return true if the associated shared/restricted aspaces have been run.
+  // Note that restricted and shared ArchVmAspace's will report that they have been accessed if an
+  // associated unified ArchVmAspace has been accessed. However, the reverse is not true; the
+  // unified ArchVmAspace will not return true if the associated shared/restricted aspaces have been
+  // accessed.
   //
-  // The |clear| flag controls whether the aspace having been active should be cleared or not. Not
+  // The |clear| flag controls whether the aspace having been accessed should be cleared or not. Not
   // clearing makes this function const and not modify any state.
-  virtual bool ActiveSinceLastCheck(bool clear) = 0;
+  virtual bool AccessedSinceLastCheck(bool clear) = 0;
 
   // Physical address of the backing data structure used for translation.
   //
@@ -221,5 +231,7 @@ class ArchVmICacheConsistencyManagerInterface {
   // This is automatically called on destruction.
   virtual void Finish() = 0;
 };
+
+FBL_ENABLE_ENUM_BITS(ArchVmAspaceInterface::ArchUnmapOptions)
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_ARCH_VM_ASPACE_H_

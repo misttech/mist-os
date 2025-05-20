@@ -175,7 +175,7 @@ impl RfcommState {
     fn clear_services(&mut self) {
         if let Some(old_task) = self.service.take() {
             info!("Clearing SPP service advertisement/search");
-            let _ = old_task.cancel();
+            let _ = old_task.abort();
         }
         self.active_sessions.clear();
     }

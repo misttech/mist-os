@@ -72,7 +72,7 @@ bool Commandline::AppendItems(std::string_view cmdline) {
   return true;
 }
 
-zx::result<size_t> Commandline::ToString(cpp20::span<char> cmdline) {
+zx::result<size_t> Commandline::ToString(std::span<char> cmdline) {
   auto pos = cmdline.begin();
   for (const auto& entry : valid_entries_) {
     // One char for a space, one for an =, one for a null terminator

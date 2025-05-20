@@ -11,6 +11,12 @@
     ],
     offer: [
         {
+            protocol: "fuchsia.power.system.ActivityGovernor",
+            from: "parent",
+            to: "#bluetooth-core",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
             to: [ "#bluetooth-core" ],
@@ -27,9 +33,20 @@
             source_availability: "unknown",
         },
         {
+            config: "fuchsia.power.SuspendEnabled",
+            from: "parent",
+            to: "#bluetooth-core",
+        },
+        {
             config: "fuchsia.bluetooth.LegacyPairing",
             from: "parent",
             to: "#bluetooth-core",
+        },
+        {
+            config: "fuchsia.bluetooth.ScoOffloadPathIndex",
+            from: "void",
+            to: "#bluetooth-core",
+            availability: "optional",
         },
         {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have

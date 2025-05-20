@@ -646,6 +646,7 @@ mod tests {
     use assert_matches::assert_matches;
     use net_types::Witness as _;
     use netstack3_base::testutil::{TEST_ADDRS_V4, TEST_ADDRS_V6};
+    use netstack3_filter::FilterIpExt;
     use packet::{Buffer, BufferView, GrowBuffer};
     use packet_formats::ip::IpProto;
     use packet_formats::ipv4::Ipv4Packet;
@@ -812,7 +813,7 @@ mod tests {
     }
 
     struct ForwardingTestEnv<E>(E);
-    impl<I: FragmentationIpExt, E: FragmentationTestEnv<I>> FragmentationTestEnv<I>
+    impl<I: FragmentationIpExt + FilterIpExt, E: FragmentationTestEnv<I>> FragmentationTestEnv<I>
         for ForwardingTestEnv<E>
     {
         fn new_serializer<'a>(

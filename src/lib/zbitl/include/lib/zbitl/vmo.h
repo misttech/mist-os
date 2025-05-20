@@ -251,10 +251,10 @@ class StorageTraits<MapUnownedVmo> {
   // true), then mapping the pages containing the data (especially when small)
   // is deemed too high a cost and this method is left unimplemented. In that
   // case, the unbuffered `Read()` is recommended instead.
-  template <typename T, bool LowLocality>
-  static std::enable_if_t<(alignof(T) <= kStorageAlignment) && !LowLocality,
-                          fit::result<error_type, cpp20::span<const T>>>
-  Read(MapUnownedVmo& zbi, payload_type payload, uint32_t length) {
+  template <PayloadCompatibleStorage T, bool LowLocality>
+    requires(!LowLocality)
+  static fit::result<error_type, std::span<const T>> Read(MapUnownedVmo& zbi, payload_type payload,
+                                                          uint32_t length) {
     auto result = Map(zbi, payload, length, false);
     if (result.is_error()) {
       return result.take_error();

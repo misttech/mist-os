@@ -2,8 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
-import("//src/starnix/tools/tar_to_pkg/tar_to_pkg.gni")
+import("//src/starnix/build/starnix_docker_container.gni")
 
 group("alpine") {
   if (target_cpu == "x64") {
@@ -13,29 +12,12 @@ group("alpine") {
 
 if (target_cpu == "x64") {
   # The Alpine system image was created using the Dockerfile in this directory.
-  tar_to_pkg("alpine_system_image") {
-    input = "//prebuilt/starnix/alpine-image-amd64/alpine.tar"
-    prefix = "data/system"
-    format = "docker-archive"
-  }
-
-  group("alpine_container_resources") {
-    deps = [
-      ":alpine_system_image",
-      "//src/starnix/containers:default_init",
-    ]
-  }
-
-  fuchsia_component("alpine_container") {
-    manifest = "meta/alpine_container.cml"
-    component_name = "alpine_container"
-  }
-
-  fuchsia_package("alpine_package") {
+  starnix_docker_container("alpine_package") {
+    input_path = "//prebuilt/starnix/alpine-image-amd64/alpine.tar"
     package_name = "alpine"
-    deps = [
-      ":alpine_container",
-      ":alpine_container_resources",
+    features = [
+      "rootfs_rw",
+      "container",
     ]
   }
 }

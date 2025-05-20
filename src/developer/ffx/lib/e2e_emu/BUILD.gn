@@ -80,16 +80,11 @@ if (is_host && has_board) {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-stream",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:tracing",
   ]
-
-  # Exported SDK with ffx binary.
-  _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
-  _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
-  _sdk_path = _sdk_outdir + "/sdk/exported/core"
 
   # Product bundle containing emulator image.
   _pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
@@ -130,12 +125,10 @@ if (is_host && has_board) {
     sources = [
       _amber_files_path,
       _product_bundle,
-      _sdk_path,
     ]
     deps = [
       _amber_files_label,
       _pb_label,
-      _sdk_label,
     ]
   }
 

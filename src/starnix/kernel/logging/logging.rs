@@ -13,7 +13,8 @@ use std::fmt;
 #[doc(hidden)]
 pub use log as __log;
 
-pub use log::Level;
+pub use log::kv::{ToValue, Value};
+pub use log::{logger, Level, Record};
 
 /// Used to track the current thread's logical context.
 enum TaskDebugInfo {

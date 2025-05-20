@@ -60,7 +60,7 @@ TEST_F(PowerFrameworkTestRealmTest, ConnectTest) {
 
   auto set_result = fidl::Call(*realm.component().Connect<test_suspendcontrol::Device>())
                         ->SetSuspendStates({{{{
-                            fuchsia_hardware_suspend::SuspendState{{.resume_latency = 100}},
+                            fuchsia_hardware_power_suspend::SuspendState{{.resume_latency = 100}},
                         }}}});
   ASSERT_EQ(true, set_result.is_ok()) << set_result.error_value();
 

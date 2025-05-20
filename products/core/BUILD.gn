@@ -119,16 +119,15 @@ _storage_storage_host = {
   }
 }
 
-_driver_host_rust = {
-  driver_framework = {
-    use_rust_driver_host = true
-  }
-}
-
 _base_packages = [
   {
     # Provides font assets for `platform.fonts.font_collection` above.
     package_target = "//src/fonts/asset_providers:small-open-fonts-collection.asset-provider.package"
+  },
+]
+_cache_packages = [
+  {
+    package_target = "//src/chromium:web_engine_pkg"
   },
 ]
 
@@ -136,13 +135,13 @@ product_assembly_configuration("core") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_driver_host_rust, "*")
   }
   product = {
     build_info = default_product_build_info
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -150,7 +149,6 @@ product_assembly_configuration("core_with_f2fs") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_driver_host_rust, "*")
     forward_variables_from(_storage_f2fs, "*")
   }
   product = {
@@ -158,6 +156,7 @@ product_assembly_configuration("core_with_f2fs") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -165,7 +164,6 @@ product_assembly_configuration("core_with_minfs") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
-    forward_variables_from(_driver_host_rust, "*")
     forward_variables_from(_storage_minfs, "*")
   }
   product = {
@@ -173,6 +171,7 @@ product_assembly_configuration("core_with_minfs") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -187,6 +186,7 @@ product_assembly_configuration("core_with_storage_host") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -196,7 +196,6 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
     forward_variables_from(_platform_configuration_base, "*")
 
     driver_framework = {
-      use_rust_driver_host = true
       test_fuzzing_config = {
         enable_load_fuzzer = true
         max_load_delay_ms = 300
@@ -209,5 +208,6 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }

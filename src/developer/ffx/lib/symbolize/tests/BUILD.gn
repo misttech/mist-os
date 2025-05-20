@@ -19,19 +19,16 @@ if (is_host) {
   ffx_e2e_test("ffx_symbolize_lib_e2e_test") {
     edition = "2021"
     source_root = "e2e_test.rs"
-    sources = [
-      "shared.rs",
-      source_root,
-    ]
+    sources = [ source_root ]
     deps = [
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/lib/e2e_emu",
       "//src/developer/ffx/lib/symbolize",
+      "//src/developer/ffx/lib/symbolize/test-utils:symbolize_test_utils",
       "//src/lib/diagnostics/log/rust_cpp_bridge",
       "//src/lib/fuchsia",
-      "//third_party/rust_crates:serde",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:tracing",
     ]
 
     product_bundle = ":product_bundle($default_toolchain)"
@@ -50,18 +47,13 @@ if (is_host) {
   rustc_binary("print_fn_ptr_bin") {
     edition = "2021"
     source_root = "print_fn_ptr.rs"
-    sources = [
-      "shared.rs",
-      source_root,
-    ]
+    sources = [ source_root ]
     deps = [
       ":no_symbol_area",
       "//sdk/rust/zx",
-      "//src/lib/process_builder",
+      "//src/developer/ffx/lib/symbolize/test-utils:symbolize_test_utils",
       "//third_party/rust_crates:libc",
-      "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:zerocopy",
     ]
   }
 
@@ -81,7 +73,6 @@ if (is_host) {
   # they're expanded on variant toolchains like for asan.
   if (current_toolchain == default_toolchain) {
     files = {
-      partitions_config = "$target_out_dir/partitions/partitions_config.json"
       outdir = target_out_dir + "/fuchsia"
       images_json = "${outdir}/images.json"
     }
@@ -90,13 +81,10 @@ if (is_host) {
       testonly = true
       name = "ffx-symbolize-test"
 
-      partitions = files.partitions_config
+      partitions = ":partitions_config"
       system_a = files.images_json
 
-      deps = [
-        ":assembly",
-        ":partitions_config",
-      ]
+      deps = [ ":assembly" ]
     }
 
     assembled_system("assembly") {
@@ -111,7 +99,6 @@ if (is_host) {
 
     generated_partitions_config("partitions_config") {
       testonly = true
-      output_path = get_path_info(files.partitions_config, "dir")
       hw_revision = board_name
     }
 

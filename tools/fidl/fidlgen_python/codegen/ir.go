@@ -123,6 +123,7 @@ type PythonMethod struct {
 	fidlgen.Method
 	HasFrameworkError            bool
 	PythonName                   string
+	PythonResponseAlias          string
 	PythonRequestPayload         *PythonPayload
 	PythonRequestIdent           fidlgen.EncodedCompoundIdentifier
 	PythonResponsePayload        *PythonPayload
@@ -803,9 +804,10 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) PythonProtocol {
 
 	for _, v := range val.Methods {
 		m := PythonMethod{
-			Method:            v,
-			HasFrameworkError: v.HasFrameworkError(),
-			PythonName:        changeIfReserved(compileSnakeIdentifier(v.Name)),
+			Method:              v,
+			HasFrameworkError:   v.HasFrameworkError(),
+			PythonName:          changeIfReserved(compileSnakeIdentifier(v.Name)),
+			PythonResponseAlias: changeIfReserved(fmt.Sprintf("%sResponse", compileCamelIdentifier(v.Name))),
 		}
 		if v.RequestPayload == nil {
 			m.PythonRequestPayload = nil

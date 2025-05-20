@@ -48,9 +48,14 @@ static const char* kDependencyPath = "/gpu-manifest-fs";
 
 static constexpr zx::duration kShutdownTimeout = zx::sec(1);
 
-// NOTE: If this value changes, you should also change the corresponding kCleanupDelay inside
-// escher/profiling/timestamp_profiler.cc.
-static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
+// After every Flatland frame is sent to the display, we kick off a task for Escher to clean up
+// unused Vulkan resources such as command buffers, which repeats with the specified interval until
+// all resources are cleaned up.
+static constexpr zx::duration kEscherCleanupRetryInterval{10'000'000};  // 10 millisecond
+
+// The maximum number of "layers" that can be passed to the display hardware in a single frame,
+// per display.
+static constexpr uint32_t kMaxDisplayLayers = 4;
 
 std::optional<fuchsia_hardware_display_types::wire::DisplayId> GetDisplayId(
     const scenic_structured_config::Config& values) {
@@ -426,7 +431,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.display_composition(), /*max_display_layers=*/1,
+        config_values_.display_composition(), kMaxDisplayLayers,
         config_values_.visual_debugging_level());
   }
 
@@ -697,17 +702,17 @@ void App::InitializeHeartbeat(display::Display& display) {
         flatland_manager_->OnFramePresented(latched_times, present_times);
       },
       /*render_scheduled_frame*/
-      [this](auto frame_number, auto presentation_time, auto callback) {
+      [this](auto frame_number, auto presentation_time, auto frame_presented_callback) {
         TRACE_DURATION("gfx", "App render_scheduled_frame");
         FX_CHECK(flatland_frame_count_ + skipped_frame_count_ == frame_number - 1);
         if (auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering()) {
           flatland_engine_->RenderScheduledFrame(frame_number, presentation_time, *display,
-                                                 std::move(callback));
+                                                 std::move(frame_presented_callback));
           ++flatland_frame_count_;
         } else {
           FX_LOGS(INFO) << "No FlatlandDisplay; skipping render scheduled frame.";
           skipped_frame_count_++;
-          flatland_engine_->SkipRender(std::move(callback));
+          flatland_engine_->SkipRender(std::move(frame_presented_callback));
         }
       });
 }

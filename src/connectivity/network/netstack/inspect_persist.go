@@ -46,7 +46,7 @@ func startPersistClient(ctx context.Context, componentCtx *component.Context, cl
 		_ = syslog.FatalTf(persistenceTagName, "failed to create channel: %s", err)
 	}
 	if err := componentCtx.ConnectToProtocolAtPath(
-		"fuchsia.diagnostics.persist.DataPersistence-netstack", persistServerEnd); err != nil {
+		"fuchsia.diagnostics.persist.DataPersistence", persistServerEnd); err != nil {
 		_ = syslog.WarnTf(persistenceTagName, "couldn't connect to persistence service: %s", err)
 		return
 	}
@@ -56,7 +56,7 @@ func startPersistClient(ctx context.Context, componentCtx *component.Context, cl
 func runPersistClient(persistClientEnd *persist.DataPersistenceWithCtxInterface, ctx context.Context, clock tcpip.Clock) {
 	_ = syslog.InfoTf(persistenceTagName, "starting persistence polling routine")
 	// Request immediately, then wait for the timer.
-	if err := makePersistenceRequest(persistClientEnd, ctx, 0*time.Second); err != nil {
+	if err := makePersistenceRequest(persistClientEnd, ctx); err != nil {
 		_ = syslog.WarnTf(persistenceTagName, "aborting persistence routine startup: %s", err)
 		return
 	}
@@ -67,7 +67,7 @@ func runPersistClient(persistClientEnd *persist.DataPersistenceWithCtxInterface,
 		case <-ctx.Done():
 			_ = syslog.InfoTf(persistenceTagName, "stopping persistence polling routine")
 		default:
-			if err := makePersistenceRequest(persistClientEnd, ctx, 5*time.Second); err != nil {
+			if err := makePersistenceRequest(persistClientEnd, ctx); err != nil {
 				_ = syslog.WarnTf(persistenceTagName, "stopping persistence routine: %s", err)
 				return
 			}
@@ -76,20 +76,16 @@ func runPersistClient(persistClientEnd *persist.DataPersistenceWithCtxInterface,
 	})
 }
 
-func makePersistenceRequest(persistClientEnd *persist.DataPersistenceWithCtxInterface, ctx context.Context, delay time.Duration) error {
+func makePersistenceRequest(persistClientEnd *persist.DataPersistenceWithCtxInterface, ctx context.Context) error {
 	_ = syslog.DebugTf(persistenceTagName, "requesting persistence for netstack")
-	for _, tag := range tags {
-		result, err := persistClientEnd.Persist(ctx, tag)
-		if err != nil {
-			return fmt.Errorf("failed to request persistence: %w", err)
-		}
-
-		if want := persist.PersistResultQueued; result != want {
-			_ = syslog.WarnTf(persistenceTagName, "unexpected persist result; expected %s got %s", want, result)
-		}
-		// TODO(https://fxbug.dev/42080432): Remove once multi-tag persistence is working
-		time.Sleep(delay)
+	results, err := persistClientEnd.PersistTags(ctx, tags)
+	if err != nil {
+		return fmt.Errorf("failed to request persistence: %w", err)
 	}
-
+	for i, got := range results {
+		if want := persist.PersistResultQueued; got != want {
+			_ = syslog.WarnTf(persistenceTagName, "unexpected persist result for %s; want %s got %s", tags[i], want, got)
+		}
+	}
 	return nil
 }

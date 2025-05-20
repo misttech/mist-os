@@ -15,7 +15,7 @@
 #include <cstdint>
 
 #include <fbl/alloc_checker.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/handle.h>
 #include <object/io_buffer_dispatcher.h>
 #include <object/io_buffer_shared_region_dispatcher.h>

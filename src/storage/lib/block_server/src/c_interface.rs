@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{IntoSessionManager, OffsetMap, Operation, RequestId, RequestTracking, SessionHelper};
+use super::{
+    ActiveRequests, DecodedRequest, IntoSessionManager, OffsetMap, Operation, RequestId,
+    SessionHelper, TraceFlowId,
+};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::RequestStream;
+use fidl_fuchsia_hardware_block::MAX_TRANSFER_UNBOUNDED;
 use fuchsia_async::{self as fasync, EHandle};
 use fuchsia_sync::{Condvar, Mutex};
 use futures::stream::{AbortHandle, Abortable};
@@ -22,6 +26,7 @@ use {fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume a
 pub struct SessionManager {
     callbacks: Callbacks,
     open_sessions: Mutex<HashMap<usize, Weak<Session>>>,
+    active_requests: ActiveRequests<Arc<Session>>,
     condvar: Condvar,
     mbox: ExecutorMailbox,
     info: super::DeviceInfo,
@@ -31,6 +36,14 @@ unsafe impl Send for SessionManager {}
 unsafe impl Sync for SessionManager {}
 
 impl SessionManager {
+    fn complete_request(&self, request_id: RequestId, status: zx::Status) {
+        if let Some((session, response)) =
+            self.active_requests.complete_and_take_response(request_id, status)
+        {
+            session.send_response(response);
+        }
+    }
+
     fn terminate(&self) {
         {
             // We must drop references to sessions whilst we're not holding the lock for
@@ -50,6 +63,8 @@ impl SessionManager {
 }
 
 impl super::SessionManager for SessionManager {
+    type Session = Arc<Session>;
+
     async fn on_attach_vmo(self: Arc<Self>, _vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
         Ok(())
     }
@@ -57,7 +72,7 @@ impl super::SessionManager for SessionManager {
     async fn open_session(
         self: Arc<Self>,
         mut stream: fblock::SessionRequestStream,
-        offset_map: Option<OffsetMap>,
+        offset_map: OffsetMap,
         block_size: u32,
     ) -> Result<(), Error> {
         let (helper, fifo) = SessionHelper::new(self.clone(), offset_map, block_size)?;
@@ -67,7 +82,6 @@ impl super::SessionManager for SessionManager {
             helper,
             fifo,
             queue: Mutex::default(),
-            vmos: Mutex::default(),
             abort_handle,
         });
         self.open_sessions.lock().insert(Arc::as_ptr(&session) as usize, Arc::downgrade(&session));
@@ -95,6 +109,10 @@ impl super::SessionManager for SessionManager {
     async fn get_info(&self) -> Result<Cow<'_, super::DeviceInfo>, zx::Status> {
         Ok(Cow::Borrowed(&self.info))
     }
+
+    fn active_requests(&self) -> &ActiveRequests<Arc<Session>> {
+        &self.active_requests
+    }
 }
 
 impl Drop for SessionManager {
@@ -116,12 +134,8 @@ pub struct Callbacks {
     pub context: *mut c_void,
     pub start_thread: unsafe extern "C" fn(context: *mut c_void, arg: *const c_void),
     pub on_new_session: unsafe extern "C" fn(context: *mut c_void, session: *const Session),
-    pub on_requests: unsafe extern "C" fn(
-        context: *mut c_void,
-        session: *const Session,
-        requests: *mut Request,
-        request_count: usize,
-    ),
+    pub on_requests:
+        unsafe extern "C" fn(context: *mut c_void, requests: *mut Request, request_count: usize),
     pub log: unsafe extern "C" fn(context: *mut c_void, message: *const c_char, message_len: usize),
 }
 
@@ -144,7 +158,7 @@ pub struct UnownedVmo(zx::sys::zx_handle_t);
 pub struct Request {
     pub request_id: RequestId,
     pub operation: Operation,
-    pub trace_flow_id: Option<NonZero<u64>>,
+    pub trace_flow_id: TraceFlowId,
     pub vmo: UnownedVmo,
 }
 
@@ -156,7 +170,6 @@ pub struct Session {
     helper: SessionHelper<SessionManager>,
     fifo: zx::Fifo<BlockFifoRequest, BlockFifoResponse>,
     queue: Mutex<SessionQueue>,
-    vmos: Mutex<HashMap<RequestId, Arc<zx::Vmo>>>,
     abort_handle: AbortHandle,
 }
 
@@ -165,15 +178,16 @@ struct SessionQueue {
     responses: VecDeque<BlockFifoResponse>,
 }
 
-pub const MAX_REQUESTS: usize = 64;
+pub const MAX_REQUESTS: usize = super::FIFO_MAX_REQUESTS;
 
 impl Session {
-    fn run(&self) {
+    fn run(self: &Arc<Self>) {
         self.fifo_loop();
         self.abort_handle.abort();
+        self.helper.drop_active_requests(|s| Arc::ptr_eq(s, self));
     }
 
-    fn fifo_loop(&self) {
+    fn fifo_loop(self: &Arc<Self>) {
         let mut requests = [MaybeUninit::uninit(); MAX_REQUESTS];
 
         loop {
@@ -199,7 +213,7 @@ impl Session {
 
             // Process pending reads.
             match self.fifo.read_uninit(&mut requests) {
-                Ok(valid_requests) => self.handle_requests(valid_requests.iter()),
+                Ok(valid_requests) => self.handle_requests(valid_requests.iter_mut()),
                 Err(zx::Status::SHOULD_WAIT) => {
                     let mut signals =
                         zx::Signals::OBJECT_READABLE | zx::Signals::USER_0 | zx::Signals::USER_1;
@@ -207,7 +221,7 @@ impl Session {
                         signals |= zx::Signals::OBJECT_WRITABLE;
                     }
                     let Ok(signals) =
-                        self.fifo.wait_handle(signals, zx::MonotonicInstant::INFINITE)
+                        self.fifo.wait_handle(signals, zx::MonotonicInstant::INFINITE).to_result()
                     else {
                         return;
                     };
@@ -224,59 +238,81 @@ impl Session {
         }
     }
 
-    fn handle_requests<'a>(&self, requests: impl Iterator<Item = &'a BlockFifoRequest>) {
-        let mut decoded_requests: [MaybeUninit<Request>; MAX_REQUESTS] =
+    fn handle_requests<'a>(
+        self: &Arc<Self>,
+        requests: impl Iterator<Item = &'a mut BlockFifoRequest>,
+    ) {
+        let mut c_requests: [MaybeUninit<Request>; MAX_REQUESTS] =
             unsafe { MaybeUninit::uninit().assume_init() };
         let mut count = 0;
         for request in requests {
-            if let Some(r) = self.helper.decode_fifo_request(request) {
-                let operation = match r.operation {
-                    Ok(Operation::CloseVmo) => {
-                        self.send_reply(r.request_tracking, zx::Status::OK);
-                        continue;
+            match self.helper.decode_fifo_request(self.clone(), request) {
+                Ok(DecodedRequest { operation: Operation::CloseVmo, request_id, .. }) => {
+                    self.complete_request(request_id, zx::Status::OK);
+                }
+                Ok(mut request) => loop {
+                    match self.helper.map_request(request) {
+                        Ok((
+                            DecodedRequest { request_id, operation, trace_flow_id, vmo },
+                            remainder,
+                        )) => {
+                            // We are handing out unowned references to the VMO here.  This is safe
+                            // because the VMO bin holds references to any closed VMOs until all
+                            // preceding operations have finished.
+                            c_requests[count].write(Request {
+                                request_id,
+                                operation,
+                                trace_flow_id,
+                                vmo: UnownedVmo(
+                                    vmo.as_ref()
+                                        .map(|vmo| vmo.raw_handle())
+                                        .unwrap_or(zx::sys::ZX_HANDLE_INVALID),
+                                ),
+                            });
+                            count += 1;
+                            if count == MAX_REQUESTS {
+                                unsafe {
+                                    (self.manager.callbacks.on_requests)(
+                                        self.manager.callbacks.context,
+                                        c_requests[0].as_mut_ptr(),
+                                        count,
+                                    );
+                                }
+                                count = 0;
+                            }
+                            if let Some(r) = remainder {
+                                request = r;
+                            } else {
+                                break;
+                            }
+                        }
+                        Err(Some(response)) => {
+                            self.send_response(response);
+                            break;
+                        }
+                        Err(None) => break,
                     }
-                    Ok(operation) => operation,
-                    Err(status) => {
-                        self.send_reply(r.request_tracking, status);
-                        continue;
-                    }
-                };
-                let RequestTracking { group_or_request, trace_flow_id } = r.request_tracking;
-                let mut request_id = group_or_request.into();
-                let vmo = if let Some(vmo) = r.vmo {
-                    let raw_handle = vmo.raw_handle();
-                    self.vmos.lock().insert(request_id, vmo);
-                    request_id = request_id.with_vmo();
-                    UnownedVmo(raw_handle)
-                } else {
-                    UnownedVmo(zx::sys::ZX_HANDLE_INVALID)
-                };
-                decoded_requests[count].write(Request {
-                    request_id,
-                    operation,
-                    trace_flow_id,
-                    vmo,
-                });
-                count += 1;
+                },
+                Err(None) => {}
+                Err(Some(response)) => self.send_response(response),
             }
         }
         if count > 0 {
             unsafe {
                 (self.manager.callbacks.on_requests)(
                     self.manager.callbacks.context,
-                    self,
-                    decoded_requests[0].as_mut_ptr(),
+                    c_requests[0].as_mut_ptr(),
                     count,
                 );
             }
         }
     }
 
-    fn send_reply(&self, tracking: RequestTracking, status: zx::Status) {
-        let response = match self.helper.finish_fifo_request(tracking, status) {
-            Some(response) => response,
-            None => return,
-        };
+    fn complete_request(&self, request_id: RequestId, status: zx::Status) {
+        self.manager.complete_request(request_id, status);
+    }
+
+    fn send_response(&self, response: BlockFifoResponse) {
         let mut queue = self.queue.lock();
         if queue.responses.is_empty() {
             match self.fifo.write_one(&response) {
@@ -364,6 +400,7 @@ pub struct PartitionInfo {
     pub instance_guid: [u8; 16],
     pub name: *const c_char,
     pub flags: u64,
+    pub max_transfer_size: u32,
 }
 
 /// cbindgen:no-export
@@ -387,6 +424,11 @@ impl PartitionInfo {
                 String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string()
             },
             flags: self.flags,
+            max_transfer_blocks: if self.max_transfer_size != MAX_TRANSFER_UNBOUNDED {
+                NonZero::new(self.max_transfer_size / self.block_size)
+            } else {
+                None
+            },
         })
     }
 }
@@ -402,6 +444,7 @@ pub unsafe extern "C" fn block_server_new(
     let session_manager = Arc::new(SessionManager {
         callbacks,
         open_sessions: Mutex::default(),
+        active_requests: ActiveRequests::default(),
         condvar: Condvar::new(),
         mbox: ExecutorMailbox::new(),
         info: partition_info.to_rust(),
@@ -518,7 +561,9 @@ pub unsafe extern "C" fn block_server_serve(block_server: *const BlockServer, ha
 /// `session` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn block_server_session_run(session: &Session) {
+    let session = Arc::from_raw(session);
     session.run();
+    let _ = Arc::into_raw(session);
 }
 
 /// # Safety
@@ -532,19 +577,12 @@ pub unsafe extern "C" fn block_server_session_release(session: &Session) {
 
 /// # Safety
 ///
-/// `session` must be valid.
+/// `block_server` must be valid.
 #[no_mangle]
 pub unsafe extern "C" fn block_server_send_reply(
-    session: &Session,
+    block_server: &BlockServer,
     request_id: RequestId,
-    trace_flow_id: Option<NonZero<u64>>,
     status: zx_status_t,
 ) {
-    if request_id.did_have_vmo() {
-        session.vmos.lock().remove(&request_id);
-    }
-    session.send_reply(
-        RequestTracking { group_or_request: request_id.into(), trace_flow_id },
-        zx::Status::from_raw(status),
-    );
+    block_server.server.session_manager.complete_request(request_id, zx::Status::from_raw(status));
 }

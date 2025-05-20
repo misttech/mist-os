@@ -28,8 +28,9 @@ TEST(TargetsTest, OwnJob) {
   profiler::TargetTree tree;
   zx::job parent;
   ASSERT_EQ(ZX_OK, zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &parent));
+  elf_search::Searcher searcher;
 
-  zx::result<profiler::JobTarget> target = tree.MakeJobTarget(std::move(parent));
+  zx::result<profiler::JobTarget> target = profiler::MakeJobTarget(std::move(parent), searcher);
   ASSERT_TRUE(target.is_ok());
 
   // We don't expect to have any sub jobs
@@ -63,6 +64,7 @@ TEST(TargetsTest, OwnJob) {
 
 // Ensure that if a sub job exits, we are able to get the remaining jobs that still exist
 TEST(TargetsTest, JobsDone) {
+  elf_search::Searcher searcher;
   std::atomic<bool> keep_going = true;
   // In the background, create and destroy some siblings
   std::thread sibling_maker{[&keep_going]() {
@@ -80,7 +82,7 @@ TEST(TargetsTest, JobsDone) {
     zx::job parent;
     ASSERT_EQ(ZX_OK, zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &parent));
 
-    zx::result<profiler::JobTarget> target = tree.MakeJobTarget(std::move(parent));
+    zx::result<profiler::JobTarget> target = profiler::MakeJobTarget(std::move(parent), searcher);
     // This should succeed regardless of if a job disappeared from under us or not. In the log for
     // the test, we'll likely see some warnings about jobs not being found.
     ASSERT_TRUE(target.is_ok());
@@ -122,7 +124,7 @@ TEST(TargetsTest, TargetTreeAddJobTopLevel) {
 
 TEST(TargetsTest, TargetTreeAddThreadTopLevel) {
   profiler::TargetTree tree;
-  profiler::ThreadTarget t1{zx::thread{ZX_HANDLE_INVALID}, 3};
+  profiler::ThreadTarget t1{.handle = zx::thread{ZX_HANDLE_INVALID}, .tid = 3};
 
   zx::result res = tree.AddThread(4, std::move(t1));
   ASSERT_TRUE(res.is_error());
@@ -132,7 +134,7 @@ TEST(TargetsTest, TargetTreeAddThreadTopLevel) {
                              std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
   EXPECT_TRUE(tree.AddProcess(std::move(p1)).is_ok());
 
-  profiler::ThreadTarget t2{zx::thread{ZX_HANDLE_INVALID}, 3};
+  profiler::ThreadTarget t2{.handle = zx::thread{ZX_HANDLE_INVALID}, .tid = 3};
   res = tree.AddThread(4, std::move(t2));
   ASSERT_TRUE(res.is_ok());
 }
@@ -140,7 +142,7 @@ TEST(TargetsTest, TargetTreeAddThreadTopLevel) {
 TEST(TargetsTest, TargetTreeAddTargetsNestedNonExist) {
   profiler::TargetTree tree;
 
-  profiler::ThreadTarget t1{zx::thread{ZX_HANDLE_INVALID}, 1};
+  profiler::ThreadTarget t1{.handle = zx::thread{ZX_HANDLE_INVALID}, .tid = 1};
   profiler::ProcessTarget p1{zx::process{ZX_HANDLE_INVALID}, 2,
                              std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
   profiler::JobTarget j1{zx::job{ZX_HANDLE_INVALID}, 3, std::vector<zx_koid_t>{}};
@@ -165,7 +167,7 @@ TEST(TargetsTest, TargetTreeAddTargetsNestedNonExist) {
 TEST(TargetsTest, TargetTreeAddTargetsNested) {
   profiler::TargetTree tree;
 
-  profiler::ThreadTarget t1{zx::thread{ZX_HANDLE_INVALID}, 1};
+  profiler::ThreadTarget t1{.handle = zx::thread{ZX_HANDLE_INVALID}, .tid = 1};
   profiler::ProcessTarget p1{zx::process{ZX_HANDLE_INVALID}, 2,
                              std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
   profiler::JobTarget j1{zx::job{ZX_HANDLE_INVALID}, 3, std::vector<zx_koid_t>{}};

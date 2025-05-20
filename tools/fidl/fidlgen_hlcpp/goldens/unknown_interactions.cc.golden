@@ -16,11 +16,11 @@ extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtoco
 const fidl_type_t* UnknownInteractionsProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -38,7 +38,6 @@ zx_status_t UnknownInteractionsProtocolStrictTwoWayFieldsResponse::Clone(Unknown
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
 const fidl_type_t* UnknownInteractionsProtocolStrictTwoWayUnionResponse::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
@@ -88,9 +87,8 @@ UnknownInteractionsProtocolStrictTwoWayUnionResponse UnknownInteractionsProtocol
   return result;
 }
 
-
 void UnknownInteractionsProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -140,7 +138,6 @@ void UnknownInteractionsProtocolStrictTwoWayUnionResponse::Decode(::fidl::Decode
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -188,13 +185,13 @@ void UnknownInteractionsProtocolStrictTwoWayUnionResponse::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse::Tag::Invalid);
 }
@@ -215,7 +212,6 @@ void UnknownInteractionsProtocolStrictTwoWayUnionResponse::EnsureStorageInitiali
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
 const fidl_type_t* UnknownInteractionsProtocolStrictTwoWayTableResponse::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
@@ -264,7 +260,7 @@ UnknownInteractionsProtocolStrictTwoWayTableResponse& UnknownInteractionsProtoco
 }
 
 void UnknownInteractionsProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -318,8 +314,6 @@ void UnknownInteractionsProtocolStrictTwoWayTableResponse::Decode(::fidl::Decode
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -340,16 +334,15 @@ zx_status_t UnknownInteractionsProtocolStrictTwoWayTableResponse::Clone(UnknownI
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -367,7 +360,6 @@ zx_status_t UnknownInteractionsProtocol_StrictTwoWayErr_Response::Clone(UnknownI
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
@@ -422,9 +414,8 @@ UnknownInteractionsProtocol_StrictTwoWayErr_Result UnknownInteractionsProtocol_S
   return result;
 }
 
-
 void UnknownInteractionsProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -492,7 +483,6 @@ void UnknownInteractionsProtocol_StrictTwoWayErr_Result::Decode(::fidl::Decoder*
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -547,10 +537,10 @@ void UnknownInteractionsProtocol_StrictTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result::Tag::Invalid);
 }
@@ -574,16 +564,15 @@ void UnknownInteractionsProtocol_StrictTwoWayErr_Result::EnsureStorageInitialize
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -601,7 +590,6 @@ zx_status_t UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Response::Clone(Un
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
@@ -656,9 +644,8 @@ UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result UnknownInteractionsProt
   return result;
 }
 
-
 void UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -726,7 +713,6 @@ void UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::Decode(::fidl::De
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -781,10 +767,10 @@ void UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -807,7 +793,6 @@ void UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result::EnsureStorageInit
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResponseTable;
@@ -857,9 +842,8 @@ UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response UnknownInteractionsPro
   return result;
 }
 
-
 void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -909,7 +893,6 @@ void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Decode(::fidl::D
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -957,13 +940,13 @@ void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -984,7 +967,6 @@ void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::EnsureStorageIni
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
@@ -1039,9 +1021,8 @@ UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result UnknownInteractionsProto
   return result;
 }
 
-
 void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1109,7 +1090,6 @@ void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::Decode(::fidl::Dec
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1164,10 +1144,10 @@ void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -1190,7 +1170,6 @@ void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result::EnsureStorageIniti
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResponseTable;
@@ -1239,7 +1218,7 @@ UnknownInteractionsProtocol_StrictTwoWayTableErr_Response& UnknownInteractionsPr
 }
 
 void UnknownInteractionsProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -1293,8 +1272,6 @@ void UnknownInteractionsProtocol_StrictTwoWayTableErr_Response::Decode(::fidl::D
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -1314,7 +1291,6 @@ zx_status_t UnknownInteractionsProtocol_StrictTwoWayTableErr_Response::Clone(Unk
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
@@ -1369,9 +1345,8 @@ UnknownInteractionsProtocol_StrictTwoWayTableErr_Result UnknownInteractionsProto
   return result;
 }
 
-
 void UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1439,7 +1414,6 @@ void UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::Decode(::fidl::Dec
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1494,10 +1468,10 @@ void UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -1521,16 +1495,15 @@ void UnknownInteractionsProtocol_StrictTwoWayTableErr_Result::EnsureStorageIniti
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWay_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWay_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWay_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWay_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWay_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -1548,7 +1521,6 @@ zx_status_t UnknownInteractionsProtocol_FlexibleTwoWay_Response::Clone(UnknownIn
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWay_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
@@ -1603,9 +1575,8 @@ UnknownInteractionsProtocol_FlexibleTwoWay_Result UnknownInteractionsProtocol_Fl
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWay_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1673,7 +1644,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWay_Result::Decode(::fidl::Decoder* 
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1728,10 +1698,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWay_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result::Tag::Invalid);
 }
@@ -1755,16 +1725,15 @@ void UnknownInteractionsProtocol_FlexibleTwoWay_Result::EnsureStorageInitialized
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayFields_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWayFields_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWayFields_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWayFields_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -1782,7 +1751,6 @@ zx_status_t UnknownInteractionsProtocol_FlexibleTwoWayFields_Response::Clone(Unk
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
@@ -1837,9 +1805,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayFields_Result UnknownInteractionsProto
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -1907,7 +1874,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Decode(::fidl::Dec
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -1962,10 +1928,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::Tag::Invalid);
 }
@@ -1988,7 +1954,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayFields_Result::EnsureStorageIniti
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResponseTable;
@@ -2038,9 +2003,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response UnknownInteractionsProt
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2090,7 +2054,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Decode(::fidl::De
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2138,13 +2101,13 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Tag::Invalid);
 }
@@ -2165,7 +2128,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::EnsureStorageInit
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
@@ -2220,9 +2182,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result UnknownInteractionsProtoc
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2290,7 +2251,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Decode(::fidl::Deco
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2345,10 +2305,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::Tag::Invalid);
 }
@@ -2371,7 +2331,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result::EnsureStorageInitia
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayTable_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResponseTable;
@@ -2420,7 +2379,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayTable_Response& UnknownInteractionsPro
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayTable_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -2474,8 +2433,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTable_Response::Decode(::fidl::De
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -2495,7 +2452,6 @@ zx_status_t UnknownInteractionsProtocol_FlexibleTwoWayTable_Response::Clone(Unkn
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
@@ -2550,9 +2506,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayTable_Result UnknownInteractionsProtoc
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2620,7 +2575,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Decode(::fidl::Deco
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2675,10 +2629,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::Tag::Invalid);
 }
@@ -2702,16 +2656,15 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTable_Result::EnsureStorageInitia
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -2729,7 +2682,6 @@ zx_status_t UnknownInteractionsProtocol_FlexibleTwoWayErr_Response::Clone(Unknow
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
@@ -2795,9 +2747,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayErr_Result UnknownInteractionsProtocol
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -2888,7 +2839,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Decode(::fidl::Decode
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -2957,10 +2907,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::Tag::Invalid);
 }
@@ -2987,16 +2937,15 @@ void UnknownInteractionsProtocol_FlexibleTwoWayErr_Result::EnsureStorageInitiali
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -3014,7 +2963,6 @@ zx_status_t UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Response::Clone(
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
@@ -3080,9 +3028,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result UnknownInteractionsPr
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -3173,7 +3120,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Decode(::fidl::
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3242,10 +3188,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -3271,7 +3217,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result::EnsureStorageIn
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResponseTable;
@@ -3321,9 +3266,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response UnknownInteractionsP
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -3373,7 +3317,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Decode(::fidl:
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3421,13 +3364,13 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -3448,7 +3391,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::EnsureStorageI
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
@@ -3514,9 +3456,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result UnknownInteractionsPro
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -3607,7 +3548,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Decode(::fidl::D
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -3676,10 +3616,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -3705,7 +3645,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result::EnsureStorageIni
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResponseTable;
@@ -3754,7 +3693,7 @@ UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response& UnknownInteractions
 }
 
 void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -3808,8 +3747,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response::Decode(::fidl:
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -3829,7 +3766,6 @@ zx_status_t UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response::Clone(U
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
@@ -3895,9 +3831,8 @@ UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result UnknownInteractionsPro
   return result;
 }
 
-
 void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -3988,7 +3923,6 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Decode(::fidl::D
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4057,10 +3991,10 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -4087,16 +4021,15 @@ void UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result::EnsureStorageIni
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
 const fidl_type_t* UnknownInteractionsProtocolStrictEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
 
 void UnknownInteractionsProtocolStrictEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocolStrictEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocolStrictEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsProtocolStrictEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -4114,7 +4047,6 @@ zx_status_t UnknownInteractionsProtocolStrictEventFieldsRequest::Clone(UnknownIn
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable;
 const fidl_type_t* UnknownInteractionsProtocolStrictEventUnionRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable;
@@ -4164,9 +4096,8 @@ UnknownInteractionsProtocolStrictEventUnionRequest UnknownInteractionsProtocolSt
   return result;
 }
 
-
 void UnknownInteractionsProtocolStrictEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -4216,7 +4147,6 @@ void UnknownInteractionsProtocolStrictEventUnionRequest::Decode(::fidl::Decoder*
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4264,13 +4194,13 @@ void UnknownInteractionsProtocolStrictEventUnionRequest::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest::Tag::Invalid);
 }
@@ -4291,7 +4221,6 @@ void UnknownInteractionsProtocolStrictEventUnionRequest::EnsureStorageInitialize
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable;
 const fidl_type_t* UnknownInteractionsProtocolStrictEventTableRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable;
@@ -4340,7 +4269,7 @@ UnknownInteractionsProtocolStrictEventTableRequest& UnknownInteractionsProtocolS
 }
 
 void UnknownInteractionsProtocolStrictEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -4394,8 +4323,6 @@ void UnknownInteractionsProtocolStrictEventTableRequest::Decode(::fidl::Decoder*
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -4416,16 +4343,15 @@ zx_status_t UnknownInteractionsProtocolStrictEventTableRequest::Clone(UnknownInt
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
 const fidl_type_t* UnknownInteractionsProtocolFlexibleEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
 
 void UnknownInteractionsProtocolFlexibleEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsProtocolFlexibleEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsProtocolFlexibleEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsProtocolFlexibleEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -4443,7 +4369,6 @@ zx_status_t UnknownInteractionsProtocolFlexibleEventFieldsRequest::Clone(Unknown
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable;
 const fidl_type_t* UnknownInteractionsProtocolFlexibleEventUnionRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable;
@@ -4493,9 +4418,8 @@ UnknownInteractionsProtocolFlexibleEventUnionRequest UnknownInteractionsProtocol
   return result;
 }
 
-
 void UnknownInteractionsProtocolFlexibleEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -4545,7 +4469,6 @@ void UnknownInteractionsProtocolFlexibleEventUnionRequest::Decode(::fidl::Decode
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4593,13 +4516,13 @@ void UnknownInteractionsProtocolFlexibleEventUnionRequest::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag::Invalid);
 }
@@ -4620,7 +4543,6 @@ void UnknownInteractionsProtocolFlexibleEventUnionRequest::EnsureStorageInitiali
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable;
 const fidl_type_t* UnknownInteractionsProtocolFlexibleEventTableRequest::FidlType = &test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable;
@@ -4669,7 +4591,7 @@ UnknownInteractionsProtocolFlexibleEventTableRequest& UnknownInteractionsProtoco
 }
 
 void UnknownInteractionsProtocolFlexibleEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -4723,8 +4645,6 @@ void UnknownInteractionsProtocolFlexibleEventTableRequest::Decode(::fidl::Decode
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -4745,16 +4665,15 @@ zx_status_t UnknownInteractionsProtocolFlexibleEventTableRequest::Clone(UnknownI
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -4772,7 +4691,6 @@ zx_status_t UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse::Clone(Unk
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
@@ -4822,9 +4740,8 @@ UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse UnknownInteractionsAjar
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -4874,7 +4791,6 @@ void UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Decode(::fidl::De
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -4922,13 +4838,13 @@ void UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Tag::Invalid);
 }
@@ -4949,7 +4865,6 @@ void UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::EnsureStorageInit
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictTwoWayTableResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
@@ -4998,7 +4913,7 @@ UnknownInteractionsAjarProtocolStrictTwoWayTableResponse& UnknownInteractionsAja
 }
 
 void UnknownInteractionsAjarProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -5052,8 +4967,6 @@ void UnknownInteractionsAjarProtocolStrictTwoWayTableResponse::Decode(::fidl::De
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -5074,16 +4987,15 @@ zx_status_t UnknownInteractionsAjarProtocolStrictTwoWayTableResponse::Clone(Unkn
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -5101,7 +5013,6 @@ zx_status_t UnknownInteractionsAjarProtocol_StrictTwoWayErr_Response::Clone(Unkn
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
@@ -5156,9 +5067,8 @@ UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result UnknownInteractionsAjarPr
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5226,7 +5136,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::Decode(::fidl::Deco
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -5281,10 +5190,10 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::Tag::Invalid);
 }
@@ -5308,16 +5217,15 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result::EnsureStorageInitia
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -5335,7 +5243,6 @@ zx_status_t UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Response::Clon
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
@@ -5390,9 +5297,8 @@ UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result UnknownInteractions
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5460,7 +5366,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::Decode(::fidl
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -5515,10 +5420,10 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -5541,7 +5446,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result::EnsureStorage
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResponseTable;
@@ -5591,9 +5495,8 @@ UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response UnknownInteraction
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5643,7 +5546,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Decode(::fid
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -5691,13 +5593,13 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -5718,7 +5620,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::EnsureStorag
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
@@ -5773,9 +5674,8 @@ UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result UnknownInteractionsA
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -5843,7 +5743,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::Decode(::fidl:
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -5898,10 +5797,10 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -5924,7 +5823,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result::EnsureStorageI
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResponseTable;
@@ -5973,7 +5871,7 @@ UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response& UnknownInteractio
 }
 
 void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -6027,8 +5925,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response::Decode(::fid
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -6048,7 +5944,6 @@ zx_status_t UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response::Clone
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
@@ -6103,9 +5998,8 @@ UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result UnknownInteractionsA
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -6173,7 +6067,6 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::Decode(::fidl:
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -6228,10 +6121,10 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -6255,16 +6148,15 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result::EnsureStorageI
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
 
 void UnknownInteractionsAjarProtocolStrictEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocolStrictEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsAjarProtocolStrictEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -6282,7 +6174,6 @@ zx_status_t UnknownInteractionsAjarProtocolStrictEventFieldsRequest::Clone(Unkno
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictEventUnionRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable;
@@ -6332,9 +6223,8 @@ UnknownInteractionsAjarProtocolStrictEventUnionRequest UnknownInteractionsAjarPr
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocolStrictEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -6384,7 +6274,6 @@ void UnknownInteractionsAjarProtocolStrictEventUnionRequest::Decode(::fidl::Deco
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -6432,13 +6321,13 @@ void UnknownInteractionsAjarProtocolStrictEventUnionRequest::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest::Tag::Invalid);
 }
@@ -6459,7 +6348,6 @@ void UnknownInteractionsAjarProtocolStrictEventUnionRequest::EnsureStorageInitia
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolStrictEventTableRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable;
@@ -6508,7 +6396,7 @@ UnknownInteractionsAjarProtocolStrictEventTableRequest& UnknownInteractionsAjarP
 }
 
 void UnknownInteractionsAjarProtocolStrictEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -6562,8 +6450,6 @@ void UnknownInteractionsAjarProtocolStrictEventTableRequest::Decode(::fidl::Deco
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -6584,16 +6470,15 @@ zx_status_t UnknownInteractionsAjarProtocolStrictEventTableRequest::Clone(Unknow
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
 
 void UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -6611,7 +6496,6 @@ zx_status_t UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest::Clone(Unk
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable;
@@ -6661,9 +6545,8 @@ UnknownInteractionsAjarProtocolFlexibleEventUnionRequest UnknownInteractionsAjar
   return result;
 }
 
-
 void UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -6713,7 +6596,6 @@ void UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Decode(::fidl::De
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -6761,13 +6643,13 @@ void UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag::Invalid);
 }
@@ -6788,7 +6670,6 @@ void UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::EnsureStorageInit
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable;
 const fidl_type_t* UnknownInteractionsAjarProtocolFlexibleEventTableRequest::FidlType = &test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable;
@@ -6837,7 +6718,7 @@ UnknownInteractionsAjarProtocolFlexibleEventTableRequest& UnknownInteractionsAja
 }
 
 void UnknownInteractionsAjarProtocolFlexibleEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -6891,8 +6772,6 @@ void UnknownInteractionsAjarProtocolFlexibleEventTableRequest::Decode(::fidl::De
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -6913,16 +6792,15 @@ zx_status_t UnknownInteractionsAjarProtocolFlexibleEventTableRequest::Clone(Unkn
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -6940,7 +6818,6 @@ zx_status_t UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse::Clone(U
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
@@ -6990,9 +6867,8 @@ UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse UnknownInteractionsCl
   return result;
 }
 
-
 void UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7042,7 +6918,6 @@ void UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Decode(::fidl::
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -7090,13 +6965,13 @@ void UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Tag::Invalid);
 }
@@ -7117,7 +6992,6 @@ void UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::EnsureStorageIn
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictTwoWayTableResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
@@ -7166,7 +7040,7 @@ UnknownInteractionsClosedProtocolStrictTwoWayTableResponse& UnknownInteractionsC
 }
 
 void UnknownInteractionsClosedProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -7220,8 +7094,6 @@ void UnknownInteractionsClosedProtocolStrictTwoWayTableResponse::Decode(::fidl::
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -7242,16 +7114,15 @@ zx_status_t UnknownInteractionsClosedProtocolStrictTwoWayTableResponse::Clone(Un
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -7269,7 +7140,6 @@ zx_status_t UnknownInteractionsClosedProtocol_StrictTwoWayErr_Response::Clone(Un
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
@@ -7324,9 +7194,8 @@ UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result UnknownInteractionsClos
   return result;
 }
 
-
 void UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7394,7 +7263,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::Decode(::fidl::De
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -7449,10 +7317,10 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::Tag::Invalid);
 }
@@ -7476,16 +7344,15 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result::EnsureStorageInit
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -7503,7 +7370,6 @@ zx_status_t UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Response::Cl
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
@@ -7558,9 +7424,8 @@ UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result UnknownInteractio
   return result;
 }
 
-
 void UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7628,7 +7493,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::Decode(::fi
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -7683,10 +7547,10 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -7709,7 +7573,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result::EnsureStora
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResponseTable;
@@ -7759,9 +7622,8 @@ UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response UnknownInteracti
   return result;
 }
 
-
 void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -7811,7 +7673,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Decode(::f
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -7859,13 +7720,13 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Destroy() 
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -7886,7 +7747,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::EnsureStor
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
@@ -7941,9 +7801,8 @@ UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result UnknownInteraction
   return result;
 }
 
-
 void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -8011,7 +7870,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::Decode(::fid
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -8066,10 +7924,10 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -8092,7 +7950,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result::EnsureStorag
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResponseTable;
@@ -8141,7 +7998,7 @@ UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response& UnknownInteract
 }
 
 void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -8195,8 +8052,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response::Decode(::f
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -8216,7 +8071,6 @@ zx_status_t UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response::Clo
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
@@ -8271,9 +8125,8 @@ UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result UnknownInteraction
   return result;
 }
 
-
 void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -8341,7 +8194,6 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::Decode(::fid
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -8396,10 +8248,10 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -8423,16 +8275,15 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result::EnsureStorag
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictEventFieldsRequest::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
 
 void UnknownInteractionsClosedProtocolStrictEventFieldsRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedProtocolStrictEventFieldsRequest>(_offset), this, sizeof(UnknownInteractionsClosedProtocolStrictEventFieldsRequest));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -8450,7 +8301,6 @@ zx_status_t UnknownInteractionsClosedProtocolStrictEventFieldsRequest::Clone(Unk
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable;
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictEventUnionRequest::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable;
@@ -8500,9 +8350,8 @@ UnknownInteractionsClosedProtocolStrictEventUnionRequest UnknownInteractionsClos
   return result;
 }
 
-
 void UnknownInteractionsClosedProtocolStrictEventUnionRequest::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -8552,7 +8401,6 @@ void UnknownInteractionsClosedProtocolStrictEventUnionRequest::Decode(::fidl::De
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -8600,13 +8448,13 @@ void UnknownInteractionsClosedProtocolStrictEventUnionRequest::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest::Tag::Invalid);
 }
@@ -8627,7 +8475,6 @@ void UnknownInteractionsClosedProtocolStrictEventUnionRequest::EnsureStorageInit
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable;
 const fidl_type_t* UnknownInteractionsClosedProtocolStrictEventTableRequest::FidlType = &test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable;
@@ -8676,7 +8523,7 @@ UnknownInteractionsClosedProtocolStrictEventTableRequest& UnknownInteractionsClo
 }
 
 void UnknownInteractionsClosedProtocolStrictEventTableRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -8730,8 +8577,6 @@ void UnknownInteractionsClosedProtocolStrictEventTableRequest::Decode(::fidl::De
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -8752,16 +8597,15 @@ zx_status_t UnknownInteractionsClosedProtocolStrictEventTableRequest::Clone(Unkn
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -8779,7 +8623,6 @@ zx_status_t UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse::Clone(U
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
@@ -8829,9 +8672,8 @@ UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse UnknownInteractionsDr
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -8881,7 +8723,6 @@ void UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Decode(::fidl::
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -8929,13 +8770,13 @@ void UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Tag::Invalid);
 }
@@ -8956,7 +8797,6 @@ void UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::EnsureStorageIn
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocolStrictTwoWayTableResponse::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
@@ -9005,7 +8845,7 @@ UnknownInteractionsDriverProtocolStrictTwoWayTableResponse& UnknownInteractionsD
 }
 
 void UnknownInteractionsDriverProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -9059,8 +8899,6 @@ void UnknownInteractionsDriverProtocolStrictTwoWayTableResponse::Decode(::fidl::
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -9081,16 +8919,15 @@ zx_status_t UnknownInteractionsDriverProtocolStrictTwoWayTableResponse::Clone(Un
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -9108,7 +8945,6 @@ zx_status_t UnknownInteractionsDriverProtocol_StrictTwoWayErr_Response::Clone(Un
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
@@ -9163,9 +8999,8 @@ UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result UnknownInteractionsDriv
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9233,7 +9068,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::Decode(::fidl::De
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -9288,10 +9122,10 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::Tag::Invalid);
 }
@@ -9315,16 +9149,15 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result::EnsureStorageInit
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -9342,7 +9175,6 @@ zx_status_t UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Response::Cl
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
@@ -9397,9 +9229,8 @@ UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result UnknownInteractio
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9467,7 +9298,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::Decode(::fi
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -9522,10 +9352,10 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -9548,7 +9378,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result::EnsureStora
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
@@ -9598,9 +9427,8 @@ UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response UnknownInteracti
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9650,7 +9478,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Decode(::f
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -9698,13 +9525,13 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Destroy() 
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -9725,7 +9552,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::EnsureStor
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
@@ -9780,9 +9606,8 @@ UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result UnknownInteraction
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -9850,7 +9675,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::Decode(::fid
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -9905,10 +9729,10 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -9931,7 +9755,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result::EnsureStorag
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResponseTable;
@@ -9980,7 +9803,7 @@ UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response& UnknownInteract
 }
 
 void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -10034,8 +9857,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response::Decode(::f
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -10055,7 +9876,6 @@ zx_status_t UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response::Clo
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
@@ -10110,9 +9930,8 @@ UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result UnknownInteraction
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10180,7 +9999,6 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::Decode(::fid
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -10235,10 +10053,10 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -10262,16 +10080,15 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result::EnsureStorag
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -10289,7 +10106,6 @@ zx_status_t UnknownInteractionsDriverProtocol_FlexibleTwoWay_Response::Clone(Unk
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
@@ -10344,9 +10160,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result UnknownInteractionsDrive
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10414,7 +10229,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Decode(::fidl::Dec
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -10469,10 +10283,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::Tag::Invalid);
 }
@@ -10496,16 +10310,15 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result::EnsureStorageIniti
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -10523,7 +10336,6 @@ zx_status_t UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Response::Clo
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
@@ -10578,9 +10390,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result UnknownInteraction
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10648,7 +10459,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Decode(::fid
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -10703,10 +10513,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::Tag::Invalid);
 }
@@ -10729,7 +10539,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result::EnsureStorag
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResponseTable;
@@ -10779,9 +10588,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response UnknownInteractio
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -10831,7 +10639,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Decode(::fi
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -10879,13 +10686,13 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Tag::Invalid);
 }
@@ -10906,7 +10713,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::EnsureStora
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
@@ -10961,9 +10767,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result UnknownInteractions
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -11031,7 +10836,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Decode(::fidl
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -11086,10 +10890,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::Tag::Invalid);
 }
@@ -11112,7 +10916,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result::EnsureStorage
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResponseTable;
@@ -11161,7 +10964,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response& UnknownInteracti
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -11215,8 +11018,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response::Decode(::fi
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -11236,7 +11037,6 @@ zx_status_t UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response::Clon
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
@@ -11291,9 +11091,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result UnknownInteractions
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -11361,7 +11160,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Decode(::fidl
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -11416,10 +11214,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::Tag::Invalid);
 }
@@ -11443,16 +11241,15 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result::EnsureStorage
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -11470,7 +11267,6 @@ zx_status_t UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Response::Clone(
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
@@ -11536,9 +11332,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result UnknownInteractionsDr
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -11629,7 +11424,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Decode(::fidl::
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -11698,10 +11492,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::Tag::Invalid);
 }
@@ -11728,16 +11522,15 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result::EnsureStorageIn
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -11755,7 +11548,6 @@ zx_status_t UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Response::
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
@@ -11821,9 +11613,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result UnknownInteract
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -11914,7 +11705,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Decode(::
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -11983,10 +11773,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Destroy()
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -12012,7 +11802,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result::EnsureSto
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResponseTable;
@@ -12062,9 +11851,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response UnknownInterac
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12114,7 +11902,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Decode(:
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -12162,13 +11949,13 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Destroy(
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -12189,7 +11976,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::EnsureSt
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
@@ -12255,9 +12041,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result UnknownInteracti
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12348,7 +12133,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Decode(::f
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -12417,10 +12201,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Destroy() 
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -12446,7 +12230,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result::EnsureStor
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResponseTable;
@@ -12495,7 +12278,7 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response& UnknownIntera
 }
 
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -12549,8 +12332,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response::Decode(:
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -12570,7 +12351,6 @@ zx_status_t UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response::C
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
@@ -12636,9 +12416,8 @@ UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result UnknownInteracti
   return result;
 }
 
-
 void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12729,7 +12508,6 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Decode(::f
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -12798,10 +12576,10 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Destroy() 
       break;
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Tag::kFrameworkErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -12828,16 +12606,15 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result::EnsureStor
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -12855,7 +12632,6 @@ zx_status_t UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse::Clo
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
@@ -12905,9 +12681,8 @@ UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse UnknownInteractio
   return result;
 }
 
-
 void UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -12957,7 +12732,6 @@ void UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Decode(::fi
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -13005,13 +12779,13 @@ void UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Destroy() {
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Tag::Invalid);
 }
@@ -13032,7 +12806,6 @@ void UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::EnsureStora
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
@@ -13081,7 +12854,7 @@ UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse& UnknownInteracti
 }
 
 void UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -13135,8 +12908,6 @@ void UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse::Decode(::fi
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -13157,16 +12928,15 @@ zx_status_t UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse::Clon
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -13184,7 +12954,6 @@ zx_status_t UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Response::Clon
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
@@ -13239,9 +13008,8 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result UnknownInteractions
   return result;
 }
 
-
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13309,7 +13077,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::Decode(::fidl
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -13364,10 +13131,10 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::Tag::Invalid);
 }
@@ -13391,16 +13158,15 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result::EnsureStorage
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -13418,7 +13184,6 @@ zx_status_t UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Response
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
@@ -13473,9 +13238,8 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result UnknownIntera
   return result;
 }
 
-
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13543,7 +13307,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::Decode(
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -13598,10 +13361,10 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::Destroy
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -13624,7 +13387,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result::EnsureS
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
@@ -13674,9 +13436,8 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response UnknownInter
   return result;
 }
 
-
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13726,7 +13487,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Decode
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -13774,13 +13534,13 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Destro
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -13801,7 +13561,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Ensure
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
@@ -13856,9 +13615,8 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result UnknownInterac
   return result;
 }
 
-
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -13926,7 +13684,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::Decode(:
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -13981,10 +13738,10 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::Destroy(
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -14007,7 +13764,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result::EnsureSt
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResponseTable;
@@ -14056,7 +13812,7 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response& UnknownInte
 }
 
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -14110,8 +13866,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response::Decode
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -14131,7 +13885,6 @@ zx_status_t UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response:
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
@@ -14186,9 +13939,8 @@ UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result UnknownInterac
   return result;
 }
 
-
 void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -14256,7 +14008,6 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::Decode(:
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -14311,10 +14062,10 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::Destroy(
       break;
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -14338,16 +14089,15 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result::EnsureSt
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
 
 void UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>(_offset), this, sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -14365,7 +14115,6 @@ zx_status_t UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse::C
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
@@ -14415,9 +14164,8 @@ UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse UnknownInteract
   return result;
 }
 
-
 void UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -14467,7 +14215,6 @@ void UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Decode(::
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -14515,13 +14262,13 @@ void UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Destroy()
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Tag::Invalid);
 }
@@ -14542,7 +14289,6 @@ void UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::EnsureSto
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
@@ -14591,7 +14337,7 @@ UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse& UnknownInterac
 }
 
 void UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -14645,8 +14391,6 @@ void UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse::Decode(::
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -14667,16 +14411,15 @@ zx_status_t UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse::Cl
   return ZX_OK;
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response));
   } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
-    
+
   }
 }
 
@@ -14694,7 +14437,6 @@ zx_status_t UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Response::Cl
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
@@ -14749,9 +14491,8 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result UnknownInteractio
   return result;
 }
 
-
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -14819,7 +14560,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::Decode(::fi
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -14874,10 +14614,10 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::Destroy() {
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::Tag::Invalid);
 }
@@ -14901,16 +14641,15 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result::EnsureStora
   }
 }
 
-
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response>::value) {
     memcpy(_encoder->template GetPtr<UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response>(_offset), this, sizeof(UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Response));
   } else {::fidl::Encode(_encoder, &some_field, _offset + 0);
-    
+
   }
 }
 
@@ -14928,7 +14667,6 @@ zx_status_t UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Respon
     return _status;
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
@@ -14983,9 +14721,8 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result UnknownInte
   return result;
 }
 
-
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -15053,7 +14790,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::Decod
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -15108,10 +14844,10 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::Destr
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::Tag::Invalid);
 }
@@ -15134,7 +14870,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result::Ensur
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
@@ -15184,9 +14919,8 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response UnknownInt
   return result;
 }
 
-
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -15236,7 +14970,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Deco
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -15284,13 +15017,13 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Dest
   switch (tag_) {
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Tag::kSomeField:
       break;
-  
+
     case static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid):
       break;
     default:
       unknown_data_.~decltype(unknown_data_)();
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Tag::Invalid);
 }
@@ -15311,7 +15044,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Ensu
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
@@ -15366,9 +15098,8 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result UnknownInter
   return result;
 }
 
-
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -15436,7 +15167,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::Decode
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -15491,10 +15221,10 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::Destro
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::Tag::Invalid);
 }
@@ -15517,7 +15247,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result::Ensure
     }
   }
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResponseTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResponseTable;
@@ -15566,7 +15295,7 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response& UnknownIn
 }
 
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -15620,8 +15349,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response::Deco
     goto done_1;
   }
 
-  
-
   return;
 
   // Clear unset values.
@@ -15641,7 +15368,6 @@ zx_status_t UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Respons
   }
   return ZX_OK;
 }
-
 
 extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
 const fidl_type_t* UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::FidlType = &test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
@@ -15696,9 +15422,8 @@ UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result UnknownInter
   return result;
 }
 
-
 void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Encode(::fidl::Encoder* encoder, size_t offset,
-                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                         std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -15766,7 +15491,6 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Decode
 
   value->EnsureStorageInitialized(xunion->tag);
 
-
   size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
 
   switch (value->tag_) {
@@ -15821,10 +15545,10 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Destro
       break;
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Tag::kErr:
       break;
-  
+
     default:
       break;
-  
+
   }
   tag_ = static_cast<fidl_xunion_tag_t>(::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Tag::Invalid);
 }
@@ -15854,78 +15578,47 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Ensure
 
 #ifdef __Fuchsia__
 
-  
-  
-  
-  
-  
-  
-  
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable;
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable;
 
 }  // namespace _internal
@@ -16245,7 +15938,6 @@ zx_status_t UnknownInteractionsProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMe
   }
   return status;
 }
-
 
 void UnknownInteractionsProtocol_Proxy::StrictOneWay() {
   ::fidl::MessageEncoder _encoder(::test::unknowninteractions::internal::kUnknownInteractionsProtocol_StrictOneWay_Ordinal, ::test::unknowninteractions::internal::kUnknownInteractionsProtocol_StrictOneWay_DynamicFlags);
@@ -17255,59 +16947,31 @@ zx_status_t UnknownInteractionsProtocol_SyncProxy::FlexibleTwoWayTableErr(::test
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-  
-  
-  
-  
-  
-  
-  
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable;
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable;
 
 }  // namespace _internal
@@ -17563,7 +17227,6 @@ zx_status_t UnknownInteractionsAjarProtocol_Proxy::Dispatch_(::fidl::HLCPPIncomi
   }
   return status;
 }
-
 
 void UnknownInteractionsAjarProtocol_Proxy::StrictOneWay() {
   ::fidl::MessageEncoder _encoder(::test::unknowninteractions::internal::kUnknownInteractionsAjarProtocol_StrictOneWay_Ordinal, ::test::unknowninteractions::internal::kUnknownInteractionsAjarProtocol_StrictOneWay_DynamicFlags);
@@ -18128,46 +17791,25 @@ zx_status_t UnknownInteractionsAjarProtocol_SyncProxy::StrictTwoWayTableErr(::te
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-
-#ifdef __Fuchsia__
-
-  
-  
-  
-  
-  
   namespace _internal {
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
-  
-  
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable;
-  
-  
+
 __LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable;
 
 }  // namespace _internal
@@ -18344,7 +17986,6 @@ zx_status_t UnknownInteractionsClosedProtocol_Proxy::Dispatch_(::fidl::HLCPPInco
   }
   return status;
 }
-
 
 void UnknownInteractionsClosedProtocol_Proxy::StrictOneWay() {
   ::fidl::MessageEncoder _encoder(::test::unknowninteractions::internal::kUnknownInteractionsClosedProtocol_StrictOneWay_Ordinal, ::test::unknowninteractions::internal::kUnknownInteractionsClosedProtocol_StrictOneWay_DynamicFlags);

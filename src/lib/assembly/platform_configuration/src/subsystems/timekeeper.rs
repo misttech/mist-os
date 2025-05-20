@@ -58,7 +58,14 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         //
         // At the moment the flag is set only if all conditions are met, i.e. the functionality
         // is requested, and the underlying driver is available.
+        //
+        // The same information is offered as a config capability to other components.
         let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms && has_aml_timer;
+        builder.set_config_capability(
+            "fuchsia.time.config.HasWakeAlarms",
+            //TODO: b/416081776 - replace `true` with serve_fuchsia_time_alarms.
+            Config::new(ConfigValueType::Bool, true.into()),
+        )?;
 
         // Adds hrtimer routing only for boards that have hardware support for
         // doing so.
@@ -91,8 +98,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .component("meta/timekeeper.cm")
             .context("while finding the timekeeper component")?;
 
-        // Refer to //src/sys/time/timekeeper/config.shard.cml
-        // for details.
+        // Refer to //src/sys/time/timekeeper/config.shard.cml for details.
         config_builder
             .field("disable_delays", false)?
             .field("oscillator_error_std_dev_ppm", 15)?
@@ -110,8 +116,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("first_sampling_delay_sec", config.first_sampling_delay_sec)?
             .field("utc_start_at_startup", utc_start_at_startup)?
             .field("early_exit", early_exit)?
-            // TODO: b/295537795 - provide this setting somehow.
-            .field("power_topology_integration_enabled", false)?
+            .field("power_topology_integration_enabled", config.power_topology_integration_enabled)?
             .field("serve_test_protocols", serve_test_protocols)?
             // Should this now be removed in favor of WritableUTCTime above?
             .field("serve_fuchsia_time_external_adjust", config.serve_fuchsia_time_external_adjust)?
@@ -120,6 +125,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?
             .field("utc_max_allowed_delta_past_sec", config.utc_max_allowed_delta_past_sec)?
             .field("utc_max_allowed_delta_future_sec", config.utc_max_allowed_delta_future_sec)?
+            .field("use_connectivity", config.use_connectivity)?
             .field("serve_fuchsia_time_alarms", serve_fuchsia_time_alarms)?;
 
         let mut time_source_config_builder = builder

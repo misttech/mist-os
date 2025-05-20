@@ -176,7 +176,7 @@ impl ToSelectorArguments for ComponentSelector {
         let moniker = self.moniker_str();
         // If not tree selectors were provided, select the full tree.
         if self.tree_selectors.is_empty() {
-            Box::new([SelectorArgument::RawSelector(format!("{}:root", moniker))].into_iter())
+            Box::new([SelectorArgument::RawSelector(format!("{moniker}:root"))].into_iter())
         } else {
             Box::new(
                 self.tree_selectors
@@ -970,7 +970,7 @@ mod tests {
                 assert_eq!(values.len(), 1);
                 assert_eq!(values[0], value);
             }
-            result => panic!("unexpected result: {:?}", result),
+            result => panic!("unexpected result: {result:?}"),
         }
         let cbor_result = reader.snapshot_raw::<ciborium::Value>().await.expect("got result");
         match cbor_result {
@@ -980,7 +980,7 @@ mod tests {
                     values[0].deserialized::<serde_json::Value>().expect("convert to json");
                 assert_eq!(json_result, value);
             }
-            result => panic!("unexpected result: {:?}", result),
+            result => panic!("unexpected result: {result:?}"),
         }
     }
 

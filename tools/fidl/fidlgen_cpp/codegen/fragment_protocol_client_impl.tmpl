@@ -5,7 +5,6 @@
 */}}
 
 {{- define "Protocol:ClientImpl:WireMessagingHeader" }}
-{{- IfdefFuchsia -}}
 {{- EnsureNamespace "" }}
 template<>
 class {{ .WireWeakOnewayClientImpl }} : public ::fidl::internal::ClientImplBase {
@@ -59,14 +58,12 @@ class {{ .WireWeakSyncClientImpl }} final : public {{ .WireWeakOnewayClientImpl 
 };
 {{- end }}
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Protocol:ClientImpl:WireMessagingSource" }}
   {{ EnsureNamespace ""}}
-  {{- IfdefFuchsia -}}
 
   {{- range .OneWayMethods }}
     {{- template "Method:WireWeakOnewayClientImpl:WireMessagingSource" . }}
@@ -87,13 +84,11 @@ class {{ .WireWeakSyncClientImpl }} final : public {{ .WireWeakOnewayClientImpl 
     {{- end }}
   {{- end }}
 
-  {{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Protocol:Client:NaturalMessagingHeader" }}
-{{- IfdefFuchsia -}}
 
 {{- range .Events }}
 {{- template "Method:Event:NaturalMessagingHeader" . }}
@@ -133,13 +128,11 @@ class {{ .NaturalClientImpl }} final : public ::fidl::internal::NaturalClientBas
   {{- end }}
 };
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Protocol:Client:NaturalMessagingSource" }}
-{{- IfdefFuchsia }}
 
 {{- range .Events }}
 {{- template "Method:Event:NaturalMessagingSource" . }}
@@ -188,7 +181,4 @@ class {{ .NaturalClientImpl }} final : public ::fidl::internal::NaturalClientBas
 }
 {{ end }}
 
-
-
-{{- EndifFuchsia }}
 {{- end }}

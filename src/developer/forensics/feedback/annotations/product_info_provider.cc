@@ -60,7 +60,7 @@ Annotations ProductInfoToAnnotations::operator()(const fuchsia::hwinfo::ProductI
   return annotations;
 }
 
-std::set<std::string> ProductInfoProvider::GetKeys() const {
+std::set<std::string> ProductInfoProvider::GetAnnotationKeys() {
   return {
       kHardwareProductSKUKey,
       kHardwareProductLanguageKey,
@@ -70,6 +70,10 @@ std::set<std::string> ProductInfoProvider::GetKeys() const {
       kHardwareProductModelKey,
       kHardwareProductManufacturerKey,
   };
+}
+
+std::set<std::string> ProductInfoProvider::GetKeys() const {
+  return ProductInfoProvider::GetAnnotationKeys();
 }
 
 }  // namespace forensics::feedback

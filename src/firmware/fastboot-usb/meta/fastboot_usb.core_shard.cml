@@ -29,10 +29,5 @@
             from: "parent",
             to: "#fastboot-usb",
         },
-        {
-            dictionary: "diagnostics",
-            from: "parent",
-            to: [ "#bt-map-mce" ],
-        },
     ],
 }

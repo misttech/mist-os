@@ -19,6 +19,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/unique_ptr.h>
 #include <vm/page.h>
+#include <vm/pmm.h>
 
 class VmPageList;
 class VMPLCursor;
@@ -39,6 +40,10 @@ class VMPLCursor;
 //                  two will be empty. If the interval spans a single page, it will be represented
 //                  as a Slot sentinel, which is conceptually the same as both a Start and an End
 //                  sentinel.
+//  * ParentContent - Indicates that there might be content for this slot, but the page list in the
+//                    parent must be checked for it. The different between `Empty`, which can also
+//                    indicate that the parent must be searched, and `ParentContent` is up to the
+//                    specific VMO.
 //
 // There are certain invariants that the page list tries to maintain at all times. It might not
 // always be possible to enforce these as the checks involved might be expensive, however it is
@@ -57,23 +62,39 @@ class VmPageOrMarker {
   VmPageOrMarker(const VmPageOrMarker&) = delete;
   VmPageOrMarker& operator=(const VmPageOrMarker&) = delete;
 
-  // Minimal wrapper around a uint64_t to provide stronger typing in code to prevent accidental
-  // mixing of references and other uint64_t values.
+  // Minimal wrapper around a uint32_t to provide stronger typing in code to prevent accidental
+  // mixing of references and other values.
   // Provides a way to query the required alignment of the references and does debug enforcement of
   // this.
   class ReferenceValue {
    public:
     // kAlignBits represents the number of low bits in a reference that must be zero so they can be
     // used for internal metadata. This is declared here for convenience, and is asserted to be in
-    // sync with the private kReferenceBits.
-    static constexpr uint64_t kAlignBits = 2;
-    explicit constexpr ReferenceValue(uint64_t raw) : value_(raw) {
-      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+    // sync with the private VmPageOrMarker::kTypeBits.
+    static constexpr int kAlignBits = 3;
+    // kExtraBits is used for bookkeeping on certain page providers, namely compressed storage.
+    static constexpr int kExtraBits = 2;
+    // Ensure the pmm page-to-index has enough zero bits.
+    static_assert((kAlignBits + kExtraBits) <= PmmNode::kIndexZeroBits);
+
+    explicit ReferenceValue(const vm_page_t* page, uint8_t extra)
+        : value_(Pmm::Node().PageToIndex(page) | (BIT_MASK32(kExtraBits) & extra) << kAlignBits) {
+      DEBUG_ASSERT((extra & ~BIT_MASK32(kExtraBits)) == 0);
     }
-    uint64_t value() const { return value_; }
+
+    explicit constexpr ReferenceValue(uint32_t raw) : value_(raw) {
+      DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
+    }
+
+    static ReferenceValue GetReservedValue() { return ReferenceValue(PmmNode::kIndexReserved0); }
+
+    uint32_t value() const { return value_; }
+    vm_page_t* page() const { return Pmm::Node().IndexToPage(value_); }
+    uint8_t extra() const { return (value_ >> kAlignBits) & BIT_MASK32(kExtraBits); }
+    bool is_reserved() const { return value_ == PmmNode::kIndexReserved0; }
 
    private:
-    uint64_t value_;
+    uint32_t value_;
   };
 
   // Returns a reference to the underlying vm_page*. Is only valid to call if `IsPage` is true.
@@ -81,11 +102,11 @@ class VmPageOrMarker {
     DEBUG_ASSERT(IsPage());
     // Do not need to mask any bits out of raw_, since Page has 0's for the type anyway.
     static_assert(kPageType == 0);
-    return reinterpret_cast<vm_page*>(raw_);
+    return Pmm::Node().IndexToPage(raw_);
   }
   ReferenceValue Reference() const {
     DEBUG_ASSERT(IsReference());
-    return ReferenceValue(raw_ & ~BIT_MASK(ReferenceValue::kAlignBits));
+    return ReferenceValue(raw_ & ~BIT_MASK32(ReferenceValue::kAlignBits));
   }
 
   // If this is a page, moves the underlying vm_page* out and returns it. After this IsPage will
@@ -95,12 +116,12 @@ class VmPageOrMarker {
     // Do not need to mask any bits out of the Release since Page has 0's for the type
     // anyway.
     static_assert(kPageType == 0);
-    return reinterpret_cast<vm_page*>(Release());
+    return Pmm::Node().IndexToPage(Release());
   }
 
   [[nodiscard]] ReferenceValue ReleaseReference() {
     DEBUG_ASSERT(IsReference());
-    return ReferenceValue(Release() & ~BIT_MASK(ReferenceValue::kAlignBits));
+    return ReferenceValue(Release() & ~BIT_MASK32(ReferenceValue::kAlignBits));
   }
 
   // Changes the content from a reference to a page and returns the original reference.
@@ -131,7 +152,7 @@ class VmPageOrMarker {
   }
 
   [[nodiscard]] VmPageOrMarker Swap(VmPageOrMarker&& other) {
-    uint64_t ret = raw_;
+    uint32_t ret = raw_;
     raw_ = other.Release();
     return VmPageOrMarker(ret);
   }
@@ -145,6 +166,7 @@ class VmPageOrMarker {
   bool IsReference() const { return GetType() == kReferenceType; }
   bool IsPageOrRef() const { return IsPage() || IsReference(); }
   bool IsInterval() const { return GetType() == kIntervalType; }
+  bool IsParentContent() const { return GetType() == kParentContentType; }
 
   VmPageOrMarker& operator=(VmPageOrMarker&& other) noexcept {
     // Forbid overriding content, as that would leak it.
@@ -160,16 +182,19 @@ class VmPageOrMarker {
   // A PageType that otherwise holds a null pointer is considered to be Empty.
   static VmPageOrMarker Empty() { return VmPageOrMarker{kPageType}; }
   static VmPageOrMarker Marker() { return VmPageOrMarker{kZeroMarkerType}; }
+  static VmPageOrMarker ParentContent() { return VmPageOrMarker{kParentContentType}; }
 
   [[nodiscard]] static VmPageOrMarker Page(vm_page* p) {
     // A null page is incorrect for two reasons
     // 1. It's a violation of the API of this method
     // 2. A null page cannot be represented internally as this is used to represent Empty
     DEBUG_ASSERT(p);
-    const uint64_t raw = reinterpret_cast<uint64_t>(p);
+    const uint32_t raw = Pmm::Node().PageToIndex(p);
+    // Getting zero in |raw| means that |p| lives on the stack or the heap. This is not supported.
+    DEBUG_ASSERT(raw != 0u);
     // A pointer should be aligned by definition, and hence the low bits should always be zero, but
     // assert this anyway just in case kTypeBits is increased or someone passed an invalid pointer.
-    DEBUG_ASSERT((raw & BIT_MASK(kTypeBits)) == 0);
+    DEBUG_ASSERT((raw & BIT_MASK32(kTypeBits)) == 0);
     return VmPageOrMarker{raw | kPageType};
   }
 
@@ -177,15 +202,19 @@ class VmPageOrMarker {
     return VmPageOrMarker(ref.value() | kReferenceType);
   }
 
+  // Interval type full bit allocation, from LSB to MSB:
+  // Type: 2b = 11 | SentinelType: 2b | IntervalType: 2b | DirtyState: 2b | Length: 24b
+  // note: Length is only valid when the DirtyState is Dirty.
+
   // The types of sparse page interval types that are supported.
-  enum class IntervalType : uint64_t {
+  enum class IntervalType : uint32_t {
     // Represents a range of zero pages.
     Zero = 0,
     NumTypes,
   };
 
   // Sentinel types that are used to represent a sparse page interval.
-  enum class IntervalSentinel : uint64_t {
+  enum class SentinelType : uint32_t {
     // Represents a single page interval.
     Slot = 0,
     // The first page of a multi-page interval.
@@ -201,125 +230,130 @@ class VmPageOrMarker {
   class ZeroRange {
    public:
     // This is the same as kIntervalBits. Equality is asserted later where kIntervalBits is defined.
-    static constexpr uint64_t kAlignBits = 6;
-    explicit constexpr ZeroRange(uint64_t val) : value_(val) {
-      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+    static constexpr int kAlignBits = 7;
+
+    explicit constexpr ZeroRange(uint32_t val) : value_(val) {
+      DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
     }
     // The various dirty states that a zero interval can be in. Refer to VmCowPages::DirtyState for
     // an explanation of the states. Note that an AwaitingClean state is not encoded in the interval
     // state bits. This information is instead stored using the AwaitingCleanLength for convenience,
     // where a non-zero length indicates that the interval is AwaitingClean. Doing this affords
     // more convenient splitting and merging of intervals.
-    enum class DirtyState : uint64_t {
+    enum class DirtyState : uint32_t {
       Untracked = 0,
       Clean,
       Dirty,
       NumStates,
     };
-    ZeroRange(uint64_t val, DirtyState state) : value_(val) {
-      DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
+
+    ZeroRange(uint32_t val, DirtyState state) : value_(val) {
+      DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
       DEBUG_ASSERT(GetDirtyState() == DirtyState::Untracked);
       SetDirtyState(state);
     }
-    uint64_t value() const { return value_; }
+    uint32_t value() const { return value_; }
 
     // For zero range tracking, we also need to track dirty state information, and if the interval
     // is AwaitingClean, the length that is AwaitingClean.
     static constexpr uint64_t kDirtyStateBits = VM_PAGE_OBJECT_DIRTY_STATE_BITS;
-    static_assert(static_cast<uint64_t>(DirtyState::NumStates) <= (1 << kDirtyStateBits));
-    static constexpr uint64_t kDirtyStateShift = kAlignBits;
+    static_assert(static_cast<uint32_t>(DirtyState::NumStates) <= (1 << kDirtyStateBits));
+    static constexpr int kDirtyStateShift = kAlignBits;
     DirtyState GetDirtyState() const {
-      return static_cast<DirtyState>((value_ & (BIT_MASK(kDirtyStateBits) << kDirtyStateShift)) >>
+      return static_cast<DirtyState>((value_ & (BIT_MASK32(kDirtyStateBits) << kDirtyStateShift)) >>
                                      kDirtyStateShift);
     }
     void SetDirtyState(DirtyState state) {
       // Only allow dirty and untracked zero ranges for now.
       DEBUG_ASSERT(state == DirtyState::Dirty || state == DirtyState::Untracked);
       // Clear the old state.
-      value_ &= ~(BIT_MASK(kDirtyStateBits) << kDirtyStateShift);
+      value_ &= ~(BIT_MASK32(kDirtyStateBits) << kDirtyStateShift);
       // Set the new state.
-      value_ |= static_cast<uint64_t>(state) << kDirtyStateShift;
+      value_ |= static_cast<uint32_t>(state) << kDirtyStateShift;
     }
+
+    static constexpr uint64_t kAwaitingCleanLengthShift = kAlignBits + kDirtyStateBits;
+    // Assert that we are not overlapping with the dirty state bits.
+    static_assert(kAwaitingCleanLengthShift >= kDirtyStateShift + kDirtyStateBits);
+    static_assert(kAwaitingCleanLengthShift <= PAGE_SIZE_SHIFT);
 
     // The AwaitingCleanLength will always be a page-aligned length, so we can mask out the low
     // PAGE_SIZE_SHIFT bits and store only the upper bits.
-    static constexpr uint64_t kAwaitingCleanLengthShift = PAGE_SIZE_SHIFT;
-    // Assert that we are not overlapping with the dirty state bits.
-    static_assert(kAwaitingCleanLengthShift >= kDirtyStateShift + kDirtyStateBits);
     void SetAwaitingCleanLength(uint64_t len) {
       DEBUG_ASSERT(GetDirtyState() == DirtyState::Dirty);
-      DEBUG_ASSERT(IS_ALIGNED(len, (1 << kAwaitingCleanLengthShift)));
+      DEBUG_ASSERT(IS_ALIGNED(len, PAGE_SIZE));
+      len = (len >> PAGE_SIZE_SHIFT) << kAwaitingCleanLengthShift;
       // Clear the old value.
-      value_ &= BIT_MASK(kAwaitingCleanLengthShift);
+      value_ &= BIT_MASK32(kAwaitingCleanLengthShift);
       // Set the new value.
-      value_ |= (len & ~BIT_MASK(kAwaitingCleanLengthShift));
+      value_ |= static_cast<uint32_t>(len);
     }
     uint64_t GetAwaitingCleanLength() const {
-      return value_ & ~BIT_MASK(kAwaitingCleanLengthShift);
+      uint64_t len = value_ & ~BIT_MASK32(kAwaitingCleanLengthShift);
+      return (len >> kAwaitingCleanLengthShift) << PAGE_SIZE_SHIFT;
     }
 
    private:
-    uint64_t value_;
+    uint32_t value_;
   };
   using IntervalDirtyState = ZeroRange::DirtyState;
 
   // Getters and setters for the interval type.
   bool IsIntervalStart() const {
-    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Start;
+    return IsInterval() && GetIntervalSentinel() == SentinelType::Start;
   }
-  bool IsIntervalEnd() const {
-    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::End;
-  }
+  bool IsIntervalEnd() const { return IsInterval() && GetIntervalSentinel() == SentinelType::End; }
   bool IsIntervalSlot() const {
-    return IsInterval() && GetIntervalSentinel() == IntervalSentinel::Slot;
+    return IsInterval() && GetIntervalSentinel() == SentinelType::Slot;
   }
   bool IsIntervalZero() const { return IsInterval() && GetIntervalType() == IntervalType::Zero; }
 
   // Getters and setter for the zero interval type.
   bool IsZeroIntervalClean() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Clean;
   }
   bool IsZeroIntervalDirty() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Dirty;
   }
   bool IsZeroIntervalUntracked() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Untracked;
   }
   ZeroRange::DirtyState GetZeroIntervalDirtyState() const {
     DEBUG_ASSERT(IsIntervalZero());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState();
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetDirtyState();
   }
   void SetZeroIntervalAwaitingCleanLength(uint64_t len) {
     DEBUG_ASSERT(IsIntervalZero());
     DEBUG_ASSERT(IsIntervalStart() || IsIntervalSlot());
     DEBUG_ASSERT(IsZeroIntervalDirty());
-    auto interval = ZeroRange(raw_ & ~BIT_MASK(kIntervalBits));
+    auto interval = ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits));
     interval.SetAwaitingCleanLength(len);
-    raw_ = (raw_ & BIT_MASK(kIntervalBits)) | interval.value();
+    raw_ = (raw_ & BIT_MASK32(kIntervalBits)) | interval.value();
   }
   uint64_t GetZeroIntervalAwaitingCleanLength() const {
     DEBUG_ASSERT(IsIntervalZero());
     DEBUG_ASSERT(IsIntervalStart() || IsIntervalSlot());
-    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetAwaitingCleanLength();
+    return ZeroRange(raw_ & ~BIT_MASK32(kIntervalBits)).GetAwaitingCleanLength();
   }
 
  private:
-  explicit VmPageOrMarker(uint64_t raw) : raw_(raw) {}
+  explicit VmPageOrMarker(uint32_t raw) : raw_(raw) {}
 
-  // The low 2 bits of raw_ are reserved to select the type, any other data has to fit into the
-  // remaining high bits. Note that there is no explicit Empty type, rather a PageType with a zero
-  // pointer is used to represent Empty.
-  static constexpr uint64_t kTypeBits = 2;
-  static constexpr uint64_t kPageType = 0b00;
-  static constexpr uint64_t kZeroMarkerType = 0b01;
-  static constexpr uint64_t kReferenceType = 0b10;
-  static constexpr uint64_t kIntervalType = 0b11;
+  // The low 3 bits of raw_ are reserved to represent the type, any other data has to fit into
+  // the remaining high bits. Note that there is no explicit Empty type, rather a PageType with a
+  // zero pointer is used to represent Empty.
+  static constexpr uint32_t kTypeBits = 3;
+  static constexpr uint32_t kPageType = 0b000;
+  static constexpr uint32_t kZeroMarkerType = 0b001;
+  static constexpr uint32_t kReferenceType = 0b010;
+  static constexpr uint32_t kIntervalType = 0b011;
+  static constexpr uint32_t kParentContentType = 0b100;
 
   // Ensure the reference values have alignment such the type bits can be set without overlapping
   // actual ref being stored. Unlike the page type, which does not allow the 0 value to be stored, a
@@ -328,26 +362,25 @@ class VmPageOrMarker {
 
   // In addition to storing the type for an interval, we also need to track the type of interval
   // sentinel: the start, the end, or a single slot marker.
-  static constexpr uint64_t kIntervalSentinelBits = 2;
-  static_assert(static_cast<uint64_t>(IntervalSentinel::NumSentinels) <=
-                (1 << kIntervalSentinelBits));
-  static constexpr uint64_t kIntervalSentinelShift = kTypeBits;
-  IntervalSentinel GetIntervalSentinel() const {
-    return static_cast<IntervalSentinel>(
+  static constexpr int kIntervalSentinelBits = 2;
+  static_assert(static_cast<int>(SentinelType::NumSentinels) <= (1 << kIntervalSentinelBits));
+  static constexpr int kIntervalSentinelShift = kTypeBits;
+  SentinelType GetIntervalSentinel() const {
+    return static_cast<SentinelType>(
         (raw_ & (BIT_MASK(kIntervalSentinelBits) << kIntervalSentinelShift)) >>
         kIntervalSentinelShift);
   }
-  void SetIntervalSentinel(IntervalSentinel sentinel) {
+  void SetIntervalSentinel(SentinelType sentinel) {
     // Clear the old sentinel type.
-    raw_ &= ~(BIT_MASK(kIntervalSentinelBits) << kIntervalSentinelShift);
+    raw_ &= ~(BIT_MASK32(kIntervalSentinelBits) << kIntervalSentinelShift);
     // Set the new sentinel type.
-    raw_ |= static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
+    raw_ |= static_cast<uint32_t>(sentinel) << kIntervalSentinelShift;
   }
   // Next we also need to store the type of interval being represented; reserve a couple of bits for
   // this. Currently we only support one type of interval: a range of zero pages, but reserving 2
   // bits allows for more types in the future.
   static constexpr uint64_t kIntervalTypeBits = 2;
-  static_assert(static_cast<uint64_t>(IntervalType::NumTypes) <= (1 << kIntervalTypeBits));
+  static_assert(static_cast<uint32_t>(IntervalType::NumTypes) <= (1 << kIntervalTypeBits));
   static constexpr uint64_t kIntervalTypeShift = kIntervalSentinelShift + kIntervalSentinelBits;
   IntervalType GetIntervalType() const {
     return static_cast<IntervalType>((raw_ & (BIT_MASK(kIntervalTypeBits) << kIntervalTypeShift)) >>
@@ -359,10 +392,10 @@ class VmPageOrMarker {
   // Only support creation of zero interval type for now.
   // Private and only friended with VmPageList so that an external caller cannot arbitrarily create
   // interval sentinels.
-  [[nodiscard]] static VmPageOrMarker ZeroInterval(IntervalSentinel sentinel,
+  [[nodiscard]] static VmPageOrMarker ZeroInterval(SentinelType sentinel,
                                                    IntervalDirtyState state) {
-    uint64_t sentinel_bits = static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
-    uint64_t type_bits = static_cast<uint64_t>(IntervalType::Zero) << kIntervalTypeShift;
+    uint32_t sentinel_bits = static_cast<uint32_t>(sentinel) << kIntervalSentinelShift;
+    uint32_t type_bits = static_cast<uint32_t>(IntervalType::Zero) << kIntervalTypeShift;
     return VmPageOrMarker(ZeroRange(0, state).value() | type_bits | sentinel_bits | kIntervalType);
   }
 
@@ -372,31 +405,30 @@ class VmPageOrMarker {
   // when extending or clipping intervals.
   // Private and only friended with VmPageList so that an external caller cannot arbitrarily
   // manipulate interval sentinels.
-  void ChangeIntervalSentinel(IntervalSentinel new_sentinel) {
+  void ChangeIntervalSentinel(SentinelType new_sentinel) {
 #if ZX_DEBUG_ASSERT_IMPLEMENTED
     DEBUG_ASSERT(IsInterval());
     auto old_sentinel = GetIntervalSentinel();
     DEBUG_ASSERT(old_sentinel != new_sentinel);
-    if (old_sentinel == IntervalSentinel::Start || old_sentinel == IntervalSentinel::End) {
-      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Slot);
+    if (old_sentinel == SentinelType::Start || old_sentinel == SentinelType::End) {
+      DEBUG_ASSERT(new_sentinel == SentinelType::Slot);
     } else {
-      DEBUG_ASSERT(old_sentinel == IntervalSentinel::Slot);
-      DEBUG_ASSERT(new_sentinel == IntervalSentinel::Start ||
-                   new_sentinel == IntervalSentinel::End);
+      DEBUG_ASSERT(old_sentinel == SentinelType::Slot);
+      DEBUG_ASSERT(new_sentinel == SentinelType::Start || new_sentinel == SentinelType::End);
     }
 #endif
     SetIntervalSentinel(new_sentinel);
   }
 
-  uint64_t GetType() const { return raw_ & BIT_MASK(kTypeBits); }
+  uint32_t GetType() const { return raw_ & BIT_MASK(kTypeBits); }
 
-  uint64_t Release() {
-    const uint64_t p = raw_;
+  uint32_t Release() {
+    const uint32_t p = raw_;
     raw_ = 0;
     return p;
   }
 
-  uint64_t raw_;
+  uint32_t raw_;
 
   friend VmPageList;
 };
@@ -606,16 +638,13 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
     return true;
   }
 
-  // For any empty slots in |this| moves over the corresponding slot in |other|. For any pages moved
-  // the |migrate_fn| is called.
+  // For any non-empty slots in |this| call the |migrate_fn| with |this| and the corresponding slot
+  // in |other|.
   template <typename F>
-  void MergeFrom(F migrate_fn, VmPageListNode& other, uint64_t skew) {
+  void MergeOnto(F migrate_fn, VmPageListNode& other, uint64_t skew) {
     for (size_t i = 0; i < kPageFanOut; i++) {
-      if (pages_[i].IsEmpty() && !other.pages_[i].IsEmpty()) {
-        if (other.pages_[i].IsPageOrRef()) {
-          migrate_fn(VmPageOrMarkerRef(&other.pages_[i]), obj_offset_ + i * PAGE_SIZE - skew);
-        }
-        pages_[i] = ktl::move(other.pages_[i]);
+      if (!pages_[i].IsEmpty()) {
+        migrate_fn(&pages_[i], &other.pages_[i], other.obj_offset_ + i * PAGE_SIZE - skew);
       }
     }
   }
@@ -950,6 +979,27 @@ class VmPageList final {
     return found_page ? true : IsOffsetInInterval(start_offset);
   }
 
+  // Similar to |AnyPagesOrIntervalsInRange| but skips over any ParentContent markers, as these do
+  // not represent content owned by this page list, but rather content owned by a parent.
+  bool AnyOwnedPagesOrIntervalsInRange(uint64_t start_offset, uint64_t end_offset) const {
+    bool found_page = false;
+    ForEveryPageInRange(
+        [&found_page](const VmPageOrMarker* page, uint64_t offset) {
+          if (page->IsParentContent()) {
+            return ZX_ERR_NEXT;
+          }
+          found_page = true;
+          return ZX_ERR_STOP;
+        },
+        start_offset, end_offset);
+    // It is possible that the range forms a part of an interval even if no nodes in the range have
+    // populated slots. We can determine that by checking to see if the start offset in the range
+    // falls in an interval (we could technically perform this check for any inclusive offset in the
+    // range since the range is entirely unpopulated and hence would only fall in the same interval
+    // if applicable).
+    return found_page ? true : IsOffsetInInterval(start_offset);
+  }
+
   // Attempts to return a reference to the VmPageOrMarker at the specified offset. The returned
   // pointer is valid until the VmPageList is destroyed or any of the Remove*/Take/Merge etc
   // functions are called.
@@ -1108,43 +1158,16 @@ class VmPageList final {
   // page list has any resource that needs to be returned.
   bool HasNoPageOrRef() const;
 
-  // Merges the pages in |other| in the range [|offset|, |end_offset|) into |this|
-  // page list, starting at offset 0 in this list.
-  //
-  // For every page in |other| in the given range, if there is no corresponding page or marker
-  // in |this|, then they will be passed to |migrate_fn|. If |migrate_fn| leaves the page in the
-  // VmPageOrMarker it will be migrated into |this|, otherwise the migrate_fn is assumed to now own
-  // the page. For any pages or markers in |other| outside the given range or which conflict with a
-  // page in |this|, they will be released given ownership to |release_fn|.
-  //
-  // The |offset| values passed to |release_fn| and |migrate_fn| are the original offsets
-  // in |other|, not the adapted offsets in |this|.
-  //
-  // **NOTE** unlike MergeOnto, |other| will be empty at the end of this method.
-  void MergeFrom(
-      VmPageList& other, uint64_t offset, uint64_t end_offset,
-      fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset), 3 * sizeof(void*)> release_fn,
-      fit::inline_function<void(VmPageOrMarker* p, uint64_t offset)> migrate_fn);
-
-  // Merges this pages in |this| onto |other|.
-  //
-  // For every page (or marker) in |this|, checks the same offset in |other|. If there is no
-  // page or marker, then it inserts the page into |other|. Otherwise, it releases the page (or
-  // marker) and gives ownership to |release_fn|.
-  //
-  // **NOTE** unlike MergeFrom, |this| will be empty at the end of this method.
-  void MergeOnto(VmPageList& other,
-                 fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset)> release_fn);
-
   // Merges the pages in the specified range in |this| onto the |other| with |offset| in this
   // mapping to the offset of 0 in |other|.
   //
-  // For any empty slot in |other| the content from |this|, if any exists, is moved there. If that
-  // content is a page or reference the given |migrate_fn| is called.
+  // For any offset in |this| that is not empty then the given |migrate_fn| is called with a
+  // reference to |this| and the corresponding slot in |other| and has the signature of:
+  // void migrate_fn(VmPageOrMarker* this_slot, VmPageOrMarker* other_slot, uint64_t other_offset);
   //
   // At the end of merging |this| is cleared and so it is an error for |this| to have any content
   // that is not a Marker that does not get moved to |other|, either because it is outside the
-  // specified range or because there was existing content in |other|.
+  // specified range or because the |migrate_fn| did not move or clear it.
   template <typename F>
   void MergeRangeOntoAndClear(F migrate_fn, VmPageList& other, uint64_t offset,
                               uint64_t end_offset) {
@@ -1203,23 +1226,33 @@ class VmPageList final {
       // If there is a target node we need to merge the nodes, otherwise we migrate this node over.
       if (cur_other && cur_other->offset() == target_node_offset) {
         DEBUG_ASSERT(cur_other->HasNoIntervalSentinel());
-        cur_other->MergeFrom(migrate_fn, *node, other.list_skew_);
+        node->MergeOnto(migrate_fn, *cur_other, other.list_skew_);
         // Done merging this node, move to the next node. This might not be the correct node if
         // |this| has a gap, but we will search for the right one in that case.
-        cur_other++;
+        auto prev = cur_other++;
+        // If prev was empty after migrating then remove it now that we have found the next node.
+        if (prev->IsEmpty()) {
+          other.list_.erase(prev);
+        }
       } else {
         // Merge target either doesn't exist, or is further ahead in the range.
         DEBUG_ASSERT(!cur_other || cur_other->offset() > target_node_offset);
         // Call the migrate on any pages and insert the node.
-        node->ForEveryPage<VmPageOrMarkerRef>(
-            [&](VmPageOrMarkerRef p, uint64_t offset) {
-              if (!p->IsMarker()) {
-                migrate_fn(p, offset);
-              }
+        node->ForEveryPage<VmPageOrMarker*>(
+            [&](VmPageOrMarker* p, uint64_t offset) {
+              // Use a temporary VmPageOrMarker to give to the |migrate_fn| that is initially empty
+              // so that it does not have to deal with the src and dest slots potentially being the
+              // same when 'moving'. In practice the migrate_fn will get inlined and this temporary
+              // gets elided.
+              VmPageOrMarker temp = VmPageOrMarker::Empty();
+              migrate_fn(p, &temp, offset);
+              *p = ktl::move(temp);
               return ZX_ERR_NEXT;
             },
             other.list_skew_);
-        other.list_.insert(ktl::move(node));
+        if (!node->IsEmpty()) {
+          other.list_.insert(ktl::move(node));
+        }
       }
     }
     list_.clear();

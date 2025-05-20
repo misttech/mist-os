@@ -92,6 +92,8 @@ if (current_toolchain == default_toolchain) {
             overrides = {
               aemu_internal = rebase_path(
                       "//prebuilt/third_party/android/aemu/release/linux-x64/emulator")
+              crosvm_internal =
+                  rebase_path("//prebuilt/third_party/crosvm/linux-x64/crosvm")
               qemu_internal = rebase_path(
                       "//prebuilt/third_party/qemu/linux-x64/bin/qemu-system-x86_64")
               uefi_internal_x64 = rebase_path(

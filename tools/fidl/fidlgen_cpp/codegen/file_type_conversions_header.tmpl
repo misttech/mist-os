@@ -43,26 +43,18 @@ fidl/{{ .LibraryDots }}/cpp/type_conversions.h
 
 {{/* TODO(https://fxbug.dev/42052360): Type conversion should not depend on messaging layer. */}}
 {{- IfdefFuchsia -}}
-{{- range .Decls }}
-{{- if Eq .Kind Kinds.Protocol }}{{ $protocol := . }}
-{{- range $transport, $_ := .Transports }}
-{{- if eq $transport "Channel" -}}
+{{- range (call .ProtocolsForTransport "Channel") }}
+  {{- range .ClientMethods }}
+  {{ template "Method:Request:Traits:TypeConversionsHeader" . }}
+  {{- end }}
 
-{{- range $protocol.ClientMethods }}
-{{ template "Method:Request:Traits:TypeConversionsHeader" . }}
-{{- end }}
+  {{- range .TwoWayMethods }}
+  {{ template "Method:Response:Traits:TypeConversionsHeader" . }}
+  {{- end }}
 
-{{- range $protocol.TwoWayMethods }}
-{{ template "Method:Response:Traits:TypeConversionsHeader" . }}
-{{- end }}
-
-{{- range $protocol.Events }}
-{{ template "Method:Event:Traits:TypeConversionsHeader" . }}
-{{- end }}
-
-{{- end }}
-{{- end }}
-{{- end }}
+  {{- range .Events }}
+  {{ template "Method:Event:Traits:TypeConversionsHeader" . }}
+  {{- end }}
 {{- end }}
 {{- EndifFuchsia -}}
 

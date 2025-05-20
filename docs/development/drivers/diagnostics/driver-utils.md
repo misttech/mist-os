@@ -36,17 +36,12 @@ TODO(https://fxbug.dev/42122211): Add inspect usage description.
 
 ## Discovery
 
-The Fuchsia driver model defines a `devfs` filesystem (see
-[Device Model](/docs/development/drivers/concepts/device_driver_model/device-model.md), which is the mechanism
-through which userspace services and applications gain access to devices. As a
-user, you can navigate the `devfs` filesystem to see what devices are exported,
-note that there are multiple ways to access the same device, you can use the
-`lsdev` command to find relationships as in:
-
-```
-lsdev /dev/class/i2c/000
-topological path for /dev/class/i2c/000: /dev/sys/platform/i2c-0/aml-i2c/i2c/i2c-2-44
-```
+Drivers advertise services which can be routed to non-driver components. When
+a service capability is routed to a non-driver component, that component will
+see an aggregated list of all instances of that service. (see
+[Driver Communication][driver-communication].) As a  user, you can navigate the
+component framework to see what services are advertised and where they are
+routed using the `fx component` commands.
 
 ## Creating new driver utilities
 
@@ -103,3 +98,4 @@ This calls the `Transfer()` method to write and read from an I2C device.
 
 <!-- xrefs -->
 [abi-api-compat]: /docs/development/languages/fidl/guides/compatibility/README.md
+[driver-communication]: /docs/concepts/drivers/driver_communication.md

@@ -100,16 +100,31 @@ if [[ ! -d "${FUCHSIA_BUILD_DIR}" ]]; then
   exit 1
 fi
 
-# Check if the user has set the default via an environment variable which will cause this
-# to be a noop. This variable is always set if the user has already called fx set-device so
-# we need to set FUCHSIA_NODENAME_IS_FROM_FILE which is exported from the hermetic-env script.
-if [[ -n "${FUCHSIA_NODENAME}" && ! -n "${FUCHSIA_NODENAME_IS_FROM_FILE}" ]]; then
-  fx-warn "FUCHSIA_NODENAME is already set to ${FUCHSIA_NODENAME}"
-  fx-warn "Calling fx set-device ${device} will have no effect"
-  fx-warn "If you would like to use this command, first unset the FUCHSIA_NODENAME variable and try again"
-fi
-
 echo "Default device for '${FUCHSIA_BUILD_DIR}' is now ${device}"
 echo "$device" > "${FUCHSIA_BUILD_DIR}.device"
 
-fx-check-default-target
+# Ensure the below checks will report the correct error message.
+export FUCHSIA_NODENAME="${device}"
+
+_status=0
+
+# Check if the user has set a default target via environment variable(s) which
+# can override the effectiveness of this command.
+function overridden-env-var-error {
+  # This line is executed after echoing `Default device for ... is now $device`.
+  fx-error "However, you've overriden this value by setting ${ENV_VARS}."
+  fx-error "If you want to use \"$device\", please unset the ${ENV_VAR_NAMES} environment variable."
+
+  # Add a newline to distinguish this as a separate warning than the potential
+  # ffx-related warning below.
+  echo >&2
+
+  _status=1
+}
+fx-if-target-set-by-env overridden-env-var-error
+
+# Check if the user has set a default target via `ffx target default set` which
+# can override the effectiveness of this command.
+fx-check-ffx-default-target --fix
+
+exit "$_status"

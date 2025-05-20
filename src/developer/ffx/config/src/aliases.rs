@@ -61,7 +61,7 @@ fn get_with_isolated_alias(
     Some((bool::try_convert(v).ok(), bool::try_convert(isov).ok()))
 }
 
-pub async fn is_usb_discovery_disabled(ctx: &EnvironmentContext) -> bool {
+pub fn is_usb_discovery_disabled(ctx: &EnvironmentContext) -> bool {
     let default = false;
     match get_with_isolated_alias(ctx, FASTBOOT_USB_DISCOVERY_DISABLED) {
         None => return default,
@@ -80,7 +80,7 @@ pub fn is_analytics_disabled(ctx: &EnvironmentContext) -> bool {
     }
 }
 
-pub async fn is_mdns_discovery_disabled(ctx: &EnvironmentContext) -> bool {
+pub fn is_mdns_discovery_disabled(ctx: &EnvironmentContext) -> bool {
     let default = false;
     match get_with_isolated_alias(ctx, MDNS_DISCOVERY_ENABLED) {
         None => return default,
@@ -89,7 +89,7 @@ pub async fn is_mdns_discovery_disabled(ctx: &EnvironmentContext) -> bool {
     }
 }
 
-pub async fn is_mdns_autoconnect_disabled(ctx: &EnvironmentContext) -> bool {
+pub fn is_mdns_autoconnect_disabled(ctx: &EnvironmentContext) -> bool {
     let default = false;
     match get_with_isolated_alias(ctx, MDNS_AUTOCONNECT_ENABLED) {
         None => return default,
@@ -113,7 +113,7 @@ mod test {
     use super::*;
     use crate::{self as ffx_config, ConfigLevel};
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ffx_isolated() {
         let env = ffx_config::test_init().await.expect("create test config");
 
@@ -132,13 +132,13 @@ mod test {
             .await
             .unwrap();
 
-        assert!(is_usb_discovery_disabled(&env.context).await);
+        assert!(is_usb_discovery_disabled(&env.context));
         assert!(is_analytics_disabled(&env.context));
-        assert!(is_mdns_discovery_disabled(&env.context).await);
-        assert!(is_mdns_autoconnect_disabled(&env.context).await);
+        assert!(is_mdns_discovery_disabled(&env.context));
+        assert!(is_mdns_autoconnect_disabled(&env.context));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ffx_isolated_can_override_global() {
         let env = ffx_config::test_init().await.expect("create test config");
 
@@ -159,10 +159,10 @@ mod test {
             .unwrap();
 
         // Isolation is respected, since it is set at a higher level
-        assert!(is_usb_discovery_disabled(&env.context).await);
+        assert!(is_usb_discovery_disabled(&env.context));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ffx_isolated_can_be_overridden() {
         let env = ffx_config::test_init().await.expect("create test config");
 
@@ -184,7 +184,7 @@ mod test {
 
         // Isolation is overridden, since it is set at a lower level
         // (It's not clear we _want_ this behavior, but this is the current plan)
-        assert!(!is_usb_discovery_disabled(&env.context).await);
+        assert!(!is_usb_discovery_disabled(&env.context));
         // Nothing else is affected
         assert!(is_analytics_disabled(&env.context));
     }

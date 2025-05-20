@@ -122,6 +122,8 @@ static const std::string POWER_SENSOR_DOMAIN = "fuchsia.BIND_POWER_SENSOR_DOMAIN
 
 static const std::string MAILBOX_ID = "fuchsia.BIND_MAILBOX_ID";
 
+static const std::string INTERCONNECT_PATH_ID = "fuchsia.BIND_INTERCONNECT_PATH_ID";
+
 }  // namespace bind_fuchsia
 
 #endif  // BIND_FUCHSIA_BINDLIB_

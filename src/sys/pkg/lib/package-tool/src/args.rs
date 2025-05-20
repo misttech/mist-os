@@ -7,7 +7,7 @@ use camino::Utf8PathBuf;
 use chrono::{DateTime, Utc};
 use fuchsia_repo::repository::CopyMode;
 use std::path::PathBuf;
-use version_history::ApiLevel;
+use version_history::{AbiRevision, ApiLevel};
 
 #[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
 /// create a package archive from a package_manifest.json
@@ -113,6 +113,11 @@ pub struct PackageArchiveEditCommand {
     /// meta/package) to <package_name>.
     #[argh(option)]
     pub package_name: Option<String>,
+
+    /// if specified, replace the ABI revision in the package. Do not do this
+    /// unless you're certain you know what you're doing!
+    #[argh(option)]
+    pub unsafe_override_abi_revision: Option<AbiRevision>,
 
     /// the name of the resulting archive. Can be the same as <archive> to
     /// overwrite <archive>

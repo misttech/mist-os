@@ -50,9 +50,6 @@ struct WireTypeForNaturalType<::test_drivertwoway::TwoWayAddResponse> {
   using type = ::test_drivertwoway::wire::TwoWayAddResponse;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

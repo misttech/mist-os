@@ -51,9 +51,9 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
 
         let write_config = |name: &str, value: serde_json::Value| -> Result<Utf8PathBuf> {
             let path = gendir.join(name);
-            let file = File::create(&path).with_context(|| format!("Creating config: {}", name))?;
+            let file = File::create(&path).with_context(|| format!("Creating config: {name}"))?;
             serde_json::to_writer_pretty(file, &value)
-                .with_context(|| format!("Writing config: {}", name))?;
+                .with_context(|| format!("Writing config: {name}"))?;
             Ok(path)
         };
         let health_checks_source = write_config(

@@ -239,11 +239,7 @@ impl ConsumerControlsBinding {
             }
         };
 
-        let trace_id: fuchsia_trace::Id = match report.trace_id {
-            Some(trace_id) => trace_id.into(),
-            None => fuchsia_trace::Id::new(),
-        };
-
+        let trace_id = fuchsia_trace::Id::random();
         fuchsia_trace::flow_begin!(c"input", c"event_in_input_pipeline", trace_id);
 
         send_consumer_controls_event(

@@ -60,7 +60,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         }
 
         if config.vsock_development
-            && matches!(context.feature_set_level, FeatureSupportLevel::Embeddable)
+            && matches!(context.feature_set_level, FeatureSetLevel::Embeddable)
             && matches!(context.build_type, BuildType::Eng | BuildType::UserDebug)
         {
             builder.platform_bundle("bootstrap_realm_vsock_development_access");
@@ -112,7 +112,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("sl4f");
         }
 
-        let is_embeddable = matches!(context.feature_set_level, FeatureSupportLevel::Embeddable);
+        let is_embeddable = matches!(context.feature_set_level, FeatureSetLevel::Embeddable);
         match (context.build_type, &config.include_bin_clock, is_embeddable) {
             (BuildType::User, true, _) => {
                 anyhow::bail!("bin/clock cannot be provided on user builds")
@@ -135,7 +135,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         if config.tools.audio.driver_tools {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng],
-                &[FeatureSupportLevel::Standard],
+                &[FeatureSetLevel::Standard],
                 "Audio driver development tools",
             )?;
             builder.platform_bundle("audio_driver_development_tools");
@@ -143,7 +143,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         if config.tools.audio.full_stack_tools {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng],
-                &[FeatureSupportLevel::Standard],
+                &[FeatureSetLevel::Standard],
                 "Audio full-stack development tools",
             )?;
             builder.platform_bundle("audio_full_stack_development_tools");
@@ -152,7 +152,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         if config.tools.connectivity.enable_networking {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng, BuildType::UserDebug],
-                &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+                &[FeatureSetLevel::Utility, FeatureSetLevel::Standard],
                 "Networking tools",
             )?;
             builder.platform_bundle("development_support_tools_connectivity_networking");
@@ -160,7 +160,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         if config.tools.connectivity.enable_wlan {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng, BuildType::UserDebug],
-                &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+                &[FeatureSetLevel::Utility, FeatureSetLevel::Standard],
                 "WLAN tools",
             )?;
             builder.platform_bundle("development_support_tools_connectivity_wlan");
@@ -168,7 +168,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         if config.tools.connectivity.enable_thread {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng, BuildType::UserDebug],
-                &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+                &[FeatureSetLevel::Utility, FeatureSetLevel::Standard],
                 "Thread (protocol) tools",
             )?;
             builder.platform_bundle("development_support_tools_connectivity_thread");
@@ -177,11 +177,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
         if config.tools.storage.enable_partitioning_tools {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng],
-                &[
-                    FeatureSupportLevel::Bootstrap,
-                    FeatureSupportLevel::Utility,
-                    FeatureSupportLevel::Standard,
-                ],
+                &[FeatureSetLevel::Bootstrap, FeatureSetLevel::Utility, FeatureSetLevel::Standard],
                 "Partitioning tools",
             )?;
             builder.platform_bundle("partitioning_tools");
@@ -189,7 +185,7 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
 
         if config.include_bootstrap_testing_framework {
             context.ensure_feature_set_level(
-                &[FeatureSupportLevel::Bootstrap],
+                &[FeatureSetLevel::Bootstrap],
                 "Bootstrap Testing Framework",
             )?;
             builder.platform_bundle("testing_support_bootstrap");

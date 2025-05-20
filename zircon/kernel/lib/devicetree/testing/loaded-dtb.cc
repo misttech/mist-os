@@ -7,7 +7,6 @@
 #include "lib/devicetree/testing/loaded-dtb.h"
 
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/span.h>
 
 #include <filesystem>
 #include <string_view>

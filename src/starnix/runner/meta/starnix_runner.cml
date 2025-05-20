@@ -83,6 +83,7 @@
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.net.filter.Control",
+                "fuchsia.net.filter.SocketControl",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
@@ -112,10 +113,11 @@
         },
         {
             protocol: [
+                "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.sockettunnel.Device",
+                "fuchsia.net.policy.socketproxy.StarnixNetworks",
                 "fuchsia.net.stack.Stack",
-                "fuchsia.netpol.socketproxy.StarnixNetworks",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
@@ -170,6 +172,11 @@
         },
         {
             service: "fuchsia.hardware.adb.Service",
+            from: "parent",
+            to: [ "#kernels" ],
+        },
+        {
+            service: "fuchsia.hardware.qcom.hvdcpopti.Service",
             from: "parent",
             to: [ "#kernels" ],
         },

@@ -627,6 +627,9 @@ pub enum BorderRoutingDhcp6PdState {
 
     /// Functional equivalent of [`otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING`](crate::otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING)
     Running = OT_BORDER_ROUTING_DHCP6_PD_STATE_RUNNING as isize,
+
+    /// Functional equivalent of [`otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_IDLE`](crate::otsys::OT_BORDER_ROUTING_DHCP6_PD_STATE_IDLE)
+    Idle = OT_BORDER_ROUTING_DHCP6_PD_STATE_IDLE as isize,
 }
 
 impl From<otBorderRoutingDhcp6PdState> for BorderRoutingDhcp6PdState {

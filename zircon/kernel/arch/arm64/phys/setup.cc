@@ -21,10 +21,10 @@
 // This is just here to get the static_asserts done somewhere.
 #include "regs.h"
 
-namespace {
-
 // The vector table is defined in assembly (see exception.S).
 extern "C" const uint32_t phys_exception[];
+
+namespace {
 
 template <typename Elr, typename Spsr, typename Sp>
 struct ResumeRegs {
@@ -79,15 +79,16 @@ constexpr auto ResumeSpEl1 = ResumeSpElx<SpSameEl, SpBadEl, SpBadEl>;
 constexpr auto ResumeSpEl2 = ResumeSpElx<arch::ArmSpEl1, SpSameEl, SpBadEl>;
 constexpr auto ResumeSpEl3 = ResumeSpElx<arch::ArmSpEl1, arch::ArmSpEl2, SpSameEl>;
 
-const zbi_dcfg_arm_psci_driver_t* FindPsciConfig(void* zbi_ptr) {
+const zbi_dcfg_arm_psci_driver_t* FindPsciConfig(EarlyBootZbi zbi) {
   const zbi_dcfg_arm_psci_driver_t* cfg = nullptr;
 
-  zbitl::View zbi(zbitl::StorageFromRawHeader(static_cast<zbi_header_t*>(zbi_ptr)));
-  for (auto [header, payload] : zbi) {
-    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI &&
-        payload.size() >= sizeof(*cfg)) {
-      // Keep looping.  The Last one wins.
-      cfg = reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
+  for (auto [header, wrapped_payload] : zbi) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_ARM_PSCI) {
+      ktl::span payload = wrapped_payload.get();
+      if (payload.size() >= sizeof(*cfg)) {
+        // Keep looping.  The Last one wins.
+        cfg = reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
+      }
     }
   }
   zbi.ignore_error();
@@ -101,14 +102,14 @@ ArchPhysInfo gArchPhysInfoStorage;
 
 ArchPhysInfo* gArchPhysInfo;
 
-void ArchSetUp(void* zbi) {
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) {
   gArchPhysInfo = &gArchPhysInfoStorage;
 
   // Hereafter any machine exceptions should be handled.
   ArmSetVbar(phys_exception);
 
   if (zbi) {
-    ArmPsciSetup(FindPsciConfig(zbi));
+    ArmPsciSetup(FindPsciConfig(*zbi));
   }
 }
 

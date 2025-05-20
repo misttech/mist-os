@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/aml-meson-power.so",
         bind: "meta/bind/aml-meson-power.bindbc",
         colocate: "false",
-        compat: "driver/aml-meson-power.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
+        service_connect_validation: "true",
     },
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },

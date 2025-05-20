@@ -4,8 +4,11 @@
 
 #include "src/cobalt/bin/app/utils.h"
 
+#include <fuchsia/buildinfo/cpp/fidl.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
+
+#include <format>
 
 #include "third_party/cobalt/src/lib/util/pem_util.h"
 #include "third_party/cobalt/src/public/lib/status.h"
@@ -45,6 +48,19 @@ std::string ReadPublicKeyPem(const std::string &pem_file_path) {
   FX_CHECK(util::PemUtil::ReadTextFile(pem_file_path, &pem_out))
       << "Unable to read file public key PEM file from path " << pem_file_path << ".";
   return pem_out;
+}
+
+std::string GetSystemVersion(const fuchsia::buildinfo::BuildInfo &build_info) {
+  if (!build_info.has_product_version() || build_info.product_version().empty() ||
+      !build_info.has_platform_version() || build_info.platform_version().empty()) {
+    return "<version not specified>";
+  }
+
+  if (build_info.product_version() != build_info.platform_version()) {
+    return std::format("{}--{}", build_info.product_version(), build_info.platform_version());
+  }
+
+  return build_info.product_version();
 }
 
 }  // namespace cobalt

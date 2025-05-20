@@ -33,14 +33,15 @@ ffx_plugin("ffx_doctor") {
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:termion",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zip",
   ]
   test_deps = [
     "//src/developer/ffx/plugins/doctor/test_utils:lib",
     "//src/lib/fidl/rust/fidl_test_util",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:tempfile",
   ]
 

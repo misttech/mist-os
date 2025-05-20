@@ -13,19 +13,6 @@ For now, these targets only map to filegroup() targets that wrap
 a symlink to the actual Ninja artifact. Later, these will point to
 actual Bazel actions to build the corresponding file on demand
 directly in the Bazel graph.
-
-Note that the top-level BUILD.bazel file in the repository will
-also include a Bazel target named "final_idk" which generates,
-at build time, an IDK export directory with the same content,
-but whose metadata files do not include any target labels.
-
-Such a repository can be distributed out-of-tree to third-party
-SDK produces, or to run the Fuchsia Bazel SDK test suite locally,
-but must be built explicitly before, e.g. with:
-
-```
-fx bazel build @fuchsia_idk//:final_idk
-```
 """
 
 import argparse
@@ -71,12 +58,12 @@ def _to_starlark_string_list(items: T.List[str], indent: int = 4) -> str:
 
 
 def _to_starlark_string_dict(mapping: T.Dict[str, str], indent: int = 4) -> str:
-    items = sorted(mapping.items())
     if not mapping:
         return "{}"
     if len(mapping) == 1:
-        key, value = mapping[0]
+        key, value = mapping.popitem()
         return f'{{ "{key}": "{value}" }}'
+    items = sorted(mapping.items())
     result = "{\n"
     for key, value in items:
         result += " " * indent + f'    "{key}": "{value}",\n'
@@ -84,7 +71,7 @@ def _to_starlark_string_dict(mapping: T.Dict[str, str], indent: int = 4) -> str:
     return result
 
 
-def split_path_to_package_name(path: str) -> (str, str):
+def split_path_to_package_name(path: str) -> tuple[str, str]:
     """Convert IDK-relative path to Bazel (package path, target/file name) pair."""
     # Use a single .build-id/BUILD.bazel file for all .build-id files.
     if path.startswith(".build-id/"):
@@ -129,7 +116,7 @@ def split_path_to_package_name(path: str) -> (str, str):
 class OutputPackageInfo(object):
     """Information about a given Bazel package in the output IDK directory."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # The list of files exported by this package.
         self._exports: T.Set[str] = set()
         # The list of filesgroups in this package.
@@ -274,26 +261,6 @@ class OutputIdk(object):
             file_path = self._output_dir / file_relpath
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content)
-
-        # Update the top-level BUILD.bazel file to generate
-        # a final IDK directory, if needed.
-        bazel_build_path = self._output_dir / "BUILD.bazel"
-        bazel_build = bazel_build_path.read_text()
-        bazel_build += """
-# buildifier: disable=load-on-top
-load(":generate_final_idk.bzl", "generate_final_idk")
-
-generate_final_idk(
-    name = "final_idk",
-    files_to_copy = {files_to_copy},
-    manifest = "meta/manifest.json",
-    meta_files_to_copy = {meta_files_to_copy},
-)
-""".format(
-            files_to_copy=_to_starlark_string_dict(self._final_files),
-            meta_files_to_copy=_to_starlark_string_dict(self._final_metas),
-        )
-        bazel_build_path.write_text(bazel_build)
 
 
 class PathRewriter(object):
@@ -476,10 +443,6 @@ class PathRewriter(object):
                 self.property_inplace(toolfiles, "executable_metadata")
             return
 
-        if atom_type == "fhcp_tests":
-            # no paths to rewrite.
-            return
-
         if atom_type == "fidl_library":
             self.path_list_inplace(meta["sources"])
             return
@@ -510,6 +473,7 @@ class PathRewriter(object):
             sysroot_rewriter = self.clone_with_exceptions(
                 [
                     "cdecls.inc",
+                    "cdecls-next.inc",
                     "libc.so",
                     "libzircon.so",
                     "Scrt1.o",
@@ -543,7 +507,7 @@ class PathRewriter(object):
         raise Exception(f"Unknown atom type {atom_type} in {meta}")
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--repository-name", required=True, help="IDK repository name."
@@ -571,14 +535,9 @@ def main():
     )
     args = parser.parse_args()
 
-    out_dir = args.output_dir
-    input_dir = args.input_dir.resolve()
-
-    repo_name = args.repository_name
-
     if not args.ninja_build_dir:
-        # args.fuchsia_dir points to the Bazel workspace which contains symlinks
-        # to the real files in the actual top-level source directory. resolve
+        # args.fuchsia_dir points to the Bazel workspace, which contains symlinks
+        # to the real files in the actual top-level source directory. Resolve
         # one of them to find the real location.
         #
         #  out/default/gen/build/bazel/workspace/README.md -->
@@ -606,9 +565,30 @@ def main():
             f"Ninja build directory does not exist: {args.ninja_build_dir}"
         )
 
-    ninja_build_dir = args.ninja_build_dir.resolve()
+    GenerateIdkRepository(
+        args.repository_name,
+        args.output_dir,
+        args.input_dir,
+        args.ninja_build_dir,
+    )
+    return 0
 
-    output_idk = OutputIdk(out_dir)
+
+def GenerateIdkRepository(
+    name: str, output_dir: Path, input_dir: Path, ninja_build_dir: Path
+) -> None:
+    """Generate a Bazel repository from the specified Fuchsia IDK directory.
+
+    Args:
+        name: Repository name.
+        output_dir: Path for the IDK repository directory.
+        input_dir: Path to the IDK directory from which to create the repository.
+        ninja_build_dir: Path to the Ninja build directory.
+    """
+    input_dir = input_dir.resolve()
+    ninja_build_dir = ninja_build_dir.resolve()
+
+    output_idk = OutputIdk(output_dir)
 
     # Symlink then source meta/manifest.json
     input_manifest_path = input_dir / _IDK_MANIFEST_RELPATH
@@ -616,19 +596,13 @@ def main():
 
     output_idk.add_symlink(_IDK_MANIFEST_RELPATH, input_manifest_path)
 
-    rewriter = PathRewriter(repo_name, output_idk, input_dir, ninja_build_dir)
-
-    def handle_path_list(
-        path_list: T.List[str], keep_as_symlinks: T.Sequence[str] = []
-    ):
-        output_idk.handle_meta_path_list_inplace(path_list, keep_as_symlinks)
+    rewriter = PathRewriter(name, output_idk, input_dir, ninja_build_dir)
 
     # Handle each part separately.
     for part in input_manifest["parts"]:
         part_meta_path = part["meta"]
 
         src_meta_path = input_dir / part_meta_path
-        out_dir / part_meta_path
         try:
             meta = json.load(src_meta_path.open())
         except:
@@ -645,8 +619,6 @@ def main():
         output_idk.add_json_file(part_meta_path, meta, is_meta=True)
 
     output_idk.write_all()
-
-    return 0
 
 
 if __name__ == "__main__":

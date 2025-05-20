@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use super::{
-    new_netlink_socket, new_socket_file, socket_fs, NetlinkFamily, SocketAddress, SocketDomain,
-    SocketFile, SocketMessageFlags, SocketProtocol, SocketType, UnixSocket, VsockSocket,
-    ZxioBackedSocket,
+    new_netlink_socket, NetlinkFamily, SocketAddress, SocketDomain, SocketFile, SocketMessageFlags,
+    SocketProtocol, SocketType, UnixSocket, VsockSocket, ZxioBackedSocket,
 };
 use crate::mm::MemoryAccessorExt;
 use crate::security;
@@ -15,7 +14,7 @@ use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
 };
 use crate::vfs::socket::SocketShutdownFlags;
-use crate::vfs::{default_ioctl, Anon, FileHandle, FileObject, FsNodeInfo};
+use crate::vfs::{default_ioctl, FileHandle, FileObject, FsNodeHandle};
 use byteorder::{ByteOrder as _, NativeEndian};
 use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::{arch_struct_with_union, AF_INET};
@@ -33,7 +32,6 @@ use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{CAP_NET_ADMIN, CAP_NET_RAW};
 use starnix_uapi::errors::{Errno, ErrnoCode};
-use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::union::struct_with_union_into_bytes;
 use starnix_uapi::user_address::UserAddress;
@@ -354,6 +352,10 @@ pub struct Socket {
     pub protocol: SocketProtocol,
 
     state: Mutex<SocketState>,
+
+    /// Security module state associated with this socket. Note that the socket's security label is
+    /// applied to the associated `fs_node`.
+    pub security: security::SocketState,
 }
 
 #[derive(Default)]
@@ -365,7 +367,14 @@ struct SocketState {
     send_timeout: Option<zx::MonotonicDuration>,
 
     /// The socket's mark. Can get and set with SO_MARK.
+    // TODO(https://fxbug.dev/410631890): Remove this when the netstack handles
+    // socket marks.
     mark: u32,
+
+    /// Reference to the [`crate::vfs::FsNode`] to which this `Socket` is attached.
+    /// `None` until the `Socket` is wrapped into a [`crate::vfs::FileObject`] (e.g. while it is
+    /// still held in a listen queue).
+    fs_node: Option<FsNodeHandle>,
 }
 
 pub type SocketHandle = Arc<Socket>;
@@ -410,7 +419,7 @@ fn create_socket_ops(
             if socket_type == SocketType::Raw {
                 security::check_task_capable(current_task, CAP_NET_RAW)?;
             }
-            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            Ok(Box::new(ZxioBackedSocket::new(current_task, domain, socket_type, protocol)?))
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
@@ -420,7 +429,7 @@ fn create_socket_ops(
             // Follow Linux, and require CAP_NET_RAW to create packet sockets.
             // See https://man7.org/linux/man-pages/man7/packet.7.html.
             security::check_task_capable(current_task, CAP_NET_RAW)?;
-            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            Ok(Box::new(ZxioBackedSocket::new(current_task, domain, socket_type, protocol)?))
         }
         SocketDomain::Key => {
             track_stub!(
@@ -459,40 +468,20 @@ impl Socket {
         socket_type: SocketType,
         protocol: SocketProtocol,
     ) -> SocketHandle {
-        Arc::new(Socket { ops, domain, socket_type, protocol, state: Mutex::default() })
+        Arc::new(Socket {
+            ops,
+            domain,
+            socket_type,
+            protocol,
+            state: Mutex::default(),
+            security: security::SocketState::default(),
+        })
     }
 
-    /// Creates a `FileHandle` where the associated `FsNode` contains a socket.
-    ///
-    /// # Parameters
-    /// - `current_task`: The task that is used to fetch `SocketFs`, to store the created socket
-    ///   node.
-    /// - `socket`: The socket to store in the `FsNode`.
-    /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
-    /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
-    ///   therefore not be security labeled nor access-checked.
-    pub fn new_file<L>(
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        socket: SocketHandle,
-        open_flags: OpenFlags,
-        kernel_private: bool,
-    ) -> FileHandle
-    where
-        L: LockBefore<FileOpsCore>,
-    {
-        let fs = socket_fs(current_task.kernel());
-        // Ensure sockfs gets labeled if mounted after the SELinux policy has been loaded.
-        security::file_system_resolve_security(locked, &current_task, &fs)
-            .expect("resolve fs security");
-        let mode = mode!(IFSOCK, 0o777);
-        let node = fs.create_node(
-            current_task,
-            Anon::new_for_socket(kernel_private),
-            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
-        );
-        security::socket_post_create(&socket, &node);
-        FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags)
+    pub(super) fn set_fs_node(&self, node: &FsNodeHandle) {
+        let mut locked_state = self.state.lock();
+        assert!(locked_state.fs_node.is_none());
+        locked_state.fs_node = Some(node.clone());
     }
 
     /// Returns the Socket that this FileHandle refers to. If this file is not a socket file,
@@ -543,11 +532,15 @@ impl Socket {
             Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
+        security::check_socket_setsockopt_access(current_task, self, level, optname)?;
         match level {
             SOL_SOCKET => match optname {
                 SO_RCVTIMEO => self.state.lock().receive_timeout = read_timeval()?,
                 SO_SNDTIMEO => self.state.lock().send_timeout = read_timeval()?,
-                SO_MARK => {
+                // When the feature isn't enabled, we use the local state to store
+                // the mark, otherwise the default branch will let netstack handle
+                // the mark.
+                SO_MARK if !current_task.task.kernel().features.netstack_mark => {
                     self.state.lock().mark = current_task.read_object(user_opt.try_into()?)?;
                 }
                 _ => self.ops.setsockopt(
@@ -576,6 +569,7 @@ impl Socket {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
+        security::check_socket_getsockopt_access(current_task, self, level, optname)?;
         let value = match level {
             SOL_SOCKET => match optname {
                 SO_TYPE => self.socket_type.as_raw().to_ne_bytes().to_vec(),
@@ -594,7 +588,12 @@ impl Socket {
                     TimeValPtr::into_bytes(current_task, timeval_from_duration(duration))
                         .map_err(|_| errno!(EINVAL))?
                 }
-                SO_MARK => self.state.lock().mark.as_bytes().to_owned(),
+                // When the feature isn't enabled, we get the mark from the local
+                // state, otherwise the default branch will let netstack handle
+                // the mark.
+                SO_MARK if !current_task.task.kernel().features.netstack_mark => {
+                    self.state.lock().mark.as_bytes().to_owned()
+                }
                 _ => {
                     self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?
                 }
@@ -1063,6 +1062,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_connect_access(current_task, self, &peer)?;
         self.ops.connect(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, peer)
     }
 
@@ -1075,6 +1075,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_listen_access(current_task, self, backlog)?;
         let max_connections =
             current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
         let backlog = std::cmp::min(backlog, max_connections);
@@ -1147,11 +1148,13 @@ impl Socket {
     pub fn shutdown<L>(
         &self,
         locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
         how: SocketShutdownFlags,
     ) -> Result<(), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_shutdown_access(current_task, self, how)?;
         self.ops.shutdown(&mut locked.cast_locked::<FileOpsCore>(), self, how)
     }
 
@@ -1168,6 +1171,13 @@ impl Socket {
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
         self.ops.to_handle(self, current_task)
+    }
+
+    /// Returns the [`crate::vfs::FsNode`] unique to this `Socket`.
+    // TODO: https://fxbug.dev/414583985 - Create `FsNode` at `Socket` creation and make this
+    // infallible.
+    pub fn fs_node(&self) -> Option<FsNodeHandle> {
+        self.state.lock().fs_node.clone()
     }
 }
 
@@ -1205,7 +1215,7 @@ where
     L: LockBefore<FileOpsCore>,
 {
     let iface_name = in_ifreq.name_as_str()?;
-    let socket = new_socket_file(
+    let socket = SocketFile::new_socket(
         locked,
         current_task,
         SocketDomain::Netlink,
@@ -1333,7 +1343,7 @@ where
     //   - no loss in precision when upcasting 16 bits to 32 bits.
     let flags: u32 = flags as u32;
 
-    let socket = new_socket_file(
+    let socket = SocketFile::new_socket(
         locked,
         current_task,
         SocketDomain::Netlink,

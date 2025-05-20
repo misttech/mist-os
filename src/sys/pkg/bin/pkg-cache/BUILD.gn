@@ -23,7 +23,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
@@ -97,7 +96,6 @@ rustc_binary("bin") {
     "src/index/retained.rs",
     "src/index/writing.rs",
     "src/main.rs",
-    "src/reboot.rs",
     "src/required_blobs.rs",
     "src/retained_packages_service.rs",
     "src/root_dir.rs",
@@ -139,11 +137,6 @@ fuchsia_structured_config_values2("config_values_from_gn") {
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
-
-    # LINT.IfChange
-    use_fxblob = fxfs_blob
-
-    # LINT.ThenChange(/src/sys/pkg/testing/blobfs-ramdisk/BUILD.gn)
     use_system_image = true
     enable_upgradable_packages = false
   }
@@ -156,9 +149,6 @@ fuchsia_structured_config_values2("config_values_from_gn-ignore-system-image") {
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
-
-    # TODO(https://fxbug.dev/42081210) Recovery should use fxblob if available.
-    use_fxblob = false
     use_system_image = false
     enable_upgradable_packages = false
   }
@@ -171,7 +161,6 @@ fuchsia_structured_config_values2("config_values_from_gn-cpp-blobfs") {
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
-    use_fxblob = false
     use_system_image = true
     enable_upgradable_packages = false
   }
@@ -184,7 +173,6 @@ fuchsia_structured_config_values2("config_values_from_gn-fxblob") {
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
-    use_fxblob = true
     use_system_image = true
     enable_upgradable_packages = false
   }

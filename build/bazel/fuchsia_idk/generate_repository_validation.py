@@ -26,15 +26,13 @@ from pathlib import Path
 _SCRIPT_DIR = Path(__file__).parent
 
 
-def _get_files_from(top_dir: Path) -> T.Tuple[T.Set[str], T.Set[str]]:
-    """Walk the top_dir directory, and return a set of all its files."""
-    all_files: T.Set[str] = set()
-    for dirpath, dirnames, filenames in os.walk(top_dir):
-        for filename in filenames:
-            filepath = os.path.relpath(os.path.join(dirpath, filename), top_dir)
-            all_files.add(filepath)
-
-    return all_files
+def _get_files_from(top_dir: Path) -> set[str]:
+    """Walk the top_dir directory, and return a set of relative paths to all its files."""
+    return {
+        os.path.relpath(os.path.join(dirpath, filename), top_dir)
+        for dirpath, dirnames, filenames in os.walk(top_dir)
+        for filename in filenames
+    }
 
 
 def compare_directories(
@@ -117,7 +115,7 @@ class BuildDir(object):
         return self._top_dir
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--validation_data-dir",
@@ -196,12 +194,11 @@ def main():
     expected_idk = top_dir / "expected_idk"
 
     if not args.no_diff_check:
-        errors = []
         diff_files, left_only, right_only = compare_directories(
             expected_idk, output_idk
         )
 
-        errors = []
+        errors: list[str] = []
         if left_only:
             errors.append(
                 "Missing files from the output IDK:\n  %s\n"

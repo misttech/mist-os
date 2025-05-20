@@ -23,7 +23,7 @@ void dump_phy3_regs(const fdf::MmioBuffer& mmio) {
 }  // namespace
 
 void UsbPhy3::dump_regs() const {
-  FDF_LOG(INFO, "    UsbPhy3");
+  fdf::info("    UsbPhy3");
   dump_phy3_regs(mmio());
 }
 
@@ -42,7 +42,7 @@ zx_status_t UsbPhy3::CrBusAddr(uint32_t addr) {
   } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Read set cap addr for addr %x timed out", addr);
+    fdf::warn("Read set cap addr for addr {:#x} timed out", addr);
   }
 
   phy3_r4.set_phy_cr_cap_addr(0);
@@ -53,7 +53,7 @@ zx_status_t UsbPhy3::CrBusAddr(uint32_t addr) {
   } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Read cap addr for addr %x timed out", addr);
+    fdf::warn("Read cap addr for addr {:#x} timed out", addr);
   }
 
   return ZX_OK;
@@ -75,7 +75,7 @@ uint32_t UsbPhy3::CrBusRead(uint32_t addr) {
   } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Read set for addr %x timed out", addr);
+    fdf::warn("Read set for addr {:#x} timed out", addr);
   }
 
   uint32_t data = phy3_r5.phy_cr_data_out();
@@ -88,7 +88,7 @@ uint32_t UsbPhy3::CrBusRead(uint32_t addr) {
   } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Read for addr %x timed out", addr);
+    fdf::warn("Read for addr {:#x} timed out", addr);
   }
 
   return data;
@@ -113,7 +113,7 @@ zx_status_t UsbPhy3::CrBusWrite(uint32_t addr, uint32_t data) {
   } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Write cap data for addr %x timed out", addr);
+    fdf::warn("Write cap data for addr {:#x} timed out", addr);
   }
 
   phy3_r4.set_phy_cr_cap_data(0);
@@ -124,7 +124,7 @@ zx_status_t UsbPhy3::CrBusWrite(uint32_t addr, uint32_t data) {
   } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Write cap data reset for addr %x timed out", addr);
+    fdf::warn("Write cap data reset for addr {:#x} timed out", addr);
   }
 
   phy3_r4.set_phy_cr_write(0);
@@ -137,7 +137,7 @@ zx_status_t UsbPhy3::CrBusWrite(uint32_t addr, uint32_t data) {
   } while (phy3_r5.phy_cr_ack() == 0 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 1) {
-    FDF_LOG(WARNING, "Write for addr %x timed out", addr);
+    fdf::warn("Write for addr {:#x} timed out", addr);
   }
 
   phy3_r4.set_phy_cr_write(0);
@@ -148,7 +148,7 @@ zx_status_t UsbPhy3::CrBusWrite(uint32_t addr, uint32_t data) {
   } while (phy3_r5.phy_cr_ack() == 1 && timeout > zx::clock::get_monotonic());
 
   if (phy3_r5.phy_cr_ack() != 0) {
-    FDF_LOG(WARNING, "Disable write for addr %x timed out", addr);
+    fdf::warn("Disable write for addr {:#x} timed out", addr);
   }
 
   return ZX_OK;

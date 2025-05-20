@@ -148,7 +148,8 @@ void lk_main(paddr_t handoff_paddr) {
   // Initialize the lockup detector, after the platform timer has been
   // configured, but before the topology subsystem has brought up other CPUs.
   dprintf(SPEW, "initializing lockup detector on boot cpu\n");
-  lockup_primary_init();
+  lockup_init();
+  lockup_percpu_init();
 
   // initialize the system topology
   dprintf(SPEW, "initializing system topology\n");
@@ -244,7 +245,7 @@ void lk_secondary_cpu_entry() {
   // secondary cpu initialize from threading level up. 0 to threading was handled in arch
   lk_init_level(LK_INIT_FLAG_SECONDARY_CPUS, LK_INIT_LEVEL_THREADING, LK_INIT_LEVEL_LAST);
 
-  lockup_secondary_init();
+  lockup_percpu_init();
 
   dprintf(SPEW, "entering scheduler on cpu %u\n", cpu);
   thread_secondary_cpu_entry();

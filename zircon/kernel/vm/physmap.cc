@@ -42,14 +42,14 @@ void physmap_modify_region(vaddr_t base, size_t size, uint mmu_flags) {
   if (mmu_flags != 0) {
     // This code only runs during the init stages before other CPUs are brought only, and so we are
     // safe to allow temporary enlargement of the operation.
-    status = VmAspace::kernel_aspace()->arch_aspace().Protect(base, page_count, mmu_flags,
-                                                              ArchVmAspace::EnlargeOperation::Yes);
+    status = VmAspace::kernel_aspace()->arch_aspace().Protect(
+        base, page_count, mmu_flags, ArchVmAspaceInterface::ArchUnmapOptions::Enlarge);
   } else {
     // This code only runs during the init stages before other CPUs are brought only, and so we are
     // safe to allow temporary enlargement of the operation.
     size_t unmapped;
     status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-        base, page_count, ArchVmAspace::EnlargeOperation::Yes, &unmapped);
+        base, page_count, ArchVmAspaceInterface::ArchUnmapOptions::Enlarge, &unmapped);
   }
   ASSERT(status == ZX_OK);
 }

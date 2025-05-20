@@ -12,7 +12,7 @@
 #include <lib/zx/result.h>
 
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/optional.h>
 
 namespace elfldltl {

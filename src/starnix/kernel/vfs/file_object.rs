@@ -1,4 +1,4 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Cmpyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -7,7 +7,8 @@ use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, 
 use crate::power::OnWakeOps;
 use crate::security;
 use crate::task::{
-    CurrentTask, EncryptionKeyId, EventHandler, Task, WaitCallback, WaitCanceler, Waiter,
+    CurrentTask, EncryptionKeyId, EventHandler, Task, ThreadGroupKey, WaitCallback, WaitCanceler,
+    Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -19,7 +20,7 @@ use crate::vfs::{
     FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
     FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
-use starnix_uapi::user_address::MultiArchUserRef;
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -49,9 +50,8 @@ use starnix_uapi::{
     FIGETBSZ, FIONBIO, FIONREAD, FIOQSIZE, FSCRYPT_KEY_IDENTIFIER_SIZE,
     FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER, FSCRYPT_POLICY_V2, FS_CASEFOLD_FL, FS_IOC_ADD_ENCRYPTION_KEY,
     FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_MEASURE_VERITY,
-    FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SETFLAGS,
-    FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET,
-    TCGETS,
+    FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SET_ENCRYPTION_POLICY,
+    FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
 };
 use std::collections::HashSet;
 use std::fmt;
@@ -338,7 +338,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             prot_flags,
             file.max_access_for_memory_mapping(),
             options,
-            MappingName::File(filename.into_active()),
+            MappingName::File(Box::new(filename.into_active())),
             file_write_guard,
         )
     }
@@ -428,7 +428,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the associated pid_t.
     ///
     /// Used by pidfd and `/proc/<pid>`. Unlikely to be used by other files.
-    fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
+    fn as_thread_group_key(&self, _file: &FileObject) -> Result<ThreadGroupKey, Errno> {
         error!(EBADF)
     }
 
@@ -611,8 +611,8 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
         self.deref().to_handle(file, current_task)
     }
 
-    fn as_pid(&self, file: &FileObject) -> Result<pid_t, Errno> {
-        self.deref().as_pid(file)
+    fn as_thread_group_key(&self, file: &FileObject) -> Result<ThreadGroupKey, Errno> {
+        self.deref().as_thread_group_key(file)
     }
 
     fn readahead(
@@ -880,6 +880,18 @@ pub use {
 };
 pub const AES256_KEY_SIZE: usize = 32;
 
+pub fn canonicalize_ioctl_request(current_task: &CurrentTask, request: u32) -> u32 {
+    if current_task.is_arch32() {
+        match request {
+            uapi::arch32::FS_IOC_GETFLAGS => uapi::FS_IOC_GETFLAGS,
+            uapi::arch32::FS_IOC_SETFLAGS => uapi::FS_IOC_SETFLAGS,
+            _ => request,
+        }
+    } else {
+        request
+    }
+}
+
 pub fn default_ioctl(
     file: &FileObject,
     locked: &mut Locked<'_, Unlocked>,
@@ -887,7 +899,7 @@ pub fn default_ioctl(
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
-    match request {
+    match canonicalize_ioctl_request(current_task, request) {
         TCGETS => error!(ENOTTY),
         FIGETBSZ => {
             let node = file.node();
@@ -955,8 +967,7 @@ pub fn default_ioctl(
             let _: fsxattr = current_task.read_object(arg)?;
             Ok(SUCCESS)
         }
-        #[allow(unreachable_patterns)]
-        uapi::FS_IOC_GETFLAGS | uapi::arch32::FS_IOC_GETFLAGS => {
+        uapi::FS_IOC_GETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322874935"), "FS_IOC_GETFLAGS");
             let arg = MultiArchUserRef::<u64, u32>::new(current_task, arg);
             let mut flags: u32 = 0;
@@ -969,7 +980,7 @@ pub fn default_ioctl(
             current_task.write_multi_arch_object(arg, flags.into())?;
             Ok(SUCCESS)
         }
-        FS_IOC_SETFLAGS => {
+        uapi::FS_IOC_SETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322875367"), "FS_IOC_SETFLAGS");
             let arg = UserAddress::from(arg).into();
             let flags: u32 = current_task.read_object(arg)?;
@@ -990,7 +1001,7 @@ pub fn default_ioctl(
         }
         FS_IOC_ADD_ENCRYPTION_KEY => {
             let fscrypt_add_key_ref = UserRef::<fscrypt_add_key_arg>::from(arg);
-            let key_ref_addr = fscrypt_add_key_ref.next().addr();
+            let key_ref_addr = fscrypt_add_key_ref.next()?.addr();
             let mut fscrypt_add_key_arg = current_task.read_object(fscrypt_add_key_ref.clone())?;
             if fscrypt_add_key_arg.key_id != 0 {
                 track_stub!(TODO("https://fxbug.dev/375649227"), "non-zero key ids");
@@ -2002,8 +2013,8 @@ impl FileObject {
         self.ops().to_handle(self, current_task)
     }
 
-    pub fn as_pid(&self) -> Result<pid_t, Errno> {
-        self.ops().as_pid(self)
+    pub fn as_thread_group_key(&self) -> Result<ThreadGroupKey, Errno> {
+        self.ops().as_thread_group_key(self)
     }
 
     pub fn update_file_flags(&self, value: OpenFlags, mask: OpenFlags) {

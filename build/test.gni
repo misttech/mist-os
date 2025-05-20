@@ -16,6 +16,10 @@ import("//build/testing/host_test.gni")
 #     environment (as a function of $current_os).
 #     See //build/testing/test_spec.gni for more details.
 #
+# package_deps
+#   Optional: The `fuchsia_package` dependencies needed by this test at runtime.
+#   See //build/testing/test_spec.gni for more details.
+#
 template("test") {
   assert(is_host || !defined(invoker.environments),
          "environments only supported for host tests")

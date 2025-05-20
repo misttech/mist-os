@@ -58,28 +58,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::E
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>& value) {
-    return os << "ClientEnd<" << "test_placementofattributes::ExampleProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>& value);
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>> {
-  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>& value) {
-    return os << "ServerEnd<" << "test_placementofattributes::ExampleProtocol" << ">(" << value.channel().get() << ")";
-  }
+  static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>& value);
 };
 
-namespace fidl {
+std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>& value);
 
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>>::Format(os, value);
-}
-
-inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>& value) {
-  return fidl::ostream::Formatter<::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>>::Format(os, value);
-}
-}  // namespace fidl
+std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>& value);
 
 #endif  // __Fuchsia__
 

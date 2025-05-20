@@ -16,6 +16,7 @@ mod counters;
 mod debug_fidl_worker;
 mod devices;
 mod filter;
+mod health_check_worker;
 mod inspect;
 mod interfaces_admin;
 mod interfaces_watcher;
@@ -26,30 +27,26 @@ mod neighbor_worker;
 mod netdevice_worker;
 mod persistence;
 mod power;
+mod reference_notifier;
 mod resource_removal;
 mod root_fidl_worker;
 mod routes;
 mod socket;
 mod stack_fidl_worker;
-
-mod health_check_worker;
 mod time;
 mod timers;
 mod util;
 
-use std::convert::Infallible as Never;
 use std::fmt::Debug;
-use std::future::Future;
 use std::ops::Deref;
-use std::pin::pin;
 use std::sync::Arc;
 
 use assert_matches::assert_matches;
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
+use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_net_multicast_ext::FidlMulticastAdminIpExt;
 use fuchsia_inspect::health::Reporter as _;
-use futures::channel::mpsc;
-use futures::{select, FutureExt as _, StreamExt as _};
+use futures::channel::{mpsc, oneshot};
+use futures::{FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
 use packet::{Buf, BufferMut};
 use rand::rngs::OsRng;
@@ -73,10 +70,11 @@ use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use ndp_watcher::RouterAdvertisementSinkError;
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
+use crate::bindings::bpf::EbpfManager;
 use crate::bindings::counters::BindingsCounters;
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
 use crate::bindings::time::{AtomicStackTime, StackTime};
-use crate::bindings::util::TaskWaitGroup;
+use crate::bindings::util::ScopeExt as _;
 use net_types::ethernet::Mac;
 use net_types::ip::{
     AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv6, Mtu,
@@ -88,23 +86,23 @@ use netstack3_core::device::{
     ReceiveQueueBindingsContext, TransmitQueueBindingsContext, WeakDeviceId,
 };
 use netstack3_core::error::ExistsError;
-use netstack3_core::filter::FilterBindingsTypes;
+use netstack3_core::filter::{FilterBindingsTypes, SocketOpsFilter, SocketOpsFilterBindingContext};
 use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
-    IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
+    IpLayerEvent, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
     Ipv6DeviceConfigurationUpdate, Lifetime, RouterAdvertisementEvent, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
-use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
+use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::udp::{
     UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
 };
 use netstack3_core::{
     neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    IpExt, ReferenceNotifiers, RngContext, StackState, StackStateBuilder, TimerBindingsTypes,
-    TimerContext, TimerId, TxMetadata, TxMetadataBindingsTypes,
+    IpExt, RngContext, StackState, StackStateBuilder, TimerBindingsTypes, TimerContext, TimerId,
+    TxMetadata, TxMetadataBindingsTypes,
 };
 
 pub(crate) use inspect::InspectPublisher;
@@ -366,6 +364,7 @@ pub(crate) struct BindingsCtxInner {
     multicast_admin: MulticastAdminEventSinks,
     config: GlobalConfig,
     counters: BindingsCounters,
+    ebpf_manager: EbpfManager,
 }
 
 impl BindingsCtxInner {
@@ -385,6 +384,7 @@ impl BindingsCtxInner {
             multicast_admin,
             config,
             counters: Default::default(),
+            ebpf_manager: Default::default(),
         }
     }
 }
@@ -421,6 +421,14 @@ impl InstantContext for BindingsCtx {
 
 impl FilterBindingsTypes for BindingsCtx {
     type DeviceClass = fidl_fuchsia_net_interfaces::PortClass;
+}
+
+impl SocketOpsFilterBindingContext<DeviceId<BindingsCtx>> for BindingsCtx {
+    fn socket_ops_filter(
+        &self,
+    ) -> impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> {
+        &self.ebpf_manager
+    }
 }
 
 #[derive(Default)]
@@ -800,80 +808,10 @@ impl EventContext<RouterAdvertisementEvent<DeviceId<BindingsCtx>>> for BindingsC
     }
 }
 
-/// Implements `RcNotifier` for futures oneshot channels.
-///
-/// We need a newtype here because of orphan rules.
-pub(crate) struct ReferenceNotifier<T>(Option<futures::channel::oneshot::Sender<T>>);
-
-impl<T: Send> netstack3_core::sync::RcNotifier<T> for ReferenceNotifier<T> {
-    fn notify(&mut self, data: T) {
-        let Self(inner) = self;
-        inner.take().expect("notified twice").send(data).unwrap_or_else(|_: T| {
-            panic!(
-                "receiver was dropped before notifying for {}",
-                // Print the type name so we don't need Debug bounds.
-                core::any::type_name::<T>()
-            )
-        })
-    }
-}
-
-pub(crate) struct ReferenceReceiver<T> {
-    pub(crate) receiver: futures::channel::oneshot::Receiver<T>,
-    pub(crate) debug_references: DynDebugReferences,
-}
-
-impl<T> ReferenceReceiver<T> {
-    pub(crate) fn into_future<'a>(
-        self,
-        resource_name: &'static str,
-        resource_id: &'a impl Debug,
-    ) -> impl Future<Output = T> + 'a
-    where
-        T: 'a,
-    {
-        let Self { receiver, debug_references: refs } = self;
-        debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
-        // If we get stuck trying to remove the resource, log the remaining refs
-        // at a low frequency to aid debugging.
-        let interval_logging = fasync::Interval::new(zx::MonotonicDuration::from_seconds(30))
-            .map(move |()| {
-                warn!("{resource_name} {resource_id:?} removal is pending references: {refs:?}")
-            })
-            .collect::<()>();
-
-        futures::future::select(receiver, interval_logging).map(|r| match r {
-            futures::future::Either::Left((rcv, _)) => {
-                rcv.expect("sender dropped without notifying")
-            }
-            futures::future::Either::Right(((), _)) => {
-                unreachable!("interval channel never completes")
-            }
-        })
-    }
-}
-
-impl ReferenceNotifiers for BindingsCtx {
-    type ReferenceReceiver<T: 'static> = ReferenceReceiver<T>;
-
-    type ReferenceNotifier<T: Send + 'static> = ReferenceNotifier<T>;
-
-    fn new_reference_notifier<T: Send + 'static>(
-        debug_references: DynDebugReferences,
-    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
-        let (sender, receiver) = futures::channel::oneshot::channel();
-        (ReferenceNotifier(Some(sender)), ReferenceReceiver { receiver, debug_references })
-    }
-}
-
 impl DeferredResourceRemovalContext for BindingsCtx {
     #[cfg_attr(feature = "instrumented", track_caller)]
     fn defer_removal<T: Send + 'static>(&mut self, receiver: Self::ReferenceReceiver<T>) {
-        let ReferenceReceiver { receiver, debug_references } = receiver;
-        self.resource_removal.defer_removal(
-            debug_references,
-            receiver.map(|r| r.expect("sender dropped without notifying receiver")),
-        );
+        self.resource_removal.defer_removal_with_receiver(receiver);
     }
 }
 
@@ -1087,11 +1025,11 @@ impl Netstack {
 
     async fn add_loopback(
         &mut self,
-    ) -> (
-        futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>,
-        BindingId,
-        [NamedTask; 2],
-    ) {
+        scope: &fasync::ScopeHandle,
+    ) -> (oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>, BindingId) {
+        let guard = scope.active_guard().expect("scope should be active");
+        let inner_scope = scope.new_child_with_name("loopback_inner");
+
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
         let devices: &Devices<_> = self.ctx.bindings_ctx().as_ref();
@@ -1129,8 +1067,14 @@ impl Netstack {
 
         let LoopbackInfo { static_common_info: _, dynamic_common_info: _, rx_notifier } =
             loopback.external_state();
-        let rx_task =
-            crate::bindings::devices::spawn_rx_task(rx_notifier, self.ctx.clone(), &loopback);
+        let _: fasync::JoinHandle<()> = inner_scope.spawn_guarded_assert_cancelled(
+            guard.clone(),
+            crate::bindings::devices::rx_task(
+                self.ctx.clone(),
+                rx_notifier.watcher(),
+                loopback.clone(),
+            ),
+        );
         let loopback: DeviceId<_> = loopback.into();
         self.ctx.bindings_ctx().devices.add_device(binding_id_alloc, loopback.clone());
 
@@ -1140,6 +1084,7 @@ impl Netstack {
             unicast_forwarding_enabled: Some(false),
             multicast_forwarding_enabled: Some(false),
             gmp_enabled: Some(false),
+            dad_transmits: Some(None),
         };
 
         let _: Ipv4DeviceConfigurationUpdate = self
@@ -1158,7 +1103,6 @@ impl Netstack {
             .update_configuration(
                 &loopback,
                 Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
                     slaac_config: SlaacConfigurationUpdate {
                         stable_address_configuration: None,
@@ -1172,30 +1116,26 @@ impl Netstack {
         add_loopback_ip_addrs(&mut self.ctx, &loopback).expect("error adding loopback addresses");
         add_loopback_routes(self.ctx.bindings_ctx(), &loopback).await;
 
-        let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
+        let (stop_sender, stop_receiver) = oneshot::channel();
 
         // Loopback interface can't be removed.
         let removable = false;
         // Loopback doesn't have a defined state stream, provide a stream that
         // never yields anything.
         let state_stream = futures::stream::pending();
-        let control_task = fuchsia_async::Task::spawn(interfaces_admin::run_interface_control(
-            self.ctx.clone(),
-            binding_id,
-            stop_receiver,
-            control_receiver,
-            removable,
-            state_stream,
-            || (),
-        ));
-        (
-            stop_sender,
-            binding_id,
-            [
-                NamedTask::new("loopback control", control_task),
-                NamedTask::new("loopback rx", rx_task),
-            ],
-        )
+        let _: fasync::JoinHandle<()> = scope.spawn_guarded_assert_cancelled(
+            guard,
+            interfaces_admin::run_interface_control(
+                self.ctx.clone(),
+                inner_scope,
+                binding_id,
+                stop_receiver,
+                control_receiver,
+                removable,
+                state_stream,
+            ),
+        );
+        (stop_sender, binding_id)
     }
 }
 
@@ -1229,54 +1169,8 @@ pub(crate) enum Service {
     RuleTableV4(fnet_routes_admin::RuleTableV4RequestStream),
     RuleTableV6(fnet_routes_admin::RuleTableV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
+    SocketControl(fidl_fuchsia_net_filter::SocketControlRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
-}
-
-trait RequestStreamExt: RequestStream {
-    fn serve_with<F, Fut, E>(self, f: F) -> futures::future::Map<Fut, fn(Result<(), E>) -> ()>
-    where
-        E: std::error::Error,
-        F: FnOnce(Self) -> Fut,
-        Fut: Future<Output = Result<(), E>>;
-}
-
-impl<D: DiscoverableProtocolMarker, S: RequestStream<Protocol = D>> RequestStreamExt for S {
-    fn serve_with<F, Fut, E>(self, f: F) -> futures::future::Map<Fut, fn(Result<(), E>) -> ()>
-    where
-        E: std::error::Error,
-        F: FnOnce(Self) -> Fut,
-        Fut: Future<Output = Result<(), E>>,
-    {
-        f(self).map(|res| res.unwrap_or_else(|err| error!("{} error: {}", D::PROTOCOL_NAME, err)))
-    }
-}
-
-/// A helper struct to have named tasks.
-///
-/// Tasks are already tracked in the executor by spawn location, but long
-/// running tasks are not expected to terminate except during clean shutdown.
-/// Naming these helps root cause debug assertions.
-#[derive(Debug)]
-pub(crate) struct NamedTask {
-    name: &'static str,
-    task: fuchsia_async::Task<()>,
-}
-
-impl NamedTask {
-    /// Creates a new named task from `fut` with `name`.
-    #[track_caller]
-    fn spawn(name: &'static str, fut: impl futures::Future<Output = ()> + Send + 'static) -> Self {
-        Self { name, task: fuchsia_async::Task::spawn(fut) }
-    }
-
-    fn new(name: &'static str, task: fuchsia_async::Task<()>) -> Self {
-        Self { name, task }
-    }
-
-    fn into_future(self) -> impl futures::Future<Output = &'static str> + Send + 'static {
-        let Self { name, task } = self;
-        task.map(move |()| name)
-    }
 }
 
 impl NetstackSeed {
@@ -1300,100 +1194,75 @@ impl NetstackSeed {
             mut multicast_admin_workers,
         } = self;
 
+        // Declare distinct levels of workers, organized by shutdown order
+        // requirements.
+        //
+        // - Level 1 workers can be cancelled and terminated as soon as service
+        //   is finished. They may have dependencies on Level 2 workers being
+        //   running.
+        // - Level 2 workers are only cancelled after all level 1 workers are
+        //   done.
+        let level1_workers = fasync::Scope::new_with_name("workers/1");
+        let level2_workers = fasync::Scope::new_with_name("workers/2");
+
         // Start servicing timers.
         let mut timer_handler_ctx = netstack.ctx.clone();
-        let timers_task = NamedTask::new(
-            "timers",
-            netstack.ctx.bindings_ctx().timers.spawn(move |dispatch, timer| {
+        let _: fasync::JoinHandle<()> = netstack.ctx.bindings_ctx().timers.spawn(
+            level1_workers.as_handle(),
+            move |dispatch, timer| {
                 timer_handler_ctx.api().handle_timer(dispatch, timer);
-            }),
+            },
         );
 
         let (dispatchers_v4, dispatchers_v6) = routes_change_runner.update_dispatchers();
 
         // Start executing routes changes.
-        let routes_change_task = NamedTask::spawn("routes_changes", {
-            let ctx = netstack.ctx.clone();
-            async move { routes_change_runner.run(ctx).await }
-        });
-
-        let routes_change_task_fut = routes_change_task.into_future().fuse();
-        let mut routes_change_task_fut = pin!(routes_change_task_fut);
+        let routes_change_task = level2_workers
+            .spawn_new_guard_assert_cancelled({
+                let ctx = netstack.ctx.clone();
+                async move { routes_change_runner.run(ctx).await }
+            })
+            .expect("scope cancelled");
 
         // Start running the multicast admin worker.
-        let multicast_admin_task = NamedTask::spawn("multicast_admin", {
-            let ctx = netstack.ctx.clone();
-            async move { multicast_admin_workers.run(ctx).await }
-        });
-        let multicast_admin_task_fut = multicast_admin_task.into_future().fuse();
-        let mut multicast_admin_task_fut = pin!(multicast_admin_task_fut);
+        let multicast_admin_task = level2_workers
+            .spawn_new_guard_assert_cancelled({
+                let ctx = netstack.ctx.clone();
+                async move { multicast_admin_workers.run(ctx).await }
+            })
+            .expect("scope cancelled");
 
         // Start executing delayed resource removal.
-        let resource_removal_task =
-            NamedTask::spawn("resource_removal", resource_removal_worker.run());
-        let resource_removal_task_fut = resource_removal_task.into_future().fuse();
-        let mut resource_removal_task_fut = pin!(resource_removal_task_fut);
+        let resource_removal_task = level2_workers
+            .spawn_new_guard_assert_cancelled(resource_removal_worker.run())
+            .expect("scope cancelled");
 
         netstack.add_default_rule::<Ipv4>().await;
         netstack.add_default_rule::<Ipv6>().await;
 
-        let (loopback_stopper, _, loopback_tasks): (
-            futures::channel::oneshot::Sender<_>,
-            BindingId,
-            _,
-        ) = netstack.add_loopback().await;
+        let loopback_scope = level1_workers.new_detached_child("loopback");
+        let (loopback_stopper, _): (_, BindingId) = netstack.add_loopback(&loopback_scope).await;
 
-        let interfaces_worker_task = NamedTask::spawn("interfaces worker", async move {
-            let result = interfaces_worker.run().await;
-            let watchers = result.expect("interfaces worker ended with an error");
-            info!("interfaces worker shutting down, waiting for watchers to end");
-            watchers
-                .map(|res| match res {
-                    Ok(()) => (),
-                    Err(e) => {
-                        if !e.is_closed() {
-                            error!("error {e:?} collecting watchers");
-                        }
-                    }
-                })
-                .collect::<()>()
-                .await;
-            info!("all interface watchers closed, interfaces worker shutdown is complete");
-        });
-        let ndp_watcher_worker_task =
-            NamedTask::spawn("ndp watcher worker", ndp_watcher_worker.run());
+        let _: fasync::JoinHandle<()> = level1_workers
+            .spawn_new_guard_assert_cancelled(async move {
+                let result = interfaces_worker.run().await;
+                let watchers = result.expect("interfaces worker ended with an error");
+                if !watchers.is_empty() {
+                    warn!("interfaces worker shut down, dropped {} watchers", watchers.len());
+                }
+            })
+            .expect("scope cancelled");
 
-        let neighbor_worker_task = NamedTask::spawn("neighbor worker", {
-            let ctx = netstack.ctx.clone();
-            neighbor_worker.run(ctx)
-        });
+        let _: fasync::JoinHandle<()> = level1_workers
+            .spawn_new_guard_assert_cancelled(ndp_watcher_worker.run())
+            .expect("scope cancelled");
 
-        let no_finish_tasks = loopback_tasks.into_iter().chain([
-            interfaces_worker_task,
-            ndp_watcher_worker_task,
-            timers_task,
-            neighbor_worker_task,
-        ]);
-        let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(
-            no_finish_tasks.map(NamedTask::into_future),
-        );
-
-        let unexpected_early_finish_fut = async {
-            let no_finish_tasks_fut = no_finish_tasks.by_ref().next().fuse();
-            let mut no_finish_tasks_fut = pin!(no_finish_tasks_fut);
-
-            let name = select! {
-                name = no_finish_tasks_fut => name,
-                name = routes_change_task_fut => Some(name),
-                name = resource_removal_task_fut => Some(name),
-                name = multicast_admin_task_fut => Some(name),
-            };
-            match name {
-                Some(name) => panic!("task {name} ended unexpectedly"),
-                None => panic!("unexpected end of infinite task stream"),
-            }
-        }
-        .fuse();
+        let _: fasync::JoinHandle<()> = level1_workers
+            .spawn_new_guard_assert_cancelled({
+                let ctx = netstack.ctx.clone();
+                neighbor_worker.run(ctx)
+            })
+            .expect("scope cancelled");
 
         let inspector = inspect_publisher.inspector();
         let inspect_nodes = {
@@ -1450,15 +1319,6 @@ impl NetstackSeed {
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();
 
-        // Insert a stream after services to get a helpful log line when it
-        // completes. The future we create from it will still wait for all the
-        // user-created resources to be joined on before returning.
-        let services =
-            services.chain(futures::stream::poll_fn(|_: &mut std::task::Context<'_>| {
-                info!("services stream ended");
-                std::task::Poll::Ready(None)
-            }));
-
         // Keep a clone of Ctx around for teardown before moving it to the
         // services future.
         let teardown_ctx = netstack.ctx.clone();
@@ -1468,309 +1328,190 @@ impl NetstackSeed {
         let ndp_watcher_sink_ref = &ndp_watcher_sink;
         let neighbor_watcher_sink_ref = &neighbor_watcher_sink;
 
-        let (route_waitgroup, route_spawner) = TaskWaitGroup::new();
+        let services_scope = fasync::Scope::new_with_name("services");
+        let sockets_scope = services_scope.new_detached_child("sockets");
 
         let filter_update_dispatcher = filter::UpdateDispatcher::default();
+        let services_handle = services_scope.to_handle();
 
-        // It is unclear why we need to wrap the `for_each_concurrent` call with
-        // `async move { ... }` but it seems like we do. Without this, the
-        // `Future` returned by this function fails to implement `Send` with the
-        // same issue reported in https://github.com/rust-lang/rust/issues/64552.
-        //
-        // TODO(https://github.com/rust-lang/rust/issues/64552): Remove this
-        // workaround.
-        let services_fut = async move {
-            services
-                .for_each_concurrent(None, |s| async {
-                    match s {
-                        Service::Stack(stack) => {
-                            stack
-                                .serve_with(|rs| {
-                                    stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
-                                })
-                                .await
-                        }
-                        Service::Socket(socket) => {
-                            // Run on a separate task so socket requests are not
-                            // bound to the same thread as the main services
-                            // loop.
-                            let wait_group = fuchsia_async::Task::spawn(socket::serve(
-                                netstack.ctx.clone(),
-                                socket,
-                            ))
-                            .await;
-                            // Wait for all socket tasks to finish.
-                            wait_group.await;
-                        }
-                        Service::PacketSocket(socket) => {
-                            // Run on a separate task so socket requests are not
-                            // bound to the same thread as the main services
-                            // loop.
-                            let wait_group = fuchsia_async::Task::spawn(socket::packet::serve(
-                                netstack.ctx.clone(),
-                                socket,
-                            ))
-                            .await;
-                            // Wait for all socket tasks to finish.
-                            wait_group.await;
-                        }
-                        Service::RawSocket(socket) => {
-                            // Run on a separate task so socket requests are not
-                            // bound to the same thread as the main services
-                            // loop.
-                            let wait_group = fuchsia_async::Task::spawn(socket::raw::serve(
-                                netstack.ctx.clone(),
-                                socket,
-                            ))
-                            .await;
-                            // Wait for all socket tasks to finish.
-                            wait_group.await;
-                        }
-                        Service::RootInterfaces(root_interfaces) => {
-                            root_interfaces
-                                .serve_with(|rs| {
-                                    root_fidl_worker::serve_interfaces(netstack.clone(), rs)
-                                })
-                                .await
-                        }
-                        Service::RootFilter(root_filter) => {
-                            root_filter
-                                .serve_with(|rs|
-                                    filter::serve_root(
-                                        rs,
-                                        &filter_update_dispatcher,
-                                        &netstack.ctx,
-                                    )
-                                )
-                                .await
-                        }
-                        Service::RoutesState(rs) => {
-                            routes::state::serve_state(rs, netstack.ctx.clone()).await
-                        }
-                        Service::RoutesStateV4(rs) => {
-                            routes::state::serve_state_v4(rs, &dispatchers_v4).await
-                        }
-                        Service::RoutesStateV6(rs) => {
-                            routes::state::serve_state_v6(rs, &dispatchers_v6).await
-                        }
-                        Service::RoutesAdminV4(rs) => routes::admin::serve_route_table::<
-                            Ipv4,
-                            routes::admin::MainRouteTable,
-                        >(
+        let services_fut = services
+            // NB: Move here is load bearing to ensure things that are moved in
+            // do not outlive the services stream.
+            .map(move |s| match s {
+                Service::Stack(stack) => services_handle
+                    .spawn_request_stream_handler(stack, |rs| {
+                        stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
+                    }),
+                Service::Socket(socket) => sockets_scope
+                    .spawn_request_stream_handler(socket, |rs| {
+                        socket::serve(netstack.ctx.clone(), rs)
+                    }),
+                Service::PacketSocket(socket) => sockets_scope
+                    .spawn_request_stream_handler(socket, |rs| {
+                        socket::packet::serve(netstack.ctx.clone(), rs)
+                    }),
+                Service::RawSocket(socket) => sockets_scope
+                    .spawn_request_stream_handler(socket, |rs| {
+                        socket::raw::serve(netstack.ctx.clone(), rs)
+                    }),
+                Service::RootInterfaces(root_interfaces) => services_handle
+                    .spawn_request_stream_handler(root_interfaces, |rs| {
+                        root_fidl_worker::serve_interfaces(netstack.clone(), rs)
+                    }),
+                Service::RootFilter(root_filter) => {
+                    services_handle.spawn_request_stream_handler(root_filter, |rs| {
+                        filter::serve_root(
                             rs,
-                            route_spawner.clone(),
+                            filter_update_dispatcher.clone(),
+                            netstack.ctx.clone(),
+                        )
+                    })
+                }
+                Service::SocketControl(rs) => services_handle
+                    .spawn_request_stream_handler(rs, |rs| {
+                        filter::socket_filters::serve_socket_control(rs, netstack.ctx.clone())
+                    }),
+                Service::RoutesState(rs) => services_handle
+                    .spawn_request_stream_handler(rs, |rs| {
+                        routes::state::serve_state(rs, netstack.ctx.clone())
+                    }),
+                Service::RoutesStateV4(rs) => services_handle
+                    .spawn_request_stream_handler(rs, |rs| {
+                        routes::state::serve_state_v4(rs, dispatchers_v4.clone())
+                    }),
+                Service::RoutesStateV6(rs) => services_handle
+                    .spawn_request_stream_handler(rs, |rs| {
+                        routes::state::serve_state_v6(rs, dispatchers_v6.clone())
+                    }),
+                Service::RoutesAdminV4(rs) => {
+                    services_handle.spawn_request_stream_handler(rs, |rs| {
+                        routes::admin::serve_route_table::<Ipv4, routes::admin::MainRouteTable>(
+                            rs,
                             routes::admin::MainRouteTable::new(netstack.ctx.clone()),
                         )
-                        .await,
-                        Service::RoutesAdminV6(rs) => routes::admin::serve_route_table::<
-                            Ipv6,
-                            routes::admin::MainRouteTable,
-                        >(
+                    })
+                }
+                Service::RoutesAdminV6(rs) => {
+                    services_handle.spawn_request_stream_handler(rs, |rs| {
+                        routes::admin::serve_route_table::<Ipv6, routes::admin::MainRouteTable>(
                             rs,
-                            route_spawner.clone(),
                             routes::admin::MainRouteTable::new(netstack.ctx.clone()),
                         )
-                        .await,
-                        Service::RouteTableProviderV4(stream) => {
-                            routes::admin::serve_route_table_provider_v4(
-                                stream,
-                                route_spawner.clone(),
-                                &netstack.ctx,
-                            )
-                            .await
-                            .unwrap_or_else(|e| {
-                                error!(
-                                    "error serving {}: {e:?}",
-                                    fnet_routes_admin::RouteTableProviderV4Marker::DEBUG_NAME
-                                );
-                            })
-                        }
-                        Service::RouteTableProviderV6(stream) => {
-                            routes::admin::serve_route_table_provider_v6(
-                                stream,
-                                route_spawner.clone(),
-                                &netstack.ctx,
-                            )
-                            .await
-                            .unwrap_or_else(|e| {
-                                error!(
-                                    "error serving {}: {e:?}",
-                                    fnet_routes_admin::RouteTableProviderV6Marker::DEBUG_NAME
-                                );
-                            })
-                        }
-                        Service::RuleTableV4(rule_table) => {
-                            rule_table
-                                .serve_with(|rs| {
-                                    routes::admin::serve_rule_table::<Ipv4>(
-                                        rs,
-                                        route_spawner.clone(),
-                                        &netstack.ctx,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::RuleTableV6(rule_table) => {
-                            rule_table
-                                .serve_with(|rs| {
-                                    routes::admin::serve_rule_table::<Ipv6>(
-                                        rs,
-                                        route_spawner.clone(),
-                                        &netstack.ctx,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::RootRoutesV4(rs) => root_fidl_worker::serve_routes_v4(
+                    })
+                }
+                Service::RouteTableProviderV4(stream) => services_handle
+                    .spawn_request_stream_handler(stream, |stream| {
+                        routes::admin::serve_route_table_provider_v4(stream, netstack.ctx.clone())
+                    }),
+                Service::RouteTableProviderV6(stream) => services_handle
+                    .spawn_request_stream_handler(stream, |stream| {
+                        routes::admin::serve_route_table_provider_v6(stream, netstack.ctx.clone())
+                    }),
+                Service::RuleTableV4(rule_table) => services_handle
+                    .spawn_request_stream_handler(rule_table, |rs| {
+                        routes::admin::serve_rule_table::<Ipv4>(rs, netstack.ctx.clone())
+                    }),
+                Service::RuleTableV6(rule_table) => services_handle
+                    .spawn_request_stream_handler(rule_table, |rs| {
+                        routes::admin::serve_rule_table::<Ipv6>(rs, netstack.ctx.clone())
+                    }),
+                Service::RootRoutesV4(rs) => services_handle
+                    .spawn_request_stream_handler(rs, |rs| {
+                        root_fidl_worker::serve_routes_v4(rs, netstack.ctx.clone())
+                    }),
+                Service::RootRoutesV6(rs) => services_handle
+                    .spawn_request_stream_handler(rs, |rs| {
+                        root_fidl_worker::serve_routes_v6(rs, netstack.ctx.clone())
+                    }),
+                Service::Interfaces(interfaces) => services_handle
+                    .spawn_request_stream_handler(interfaces, |rs| {
+                        interfaces_watcher::serve(rs, interfaces_watcher_sink_ref.clone())
+                    }),
+                Service::NdpWatcher(stream) => services_handle
+                    .spawn_request_stream_handler(stream, |rs| {
+                        ndp_watcher::serve(rs, ndp_watcher_sink_ref.clone())
+                    }),
+                Service::InterfacesAdmin(installer) => services_handle
+                    .spawn_request_stream_handler(installer, |installer| {
+                        interfaces_admin::serve(netstack.clone(), installer)
+                    }),
+                Service::MulticastAdminV4(controller) => {
+                    debug!(
+                        "serving {}",
+                        fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
+                    );
+                    netstack
+                        .ctx
+                        .bindings_ctx()
+                        .multicast_admin
+                        .sink::<Ipv4>()
+                        .serve_multicast_admin_client(controller);
+                }
+                Service::MulticastAdminV6(controller) => {
+                    debug!(
+                        "serving {}",
+                        fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
+                    );
+                    netstack
+                        .ctx
+                        .bindings_ctx()
+                        .multicast_admin
+                        .sink::<Ipv6>()
+                        .serve_multicast_admin_client(controller);
+                }
+                Service::DebugInterfaces(debug_interfaces) => services_handle
+                    .spawn_request_stream_handler(debug_interfaces, |rs| {
+                        debug_fidl_worker::serve_interfaces(netstack.ctx.clone(), rs)
+                    }),
+                Service::DebugDiagnostics(debug_diagnostics) => {
+                    diagnostics_handler.serve_diagnostics(debug_diagnostics)
+                }
+                Service::DnsServerWatcher(dns) => services_handle
+                    .spawn_request_stream_handler(dns, |rs| {
+                        name_worker::serve(netstack.clone(), rs)
+                    }),
+                Service::FilterState(filter) => services_handle
+                    .spawn_request_stream_handler(filter, |rs| {
+                        filter::serve_state(rs, filter_update_dispatcher.clone())
+                    }),
+                Service::FilterControl(filter) => {
+                    services_handle.spawn_request_stream_handler(filter, |rs| {
+                        filter::serve_control(
                             rs,
-                            route_spawner.clone(),
-                            &netstack.ctx,
+                            filter_update_dispatcher.clone(),
+                            netstack.ctx.clone(),
                         )
-                        .await
-                        .unwrap_or_else(|e| {
-                            error!(
-                                "error serving {}: {e:?}",
-                                fidl_fuchsia_net_root::RoutesV4Marker::DEBUG_NAME
-                            );
-                        }),
-                        Service::RootRoutesV6(rs) => root_fidl_worker::serve_routes_v6(
-                            rs,
-                            route_spawner.clone(),
-                            &netstack.ctx,
-                        )
-                        .await
-                        .unwrap_or_else(|e| {
-                            error!(
-                                "error serving {}: {e:?}",
-                                fidl_fuchsia_net_root::RoutesV6Marker::DEBUG_NAME
-                            );
-                        }),
-                        Service::Interfaces(interfaces) => {
-                            interfaces
-                                .serve_with(|rs| {
-                                    interfaces_watcher::serve(
-                                        rs,
-                                        interfaces_watcher_sink_ref.clone(),
-                                    )
-                                })
-                                .await
-                        }
-                        Service::NdpWatcher(stream) => {
-                            stream.serve_with(|rs| {
-                                ndp_watcher::serve(rs, ndp_watcher_sink_ref.clone())
-                            }).await
-                        }
-                        Service::InterfacesAdmin(installer) => {
-                            debug!(
-                                "serving {}",
-                                fidl_fuchsia_net_interfaces_admin::InstallerMarker::PROTOCOL_NAME
-                            );
-                            interfaces_admin::serve(netstack.clone(), installer).await;
-                        }
-                        Service::MulticastAdminV4(controller) => {
-                            debug!(
-                                "serving {}",
-                                fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
-                            );
-                            netstack
-                                .ctx
-                                .bindings_ctx()
-                                .multicast_admin
-                                .sink::<Ipv4>()
-                                .serve_multicast_admin_client(controller);
-                        }
-                        Service::MulticastAdminV6(controller) => {
-                            debug!(
-                                "serving {}",
-                                fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
-                            );
-                            netstack
-                                .ctx
-                                .bindings_ctx()
-                                .multicast_admin
-                                .sink::<Ipv6>()
-                                .serve_multicast_admin_client(controller);
-                        }
-                        Service::DebugInterfaces(debug_interfaces) => {
-                            debug_interfaces
-                                .serve_with(|rs| {
-                                    debug_fidl_worker::serve_interfaces(
-                                        netstack.ctx.bindings_ctx(),
-                                        rs,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::DebugDiagnostics(debug_diagnostics) => {
-                            diagnostics_handler.serve_diagnostics(debug_diagnostics).await
-                        }
-                        Service::DnsServerWatcher(dns) => {
-                            dns.serve_with(|rs| name_worker::serve(netstack.clone(), rs)).await
-                        }
-                        Service::FilterState(filter) => {
-                            filter
-                                .serve_with(|rs| filter::serve_state(rs, &filter_update_dispatcher))
-                                .await
-                        }
-                        Service::FilterControl(filter) => {
-                            filter
-                                .serve_with(|rs| {
-                                    filter::serve_control(
-                                        rs,
-                                        &filter_update_dispatcher,
-                                        &netstack.ctx,
-                                    )
-                                })
-                                .await
-                        }
-                        Service::Neighbor(neighbor) => {
-                            neighbor
-                                .serve_with(|rs| {
-                                    neighbor_worker::serve_view(
-                                        rs,
-                                        neighbor_watcher_sink_ref.clone(),
-                                    )
-                                })
-                                .await
-                        }
-                        Service::NeighborController(neighbor_controller) => {
-                            neighbor_controller
-                                .serve_with(|rs| {
-                                    neighbor_worker::serve_controller(netstack.ctx.clone(), rs)
-                                })
-                                .await
-                        }
-                        Service::HealthCheck(health_check) => {
-                            health_check.serve_with(|rs| health_check_worker::serve(rs)).await
-                        }
-                    }
-                })
-                .await
-        };
+                    })
+                }
+                Service::Neighbor(neighbor) => services_handle
+                    .spawn_request_stream_handler(neighbor, |rs| {
+                        neighbor_worker::serve_view(rs, neighbor_watcher_sink_ref.clone())
+                    }),
+                Service::NeighborController(neighbor_controller) => services_handle
+                    .spawn_request_stream_handler(neighbor_controller, |rs| {
+                        neighbor_worker::serve_controller(netstack.ctx.clone(), rs)
+                    }),
+                Service::HealthCheck(health_check) => services_handle
+                    .spawn_request_stream_handler(health_check, |rs| {
+                        health_check_worker::serve(rs)
+                    }),
+            })
+            .collect::<()>();
 
         // We just let this be destroyed on drop because it's effectively tied
         // to the lifecycle of the entire component.
-        let _inspect_task = inspect_publisher.publish();
+        let inspect_task = inspect_publisher.publish();
 
-        {
-            let services_fut = services_fut.fuse();
-            // Pin services_fut to this block scope so it's dropped after the
-            // select.
-            let mut services_fut = pin!(services_fut);
+        // Wait for services to stop.
+        services_fut.await;
+        info!("services stream terminated, starting shutdown");
 
-            // Do likewise for unexpected_early_finish_fut.
-            let mut unexpected_early_finish_fut = pin!(unexpected_early_finish_fut);
+        // Cancel all services and wait for them to join.
+        services_scope.cancel().await;
 
-            let () = futures::select! {
-                () = services_fut => (),
-                never = unexpected_early_finish_fut => {
-                    let never: Never = never;
-                    match never {}
-                },
-            };
-        }
+        info!("stopping level 1 workers");
+        let level1_workers = level1_workers.cancel();
 
-        info!("all services terminated, starting shutdown");
         let ctx = teardown_ctx;
         // Stop the loopback interface.
         loopback_stopper
@@ -1785,33 +1526,43 @@ impl NetstackSeed {
         // Stop the neighbor watcher worker.
         std::mem::drop(neighbor_watcher_sink);
 
-        // Collect the routes admin waitgroup.
-        route_waitgroup.await;
+        // We've signalled all the level 1 workers. Wait for them to finish.
+        level1_workers.await;
 
-        // We've signalled all long running tasks, now we can collect them.
-        no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;
+        // Now get rid of level2 workers that must exit after level1. Here we
+        // carefully end each task separately.
+        info!("stopping level 2 workers");
+        let level2_workers = level2_workers.cancel();
 
         // Stop the routes change runner.
         // NB: All devices must be removed before stopping the routes change
         // runner, otherwise device removal will fail when purging references
         // from the routing table.
         ctx.bindings_ctx().routes.close_senders();
-        let _task_name: &str = routes_change_task_fut.await;
+        routes_change_task.await;
 
         // Stop the multicast admin worker.
         // NB: All devices must be removed before stopping the multicast admin
         // worker, otherwise device removal will fail when purging references
         // from the multicast routing table.
         ctx.bindings_ctx().multicast_admin.close();
-        let _task_name: &str = multicast_admin_task_fut.await;
+        multicast_admin_task.await;
 
         // Stop the resource removal worker.
         ctx.bindings_ctx().resource_removal.close();
-        let _task_name: &str = resource_removal_task_fut.await;
+        resource_removal_task.await;
+
+        // All level2 workers should've finished.
+        level2_workers.await;
 
         // Drop all inspector data, it holds ctx clones.
         std::mem::drop(inspect_nodes);
         inspector.root().clear_recorded();
+        if let Some(inspect_task) = inspect_task {
+            inspect_task.cancel().await;
+        }
+
+        info!("shutdown complete");
 
         // Last thing to happen is dropping the context.
         ctx.try_destroy_last().expect("all Ctx references must have been dropped")

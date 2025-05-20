@@ -204,7 +204,8 @@ TEST(SnapshotAnnotationsTest, GetReportAnnotations_Snapshot) {
 
 TEST(SnapshotAnnotationsTest, GetReportAnnotations_Product) {
   AnnotationMap annotations = {
-      {feedback::kBuildVersionKey, "version"},
+      {feedback::kBuildPlatformVersionKey, "platform-version"},
+      {feedback::kBuildProductVersionKey, "product-version"},
       {feedback::kSystemUpdateChannelCurrentKey, "channel"},
   };
   Product product = Product::DefaultPlatformProduct();
@@ -213,7 +214,7 @@ TEST(SnapshotAnnotationsTest, GetReportAnnotations_Product) {
 
   EXPECT_THAT(added_annotations.Raw(), UnorderedElementsAreArray({
                                            Pair("product", "Fuchsia"),
-                                           Pair("version", "version"),
+                                           Pair("version", "product-version--platform-version"),
                                            Pair("channel", "channel"),
                                        }));
 }

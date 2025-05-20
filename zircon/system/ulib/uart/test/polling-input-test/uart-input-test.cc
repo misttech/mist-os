@@ -56,7 +56,7 @@ bool UartInputTest(UartDriver& uart) {
 
 }  // namespace
 
-int TestMain(void* zbi, arch::EarlyTicks ticks) {
+int TestMain(void* bootloader_data, ktl::optional<EarlyBootZbi> zbi, arch::EarlyTicks ticks) {
   printf("uart-input-test: %*s\n", static_cast<int>(kSerialReady.length()), kSerialReady.data());
   // Run the test.
   return UartInputTest(GetUartDriver()) ? 0 : 1;

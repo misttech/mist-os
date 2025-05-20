@@ -43,10 +43,6 @@ build --legacy_external_runfiles=false
 # We need to set them for cqueries and aqueries as well as build (and
 # everything else that inherits from it). Alas, setting them in `common`
 # breaks other things.
-cquery --platforms=//build/bazel/platforms:default
-cquery --host_platform=//build/bazel/platforms:host
-aquery --platforms=//build/bazel/platforms:default
-aquery --host_platform=//build/bazel/platforms:host
 build --platforms=//build/bazel/platforms:default
 build --host_platform=//build/bazel/platforms:host
 
@@ -66,17 +62,14 @@ common:exec_log --experimental_enable_execution_graph_log
 
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config=build/bazel/config/no_downloads_allowed.config
-
-# Pass local developer overrides for assembly to Bazel
-common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
+common --vendor_dir=third_party/bazel_vendor
+common --registry=file://%workspace%/third_party/bazel_vendor/_registries/bcr.bazel.build
 
 # Disable verbose Bazel output with --config=quiet
 # Note that --show_result=0 is not supported by `bazel query`.
 common:quiet --noshow_loading_progress
 common:quiet --noshow_progress
 common:quiet --ui_event_filters=-info
-cquery:quiet --show_result=0
-aquery:quiet --show_result=0
 build:quiet --show_result=0
 
 # Ensure outputs are writable (umask 0755) instead of readonly (0555),
@@ -102,16 +95,6 @@ import third_party/pigweed/configuration.bazelrc
 # As of Bazel 8, this will be enabled by default.
 build --experimental_collect_system_network_usage
 
-# Use --config=no_sdk to ensure that the @fuchsia_sdk and @fuchsia_clang
-# repositories will be empty. This prevents generating Fuchsia binaries
-# entirely but may be useful to run Bazel commands immediately in the build.
-common:no_sdk \
-  --override_repository=fuchsia_in_tree_idk=build/bazel/local_repositories/empty \
-  --override_repository=fuchsia_internal_idk=build/bazel/local_repositories/empty \
-  --override_repository=fuchsia_sdk=build/bazel/local_repositories/empty_fuchsia_sdk \
-  --override_repository=fuchsia_clang=build/bazel/local_repositories/empty_fuchsia_clang \
-  --platforms=//build/bazel/platforms:host
-
 # Link Go binaries with PIE to avoid relocation errors.
 build --@io_bazel_rules_go//go/config:linkmode=pie
 
@@ -120,3 +103,31 @@ build --@io_bazel_rules_go//go/config:linkmode=pie
 # very intentionally.
 common:no_gn_targets \
   --override_repository=gn_targets=build/bazel/local_repositories/empty
+
+# The `--config=host option` is shorthand for
+#`--platforms=//build/bazel/platforms:host`.
+cquery:host --platforms=//build/bazel/platforms:host
+aquery:host --platforms=//build/bazel/platforms:host
+build:host --platforms=//build/bazel/platforms:host
+
+# Enable clippy for Rust targets specified on the build line.
+# See https://bazelbuild.github.io/rules_rust/rust_clippy.html.
+build --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
+build --output_groups=+clippy_checks
+build --@rules_rust//rust/settings:clippy_flag=-Wclippy::all
+
+# Disable bzlmod by default.
+common --enable_bzlmod=true
+common --enable_workspace=true
+
+### FUCHSIA_SDK_CUTOFF
+# The line above and anything that follows will be removed from
+# the .bazelrc file used by the --config=no_sdk.
+
+# Pass local developer overrides for assembly to Bazel
+# For now, this needs to set the label_flag() in both @rules_fuchsia
+# and @fuchsia_sdk to ensure that all fuchsia_product() definitions
+# correctly support this feature. The @fuchsia_sdk one may be
+# removed when the fuchsia.git and vendor/*.git repositories no
+# longer include rules from @fuchsia_sdk.
+common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list

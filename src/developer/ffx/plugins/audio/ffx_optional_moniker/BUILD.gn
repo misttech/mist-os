@@ -17,7 +17,7 @@ rustc_library("ffx_optional_moniker") {
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

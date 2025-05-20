@@ -39,6 +39,7 @@ DEFAULT_CATEGORIES: list[str] = [
     "audio",
     "benchmark",
     "blobfs",
+    "driver_dispatcher",
     "fxfs",
     "gfx",
     "input",
@@ -49,6 +50,10 @@ DEFAULT_CATEGORIES: list[str] = [
     "minfs",
     "modular",
     "net",
+    "sdmmc",
+    "starnix",
+    "starnix:binder",
+    "starnix:pager",
     "storage",
     "system_metrics",
     "view",
@@ -117,7 +122,7 @@ class TracingUsingFc(tracing.Tracing):
     # List all the public methods
     def initialize(
         self,
-        categories: list[str] | None = DEFAULT_CATEGORIES,
+        categories: list[str] | None = None,
         buffer_size: int | None = None,
         start_timeout_milliseconds: int | None = None,
     ) -> None:
@@ -302,13 +307,12 @@ class TracingUsingFc(tracing.Tracing):
         if not trace_file:
             timestamp: str = datetime.now().strftime("%Y-%m-%d-%I-%M-%S-%p")
             trace_file = f"trace_{self._name}_{timestamp}.fxt"
-        trace_file_path: str = os.path.join(directory, trace_file)
 
+        trace_file_path: str = os.path.join(directory, trace_file)
         with open(trace_file_path, "wb") as trace_file_handle:
             trace_file_handle.write(trace_buffer)
-
         _LOGGER.info("Trace downloaded at '%s'", trace_file_path)
-
+        self._reset_state()
         return trace_file_path
 
     async def _drain_socket(self) -> bytes:

@@ -32,4 +32,12 @@
             from: "framework",
         },
     ],
+    offer: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            from: "void",
+            to: "#shutdown_shim",
+            availability: "optional",
+        },
+    ],
 }

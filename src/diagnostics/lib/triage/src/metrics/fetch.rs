@@ -90,7 +90,7 @@ impl<'a> FileDataFetcher<'a> {
 
     // Return a vector of errors encountered by contained fetchers.
     pub fn errors(&self) -> Vec<String> {
-        self.inspect.component_errors.iter().map(|e| format!("{}", e)).collect()
+        self.inspect.component_errors.iter().map(|e| format!("{e}")).collect()
     }
 }
 
@@ -147,7 +147,7 @@ impl<'a> TrialDataFetcher<'a> {
     pub(crate) fn fetch(&self, name: &str) -> MetricValue {
         match self.values.get(name) {
             Some(value) => MetricValue::from(value),
-            None => syntax_error(format!("Value {} not overridden in test", name)),
+            None => syntax_error(format!("Value {name} not overridden in test")),
         }
     }
 
@@ -259,7 +259,7 @@ impl KeyValueFetcher {
     pub fn fetch(&self, key: &str) -> MetricValue {
         match self.map.get(key) {
             Some(value) => MetricValue::from(value),
-            None => missing(format!("Key '{}' not found in annotations", key)),
+            None => missing(format!("Key '{key}' not found in annotations")),
         }
     }
 }
@@ -354,8 +354,7 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
                 }
                 raw_contents => serde_json::from_value(raw_contents).with_context(|| {
                     format!(
-                        "Unable to deserialize Inspect contents for {} to node hierarchy",
-                        moniker,
+                        "Unable to deserialize Inspect contents for {moniker} to node hierarchy",
                     )
                 })?,
             };
@@ -431,7 +430,7 @@ impl InspectFetcher {
     pub fn fetch(&self, selector: &SelectorString) -> Vec<MetricValue> {
         match self.try_fetch(selector) {
             Ok(v) => v,
-            Err(e) => vec![syntax_error(format!("Fetch {:?} -> {}", selector, e))],
+            Err(e) => vec![syntax_error(format!("Fetch {selector:?} -> {e}"))],
         }
     }
 
@@ -439,7 +438,7 @@ impl InspectFetcher {
     fn fetch_str(&self, selector_str: &str) -> Vec<MetricValue> {
         match SelectorString::try_from(selector_str.to_owned()) {
             Ok(selector) => self.fetch(&selector),
-            Err(e) => vec![syntax_error(format!("Bad selector {}: {}", selector_str, e))],
+            Err(e) => vec![syntax_error(format!("Bad selector {selector_str}: {e}"))],
         }
     }
 }
@@ -818,7 +817,7 @@ mod test {
             let inspect = InspectFetcher::try_from(json)?;
             assert_eq!(
                 vec!["Unable to deserialize Inspect contents for fail_component to node hierarchy"],
-                inspect.component_errors.iter().map(|e| format!("{}", e)).collect::<Vec<_>>()
+                inspect.component_errors.iter().map(|e| format!("{e}")).collect::<Vec<_>>()
             );
             macro_rules! assert_wrong {
                 ($selector:expr, $error:expr) => {

@@ -259,6 +259,7 @@
                 "fuchsia.gpu.magma.Service", // replaces /dev/class/gpu
                 "fuchsia.hardware.backlight.Service", // replaces /dev/class/backlight
                 "fuchsia.hardware.bluetooth.Service", // replaces /dev/class/bt-hci
+                "fuchsia.hardware.haptics.Service",
                 "fuchsia.hardware.hrtimer.Service", // replaces /dev/class/hrtimer
                 "fuchsia.hardware.light.LightService", // replaces /dev/class/light
                 "fuchsia.hardware.power.sensor.Service", // replaces /dev/class/power-sensor
@@ -323,6 +324,7 @@
                 "fuchsia.session.window.Collection",
                 "fuchsia.session.window.InitialElementUrl",
                 "fuchsia.session.window.InitialViewIdAnnotation",
+                "fuchsia.time.config.HasWakeAlarms",
                 "fuchsia.time.config.WritableUTCTime",
                 "fuchsia.ui.VisualDebuggingLevel",
             ],
@@ -424,6 +426,13 @@
             protocol: "fuchsia.process.Resolver",
             from: "#process_resolver",
             to: "#session-manager",
+        },
+        {
+            protocol: "fuchsia.time.alarms.Wake",
+            from: "#timekeeper",
+            to: "#session-manager",
+            source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: [

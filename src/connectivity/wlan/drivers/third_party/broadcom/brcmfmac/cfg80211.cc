@@ -5111,7 +5111,6 @@ void brcmf_if_query_telemetry_support(net_device* ndev,
   inspect_counter_configs.push_back(CounterConfigs::FW_RX_NO_SCB.toFidl(arena));
   inspect_counter_configs.push_back(CounterConfigs::FW_RX_BAD_SRC_MAC.toFidl(arena));
   inspect_counter_configs.push_back(CounterConfigs::FW_RX_DECRYPT_FAILURES.toFidl(arena));
-
   inspect_counter_configs.push_back(CounterConfigs::SDIO_FLOW_CONTROL_EVENTS.toFidl(arena));
   inspect_counter_configs.push_back(CounterConfigs::SDIO_TX_CTRL_FRAME_GOOD.toFidl(arena));
   inspect_counter_configs.push_back(CounterConfigs::SDIO_TX_CTRL_FRAME_BAD.toFidl(arena));
@@ -5122,6 +5121,7 @@ void brcmf_if_query_telemetry_support(net_device* ndev,
   inspect_counter_configs.push_back(CounterConfigs::SDIO_RX_HEADERS_READ.toFidl(arena));
   inspect_counter_configs.push_back(CounterConfigs::SDIO_RX_PACKETS_READ.toFidl(arena));
   inspect_counter_configs.push_back(CounterConfigs::SDIO_TX_PACKETS_WRITE.toFidl(arena));
+  inspect_counter_configs.push_back(CounterConfigs::BT_COEX_WLAN_PREEMPT_COUNT.toFidl(arena));
 
   std::vector<fuchsia_wlan_stats::wire::InspectGaugeConfig> inspect_gauge_configs;
   inspect_gauge_configs.push_back(GaugeConfigs::SDIO_TX_SEQ.toFidl(arena));
@@ -5164,7 +5164,10 @@ void brcmf_get_noise_floor_samples(
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxnoiseflr[i];
-    out_noise_floor_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_noise_floor_samples->push_back(bucket);
+    }
   }
   // rxnoiseflr has an extra bucket. If there is anything in it, it is invalid.
   *out_invalid_samples = histograms_report.rxsnr[255];
@@ -5177,7 +5180,10 @@ void brcmf_get_rssi_samples(const histograms_report_t& histograms_report,
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxrssi[i];
-    out_rssi_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_rssi_samples->push_back(bucket);
+    }
   }
   // rxrssi has an extra bucket. If there is anything in it, it is invalid.
   *out_invalid_samples = histograms_report.rxrssi[255];
@@ -5190,7 +5196,10 @@ void brcmf_get_snr_samples(const histograms_report_t& histograms_report,
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = histograms_report.rxsnr[i];
-    out_snr_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_snr_samples->push_back(bucket);
+    }
   }
   // rxsnr does not have any indices that should be considered invalid buckets.
   *out_invalid_samples = 0;
@@ -5209,7 +5218,10 @@ void brcmf_get_rx_rate_index_samples(
     fuchsia_wlan_stats::wire::HistBucket bucket;
     bucket.bucket_index = i;
     bucket.num_samples = rxrate[i];
-    out_rx_rate_index_samples->push_back(bucket);
+    // Do not add empty buckets.
+    if (bucket.num_samples > 0) {
+      out_rx_rate_index_samples->push_back(bucket);
+    }
   }
   // rxrate does not have any indices that should be considered invalid buckets.
   *out_invalid_samples = 0;
@@ -5336,9 +5348,11 @@ zx_status_t brcmf_if_get_iface_stats(net_device* ndev,
   }
 
   auto stats_builder = fuchsia_wlan_stats::wire::IfaceStats::Builder(arena);
-  std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> sdio_counters =
+  std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> iface_counters =
       brcmf_bus_get_counters(cfg->pub->bus_if);
-  stats_builder.driver_specific_counters(sdio_counters);
+  uint32_t wlan_preempt_count = brcmf_btcoex_get_wlan_preempt_count(ifp);
+  iface_counters.push_back(CounterConfigs::BT_COEX_WLAN_PREEMPT_COUNT.unnamed(wlan_preempt_count));
+  stats_builder.driver_specific_counters(iface_counters);
 
   std::vector<fuchsia_wlan_stats::wire::UnnamedGauge> sdio_gauges =
       brcmf_bus_get_gauges(cfg->pub->bus_if);
@@ -5371,18 +5385,18 @@ zx_status_t brcmf_if_get_iface_stats(net_device* ndev,
           .tx_total(pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
           .tx_drop(pktcnt.tx_bad_pkt + ndev->stats.tx_dropped);
 
-  std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> driver_counters;
-  driver_counters.push_back(CounterConfigs::FW_RX_GOOD.unnamed(pktcnt.rx_good_pkt));
-  driver_counters.push_back(CounterConfigs::FW_RX_BAD.unnamed(pktcnt.rx_bad_pkt));
-  driver_counters.push_back(CounterConfigs::FW_RX_OCAST.unnamed(pktcnt.rx_ocast_good_pkt));
-  driver_counters.push_back(CounterConfigs::FW_TX_GOOD.unnamed(pktcnt.tx_good_pkt));
-  driver_counters.push_back(CounterConfigs::FW_TX_BAD.unnamed(pktcnt.rx_bad_pkt));
-  driver_counters.push_back(CounterConfigs::DRIVER_RX_GOOD.unnamed(ndev->stats.rx_packets));
-  driver_counters.push_back(CounterConfigs::DRIVER_RX_BAD.unnamed(ndev->stats.rx_errors));
-  driver_counters.push_back(CounterConfigs::DRIVER_TX_TOTAL.unnamed(ndev->stats.tx_packets));
-  driver_counters.push_back(CounterConfigs::DRIVER_TX_CONF.unnamed(ndev->stats.tx_confirmed));
-  driver_counters.push_back(CounterConfigs::DRIVER_TX_DROP.unnamed(ndev->stats.tx_dropped));
-  driver_counters.push_back(CounterConfigs::DRIVER_TX_BAD.unnamed(ndev->stats.tx_errors));
+  std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> connection_counters;
+  connection_counters.push_back(CounterConfigs::FW_RX_GOOD.unnamed(pktcnt.rx_good_pkt));
+  connection_counters.push_back(CounterConfigs::FW_RX_BAD.unnamed(pktcnt.rx_bad_pkt));
+  connection_counters.push_back(CounterConfigs::FW_RX_OCAST.unnamed(pktcnt.rx_ocast_good_pkt));
+  connection_counters.push_back(CounterConfigs::FW_TX_GOOD.unnamed(pktcnt.tx_good_pkt));
+  connection_counters.push_back(CounterConfigs::FW_TX_BAD.unnamed(pktcnt.rx_bad_pkt));
+  connection_counters.push_back(CounterConfigs::DRIVER_RX_GOOD.unnamed(ndev->stats.rx_packets));
+  connection_counters.push_back(CounterConfigs::DRIVER_RX_BAD.unnamed(ndev->stats.rx_errors));
+  connection_counters.push_back(CounterConfigs::DRIVER_TX_TOTAL.unnamed(ndev->stats.tx_packets));
+  connection_counters.push_back(CounterConfigs::DRIVER_TX_CONF.unnamed(ndev->stats.tx_confirmed));
+  connection_counters.push_back(CounterConfigs::DRIVER_TX_DROP.unnamed(ndev->stats.tx_dropped));
+  connection_counters.push_back(CounterConfigs::DRIVER_TX_BAD.unnamed(ndev->stats.tx_errors));
 
   // Get the WME counters
   wl_wme_cnt_t wme_cnt;
@@ -5391,29 +5405,37 @@ zx_status_t brcmf_if_get_iface_stats(net_device* ndev,
     BRCMF_INFO("Unable to get WME counters err: %s fw err %s", zx_status_get_string(status),
                brcmf_fil_get_errstr(fw_err));
   } else {
-    driver_counters.push_back(CounterConfigs::WME_VO_RX_GOOD.unnamed(wme_cnt.rx[AC_VO].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_VO_RX_GOOD.unnamed(wme_cnt.rx[AC_VO].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_VO_RX_BAD.unnamed(wme_cnt.rx_failed[AC_VO].packets));
-    driver_counters.push_back(CounterConfigs::WME_VO_TX_GOOD.unnamed(wme_cnt.tx[AC_VO].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_VO_TX_GOOD.unnamed(wme_cnt.tx[AC_VO].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_VO_TX_BAD.unnamed(wme_cnt.tx_failed[AC_VO].packets));
-    driver_counters.push_back(CounterConfigs::WME_VI_RX_GOOD.unnamed(wme_cnt.rx[AC_VI].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_VI_RX_GOOD.unnamed(wme_cnt.rx[AC_VI].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_VI_RX_BAD.unnamed(wme_cnt.rx_failed[AC_VI].packets));
-    driver_counters.push_back(CounterConfigs::WME_VI_TX_GOOD.unnamed(wme_cnt.tx[AC_VI].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_VI_TX_GOOD.unnamed(wme_cnt.tx[AC_VI].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_VI_TX_BAD.unnamed(wme_cnt.tx_failed[AC_VI].packets));
-    driver_counters.push_back(CounterConfigs::WME_BE_RX_GOOD.unnamed(wme_cnt.rx[AC_BE].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_BE_RX_GOOD.unnamed(wme_cnt.rx[AC_BE].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_BE_RX_BAD.unnamed(wme_cnt.rx_failed[AC_BE].packets));
-    driver_counters.push_back(CounterConfigs::WME_BE_TX_GOOD.unnamed(wme_cnt.tx[AC_BE].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_BE_TX_GOOD.unnamed(wme_cnt.tx[AC_BE].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_BE_TX_BAD.unnamed(wme_cnt.tx_failed[AC_BE].packets));
-    driver_counters.push_back(CounterConfigs::WME_BK_RX_GOOD.unnamed(wme_cnt.rx[AC_BK].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_BK_RX_GOOD.unnamed(wme_cnt.rx[AC_BK].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_BK_RX_BAD.unnamed(wme_cnt.rx_failed[AC_BK].packets));
-    driver_counters.push_back(CounterConfigs::WME_BK_TX_GOOD.unnamed(wme_cnt.tx[AC_BK].packets));
-    driver_counters.push_back(
+    connection_counters.push_back(
+        CounterConfigs::WME_BK_TX_GOOD.unnamed(wme_cnt.tx[AC_BK].packets));
+    connection_counters.push_back(
         CounterConfigs::WME_BK_TX_BAD.unnamed(wme_cnt.tx_failed[AC_BK].packets));
   }
 
@@ -5427,32 +5449,33 @@ zx_status_t brcmf_if_get_iface_stats(net_device* ndev,
     BRCMF_WARN("Unable to get fw counters err: %s fw_err %d", zx_status_get_string(status), fw_err);
   } else {
     wl_cnt_ver_6_t* counters = reinterpret_cast<wl_cnt_ver_6_t*>(cnt_buf);
-    driver_counters.push_back(CounterConfigs::FW_TX_RETRANSMITS.unnamed(counters->txretrans));
-    driver_counters.push_back(CounterConfigs::FW_TX_DATA_ERRORS.unnamed(counters->txerror));
-    driver_counters.push_back(CounterConfigs::FW_TX_STATUS_ERRORS.unnamed(counters->txserr));
-    driver_counters.push_back(CounterConfigs::FW_TX_NO_BUFFER.unnamed(counters->txnobuf));
-    driver_counters.push_back(CounterConfigs::FW_TX_RUNT_FRAMES.unnamed(counters->txrunt));
-    driver_counters.push_back(CounterConfigs::FW_TX_UNDERFLOW.unnamed(counters->txuflo));
-    driver_counters.push_back(CounterConfigs::FW_TX_PHY_ERRORS.unnamed(counters->txphyerr));
-    driver_counters.push_back(CounterConfigs::FW_TX_DOT11_FAILURES.unnamed(counters->txfail));
-    driver_counters.push_back(CounterConfigs::FW_TX_NO_ASSOC.unnamed(counters->txnoassoc));
-    driver_counters.push_back(CounterConfigs::FW_TX_NO_ACK.unnamed(counters->txnoack));
-    driver_counters.push_back(CounterConfigs::FW_RX_DATA_ERRORS.unnamed(counters->rxerror));
-    driver_counters.push_back(CounterConfigs::FW_RX_OVERFLOW.unnamed(counters->rxoflo));
-    driver_counters.push_back(CounterConfigs::FW_RX_NO_BUFFER.unnamed(counters->rxnobuf));
-    driver_counters.push_back(CounterConfigs::FW_RX_RUNT_FRAMES.unnamed(counters->rxrunt));
-    driver_counters.push_back(
+    connection_counters.push_back(CounterConfigs::FW_TX_RETRANSMITS.unnamed(counters->txretrans));
+    connection_counters.push_back(CounterConfigs::FW_TX_DATA_ERRORS.unnamed(counters->txerror));
+    connection_counters.push_back(CounterConfigs::FW_TX_STATUS_ERRORS.unnamed(counters->txserr));
+    connection_counters.push_back(CounterConfigs::FW_TX_NO_BUFFER.unnamed(counters->txnobuf));
+    connection_counters.push_back(CounterConfigs::FW_TX_RUNT_FRAMES.unnamed(counters->txrunt));
+    connection_counters.push_back(CounterConfigs::FW_TX_UNDERFLOW.unnamed(counters->txuflo));
+    connection_counters.push_back(CounterConfigs::FW_TX_PHY_ERRORS.unnamed(counters->txphyerr));
+    connection_counters.push_back(CounterConfigs::FW_TX_DOT11_FAILURES.unnamed(counters->txfail));
+    connection_counters.push_back(CounterConfigs::FW_TX_NO_ASSOC.unnamed(counters->txnoassoc));
+    connection_counters.push_back(CounterConfigs::FW_TX_NO_ACK.unnamed(counters->txnoack));
+    connection_counters.push_back(CounterConfigs::FW_RX_DATA_ERRORS.unnamed(counters->rxerror));
+    connection_counters.push_back(CounterConfigs::FW_RX_OVERFLOW.unnamed(counters->rxoflo));
+    connection_counters.push_back(CounterConfigs::FW_RX_NO_BUFFER.unnamed(counters->rxnobuf));
+    connection_counters.push_back(CounterConfigs::FW_RX_RUNT_FRAMES.unnamed(counters->rxrunt));
+    connection_counters.push_back(
         CounterConfigs::FW_RX_FRAGMENTATION_ERRORS.unnamed(counters->rxfragerr));
-    driver_counters.push_back(CounterConfigs::FW_RX_BAD_PLCP.unnamed(counters->rxbadplcp));
-    driver_counters.push_back(CounterConfigs::FW_RX_CRS_GLITCH.unnamed(counters->rxcrsglitch));
-    driver_counters.push_back(CounterConfigs::FW_RX_BAD_FCS.unnamed(counters->rxbadfcs));
-    driver_counters.push_back(CounterConfigs::FW_RX_GIANT_FRAMES.unnamed(counters->rxgiant));
-    driver_counters.push_back(CounterConfigs::FW_RX_NO_SCB.unnamed(counters->rxnoscb));
-    driver_counters.push_back(CounterConfigs::FW_RX_BAD_SRC_MAC.unnamed(counters->rxbadsrcmac));
-    driver_counters.push_back(CounterConfigs::FW_RX_DECRYPT_FAILURES.unnamed(counters->rxundec));
+    connection_counters.push_back(CounterConfigs::FW_RX_BAD_PLCP.unnamed(counters->rxbadplcp));
+    connection_counters.push_back(CounterConfigs::FW_RX_CRS_GLITCH.unnamed(counters->rxcrsglitch));
+    connection_counters.push_back(CounterConfigs::FW_RX_BAD_FCS.unnamed(counters->rxbadfcs));
+    connection_counters.push_back(CounterConfigs::FW_RX_GIANT_FRAMES.unnamed(counters->rxgiant));
+    connection_counters.push_back(CounterConfigs::FW_RX_NO_SCB.unnamed(counters->rxnoscb));
+    connection_counters.push_back(CounterConfigs::FW_RX_BAD_SRC_MAC.unnamed(counters->rxbadsrcmac));
+    connection_counters.push_back(
+        CounterConfigs::FW_RX_DECRYPT_FAILURES.unnamed(counters->rxundec));
   }
 
-  connection_stats_builder.driver_specific_counters(fidl::VectorView(arena, driver_counters));
+  connection_stats_builder.driver_specific_counters(fidl::VectorView(arena, connection_counters));
   *out_stats = stats_builder.connection_stats(connection_stats_builder.Build()).Build();
   return ZX_OK;
 }
@@ -5803,6 +5826,11 @@ static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t con
       // Roam is done, so reset roam_start_sent.
       cfg->roam_start_sent = false;
     } else {
+      if (!ifp->roam_req.has_value()) {
+        BRCMF_ERR("Missing roam request, cannot notify SME of roam conf");
+        clear_roam_attempt(ifp);
+        return ZX_ERR_INTERNAL;
+      }
       brcmf_return_roam_conf(ndev, target_bssid, status_code);
     }
 
@@ -6698,6 +6726,13 @@ static zx_status_t brcmf_handle_reassoc_event(struct brcmf_if* ifp, const struct
   }
   ZX_DEBUG_ASSERT(!brcmf_is_apmode(ifp->vif));
 
+  // Ignore REASSOC events unless roaming is expected.
+  if (!brcmf_roaming_offload_enabled(ifp) && !ifp->roam_req.has_value()) {
+    BRCMF_WARN("Ignoring REASSOC (%s) event because reassociation/roaming is not expected",
+               brcmf_fweh_get_event_status_str(e->status));
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   if (e->status == BRCMF_E_STATUS_ATTEMPT || e->status == BRCMF_E_STATUS_NEWASSOC) {
     BRCMF_DBG(CONN, "REASSOC event: attempting roam to " FMT_MAC, FMT_MAC_ARGS(e->addr));
     std::array<uint8_t, ETH_ALEN> target_bssid;
@@ -7330,6 +7365,11 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
 
   BRCMF_DBG_EVENT(ifp, e, "%d", [](uint32_t reason) { return reason; });
 
+  if (!brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    // Roam failure was already reported, or this is a spurious ROAM event.
+    return ZX_OK;
+  }
+
   switch (status) {
     case BRCMF_E_STATUS_ATTEMPT: {
       BRCMF_DBG(CONN, "ROAM event: attempt");
@@ -7357,10 +7397,6 @@ static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
     }
   }
 
-  if (!brcmf_test_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
-    // Roam failure was already reported.
-    return ZX_OK;
-  }
   const auto status_code = fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified;
   const auto connect_status = brcmf_connect_status_t::REASSOC_REQ_FAILED;
   return brcmf_bss_roam_done(ifp, connect_status, status_code);

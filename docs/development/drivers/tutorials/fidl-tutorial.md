@@ -166,7 +166,7 @@ zx_status_t CallEcho() {
   // We can now utilize our client to make calls!
   constexpr std::string_view kInput = "Test String";
 
-  auto result = client->EchoString(fidl::StringView::FromExternal(cpp17::string_view(kInput)));
+  auto result = client->EchoString(fidl::StringView::FromExternal(std::string_view(kInput)));
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to call EchoString");
     return result.status();

@@ -33,10 +33,10 @@ use {
 };
 
 use crate::bindings::devices::TxTask;
-use crate::bindings::util::NeedsDataNotifier;
+use crate::bindings::util::{NeedsDataNotifier, ScopeExt as _};
 use crate::bindings::{
     devices, interfaces_admin, routes, BindingId, BindingsCtx, Ctx, DeviceId,
-    Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    Ipv4DeviceConfiguration, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 /// Like [`DeviceId`], but restricted to netdevice devices.
@@ -101,6 +101,8 @@ pub(crate) enum Error {
     InvalidPortClass(fnet_interfaces_ext::UnknownHardwareNetworkPortClassError),
     #[error("received unsupported frame type: {0:?}")]
     UnsupportedFrameType(fhardware_network::FrameType),
+    #[error("scope finished")]
+    ScopeFinished,
 }
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
@@ -161,7 +163,7 @@ impl NetdeviceWorker {
         let Self { mut ctx, inner: Inner { device: _, session, state }, task, watch_rx_leases } =
             self;
         // Allow buffer shuttling to happen in other threads.
-        let mut task = fuchsia_async::Task::spawn(task).fuse();
+        let mut task = fasync::Scope::current().compute(task).fuse();
 
         // Watch rx leases in a separate task if configured to do so.
         //
@@ -169,7 +171,7 @@ impl NetdeviceWorker {
         // that it goes away when we stop serving the device (executor polls the
         // future for us). Any leases held in the stream will be safely dropped,
         // but before netstack executes any logic on them.
-        let _watch_rx_leases_task = watch_rx_leases.then(|| {
+        if watch_rx_leases {
             let ctx = ctx.clone();
             let fut = session
                 .watch_rx_leases()
@@ -189,8 +191,8 @@ impl NetdeviceWorker {
                     std::mem::drop(lease);
                 })
                 .collect::<()>();
-            fasync::Task::spawn(fut)
-        });
+            let _: fasync::JoinHandle<()> = fasync::Scope::current().spawn(fut);
+        };
 
         // Keep a buffer around in case we're receiving fragmented buffers.
         let mut linearized_buffer = Vec::new();
@@ -398,6 +400,7 @@ impl DeviceHandler {
     pub(crate) async fn add_port(
         &self,
         ns: &mut Netstack,
+        scope: &fasync::ScopeHandle,
         InterfaceOptions { name, metric }: InterfaceOptions,
         port: fhardware_network::PortId,
         control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
@@ -405,6 +408,7 @@ impl DeviceHandler {
         (
             BindingId,
             impl futures::Stream<Item = netdevice_client::Result<netdevice_client::PortStatus>>,
+            fasync::scope::ScopeActiveGuard,
             TxTask,
         ),
         Error,
@@ -501,6 +505,13 @@ impl DeviceHandler {
             }
         };
 
+        // Ensure we're not going to get stopped. Holding a guard on a child
+        // scope ensures a guard on the parent.
+        let guard = scope
+            .new_detached_child(format!("{binding_id}({name})"))
+            .active_guard()
+            .ok_or(Error::ScopeFinished)?;
+
         let iid_generation = if ctx.bindings_ctx().config.default_opaque_iids {
             IidGenerationConfiguration::Opaque {
                 idgen_retries: StableSlaacAddressConfiguration::DEFAULT_IDGEN_RETRIES,
@@ -581,7 +592,7 @@ impl DeviceHandler {
                 }
             };
 
-            let tx_task = TxTask::new(ctx.clone(), core_id.downgrade(), tx_watcher);
+            let tx_task = TxTask::new(ctx.clone(), core_id.clone(), tx_watcher);
             match &core_id {
                 DeviceId::PureIp(device) => {
                     ctx.api().transmit_queue::<PureIpDevice>().set_configuration(
@@ -604,12 +615,25 @@ impl DeviceHandler {
             }
             add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
-            let ip_config = IpDeviceConfigurationUpdate {
-                ip_enabled: Some(false),
-                unicast_forwarding_enabled: Some(false),
-                multicast_forwarding_enabled: Some(false),
-                gmp_enabled: Some(true),
-            };
+            /// Construct the update to IpDeviceConfiguration to apply for a
+            /// given IP version
+            fn ip_device_config(version: IpVersion) -> IpDeviceConfigurationUpdate {
+                let dad_transmits = match version {
+                    IpVersion::V4 => {
+                        Ipv4DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS
+                    }
+                    IpVersion::V6 => {
+                        Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS
+                    }
+                };
+                IpDeviceConfigurationUpdate {
+                    ip_enabled: Some(false),
+                    unicast_forwarding_enabled: Some(false),
+                    multicast_forwarding_enabled: Some(false),
+                    gmp_enabled: Some(true),
+                    dad_transmits: Some(Some(dad_transmits)),
+                }
+            }
 
             let _: Ipv6DeviceConfigurationUpdate = ctx
                 .api()
@@ -617,9 +641,6 @@ impl DeviceHandler {
                 .update_configuration(
                     &core_id,
                     Ipv6DeviceConfigurationUpdate {
-                        dad_transmits: Some(Some(
-                            Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
-                        )),
                         max_router_solicitations: Some(Some(
                             Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
                         )),
@@ -631,7 +652,7 @@ impl DeviceHandler {
                                 TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults(),
                             ),
                         },
-                        ip_config,
+                        ip_config: ip_device_config(IpVersion::V6),
                         mld_mode: None,
                     },
                 )
@@ -641,7 +662,10 @@ impl DeviceHandler {
                 .device_ip::<Ipv4>()
                 .update_configuration(
                     &core_id,
-                    Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode: None },
+                    Ipv4DeviceConfigurationUpdate {
+                        ip_config: ip_device_config(IpVersion::V4),
+                        igmp_mode: None,
+                    },
                 )
                 .unwrap();
 
@@ -652,7 +676,7 @@ impl DeviceHandler {
         };
         let (binding_id, tx_task) = finalize().await;
 
-        Ok((binding_id, status_stream, tx_task))
+        Ok((binding_id, status_stream, guard, tx_task))
     }
 }
 

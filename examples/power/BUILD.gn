@@ -7,7 +7,6 @@ group("power") {
   deps = [
     "optimistic_lease_management",
     "suspend_config",
-    "unmanaged_element",
     "wake_lease",
   ]
 }
@@ -17,7 +16,6 @@ group("hermetic_tests") {
   deps = [
     "optimistic_lease_management:tests",
     "suspend_config:tests",
-    "unmanaged_element:tests",
     "wake_lease:tests",
   ]
 }

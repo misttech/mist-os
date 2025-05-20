@@ -248,8 +248,8 @@ TEST_F(UnixSocketTest, ImmediatePeercredCheck) {
   socklen_t cred_size = sizeof(cred);
   ASSERT_EQ(getsockopt(client(), SOL_SOCKET, SO_PEERCRED, &cred, &cred_size), 0);
   ASSERT_NE(cred.pid, 0);
-  ASSERT_NE(cred.uid, static_cast<uid_t>(-1));
-  ASSERT_NE(cred.uid, static_cast<gid_t>(-1));
+  ASSERT_EQ(cred.uid, getuid());
+  ASSERT_EQ(cred.gid, getgid());
 }
 
 namespace {

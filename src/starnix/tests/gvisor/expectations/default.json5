@@ -804,20 +804,9 @@
                 "FstatfsTest.BlocksFree",
 
                 // tuntap_test
+                // All TuntapTest fails because Starnix doesn't have /dev/net/tun.
                 "TuntapStaticTest.NetTunExists",
-                "TuntapTest.CreateInterfaceNoCap",
-                "TuntapTest.PingKernel",
-                "TuntapTest.CreateFixedNameInterface",
-                "TuntapTest.CreateInterface",
-                "TuntapTest.LargeWritesFailWithEMSGSIZE",
-                "TuntapTest.InvalidReadWrite",
-                "TuntapTest.ZeroWrite",
-                "TuntapTest.SendUdpTriggersArpResolution",
-                "TuntapTest.TUNNoPacketInfo",
-                "TuntapTest.WriteHangBug155928773",
-                "TuntapTest.TCPNonBlockingConnectFailsArpResolution",
-                "TuntapTest.TCPBlockingConnectFailsArpResolution",
-                "TuntapTest.RawPacketSocket",
+                "TuntapTest.*",
 
                 // semaphore_test
                 "SemaphoreTest.*",
@@ -1117,6 +1106,7 @@
 
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
+                "PtraceTest.SingleStep",
 
                 // TODO(https://fxbug.dev/328690720) Re-enable once flake is resolved.
                 "PtraceTest.Seize_Interrupt_Listen",
@@ -1197,6 +1187,11 @@
                 "PtyTest.PacketModeWriteMasterToReplica",
                 "PtyTest.PacketModeWriteReplicaToMaster",
                 "PtyTest.PacketModeFailsOnReplica",
+
+                // TODO(https://fxbug.dev/414851239): Fix and re-enable
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.DualStackV6AnyCloseAndBindAgain/UDP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.DualStackV6AnyBindAgain/UDP",
+                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.DualStackV6AnyBindAgain/TCP",
             ],
         },
     ],

@@ -12,6 +12,7 @@ use errors::{ffx_bail, ffx_error};
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{deferred, FfxMain, FfxTool};
 use fuchsia_async::unblock;
+use log::info;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::io::{stdin, BufRead};
@@ -20,7 +21,6 @@ use std::time::Duration;
 use target_holders::moniker;
 use tempfile::Builder;
 use termion::{color, style};
-use tracing::info;
 use {fidl_fuchsia_cpu_profiler as profiler, fidl_fuchsia_test_manager as test_manager};
 
 #[derive(Serialize, JsonSchema)]
@@ -72,7 +72,7 @@ impl FfxMain for ProfilerTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        info!(?self.cmd, "Running profiler...");
+        info!(cmd:? = self.cmd; "Running profiler... ");
         Ok(profiler(self.controller, writer, self.cmd).await?)
     }
 }
@@ -190,7 +190,7 @@ async fn run_session(
     config: profiler::Config,
     opts: SessionOpts,
 ) -> Result<()> {
-    info!(?config, ?opts, "Running profiler session...");
+    info!(config:? = config, opts:? = opts; "Running profiler session...");
     let (client, server) = fidl::Socket::create_stream();
     let client = fidl::AsyncSocket::from_socket(client);
     let controller = controller.await?;
@@ -281,11 +281,20 @@ async fn run_session(
     } else {
         std::path::PathBuf::from(&opts.output)
     };
-    symbolize(&unsymbolized_path, &symbolized_path).await?;
     if !opts.pprof_conversion {
-        return Ok(());
+        if let Ok(_symbolized_record) =
+            ffx_profiler::symbolize::symbolize(&unsymbolized_path, &symbolized_path, false)
+        {
+            return Ok(());
+        } else {
+            anyhow::bail!("Failed to symbolize profile");
+        }
+    } else {
+        // TODO(https://fxbug.dev/401034854): We need to remove `ffx debug symbolize` by
+        // implementing symbolized text to pprof.
+        symbolize(&unsymbolized_path, &symbolized_path).await?;
+        pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
     }
-    pprof_conversion(&symbolized_path, PathBuf::from(&opts.output))
 }
 
 pub async fn profiler(
@@ -371,11 +380,18 @@ pub async fn profiler(
             } else {
                 opts.output.clone()
             };
-            symbolize(&opts.input, &symbolized_path).await?;
-
             if !opts.pprof_conversion {
-                return Ok(());
+                if let Ok(_symbolized_record) =
+                    ffx_profiler::symbolize::symbolize(&opts.input, &symbolized_path, false)
+                {
+                    return Ok(());
+                } else {
+                    anyhow::bail!("Failed to symbolize profile");
+                }
             }
+            // TODO(https://fxbug.dev/401034854): We need to remove `ffx debug symbolize` by
+            // implementing symbolized text to pprof.
+            symbolize(&opts.input, &symbolized_path).await?;
             return pprof_conversion(&symbolized_path, opts.output);
         }
     };

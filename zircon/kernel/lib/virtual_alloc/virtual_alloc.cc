@@ -263,7 +263,7 @@ void VirtualAlloc::UnmapFreePages(vaddr_t vaddr, size_t pages) {
   // As this is the kernel aspace we cannot tolerate enlarging the operation, as other CPUs may be
   // accessing the nearby portions and we cannot trigger faults.
   zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-      vaddr, pages, ArchVmAspace::EnlargeOperation::No, &unmapped);
+      vaddr, pages, ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to unmap %zu pages at %" PRIxPTR "", pages, vaddr);
   ZX_ASSERT(unmapped == pages);
   pmm_free(&free_list);
@@ -288,7 +288,7 @@ zx_status_t VirtualAlloc::AllocMapPages(vaddr_t vaddr, size_t num_pages) {
     if (mapped_count > 0) {
       size_t unmapped = 0;
       zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-          vaddr, mapped_count, ArchVmAspace::EnlargeOperation::No, &unmapped);
+          vaddr, mapped_count, ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
       ZX_ASSERT(status == ZX_OK);
       ZX_ASSERT(unmapped == mapped_count);
     }

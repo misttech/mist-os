@@ -21,8 +21,10 @@
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include <fbl/alloc_checker.h>
@@ -258,9 +260,14 @@ class TestFidlClient {
 
   zx::result<> SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
   zx::result<display::LayerId> CreateLayer();
+  zx::result<> ImportBufferCollection(
+      display::BufferCollectionId buffer_collection_id,
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_token);
   zx::result<> ImportImage(const display::ImageMetadata& image_metadata,
                            display::BufferId image_buffer_id, display::ImageId image_id);
   zx::result<> ImportEvent(zx::event event, display::EventId event_id);
+  zx::result<> SetBufferCollectionConstraints(display::BufferCollectionId buffer_collection_id,
+                                              display::ImageBufferUsage image_buffer_usage);
 
   // The std::vector can be converted to std::span once we adopt C++23, which has
   // more ergonoic span handling.
@@ -275,6 +282,22 @@ class TestFidlClient {
   zx::result<> AcknowledgeVsync(display::VsyncAckCookie vsync_ack_cookie);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
   zx::result<display::ConfigStamp> GetLastAppliedConfigStamp();
+
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
+  SysmemAllocateSharedCollection();
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>> SysmemTokenDuplicateSync(
+      const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken>& token);
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollection>> SysmemTokenBind(
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token);
+  zx::result<> SysmemBufferCollectionRelease(
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollection> buffer_collection);
+
+  // Returns the number of allocated buffers.
+  zx::result<size_t> SysmemWaitForAllBuffersAllocated(
+      const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection);
+
+  zx::result<> SetSysmemConstraintsForImage(
+      const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection);
 
   zx::result<display::ImageId> ImportImageWithSysmem(const display::ImageMetadata& image_metadata);
 
@@ -311,6 +334,7 @@ class TestFidlClient {
                            const std::vector<LayerConfig>& layer_configs);
 
  private:
+  display::BufferCollectionId next_buffer_collection_id_{1};
   display::ImageId next_imported_image_id_{1};
 
   fidl::WireSyncClient<fuchsia_hardware_display::Coordinator> coordinator_fidl_client_;
@@ -754,139 +778,253 @@ std::vector<TestFidlClient::LayerConfig> TestFidlClient::CreateFullscreenLayerCo
   };
 }
 
+zx::result<> TestFidlClient::ImportBufferCollection(
+    display::BufferCollectionId buffer_collection_id,
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_token) {
+  const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
+      display::ToFidlBufferCollectionId(buffer_collection_id);
+
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportBufferCollection> fidl_status =
+      coordinator_fidl_client_->ImportBufferCollection(fidl_buffer_collection_id,
+                                                       std::move(buffer_token));
+  if (!fidl_status.ok()) {
+    fdf::error("ImportBufferCollection() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+
+  const fit::result<zx_status_t>& fidl_result = fidl_status.value();
+  if (fidl_result.is_error()) {
+    fdf::error("ImportBufferCollection() returned error: {}",
+               zx::make_result(fidl_result.error_value()));
+    return zx::error(fidl_result.error_value());
+  }
+  return zx::ok();
+}
+
+zx::result<> TestFidlClient::SetBufferCollectionConstraints(
+    display::BufferCollectionId buffer_collection_id,
+    display::ImageBufferUsage image_buffer_usage) {
+  const fuchsia_hardware_display::wire::BufferCollectionId fidl_buffer_collection_id =
+      display::ToFidlBufferCollectionId(buffer_collection_id);
+  const fuchsia_hardware_display_types::wire::ImageBufferUsage fidl_image_buffer_usage =
+      display::ToFidlImageBufferUsage(image_buffer_usage);
+
+  fidl::WireResult<fuchsia_hardware_display::Coordinator::SetBufferCollectionConstraints>
+      fidl_status = coordinator_fidl_client_->SetBufferCollectionConstraints(
+          fidl_buffer_collection_id, fidl_image_buffer_usage);
+  if (!fidl_status.ok()) {
+    fdf::error("SetBufferCollectionConstraints() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+
+  const fit::result<zx_status_t>& fidl_result = fidl_status.value();
+  if (fidl_result.is_error()) {
+    fdf::error("SetBufferCollectionConstraints() failed: {}",
+               zx::make_result(fidl_result.error_value()));
+    return zx::error(fidl_result.error_value());
+  }
+  return zx::ok();
+}
+
+zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
+TestFidlClient::SysmemAllocateSharedCollection() {
+  auto [token_client, token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::Arena arena;
+  fidl::OneWayStatus fidl_status = sysmem_->AllocateSharedCollection(
+      fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena)
+          .token_request(std::move(token_server))
+          .Build());
+  if (!fidl_status.ok()) {
+    fdf::error("AllocateSharedCollection() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+  return zx::ok(std::move(token_client));
+}
+
+zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
+TestFidlClient::SysmemTokenDuplicateSync(
+    const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken>& token) {
+  auto [new_token_client, new_token_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+
+  fidl::Arena arena;
+  static constexpr zx_rights_t kRightAttenunationMasks[] = {ZX_RIGHT_SAME_RIGHTS};
+  fidl::WireResult<fuchsia_sysmem2::BufferCollectionToken::DuplicateSync> fidl_status =
+      token->DuplicateSync(
+          fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncRequest::Builder(arena)
+              .rights_attenuation_masks(kRightAttenunationMasks)
+              .Build());
+  if (!fidl_status.ok()) {
+    fdf::error("BufferCollectionToken.Duplicate() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+
+  fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateSyncResponse& fidl_result =
+      fidl_status.value();
+  ZX_ASSERT(fidl_result.has_tokens());
+  ZX_ASSERT(fidl_result.tokens().count() == 1);
+
+  return zx::ok(std::move(fidl_result.tokens()[0]));
+}
+
+zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollection>> TestFidlClient::SysmemTokenBind(
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token) {
+  auto [buffer_collection_client, buffer_collection_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+
+  fidl::Arena arena;
+  fidl::OneWayStatus fidl_status = sysmem_->BindSharedCollection(
+      fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena)
+          .token(std::move(token))
+          .buffer_collection_request(std::move(buffer_collection_server))
+          .Build());
+  if (!fidl_status.ok()) {
+    fdf::error("BindSharedCollection() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+  return zx::ok(std::move(buffer_collection_client));
+}
+
+zx::result<> TestFidlClient::SysmemBufferCollectionRelease(
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollection> buffer_collection) {
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> buffer_collection_client(
+      std::move(buffer_collection));
+
+  fidl::OneWayStatus fidl_status = buffer_collection_client->Release();
+  if (!fidl_status.ok()) {
+    fdf::error("BufferCollection.Release() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+  return zx::ok();
+}
+
+zx::result<size_t> TestFidlClient::SysmemWaitForAllBuffersAllocated(
+    const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection) {
+  fidl::WireResult<fuchsia_sysmem2::BufferCollection::WaitForAllBuffersAllocated> fidl_status =
+      buffer_collection->WaitForAllBuffersAllocated();
+  if (!fidl_status.ok()) {
+    fdf::error("WaitForAllBuffersAllocated() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+
+  fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse* fidl_result =
+      fidl_status->value();
+  ZX_DEBUG_ASSERT_MSG(fidl_result->has_buffer_collection_info(),
+                      "Sysmem deviated from its contract");
+  ZX_DEBUG_ASSERT_MSG(fidl_result->buffer_collection_info().has_buffers(),
+                      "Sysmem deviated from its contract");
+  return zx::ok(fidl_result->buffer_collection_info().buffers().count());
+}
+
+zx::result<> TestFidlClient::SetSysmemConstraintsForImage(
+    const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& buffer_collection) {
+  {
+    fidl::Arena arena;
+    fidl::OneWayStatus fidl_status =
+        buffer_collection->SetName(fuchsia_sysmem2::wire::NodeSetNameRequest::Builder(arena)
+                                       .priority(10000u)
+                                       .name("display-coordintator-tests")
+                                       .Build());
+    if (!fidl_status.ok()) {
+      fdf::error("BufferCollection.SetName() failed: {}", fidl_status.status_string());
+      return zx::error(fidl_status.status());
+    }
+  }
+
+  fidl::Arena arena;
+  fidl::WireTableBuilder<fuchsia_sysmem2::wire::BufferCollectionConstraints> constraints_builder =
+      fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  constraints_builder.min_buffer_count(1)
+      .usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                 .none(fuchsia_sysmem2::wire::kNoneUsage)
+                 .Build())
+      // We specify min_size_bytes 1 so that something is specifying a minimum size. More typically
+      // the display client would specify ImageFormatConstraints that implies a non-zero
+      // min_size_bytes.
+      .buffer_memory_constraints(fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+                                     .min_size_bytes(1)
+                                     .ram_domain_supported(true)
+                                     .Build());
+
+  fidl::OneWayStatus fidl_status = buffer_collection->SetConstraints(
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
+          .constraints(constraints_builder.Build())
+          .Build());
+  if (!fidl_status.ok()) {
+    fdf::error("BufferCollection.SetConstraints() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+  return zx::ok();
+}
+
 zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     const display::ImageMetadata& image_metadata) {
-  // Create all the tokens.
-  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken> local_token;
-  {
-    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
-    fidl::Arena arena;
-    auto allocate_shared_request =
-        fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena);
-    allocate_shared_request.token_request(std::move(server));
-    auto result = sysmem_->AllocateSharedCollection(allocate_shared_request.Build());
-    if (!result.ok()) {
-      fdf::error("Failed to allocate shared collection: {}", result.status_string());
-      return zx::error(result.status());
-    }
-    local_token = fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken>(std::move(client));
-    EXPECT_NE(ZX_HANDLE_INVALID, local_token.client_end().channel().get());
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>> local_buffer_token_result =
+      SysmemAllocateSharedCollection();
+  if (local_buffer_token_result.is_error()) {
+    // SysmemAllocateSharedCollection() already logged the error.
+    return local_buffer_token_result.take_error();
   }
-  auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
-  {
-    fidl::Arena arena;
-    auto duplicate_request =
-        fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateRequest::Builder(arena);
-    duplicate_request.rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
-    duplicate_request.token_request(std::move(server));
-    if (auto result = local_token->Duplicate(duplicate_request.Build()); !result.ok()) {
-      fdf::error("Failed to duplicate token: {}", result.FormatDescription());
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken> local_buffer_token(
+      std::move(local_buffer_token_result).value());
+
+  // We use DuplicateSync() to ensure that the buffer token is created before
+  // passing it to the driver.
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>> driver_buffer_token_result =
+      SysmemTokenDuplicateSync(local_buffer_token);
+  if (driver_buffer_token_result.is_error()) {
+    // SysmemTokenDuplicateSync() already logged the error.
+    return driver_buffer_token_result.take_error();
+  }
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken> driver_buffer_token(
+      std::move(driver_buffer_token_result).value());
+
+  const display::BufferCollectionId buffer_collection_id = next_buffer_collection_id_;
+  ++next_buffer_collection_id_;
+  zx::result<> import_buffer_collection_result =
+      ImportBufferCollection(buffer_collection_id, driver_buffer_token.TakeClientEnd());
+  if (import_buffer_collection_result.is_error()) {
+    // ImportBufferCollection() has already logged the error.
+    return import_buffer_collection_result.take_error();
   }
 
-  // Set display buffer constraints.
-  static display::BufferCollectionId next_display_collection_id(0);
-  const display::BufferCollectionId display_collection_id = ++next_display_collection_id;
-  if (auto result = local_token->Sync(); !result.ok()) {
-    fdf::error("Failed to sync token {} {}", result.status(), result.FormatDescription());
-    return zx::error(result.status());
-  }
-
-  const fuchsia_hardware_display::wire::BufferCollectionId fidl_display_collection_id =
-      ToFidlBufferCollectionId(display_collection_id);
-  const auto result = coordinator_fidl_client_->ImportBufferCollection(fidl_display_collection_id,
-                                                                       std::move(client));
-  if (!result.ok()) {
-    fdf::error("Failed to call FIDL ImportBufferCollection {} ({})", display_collection_id.value(),
-               result.status_string());
-    return zx::error(result.status());
-  }
-  if (result.value().is_error()) {
-    fdf::error("Failed to import buffer collection {} ({})", display_collection_id.value(),
-               zx::make_result(result.value().error_value()));
-    return zx::error(result.value().error_value());
-  }
-
-  const fuchsia_hardware_display_types::wire::ImageBufferUsage image_buffer_usage = {
-      .tiling_type = image_metadata.tiling_type().ToFidl(),
+  const display::ImageBufferUsage image_buffer_usage = {
+      .tiling_type = image_metadata.tiling_type(),
   };
-
-  const auto set_constraints_result = coordinator_fidl_client_->SetBufferCollectionConstraints(
-      fidl_display_collection_id, image_buffer_usage);
-
-  if (!set_constraints_result.ok()) {
-    fdf::error("Failed to call FIDL SetBufferCollectionConstraints {} ({})",
-               display_collection_id.value(), set_constraints_result.status_string());
-    (void)coordinator_fidl_client_->ReleaseBufferCollection(fidl_display_collection_id);
-    return zx::error(set_constraints_result.status());
-  }
-  if (set_constraints_result.value().is_error()) {
-    fdf::error("Failed to set buffer collection constraints: {}",
-               zx::make_result(set_constraints_result.value().error_value()));
-    (void)coordinator_fidl_client_->ReleaseBufferCollection(fidl_display_collection_id);
-    return zx::error(set_constraints_result.value().error_value());
+  zx::result<> set_buffer_constraints_result =
+      SetBufferCollectionConstraints(buffer_collection_id, image_buffer_usage);
+  if (set_buffer_constraints_result.is_error()) {
+    // SetBufferCollectionConstraints() has already logged the error.
+    return set_buffer_constraints_result.take_error();
   }
 
-  // Use the local collection so we can read out the error if allocation
-  // fails, and to ensure everything's allocated before trying to import it
-  // into another process.
-  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> sysmem_collection;
-  {
-    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
-    fidl::Arena arena;
-    auto bind_shared_request =
-        fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena);
-    bind_shared_request.token(local_token.TakeClientEnd());
-    bind_shared_request.buffer_collection_request(std::move(server));
-    if (auto result = sysmem_->BindSharedCollection(bind_shared_request.Build()); !result.ok()) {
-      fdf::error("Failed to bind shared collection: {}", result.FormatDescription());
-      return zx::error(result.status());
-    }
-    sysmem_collection = fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>(std::move(client));
+  // Ensure that the collection's buffers are allocated before using them in
+  // ImportImage() calls.
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::BufferCollection>> buffer_collection_result =
+      SysmemTokenBind(local_buffer_token.TakeClientEnd());
+  if (buffer_collection_result.is_error()) {
+    // SysmemTokenBind() has already logged the error.
+    return buffer_collection_result.take_error();
   }
-  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  fidl::Arena arena;
-  auto set_name_request = fuchsia_sysmem2::wire::NodeSetNameRequest::Builder(arena);
-  set_name_request.priority(10000u);
-  set_name_request.name("display-client-unittest");
-  (void)sysmem_collection->SetName(set_name_request.Build());
-  arena.Reset();
-  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
-  constraints.min_buffer_count(1);
-  constraints.usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
-                        .none(fuchsia_sysmem2::wire::kNoneUsage)
-                        .Build());
-  // We specify min_size_bytes 1 so that something is specifying a minimum size. More typically the
-  // display client would specify ImageFormatConstraints that implies a non-zero min_size_bytes.
-  constraints.buffer_memory_constraints(
-      fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
-          .min_size_bytes(1)
-          .ram_domain_supported(true)
-          .Build());
-  auto set_constraints_request =
-      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
-  set_constraints_request.constraints(constraints.Build());
-  zx_status_t status = sysmem_collection->SetConstraints(set_constraints_request.Build()).status();
-  if (status != ZX_OK) {
-    fdf::error("Unable to set constraints ({})", status);
-    return zx::error(status);
-  }
-  // Wait for the buffers to be allocated.
-  auto info_result = sysmem_collection->WaitForAllBuffersAllocated();
-  if (!info_result.ok()) {
-    fdf::error("Waiting for buffers failed (fidl={} res={})", info_result.status(),
-               fidl::ToUnderlying(info_result->error_value()));
-    zx_status_t status = info_result.status();
-    if (status == ZX_OK) {
-      status = sysmem::V1CopyFromV2Error(info_result->error_value());
-    }
-    return zx::error(status);
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> buffer_collection(
+      std::move(buffer_collection_result).value());
+
+  zx::result<> set_image_constraints_result = SetSysmemConstraintsForImage(buffer_collection);
+  if (set_image_constraints_result.is_error()) {
+    // SetSysmemConstraintsForImage() has already logged the error.
+    return set_image_constraints_result.take_error();
   }
 
-  auto& info = info_result.value()->buffer_collection_info();
-  if (info.buffers().count() < 1) {
-    fdf::error("Incorrect buffer collection count {}", info.buffers().count());
+  zx::result<size_t> wait_for_all_buffers_allocated_result =
+      SysmemWaitForAllBuffersAllocated(buffer_collection);
+  if (wait_for_all_buffers_allocated_result.is_error()) {
+    // SysmemWaitForAllBuffersAllocated() has already logged the error.
+    return wait_for_all_buffers_allocated_result.take_error();
+  }
+  if (wait_for_all_buffers_allocated_result.value() < 1) {
+    fdf::error("WaitForAllBuffersAllocated() only allocated {} buffers",
+               wait_for_all_buffers_allocated_result.value());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -894,7 +1032,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
   ++next_imported_image_id_;
 
   const display::BufferId image_buffer_id{
-      .buffer_collection_id = display_collection_id,
+      .buffer_collection_id = buffer_collection_id,
       .buffer_index = 0,
   };
   zx::result<> import_image_result = ImportImage(image_metadata, image_buffer_id, image_id);
@@ -903,8 +1041,13 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     return import_image_result.take_error();
   }
 
-  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-  (void)sysmem_collection->Release();
+  zx::result<> buffer_collection_release_result =
+      SysmemBufferCollectionRelease(buffer_collection.TakeClientEnd());
+  if (buffer_collection_release_result.is_error()) {
+    // SysmemBufferCollectionRelease() has already logged the error.
+    return buffer_collection_release_result.take_error();
+  }
+
   return zx::ok(image_id);
 }
 
@@ -1010,17 +1153,19 @@ class IntegrationTest : public TestBase {
   // |TestBase|
   void SetUp() override {
     TestBase::SetUp();
-    fidl::SyncClient sysmem_client(ConnectToSysmemAllocatorV2());
-    EXPECT_TRUE(sysmem_client.is_valid());
 
-    fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
-    request.name() = fsl::GetCurrentProcessName();
-    request.id() = fsl::GetCurrentProcessKoid();
-    fit::result<fidl::OneWayStatus> set_debug_result =
-        sysmem_client->SetDebugClientInfo(std::move(request));
-    EXPECT_TRUE(set_debug_result.is_ok());
-    sysmem_client_ =
-        fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem_client.TakeClientEnd());
+    sysmem_client_ = fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(ConnectToSysmemAllocatorV2());
+
+    zx_koid_t koid = fsl::GetCurrentProcessKoid();
+    std::string debug_name = std::format("display-coordinator-unittests[{}]", koid);
+
+    fidl::Arena arena;
+    fidl::OneWayStatus set_debug_status = sysmem_client_->SetDebugClientInfo(
+        fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena)
+            .name(fidl::StringView::FromExternal(debug_name))
+            .id(koid)
+            .Build());
+    EXPECT_TRUE(set_debug_status.ok()) << set_debug_status.status_string();
   }
 
   // |TestBase|

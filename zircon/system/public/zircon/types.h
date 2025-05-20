@@ -179,8 +179,11 @@ typedef uint32_t zx_signals_t;
 #define ZX_IOB_PEER_CLOSED          __ZX_OBJECT_PEER_CLOSED
 
 // Counter
+#define ZX_COUNTER_SIGNALED          __ZX_OBJECT_SIGNALED
 #define ZX_COUNTER_POSITIVE          __ZX_OBJECT_SIGNAL_4
 #define ZX_COUNTER_NON_POSITIVE      __ZX_OBJECT_SIGNAL_5
+
+#define ZX_VIRTUAL_INTERRUPT_UNTRIGGERED  __ZX_OBJECT_SIGNAL_4
 
 // global kernel object id.
 // Note: kernel object ids use 63 bits, with the most significant bit being zero.
@@ -503,6 +506,11 @@ typedef uint32_t zx_system_event_type_t;
 #define ZX_SYSTEM_EVENT_MEMORY_PRESSURE_WARNING     ((zx_system_event_type_t)3u)
 #define ZX_SYSTEM_EVENT_MEMORY_PRESSURE_NORMAL      ((zx_system_event_type_t)4u)
 #define ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY      ((zx_system_event_type_t)5u)
+
+// Specifies a type of stall to be observed with zx_system_watch_memory_stall.
+typedef uint32_t zx_system_memory_stall_type_t;
+#define ZX_SYSTEM_MEMORY_STALL_SOME ((zx_system_memory_stall_type_t)(0u))
+#define ZX_SYSTEM_MEMORY_STALL_FULL ((zx_system_memory_stall_type_t)(1u))
 
 // Used in channel_read_etc.
 typedef struct zx_handle_info {

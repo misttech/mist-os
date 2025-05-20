@@ -86,7 +86,7 @@ template <>
 struct CodingTraits<::test::bitsconstants::BitsType> {
   static constexpr size_t kInlineSize = sizeof(::test::bitsconstants::BitsType);
   static void Encode(Encoder* encoder, ::test::bitsconstants::BitsType* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     uint32_t underlying = static_cast<uint32_t>(*value);
     ::fidl::Encode(encoder, &underlying, offset);

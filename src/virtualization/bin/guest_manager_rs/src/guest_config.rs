@@ -246,7 +246,6 @@ pub fn merge_configs(mut base: GuestConfig, overrides: GuestConfig) -> GuestConf
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_fs::Flags;
     use std::path::PathBuf;
     use tempfile::tempdir;
 
@@ -272,7 +271,7 @@ mod tests {
         // Create file to ensure error comes from missing directory.
         let flinux = file::open_in_namespace(
             linux.to_str().unwrap(),
-            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
+            fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
         )
         .unwrap();
         flinux.write(kernel_content.as_bytes()).await.unwrap().unwrap();
@@ -315,7 +314,7 @@ mod tests {
         let fpath = tmpdir.path().join(&fname);
         let tmpfile = file::open_in_namespace(
             fpath.to_str().unwrap(),
-            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
+            fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
         )?;
         tmpfile.write(fcontent.as_bytes()).await?.unwrap();
 
@@ -346,7 +345,7 @@ mod tests {
 
         let flinux = file::open_in_namespace(
             tmpdir.path().join(linux).to_str().unwrap(),
-            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
+            fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
         )?;
         flinux.write(kernel_content.as_bytes()).await?.unwrap();
 
@@ -374,7 +373,7 @@ mod tests {
         for fs in fss.iter() {
             file::open_in_namespace(
                 fs.to_str().unwrap(),
-                Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
+                fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
             )?;
         }
         let block1 = format!("{},ro,file", fss[0].to_str().unwrap());
@@ -401,7 +400,7 @@ mod tests {
         let kernel = "kernel.img";
         file::open_in_namespace(
             tmpdir.path().join(kernel).to_str().unwrap(),
-            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
+            fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
         )?;
 
         let cfgbase = GuestConfig {

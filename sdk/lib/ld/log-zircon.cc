@@ -4,7 +4,7 @@
 
 #include "lib/ld/log-zircon.h"
 
-#include <lib/fdio/io.h>
+#include <lib/fdio/processargs.h>
 #include <lib/zircon-internal/unique-backtrace.h>
 #include <lib/zx/debuglog.h>
 #include <lib/zx/result.h>
@@ -12,14 +12,38 @@
 #include <zircon/processargs.h>
 #include <zircon/syscalls/object.h>
 
+#include <cassert>
+
 namespace ld {
 namespace {
 
 constexpr zx_signals_t kSocketWait = ZX_SOCKET_WRITABLE | ZX_SOCKET_PEER_CLOSED;
 
 void DebuglogWrite(const zx::debuglog& debuglog, std::string_view str) {
-  if (size_t chars = str.size() - (str.back() == '\n' ? 1 : 0); chars > 0) {
-    debuglog.write(0, str.data(), chars);
+  while (!str.empty()) {
+    // Scan up to one past the maximum chunk size, so as to both use the full
+    // buffer and omit the trailing newline when the buffer is exactly full.
+    constexpr size_t kMaxScan = ld::Log::kBufferSize + 1;
+    std::string_view chunk = str.substr(0, std::min(kMaxScan, str.size()));
+
+    if (size_t nl = chunk.find('\n'); nl != std::string_view::npos) {
+      // Write only a single line at a time so each line gets tagged.
+      // Elide the trailing newline.
+      chunk = chunk.substr(0, nl);
+      str.remove_prefix(nl + 1);
+    } else {
+      // There was no newline, so write as much as fits in one packet.
+      if (chunk.size() > ld::Log::kBufferSize) {
+        assert(chunk.size() == ld::Log::kBufferSize + 1);
+        chunk.remove_suffix(1);
+      }
+      str = str.substr(chunk.size());
+    }
+
+    zx_status_t status = debuglog.write(0, chunk.data(), chunk.size());
+    if (status != ZX_OK) {
+      CRASH_WITH_UNIQUE_BACKTRACE();
+    }
   }
 }
 

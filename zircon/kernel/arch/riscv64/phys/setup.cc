@@ -25,7 +25,7 @@ __CONSTINIT ArchPhysInfo gArchPhysInfoStorage;
 
 ArchPhysInfo* gArchPhysInfo;
 
-void ArchSetUp(void* zbi_ptr) {
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) {
   gArchPhysInfo = &gArchPhysInfoStorage;
 
   arch::RiscvStvec::Get()
@@ -34,16 +34,15 @@ void ArchSetUp(void* zbi_ptr) {
       .set_mode(arch::RiscvStvec::Mode::kDirect)
       .Write();
 
-  if (zbi_ptr) {
-    zbitl::View zbi(zbitl::StorageFromRawHeader(reinterpret_cast<const zbi_header_t*>(zbi_ptr)));
-
+  if (zbi) {
     zbitl::CpuTopologyTable topology;
     ktl::span<const char> strtab;
-    for (auto it = zbi.begin(); it != zbi.end(); ++it) {
-      auto [header, payload] = *it;
+    for (auto it = zbi->begin(); it != zbi->end(); ++it) {
+      auto [header, wrapped_payload] = *it;
       switch (header->type) {
         case ZBI_TYPE_CPU_TOPOLOGY: {
-          auto result = zbitl::CpuTopologyTable::FromItem(it);
+          ktl::span payload = wrapped_payload.get();
+          auto result = zbitl::CpuTopologyTable::FromPayload(header->type, payload);
           if (result.is_ok()) {
             topology = result.value();
           } else {
@@ -53,7 +52,8 @@ void ArchSetUp(void* zbi_ptr) {
           }
           break;
         }
-        case ZBI_TYPE_RISCV64_ISA_STRTAB:
+        case ZBI_TYPE_RISCV64_ISA_STRTAB: {
+          ktl::span payload = wrapped_payload.get();
           strtab = {reinterpret_cast<const char*>(payload.data()), payload.size()};
 
           // Defensively zero out the last character. This should not overwrite
@@ -61,9 +61,10 @@ void ArchSetUp(void* zbi_ptr) {
           // pointers into the table as C strings (as intended).
           const_cast<char&>(strtab.back()) = '\0';
           break;
+        }
       }
     }
-    zbi.ignore_error();
+    zbi->ignore_error();
 
     if (strtab.empty()) {
       printf(

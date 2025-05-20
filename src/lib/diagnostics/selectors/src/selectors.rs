@@ -943,11 +943,10 @@ enum SegmentIterator<'a> {
 
 impl<'a> From<&'a Moniker> for SegmentIterator<'a> {
     fn from(moniker: &'a Moniker) -> Self {
-        let path = moniker.path();
-        if path.is_empty() {
+        if moniker.is_root() {
             return SegmentIterator::Root(false);
         }
-        SegmentIterator::Iter { path: path.as_slice(), current_index: 0 }
+        SegmentIterator::Iter { path: moniker.path(), current_index: 0 }
     }
 }
 
@@ -1083,9 +1082,7 @@ a:b:c
             let parsed_selector = parse_selector::<VerboseError>(selector).unwrap();
             assert!(
                 match_component_moniker_against_selector(&moniker, &parsed_selector).unwrap(),
-                "Selector {:?} failed to match {:?}",
-                selector,
-                moniker
+                "Selector {selector:?} failed to match {moniker:?}"
             );
         }
 
@@ -1102,9 +1099,7 @@ a:b:c
             let parsed_selector = parse_selector::<VerboseError>(selector).unwrap();
             assert!(
                 !match_component_moniker_against_selector(&moniker, &parsed_selector).unwrap(),
-                "Selector {:?} matched {:?}, but was expected to fail",
-                selector,
-                moniker
+                "Selector {selector:?} matched {moniker:?}, but was expected to fail"
             );
         }
     }

@@ -4,4 +4,3 @@
 
 include /src/starnix/OWNERS
 include /third_party/rust_crates/forks/rustyline/OWNERS
-include /third_party/rust_crates/vendor/vte-0.3.3/OWNERS

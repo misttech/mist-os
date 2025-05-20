@@ -211,6 +211,8 @@ void DebugAgent::OnStatus(const debug_ipc::StatusRequest& request, debug_ipc::St
           thread->GetThreadRecord(debug_ipc::ThreadRecord::StackAmount::kMinimal));
     }
 
+    process_record.shared_address_space = proc->process_handle().GetSharedAddressSpace();
+
     reply->processes.emplace_back(std::move(process_record));
   }
 
@@ -237,6 +239,8 @@ void DebugAgent::OnStatus(const debug_ipc::StatusRequest& request, debug_ipc::St
 
       // For now, only fill the thread blocked on exception.
       process_record.threads.push_back(record.thread->GetThreadRecord(process_koid));
+
+      process_record.shared_address_space = record.process->GetSharedAddressSpace();
 
       reply->limbo.push_back(std::move(process_record));
     }
@@ -854,6 +858,7 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
   reply->name = process->process_handle().GetName();
   reply->components =
       system_interface_->GetComponentManager().FindComponentInfo(process->process_handle());
+  reply->shared_address_space = process->process_handle().GetSharedAddressSpace();
 
   // Send the reply first, then the notifications about the process and threads.
   debug::MessageLoop::Current()->PostTask(
@@ -1027,6 +1032,7 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
   notify.timestamp = GetNowTimestamp();
   notify.components = system_interface_->GetComponentManager().FindComponentInfo(*process_handle);
   notify.filter_id = matched_filter ? matched_filter->id : debug_ipc::kInvalidFilterId;
+  notify.shared_address_space = process_handle->GetSharedAddressSpace();
 
   DebuggedProcessCreateInfo create_info(std::move(process_handle));
   create_info.stdio = std::move(stdio);

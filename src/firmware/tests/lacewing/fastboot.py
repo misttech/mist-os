@@ -14,20 +14,31 @@ from mobly import asserts, test_runner
 
 # Required fastboot variables.
 # - key: variable name
-# - value: a list of acceptable strings for the value, or [] for any value
+# - value: a list of acceptable strings for the value, or None for any value
 _REQUIRED_VARS = {
-    "hw-revision": [],
+    # Required for fastboot protocol communication.
+    "max-download-size": None,
+    "serialno": None,
+    # Required for `ffx target flash` to identify boards.
+    "hw-revision": None,
+    # Slot information for debugging and failure analysis.
+    "current-slot": ["a", "b"],
     "slot-count": ["2"],
-    "slot-suffixes": ["a,b"],
+    "slot-retry-count:a": None,
+    "slot-retry-count:b": None,
+    "slot-successful:a": None,
+    "slot-successful:b": None,
+    "slot-unbootable:a": None,
+    "slot-unbootable:b": None,
     # TODO(b/308030836):: add is-userspace back after all devices support it.
     # "is-userspace": ["no"],
-    "max-download-size": [],
-    "version": ["0.4"],
     # TODO(b/308030836):: add the vx- variables after all devices support it.
     # "vx-locked": ["no", "yes"],
     # "vx-unlockable": ["ephemeral", "no", "yes"],
 }
 
+# Regexp to extract variable name and value from fastboot output.
+#
 # Example getvar output:
 # - "foo:bar"
 # - "foo: bar"
@@ -36,32 +47,29 @@ _REQUIRED_VARS = {
 # - "(bootloader) foo: bar"
 #
 # TODO(b/308030836): require a space between the name/arg and value, otherwise
-# parsing can be ambiguous if the value itself could contain a colon.
+# parsing can be ambiguous if the value itself could contain a colon. Currently
+# we assume there is at most one arg per variable, and any other colon belongs
+# to the value, e.g. `foo:a:b:c` results in name="foo:a", value="b:c".
 _GETVAR_REGEX = re.compile(
-    r"(\(bootloader\) )?(?P<name>[a-z\-]+):((?P<arg>[a-z0-9]+):)? ?(?P<val>.*)"
+    r"(\(bootloader\) )?(?P<name>[a-z\-]+(:[a-z0-9]+)?): ?(?P<val>.*)"
 )
 
 
-def parse_getvar(line: str) -> Tuple[str, str, str]:  # type: ignore[return]
+def parse_getvar(line: str) -> Tuple[str, str]:  # type: ignore[return]
     """Parses a `getvar` or `getvar all` output line.
 
     Args:
         line: a single line of `getvar` output.
 
     Returns:
-        A tuple containing (name, arg, value). Arg or value may be the empty
-        string if they are not present.
+        A tuple containing (name, value).
 
     Raises:
         Mobly assert if the line doesn't look like `getvar` output.
     """
     match = _GETVAR_REGEX.match(line)
     if match:
-        return (
-            match.group("name"),
-            match.group("arg") or "",
-            match.group("val") or "",
-        )
+        return (match.group("name"), match.group("val"))
     asserts.fail("Failed to parse getvar output", extras={"line": line})
 
 
@@ -102,7 +110,7 @@ class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
                 "getvar output should only be a single line",
                 extras={"output": output},
             )
-            name, _, value = parse_getvar(output[0])
+            name, value = parse_getvar(output[0])
 
             asserts.assert_equal(
                 name, expected_name, "getvar name doesn't match expected"
@@ -115,26 +123,18 @@ class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
                     extras={"name": name},
                 )
 
+        # Make sure all the variables we care about also exist in `getvar all`.
         logging.info("Checking `getvar all`")
         getvar_all_vars = []
         for line in self.device.fastboot.run(["getvar", "all"]):
-            name, _, _ = parse_getvar(line)
+            name, _ = parse_getvar(line)
             if name != "all":
                 getvar_all_vars.append(name)
 
-        # Make sure all the important variables are there.
         for name in _REQUIRED_VARS:
             asserts.assert_in(
                 name, getvar_all_vars, "Missing variable in `getvar all`"
             )
-
-        # For readability `getvar all` should sort output.
-        # TODO(b/308030836): re-enable this after all devices sort output.
-        # asserts.assert_equal(
-        #     getvar_all_vars,
-        #     sorted(getvar_all_vars),
-        #     "`getvar all` output is not sorted",
-        # )
 
 
 if __name__ == "__main__":

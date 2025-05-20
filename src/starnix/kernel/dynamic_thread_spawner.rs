@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::execution::create_kernel_thread;
 use crate::task::{with_new_current_task, CurrentTask, Task};
 use futures::channel::oneshot;
 use futures::TryFutureExt;
@@ -231,7 +232,7 @@ impl RunningThread {
                         let Some(system_task) = system_task.upgrade() else {
                             return;
                         };
-                        match CurrentTask::create_kernel_thread(
+                        match create_kernel_thread(
                             &mut locked,
                             &system_task,
                             CString::new("kthreadd").unwrap(),

@@ -262,10 +262,10 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     ZX_ASSERT(info.type == ZX_OBJ_TYPE_SOCKET);
     fuchsia_io::wire::Flags flags{};
     if (info.rights & ZX_RIGHT_READ) {
-      flags |= fuchsia_io::wire::Flags::kPermRead;
+      flags |= fuchsia_io::wire::Flags::kPermReadBytes;
     }
     if (info.rights & ZX_RIGHT_WRITE) {
-      flags |= fuchsia_io::wire::Flags::kPermWrite;
+      flags |= fuchsia_io::wire::Flags::kPermWriteBytes;
     }
     *out_flags = static_cast<uint64_t>(flags);
     return ZX_OK;
@@ -279,8 +279,10 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
       return status;
     }
     // Ensure that the supported flags (readable, writeable) match the rights on the socket.
-    const bool set_readable = flags & static_cast<uint64_t>(fuchsia_io::wire::Flags::kPermRead);
-    const bool set_writable = flags & static_cast<uint64_t>(fuchsia_io::wire::Flags::kPermWrite);
+    const bool set_readable =
+        flags & static_cast<uint64_t>(fuchsia_io::wire::Flags::kPermReadBytes);
+    const bool set_writable =
+        flags & static_cast<uint64_t>(fuchsia_io::wire::Flags::kPermWriteBytes);
     const bool is_readable = info.rights & ZX_RIGHT_READ;
     const bool is_writable = info.rights & ZX_RIGHT_WRITE;
     if ((set_readable != is_readable) || (set_writable != is_writable)) {

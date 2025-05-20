@@ -5,8 +5,9 @@
 //! FFX plugin for constructing product bundles, which are distributable containers for a product's
 //! images and packages, and can be used to emulate, flash, or update a product.
 
-use anyhow::{bail, ensure, Context, Result};
-use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
+use anyhow::{ensure, Context, Result};
+use assembled_system::{AssembledSystem, BlobfsContents, Image, PackagesMetadata};
+use assembly_container::AssemblyContainer;
 use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_package::{Slot, UpdatePackageBuilder};
@@ -15,7 +16,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_config::EnvironmentContext;
-use ffx_fastboot::manifest::FlashManifestVersion;
+use ffx_flash_manifest::FlashManifestVersion;
 use ffx_product_create_args::CreateCommand;
 use ffx_writer::SimpleWriter;
 use fho::{return_bug, FfxMain, FfxTool};
@@ -26,9 +27,8 @@ use fuchsia_repo::repository::FileSystemRepository;
 use sdk_metadata::{
     ProductBundle, ProductBundleV2, Repository, VirtualDevice, VirtualDeviceManifest,
 };
-use std::fs::{self, File};
+use std::fs::File;
 use tempfile::TempDir;
-use walkdir::WalkDir;
 
 /// Default delivery blob type to use for products.
 const DEFAULT_DELIVERY_BLOB_TYPE: u32 = 1;
@@ -96,15 +96,15 @@ pub async fn pb_create_with_sdk_version(
 
     let partitions = load_partitions_config(&cmd.partitions, &cmd.out_dir.join("partitions"))?;
     let (system_a, packages_a) =
-        load_assembly_manifest(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
+        load_assembled_system(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
     let (system_b, _packages_b) =
-        load_assembly_manifest(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
+        load_assembled_system(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
     let (system_r, packages_r) =
-        load_assembly_manifest(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
+        load_assembled_system(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
 
     // We must assert that the board_name for the system of images matches the hardware_revision in
     // the partitions config, otherwise OTAs may not work.
-    let ensure_system_board = |system: &AssemblyManifest| -> Result<()> {
+    let ensure_system_board = |system: &AssembledSystem| -> Result<()> {
         if partitions.hardware_revision != "" {
             ensure!(
                 &system.board_name == &partitions.hardware_revision,
@@ -310,48 +310,23 @@ fn load_partitions_config(
     path: impl AsRef<Utf8Path>,
     out_dir: impl AsRef<Utf8Path>,
 ) -> Result<PartitionsConfig> {
-    let path = path.as_ref().parent().context("Determine base path")?;
-    let out_dir = out_dir.as_ref();
-
-    std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
-
-    // This is invalid, causing a cycle since WalkDir would infinitely iterate
-    // as we keep adding subdirectories/subfiles.
-    if out_dir.canonicalize_utf8()?.starts_with(path.canonicalize_utf8()?) {
-        bail!("out_dir {:?} cannot be nested in partitions_config base path {:?}", out_dir, path);
-    }
-
-    for entry in WalkDir::new(path).follow_links(true) {
-        let entry = entry?;
-        let entry_path = entry.path();
-
-        let relative_path = entry_path.strip_prefix(path)?;
-        let rebased_path = out_dir.join_os(relative_path);
-
-        if entry.file_type().is_dir() {
-            fs::create_dir_all(rebased_path).context("Create directory")?;
-        } else if entry.file_type().is_file() {
-            fs::copy(entry_path, rebased_path).context("Copy file")?;
-        }
-    }
-
-    PartitionsConfig::try_load_from(out_dir.join("partitions_config.json"))
-        .context("Loading partitions config")
+    let config = PartitionsConfig::from_dir(path)?;
+    config.write_to_dir(out_dir, None::<Utf8PathBuf>)
 }
 
-/// Open and parse an AssemblyManifest from a path, copying the images into `out_dir`.
+/// Open and parse an AssembledSystem from a path, copying the images into `out_dir`.
 /// Returns None if the given path is None.
-fn load_assembly_manifest(
+fn load_assembled_system(
     path: &Option<Utf8PathBuf>,
     out_dir: impl AsRef<Utf8Path>,
-) -> Result<(Option<AssemblyManifest>, Vec<(Option<Utf8PathBuf>, PackageManifest)>)> {
+) -> Result<(Option<AssembledSystem>, Vec<(Option<Utf8PathBuf>, PackageManifest)>)> {
     let out_dir = out_dir.as_ref();
 
     if let Some(path) = path {
         // Make sure `out_dir` is created.
         std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
 
-        let manifest = AssemblyManifest::try_load_from(path)
+        let system = AssembledSystem::try_load_from(path)
             .with_context(|| format!("Loading assembly manifest: {}", path))?;
 
         // Filter out the base package, and the blobfs contents.
@@ -370,7 +345,7 @@ fn load_assembly_manifest(
         let mut has_zbi = false;
         let mut has_vbmeta = false;
         let mut has_dtbo = false;
-        for image in manifest.images.into_iter() {
+        for image in system.images.into_iter() {
             match image {
                 Image::BasePackage(..) => {}
                 Image::Fxfs { path, contents } => {
@@ -423,10 +398,7 @@ fn load_assembly_manifest(
             new_images.push(image);
         }
 
-        Ok((
-            Some(AssemblyManifest { images: new_images, board_name: manifest.board_name }),
-            packages,
-        ))
+        Ok((Some(AssembledSystem { images: new_images, board_name: system.board_name }), packages))
     } else {
         Ok((None, vec![]))
     }
@@ -455,6 +427,7 @@ mod test {
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use fuchsia_repo::test_utils;
     use sdk_metadata::VirtualDeviceV1;
+    use std::fs;
     use std::io::Write;
 
     const VIRTUAL_DEVICE_VALID: &str =
@@ -493,28 +466,21 @@ mod test {
         let mut error_file = File::create(&error_path).unwrap();
         error_file.write_all("error".as_bytes()).unwrap();
 
-        let nested_error_path = pb_dir.join("partitions_config.json");
-        let nested_error_file = File::create(&nested_error_path).unwrap();
-        serde_json::to_writer(&nested_error_file, &PartitionsConfig::default()).unwrap();
-
-        let parsed = load_partitions_config(&config_path, &pb_dir);
+        let parsed = load_partitions_config(&config_dir, &pb_dir);
         assert!(parsed.is_ok());
 
-        let error = load_partitions_config(&error_path, &pb_dir);
+        let error = load_partitions_config(&error_dir, &pb_dir);
         assert!(error.is_err());
-
-        let nested_error = load_partitions_config(&nested_error_path, &pb_dir);
-        assert!(nested_error.is_err());
     }
 
     #[test]
-    fn test_load_assembly_manifest() {
+    fn test_load_assembled_system() {
         let temp = TempDir::new().unwrap();
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
         let pb_dir = tempdir.join("pb");
 
         let manifest_path = tempdir.join("manifest.json");
-        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
             .write(&manifest_path)
             .unwrap();
 
@@ -522,14 +488,14 @@ mod test {
         let mut error_file = File::create(&error_path).unwrap();
         error_file.write_all("error".as_bytes()).unwrap();
 
-        let (parsed, packages) = load_assembly_manifest(&Some(manifest_path), &pb_dir).unwrap();
+        let (parsed, packages) = load_assembled_system(&Some(manifest_path), &pb_dir).unwrap();
         assert!(parsed.is_some());
         assert_eq!(packages, Vec::new());
 
-        let error = load_assembly_manifest(&Some(error_path), &pb_dir);
+        let error = load_assembled_system(&Some(error_path), &pb_dir);
         assert!(error.is_err());
 
-        let (none, _) = load_assembly_manifest(&None, &pb_dir).unwrap();
+        let (none, _) = load_assembled_system(&None, &pb_dir).unwrap();
         assert!(none.is_none());
     }
 
@@ -551,7 +517,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -602,7 +568,7 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
             .write(&system_path)
             .unwrap();
 
@@ -612,7 +578,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: Some(system_path.clone()),
                 system_b: None,
                 system_r: Some(system_path.clone()),
@@ -664,7 +630,7 @@ mod test {
 
         let system_path = tempdir.join("system.json");
         let mut manifest =
-            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         manifest.images = vec![
             Image::ZBI { path: Utf8PathBuf::from("path1"), signed: false },
             Image::ZBI { path: Utf8PathBuf::from("path2"), signed: true },
@@ -677,7 +643,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: Some(system_path.clone()),
                 system_b: None,
                 system_r: Some(system_path.clone()),
@@ -711,7 +677,7 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
             .write(&system_path)
             .unwrap();
 
@@ -724,7 +690,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: Some(system_path.clone()),
                 system_b: None,
                 system_r: Some(system_path.clone()),
@@ -795,7 +761,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -872,7 +838,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_path,
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,

@@ -33,7 +33,7 @@ class MagmaVsi {
           continue;
         }
         char filename[NAME_MAX] = {};
-        snprintf(filename, sizeof(filename), "%s/%s", kDevicePath, dp->d_name);
+        snprintf(filename, sizeof(filename), "%s/%s/device", kDevicePath, dp->d_name);
 
         zx::channel server_end, client_end;
         zx::channel::create(0, &server_end, &client_end);
@@ -91,7 +91,7 @@ class MagmaVsi {
   inline uint32_t& GetContextId() { return context_id_; }
 
  protected:
-  static constexpr const char* kDevicePath = "/dev/class/gpu";
+  static constexpr const char* kDevicePath = "/svc/fuchsia.gpu.magma.Service";
 
   magma_device_t device_ = 0ul;
   magma_connection_t connection_ = {};

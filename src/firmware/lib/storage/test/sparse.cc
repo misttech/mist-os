@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/stdcompat/span.h>
 #include <lib/storage/gpt_utils.h>
 #include <lib/storage/sparse.h>
 #include <lib/storage/storage.h>
@@ -12,6 +11,7 @@
 #include <array>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -86,7 +86,7 @@ class GptDataHolder {
 };
 
 template <size_t FileHeaderSize, size_t ChunkHeaderSize>
-std::vector<uint8_t> MakeSparseImage(cpp20::span<const SparseDataDescriptor> descriptors) {
+std::vector<uint8_t> MakeSparseImage(std::span<const SparseDataDescriptor> descriptors) {
   static_assert(FileHeaderSize >= sizeof(sparse_header_t));
   static_assert(ChunkHeaderSize >= sizeof(chunk_header_t));
 
@@ -141,7 +141,7 @@ std::vector<uint8_t> MakeSparseImage(cpp20::span<const SparseDataDescriptor> des
   return data;
 }
 
-std::vector<uint8_t> GenerateExpectedData(cpp20::span<const SparseDataDescriptor> descriptors,
+std::vector<uint8_t> GenerateExpectedData(std::span<const SparseDataDescriptor> descriptors,
                                           uint32_t base_fill) {
   std::vector<uint8_t> data;
   for (const auto &chunk : descriptors) {

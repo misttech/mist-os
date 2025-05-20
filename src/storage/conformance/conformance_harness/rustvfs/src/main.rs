@@ -5,7 +5,7 @@
 //! fuchsia io conformance testing harness for the rust pseudo-fs-mt library
 
 use anyhow::{anyhow, Context as _, Error};
-use fidl::endpoints::{create_endpoints, DiscoverableProtocolMarker as _};
+use fidl::endpoints::{DiscoverableProtocolMarker as _, Proxy as _};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_io_test::{
     self as io_test, HarnessConfig, TestHarnessRequest, TestHarnessRequestStream,
@@ -15,12 +15,10 @@ use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
 use log::error;
 use std::sync::Arc;
-use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::{simple, Simple};
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo;
-use vfs::path::Path;
 use vfs::remote::remote_dir;
 
 struct Harness(TestHarnessRequestStream);
@@ -105,25 +103,14 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                         add_entry(*entry, &dir)?;
                     }
                 }
-                let mut object_request = vfs::ObjectRequest::new(
-                    flags,
-                    &Default::default(),
-                    object_request.into_channel(),
-                );
-                dir.open3(ExecutionScope::new(), Path::dot(), flags, &mut object_request)
-                    .expect("failed to open directory");
+                vfs::directory::serve_on(dir, flags, ExecutionScope::new(), object_request);
             }
             TestHarnessRequest::OpenServiceDirectory { responder } => {
-                const FLAGS: fio::Flags = fio::PERM_READABLE;
                 let svc_dir = simple();
                 let service = vfs::service::host(run_echo_server);
                 svc_dir.add_entry(EchoMarker::PROTOCOL_NAME, service).unwrap();
-                let (svc_client, svc_server) = create_endpoints::<fio::DirectoryMarker>();
-                let mut object_request =
-                    vfs::ObjectRequest::new(FLAGS, &Default::default(), svc_server.into_channel());
-                svc_dir
-                    .open3(ExecutionScope::new(), Path::dot(), FLAGS, &mut object_request)
-                    .unwrap();
+                let svc_client =
+                    vfs::directory::serve_read_only(svc_dir).into_client_end().unwrap();
                 responder.send(svc_client).unwrap();
             }
         }

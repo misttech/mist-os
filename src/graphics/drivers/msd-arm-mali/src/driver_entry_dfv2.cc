@@ -20,20 +20,17 @@
 
 #if MAGMA_TEST_DRIVER
 constexpr char kDriverName[] = "mali-test";
-using MagmaDriverBaseType = msd::MagmaTestDriverBase;
 
 zx_status_t magma_indriver_test(ParentDevice* device);
 
 #else
 constexpr char kDriverName[] = "mali";
-using MagmaDriverBaseType = msd::MagmaProductionDriverBase;
 #endif
 
-class MaliDriver : public MagmaDriverBaseType,
-                   public fidl::WireServer<fuchsia_hardware_gpu_mali::MaliUtils> {
+class MaliDriver : public msd::MagmaDriverBase {
  public:
   MaliDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : MagmaDriverBaseType(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
+      : msd::MagmaDriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> MagmaStart() override {
     zx::result info_resource = GetInfoResource();
@@ -57,7 +54,14 @@ class MaliDriver : public MagmaDriverBaseType,
     }
 
 #if MAGMA_TEST_DRIVER
-    set_unit_test_status(magma_indriver_test(parent_device_.get()));
+    {
+      test_server_.set_unit_test_status(magma_indriver_test(parent_device_.get()));
+      zx::result result = CreateTestService(test_server_);
+      if (result.is_error()) {
+        DMESSAGE("Failed to serve the TestService");
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+    }
 #endif
 
     set_magma_system_device(msd::MagmaSystemDevice::Create(
@@ -69,33 +73,10 @@ class MaliDriver : public MagmaDriverBaseType,
 
     return zx::ok();
   }
-  zx::result<> CreateAdditionalDevNodes() override {
-    fuchsia_hardware_gpu_mali::UtilsService::InstanceHandler handler({
-        .device =
-            mali_utils_bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
-    });
-
-    return outgoing()->AddService<fuchsia_hardware_gpu_mali::UtilsService>(std::move(handler));
-  }
 
   void Stop() override {
-    MagmaDriverBaseType::Stop();
+    msd::MagmaDriverBase::Stop();
     magma::PlatformBusMapper::SetInfoResource(zx::resource{});
-  }
-
-  void BindUtilsConnector(fidl::ServerEnd<fuchsia_hardware_gpu_mali::MaliUtils> server) {
-    fidl::BindServer(dispatcher(), std::move(server), this);
-  }
-
-  void SetPowerState(fuchsia_hardware_gpu_mali::wire::MaliUtilsSetPowerStateRequest* request,
-                     SetPowerStateCompleter::Sync& completer) override {
-    std::lock_guard lock(magma_mutex());
-
-    msd::Device* dev = magma_system_device()->msd_dev();
-
-    static_cast<MsdArmDevice*>(dev)->SetPowerState(
-        request->enabled,
-        [completer = completer.ToAsync()](bool powered_on) mutable { completer.ReplySuccess(); });
   }
 
   void GetPowerGoals(GetPowerGoalsCompleter::Sync& completer) override {
@@ -124,7 +105,9 @@ class MaliDriver : public MagmaDriverBaseType,
  private:
   std::unique_ptr<ParentDeviceDFv2> parent_device_;
 
-  fidl::ServerBindingGroup<fuchsia_hardware_gpu_mali::MaliUtils> mali_utils_bindings_;
+#if MAGMA_TEST_DRIVER
+  msd::MagmaTestServer test_server_;
+#endif
 };
 
 FUCHSIA_DRIVER_EXPORT(MaliDriver);

@@ -41,6 +41,13 @@ install_host_tools("host") {
 # relies on host test data that includes an IR for each FIDL library stored in a shared IR root
 # path. Because many golden libraries have duplicate names, there is a conflict to write
 # IRs with the same library name to the same IR root path.
+#
+# If you'd like to update the goldens, edit your `args.gn` to have `update_goldens=true` or run
+# `fx set` with `--args="update_goldens=true"`. Then make sure to run
+#
+# `fx build --host //tools/fidl/fidlgen_python:tests`
+#
+# The tests aren't "run" they're just part of a build step.
 golden_files("fidlgen_python_golden_tests") {
   testonly = true
 

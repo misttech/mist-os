@@ -20,9 +20,7 @@ class {{ .Name }} final {
   static constexpr char Name[] = "{{ .ServiceName }}";
   using Transport = {{ .Transport.Type }};
 
-  {{- IfdefFuchsia -}}
   using ServiceInstanceHandler = fidl::ServiceInstanceHandler<{{ .Transport.Type }}>;
-  {{ EndifFuchsia }}
 
   {{- range .Members }}
   {{ "" }}
@@ -39,7 +37,6 @@ class {{ .Name }} final {
   // Client protocol for connecting to member protocols of a service instance.
   class ServiceClient final {
     ServiceClient() = delete;
-  {{- IfdefFuchsia -}}
    public:
     ServiceClient(::zx::channel dir, ::fidl::internal::ConnectMemberFunc connect_func)
     {{- with .Members }}
@@ -95,10 +92,8 @@ class {{ .Name }} final {
     ::zx::channel dir_;
     ::fidl::internal::ConnectMemberFunc connect_func_;
     {{- end }}
-  {{ EndifFuchsia }}
   };
 
-  {{- IfdefFuchsia -}}
   // Facilitates member protocol registration for servers.
   class InstanceHandler final : public fidl::ServiceInstanceHandler<{{ .Transport.Type }}> {
    public:
@@ -136,6 +131,5 @@ class {{ .Name }} final {
     {{- end }}
 
   };
-  {{ EndifFuchsia }}
 };
 {{- end }}

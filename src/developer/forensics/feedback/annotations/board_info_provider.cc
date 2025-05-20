@@ -26,11 +26,15 @@ Annotations BoardInfoToAnnotations::operator()(const fuchsia::hwinfo::BoardInfo&
   return annotations;
 }
 
-std::set<std::string> BoardInfoProvider::GetKeys() const {
+std::set<std::string> BoardInfoProvider::GetAnnotationKeys() {
   return {
       kHardwareBoardNameKey,
       kHardwareBoardRevisionKey,
   };
+}
+
+std::set<std::string> BoardInfoProvider::GetKeys() const {
+  return BoardInfoProvider::GetAnnotationKeys();
 }
 
 }  // namespace forensics::feedback

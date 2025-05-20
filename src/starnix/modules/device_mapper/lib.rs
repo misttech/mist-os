@@ -811,7 +811,7 @@ impl FileOps for DeviceMapper {
                 Ok(SUCCESS)
             }
             DM_TABLE_LOAD => {
-                let mut start_addr = info_addr + info.data_start;
+                let mut start_addr = (info_addr + info.data_start)?;
                 let mut num_targets = 0;
                 let dm_device = self.registry.get(&info)?;
                 let mut state = dm_device.state.lock();
@@ -832,7 +832,7 @@ impl FileOps for DeviceMapper {
                     let target_ref = UserRef::<uapi::dm_target_spec>::new(start_addr);
                     let target = current_task.read_object(target_ref)?;
                     let parameter_cstring =
-                        UserCString::new(current_task, target_ref.next().addr());
+                        UserCString::new(current_task, target_ref.next()?.addr());
                     let parameters = current_task.read_c_string_to_vec(
                         parameter_cstring,
                         target.next as usize - std::mem::size_of::<uapi::dm_target_spec>(),
@@ -967,7 +967,7 @@ impl FileOps for DeviceMapper {
                 {
                     return error!(ENOTSUP);
                 }
-                let mut name_list_addr = user_info.next().addr();
+                let mut name_list_addr = user_info.next()?.addr();
                 let mut total_size = std::mem::size_of::<uapi::dm_ioctl>() as u32;
                 for (_, device) in self.registry.devices.lock().iter() {
                     let state = device.state.lock();
@@ -1002,8 +1002,8 @@ impl FileOps for DeviceMapper {
                         return Ok(SUCCESS);
                     }
                     total_size += size;
-                    let mut name_addr = dm_name_list.next().addr();
-                    name_addr = name_addr.sub(4 as usize);
+                    let mut name_addr = dm_name_list.next()?.addr();
+                    name_addr = name_addr.sub(4 as usize)?;
                     current_task.write_object(dm_name_list, &name_list)?;
                     name_vec_with_nul.extend(vec![0; padding as usize + 8]);
                     current_task.write_memory(name_addr, name_vec_with_nul.as_slice())?;
@@ -1020,7 +1020,7 @@ impl FileOps for DeviceMapper {
                 Ok(SUCCESS)
             }
             DM_LIST_VERSIONS => {
-                let version_list_addr = user_info.next().addr();
+                let version_list_addr = user_info.next()?.addr();
                 let dm_versions_list = UserRef::<uapi::dm_target_versions>::new(version_list_addr);
                 let name_c_str =
                     std::ffi::CString::new(String::from("verity")).map_err(|_| errno!(EINVAL))?;
@@ -1053,7 +1053,7 @@ impl FileOps for DeviceMapper {
                     ],
                     ..Default::default()
                 };
-                let name_addr = dm_versions_list.next().addr();
+                let name_addr = dm_versions_list.next()?.addr();
                 current_task.write_object(dm_versions_list, &target_versions)?;
                 current_task.write_memory(name_addr, name_vec_with_nul.as_slice())?;
 
@@ -1071,7 +1071,7 @@ impl FileOps for DeviceMapper {
                 let state = dm_device.state.lock();
                 let mut total_data_size = 0;
                 let mut data_padding = 0;
-                let mut target_spec_addr = user_info.next().addr();
+                let mut target_spec_addr = user_info.next()?.addr();
                 let mut out_flags = DeviceMapperFlags::empty();
                 let space_for_data = info.data_size as usize
                     - std::cmp::min(info.data_size as usize, std::mem::size_of::<uapi::dm_ioctl>());
@@ -1084,7 +1084,7 @@ impl FileOps for DeviceMapper {
                             out_flags |= DeviceMapperFlags::BUFFER_FULL;
                             break;
                         }
-                        let data_addr = target_spec_info.next().addr();
+                        let data_addr = target_spec_info.next()?.addr();
                         if flags.contains(DeviceMapperFlags::STATUS_TABLE) {
                             match &target.target_type {
                                 TargetType::Verity(args) => {

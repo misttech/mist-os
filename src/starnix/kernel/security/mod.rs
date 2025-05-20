@@ -27,7 +27,13 @@ pub struct KernelState {
     state: Option<selinux_hooks::KernelState>,
 }
 
-/// Opaque structure encapsulating security state for a `ThreadGroup`.
+impl KernelState {
+    pub fn access_denial_count(&self) -> u64 {
+        self.state.as_ref().map_or(0u64, |state| state.access_denial_count())
+    }
+}
+
+/// Opaque structure encapsulating active security state for a `Task`.
 #[derive(Debug)]
 pub struct TaskState(Mutex<selinux_hooks::TaskAttrs>);
 
@@ -38,6 +44,10 @@ impl TaskState {
         self.0.lock()
     }
 }
+
+/// Opaque structure encapsulating the effective security state saved from a task.
+#[derive(Clone, Debug)]
+pub struct SavedEffectiveState(SecurityId);
 
 /// Opaque structure holding security state associated with a `ResolvedElf` instance.
 #[derive(Debug, PartialEq)]
@@ -53,6 +63,12 @@ impl FsNodeState {
     pub fn lock(&self) -> starnix_sync::MutexGuard<'_, selinux_hooks::FsNodeState> {
         self.0.lock()
     }
+}
+
+/// Opaque structure holding security state for a [`crate::vfs::Socket`].
+#[derive(Debug, Default)]
+pub struct SocketState {
+    state: selinux_hooks::SocketState,
 }
 
 /// Opaque structure holding security state for a [`crate::vfs::FileObject`].
@@ -78,6 +94,3 @@ pub struct BpfMapState {
 pub struct BpfProgState {
     state: selinux_hooks::BpfProgState,
 }
-
-/// Default access-check exceptions configuration for SELinux-enabled Starnix containers.
-pub const DEFAULT_EXCEPTIONS_CONFIG: &str = include_str!("selinux_hooks/default_exceptions_config");

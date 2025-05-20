@@ -512,6 +512,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.gpu.magma/Primary.CreateContext2",
+        "strictness": "strict",
+        "ordinal": "6881001401173367030",
+        "direction": "one_way",
+        "request": "fuchsia.gpu.magma/PrimaryCreateContext2Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.gpu.magma/Primary.CreatePerformanceCounterBufferPool",
         "strictness": "strict",
         "ordinal": "5245838496345343544",
@@ -699,6 +707,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.gpu.magma/PrimaryClearPerformanceCountersRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.gpu.magma/PrimaryCreateContext2Request.context_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.gpu.magma/PrimaryCreateContext2Request.priority",
+        "ordinal": "2",
+        "type": "fuchsia.gpu.magma/Priority"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.gpu.magma/PrimaryCreateContext2Request"
     },
     {
         "kind": "struct/member",
@@ -968,6 +992,32 @@
     {
         "kind": "table",
         "name": "fuchsia.gpu.magma/PrimaryUnmapBufferRequest"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.gpu.magma/Priority.HIGH",
+        "value": "512"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.gpu.magma/Priority.LOW",
+        "value": "128"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.gpu.magma/Priority.MEDIUM",
+        "value": "256"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.gpu.magma/Priority.REALTIME",
+        "value": "1024"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.gpu.magma/Priority",
+        "strictness": "flexible",
+        "type": "uint64"
     },
     {
         "kind": "enum/member",

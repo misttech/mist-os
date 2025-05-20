@@ -54,8 +54,6 @@ if (is_fuchsia) {
   }
 
   files = {
-    partitions_config = "$target_out_dir/partitions/partitions_config.json"
-
     outdir = target_out_dir + "/assembly"
     packages_json = "${outdir}/packages.json"
     images_json = "${outdir}/images.json"
@@ -144,7 +142,6 @@ if (is_fuchsia) {
 
   generated_partitions_config("partitions_config") {
     testonly = true
-    output_path = get_path_info(files.partitions_config, "dir")
     hw_revision = board_name
   }
 
@@ -152,10 +149,9 @@ if (is_fuchsia) {
     testonly = true
     deps = [
       ":assembly",
-      ":partitions_config",
       "//build/info:build_info_files",
     ]
-    partitions = files.partitions_config
+    partitions = ":partitions_config"
     system_a = files.images_json
     version_file = build_info_files.version
     board_name = "fake_board"
@@ -167,7 +163,6 @@ if (is_fuchsia) {
     name = "scrutiny-failed-route-verify-test"
     deps = [
       ":assembly",
-      ":partitions_config",
       "//build/info:build_info_files",
     ]
 
@@ -176,7 +171,7 @@ if (is_fuchsia) {
       epoch = "1"
     }
 
-    partitions = files.partitions_config
+    partitions = ":partitions_config"
     system_a = files.images_json
 
     # Create lists of the files that are referenced by the assembly manifests.

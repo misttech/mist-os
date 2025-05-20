@@ -53,27 +53,17 @@ pub const NETLINK_LOG_TAG: &'static str = "netlink";
 
 /// Flags to enable/disable certain features to allow for convenient rollbacks.
 #[derive(Copy, Clone, Debug)]
-pub struct FeatureFlags {
-    /// If set, use the NDP watcher instead of stubbing a fake nduseropt
-    /// message for indicating IPv6 upstream connectivity.
-    // TODO(https://fxbug.dev/397475289): Remove this flag and use the NDP
-    // watcher by default.
-    pub use_ndp_watcher_instead_of_nduseropt_stub: bool,
-}
+pub struct FeatureFlags {}
 
 impl FeatureFlags {
     /// Flags to use in "real" binaries.
     pub fn prod() -> Self {
-        FeatureFlags { use_ndp_watcher_instead_of_nduseropt_stub: true }
+        FeatureFlags {}
     }
 
     /// Flags to use in unit and integration tests.
     pub fn test() -> Self {
-        FeatureFlags {
-            // This flag is due to be cleaned up soon, after which `true` will
-            // be the only supported behavior.
-            use_ndp_watcher_instead_of_nduseropt_stub: true,
-        }
+        FeatureFlags {}
     }
 }
 

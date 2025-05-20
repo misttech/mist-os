@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -3145,15 +3143,15 @@ class AjarTargetEventReporterServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_report_event: typing.TypeAlias = None
+    ReportEventResponse: typing.TypeAlias = None
 
     @abstractmethod
     def report_event(
         self,
         request: AjarTargetEventReport,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_report_event]
-        | _MethodResponse_report_event
+        typing.Coroutine[typing.Any, typing.Any, ReportEventResponse]
+        | ReportEventResponse
     ):
         ...
 
@@ -3337,59 +3335,51 @@ class ClosedTargetServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_two_way_no_payload: typing.TypeAlias = None
+    TwoWayNoPayloadResponse: typing.TypeAlias = None
 
     @abstractmethod
     def two_way_no_payload(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_no_payload
-        ]
-        | _MethodResponse_two_way_no_payload
+        typing.Coroutine[typing.Any, typing.Any, TwoWayNoPayloadResponse]
+        | TwoWayNoPayloadResponse
     ):
         ...
 
-    _MethodResponse_two_way_struct_payload: typing.TypeAlias = NonEmptyPayload
+    TwoWayStructPayloadResponse: typing.TypeAlias = NonEmptyPayload
 
     @abstractmethod
     def two_way_struct_payload(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_struct_payload
-        ]
-        | _MethodResponse_two_way_struct_payload
+        typing.Coroutine[typing.Any, typing.Any, TwoWayStructPayloadResponse]
+        | TwoWayStructPayloadResponse
     ):
         ...
 
-    _MethodResponse_two_way_table_payload: typing.TypeAlias = TablePayload
+    TwoWayTablePayloadResponse: typing.TypeAlias = TablePayload
 
     @abstractmethod
     def two_way_table_payload(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_table_payload
-        ]
-        | _MethodResponse_two_way_table_payload
+        typing.Coroutine[typing.Any, typing.Any, TwoWayTablePayloadResponse]
+        | TwoWayTablePayloadResponse
     ):
         ...
 
-    _MethodResponse_two_way_union_payload: typing.TypeAlias = UnionPayload
+    TwoWayUnionPayloadResponse: typing.TypeAlias = UnionPayload
 
     @abstractmethod
     def two_way_union_payload(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_union_payload
-        ]
-        | _MethodResponse_two_way_union_payload
+        typing.Coroutine[typing.Any, typing.Any, TwoWayUnionPayloadResponse]
+        | TwoWayUnionPayloadResponse
     ):
         ...
 
-    _MethodResponse_two_way_struct_payload_err: typing.TypeAlias = typing.Union[
+    TwoWayStructPayloadErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         NonEmptyPayload,
     ]
@@ -3398,107 +3388,91 @@ class ClosedTargetServer(ServerBase, ABC):
     def two_way_struct_payload_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_struct_payload_err
-        ]
-        | _MethodResponse_two_way_struct_payload_err
+        typing.Coroutine[typing.Any, typing.Any, TwoWayStructPayloadErrResponse]
+        | TwoWayStructPayloadErrResponse
     ):
         ...
 
-    _MethodResponse_two_way_struct_request: typing.TypeAlias = None
+    TwoWayStructRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def two_way_struct_request(
         self,
         request: NonEmptyPayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_struct_request
-        ]
-        | _MethodResponse_two_way_struct_request
+        typing.Coroutine[typing.Any, typing.Any, TwoWayStructRequestResponse]
+        | TwoWayStructRequestResponse
     ):
         ...
 
-    _MethodResponse_two_way_table_request: typing.TypeAlias = None
+    TwoWayTableRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def two_way_table_request(
         self,
         request: TablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_table_request
-        ]
-        | _MethodResponse_two_way_table_request
+        typing.Coroutine[typing.Any, typing.Any, TwoWayTableRequestResponse]
+        | TwoWayTableRequestResponse
     ):
         ...
 
-    _MethodResponse_two_way_union_request: typing.TypeAlias = None
+    TwoWayUnionRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def two_way_union_request(
         self,
         request: UnionPayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_two_way_union_request
-        ]
-        | _MethodResponse_two_way_union_request
+        typing.Coroutine[typing.Any, typing.Any, TwoWayUnionRequestResponse]
+        | TwoWayUnionRequestResponse
     ):
         ...
 
-    _MethodResponse_one_way_no_request: typing.TypeAlias = None
+    OneWayNoRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_no_request(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_no_request
-        ]
-        | _MethodResponse_one_way_no_request
+        typing.Coroutine[typing.Any, typing.Any, OneWayNoRequestResponse]
+        | OneWayNoRequestResponse
     ):
         ...
 
-    _MethodResponse_one_way_struct_request: typing.TypeAlias = None
+    OneWayStructRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_struct_request(
         self,
         request: NonEmptyPayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_struct_request
-        ]
-        | _MethodResponse_one_way_struct_request
+        typing.Coroutine[typing.Any, typing.Any, OneWayStructRequestResponse]
+        | OneWayStructRequestResponse
     ):
         ...
 
-    _MethodResponse_one_way_table_request: typing.TypeAlias = None
+    OneWayTableRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_table_request(
         self,
         request: TablePayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_table_request
-        ]
-        | _MethodResponse_one_way_table_request
+        typing.Coroutine[typing.Any, typing.Any, OneWayTableRequestResponse]
+        | OneWayTableRequestResponse
     ):
         ...
 
-    _MethodResponse_one_way_union_request: typing.TypeAlias = None
+    OneWayUnionRequestResponse: typing.TypeAlias = None
 
     @abstractmethod
     def one_way_union_request(
         self,
         request: UnionPayload,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_one_way_union_request
-        ]
-        | _MethodResponse_one_way_union_request
+        typing.Coroutine[typing.Any, typing.Any, OneWayUnionRequestResponse]
+        | OneWayUnionRequestResponse
     ):
         ...
 
@@ -3836,15 +3810,15 @@ class ClosedTargetEventReporterServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_report_event: typing.TypeAlias = None
+    ReportEventResponse: typing.TypeAlias = None
 
     @abstractmethod
     def report_event(
         self,
         request: ClosedTargetEventReport,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_report_event]
-        | _MethodResponse_report_event
+        typing.Coroutine[typing.Any, typing.Any, ReportEventResponse]
+        | ReportEventResponse
     ):
         ...
 
@@ -4018,55 +3992,51 @@ class OpenTargetServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_strict_one_way: typing.TypeAlias = None
+    StrictOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_one_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_one_way]
-        | _MethodResponse_strict_one_way
+        typing.Coroutine[typing.Any, typing.Any, StrictOneWayResponse]
+        | StrictOneWayResponse
     ):
         ...
 
-    _MethodResponse_flexible_one_way: typing.TypeAlias = None
+    FlexibleOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def flexible_one_way(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_one_way
-        ]
-        | _MethodResponse_flexible_one_way
+        typing.Coroutine[typing.Any, typing.Any, FlexibleOneWayResponse]
+        | FlexibleOneWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way: typing.TypeAlias = None
+    StrictTwoWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_two_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_two_way]
-        | _MethodResponse_strict_two_way
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayResponse]
+        | StrictTwoWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields: typing.TypeAlias = NonEmptyPayload
+    StrictTwoWayFieldsResponse: typing.TypeAlias = NonEmptyPayload
 
     @abstractmethod
     def strict_two_way_fields(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields
-        ]
-        | _MethodResponse_strict_two_way_fields
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsResponse]
+        | StrictTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         None,
     ]
@@ -4075,14 +4045,12 @@ class OpenTargetServer(ServerBase, ABC):
     def strict_two_way_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_err
-        ]
-        | _MethodResponse_strict_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayErrResponse]
+        | StrictTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayFieldsErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         NonEmptyPayload,
     ]
@@ -4091,14 +4059,12 @@ class OpenTargetServer(ServerBase, ABC):
     def strict_two_way_fields_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields_err
-        ]
-        | _MethodResponse_strict_two_way_fields_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsErrResponse]
+        | StrictTwoWayFieldsErrResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         None,
     ]
@@ -4107,14 +4073,12 @@ class OpenTargetServer(ServerBase, ABC):
     def flexible_two_way(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way
-        ]
-        | _MethodResponse_flexible_two_way
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayResponse]
+        | FlexibleTwoWayResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_fields: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayFieldsResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         NonEmptyPayload,
     ]
@@ -4123,14 +4087,12 @@ class OpenTargetServer(ServerBase, ABC):
     def flexible_two_way_fields(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_fields
-        ]
-        | _MethodResponse_flexible_two_way_fields
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayFieldsResponse]
+        | FlexibleTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_err: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayErrResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         DomainError,
         None,
@@ -4140,29 +4102,25 @@ class OpenTargetServer(ServerBase, ABC):
     def flexible_two_way_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_err
-        ]
-        | _MethodResponse_flexible_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayErrResponse]
+        | FlexibleTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_fields_err: typing.TypeAlias = (
-        typing.Union[
-            FrameworkError,
-            DomainError,
-            NonEmptyPayload,
-        ]
-    )
+    FlexibleTwoWayFieldsErrResponse: typing.TypeAlias = typing.Union[
+        FrameworkError,
+        DomainError,
+        NonEmptyPayload,
+    ]
 
     @abstractmethod
     def flexible_two_way_fields_err(
         self,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_fields_err
+            typing.Any, typing.Any, FlexibleTwoWayFieldsErrResponse
         ]
-        | _MethodResponse_flexible_two_way_fields_err
+        | FlexibleTwoWayFieldsErrResponse
     ):
         ...
 
@@ -4417,15 +4375,15 @@ class OpenTargetEventReporterServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_report_event: typing.TypeAlias = None
+    ReportEventResponse: typing.TypeAlias = None
 
     @abstractmethod
     def report_event(
         self,
         request: OpenTargetEventReport,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_report_event]
-        | _MethodResponse_report_event
+        typing.Coroutine[typing.Any, typing.Any, ReportEventResponse]
+        | ReportEventResponse
     ):
         ...
 
@@ -4749,76 +4707,64 @@ class RunnerServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_get_version: typing.TypeAlias = RunnerGetVersionResponse
+    GetVersionResponse: typing.TypeAlias = RunnerGetVersionResponse
 
     @abstractmethod
     def get_version(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_get_version]
-        | _MethodResponse_get_version
+        typing.Coroutine[typing.Any, typing.Any, GetVersionResponse]
+        | GetVersionResponse
     ):
         ...
 
-    _MethodResponse_is_test_enabled: typing.TypeAlias = (
-        RunnerIsTestEnabledResponse
-    )
+    IsTestEnabledResponse: typing.TypeAlias = RunnerIsTestEnabledResponse
 
     @abstractmethod
     def is_test_enabled(
         self,
         request: RunnerIsTestEnabledRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_is_test_enabled
-        ]
-        | _MethodResponse_is_test_enabled
+        typing.Coroutine[typing.Any, typing.Any, IsTestEnabledResponse]
+        | IsTestEnabledResponse
     ):
         ...
 
-    _MethodResponse_check_alive: typing.TypeAlias = None
+    CheckAliveResponse: typing.TypeAlias = None
 
     @abstractmethod
     def check_alive(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_check_alive]
-        | _MethodResponse_check_alive
+        typing.Coroutine[typing.Any, typing.Any, CheckAliveResponse]
+        | CheckAliveResponse
     ):
         ...
 
-    _MethodResponse_get_bindings_properties: typing.TypeAlias = (
-        BindingsProperties
-    )
+    GetBindingsPropertiesResponse: typing.TypeAlias = BindingsProperties
 
     @abstractmethod
     def get_bindings_properties(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_get_bindings_properties
-        ]
-        | _MethodResponse_get_bindings_properties
+        typing.Coroutine[typing.Any, typing.Any, GetBindingsPropertiesResponse]
+        | GetBindingsPropertiesResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_no_payload: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallTwoWayNoPayloadResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_two_way_no_payload(
         self,
         request: RunnerCallTwoWayNoPayloadRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_two_way_no_payload
-        ]
-        | _MethodResponse_call_two_way_no_payload
+        typing.Coroutine[typing.Any, typing.Any, CallTwoWayNoPayloadResponse]
+        | CallTwoWayNoPayloadResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_struct_payload: typing.TypeAlias = (
+    CallTwoWayStructPayloadResponse: typing.TypeAlias = (
         NonEmptyResultClassification
     )
 
@@ -4828,45 +4774,37 @@ class RunnerServer(ServerBase, ABC):
         request: RunnerCallTwoWayStructPayloadRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_two_way_struct_payload
+            typing.Any, typing.Any, CallTwoWayStructPayloadResponse
         ]
-        | _MethodResponse_call_two_way_struct_payload
+        | CallTwoWayStructPayloadResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_table_payload: typing.TypeAlias = (
-        TableResultClassification
-    )
+    CallTwoWayTablePayloadResponse: typing.TypeAlias = TableResultClassification
 
     @abstractmethod
     def call_two_way_table_payload(
         self,
         request: RunnerCallTwoWayTablePayloadRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_two_way_table_payload
-        ]
-        | _MethodResponse_call_two_way_table_payload
+        typing.Coroutine[typing.Any, typing.Any, CallTwoWayTablePayloadResponse]
+        | CallTwoWayTablePayloadResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_union_payload: typing.TypeAlias = (
-        UnionResultClassification
-    )
+    CallTwoWayUnionPayloadResponse: typing.TypeAlias = UnionResultClassification
 
     @abstractmethod
     def call_two_way_union_payload(
         self,
         request: RunnerCallTwoWayUnionPayloadRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_two_way_union_payload
-        ]
-        | _MethodResponse_call_two_way_union_payload
+        typing.Coroutine[typing.Any, typing.Any, CallTwoWayUnionPayloadResponse]
+        | CallTwoWayUnionPayloadResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_struct_payload_err: typing.TypeAlias = (
+    CallTwoWayStructPayloadErrResponse: typing.TypeAlias = (
         NonEmptyResultWithErrorClassification
     )
 
@@ -4876,15 +4814,13 @@ class RunnerServer(ServerBase, ABC):
         request: RunnerCallTwoWayStructPayloadErrRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_call_two_way_struct_payload_err,
+            typing.Any, typing.Any, CallTwoWayStructPayloadErrResponse
         ]
-        | _MethodResponse_call_two_way_struct_payload_err
+        | CallTwoWayStructPayloadErrResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_struct_request: typing.TypeAlias = (
+    CallTwoWayStructRequestResponse: typing.TypeAlias = (
         EmptyResultClassification
     )
 
@@ -4894,61 +4830,49 @@ class RunnerServer(ServerBase, ABC):
         request: RunnerCallTwoWayStructRequestRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_two_way_struct_request
+            typing.Any, typing.Any, CallTwoWayStructRequestResponse
         ]
-        | _MethodResponse_call_two_way_struct_request
+        | CallTwoWayStructRequestResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_table_request: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallTwoWayTableRequestResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_two_way_table_request(
         self,
         request: RunnerCallTwoWayTableRequestRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_two_way_table_request
-        ]
-        | _MethodResponse_call_two_way_table_request
+        typing.Coroutine[typing.Any, typing.Any, CallTwoWayTableRequestResponse]
+        | CallTwoWayTableRequestResponse
     ):
         ...
 
-    _MethodResponse_call_two_way_union_request: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallTwoWayUnionRequestResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_two_way_union_request(
         self,
         request: RunnerCallTwoWayUnionRequestRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_two_way_union_request
-        ]
-        | _MethodResponse_call_two_way_union_request
+        typing.Coroutine[typing.Any, typing.Any, CallTwoWayUnionRequestResponse]
+        | CallTwoWayUnionRequestResponse
     ):
         ...
 
-    _MethodResponse_call_one_way_no_request: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallOneWayNoRequestResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_one_way_no_request(
         self,
         request: RunnerCallOneWayNoRequestRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_one_way_no_request
-        ]
-        | _MethodResponse_call_one_way_no_request
+        typing.Coroutine[typing.Any, typing.Any, CallOneWayNoRequestResponse]
+        | CallOneWayNoRequestResponse
     ):
         ...
 
-    _MethodResponse_call_one_way_struct_request: typing.TypeAlias = (
+    CallOneWayStructRequestResponse: typing.TypeAlias = (
         EmptyResultClassification
     )
 
@@ -4958,93 +4882,73 @@ class RunnerServer(ServerBase, ABC):
         request: RunnerCallOneWayStructRequestRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_one_way_struct_request
+            typing.Any, typing.Any, CallOneWayStructRequestResponse
         ]
-        | _MethodResponse_call_one_way_struct_request
+        | CallOneWayStructRequestResponse
     ):
         ...
 
-    _MethodResponse_call_one_way_table_request: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallOneWayTableRequestResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_one_way_table_request(
         self,
         request: RunnerCallOneWayTableRequestRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_one_way_table_request
-        ]
-        | _MethodResponse_call_one_way_table_request
+        typing.Coroutine[typing.Any, typing.Any, CallOneWayTableRequestResponse]
+        | CallOneWayTableRequestResponse
     ):
         ...
 
-    _MethodResponse_call_one_way_union_request: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallOneWayUnionRequestResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_one_way_union_request(
         self,
         request: RunnerCallOneWayUnionRequestRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_one_way_union_request
-        ]
-        | _MethodResponse_call_one_way_union_request
+        typing.Coroutine[typing.Any, typing.Any, CallOneWayUnionRequestResponse]
+        | CallOneWayUnionRequestResponse
     ):
         ...
 
-    _MethodResponse_call_strict_one_way: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallStrictOneWayResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_strict_one_way(
         self,
         request: RunnerCallStrictOneWayRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_strict_one_way
-        ]
-        | _MethodResponse_call_strict_one_way
+        typing.Coroutine[typing.Any, typing.Any, CallStrictOneWayResponse]
+        | CallStrictOneWayResponse
     ):
         ...
 
-    _MethodResponse_call_flexible_one_way: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallFlexibleOneWayResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_flexible_one_way(
         self,
         request: RunnerCallFlexibleOneWayRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_flexible_one_way
-        ]
-        | _MethodResponse_call_flexible_one_way
+        typing.Coroutine[typing.Any, typing.Any, CallFlexibleOneWayResponse]
+        | CallFlexibleOneWayResponse
     ):
         ...
 
-    _MethodResponse_call_strict_two_way: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallStrictTwoWayResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_strict_two_way(
         self,
         request: RunnerCallStrictTwoWayRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_strict_two_way
-        ]
-        | _MethodResponse_call_strict_two_way
+        typing.Coroutine[typing.Any, typing.Any, CallStrictTwoWayResponse]
+        | CallStrictTwoWayResponse
     ):
         ...
 
-    _MethodResponse_call_strict_two_way_fields: typing.TypeAlias = (
+    CallStrictTwoWayFieldsResponse: typing.TypeAlias = (
         NonEmptyResultClassification
     )
 
@@ -5053,14 +4957,12 @@ class RunnerServer(ServerBase, ABC):
         self,
         request: RunnerCallStrictTwoWayFieldsRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_strict_two_way_fields
-        ]
-        | _MethodResponse_call_strict_two_way_fields
+        typing.Coroutine[typing.Any, typing.Any, CallStrictTwoWayFieldsResponse]
+        | CallStrictTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_call_strict_two_way_err: typing.TypeAlias = (
+    CallStrictTwoWayErrResponse: typing.TypeAlias = (
         EmptyResultWithErrorClassification
     )
 
@@ -5069,14 +4971,12 @@ class RunnerServer(ServerBase, ABC):
         self,
         request: RunnerCallStrictTwoWayErrRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_strict_two_way_err
-        ]
-        | _MethodResponse_call_strict_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, CallStrictTwoWayErrResponse]
+        | CallStrictTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_call_strict_two_way_fields_err: typing.TypeAlias = (
+    CallStrictTwoWayFieldsErrResponse: typing.TypeAlias = (
         NonEmptyResultWithErrorClassification
     )
 
@@ -5086,31 +4986,25 @@ class RunnerServer(ServerBase, ABC):
         request: RunnerCallStrictTwoWayFieldsErrRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_call_strict_two_way_fields_err,
+            typing.Any, typing.Any, CallStrictTwoWayFieldsErrResponse
         ]
-        | _MethodResponse_call_strict_two_way_fields_err
+        | CallStrictTwoWayFieldsErrResponse
     ):
         ...
 
-    _MethodResponse_call_flexible_two_way: typing.TypeAlias = (
-        EmptyResultClassification
-    )
+    CallFlexibleTwoWayResponse: typing.TypeAlias = EmptyResultClassification
 
     @abstractmethod
     def call_flexible_two_way(
         self,
         request: RunnerCallFlexibleTwoWayRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_flexible_two_way
-        ]
-        | _MethodResponse_call_flexible_two_way
+        typing.Coroutine[typing.Any, typing.Any, CallFlexibleTwoWayResponse]
+        | CallFlexibleTwoWayResponse
     ):
         ...
 
-    _MethodResponse_call_flexible_two_way_fields: typing.TypeAlias = (
+    CallFlexibleTwoWayFieldsResponse: typing.TypeAlias = (
         NonEmptyResultClassification
     )
 
@@ -5120,13 +5014,13 @@ class RunnerServer(ServerBase, ABC):
         request: RunnerCallFlexibleTwoWayFieldsRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_flexible_two_way_fields
+            typing.Any, typing.Any, CallFlexibleTwoWayFieldsResponse
         ]
-        | _MethodResponse_call_flexible_two_way_fields
+        | CallFlexibleTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_call_flexible_two_way_err: typing.TypeAlias = (
+    CallFlexibleTwoWayErrResponse: typing.TypeAlias = (
         EmptyResultWithErrorClassification
     )
 
@@ -5135,14 +5029,12 @@ class RunnerServer(ServerBase, ABC):
         self,
         request: RunnerCallFlexibleTwoWayErrRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_call_flexible_two_way_err
-        ]
-        | _MethodResponse_call_flexible_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, CallFlexibleTwoWayErrResponse]
+        | CallFlexibleTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_call_flexible_two_way_fields_err: typing.TypeAlias = (
+    CallFlexibleTwoWayFieldsErrResponse: typing.TypeAlias = (
         NonEmptyResultWithErrorClassification
     )
 
@@ -5152,53 +5044,45 @@ class RunnerServer(ServerBase, ABC):
         request: RunnerCallFlexibleTwoWayFieldsErrRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_call_flexible_two_way_fields_err,
+            typing.Any, typing.Any, CallFlexibleTwoWayFieldsErrResponse
         ]
-        | _MethodResponse_call_flexible_two_way_fields_err
+        | CallFlexibleTwoWayFieldsErrResponse
     ):
         ...
 
-    _MethodResponse_receive_closed_events: typing.TypeAlias = None
+    ReceiveClosedEventsResponse: typing.TypeAlias = None
 
     @abstractmethod
     def receive_closed_events(
         self,
         request: RunnerReceiveClosedEventsRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_receive_closed_events
-        ]
-        | _MethodResponse_receive_closed_events
+        typing.Coroutine[typing.Any, typing.Any, ReceiveClosedEventsResponse]
+        | ReceiveClosedEventsResponse
     ):
         ...
 
-    _MethodResponse_receive_ajar_events: typing.TypeAlias = None
+    ReceiveAjarEventsResponse: typing.TypeAlias = None
 
     @abstractmethod
     def receive_ajar_events(
         self,
         request: RunnerReceiveAjarEventsRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_receive_ajar_events
-        ]
-        | _MethodResponse_receive_ajar_events
+        typing.Coroutine[typing.Any, typing.Any, ReceiveAjarEventsResponse]
+        | ReceiveAjarEventsResponse
     ):
         ...
 
-    _MethodResponse_receive_open_events: typing.TypeAlias = None
+    ReceiveOpenEventsResponse: typing.TypeAlias = None
 
     @abstractmethod
     def receive_open_events(
         self,
         request: RunnerReceiveOpenEventsRequest,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_receive_open_events
-        ]
-        | _MethodResponse_receive_open_events
+        typing.Coroutine[typing.Any, typing.Any, ReceiveOpenEventsResponse]
+        | ReceiveOpenEventsResponse
     ):
         ...
 

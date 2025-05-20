@@ -16,6 +16,7 @@
 #include "src/ui/scenic/lib/flatland/global_topology_data.h"
 #include "src/ui/scenic/lib/flatland/scene_dumper.h"
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
+#include "src/ui/scenic/lib/utils/logging.h"
 
 // Hardcoded double buffering.
 // TODO(https://fxbug.dev/42156567): make this configurable.  Even fancier: is it worth considering
@@ -77,6 +78,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                                   const FlatlandDisplay& display,
                                   scheduling::FramePresentedCallback callback) {
   // Emit a counter called "ScenicRender" for visualization in the Trace Viewer.
+  //
+  // This counter is flipped between 0 and 1 and back on each frame, and is
+  // used to visually delineate successive frames in the sometimes busy trace
+  // view.
   static bool render_edge_flag = false;
   TRACE_COUNTER("gfx", "ScenicRender", 0, "", TA_UINT32(render_edge_flag = !render_edge_flag));
   // NOTE: this name is important for benchmarking.  Do not remove or modify it
@@ -90,8 +95,8 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
 
 #if defined(USE_FLATLAND_VERBOSE_LOGGING)
   std::ostringstream str;
-  str << "Engine::RenderScheduledFrame()\n"
-      << "Root transform of global topology: " << scene_state.topology_data.topology_vector[0]
+  str << "Engine::RenderScheduledFrame() frame_number=" << frame_number
+      << "\nRoot transform of global topology: " << scene_state.topology_data.topology_vector[0]
       << "\nTopologically-sorted transforms and their corresponding parent transforms:";
   for (size_t i = 1; i < scene_state.topology_data.topology_vector.size(); ++i) {
     str << "\n        " << scene_state.topology_data.topology_vector[i] << " -> "
@@ -102,8 +107,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   for (auto& r : scene_state.image_rectangles) {
     str << "\n        rect: " << r;
   }
-  for (auto& i : scene_state.images) {
-    str << "\n        image: " << i;
+  for (size_t i = 0; i < scene_state.image_indices.size(); ++i) {
+    str << "\n        image: "
+        << scene_state.topology_data.topology_vector[scene_state.image_indices[i]] << " "
+        << scene_state.images[i];
   }
   FLATLAND_VERBOSE_LOG << str.str();
 #endif
@@ -218,8 +225,8 @@ Engine::SceneState::SceneState(Engine& engine, TransformHandle root_transform) {
 
 void Engine::SkipRender(scheduling::FramePresentedCallback callback) {
   SignalAll(flatland_presenter_->TakeReleaseFences());
-  const auto now = async::Now(async_get_default_dispatcher());
-  callback({now, now});
+  const zx::time now = async::Now(async_get_default_dispatcher());
+  callback({.render_done_time = now, .actual_presentation_time = now});
 }
 
 }  // namespace flatland

@@ -46,10 +46,6 @@ struct WireTypeForNaturalType<::test_handlesintypes::HandlesInTypes> {
   using type = ::test_handlesintypes::wire::HandlesInTypes;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceStruct, ::test_handlesintypes::EmptyResourceStruct> {
   static ::test_handlesintypes::EmptyResourceStruct ToNatural(::test_handlesintypes::wire::EmptyResourceStruct src);
@@ -64,10 +60,6 @@ template <>
 struct WireTypeForNaturalType<::test_handlesintypes::EmptyResourceStruct> {
   using type = ::test_handlesintypes::wire::EmptyResourceStruct;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_handlesintypes::wire::TableWithHandle, ::test_handlesintypes::TableWithHandle> {
@@ -84,10 +76,6 @@ struct WireTypeForNaturalType<::test_handlesintypes::TableWithHandle> {
   using type = ::test_handlesintypes::wire::TableWithHandle;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceTable, ::test_handlesintypes::EmptyResourceTable> {
   static ::test_handlesintypes::EmptyResourceTable ToNatural(::test_handlesintypes::wire::EmptyResourceTable src);
@@ -102,10 +90,6 @@ template <>
 struct WireTypeForNaturalType<::test_handlesintypes::EmptyResourceTable> {
   using type = ::test_handlesintypes::wire::EmptyResourceTable;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_handlesintypes::wire::UnionWithHandle, ::test_handlesintypes::UnionWithHandle> {
@@ -128,10 +112,6 @@ struct WireTypeForNaturalType<::test_handlesintypes::UnionWithHandle> {
   using type = ::test_handlesintypes::wire::UnionWithHandle;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct WireNaturalConversionTraits<::test_handlesintypes::wire::EmptyResourceUnion, ::test_handlesintypes::EmptyResourceUnion> {
   static ::test_handlesintypes::EmptyResourceUnion ToNatural(::test_handlesintypes::wire::EmptyResourceUnion src);
@@ -152,10 +132,6 @@ template <>
 struct WireTypeForNaturalType<::test_handlesintypes::EmptyResourceUnion> {
   using type = ::test_handlesintypes::wire::EmptyResourceUnion;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
 #pragma clang diagnostic pop

@@ -1279,8 +1279,8 @@ async fn inspect_devices(name: &str) {
             netemul::new_endpoint_config(max_frame_size, Some(fidl_mac!("02:00:00:00:00:01"))),
             netemul::InterfaceConfig {
                 name: Some(NETDEV_NAME.into()),
-                metric: None,
-                dad_transmits: Some(u16::MAX),
+                ipv6_dad_transmits: Some(u16::MAX),
+                ..Default::default()
             },
         )
         .await
@@ -1309,12 +1309,14 @@ async fn inspect_devices(name: &str) {
                         "127.0.0.1/8": {
                             ValidUntil: "infinite",
                             PreferredLifetime: "infinite",
+                            Assigned: true,
                         }
                     },
                     Configuration: {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": 0u64,
                     },
                     GMP: {
                         Mode: "IGMPv3",
@@ -1339,6 +1341,7 @@ async fn inspect_devices(name: &str) {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": 0u64,
                     },
                     GMP: {
                         Mode: "MLDv2",
@@ -1379,6 +1382,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: 0u64,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1390,6 +1394,7 @@ async fn inspect_devices(name: &str) {
                             ParameterProblem: 0u64,
                             UnspecifiedDst: 0u64,
                             UnspecifiedSrc: 0u64,
+                            InvalidSrc: 0u64,
                             Dropped: 0u64,
                             MulticastNoInterest: 0u64,
                             InvalidCachedConntrackEntry: 0u64,
@@ -1422,6 +1427,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: 0u64,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1432,9 +1438,9 @@ async fn inspect_devices(name: &str) {
                             ParameterProblem: 0u64,
                             UnspecifiedDst: 0u64,
                             UnspecifiedSrc: 0u64,
+                            InvalidSrc: 0u64,
                             Dropped: 0u64,
                             DroppedTentativeDst: 0u64,
-                            DroppedNonUnicastSrc: 0u64,
                             DroppedExtensionHeader: 0u64,
                             DroppedLoopedBackDadProbe: 0u64,
                             MulticastNoInterest: 0u64,
@@ -1525,12 +1531,14 @@ async fn inspect_devices(name: &str) {
                         "192.168.0.1/24": {
                             ValidUntil: "infinite",
                             PreferredLifetime: "infinite",
+                            Assigned: true,
                         }
                     },
                     Configuration: {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": 3u64,
                     },
                     GMP: {
                         Mode: "IGMPv3",
@@ -1560,6 +1568,7 @@ async fn inspect_devices(name: &str) {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
+                        "DadTransmits": u16::MAX,
                     },
                     GMP: {
                         Mode: "MLDv2",
@@ -1604,6 +1613,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: diagnostics_assertions::AnyUintProperty,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1615,6 +1625,7 @@ async fn inspect_devices(name: &str) {
                             ParameterProblem: 0u64,
                             UnspecifiedDst: 0u64,
                             UnspecifiedSrc: 0u64,
+                            InvalidSrc: 0u64,
                             Dropped: 0u64,
                             MulticastNoInterest: 0u64,
                             InvalidCachedConntrackEntry: 0u64,
@@ -1647,6 +1658,7 @@ async fn inspect_devices(name: &str) {
                         PacketTx: {
                             Sent: diagnostics_assertions::AnyUintProperty,
                             IllegalLoopbackAddress: 0u64,
+                            SocketEgressFilterDropped: 0u64,
                         },
                         PacketRx: {
                             Received: 0u64,
@@ -1657,9 +1669,9 @@ async fn inspect_devices(name: &str) {
                             ParameterProblem: 0u64,
                             UnspecifiedDst: 0u64,
                             UnspecifiedSrc: 0u64,
+                            InvalidSrc: 0u64,
                             Dropped: 0u64,
                             DroppedTentativeDst: 0u64,
-                            DroppedNonUnicastSrc: 0u64,
                             DroppedExtensionHeader: 0u64,
                             DroppedLoopedBackDadProbe: 0u64,
                             MulticastNoInterest: 0u64,
@@ -1829,6 +1841,7 @@ async fn inspect_counters(name: &str) {
                     Requests: 0u64,
                     Responses: 0u64,
                     Malformed: 0u64,
+                    Echoed: 0u64,
                     NonLocalDstAddr: 0u64,
                 },
                 "Tx": {
@@ -1961,6 +1974,7 @@ async fn inspect_counters(name: &str) {
                 PacketTx: {
                     Sent: 1u64,
                     IllegalLoopbackAddress: 0u64,
+                    SocketEgressFilterDropped: 0u64,
                 },
                 "PacketRx": {
                     Received: 1u64,
@@ -1972,6 +1986,7 @@ async fn inspect_counters(name: &str) {
                     ParameterProblem: 0u64,
                     UnspecifiedDst: 0u64,
                     UnspecifiedSrc: 0u64,
+                    InvalidSrc: 0u64,
                     Dropped: 0u64,
                     MulticastNoInterest: 0u64,
                     InvalidCachedConntrackEntry: 0u64,
@@ -2004,6 +2019,7 @@ async fn inspect_counters(name: &str) {
                 PacketTx: {
                     Sent: 0u64,
                     IllegalLoopbackAddress: 0u64,
+                    SocketEgressFilterDropped: 0u64,
                 },
                 "PacketRx": {
                     Received: 0u64,
@@ -2014,9 +2030,9 @@ async fn inspect_counters(name: &str) {
                     ParameterProblem: 0u64,
                     UnspecifiedDst: 0u64,
                     UnspecifiedSrc: 0u64,
+                    InvalidSrc: 0u64,
                     Dropped: 0u64,
                     DroppedTentativeDst: 0u64,
-                    DroppedNonUnicastSrc: 0u64,
                     DroppedExtensionHeader: 0u64,
                     DroppedLoopedBackDadProbe: 0u64,
                     MulticastNoInterest: 0u64,

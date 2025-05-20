@@ -4,7 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
-use ffx_fastboot::common::cmd::{BootParams, Command, ManifestParams, UnlockParams};
+use ffx_flash_manifest::{BootParams, Command, ManifestParams, UnlockParams};
 use std::path::PathBuf;
 
 #[ffx_command()]

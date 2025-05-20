@@ -195,7 +195,10 @@ if (is_efi_toolchain) {
     ]
     public_configs = [ ":includes" ]
     sources = [ "efi-boot-zbi.cc" ]
-    deps = [ "..:allocation" ]
+    deps = [
+      "..:allocation",
+      "..:zbi",
+    ]
   }
 }
 

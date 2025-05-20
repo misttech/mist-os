@@ -8,7 +8,7 @@ import("//build/test.gni")
 test("power_framework_test_realm_test_cpp_bin") {
   sources = [ "test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_cpp",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",

@@ -115,7 +115,11 @@ fit::result<uint64_t, size_t> GetExtendedSize(uint32_t low, uint32_t high) {
 LegacyBoot gLegacyBoot;
 
 // This populates the allocator and also collects other information.
-void InitMemory(void* bootloader_data, AddressSpace* aspace) {
+void InitMemory(const void* bootloader_data, ktl::optional<EarlyBootZbi> zbi,
+                AddressSpace* aspace) {
+  // A linuxboot shim should not have a ZBI encoding boot state at this point.
+  ZX_DEBUG_ASSERT(!zbi);
+
   auto& bp = *static_cast<const linuxboot::boot_params*>(bootloader_data);
 
   // Synthesize a boot loader name from the few bits we get.

@@ -17,11 +17,11 @@ use compat_info::{CompatibilityInfo, CompatibilityState};
 use ffx::{TargetIpAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{TargetConnectionState, TargetEvent};
-use ffx_fastboot::common::fastboot::{
+use ffx_fastboot_connection_factory::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
 use ffx_ssh::parse::HostAddr;
-use ffx_target::{Description, FastbootInterface};
+use ffx_target::{Description, FastbootInterface, UNKNOWN_TARGET_NAME};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx::TargetState;
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
@@ -43,7 +43,7 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 #[cfg(not(target_os = "macos"))]
 use std::sync::Mutex;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 use usb_bulk::AsyncInterface as Interface;
 use usb_fastboot_discovery::open_interface_with_serial;
 #[cfg(not(target_os = "macos"))]
@@ -116,10 +116,6 @@ impl TargetAddrStatus {
         Self { source: TargetSource::Manual, ..self }
     }
 
-    pub fn manually_added_until(self, expires_after: SystemTime) -> Self {
-        Self { source: TargetSource::Ephemeral { expires_after }, ..self }
-    }
-
     pub fn protocol(&self) -> TargetProtocol {
         self.protocol
     }
@@ -133,7 +129,7 @@ impl TargetAddrStatus {
     }
 
     pub fn is_manual(&self) -> bool {
-        !matches!(self.source, TargetSource::Discovered)
+        self.source == TargetSource::Manual
     }
 }
 
@@ -229,7 +225,6 @@ impl Into<FastbootInterface> for TargetTransport {
 pub enum TargetSource {
     Manual,
     Discovered,
-    Ephemeral { expires_after: SystemTime },
 }
 
 impl TargetSource {
@@ -237,11 +232,7 @@ impl TargetSource {
         use TargetSource::*;
         *self = match (*self, other) {
             (Discovered, _) => other,
-            (Manual, _) | (_, Manual) => Manual,
-            (Ephemeral { expires_after: a }, Ephemeral { expires_after: b }) => {
-                Ephemeral { expires_after: std::cmp::max(a, b) }
-            }
-            (_, Discovered) => return,
+            _ => Manual,
         };
     }
 }
@@ -390,7 +381,7 @@ impl Target {
                 .replace(UsbVsockHost::new(Vec::<std::path::PathBuf>::new(), true, sender))
                 .is_some()
             {
-                tracing::warn!("Re-initializing USB VSock host");
+                log::warn!("Re-initializing USB VSock host");
             }
             Some(receiver)
         } else {
@@ -413,15 +404,6 @@ impl Target {
     {
         let target = Self::new();
         target.replace_identity(Identity::from_name(nodename.into()));
-        target
-    }
-
-    pub fn new_with_boot_timestamp<S>(nodename: S, boot_timestamp_nanos: u64) -> Rc<Self>
-    where
-        S: Into<String>,
-    {
-        let target = Self::new_named(nodename);
-        target.boot_timestamp_nanos.replace(Some(boot_timestamp_nanos));
         target
     }
 
@@ -548,22 +530,6 @@ impl Target {
             *res.ssh_port.borrow_mut() = t.ssh_port;
             res
         }
-    }
-
-    pub fn from_netsvc_target_info(mut t: Description) -> Rc<Self> {
-        Self::new_with_netsvc_addrs(
-            t.nodename.take(),
-            t.addresses.drain(..).filter_map(|x| x.try_into().ok()).collect(),
-        )
-    }
-
-    pub fn from_fastboot_target_info(mut t: Description) -> Result<Rc<Self>> {
-        Ok(Self::new_with_fastboot_addrs(
-            t.nodename.take(),
-            t.serial.take(),
-            t.addresses.drain(..).filter_map(|x| x.try_into().ok()).collect(),
-            t.fastboot_interface.ok_or_else(|| anyhow!("No fastboot mode?"))?,
-        ))
     }
 
     fn infer_fastboot_interface(&self) -> Option<FastbootInterface> {
@@ -822,7 +788,7 @@ impl Target {
     }
 
     pub fn nodename_str(&self) -> String {
-        self.nodename().unwrap_or_else(|| "<unknown>".to_owned())
+        self.nodename().unwrap_or_else(|| UNKNOWN_TARGET_NAME.to_owned())
     }
 
     pub fn boot_timestamp_nanos(&self) -> Option<u64> {
@@ -845,7 +811,7 @@ impl Target {
         let current_status = self.get_compatibility_status();
         let new_status = match current_status {
             Some(_) => {
-                tracing::debug!(
+                log::debug!(
                     "ignoring status change from id:{} {:?} to {:?}",
                     self.id(),
                     current_status,
@@ -856,12 +822,12 @@ impl Target {
             None if status.is_some() => {
                 // Make compatibility status change more obvious to the user in the info logs.
                 // Leave the detailed status struct in the debug logs in case it is needed.
-                tracing::info!(
+                log::info!(
                     "Compatibility status changed to ['{:#?}'] for target: [{}]",
                     status.as_ref().unwrap().status,
                     self.id()
                 );
-                tracing::debug!("{:#?}", status);
+                log::debug!("{:#?}", status);
                 status.clone()
             }
             _ => None,
@@ -880,7 +846,7 @@ impl Target {
         // enforce state transition control, such as ensuring that
         // manual targets do not enter the disconnected state. It must
         // only be used in tests.
-        tracing::debug!(
+        log::debug!(
             "Setting state directly for {name}@{id} from {old:?} to {new:?}",
             name = self.nodename_str(),
             id = self.id(),
@@ -901,7 +867,6 @@ impl Target {
     ///
     ///   RCS  ->   MDNS          =>  RCS (does not drop RCS state)
     ///   *    ->   Disconnected  =>  Manual if the device is manual
-    #[tracing::instrument(skip(func))]
     pub fn update_connection_state<F>(&self, func: F)
     where
         F: FnOnce(TargetConnectionState) -> TargetConnectionState + Sized,
@@ -916,28 +881,20 @@ impl Target {
             TargetConnectionState::Disconnected => {
                 self.clear_ids();
                 if self.is_manual() {
-                    let timeout = self.get_manual_timeout();
-                    let last_seen = if timeout.is_some() { Some(Instant::now()) } else { None };
+                    let last_seen = None;
                     if former_state.is_rcs() {
                         self.update_last_response(Utc::now());
-                        new_state = TargetConnectionState::Manual(last_seen)
+                        new_state = TargetConnectionState::Manual;
                     } else {
-                        let current = SystemTime::now();
-                        if timeout.is_none() || current < timeout.unwrap() {
-                            new_state = match former_state {
-                                TargetConnectionState::Fastboot(old_last_seen) => {
-                                    TargetConnectionState::Fastboot(
-                                        last_seen.unwrap_or(old_last_seen),
-                                    )
-                                }
-                                TargetConnectionState::Zedboot(old_last_seen) => {
-                                    TargetConnectionState::Zedboot(
-                                        last_seen.unwrap_or(old_last_seen),
-                                    )
-                                }
-                                _ => TargetConnectionState::Manual(last_seen),
-                            };
-                        }
+                        new_state = match former_state {
+                            TargetConnectionState::Fastboot(old_last_seen) => {
+                                TargetConnectionState::Fastboot(last_seen.unwrap_or(old_last_seen))
+                            }
+                            TargetConnectionState::Zedboot(old_last_seen) => {
+                                TargetConnectionState::Zedboot(last_seen.unwrap_or(old_last_seen))
+                            }
+                            _ => TargetConnectionState::Manual,
+                        };
                     }
                 }
             }
@@ -945,7 +902,7 @@ impl Target {
             // re-added manually, if the target is presently in an RCS state, that state is
             // preserved, and the last response time is just adjusted to represent the observation.
             TargetConnectionState::Mdns(_)
-            | TargetConnectionState::Manual(_)
+            | TargetConnectionState::Manual
             | TargetConnectionState::Vsock(_) => {
                 // Do not transition connection state for RCS -> MDNS.
                 if former_state.is_rcs() {
@@ -969,7 +926,7 @@ impl Target {
         }
 
         if former_state == new_state {
-            tracing::trace!(
+            log::trace!(
                 "State unchanged for {}@{} from {:?}",
                 self.nodename_str(),
                 self.id(),
@@ -978,7 +935,7 @@ impl Target {
             return;
         }
 
-        tracing::debug!(
+        log::debug!(
             "Updating state for {}@{} from {:?} to {:?}",
             self.nodename_str(),
             self.id(),
@@ -995,25 +952,23 @@ impl Target {
             // If the target is going from the disconnected state to discovered, clear the transient
             // flag.
             if self.transient.get() {
-                tracing::debug!("Cleared transient flag for target connection state transition");
+                log::debug!("Cleared transient flag for target connection state transition");
                 self.transient.set(false);
             }
         } else if expired && self.transient.get() && self.is_enabled() {
-            tracing::debug!("Enabled transient target expired, closing...");
+            log::debug!("Enabled transient target expired, closing...");
             self.disable();
         }
 
         if self.get_connection_state().is_rcs() {
             self.events.push(TargetEvent::RcsActivated).unwrap_or_else(|err| {
-                tracing::warn!("unable to enqueue RCS activation event: {:#}", err)
+                log::warn!("unable to enqueue RCS activation event: {:#}", err)
             });
         }
 
         self.events
             .push(TargetEvent::ConnectionStateChanged(former_state, self.state.borrow().clone()))
-            .unwrap_or_else(|e| {
-                tracing::error!("Failed to push state change for {:?}: {:?}", self, e)
-            });
+            .unwrap_or_else(|e| log::error!("Failed to push state change for {:?}: {:?}", self, e));
     }
 
     pub fn from_manual_to_tcp_fastboot(&self) {
@@ -1123,7 +1078,7 @@ impl Target {
 
     pub fn set_ssh_port(&self, port: Option<u16>) {
         if *self.ssh_port.borrow() != port {
-            tracing::debug!(
+            log::debug!(
                 "Setting ssh port for {} from {:?} to {:?}",
                 self.nodename_str(),
                 self.ssh_port.borrow(),
@@ -1250,7 +1205,7 @@ impl Target {
             // -- we don't want to return Ok(None), that would imply that the
             // connection _did_ get made, but didn't provide an id.)
             drop(task);
-            tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
+            log::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
             self.run_host_pipe_with_sender(&overnet_node, roid_sender);
         }
     }
@@ -1273,7 +1228,7 @@ impl Target {
                 Ok(addr) => {
                     target.ssh_host_address.replace(Some(addr.into()));
                 }
-                Err(error) => tracing::debug!(error = ?error, "Error fetching ssh host address"),
+                Err(error) => log::debug!(error:? = error; "Error fetching ssh host address"),
             }
         })
         .detach();
@@ -1303,8 +1258,7 @@ impl Target {
     // will eventually send the resulting roid (even if it is None) back to the caller.
     //
     // This function can also take a HostPipeChildBuilder, for test purposes
-    #[tracing::instrument(skip(host_pipe_child_builder))]
-    pub fn run_host_pipe_with<T>(
+    fn run_host_pipe_with<T>(
         self: &Rc<Self>,
         overnet_node: &Arc<overnet_core::Router>,
         roid_sender: Option<channel::oneshot::Sender<Option<u64>>>,
@@ -1316,7 +1270,7 @@ impl Target {
             if let Some(sender) = roid_sender {
                 let _ = sender.send(None);
             }
-            tracing::error!("Cannot run host pipe for device not in use");
+            log::error!("Cannot run host pipe for device not in use");
             return;
         }
 
@@ -1327,14 +1281,14 @@ impl Target {
                 match &mut hp.remote_overnet_id {
                     RemoteOvernetIdState::Pending(ref mut waiters) => waiters.push(sender),
                     RemoteOvernetIdState::Ready(roid) => {
-                        tracing::debug!(
+                        log::debug!(
                         "Got request for host pipe overnet id for an already-running host-pipe -- sending back {roid:?}",
                     );
                         let _ = sender.send(*roid);
                     }
                 }
             }
-            // tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
+            // log::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
         }
 
@@ -1423,7 +1377,7 @@ impl Target {
                 }
 
                 weak_target.upgrade().and_then(|target| {
-                    tracing::debug!(
+                    log::debug!(
                         "Exiting run_host_pipe for {target_name_str} ({conn_type} connection)"
                     );
                     target.host_pipe.borrow_mut().take()
@@ -1445,7 +1399,7 @@ impl Target {
 
             match nr {
                 Ok(mut hp) => {
-                    tracing::debug!("host pipe spawn returned OK for {target_name_str}");
+                    log::debug!("host pipe spawn returned OK for {target_name_str}");
                     eprintln!("host pipe spawn returned OK for {target_name_str}");
                     let compatibility_status = hp.get_compatibility_status();
 
@@ -1461,7 +1415,7 @@ impl Target {
                         if let Some(host_pipe) = target.host_pipe.borrow_mut().as_mut() {
                             host_pipe.ssh_addr = Some(hp.get_address());
                             let overnet_id = hp.overnet_id();
-                            tracing::debug!(
+                            log::debug!(
                                 "Got host pipe overnet id {:?} -- sending to waiters",
                                 overnet_id
                             );
@@ -1484,10 +1438,10 @@ impl Target {
                         Ok(r) => {
                             // This was an info. Moved to debug as this is not informational or
                             // actionable to end users.
-                            tracing::debug!("HostPipeConnection returned: {:?}", r);
+                            log::debug!("HostPipeConnection returned: {:?}", r);
                         }
                         Err(r) => {
-                            tracing::warn!(
+                            log::warn!(
                                 "The host pipe connection to ['{target_name_str}'] returned: {:?}",
                                 r
                             );
@@ -1497,7 +1451,7 @@ impl Target {
                 Err(e) => {
                     // Change this to a debug message (from warn). We will get any error from
                     // SSH client in the logs so this is redundant.
-                    tracing::debug!("Host pipe spawn {:?}", e);
+                    log::debug!("Host pipe spawn {:?}", e);
                     let compatibility_status = Some(CompatibilityInfo {
                         status: CompatibilityState::Error,
                         platform_abi: 0,
@@ -1513,7 +1467,7 @@ impl Target {
             }
 
             weak_target.upgrade().and_then(|target| {
-                tracing::debug!("Exiting run_host_pipe for {target_name_str}");
+                log::debug!("Exiting run_host_pipe for {target_name_str}");
                 target.host_pipe.borrow_mut().take()
             });
         };
@@ -1529,7 +1483,6 @@ impl Target {
         self.host_pipe.borrow().is_some()
     }
 
-    #[tracing::instrument]
     pub async fn init_remote_proxy(
         self: &Rc<Self>,
         overnet_node: &Arc<overnet_core::Router>,
@@ -1543,7 +1496,7 @@ impl Target {
         match self.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await {
             Ok(()) => (),
             Err(e) => {
-                tracing::warn!("{}", e);
+                log::warn!("{}", e);
                 bail!("RCS connection issue")
             }
         }
@@ -1572,14 +1525,13 @@ impl Target {
     /// Check the current target state, and if it is a state that expires (such
     /// as mdns) perform the appropriate state transition. The daemon target
     /// collection expiry loop calls this function regularly.
-    #[tracing::instrument]
     pub fn expire_state(&self) {
         self.update_connection_state(|current_state| {
             let expire_duration = match current_state {
                 TargetConnectionState::Mdns(_) => MDNS_MAX_AGE,
                 TargetConnectionState::Fastboot(_) => FASTBOOT_MAX_AGE,
                 TargetConnectionState::Zedboot(_) => ZEDBOOT_MAX_AGE,
-                TargetConnectionState::Manual(_) => MDNS_MAX_AGE,
+                TargetConnectionState::Manual => MDNS_MAX_AGE,
                 _ => Duration::default(),
             };
 
@@ -1591,21 +1543,16 @@ impl Target {
                 {
                     Some(TargetConnectionState::Disconnected)
                 }
-                TargetConnectionState::Manual(ref last_seen)
-                    if last_seen.map(|time| time.elapsed() > expire_duration).unwrap_or(false) =>
-                {
-                    Some(TargetConnectionState::Disconnected)
-                }
                 _ => None,
             };
 
             if new_state.is_some() && self.is_transient() && self.has_keep_alive() {
-                tracing::debug!("Not expiring state for transient target with keep alive");
+                log::debug!("Not expiring state for transient target with keep alive");
                 return current_state;
             }
 
             if let Some(ref new_state) = new_state {
-                tracing::debug!(
+                log::debug!(
                     "Target {:?} state {:?} => {:?} due to expired state after {:?}.",
                     self,
                     &current_state,
@@ -1667,27 +1614,18 @@ impl Target {
         self.addrs.borrow().iter().any(|addr_entry| addr_entry.is_manual())
     }
 
-    pub fn get_manual_timeout(&self) -> Option<SystemTime> {
-        let addrs = self.addrs.borrow();
-        addrs.iter().find_map(|addr_entry| match addr_entry.source {
-            TargetSource::Ephemeral { expires_after } => Some(expires_after),
-            _ => None,
-        })
-    }
-
     pub fn is_waiting_for_rcs_identity(&self) -> bool {
         self.is_manual() && self.is_host_pipe_running() && self.identity().is_none()
     }
 
     pub fn disconnect(&self) {
         drop(self.host_pipe.take());
-        tracing::debug!("Disconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
+        log::debug!("Disconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
         self.update_connection_state(|_| TargetConnectionState::Disconnected);
     }
 }
 
 impl From<&Target> for ffx::TargetInfo {
-    #[tracing::instrument]
     fn from(target: &Target) -> Self {
         let (product_config, board_config) = target
             .build_config()
@@ -1706,7 +1644,7 @@ impl From<&Target> for ffx::TargetInfo {
                 .num_milliseconds()
             {
                 dur if dur < 0 => {
-                    tracing::trace!(
+                    log::trace!(
                         "negative duration encountered on target '{}': {}",
                         target.nodename_str(),
                         dur
@@ -1720,7 +1658,7 @@ impl From<&Target> for ffx::TargetInfo {
             rcs_state: Some(target.rcs_state()),
             target_state: Some(match target.state() {
                 TargetConnectionState::Disconnected => TargetState::Disconnected,
-                TargetConnectionState::Manual(_)
+                TargetConnectionState::Manual
                 | TargetConnectionState::Mdns(_)
                 | TargetConnectionState::Rcs(_)
                 | TargetConnectionState::Vsock(_) => TargetState::Product,
@@ -1739,6 +1677,7 @@ impl From<&Target> for ffx::TargetInfo {
                 Some(data) => Some(data.into()),
                 None => None,
             },
+            is_manual: Some(target.is_manual()),
             ..Default::default()
         }
     }
@@ -2097,7 +2036,7 @@ mod test {
 
         // Attempt to set the state to TargetConnectionState::Manual, this transition should fail, as in
         // this transition RCS should be retained.
-        t.update_connection_state(|_| TargetConnectionState::Manual(None));
+        t.update_connection_state(|_| TargetConnectionState::Manual);
 
         assert_eq!(t.get_connection_state(), rcs_state);
     }
@@ -2505,30 +2444,6 @@ mod test {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_target_get_manual_timeout() {
-        let target = Target::new();
-        assert_eq!(target.get_manual_timeout(), None);
-
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh().manually_added(),
-        ));
-        assert!(target.is_manual());
-        assert_eq!(target.get_manual_timeout(), None);
-
-        let target = Target::new();
-        let now = SystemTime::now();
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh().manually_added_until(now),
-        ));
-        assert!(target.is_manual());
-        assert_eq!(target.get_manual_timeout(), Some(now));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_manual_disconnect() {
         let local_node = overnet_core::Router::new(None).unwrap();
 
@@ -2538,12 +2453,12 @@ mod test {
             Utc::now(),
             TargetAddrStatus::ssh().manually_added(),
         ));
-        target.set_state(TargetConnectionState::Manual(None));
+        target.set_state(TargetConnectionState::Manual);
 
         // Attempting to transition a manual target into the disconnected state remains in manual,
         // if the target has no timeout set.
         target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
+        assert_eq!(target.get_connection_state(), TargetConnectionState::Manual);
 
         let conn = RcsConnection::new_with_proxy(
             local_node,
@@ -2556,71 +2471,7 @@ mod test {
 
         // A manual target exiting the RCS state to disconnected returns to manual instead.
         target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_update_connection_state_expired_ephemeral_disconnect() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-
-        let target = Target::new();
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh()
-                .manually_added_until(SystemTime::now() - Duration::from_secs(3600)),
-        ));
-        target.set_state(TargetConnectionState::Manual(Some(Instant::now())));
-
-        // Attempting to transition a manual target into the disconnected state can disconnect,
-        // if the target has a timeout set and it's expired.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Disconnected);
-
-        let conn = RcsConnection::new_with_proxy(
-            local_node,
-            setup_fake_remote_control_service(false, "abc".to_owned()),
-            &NodeId { id: 1234 },
-        );
-        // A manual target can enter the RCS state.
-        target.update_connection_state(|_| TargetConnectionState::Rcs(conn));
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Rcs(_));
-
-        // A manual target exiting the RCS state to disconnected returns to manual instead.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_update_connection_state_ephemeral_disconnect() {
-        let local_node = overnet_core::Router::new(None).unwrap();
-
-        let target = Target::new();
-        target.addrs_insert_entry(TargetAddrEntry::new(
-            TargetAddr::new("::1".parse().unwrap(), 0, 0),
-            Utc::now(),
-            TargetAddrStatus::ssh()
-                .manually_added_until(SystemTime::now() + Duration::from_secs(3600)),
-        ));
-        target.set_state(TargetConnectionState::Manual(Some(Instant::now())));
-
-        // Attempting to transition a manual target into the disconnected state returns to manual
-        // if the target has a timeout set but there's still time before expiry.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
-
-        let conn = RcsConnection::new_with_proxy(
-            local_node,
-            setup_fake_remote_control_service(false, "abc".to_owned()),
-            &NodeId { id: 1234 },
-        );
-        // A manual target can enter the RCS state.
-        target.update_connection_state(|_| TargetConnectionState::Rcs(conn));
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Rcs(_));
-
-        // A manual target exiting the RCS state to disconnected returns to manual instead.
-        target.update_connection_state(|_| TargetConnectionState::Disconnected);
-        assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
+        assert_eq!(target.get_connection_state(), TargetConnectionState::Manual);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -2689,6 +2540,20 @@ mod test {
 
             let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
             assert_eq!(info.fastboot_interface, Some(ffx::FastbootInterface::Udp));
+        }
+        {
+            let target = Target::new_with_addr_entries(
+                Some("manual"),
+                [TargetAddrEntry::new(
+                    TargetAddr::new("::1".parse::<IpAddr>().unwrap().into(), 0, 0),
+                    Utc::now(),
+                    TargetAddrStatus::ssh().manually_added(),
+                )]
+                .into_iter(),
+            );
+
+            let info: ffx::TargetInfo = ffx::TargetInfo::from(target.borrow());
+            assert_eq!(info.is_manual, Some(true));
         }
     }
 

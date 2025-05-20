@@ -6,7 +6,6 @@
 
 #include "phys/trampoline-boot.h"
 
-#include <lib/arch/zbi-boot.h>
 #include <lib/memalloc/pool.h>
 #include <zircon/assert.h>
 
@@ -147,7 +146,8 @@ class TrampolineBoot::Trampoline {
 
   static size_t size() { return offsetof(Trampoline, code_) + TrampolineCode().size(); }
 
-  [[noreturn]] void Boot(RelocateTarget kernel, RelocateTarget zbi, uint64_t entry_address) {
+  [[noreturn]] void Boot(const TrampolineBoot* boot, RelocateTarget kernel, RelocateTarget zbi,
+                         uint64_t entry_address) {
     args_ = {
         .kernel = kernel,
         .zbi = zbi,
@@ -155,7 +155,7 @@ class TrampolineBoot::Trampoline {
         .entry = entry_address,
     };
     ZX_ASSERT(args_.entry == entry_address);
-    ZbiBootRaw(reinterpret_cast<uintptr_t>(code_), &args_);
+    boot->ZbiBoot(reinterpret_cast<uintptr_t>(code_), &args_);
   }
 
  private:
@@ -542,7 +542,7 @@ fit::result<BootZbi::Error> TrampolineBoot::Load(uint32_t extra_data_capacity,
   auto zbi_blob = ktl::span<const ktl::byte>(reinterpret_cast<const ktl::byte*>(zbi_location),
                                              DataZbi().size_bytes());
   trampoline_->Boot(
-      RelocateTarget(static_cast<uintptr_t>(*kernel_load_address_), kernel_blob),
+      this, RelocateTarget(static_cast<uintptr_t>(*kernel_load_address_), kernel_blob),
       RelocateTarget(static_cast<uintptr_t>(data_load_address_.value_or(zbi_location)), zbi_blob),
       KernelEntryAddress());
 }

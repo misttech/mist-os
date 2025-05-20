@@ -23,8 +23,8 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/page_state.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>

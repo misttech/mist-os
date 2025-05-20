@@ -6,9 +6,9 @@
 #define SRC_LIB_ZBITL_INCLUDE_LIB_ZBITL_DECOMPRESS_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <memory>
+#include <span>
 #include <string_view>
 
 #include "storage-traits.h"
@@ -29,7 +29,7 @@ class OneShot {
   // Called (once) with the whole payload and returns success only if exactly
   // the whole output buffer was filled.
   template <typename Allocator>
-  static fit::result<std::string_view> Decompress(cpp20::span<std::byte> out, ByteView payload,
+  static fit::result<std::string_view> Decompress(std::span<std::byte> out, ByteView payload,
                                                   Allocator&& allocator) {
     const size_t need = GetScratchSize();
     auto scratch = allocator(need);
@@ -46,7 +46,7 @@ class OneShot {
   // Set up the decompression context in a buffer according to GetScratchSize.
   static Context* Init(void* scratch_space, size_t scratch_size);
 
-  static fit::result<std::string_view> DecompressImpl(Context* dctx, cpp20::span<std::byte> out,
+  static fit::result<std::string_view> DecompressImpl(Context* dctx, std::span<std::byte> out,
                                                       ByteView in);
 };
 
@@ -56,14 +56,14 @@ class Streaming {
   static auto Create(ByteView probe, Allocator&& allocator) {
     if constexpr (Buffered) {
       // Returns fit::result<std::string_view, lambda>.  On success, lambda is
-      // (ByteView& in) -> fit::result<std::string_view, cpp20::span<std::byte>>
+      // (ByteView& in) -> fit::result<std::string_view, std::span<std::byte>>
       // It updates the `in` argument for the data consumed, and it returns the
       // a buffer of decompressed data that can be used until the next call.
       return Streaming::CreateBufferedImpl(probe, std::forward<Allocator>(allocator));
     } else {
       // Returns fit::result<std::string_view, lambda>.  On success, the
-      // lambda is (cpp20::span<std::byte> out, ByteView& in) ->
-      // fit::result<std::string_view, cpp20::span<std::byte>>.  It updates the
+      // lambda is (std::span<std::byte> out, ByteView& in) ->
+      // fit::result<std::string_view, std::span<std::byte>>.  It updates the
       // `in` argument for the data consumed, and it returns the remainder of
       // the `out` argument not yet written.
       return Streaming::CreateUnbufferedImpl(probe, std::forward<Allocator>(allocator));
@@ -88,21 +88,22 @@ class Streaming {
   // Decompress a chunk of payload into the buffer.  The returned buffer is a
   // subset of the supplied buffer.  The argument is updated to leave only the
   // unprocessed remainder.
-  static fit::result<std::string_view, cpp20::span<std::byte>> Decompress(
-      Context* dctx, cpp20::span<std::byte> buffer, ByteView& chunk);
+  static fit::result<std::string_view, std::span<std::byte>> Decompress(Context* dctx,
+                                                                        std::span<std::byte> buffer,
+                                                                        ByteView& chunk);
 
   // This creates the decompressor object that View::DecompressStorage calls
   // repeatedly.  The object is a lambda that holds onto the owning objects
   // returned by the allocator.
   static constexpr auto MakeBuffered = [](ScratchSize need, auto&& owner, auto&& buffer) {
     Context* dctx = Init(owner.get(), need.scratch_size);
-    cpp20::span<std::byte> out{
+    std::span<std::byte> out{
         reinterpret_cast<std::byte*>(buffer.get()),
         need.buffer_size,
     };
     return [owner = std::forward<decltype(owner)>(owner),
             buffer = std::forward<decltype(buffer)>(buffer), dctx,
-            out](ByteView& in) -> fit::result<std::string_view, cpp20::span<std::byte>> {
+            out](ByteView& in) -> fit::result<std::string_view, std::span<std::byte>> {
       auto result = Decompress(dctx, out, in);
       if (result.is_error()) {
         return result.take_error();
@@ -138,7 +139,7 @@ class Streaming {
   static constexpr auto MakeUnbuffered = [](size_t scratch_size, auto&& owner) {
     Context* dctx = Init(owner.get(), scratch_size);
     return [owner = std::forward<decltype(owner)>(owner), dctx](
-               cpp20::span<std::byte> out, ByteView& in) { return Decompress(dctx, out, in); };
+               std::span<std::byte> out, ByteView& in) { return Decompress(dctx, out, in); };
   };
 
   template <typename Allocator>

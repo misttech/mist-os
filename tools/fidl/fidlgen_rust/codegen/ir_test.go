@@ -54,7 +54,7 @@ func TestDerivesCalculation(t *testing.T) {
 		},
 	}
 	for _, ex := range cases {
-		root := Compile(fidlgentest.EndToEndTest{T: t}.Single(`library example; `+ex.fidl), false, false)
+		root := Compile(fidlgentest.EndToEndTest{T: t}.Single(`library example; `+ex.fidl), false, false, false)
 		actual := root.Structs[0].Derives.String()
 		if ex.expected != actual {
 			t.Errorf("%s: expected %s, found %s", ex.fidl, ex.expected, actual)

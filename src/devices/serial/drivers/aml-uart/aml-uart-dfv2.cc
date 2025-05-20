@@ -10,8 +10,6 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
-#include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/power-support.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/serial/cpp/bind.h>
@@ -36,11 +34,9 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 
   parent_node_client_.Bind(std::move(node()), dispatcher());
 
-  device_server_.Begin(
-      incoming(), outgoing(), node_name(), kChildName,
-      fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
-      // TODO(b/373918767): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer retrieved.
-      compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
+  device_server_.Begin(incoming(), outgoing(), node_name(), kChildName,
+                       fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
+                       compat::ForwardMetadata::None());
 }
 
 void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {

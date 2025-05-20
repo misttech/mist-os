@@ -14,7 +14,7 @@ declare_args() {
   # LINT.IfChange
   use_vbmeta = false
 
-  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 
   # a key which will be used to sign VBMETA and images for AVB
   avb_key = ""

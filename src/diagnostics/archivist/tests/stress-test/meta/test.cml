@@ -60,11 +60,6 @@
             to: "#actors",
         },
         {
-            protocol: [ "fuchsia.logger.Log" ],
-            from: "#archivist",
-            to: "#actors",
-        },
-        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

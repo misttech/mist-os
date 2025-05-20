@@ -48,7 +48,7 @@ pub mod {{ module_name }} {
 
             {% if method.kind == ProtocolMethodKind::OneWay || method.kind == ProtocolMethodKind::TwoWay %}
                 {% if let Some(request) = method.maybe_request_payload %}
-                    type Request = {{ context.wire_type(request) }};
+                    type Request = {{ context.static_wire_type(request) }};
                 {% else %}
                     type Request = ();
                 {% endif %}
@@ -68,35 +68,37 @@ pub mod {{ module_name }} {
                                 ::fidl_next::WireResult
                             {% endif %}
                             <
+                                'static,
                             {% if let Some(success) = method.maybe_response_success_type.as_ref() %}
-                                {{ context.wire_type(success) }},
+                                {{ context.static_wire_type(success) }},
                             {% else %}
                                 (),
                             {% endif %}
                             {% if let Some(error) = method.maybe_response_err_type.as_ref() %}
-                                {{ context.wire_type(error) }},
+                                {{ context.static_wire_type(error) }},
                             {% else %}
                                 (),
                             {% endif %}
                             >
                         {% else if !method.is_strict %}
                             ::fidl_next::WireFlexible<
+                                'static,
                             {% if let Some(success) = method.maybe_response_success_type.as_ref() %}
-                                {{ context.wire_type(success) }}
+                                {{ context.static_wire_type(success) }}
                             {% else %}
                                 ()
                             {% endif %}
                             >
                         {% else %}
                             {% if let Some(response) = method.maybe_response_payload.as_ref() %}
-                                {{ context.wire_type(response) }}
+                                {{ context.static_wire_type(response) }}
                             {% else %}
                                 ()
                             {% endif %}
                         {% endif %}
                     {% when ProtocolMethodKind::Event %}
                         {% if let Some(response) = method.maybe_response_payload.as_ref() %}
-                            {{ context.wire_type(response) }}
+                            {{ context.static_wire_type(response) }}
                         {% else %}
                             ()
                         {% endif %}
@@ -120,12 +122,12 @@ pub trait {{ client_sender_name }} {
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
                             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.wire_type(request) }},
+                            Encoded = {{ context.static_wire_type(request) }},
                         >;
                 {% else %}
                     fn {{ method_name }}(
@@ -137,7 +139,7 @@ pub trait {{ client_sender_name }} {
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
@@ -149,7 +151,7 @@ pub trait {{ client_sender_name }} {
                     where
                         ___R: ::fidl_next::Encode<
                             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.wire_type(request) }},
+                            Encoded = {{ context.static_wire_type(request) }},
                         >;
                 {% else %}
                     fn {{ method_name }}(
@@ -184,12 +186,12 @@ where
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                     where
                         ___R: ::fidl_next::Encode<
                             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.wire_type(request) }},
+                            Encoded = {{ context.static_wire_type(request) }},
                         >,
                     {
                         self.as_untyped().send_one_way({{ method.ordinal }}, request)
@@ -198,7 +200,7 @@ where
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-                        self.as_untyped().send_one_way({{ method.ordinal }}, &mut ())
+                        self.as_untyped().send_one_way({{ method.ordinal }}, ())
                     }
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
@@ -206,7 +208,7 @@ where
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
-                        request: &mut ___R,
+                        request: ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<'_, Self::Transport, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
@@ -214,7 +216,7 @@ where
                     where
                         ___R: ::fidl_next::Encode<
                             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = {{ context.wire_type(request) }},
+                            Encoded = {{ context.static_wire_type(request) }},
                         >,
                     {
                         self.as_untyped().send_two_way({{ method.ordinal }}, request)
@@ -227,7 +229,7 @@ where
                         ::fidl_next::ResponseFuture<'_, Self::Transport, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
                     > {
-                        self.as_untyped().send_two_way({{ method.ordinal }}, &mut ())
+                        self.as_untyped().send_two_way({{ method.ordinal }}, ())
                             .map(::fidl_next::ResponseFuture::from_untyped)
                     }
                 {% endif %}
@@ -250,7 +252,7 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::Transport> {
                 &mut self,
                 sender: &::fidl_next::ClientSender<___T, {{ protocol_name }}>,
                 {% if method.maybe_response_payload.is_some() %}
-                    message: ::fidl_next::ResponseBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                    event: ::fidl_next::Response<___T, {{ module_name }}::{{ method_type_name }}>,
                 {% endif %}
             );
         {% endif %}
@@ -292,8 +294,13 @@ where
                 {% if method.kind == ProtocolMethodKind::Event %}
                     {{ method.ordinal }} => {
                         {% if method.maybe_response_payload.is_some() %}
-                            let buffer = ::fidl_next::ResponseBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Err(e) => {
+                                    {# TODO: send epitaph / log error #}
+                                    sender.close();
+                                }
+                            }
                         {% else %}
                             handler.{{ method_name}}(sender);
                         {% endif %}
@@ -325,7 +332,7 @@ pub trait {{ server_sender_name }} {
                 {% let method_type_name = filters::ident(method.name.camel())? %}
                 fn {{ method_name }}<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
@@ -356,11 +363,11 @@ where
                 {% let method_type_name = filters::ident(method.name.camel())? %}
                 fn {{ method_name }}<___R>(
                     &self,
-                    request: &mut ___R,
+                    request: ___R,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
                 where
                     ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                         Encoded = <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Response,
                     >,
                 {
@@ -370,7 +377,7 @@ where
                 fn {{ method_name }}(
                     &self,
                 ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-                    self.as_untyped().send_event({{ method.ordinal }}, &mut ())
+                    self.as_untyped().send_event({{ method.ordinal }}, ())
                 }
             {% endif %}
         {% endif %}
@@ -392,7 +399,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
                     &mut self,
                     sender: &::fidl_next::ServerSender<___T, {{ protocol_name }}>,
                     {% if let Some(request) = method.maybe_request_payload %}
-                        request: ::fidl_next::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                        request: ::fidl_next::Request<___T, {{ module_name }}::{{ method_type_name }}>,
                     {% endif %}
                 );
             {% when ProtocolMethodKind::TwoWay %}
@@ -401,7 +408,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
                     &mut self,
                     sender: &::fidl_next::ServerSender<___T, {{ protocol_name }}>,
                     {% if let Some(request) = method.maybe_request_payload %}
-                        request: ::fidl_next::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                        request: ::fidl_next::Request<___T, {{ module_name }}::{{ method_type_name }}>,
                     {% endif %}
                     responder: ::fidl_next::Responder<{{ module_name }}::{{ method_type_name }}>,
                 );
@@ -426,8 +433,9 @@ where
     ___T: ::fidl_next::Transport,
     ___H: {{ server_handler_name }}<___T>,
     {% for method in protocol.methods %}
-        {% if let Some(request) = method.maybe_request_payload %}
-            {{ context.wire_type(request) }}:
+        {% if method.maybe_request_payload.is_some() %}
+            {% let method_type_name = filters::ident(method.name.camel())? %}
+            <{{ module_name }}::{{ method_type_name }} as ::fidl_next::Method>::Request:
                 ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
         {% endif %}
     {% endfor %}
@@ -444,8 +452,13 @@ where
                 {% if method.kind == ProtocolMethodKind::OneWay %}
                     {{ method.ordinal }} => {
                         {% if let Some(request) = method.maybe_request_payload %}
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(sender, buffer);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Err(e) => {
+                                    {# TODO: send epitaph / log error #}
+                                    sender.close();
+                                }
+                            }
                         {% else %}
                             handler.{{ method_name}}(sender);
                         {% endif %}
@@ -478,8 +491,13 @@ where
                         let responder = ::fidl_next::Responder::from_untyped(responder);
 
                         {% if let Some(request) = method.maybe_request_payload %}
-                            let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(sender, buffer, responder);
+                            match ::fidl_next::DecoderExt::decode(buffer) {
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded, responder),
+                                Err(e) => {
+                                    {# TODO: send epitaph / log error #}
+                                    sender.close();
+                                }
+                            }
                         {% else %}
                             handler.{{ method_name}}(sender, responder);
                         {% endif %}

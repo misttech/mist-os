@@ -109,7 +109,7 @@ impl ExternalSubToolSuite {
 
         if workspace_tools.is_empty() {
             // This really should not happen, but it is not fatal, so just log an error...
-            tracing::error!(
+            log::error!(
                 "Subtool manifest {subtool_manifest:?} is empty. No workspace subtools defined."
             );
         }
@@ -148,24 +148,23 @@ impl ExternalSubToolSuite {
 
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for ExternalSubToolSuite {
-    async fn from_env(env: &EnvironmentContext) -> Result<Self> {
+    fn from_env(env: &EnvironmentContext) -> Result<Self> {
         let subtool_manifest: PathBuf =
-            env.query(FFX_SUBTOOL_MANIFEST_CONFIG).get_file().await.unwrap_or_default();
+            env.query(FFX_SUBTOOL_MANIFEST_CONFIG).get_file().unwrap_or_default();
 
         // If the subtool manifest is configured, it use it to load the information for
         // external subtools. Otherwise scan the directories. The manifest file is used when
         // ffx is being run hermetically, and should not scan and read directories.
         if subtool_manifest.exists() {
-            tracing::info!("Initializing ExternalSubToolSuite from {subtool_manifest:?} ");
+            log::info!("Initializing ExternalSubToolSuite from {subtool_manifest:?} ");
             Ok(Self::with_tools_manifest(env.clone(), subtool_manifest))
         } else {
             let subtool_config: Vec<Value> = env
                 .query(FFX_SUBTOOL_PATHS_CONFIG)
                 .select(SelectMode::All)
                 .get_file()
-                .await
                 .unwrap_or_else(|_| vec![]);
-            tracing::info!("Initializing ExternalSubToolSuite from {subtool_config:?}");
+            log::info!("Initializing ExternalSubToolSuite from {subtool_config:?}");
             Ok(Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config)))
         }
     }
@@ -239,16 +238,16 @@ impl ToolSuite for ExternalSubToolSuite {
     ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
         // look in the workspace first
         if let Some(cmd) = self.find_workspace_tool(ffx_cmd) {
-            tracing::info!("Found workspace tool {cmd:?}");
+            log::info!("Found workspace tool {cmd:?}");
             return Ok(Some(Box::new(cmd)));
         }
         // then try the sdk
         let sdk_cmd = self.context.get_sdk().ok().and_then(|sdk| self.find_sdk_tool(&sdk, ffx_cmd));
         if let Some(cmd) = sdk_cmd {
-            tracing::info!("Found SDK tool {cmd:?}");
+            log::info!("Found SDK tool {cmd:?}");
             return Ok(Some(Box::new(cmd)));
         }
-        tracing::warn!("Did not find external tool for {ffx_cmd:?}");
+        log::warn!("Did not find external tool for {ffx_cmd:?}");
         // and we're done
         Ok(None)
     }

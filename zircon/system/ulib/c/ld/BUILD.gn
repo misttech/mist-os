@@ -3,20 +3,71 @@
 # found in the LICENSE file.
 
 import("//src/zircon/lib/zircon/libzircon.gni")
-import("//zircon/system/ulib/c/libc.gni")
+import("../libc.gni")
 
 # This will be linked into the new libc.so to integrate with //sdk/lib/ld.  It
 # will never be used by the legacy libc.so, so this directory is not in the
-# $components list in ../BUILD.gn; it has no unittests target.
+# $libc_components list in ../BUILD.gn; but it has a unittests target.
 libc_source_set("ld") {
   sources = []
+}
+
+libc_test("unittests") {
+  sources = []
+  deps = [ ":log-tests" ]
+}
+
+source_set("log.headers") {
+  public = [ "log.h" ]
+  public_deps = [
+    "..:asm-linkage",
+    "//sdk/lib/ld:ld-log-zircon",
+  ]
+}
+
+# This is meant to be used in deps of basic_abi libc_source_set()s, which must
+# list "${libc_namespace}_gLog" in $undefined_symbols.  It provides the panic
+# printfs used by various assert macros and such.
+libc_source_set("log-panic") {
+  sources = [ "log-panic.cc" ]
+  deps = [
+    ":log.headers",
+    "//zircon/system/ulib/c/stdio/printf_core:wrapper",
+  ]
+}
+
+# This is used in the main libc, both old and new implementations.  It just
+# defines the LIBC_NAMESPACE::gLog variable, which hermetic_source_set()s using
+# :log-panic will refer to.
+libc_source_set("log-storage") {
+  visibility = [ ":*" ]
+  sources = [ "log-storage.cc" ]
+  deps = [ ":log.headers" ]
+}
+
+libc_test("log-tests") {
+  sources = [ "log-tests.cc" ]
+  deps = [
+    ":log.headers",
+    "../test:safe-zero-construction",
+    "//zircon/system/ulib/zxtest",
+  ]
 }
 
 # This is linked into the legacy libc.so to satisfy references from the old
 # musl integrated dynamic linker code.
 libc_source_set("musl-glue") {
-  # These things are called too early in startup to use the compiler ABI.
-  # (Except __sanitizer_log_write, but see comments above.)
+  # These things are called only after the full compiler ABI is available.
+  sources = []
+  libc_deps = [
+    ":log-storage",
+    ":musl-glue.basic",
+  ]
+}
+
+# These things are called too early in startup to use the compiler ABI.
+# (Except __sanitizer_log_write, but see comments above.)
+libc_source_set("musl-glue.basic") {
   basic_abi = true
 
   # These symbols are what the legacy libc.so gets from this libc_source_set().
@@ -25,11 +76,13 @@ libc_source_set("musl-glue") {
     "_dl_log_write",
     "_dl_log_write_init",
     "_dl_log_write_init_fallback",
-    "_dl_log_write_preinit",
     "_dl_phdr_report_globals",
   ]
 
-  undefined_symbols = [ "_dl_log_unlogged" ]
+  undefined_symbols = [
+    "_dl_log_unlogged",
+    "${libc_namespace}_gLog",
+  ]
 
   # All the vDSO's symbols are safe since it uses only the basic ABI anyway.
   undefined_symbols += libzircon_linkage_names
@@ -53,6 +106,8 @@ libc_source_set("musl-glue") {
     "__sanitizer_log_write.cc",
   ]
   deps = [
+    ":log-panic",
+    ":log.headers",
     "../stdlib:hermetic",
     "../string:hermetic",
     "//sdk/lib/ld:ld-log-zircon",

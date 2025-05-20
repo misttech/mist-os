@@ -87,7 +87,6 @@ struct CounterConfigs {
   static constexpr CounterConfig FW_RX_NO_SCB{48, "fw_rx_no_scb"};
   static constexpr CounterConfig FW_RX_BAD_SRC_MAC{49, "fw_rx_bad_src_mac"};
   static constexpr CounterConfig FW_RX_DECRYPT_FAILURES{50, "fw_rx_decrypt_failures"};
-
   static constexpr CounterConfig SDIO_FLOW_CONTROL_EVENTS{51, "sdio_flow_control_events"};
   static constexpr CounterConfig SDIO_TX_CTRL_FRAME_GOOD{52, "sdio_tx_ctrl_frame_good"};
   static constexpr CounterConfig SDIO_TX_CTRL_FRAME_BAD{53, "sdio_tx_ctrl_frame_bad"};
@@ -100,6 +99,7 @@ struct CounterConfigs {
   static constexpr CounterConfig SDIO_TX_PACKETS_WRITE{60, "sdio_tx_packets_write"};
   static constexpr CounterConfig SDIO_TX_QUEUE_FULL_COUNT{61, "sdio_tx_queue_full_count"};
   static constexpr CounterConfig SDIO_TX_ENQUEUE_COUNT{62, "sdio_tx_enqueue_count"};
+  static constexpr CounterConfig BT_COEX_WLAN_PREEMPT_COUNT{63, "bt_coex_wlan_preempt_count"};
 };
 
 template <size_t N>

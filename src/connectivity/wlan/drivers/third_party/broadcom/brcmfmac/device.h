@@ -94,6 +94,13 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   void SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
                         SetPowerSaveModeCompleter::Sync& completer) override;
   void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override;
+  void PowerDown(fdf::Arena& arena, PowerDownCompleter::Sync& completer) override;
+  void PowerUp(fdf::Arena& arena, PowerUpCompleter::Sync& completer) override;
+  void Reset(fdf::Arena& arena, ResetCompleter::Sync& completer) override;
+  void GetPowerState(fdf::Arena& arena, GetPowerStateCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_wlan_phyimpl::WlanPhyImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   // NetworkDevice::Callbacks implementation
   void NetDevInit(wlan::drivers::components::NetworkDevice::Callbacks::InitTxn txn) override;
@@ -112,6 +119,10 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   virtual zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) = 0;
   virtual zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen,
                                         size_t* actual) = 0;
+  virtual zx::result<std::vector<uint8_t>> DeviceGetPersistedMetadata(
+      std::string_view metadata_serializable_name) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
   // This is intended for implementations that want to perform additional actions when the driver's
   // recovery worker has finished.
   virtual void OnRecoveryComplete() {}

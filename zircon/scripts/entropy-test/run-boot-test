@@ -182,7 +182,7 @@ case "$METHOD" in
     qemu)
         while "$BUILDDIR"/tools/netaddr --nowait --timeout=1000 \
                 "$NODENAME" >/dev/null 2>/dev/null; do
-            "$BUILDDIR"/tools/netruncmd --nowait --timeout=1000 "$NODENAME" dm shutdown
+            "$BUILDDIR"/tools/netruncmd --nowait --timeout=1000 "$NODENAME" power shutdown
             sleep 2
         done
         ;;
@@ -191,7 +191,7 @@ case "$METHOD" in
         sleep 1 # make sure bootserver actually has time to shut down
         while "$BUILDDIR"/tools/netaddr --nowait --timeout=1000 \
                 "$NODENAME" >/dev/null 2>/dev/null; do
-            "$BUILDDIR"/tools/netruncmd --nowait --timeout=1000 "$NODENAME" dm reboot
+            "$BUILDDIR"/tools/netruncmd --nowait --timeout=1000 "$NODENAME" power reboot
             sleep 2
         done
         ;;

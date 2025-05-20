@@ -39,7 +39,7 @@ if (_generating_sdk) {
         version = "1.0.0"
       }
       dest = "${_sdk_prefix}third_party/rust_crates/sdk_metadata/meta.json"
-      schema = "rust_3p_library"
+      type = "rust_3p_library"
     }
   }
 }

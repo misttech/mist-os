@@ -51,6 +51,9 @@ InternalTouchEvent TouchInjector::PointerInjectorEventToInternalTouchEvent(
   InternalTouchEvent internal_event;
   internal_event.timestamp = event.timestamp();
   internal_event.device_id = settings.device_id;
+  if (event.has_trace_flow_id()) {
+    internal_event.trace_flow_id = event.trace_flow_id();
+  }
 
   const fuchsia::ui::pointerinjector::PointerSample& pointer_sample = event.data().pointer_sample();
   internal_event.pointer_id = pointer_sample.pointer_id();

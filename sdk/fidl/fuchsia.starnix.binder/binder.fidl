@@ -11,6 +11,7 @@ using fuchsia.unknown;
 
 const MAX_PATH_LENGTH uint64 = 4095;
 const MAX_REQUEST_COUNT uint64 = 16;
+const MAX_WRITE_BYTES uint64 = 32768;
 
 alias Fd = int32;
 
@@ -49,6 +50,14 @@ open protocol ProcessAccessor {
     flexible WriteMemory(resource struct {
         address uint64;
         content zx.Handle:VMO;
+    }) -> () error fuchsia.posix.Errno;
+
+    /// Writes the contents of `bytes` to `address` in the process memory.
+    /// `WriteBytes` is functionally equivalent to `WriteMemory`, but is
+    /// optimized for small writes of less than `MAX_WRITE_BYTES`.
+    flexible WriteBytes(resource struct {
+        address uint64;
+        bytes vector<uint8>:MAX_WRITE_BYTES;
     }) -> () error fuchsia.posix.Errno;
 
     /// Execute the given `request` and returns the associated `response`. Any
@@ -121,6 +130,9 @@ open protocol ContainerPowerController {
         /// closed.
         /// If this does not exist, then the container can sleep when it chooses after handling the
         /// Wake call.
+        ///
+        /// The container will signal the pair of wake_lock with USER_0 when the lock has been created
+        /// in the kernel.
         2: wake_lock zx.Handle:EVENTPAIR;
     });
 

@@ -24,7 +24,8 @@ use packet_formats::ipv6::Ipv6Packet;
 use packet_formats::udp::{UdpPacket, UdpParseArgs};
 use test_case::test_case;
 use {
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_hardware_suspend as fhsuspend,
+    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_hardware_power_suspend as fhsuspend,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
     fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,

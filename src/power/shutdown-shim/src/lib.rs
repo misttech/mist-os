@@ -29,6 +29,7 @@ use futures::channel::mpsc;
 use futures::lock::Mutex as AMutex;
 use futures::prelude::*;
 use futures::select;
+use shutdown_shim_config::Config;
 use std::pin::pin;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
@@ -51,8 +52,11 @@ enum IncomingRequest {
 pub async fn main(
     svc: impl Directory + AsRefDirectory + 'static,
     directory_request: ServerEnd<fio::DirectoryMarker>,
+    config_vmo: Option<zx::Vmo>,
 ) -> Result<(), anyhow::Error> {
-    println!("[shutdown-shim]: started");
+    // Check the config
+    let config = Config::from_vmo(&config_vmo.expect("Config VMO handle must be present."))?;
+    println!("[shutdown-shim]: started with config: {:?}", config);
 
     // Initialize the inspect framework.
     //
@@ -96,6 +100,7 @@ pub async fn main(
         collaborative_reboot: cr_state,
         shutdown_pending: Arc::new(AMutex::new(false)),
         shutdown_watcher: ShutdownWatcher::new_with_inspector(&inspector),
+        config,
     };
 
     let shutdown_watcher = ctx.shutdown_watcher.clone();
@@ -141,6 +146,7 @@ struct ProgramContext<D: Directory + AsRefDirectory> {
     shutdown_pending: Arc<AMutex<bool>>,
 
     shutdown_watcher: Arc<ShutdownWatcher>,
+    config: Config,
 }
 
 impl<D: Directory + AsRefDirectory> ProgramContext<D> {
@@ -333,6 +339,9 @@ impl<D: Directory + AsRefDirectory> ProgramContext<D> {
     }
 
     async fn acquire_shutdown_control_lease(&self) -> Option<zx::EventPair> {
+        if !self.config.suspend_enabled {
+            return None;
+        }
         let res = async {
             let activity_governor = self
                 .connect_to_protocol::<fsystem::ActivityGovernorMarker>()

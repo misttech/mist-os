@@ -264,6 +264,10 @@ void shutdown_interrupts_curr_cpu(void) {
   // TODO(maniscalco): Walk interrupt redirection entries and make sure nothing targets this CPU.
 }
 
+zx_status_t suspend_interrupts_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t resume_interrupts_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 // Intel 64 socs support the IOAPIC and Local APIC which support MSI by default.
 // See 10.1, 10.4, and 10.11 of Intel® 64 and IA-32 Architectures Software Developer’s
 // Manual 3A

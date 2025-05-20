@@ -144,7 +144,7 @@ pub async fn serve_capability_store(
                     let cap = match this.get(&key) {
                         Ok(Some(cap)) => Ok(cap),
                         Ok(None) => {
-                            (this.lock().not_found)(key.as_str());
+                            this.not_found(key.as_str());
                             Err(fsandbox::CapabilityStoreError::ItemNotFound)
                         }
                         Err(()) => Err(fsandbox::CapabilityStoreError::NotDuplicatable),
@@ -167,7 +167,7 @@ pub async fn serve_capability_store(
                     let cap = match this.remove(&key) {
                         Some(cap) => Ok(cap.into()),
                         None => {
-                            (this.lock().not_found)(key.as_str());
+                            this.not_found(key.as_str());
                             Err(fsandbox::CapabilityStoreError::ItemNotFound)
                         }
                     }?;

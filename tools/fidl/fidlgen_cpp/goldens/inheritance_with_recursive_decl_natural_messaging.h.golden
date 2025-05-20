@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.inheritancewithrecursivedecl/cpp/markers.h>
 #include <fidl/test.inheritancewithrecursivedecl/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -16,18 +18,12 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace fidl {
-
-}  // namespace fidl
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl::Parent::First> {
   using Request = ::test_inheritancewithrecursivedecl::ParentFirstRequest;
 
   using Completer = fidl::Completer<>;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Parent> final : public ::fidl::internal::NaturalClientBase {
@@ -36,10 +32,6 @@ class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::P
   ::fit::result<::fidl::OneWayError> First(::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First> request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Parent> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Parent>> {
@@ -47,15 +39,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedec
   ::fit::result<::fidl::OneWayError> First(::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First> request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -87,13 +72,9 @@ class ::fidl::SyncEventHandler<::test_inheritancewithrecursivedecl::Parent>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Parent> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Parent>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -106,8 +87,6 @@ class ::fidl::internal::NaturalEventSender<::test_inheritancewithrecursivedecl::
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_inheritancewithrecursivedecl::Parent> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -133,19 +112,13 @@ class ::fidl::Server<::test_inheritancewithrecursivedecl::Parent> : public ::fid
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Parent> final {
@@ -161,8 +134,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursive
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl::Child::First> {
   using Request = ::test_inheritancewithrecursivedecl::ParentFirstRequest;
@@ -177,8 +148,6 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl:
   using Completer = fidl::Completer<>;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Child> final : public ::fidl::internal::NaturalClientBase {
  public:
@@ -187,10 +156,6 @@ class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::C
 
   ::fit::result<::fidl::OneWayError> Second(::fidl::Request<::test_inheritancewithrecursivedecl::Child::Second> request) const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedecl::Child> final
@@ -201,15 +166,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_inheritancewithrecursivedec
   ::fit::result<::fidl::OneWayError> Second(::fidl::Request<::test_inheritancewithrecursivedecl::Child::Second> request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -241,13 +199,9 @@ class ::fidl::SyncEventHandler<::test_inheritancewithrecursivedecl::Child>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_inheritancewithrecursivedecl::Child> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_inheritancewithrecursivedecl::Child>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -260,8 +214,6 @@ class ::fidl::internal::NaturalEventSender<::test_inheritancewithrecursivedecl::
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::Server<::test_inheritancewithrecursivedecl::Child> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -293,19 +245,13 @@ class ::fidl::Server<::test_inheritancewithrecursivedecl::Child> : public ::fidl
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursivedecl::Child> final {
@@ -321,6 +267,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_inheritancewithrecursive
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

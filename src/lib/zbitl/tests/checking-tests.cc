@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/stdcompat/span.h>
 #include <lib/zbitl/checking.h>
 #include <lib/zbitl/view.h>
+
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -18,7 +19,7 @@
 
 namespace {
 
-using ByteView = cpp20::span<const uint8_t>;
+using ByteView = std::span<const uint8_t>;
 
 constexpr uint32_t kKernelType = 1u;
 constexpr uint32_t kNonKernelType = 2u;

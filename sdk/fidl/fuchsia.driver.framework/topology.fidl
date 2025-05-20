@@ -24,7 +24,7 @@ const MAX_PROPERTY_COUNT uint8 = 64;
 const MAX_NODE_NAME_LENGTH uint8 = 128;
 const MAX_SYMBOL_NAME_LENGTH uint8 = 128;
 
-@available(added=NEXT)
+@available(added=27)
 const MAX_MODULE_NAME_LENGTH uint8 = 128;
 
 @available(added=26)
@@ -49,7 +49,7 @@ alias NodeProperties = vector<NodeProperty2>:MAX_PROPERTY_COUNT;
 type NodeSymbol = table {
     /// Module name that provided the symbol.
     /// Will not be provided when the symbol originates from the primary parent.
-    @available(added=NEXT)
+    @available(added=27)
     3: module_name string:MAX_MODULE_NAME_LENGTH;
 
     /// Name of the symbol.
@@ -197,15 +197,6 @@ type NodeAddArgs = resource table {
     /// Name of the node.
     1: name NodeName;
 
-    /// Capabilities to offer to the driver that is bound to this node.
-    /// The driver must ensure these capabilities are added to its outgoing directory
-    /// before adding the child node.
-    @available(
-            deprecated=18,
-            removed=19,
-            note="Replaced with 'offers2' which can carry the transport type.")
-    2: offers vector<fuchsia.component.decl.Offer>:MAX_OFFER_COUNT;
-
     /// Functions to provide to the driver that is bound to this node.
     3: symbols vector<NodeSymbol>:MAX_SYMBOL_COUNT;
 
@@ -259,7 +250,12 @@ open protocol NodeController {
 
 
     /// Event that is triggered when the associated `Node` is bound to a driver.
-    flexible -> OnBind();
+    flexible -> OnBind(resource table {
+        /// Provides a token representing this node which can be exchanged with the
+        /// driver framework to discern additional information about this node.
+        @available(added=NEXT)
+        1: node_token zx.Handle:EVENT;
+    });
 };
 
 /// Error codes for the Node protocol.

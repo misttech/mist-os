@@ -81,16 +81,22 @@ impl ExtFilesystem {
         // Note that we *require* get_memory to work here for performance reasons.  Fallback to
         // FIDL-based read/write API is not an option.
         let memory = source_device.get_memory(locked, current_task, None, prot_flags)?;
-        let vmo = Arc::new(
+        let pager_vmo = memory
+            .as_vmo()
+            .ok_or_else(|| errno!(EINVAL))?
+            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map_err(impossible_error)?;
+        let parser_vmo = Arc::new(
             memory
                 .as_vmo()
                 .ok_or_else(|| errno!(EINVAL))?
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                 .map_err(impossible_error)?,
         );
-        let parser = ExtParser::new(Box::new(VmoReader::new(vmo.clone())));
-        let pager = Arc::new(Pager::new(vmo, parser.block_size().map_err(|e| errno!(EIO, e))?)?);
-        let fs = Self { parser, pager: pager.clone() };
+        let parser = ExtParser::new(Box::new(VmoReader::new(parser_vmo)));
+        let pager =
+            Arc::new(Pager::new(pager_vmo, parser.block_size().map_err(|e| errno!(EIO, e))?)?);
+        let fs = Self { parser, pager };
         let ops = ExtDirectory { inner: Arc::new(ExtNode::new(&fs, ROOT_INODE_NUM)?) };
         let fs = FileSystem::new(
             current_task.kernel(),
@@ -101,15 +107,8 @@ impl ExtFilesystem {
         let mut root = FsNode::new_root(ops);
         root.node_id = ROOT_INODE_NUM as ino_t;
         fs.set_root_node(root);
-        pager.start_pager_threads(current_task);
 
         Ok(fs)
-    }
-}
-
-impl Drop for ExtFilesystem {
-    fn drop(&mut self) {
-        self.pager.terminate();
     }
 }
 
@@ -173,7 +172,7 @@ impl FsNodeOps for ExtDirectory {
             .ok_or_else(|| errno!(ENOENT, name))?;
         let ext_node = ExtNode::new(fs_ops, entry.e2d_ino.into())?;
         let inode_num = ext_node.inode_num as ino_t;
-        fs.get_or_create_node(current_task, Some(inode_num as ino_t), |inode_num| {
+        fs.get_or_create_node(Some(inode_num as ino_t), |inode_num| {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
             let owner =
@@ -280,7 +279,7 @@ impl FsNodeOps for ExtFile {
             Ok(Arc::new(MemoryObject::from(
                 fs_ops
                     .pager
-                    .register(self.name.as_ref(), inode_num, file_size, pager_extents.into())
+                    .register(self.name.as_ref(), inode_num, file_size, &pager_extents)
                     .map_err(|e| errno!(EINVAL, e))?,
             )))
         })?;

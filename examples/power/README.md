@@ -21,7 +21,3 @@ Examples below include recommended unit and integration tests.
 ### Taking a Wake Lease
 
 Prevent system suspend by requesting a wake lease from the System Activity Governor.
-
-### Unmanaged Element
-
-Control unmanaged power elements without dependencies to report power states to Power Framework.

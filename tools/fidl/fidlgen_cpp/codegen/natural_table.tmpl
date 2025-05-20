@@ -12,9 +12,7 @@ class {{ .Name }};
 
 {{- define "Table:NaturalTypesHeader" }}
 {{ EnsureNamespace . }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ .Docs }}
 class {{ .Name }} {
@@ -31,33 +29,18 @@ class {{ .Name }} {
   {{- if not .IsResourceType }}
     {{ .Name }}(const {{ .Name }}& other) noexcept;
     {{ .Name }}& operator=(const {{ .Name }}& other) noexcept;
-    bool operator==(const {{.Name }}& other) const noexcept {
-      return ::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
-    }
-    bool operator!=(const {{.Name }}& other) const noexcept {
-      return !::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
-    }
+    bool operator==(const {{.Name }}& other) const noexcept;
+    bool operator!=(const {{.Name }}& other) const noexcept;
   {{- end }}
 
-  bool IsEmpty() const {
-    {{- if len .Members }}
-      return !(
-        {{- range $i, $m := .Members }}
-          {{- if $i }}||{{ end -}}
-          storage_.{{ .Name }}.has_value()
-        {{- end }}
-      );
-    {{- else }}
-      return true;
-    {{- end }}
-  }
+  bool IsEmpty() const;
 
   {{- range .Members }}
     {{ .Docs }}
-    const std::optional<{{ .Type }}>& {{ .Name }}() const { return storage_.{{ .Name }}; }
+    const std::optional<{{ .Type }}>& {{ .Name }}() const;
 
     {{- .Docs }}
-    ::std::optional<{{ .Type }}>& {{ .Name }}() { return storage_.{{ .Name }}; }
+    ::std::optional<{{ .Type }}>& {{ .Name }}();
 
     // Setter for {{ .Name }}.
     //
@@ -91,47 +74,16 @@ class {{ .Name }} {
     {{- end -}}
   );
 };
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{- end }}
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 
 {{- define "Table:InlineDefinition:NaturalTypesHeader" }}
-  {{ EnsureNamespace . }}
-  {{ if .IsResourceType }}
-    {{- IfdefFuchsia -}}
-  {{- end }}
-
-  inline {{ .Name }}::{{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-
-  {{- if not .IsResourceType }}
-    inline {{ .Name }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
-    inline {{ .Name }}& {{ . }}::operator=(const {{ .Name }}& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
-  {{- end }}
-
-  inline {{ .Name }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{}) {}
-
-  {{- range .Members }}
-    inline {{ $.Name }}& {{ $.Name }}::{{ .Name }}(std::optional<{{ .Type }}> value) {
-      storage_.{{ .Name }} = std::move(value);
-      return *this;
-    }
-  {{- end }}
-
-  {{ if .IsResourceType }}
-    {{- EndifFuchsia -}}
-  {{- end }}
 {{- end }}
 
 
 {{- define "Table:Traits:NaturalTypesHeader" }}
-  {{ if .IsResourceType }}
-  {{- IfdefFuchsia -}}
-  {{- end }}
+  {{- IfdefFuchsiaIf .IsResourceType -}}
 
   {{ if .IsResourceType }}
   template <>
@@ -156,21 +108,35 @@ class {{ .Name }} {
   struct internal::NaturalCodingTraits<{{ . }}, ::fidl::internal::NaturalCodingConstraintEmpty> :
     public ::fidl::internal::NaturalTableCodingTraits<{{ . }}> {};
 
-  {{ if .IsResourceType }}
-  {{- EndifFuchsia -}}
-  {{ end }}
+  {{- EndifFuchsiaIf .IsResourceType -}}
 {{ end }}
 
 
 {{- define "Table:NaturalTypesSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{- EnsureNamespace "" }}
 
+{{ . }}::{{ .Name }}({{ . }}::Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+{{ . }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{}) {}
+
 {{ if not .IsResourceType }}
-{{ . }}::Storage_ {{ .NoLeading }}::CloneStorage_() const {
+  {{ . }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
+
+  {{ . }}& {{ . }}::operator=(const {{ . }}& other) noexcept {
+    storage_ = other.CloneStorage_();
+    return *this;
+  }
+
+  bool {{ .NoLeading }}::operator==(const {{.Name }}& other) const noexcept {
+    return ::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
+  }
+  bool {{ .NoLeading }}::operator!=(const {{.Name }}& other) const noexcept {
+    return !::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
+  }
+
+  {{ . }}::Storage_ {{ .NoLeading }}::CloneStorage_() const {
     return Storage_{
       {{- range $i, $m := .Members }}
         {{- if $i }}, {{ end }}
@@ -180,15 +146,40 @@ class {{ .Name }} {
   }
 {{- end }}
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+bool {{ .NoLeading }}::IsEmpty() const {
+  {{- if len .Members }}
+    return !(
+      {{- range $i, $m := .Members }}
+        {{- if $i }}||{{ end -}}
+        storage_.{{ .Name }}.has_value()
+      {{- end }}
+    );
+  {{- else }}
+    return true;
+  {{- end }}
+}
+
+{{- range .Members }}
+  const std::optional<{{ .Type }}>& {{ $.NoLeading }}::{{ .Name }}() const {
+    return storage_.{{ .Name }};
+  }
+
+  ::std::optional<{{ .Type }}>& {{ $.NoLeading }}::{{ .Name }}() {
+    return storage_.{{ .Name }};
+  }
+
+  {{ $ }}& {{ $.NoLeading }}::{{ .Name }}(std::optional<{{ .Type }}> value) {
+    storage_.{{ .Name }} = std::move(value);
+    return *this;
+  }
+
+{{- end }}
+
+{{- EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Table:Traits:TypeConversionsHeader" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 template <>
 struct WireNaturalConversionTraits<{{ .Wire }}, {{ .Unified }}> {
@@ -204,16 +195,11 @@ template <>
 struct WireTypeForNaturalType<{{ .Unified }}> {
     using type = {{ .Wire }};
 };
-
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}
 
 {{- define "Table:Traits:TypeConversionsSource" }}
-{{ if .IsResourceType }}
-{{- IfdefFuchsia -}}
-{{- end }}
+{{- IfdefFuchsiaIf .IsResourceType -}}
 
 {{ .Unified }} WireNaturalConversionTraits<{{ .Wire }}, {{ .Unified }}>::ToNatural({{ .Wire }} src) {
   {{ .Unified }} dst;
@@ -237,7 +223,5 @@ struct WireTypeForNaturalType<{{ .Unified }}> {
   return builder.Build();
 }
 
-{{ if .IsResourceType }}
-{{- EndifFuchsia -}}
-{{ end }}
+{{ EndifFuchsiaIf .IsResourceType -}}
 {{- end }}

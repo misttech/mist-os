@@ -27,6 +27,8 @@ class ContiguousBufferImpl : public ContiguousBuffer {
     pmt_.unpin();
   }
 
+  zx::unowned_vmo vmo() const override { return vmo_.borrow(); }
+
  private:
   size_t size_;
   void* virt_;

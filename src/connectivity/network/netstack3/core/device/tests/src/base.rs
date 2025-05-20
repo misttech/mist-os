@@ -19,9 +19,10 @@ use netstack3_core::device::{
 };
 use netstack3_core::error::NotFoundError;
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, CommonAddressProperties, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
-    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate, Lifetime,
-    PreferredLifetime, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
+    AddIpAddrSubnetError, CommonAddressConfig, CommonAddressProperties,
+    IpDeviceConfigurationUpdate, Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate,
+    Ipv6AddrManualConfig, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
+    SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
 };
 use netstack3_core::testutil::{
     CtxPairExt as _, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
@@ -204,9 +205,6 @@ fn tx_queue(
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                // Enable DAD so that the auto-generated address triggers a DAD
-                // message immediately on interface enable.
-                dad_transmits: Some(Some(NonZeroU16::new(1).unwrap())),
                 // Enable stable addresses so the link-local address is auto-
                 // generated.
                 slaac_config: SlaacConfigurationUpdate {
@@ -217,6 +215,9 @@ fn tx_queue(
                 },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
+                    // Enable DAD so that the auto-generated address triggers a DAD
+                    // message immediately on interface enable.
+                    dad_transmits: Some(Some(NonZeroU16::new(1).unwrap())),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -315,12 +316,13 @@ fn test_add_remove_ip_addresses<I: Ip + TestIpExt + IpExt>(
 
 #[test_case(None; "with no AddressConfig specified")]
 #[test_case(Some(Ipv4AddrConfig {
-        common: CommonAddressProperties {
+        config: CommonAddressConfig {should_perform_dad: None},
+        properties: CommonAddressProperties {
             valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1))),
             preferred_lifetime: PreferredLifetime::preferred_until(
                 FakeInstant::from(Duration::from_secs(1))
             )
-        }
+        },
     }); "with AddressConfig specified")]
 fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant>>) {
     test_add_remove_ip_addresses::<Ipv4>(addr_config);
@@ -328,7 +330,8 @@ fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant
 
 #[test_case(None; "with no AddressConfig specified")]
 #[test_case(Some(Ipv6AddrManualConfig {
-        common: CommonAddressProperties {
+        config: CommonAddressConfig {should_perform_dad: None},
+        properties: CommonAddressProperties {
             valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(2))),
             preferred_lifetime: PreferredLifetime::preferred_until(
                 FakeInstant::from(Duration::from_secs(1))

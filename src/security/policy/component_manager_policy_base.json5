@@ -174,7 +174,6 @@
                     "/bootstrap",
                     "/bootstrap/driver_manager",
                     "/bootstrap/boot-drivers:**",
-                    "/core/thermd",
                 ],
             },
             {

@@ -245,12 +245,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_hook_test() {
         let root = Moniker::root();
-        let a: Moniker = vec!["a"].try_into().unwrap();
-        let ab: Moniker = vec!["a", "b"].try_into().unwrap();
-        let ac: Moniker = vec!["a", "c"].try_into().unwrap();
-        let abd: Moniker = vec!["a", "b", "d"].try_into().unwrap();
-        let abe: Moniker = vec!["a", "b", "e"].try_into().unwrap();
-        let acf: Moniker = vec!["a", "c", "f"].try_into().unwrap();
+        let a: Moniker = ["a"].try_into().unwrap();
+        let ab: Moniker = ["a", "b"].try_into().unwrap();
+        let ac: Moniker = ["a", "c"].try_into().unwrap();
+        let abd: Moniker = ["a", "b", "d"].try_into().unwrap();
+        let abe: Moniker = ["a", "b", "e"].try_into().unwrap();
+        let acf: Moniker = ["a", "c", "f"].try_into().unwrap();
 
         // Try adding parent followed by children then verify the topology string
         // is correct.

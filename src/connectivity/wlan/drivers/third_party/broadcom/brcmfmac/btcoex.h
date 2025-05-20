@@ -25,5 +25,6 @@ void brcmf_btcoex_detach(struct brcmf_cfg80211_info* cfg);
 zx_status_t brcmf_btcoex_set_mode(struct brcmf_cfg80211_vif* vif, enum brcmf_btcoex_mode mode,
                                   uint16_t duration);
 void brcmf_btcoex_log_active_bt_tasks(brcmf_if* ifp);
+uint32_t brcmf_btcoex_get_wlan_preempt_count(brcmf_if* ifp);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BTCOEX_H_

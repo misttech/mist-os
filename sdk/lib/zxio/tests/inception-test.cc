@@ -101,7 +101,7 @@ TEST(CreateWithAllocator, Vmo) {
   ASSERT_EQ(actual, sizeof(buffer));
   ASSERT_EQ(buffer, data);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  zxio_destroy(io);
 }
 
 namespace {
@@ -143,7 +143,8 @@ TEST(CreateWithAllocator, Directory) {
   // Check the zxio by sending a sync operation to the server.
   EXPECT_OK(zxio_sync(zxio));
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
 
   dir_control_loop.Shutdown();
 }
@@ -194,7 +195,8 @@ TEST(CreateWithAllocator, File) {
   EXPECT_EQ(sizeof(buffer), actual);
   EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
 
   file_control_loop.Shutdown();
 }
@@ -240,7 +242,8 @@ TEST(CreateWithAllocator, Node) {
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
 
   service_control_loop.Shutdown();
 }
@@ -312,7 +315,8 @@ TEST(CreateWithAllocator, Tty) {
   EXPECT_NE(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
       << "pending is " << std::showbase << std::hex << pending;
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
 
   ASSERT_STATUS(event0.wait_one(0u, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
   EXPECT_EQ(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
@@ -355,7 +359,8 @@ TEST(CreateWithAllocator, PacketSocket) {
   EXPECT_NE(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
       << "pending is " << std::showbase << std::hex << pending;
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
 
   ASSERT_STATUS(event0.wait_one(0u, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
   EXPECT_EQ(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
@@ -397,7 +402,8 @@ TEST(CreateWithAllocator, RawSocket) {
   EXPECT_NE(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
       << "pending is " << std::showbase << std::hex << pending;
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
 
   ASSERT_STATUS(event0.wait_one(0u, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
   EXPECT_EQ(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
@@ -440,7 +446,8 @@ TEST(CreateWithAllocator, SynchronousDatagramSocket) {
   EXPECT_NE(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
       << "pending is " << std::showbase << std::hex << pending;
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
 
   ASSERT_STATUS(event0.wait_one(0u, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
   EXPECT_EQ(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
@@ -477,7 +484,8 @@ TEST(CreateWithAllocator, DatagramSocket) {
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
   control_loop.Shutdown();
 }
 
@@ -509,7 +517,8 @@ TEST(CreateWithAllocator, StreamSocket) {
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* zxio = &(storage->io);
 
-  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio));
+  zxio_destroy(zxio);
   control_loop.Shutdown();
 }
 

@@ -21,6 +21,7 @@ group("drivers-not-templates") {
     "//src/developer/adb:drivers",
     "//src/devices/bundles:drivers",
     "//src/diagnostics/validator/logs/ddk/log-test-driver",
+    "//src/firmware/drivers/usb-fastboot-function:component",
     "//src/graphics/bundles:drivers",
     "//src/lib/ddktl:drivers",
     "//src/media/bundles:drivers",

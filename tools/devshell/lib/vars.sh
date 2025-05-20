@@ -96,7 +96,7 @@ RBE_WRAPPER=( "$FUCHSIA_DIR"/build/rbe/fuchsia-reproxy-wrap.sh )
 # Propagate tracing option from `fx -x build` to the wrapper script.
 # This is less invasive than re-exporting SHELLOPTS.
 if [[ -o xtrace ]]; then
-  RBE_WRAPPER=( "$SHELL" -x "${RBE_WRAPPER[@]}" )
+  RBE_WRAPPER=(/bin/bash -x "${RBE_WRAPPER[@]}" )
 fi
 
 # fx-command-stdout-to-array runs a command and stores its standard output
@@ -262,13 +262,6 @@ function fx-build-config-load {
     return 1
   fi
 
-  # The source of `fx.config` will re-set the build dir to relative, so we need
-  # to abspath it again.
-  if [[ "${FUCHSIA_BUILD_DIR:0:1}" != "/" ]]; then
-    FUCHSIA_BUILD_DIR="${FUCHSIA_DIR}/${FUCHSIA_BUILD_DIR}"
-  fi
-
-
   export FUCHSIA_BUILD_DIR FUCHSIA_ARCH
 
   if [[ "${HOST_OUT_DIR:0:1}" != "/" ]]; then
@@ -291,10 +284,10 @@ function fx-export-default-target {
   fi
 }
 
-# Forces the command to fail if a user specifies the -d flag
+# Forces the command to fail if a user specifies the -t flag
 function fx-fail-if-device-specified {
   if [[ -n "${FUCHSIA_NODENAME_SET_BY_FX_FLAG}" ]]; then
-    fx-error "The -d flag is not supported when calling this function"
+    fx-error "The -t flag is not supported when calling this function"
     exit 1
   fi
 }
@@ -339,40 +332,88 @@ function fx-config-read {
   _FX_LOCK_FILE="${FUCHSIA_BUILD_DIR}.build_lock"
 }
 
-# If the fx default target is set, provide a best-effort check against whether
-# a ffx default target is overshadowing it. If so, emit a helpful warning.
+# Evaluates $@ if $FUCHSIA_NODENAME or $FUCHSIA_DEVICE_ADDR have been set by the
+# user outside of `fx set-device` or `fx -t|--target`.
+#
+# Argument expressions are evaluated with the following environment variables
+# provided:
+#  - ENV_VAR_NAMES: A human readable message fragment of the environment
+#    variable names that are overriding the default target.
+#    Example: '$FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR'
+#  - ENV_VARS: A human readable message fragment of the environment variable
+#    key-value pairs that are overriding the default target.
+#    Example: '$FUCHSIA_NODENAME="foo" and $FUCHSIA_DEVICE_ADDR="bar"'
+#
+# Examples:
+# > fx-if-target-set-by-env echo '$ENV_VARS overrides the default target.'
+#
+# > fx-if-target-set-by-env echo '$ENV_VARS overrides the default target.'
+# $FUCHSIA_NODENAME="foo" overrides the default target.
+#
+# > fx-if-target-set-by-env echo '$ENV_VAR_NAMES overrides the default target.'
+# $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR overrides the default target.
+_FUCHSIA_NODENAME_FROM_PARENT="${FUCHSIA_NODENAME:-}"
+function fx-if-target-set-by-env {
+  if [[ -n "${_FUCHSIA_NODENAME_FROM_PARENT}" && -n "${FUCHSIA_DEVICE_ADDR}" ]]; then
+    ENV_VAR_NAMES="\$FUCHSIA_NODENAME and \$FUCHSIA_DEVICE_ADDR" \
+    ENV_VARS="\$FUCHSIA_NODENAME=\"${_FUCHSIA_NODENAME_FROM_PARENT}\" and \$FUCHSIA_DEVICE_ADDR=\"${FUCHSIA_DEVICE_ADDR}\"" \
+    "$@"
+  elif [[ -n "${_FUCHSIA_NODENAME_FROM_PARENT}" ]]; then
+    ENV_VAR_NAMES="\$FUCHSIA_NODENAME" \
+    ENV_VARS="\$FUCHSIA_NODENAME=\"${_FUCHSIA_NODENAME_FROM_PARENT}\"" \
+    "$@"
+  elif [[ -n "${FUCHSIA_DEVICE_ADDR}" ]]; then
+    ENV_VAR_NAMES="\$FUCHSIA_DEVICE_ADDR" \
+    ENV_VARS="\$FUCHSIA_DEVICE_ADDR=\"${FUCHSIA_DEVICE_ADDR}\"" \
+    "$@"
+  fi
+}
+
+# Provides a best-effort check against whether a ffx default target is set,
+# which can overshadow fx-level targets.
+# If this is the case, emit a helpful warning by default or error if `--error`
+# is specified.
+# Attempts to unset the ffx default target if `--fix` is specified.
 # To minimize DX disruptions, suggests the user to verify if ffx hasn't been
 # built yet.
-function fx-check-default-target {
+function fx-check-ffx-default-target {
   # Refresh $FUCHSIA_NODENAME.
   fx-export-default-target
-
-  # Skip check if fx device is not set.
-  if [[ -z "$FUCHSIA_NODENAME" ]]; then
-    return 0
-  fi
 
   # Skip check with warning if ffx hasn't been built.
   local ffx_binary="${FUCHSIA_BUILD_DIR}/host-tools/ffx"
   if [[ ! -x "${ffx_binary}" ]]; then
-    fx-warn "ffx not found in build directory, skipping verification that effective target device is \"$FUCHSIA_NODENAME\"."
+    fx-warn "ffx not found in build directory, skipping verification that effective target device is ${FUCHSIA_NODENAME:-"unset"}."
     # shellcheck disable=SC2016
     fx-warn 'Please run `ffx target default get` after the build to confirm.'
     return 0
   fi
 
-  # Check passes if ffx default target agrees with fx device.
-  local effective_default_target
-  effective_default_target="$($ffx_binary target default get)"
-  if [[ "$FUCHSIA_NODENAME" == "$effective_default_target" ]]; then
+  # Get the default target configured within ffx.
+  local ffx_configured_target
+  ffx_configured_target="$(FUCHSIA_NODENAME= FUCHSIA_DEVICE_ADDR= $ffx_binary target default get 2>/dev/null)"
+  if [[ -z "$ffx_configured_target" ]]; then
     return 0
   fi
 
-  fx-error "The build level device \"$FUCHSIA_NODENAME\" is being overridden by the user level device \"$effective_default_target\"."
-  fx-error "Here are all of the ffx default values set: $(ffx config get --select all target.default)"
-  # shellcheck disable=SC2016
-  fx-error 'Please run `ffx target default unset` to fix this.'
-  return 1
+  local -r args=$*
+  function log {
+    if [[ $args == *"--error"* ]]; then
+      fx-error "$@"
+    else
+      fx-warn "$@"
+    fi
+  }
+
+  log "The build level device ${FUCHSIA_NODENAME:-"is unset, but"} is overridden by the user level device \"$ffx_configured_target\"."
+  if [[ $* == *"--fix"* ]]; then
+    log 'Attempting to fix this by running `ffx target default unset`...'
+    FUCHSIA_NODENAME= FUCHSIA_DEVICE_ADDR= $ffx_binary target default unset
+    return $?
+  else
+    log 'Please run `ffx target default unset` to fix this.'
+    return 1
+  fi
 }
 
 function fx-change-build-dir {
@@ -470,7 +511,8 @@ function json-config-get {
 function get-device-raw {
   fx-config-read
   local device=""
-  device="$(ffx target default get)"
+  # Suppress the unset default target message from stderr.
+  device="$(ffx target default get 2>/dev/null)"
 
   if ! is-valid-device "${device}"; then
     fx-error "Invalid device name or address: '${device}'. Some valid examples are:
@@ -699,7 +741,7 @@ function fx-target-ssh-address {
 function multi-device-fail {
   local output devices
   fx-error "Multiple devices found."
-  fx-error "Please specify one of the following devices using either \`fx -d <device-name>\` or \`fx set-device <device-name>\`."
+  fx-error "Please specify one of the following devices using either \`fx -t <device-name>\` or \`fx set-device <device-name>\`."
   devices="$(fx-target-finder-info)" || {
     code=$?
     fx-error "Device discovery failed with status: $code"
@@ -939,84 +981,22 @@ function fx-exit-on-failure {
   "$@" || exit $?
 }
 
-# Massage a ninja command line to add default -j and/or -l switches.
+# Run a Ninja or Bazel command with the right environment, after eventually
+# prepending necessary RBE wrapper scripts to it.
+#
 # Arguments:
 #    print_full_cmd   if true, prints the full ninja command line before
 #                     executing it
-#    ninja command    the ninja command itself. This can be used both to run
-#                     ninja directly or to run a wrapper script around ninja.
-function fx-run-ninja {
-  # Separate the command from the arguments so we can prepend default -j/-l
-  # switch arguments.  They need to come before the user's arguments in case
-  # those include -- or something else that makes following arguments not be
-  # handled as normal switches.
+#    command_type     either "ninja" or "bazel"
+#
+#    build_command    The build command itself.
+#
+function fx-run-build-command {
   local print_full_cmd="$1"
   shift
-  local cmd="$1"
+  local command_type="$1"
   shift
-
-  local args=()
-  local full_cmdline
-  local cpu_load
-  local concurrency
-  local have_load=false
-  local have_jobs=false
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-    -l)
-      have_load=true
-      cpu_load="$2"
-      ;;
-    -j)
-      have_jobs=true
-      concurrency="$2"
-      ;;
-    -l*)
-      have_load=true
-      cpu_load="${1#-l}"
-      ;;
-    -j*)
-      have_jobs=true
-      concurrency="${1#-j}"
-      ;;
-    esac
-    args+=("$1")
-    shift
-  done
-
-  if ! "$have_load"; then
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-      # Load level on Darwin is quite different from that of Linux, wherein a
-      # load level of 1 per CPU is not necessarily a prohibitive load level. An
-      # unscientific study of build side effects suggests that cpus*20 is a
-      # reasonable value to prevent catastrophic load (i.e. user can not kill
-      # the build, can not lock the screen, etc).
-      local cpus
-      cpus="$(fx-cpu-count)"
-      cpu_load=$((cpus * 20))
-      args=("-l" "${cpu_load}" "${args[@]}")
-    fi
-  elif [[ -z "${cpu_load}" ]]; then
-    echo "ERROR: Missing cpu load (-l) argument."
-    exit 1
-  fi
-
-  if ! "$have_jobs"; then
-    concurrency="$(fx-choose-build-concurrency)"
-    # macOS in particular has a low default for number of open file descriptors
-    # per process, which is prohibitive for higher job counts. Here we raise
-    # the number of allowed file descriptors per process if it appears to be
-    # low in order to avoid failures due to the limit. See `getrlimit(2)` for
-    # more information.
-    local min_limit=$((concurrency * 2))
-    if [[ $(ulimit -n) -lt "${min_limit}" ]]; then
-      ulimit -n "${min_limit}"
-    fi
-    args=("-j" "${concurrency}" "${args[@]}")
-  elif [[ -z "${concurrency}" ]]; then
-    echo "ERROR: Missing job count (-j) argument."
-    exit 1
-  fi
+  local build_command=("$@")
 
   # Check for a bad element in $PATH.
   # We build tools in the build, such as touch(1), targeting Fuchsia. Those
@@ -1043,7 +1023,6 @@ function fx-run-ninja {
     exit 1
   ;;
   esac
-
 
   # TERM is passed for the pretty ninja UI
   # PATH is passed through.  The ninja actions should invoke tools without
@@ -1164,6 +1143,7 @@ EOF
     # Forward the following only if the environment already sets them:
     ${MAKEFLAGS+"MAKEFLAGS=${MAKEFLAGS}"}
     ${FUCHSIA_BAZEL_DISK_CACHE+"FUCHSIA_BAZEL_DISK_CACHE=${FUCHSIA_BAZEL_DISK_CACHE}"}
+    ${FUCHSIA_BAZEL_JOB_COUNT+"FUCHSIA_BAZEL_JOB_COUNT=$FUCHSIA_BAZEL_JOB_COUNT"}
     ${FUCHSIA_DEBUG_BAZEL_SANDBOX+"FUCHSIA_DEBUG_BAZEL_SANDBOX=${FUCHSIA_DEBUG_BAZEL_SANDBOX}"}
     ${NINJA_PERSISTENT_TIMEOUT_SECONDS+"NINJA_PERSISTENT_TIMEOUT_SECONDS=$NINJA_PERSISTENT_TIMEOUT_SECONDS"}
     ${NINJA_PERSISTENT_LOG_FILE+"NINJA_PERSISTENT_LOG_FILE=$NINJA_PERSISTENT_LOG_FILE"}
@@ -1171,13 +1151,6 @@ EOF
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
   )
-
-  if [[ "${have_jobs}" ]]; then
-    # Pass any _explicit_ job count provided by the user to the Bazel
-    # launcher script through an environment variable.
-    # See https://fxbug.dev/351623259
-    envs+=("FUCHSIA_BAZEL_JOB_COUNT=${concurrency}")
-  fi
 
   local profile_wrapper=()
   if [[ "$BUILD_PROFILE_ENABLED" == 1 ]]
@@ -1198,19 +1171,112 @@ EOF
     )
   fi
 
-  full_cmdline=(
+  local full_cmdline=(
     env -i "${envs[@]}"
     "${profile_wrapper[@]}"
     "${rbe_wrapper[@]}"
-    "$cmd"
-    "${args[@]}"
+    "${build_command[@]}"
   )
 
   if [[ "${print_full_cmd}" = true ]]; then
     echo "${full_cmdline[@]}"
     echo
   fi
-  fx-try-locked "${full_cmdline[@]}"
+  if [[ "${command_type}" == "ninja" ]]; then
+    fx-try-locked "${full_cmdline[@]}"
+  else
+    # There is no need to use a lock file for Bazel
+    "${full_cmdline[@]}"
+  fi
+}
+
+# Massage a ninja command line to add default -j and/or -l switches.
+# Arguments:
+#    print_full_cmd   if true, prints the full ninja command line before
+#                     executing it
+#    ninja command    the ninja command itself. This can be used both to run
+#                     ninja directly or to run a wrapper script around ninja.
+function fx-run-ninja {
+  # Separate the command from the arguments so we can prepend default -j/-l
+  # switch arguments.  They need to come before the user's arguments in case
+  # those include -- or something else that makes following arguments not be
+  # handled as normal switches.
+  local print_full_cmd="$1"
+  shift
+  local cmd="$1"
+  shift
+
+  local args=()
+  local full_cmdline
+  local cpu_load
+  local concurrency
+  local have_load=false
+  local have_jobs=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -l)
+      have_load=true
+      cpu_load="$2"
+      ;;
+    -j)
+      have_jobs=true
+      concurrency="$2"
+      ;;
+    -l*)
+      have_load=true
+      cpu_load="${1#-l}"
+      ;;
+    -j*)
+      have_jobs=true
+      concurrency="${1#-j}"
+      ;;
+    esac
+    args+=("$1")
+    shift
+  done
+
+  if ! "$have_load"; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      # Load level on Darwin is quite different from that of Linux, wherein a
+      # load level of 1 per CPU is not necessarily a prohibitive load level. An
+      # unscientific study of build side effects suggests that cpus*20 is a
+      # reasonable value to prevent catastrophic load (i.e. user can not kill
+      # the build, can not lock the screen, etc).
+      local cpus
+      cpus="$(fx-cpu-count)"
+      cpu_load=$((cpus * 20))
+      args=("-l" "${cpu_load}" "${args[@]}")
+    fi
+  elif [[ -z "${cpu_load}" ]]; then
+    echo "ERROR: Missing cpu load (-l) argument."
+    exit 1
+  fi
+
+  if ! "$have_jobs"; then
+    concurrency="$(fx-choose-build-concurrency)"
+    # macOS in particular has a low default for number of open file descriptors
+    # per process, which is prohibitive for higher job counts. Here we raise
+    # the number of allowed file descriptors per process if it appears to be
+    # low in order to avoid failures due to the limit. See `getrlimit(2)` for
+    # more information.
+    local min_limit=$((concurrency * 2))
+    if [[ $(ulimit -n) -lt "${min_limit}" ]]; then
+      ulimit -n "${min_limit}"
+    fi
+    args=("-j" "${concurrency}" "${args[@]}")
+  elif [[ -z "${concurrency}" ]]; then
+    echo "ERROR: Missing job count (-j) argument."
+    exit 1
+  fi
+
+  if [[ "${have_jobs}" ]]; then
+    # Pass any _explicit_ job count provided by the user to the Bazel
+    # launcher script through an environment variable.
+    # See https://fxbug.dev/351623259
+    FUCHSIA_BAZEL_JOB_COUNT=${concurrency}
+  fi
+
+  fx-run-build-command "${print_full_cmd}" "ninja" "${cmd}" "${args[@]}"
 }
 
 function fx-get-image {
@@ -1231,4 +1297,74 @@ function fx-zbi {
 
 function fx-zbi-default-compression {
   "${FUCHSIA_BUILD_DIR}/$(fx-command-run list-build-artifacts --name zbi --expect-one tools)" "$@"
+}
+
+# Failsafe check for global TUI functionality, defaults to 'text' in case of
+# errors. Call with e.g. $(fx-get-ui-mode "fx-use") to check for command
+# specific overrides. By convention use snake-case to identify commands in
+# overrides, e.g. "fx-use" or "ffx-target-list".
+# Echos "tui" or "text" for the two modes, returns 0 on error-free invocation
+# and returns 1 if any of the called commands have errors.
+function fx-get-ui-mode() {
+  local command="$1"
+  local override_mode
+  local mode
+
+  mode="text" # default to text
+  # We are NOT using fx-command-run to avoid having to build `ffx` -
+  # one instance of this call chooses which out dir to use with `fx use`
+  local ffx_binary="${FUCHSIA_BUILD_DIR}/host-tools/ffx"
+  if [[ ! -x "${ffx_binary}" ]]; then
+    fx-warn "ffx not found in build directory. It is needed to check \`ffx.ui.mode\`. Defaulting to 'text'"
+    echo "text"
+    return 1
+  fi
+  # check for the ffx.ui.mode
+  tui_setting_raw="$("${ffx_binary}" config get ffx.ui.mode 2>/dev/null)"
+  exit_status=$?
+  if [[ "$exit_status" -ne 0 ]]; then
+    fx-warn "error running ffx config get ffx.ui.mode, defaulting to 'text'"
+    echo "text"
+    return 1
+  elif [[ -n "$tui_setting_raw" ]]; then
+    tui_setting="${tui_setting_raw#\"}" # Remove leading " if it exists
+    tui_setting="${tui_setting%\"}" # Remove trailing " if it exists
+    mode="${tui_setting}"
+  fi
+  # there can be command specific overrides, check for those
+  if [[ -n $command ]]; then
+    overrides="$("${ffx_binary}" config get ffx.ui.overrides 2>/dev/null)"
+    exit_status=$?
+    if [[ "$exit_status" -ne 0 && "$exit_status" -ne 2 ]]; then # 2 is Value not found, which not an error
+        fx-warn "Error calling ffx config get ffx.ui.overrides, $mode"
+        echo "$mode"
+        return 1
+    else
+      override_mode="$(jq --arg cmd "$command" -r '.[$cmd] //empty' <<< "$overrides")"
+      exit_status=$?
+      if [[ "$exit_status" -ne 0 ]]; then
+        fx-warn "Error parsing overrides in fx-get-ui-mode, using $mode"
+        echo "$mode"
+        return 1
+      elif [[ -n "$override_mode" ]]; then
+          mode="$override_mode"
+      fi
+    fi
+  fi
+  # check the mode set is in the right format (or default to text)
+  case "$mode" in
+        text|tui)
+          echo "$mode"
+          ;;
+        *)
+          fx-warn "Warning: Invalid mode '$mode' detected for ffx.ui.mode, but 'tui' or 'text' expected: defaulting to 'text'\n\t (Change the setting with e.g. 'ffx config set ffx.ui.mode tui' )" >&2
+          echo "text"
+          ;;
+  esac
+  return 0
+}
+
+# Gum - wrapped functionality for choosing amongst options
+function fx-choose-tui {
+    fx-command-run gum choose "$@"
 }

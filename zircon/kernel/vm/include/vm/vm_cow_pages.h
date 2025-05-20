@@ -196,7 +196,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx::result<LockedRefPtr> CreateCloneLocked(SnapshotType type, bool require_unidirection,
-                                             VmCowRange range) TA_REQ(lock());
+                                             VmCowRange range, DeferredOps& ops) TA_REQ(lock());
 
   // VmCowPages are initially created in the Init state and need to be transitioned to Alive prior
   // to being used. This is exposed for VmObjectPaged to call after ensuring that creation is
@@ -215,27 +215,21 @@ class VmCowPages final : public VmHierarchyBase,
   // This should only be used to report to user mode whether a VMO is user-pager backed, not for any
   // other purpose.
   bool is_root_source_user_pager_backed() const {
-    canary_.Assert();
     return !!(options_ & VmCowPagesOptions::kUserPagerBackedRoot);
   }
 
   // Returns whether the root of the cow pages hierarchy has non-null page_source_.
-  bool root_has_page_source() const {
-    canary_.Assert();
-    return !!(options_ & VmCowPagesOptions::kPageSourceRoot);
-  }
+  bool root_has_page_source() const { return !!(options_ & VmCowPagesOptions::kPageSourceRoot); }
 
   // Helper function for CowPage cloning methods. Returns any options that should be passed down to
   // the child.
   VmCowPagesOptions inheritable_options() const {
-    canary_.Assert();
     return VmCowPagesOptions::kNone | (options_ & (VmCowPagesOptions::kUserPagerBackedRoot |
                                                    VmCowPagesOptions::kPreservingPageContentRoot |
                                                    VmCowPagesOptions::kPageSourceRoot));
   }
 
   bool is_root_source_preserving_page_content() const {
-    canary_.Assert();
     return !!(options_ & VmCowPagesOptions::kPreservingPageContentRoot);
   }
 
@@ -244,7 +238,6 @@ class VmCowPages final : public VmHierarchyBase,
   bool is_discardable() const { return !!discardable_tracker_; }
 
   bool can_evict() const {
-    canary_.Assert();
     return page_source_ && page_source_->properties().is_preserving_page_content;
   }
 
@@ -324,10 +317,40 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Returns whether this cow pages node is dirty tracked.
   bool is_dirty_tracked() const {
-    canary_.Assert();
     // Pager-backed VMOs require dirty tracking either if they are directly backed by the pager,
     // i.e. the root VMO.
     return page_source_ && page_source_->properties().is_preserving_page_content;
+  }
+
+  // If true this node, and all nodes in this hierarchy, are using parent content markers to
+  // indicate when a leaf node may need to walk up the tree to find content.
+  //
+  // When parent content markers are in use an empty page list slot in a leaf node means that there
+  // is *no* visible parent content above, and the parent hierarchy does not have to be searched.
+  //
+  // For memory efficiency, and because it would be redundant, parent content markers are never
+  // placed in the hidden nodes, only leaf nodes.
+  //
+  // The presence of a parent content marker in a leaf node indicates that there *might* be content
+  // in a parent node and that a tree walk *must* be performed to search for it. The reason for
+  // spurious parent content markers is that zero page deduplication could happen on hidden nodes,
+  // which could remove the content, but leave the parent content markers in the leaf nodes. These
+  // parent content markers are redundant and could be cleaned up.
+  //
+  // Use of parent content markers is just the inverse of having a page source, since if there is a
+  // page source we always have to go to it for content as the zero page cannot be assumed. Although
+  // some page sources do supply zero content (physical page provider for contiguous VMOs),
+  // optimizing this check for that is redundant since such page sources do not support
+  // copy-on-write, and so never have children to begin with.
+  bool tree_has_parent_content_markers() const { return !root_has_page_source(); }
+
+  // Indicates whether this node can have parent content markers placed in it. This is just checking
+  // if it is both a leaf node, and the tree overall can have parent content markers.
+  //
+  // Note that even if this is false, if |tree_has_parent_content_markers| is true then reasoning
+  // may need to be done about parent content markers.
+  bool node_has_parent_content_markers() const {
+    return !is_hidden() && tree_has_parent_content_markers();
   }
 
   // The modified state is only supported for root pager-backed VMOs, and will get queried (and
@@ -608,9 +631,12 @@ class VmCowPages final : public VmHierarchyBase,
   using AttributionCounts = VmObject::AttributionCounts;
   AttributionCounts GetAttributedMemoryInRangeLocked(VmCowRange range) const TA_REQ(lock());
 
-  enum class EvictionHintAction : uint8_t {
-    Follow,
-    Ignore,
+  // TODO(sagebarreda@): consider refactoring eviction out of reclamation so it can be called
+  // instead of using reclamation with `Require`.
+  enum class EvictionAction : uint8_t {
+    FollowHint,
+    IgnoreHint,
+    Require,
   };
 
   // Asks the VMO to attempt to reclaim the specified page. There are a few possible outcomes:
@@ -628,7 +654,8 @@ class VmCowPages final : public VmHierarchyBase,
   // The effect of (2) is that the caller can assume in the case of reclamation failure it will not
   // keep finding this page as a reclamation candidate and infinitely retry it.
   // If the |compressor| is non-null then it must have just had |Arm| called on it.
-  // |hint_action| indicates whether the |always_need| eviction hint should be respected or ignored.
+  // |eviction_action| hints indicates whether the |always_need| eviction hint should be respected
+  // or ignored. Require will force eviction.
   //
   // The actual number of pages reclaimed is returned.
   struct ReclaimCounts {
@@ -639,7 +666,7 @@ class VmCowPages final : public VmHierarchyBase,
 
     uint64_t Total() const { return compressed + discarded + evicted_non_loaned + evicted_loaned; }
   };
-  ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
+  ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionAction eviction_action,
                             VmCompressor* compressor);
 
   // Helper for reclamation functions to perform common checks for whether or not reclamation should
@@ -750,10 +777,6 @@ class VmCowPages final : public VmHierarchyBase,
   // backed) then a nullptr can be provided.
   void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op, DeferredOps* deferred)
       TA_REQ(lock());
-  // TODO(https://fxbug.dev/338300943): Under fine grained locking children cannot be iterated while
-  // this VMOs lock is held. This method exists while call sites transition to the above method that
-  // takes ownership of the lock.
-  void RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
   // Promote pages in the specified range for reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
@@ -822,7 +845,7 @@ class VmCowPages final : public VmHierarchyBase,
   // reclaim loaned pages.
   // Is also used as an internal helper by ReclaimPage.
   VmCowPages::ReclaimCounts ReclaimPageForEviction(vm_page_t* page, uint64_t offset,
-                                                   EvictionHintAction hint_action);
+                                                   EvictionAction eviction_action);
 
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
@@ -1135,16 +1158,8 @@ class VmCowPages final : public VmHierarchyBase,
   // AddNewPagesLocked or similar.
   zx_status_t AllocUninitializedPage(vm_page_t** page, AnonymousPageRequest* page_request);
 
-  // Helper for removing a page from the PageQueues and freeing it (either to the PMM, or the owning
-  // page source).
-  void RemoveAndFreePageLocked(vm_page_t* page) TA_REQ(lock());
-
   // Helper for removing a page from the PageQueues and adding to a deferred ops for later freeing.
   void RemovePageLocked(vm_page_t* page, DeferredOps& ops) TA_REQ(lock());
-
-  // Helper for removing a page from the page queues and either returning it immediately to the PMM
-  // if it's a loaned page, or appending it to the supplied list.
-  void RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) TA_REQ(lock());
 
   // Helper class for managing a two part add page transaction. This object allows adding a page to
   // be split into a check and allocation, which can fail, with the final insertion, which cannot
@@ -1262,18 +1277,21 @@ class VmCowPages final : public VmHierarchyBase,
                                               AttributionCounts* count) const TA_REQ(lock());
 
   // Searches for the content for the page in |this| at |offset|. If the offset is already
-  // populated in |this| then that page is returned with the |owner| set to |this|, otherwise the
+  // populated in |this| then that page is returned with the |owner| unset, otherwise the
   // parent hierarchy is searched for any content. The result could be used to initialize a commit,
   // or compare an existing commit with the original. The initial content is a VMPLCursor and may
   // be invalid if there was no explicit initial content. How to interpret an absence of content,
   // whether it is zero or otherwise, is left up to the caller.
   //
   // If an ancestor has a committed page which corresponds to |offset|, returns a cursor with
-  // |current()| as that page as well as the VmCowPages and offset which own the page. If no
-  // ancestor has a committed page for the offset, returns a cursor with a |current()| of nullptr as
-  // well as the VmCowPages/offset which need to be queried to populate the page.
+  // |current()| as that page as well as a LockedPtr to the VmCowPages and offset which own the
+  // page. If no ancestor has a committed page for the offset, returns a cursor with a |current()|
+  // of nullptr as well as the VmCowPages/offset which need to be queried to populate the page. If
+  // |this| needs to be queried to populate the page, |owner| is not set, otherwise it is set to the
+  // ancestor that owns the page. The reason being that |this| will already be externally locked by
+  // the caller, whereas an ancestor needs to be locked inside this function.
   //
-  // The returned |visible_end| represents the size of the range in |owner| for which it can be
+  // The returned |visible_end| represents the size of the range in the owner for which it can be
   // assumed that no child has content for, although for which the content might be in yet a higher
   // up parent. This will always be a subset of the provided |max_owner_length|, which serves as a
   // bound for the calculation and so passing in a smaller |max_owner_length| can sometimes be more
@@ -1281,7 +1299,7 @@ class VmCowPages final : public VmHierarchyBase,
   // It is an error for the |max_owner_length| to be < PAGE_SIZE.
   struct PageLookup {
     VMPLCursor cursor;
-    VmCowPages* owner = nullptr;
+    LockedPtr owner;
     uint64_t owner_offset = 0;
     uint64_t visible_end = 0;
   };
@@ -1355,7 +1373,7 @@ class VmCowPages final : public VmHierarchyBase,
     uint64_t size;
   };
 
-  // Helper function for |CloneUnidirectionalLocked| and |CloneBidirectionalLocked|.
+  // Helper function for |CreateCloneLocked|.
   //
   // Walks the hierarchy from the |this| node to the root and finds the most distant node which
   // could correctly be the parent for a new clone of this node.
@@ -1385,49 +1403,33 @@ class VmCowPages final : public VmHierarchyBase,
   ParentAndRange FindParentAndRangeForCloneLocked(uint64_t offset, uint64_t size,
                                                   bool parent_must_be_hidden) TA_REQ(lock());
 
-  // Helper function for |CloneBidirectionalLocked|.
+  // Helper function for |CreateCloneLocked|.
   //
-  // Adds the newly created bidirectionally cloned |child| as a child of this node. Also, updates
-  // the appropriate share counts for the pages that are now shared by the new child. If there is a
-  // parent_ then the passed in |parent| is a locked ptr to it.
-  void AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit, VmCowPages* child,
-                                           const LockedPtr& parent, bool update_backlinks)
-      TA_REQ(lock()) TA_REQ(child->lock());
+  // Performs a clone by creating a new hidden parent, under which both the clone and this node will
+  // hang. The range [|offset|,|offset| + |limit|) in this node become read-only and are
+  // copy-on-write with the child. Anything in the |parent| above |this| in that range are also
+  // copy-on-write with the child.
+  //
+  // If there is a parent_ then the passed in |parent| is a locked ptr to it.
+  // An |initial_page_list| may be passed in to populate the clone's page list with any parent
+  // content markers if needed.
+  zx::result<LockedRefPtr> CloneNewHiddenParentLocked(uint64_t offset, uint64_t limit,
+                                                      uint64_t size, VmPageList&& initial_page_list,
+                                                      const LockedPtr& parent) TA_REQ(lock());
 
   // Helper function for |CreateCloneLocked|.
   //
-  // Performs a bidirectional clone operation, creating a new child node. The child behaves as if it
-  // was an eager snapshot of the range [|offset|,|offset| + |size|) in this node.
-  //
-  // Writes to an uncommitted page in the child will cause it to snapshot that page from its
-  // ancestors as the page existed at the time of this clone operation. The ancestor page is
-  // guaranteed to never see the writes by the child.
-  //
-  // Unlike a unidirectional clone, the snapshot taken by the child is guaranteed to never contain
-  // any writes or newly committed pages made by ancestor nodes after the clone operation is
-  // performed.
+  // Performs a clone operation by hanging a new child under |this|.
+  // Unlike |CloneNewHiddenParentLocked|, items in the range [|offset|,|offset| + |limit|) do not
+  // become read-only, rather they remain writable by |this| and are copy-on-write in the child.
+  // Anything in the |parent| above |this| in that range are also copy-in-write with the child.
   //
   // If there is a parent_ then the passed in |parent| is a locked ptr to it.
-  zx::result<LockedRefPtr> CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
-                                                    const LockedPtr& parent) TA_REQ(lock());
-
-  // Helper function for |CreateCloneLocked|.
-  //
-  // Performs a unidirectional clone operation, creating a new child node. The child behaves as if
-  // it were a lazy snapshot of the range [|offset|,|offset| + |size|) in this node.
-  //
-  // Writes to an uncommitted page in the child will cause it to snapshot that page from its
-  // ancestors *as the page exists at the time of the write*. The ancestor page is guaranteed to
-  // never see the writes by the child.
-  //
-  // The snapshot taken by the child may or may not contain writes made by ancestor nodes after the
-  // clone operation is performed, but this is not guaranteed. This includes pages which ancestors
-  // have newly committed since this clone operation was performed - the clone may see these pages
-  // to snapshot them but it is not guaranteed.
-  //
-  // If there is a parent_ then the passed in |parent| is a locked ptr to it.
-  zx::result<LockedRefPtr> CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
-                                                     const LockedPtr& parent) TA_REQ(lock());
+  // An |initial_page_list| may be passed in to populate the clone's page list with any parent
+  // content markers if needed.
+  zx::result<LockedRefPtr> CloneChildLocked(uint64_t offset, uint64_t limit, uint64_t size,
+                                            VmPageList&& initial_page_list, const LockedPtr& parent)
+      TA_REQ(lock());
 
   // Release any pages this VMO can reference from the provided start offset till the end of the
   // VMO. This releases both directly owned pages, as well as pages in hidden parents that may be
@@ -1473,11 +1475,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper to invalidate any READ requests in the specified range by spuriously resolving them.
   void InvalidateReadRequestsLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
-
-  // Replaces this node in its parent's child list with a hidden node and makes this node a child
-  // of the newly created hidden node. Moves the pages that were stored at this node into the
-  // newly created hidden node.
-  zx::result<LockedRefPtr> ReplaceWithHiddenNodeLocked(const LockedPtr& parent) TA_REQ(lock());
 
   // Removes the specified child from this objects |children_list_| and performs any hierarchy
   // updates that need to happen as a result. This does not modify the |parent_| member of the
@@ -1644,6 +1641,21 @@ class VmCowPages final : public VmHierarchyBase,
   // list of every child
   fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag> children_list_
       TA_GUARDED(lock());
+
+  // To support iterating over a subtree a cursor object is used and installed in nodes as they are
+  // iterated. This ensures that if iteration races with any node destruction that the cursor can be
+  // used to perform fixups.
+  // Any cursors in these lists are processed (i.e. moved) during a dead transition, and so it is
+  // invalid to perform an iteration over a non-alive node / subtree. Equivalently the cursor itself
+  // relies on this fact to allow it to safely store raw pointer backlinks, knowing they will always
+  // be cleared in a dead transition prior to the pointer becoming invalid.
+  // Both the root (i.e. start and final termination point) and the current location of any cursor
+  // needs to be tracked, as these both need potential updates.
+  struct RootListTag {};
+  struct CurListTag {};
+  class TreeWalkCursor;
+  fbl::TaggedDoublyLinkedList<TreeWalkCursor*, RootListTag> root_cursor_list_ TA_GUARDED(lock());
+  fbl::TaggedDoublyLinkedList<TreeWalkCursor*, CurListTag> cur_cursor_list_ TA_GUARDED(lock());
 
   // Counts the total number of pages pinned by ::CommitRange. If one page is pinned n times, it
   // contributes n to this count.
@@ -1839,6 +1851,9 @@ class VmCowPages::LookupCursor {
     return target_->lock_ref();
   }
 
+  LookupCursor(LookupCursor& other) = delete;
+  LookupCursor(LookupCursor&& other) = default;
+
  private:
   LookupCursor(VmCowPages* target, VmCowRange range)
       : target_(target),
@@ -1857,8 +1872,8 @@ class VmCowPages::LookupCursor {
     offset_ += PAGE_SIZE;
     if (offset_ == owner_info_.visible_end) {
       // Have reached either the end of the valid iteration range, or the end of the visible portion
-      // of the owner. In the latter case we set owner_ to null as we need to walk up the hierarchy
-      // again to find the next owner that applies to this slot.
+      // of the owner. In the latter case we invalidate the cursor as we need to walk up the
+      // hierarchy again to find the next owner that applies to this slot.
       // In the case where we have reached the end of the range, i.e. offset_ is also equal to
       // end_offset_, there is nothing we need to do, but to ensure that an error is generated if
       // the user incorrectly attempts to get another page we also invalidate the owner.
@@ -1870,8 +1885,8 @@ class VmCowPages::LookupCursor {
       owner_cursor_ = owner_info_.cursor.current();
 
       // When iterating, it's possible that we need to find a new owner even before we hit the
-      // visible_end_. This happens since even if we have no content at our cursor, we might have a
-      // parent with content, and the visible_end_ is tracking the range visible in us from the
+      // visible_end. This happens since even if we have no content at our cursor, we might have a
+      // parent with content, and the visible_end is tracking the range visible in us from the
       // target and does not imply we have all the content.
       // Consider a simple hierarchy where the root has a page in slot 1, [.P.], then its child has
       // a page in slot 0 [P...] and then its child, the target, has no pages [...] A cursor on this
@@ -1881,7 +1896,23 @@ class VmCowPages::LookupCursor {
       // content, or if no parent keep returning empty slots. Unfortunately once the cursor returns
       // a nullptr we cannot know where the next content might be. To make things simpler we just
       // invalidate owner if we hit this case and re-walk from the bottom again.
-      if (!owner_cursor_ || (owner_cursor_->IsEmpty() && owner()->parent_)) {
+      // Whether or not a parent might have content is a combination of
+      //  1. There must be a parent and the offset within the parent limit
+      //  2. Either the slot is empty, meaning we see the parent, and the node does not use parent
+      //     content markers. Or there is a parent content marker.
+      auto can_see_parent = [&]() TA_REQ(lock()) -> bool {
+        if (!owner_info_.owner.locked_or(target_).parent_) {
+          return false;
+        }
+        if (owner_info_.owner_offset >= owner_info_.owner.locked_or(target_).parent_limit_) {
+          return false;
+        }
+        if (owner_info_.owner.locked_or(target_).node_has_parent_content_markers()) {
+          return owner_cursor_->IsParentContent();
+        }
+        return owner_cursor_->IsEmpty();
+      };
+      if (!owner_cursor_ || can_see_parent()) {
         InvalidateCursor();
       }
     }
@@ -1899,25 +1930,30 @@ class VmCowPages::LookupCursor {
   void EstablishCursor() TA_REQ(lock());
 
   // Returns true if target_ is the owner.
-  bool TargetIsOwner() const { return owner_info_.owner == target_; }
+  bool TargetIsOwner() const { return !owner_info_.owner; }
 
   // Invalidates the owner, so that the next page will have to perform the lookup again, walking up
   // the hierarchy if needed.
-  void InvalidateCursor() { is_valid_ = false; }
+  void InvalidateCursor() {
+    owner_info_.owner.release();
+    is_valid_ = false;
+  }
 
   // Helpers for querying the state of the cursor.
   bool CursorIsPage() const { return owner_cursor_ && owner_cursor_->IsPage(); }
   bool CursorIsMarker() const { return owner_cursor_ && owner_cursor_->IsMarker(); }
   bool CursorIsEmpty() const { return !owner_cursor_ || owner_cursor_->IsEmpty(); }
+  bool CursorIsParentContent() const { return owner_cursor_ && owner_cursor_->IsParentContent(); }
   bool CursorIsReference() const { return owner_cursor_ && owner_cursor_->IsReference(); }
   // Checks if the cursor is exactly at a sentinel, and not generally inside an interval.
   bool CursorIsIntervalZero() const { return owner_cursor_ && owner_cursor_->IsIntervalZero(); }
 
-  // Checks if the cursor, as determined by the current offset and not the literal cursor_, is in a
-  // zero interval.
+  // Checks if the cursor, as determined by the current offset and not the literal
+  // owner_info_.cursor, is in a zero interval.
   bool CursorIsInIntervalZero() const TA_REQ(lock()) {
     return CursorIsIntervalZero() ||
-           owner()->page_list_.IsOffsetInZeroInterval(owner_info_.owner_offset);
+           owner_info_.owner.locked_or(target_).page_list_.IsOffsetInZeroInterval(
+               owner_info_.owner_offset);
   }
 
   // The cursor can be considered to have content of zero if either it points at a zero marker, or
@@ -1956,7 +1992,7 @@ class VmCowPages::LookupCursor {
     if (mark_accessed_) {
       pmm_page_queues()->MarkAccessed(owner_cursor_->Page());
     }
-    // Inform PageAsResult whether the owner_ is the target_, but otherwise let it calculate the
+    // Inform PageAsResult whether the owner is the target_, but otherwise let it calculate the
     // actual writability of the page.
     RequireResult result = PageAsResultNoIncrement(owner_cursor_->Page(), TargetIsOwner());
     IncrementCursor();
@@ -1978,10 +2014,6 @@ class VmCowPages::LookupCursor {
   zx_status_t ReadRequest(uint max_request_pages, PageRequest* page_request) TA_REQ(lock());
   zx_status_t DirtyRequest(uint max_request_pages, LazyPageRequest* page_request) TA_REQ(lock());
 
-  // If we held lock(), then since owner_ is from the same hierarchy as the target then we must also
-  // hold its lock.
-  VmCowPages* owner() const TA_REQ(lock()) TA_ASSERT(owner()->lock()) { return owner_info_.owner; }
-
   // Target always exists. This is provided in the constructor and will always be non-null.
   VmCowPages* const target_;
 
@@ -1998,31 +2030,29 @@ class VmCowPages::LookupCursor {
   // follows.
   //
   // owner_info_.cursor:
-  // Cursor in the page list of the current owner_info_.owner and is invalid if owner_info_.owner is
-  // nullptr. This is used to efficiently pull contiguous pages in the owner and the current() value
-  // of it is cached in owner_cursor_.
+  // Cursor in the page list of the current owner_info_.owner or target_, depending on who owns the
+  // page. Is only valid if is_valid_ is true. This is used to efficiently pull contiguous pages in
+  // the owner and the current() value of it is cached in owner_cursor_.
   //
   // owner_info_.owner:
   // Represents the current owner of owner_cursor_/owner_info_.cursor. Can be non-null while
   // owner_info_.cursor is null to indicate a lack of content, although in this case the
-  // owner_info_.owner can also be assumed to be the root. owner_info_.owner being null is used to
-  // indicate that the cursor is invalid and the owner for any content in the current slot needs to
-  // be looked up.
+  // owner can also be assumed to be the root. If owner_info_.owner is null while is_valid_ is true,
+  // target_ is the owner of the cursor.
   //
   // owner_info_.owner_offset:
-  // The offset_ normalized to the current owner_info_.owner. This is equal to offset_ when
-  // TargetIsOwner().
+  // The offset_ normalized to the current owner. This is equal to offset_ when TargetIsOwner().
   //
   // owner_info_.visible_end:
   // Tracks the offset in target_ at which the current owner_info_.cursor becomes invalid. This
   // range essentially means that no VMO between target_ and owner_info_.owner had any content, and
   // so the cursor in owner is free to walk contiguous pages up to this point. This does not mean
-  // that there is no content in the parent_ of owner_info_.owner, and so even if
-  // owner_info_.visible_end is not reached, if an empty slot is found the parent_ must then be
-  // checked. See IncrementCursor for more details.
+  // that there is no content in the parent_ of the owner, and so even if owner_info_.visible_end is
+  // not reached, if an empty slot is found the parent_ must then be checked. See IncrementCursor
+  // for more details.
   PageLookup owner_info_;
 
-  // This is a cache of owner_pl_cursor_.current()
+  // This is a cache of owner_info_.cursor.current()
   VmPageOrMarkerRef owner_cursor_;
 
   // Value of target_->is_source_preserving_page_content() cached on creation as there is spare
@@ -2094,13 +2124,6 @@ class VmCowPages::DeferredOps {
   // without the lock held. It is the callers responsibility to ensure the pointer remains valid
   // over the lifetime of the object.
   explicit DeferredOps(VmCowPages* self) TA_EXCL(self->lock());
-  // TODO(https://fxbug.dev/338300943): This is a transitional constructor to allow for the range
-  // change updates, and by extension this helper object, to be gradually moved outside the lock.
-  // Using this constructor instructs the DeferredOps that the lock is already held during both
-  // construction and destruction and it should not attempt to reacquire.
-  struct LockedTag {};
-  DeferredOps(VmCowPages* self, LockedTag tag) TA_REQ(self->lock())
-      : locked_range_update_(true), self_(self) {}
   ~DeferredOps();
 
   DeferredOps(const DeferredOps&) = delete;
@@ -2126,9 +2149,6 @@ class VmCowPages::DeferredOps {
     return freed_list_;
   }
 
-  // TODO(https://fxbug.dev/338300943): Tracks whether the locked temporary constructor was used.
-  bool locked_range_update_ = false;
-
   // A reference to the VmCowPages for any deferred operations to be run against.
   VmCowPages* const self_;
 
@@ -2148,7 +2168,12 @@ class VmCowPages::DeferredOps {
   // page source has parent VMOs whose contents is able to change, and if we had parallelism
   // between multiple mutating operations with range change updates user space would be able to see
   // inconsistent views of memory.
-  ktl::optional<Guard<Mutex>> page_source_lock_;
+  // In addition to the lock itself, held via its Guard, we also hold a RefPtr to the PageSource
+  // itself. During the lifetime of the DeferredOps it is possible for the self vmo to become
+  // detached from the rest of the vmo tree, and for the remainder of the tree, including the root
+  // node with the page source to be destroyed. Holding a RefPtr to the page source of the mutex we
+  // are holding therefore prevents a use-after-free of the guard.
+  ktl::optional<ktl::pair<Guard<Mutex>, fbl::RefPtr<PageSource>>> page_source_lock_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_COW_PAGES_H_

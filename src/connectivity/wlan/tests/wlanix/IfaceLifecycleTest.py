@@ -9,7 +9,7 @@ import asyncio
 
 import fidl_fuchsia_wlan_wlanix as fidl_wlanix
 from fuchsia_controller_py import Channel
-from mobly import base_test, test_runner
+from mobly import test_runner
 from mobly.asserts import assert_equal
 from wlanix_testing import base_test
 
@@ -19,6 +19,7 @@ class IfaceLifecycleTest(base_test.WifiChipBaseTestClass):
         response = asyncio.run(
             self.wifi_chip_proxy.get_sta_iface_names()
         ).unwrap()
+        assert response.iface_names is not None
         assert_equal(
             len(response.iface_names),
             0,
@@ -34,6 +35,7 @@ class IfaceLifecycleTest(base_test.WifiChipBaseTestClass):
         response = asyncio.run(
             self.wifi_chip_proxy.get_sta_iface_names()
         ).unwrap()
+        assert response.iface_names is not None
         assert_equal(
             len(response.iface_names),
             1,
@@ -41,10 +43,12 @@ class IfaceLifecycleTest(base_test.WifiChipBaseTestClass):
         )
 
         iface_name = response.iface_names[0]
-        response = asyncio.run(wifi_sta_iface.get_name()).unwrap()
+        wifi_sta_iface_response = asyncio.run(
+            wifi_sta_iface.get_name()
+        ).unwrap()
         assert_equal(
             iface_name,
-            response.iface_name,
+            wifi_sta_iface_response.iface_name,
             "WifiStaIface returns a different name than WifiChip",
         )
         asyncio.run(
@@ -54,6 +58,7 @@ class IfaceLifecycleTest(base_test.WifiChipBaseTestClass):
         response = asyncio.run(
             self.wifi_chip_proxy.get_sta_iface_names()
         ).unwrap()
+        assert response.iface_names is not None
         assert_equal(
             len(response.iface_names),
             0,

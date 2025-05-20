@@ -9,7 +9,7 @@
 #include <align.h>
 #include <trace.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include "vm/vm.h"
 

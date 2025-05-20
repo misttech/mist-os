@@ -20,7 +20,7 @@
 #include <utility>
 
 #include "allocator.h"
-#include "bootstrap.h"
+#include "startup-bootstrap.h"
 #include "startup-diagnostics.h"
 #include "zircon.h"
 
@@ -150,14 +150,10 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // is completed successfully, there's no way to make a system call to get an
   // error out anyway.
   auto bootstrap_diag = elfldltl::TrapDiagnostics();
-
-  BootstrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso);
-  BootstrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
-
-  // Only now can we make the system call to discover the page size.
-  const size_t page_size = zx_system_get_page_size();
-  CompleteBootstrapModule(vdso_module.module, page_size);
-  CompleteBootstrapModule(self_module.module, page_size);
+  StartupBootstrap bootstrap{bootstrap_diag, vdso,
+                             []() {  // This can only be used after relocation.
+                               return zx_system_get_page_size();
+                             }};
 
   // Read the bootstrap message.
   StartupData startup = ReadBootstrap(zx::unowned_channel{handle});
@@ -179,7 +175,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // the user entry point as its third argument.  Eventually, the user's libc
   // will pass this to ld::Debugdata::Forward.
   ld::Debugdata::Deferred debugdata =
-      PublishProfdata(diag, startup.vmar.borrow(), self_module.module.build_id);
+      PublishProfdata(diag, startup.vmar.borrow(), StartupBootstrap::gSelfModule.build_id);
 
   // Set up the allocators.  These objects hold zx::unowned_vmar copies but do
   // not own the VMAR handle.
@@ -191,6 +187,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   LoadExecutableResult main =
       LoadExecutable(diag, startup, scratch, initial_exec, std::move(startup.executable_vmo));
   mutable_abi.preinit_array = main.preinit_array;
+  mutable_abi.stack_size = main.stack_size.value_or(0);
 
   // It doesn't matter whether or how this dynamic linker binary itself is
   // instrumented.  It's only the executable's instrumentation details that
@@ -218,8 +215,8 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
     return {};
   };
 
-  StartupModule::LinkModules(diag, scratch, initial_exec, main.module, get_vmo_file,
-                             {vdso_module, self_module}, main.needed_count, startup.vmar);
+  StartupModule::LinkModules(diag, scratch, initial_exec, main.module, get_vmo_file, bootstrap,
+                             main.needed_count, startup.vmar);
 
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);
@@ -228,7 +225,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
     // Now that startup is completed, protect not only the RELRO, but also all
     // the data and bss.  Then drop that VMAR handle so the protections cannot
     // be changed again.
-    ProtectData(diag, page_size, std::move(startup.self_vmar));
+    ProtectData(diag, bootstrap.page_size(), std::move(startup.self_vmar));
   }
 
   // Bail out before handoff if any errors have been detected.

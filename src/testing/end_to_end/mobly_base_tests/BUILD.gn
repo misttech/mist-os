@@ -39,10 +39,10 @@ if (is_host) {
 
   # NOTE: fuchsia_power_base_test requires associated on device packages to be available. Since python
   # libraries are only built on the host, if you depend on `fuchsia_power_base_test` then you must
-  # also include a target_deps for the packages:
+  # also include a package_deps for the packages:
   #
   #```
-  #  target_deps = [ "//src/tests/end_to_end/mobly_base_tests:fuchsia_power_base_tests_packages" ]
+  #  package_deps = [ "//src/tests/end_to_end/power/load_generator" ]
   #```
   python_library("fuchsia_power_base_test") {
     testonly = true
@@ -82,8 +82,4 @@ if (is_host) {
     ]
     library_deps = [ ":fuchsia_base_test" ]
   }
-}
-
-group("fuchsia_power_base_test_packages") {
-  deps = [ "//src/tests/end_to_end/power/load_generator" ]
 }

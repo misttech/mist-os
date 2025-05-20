@@ -33,8 +33,6 @@ esac
 
 fx-config-read
 
-${FUCHSIA_DIR}/tools/ssh-keys/gen-ssh-keys.sh || exit $?
-
 # Make sure the ssh config is present and has the expected private key
 check-ssh-config
 

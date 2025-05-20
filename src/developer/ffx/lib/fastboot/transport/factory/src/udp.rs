@@ -60,11 +60,7 @@ impl InterfaceFactoryBase<UdpNetworkInterface> for UdpFactory {
                 Ok(interface) => return Ok(interface),
 
                 Err(e) => {
-                    tracing::debug!(
-                        "Attempt {}. Got error connecting to fastboot address:{}",
-                        i,
-                        e,
-                    );
+                    log::debug!("Attempt {}. Got error connecting to fastboot address:{}", i, e,);
 
                     Timer::new(wait_duration).await;
                 }
@@ -74,7 +70,7 @@ impl InterfaceFactoryBase<UdpNetworkInterface> for UdpFactory {
     }
 
     async fn close(&self) {
-        tracing::debug!("Closing Fastboot UDP Factory for: {}", self.addr);
+        log::debug!("Closing Fastboot UDP Factory for: {}", self.addr);
     }
 
     async fn rediscover(&mut self) -> Result<(), InterfaceFactoryError> {
@@ -119,11 +115,11 @@ impl TargetFilter for UdpTargetFilter {
             TargetState::Fastboot(ts)
                 if matches!(ts.connection_state, FastbootConnectionState::Udp(_)) =>
             {
-                tracing::trace!("Filtered and found target handle: {}", handle);
+                log::trace!("Filtered and found target handle: {}", handle);
                 true
             }
             state @ _ => {
-                tracing::debug!("Target state {} is not  UDP Fastboot... skipping", state);
+                log::debug!("Target state {} is not  UDP Fastboot... skipping", state);
                 false
             }
         }
@@ -154,7 +150,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Udp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: wrong name
         assert!(!filter.filter_target(&TargetHandle {
@@ -162,7 +159,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Udp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: wrong state
         assert!(!filter.filter_target(&TargetHandle {
@@ -170,7 +168,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         // Fails: Bad name
         assert!(!filter.filter_target(&TargetHandle {
@@ -178,7 +177,8 @@ mod test {
             state: TargetState::Fastboot(discovery::FastbootTargetState {
                 serial_number: "".to_string(),
                 connection_state: FastbootConnectionState::Udp(vec![addr])
-            })
+            }),
+            manual: false,
         }));
         Ok(())
     }

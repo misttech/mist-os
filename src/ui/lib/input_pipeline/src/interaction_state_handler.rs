@@ -223,7 +223,7 @@ impl InteractionStateHandler {
         if let Some(t) = self.idle_transition_task.take() {
             // If the task returns a completed output, we can assume the
             // state has transitioned to Idle.
-            if let Some(()) = t.cancel().await {
+            if let Some(()) = t.abort().await {
                 Self::transition_to_active(&self.state_publisher, &self.lease_holder).await;
             }
         }

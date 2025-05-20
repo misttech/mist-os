@@ -269,15 +269,32 @@ void IntelHDAStreamConfigBase::SetGain(audio_fidl::wire::GainState target_state,
     LOG("Can't mute\n");
     return;
   }
-
   if (target_state.has_agc_enabled() && target_state.agc_enabled() && !cur_gain_state_.can_agc) {
     LOG("Can't enable AGC\n");
     return;
   }
+  if (target_state.has_gain_db()) {
+    if (!std::isfinite(target_state.gain_db())) {
+      LOG("Can't set a non-normal float for gain_db\n");
+      return;
+    }
+    if (target_state.gain_db() < cur_gain_state_.min_gain ||
+        target_state.gain_db() > cur_gain_state_.max_gain) {
+      LOG("Can't set gain_db outside valid range\n");
+      return;
+    }
+  }
 
-  if (target_state.has_gain_db() && ((target_state.gain_db() < cur_gain_state_.min_gain) ||
-                                     (target_state.gain_db() > cur_gain_state_.max_gain))) {
-    LOG("Can't set gain outside valid range\n");
+  // Check whether this request represents a change -- and exit if no change.
+  if ((!target_state.has_gain_db() || target_state.gain_db() == cur_gain_state_.cur_gain) &&
+      (!target_state.has_muted() ||
+       target_state.muted() == (cur_gain_state_.can_mute && cur_gain_state_.cur_mute)) &&
+      (!target_state.has_agc_enabled() ||
+       target_state.agc_enabled() == (cur_gain_state_.can_agc && cur_gain_state_.cur_agc))) {
+    LOG("SetGain with no change %f %d %d\n",
+        target_state.has_gain_db() ? target_state.gain_db() : NAN,
+        target_state.has_muted() ? target_state.muted() : -1,
+        target_state.has_agc_enabled() ? target_state.agc_enabled() : -1);
     return;
   }
 
@@ -428,6 +445,7 @@ void IntelHDAStreamConfigBase::OnSetGainLocked(const audio_proto::SetGainReq& re
                                                audio_proto::SetGainResp* out_resp) {
   // Nothing to do if no response is expected.
   if (out_resp == nullptr) {
+    LOG("OnSetGainLocked, bailing out early\n");
     ZX_DEBUG_ASSERT(req.hdr.cmd & AUDIO_FLAG_NO_ACK);
     return;
   }
@@ -439,6 +457,8 @@ void IntelHDAStreamConfigBase::OnSetGainLocked(const audio_proto::SetGainReq& re
   out_resp->cur_mute = false;
   out_resp->cur_gain = 0.0;
   out_resp->result = (illegal_mute || illegal_agc || illegal_gain) ? ZX_ERR_INVALID_ARGS : ZX_OK;
+  LOG("OnSetGainLocked, illegal g%d m%d a%d, returning 0.0 false [none]\n", illegal_gain,
+      illegal_mute, illegal_agc);
 }
 
 void IntelHDAStreamConfigBase::OnPlugDetectLocked(StreamChannel* response_channel,

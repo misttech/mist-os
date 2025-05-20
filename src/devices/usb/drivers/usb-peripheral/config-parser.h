@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire_types.h>
-#include <lib/ddk/device.h>
 #include <stdint.h>
 
 #include <cstdint>
@@ -93,7 +92,7 @@ class PeripheralConfigParser {
 
  private:
   // Helper function for determining the pid and product description.
-  zx_status_t SetCompositeProductDescription(uint16_t pid);
+  zx_status_t SetCompositeProductDescription(uint16_t pid, const std::string_view& desc);
 
   uint16_t pid_ = 0;
   std::string product_desc_;

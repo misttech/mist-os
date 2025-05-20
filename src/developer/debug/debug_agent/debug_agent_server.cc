@@ -5,6 +5,7 @@
 #include "src/developer/debug/debug_agent/debug_agent_server.h"
 
 #include <lib/fit/result.h>
+#include <lib/stdcompat/functional.h>
 
 #include "fidl/fuchsia.debugger/cpp/natural_types.h"
 #include "src/developer/debug/debug_agent/backtrace_utils.h"
@@ -295,7 +296,7 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyException& notify) 
   // valid here. The thread and process might exit independently before the message loop runs this
   // callback, so we capture the process's koid by value first.
   debug::MessageLoop::Current()->PostTask(
-      FROM_HERE, [=, process_koid = thread->process()->koid()]() {
+      FROM_HERE, [=, this, process_koid = thread->process()->koid()]() {
         FX_DCHECK(this);
         FX_DCHECK(debug_agent_);
 

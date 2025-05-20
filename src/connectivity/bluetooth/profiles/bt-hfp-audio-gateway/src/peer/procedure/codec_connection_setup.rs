@@ -4,10 +4,10 @@
 
 use super::{AgUpdate, Procedure, ProcedureError, ProcedureMarker, ProcedureRequest, SlcRequest};
 
-use crate::features::CodecId;
 use crate::peer::service_level_connection::SlcState;
 
 use at_commands as at;
+use bt_hfp::codec_id::CodecId;
 use log::warn;
 use std::mem;
 

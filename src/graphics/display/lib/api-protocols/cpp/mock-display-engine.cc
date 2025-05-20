@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <utility>
 
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"

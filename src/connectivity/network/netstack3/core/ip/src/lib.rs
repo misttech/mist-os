@@ -46,8 +46,9 @@ pub mod device {
         Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
     };
     pub use crate::internal::device::dad::{
-        DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef,
-        DadTimerId,
+        DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler, DadState,
+        DadStateRef, DadTimerId, Ipv4DadSentProbeData, Ipv6DadAddressContext, Ipv6DadSentProbeData,
+        OwnedNdpNonce,
     };
     pub use crate::internal::device::opaque_iid::{IidSecret, OpaqueIid, OpaqueIidNonce};
     pub use crate::internal::device::route_discovery::{
@@ -66,26 +67,25 @@ pub mod device {
         SLAAC_MIN_REGEN_ADVANCE,
     };
     pub use crate::internal::device::state::{
-        AddressId, AddressIdIter, AssignedAddressState, CommonAddressProperties, DefaultHopLimit,
-        DualStackIpDeviceState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
-        IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv4AddrConfig,
-        Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig,
-        Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags,
-        Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
-        Lifetime, PreferredLifetime, PrimaryAddressId, SlaacConfig, TemporarySlaacConfig,
-        WeakAddressId,
+        AddressId, AddressIdIter, CommonAddressConfig, CommonAddressProperties, DefaultHopLimit,
+        DualStackIpDeviceState, IpAddressData, IpAddressEntry, IpAddressFlags, IpDeviceAddresses,
+        IpDeviceConfiguration, IpDeviceFlags, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
+        IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv6AddrConfig,
+        Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6DeviceConfiguration,
+        Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, PrimaryAddressId, SlaacConfig,
+        TemporarySlaacConfig, WeakAddressId,
     };
     pub use crate::internal::device::{
         add_ip_addr_subnet_with_config, clear_ipv4_device_state, clear_ipv6_device_state,
         del_ip_addr_inner, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
         is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled, join_ip_multicast,
         join_ip_multicast_with_config, leave_ip_multicast, leave_ip_multicast_with_config,
-        receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressIdSpec,
-        IpAddressIdSpecContext, IpAddressState, IpDeviceAddressContext, IpDeviceBindingsContext,
-        IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext,
-        IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext,
-        Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6LinkLayerAddr,
-        WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
+        on_arp_packet, receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressState,
+        IpDeviceAddressContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
+        IpDeviceEvent, IpDeviceHandler, IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext,
+        IpDeviceTimerId, Ipv4DeviceTimerId, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6LinkLayerAddr, WithIpDeviceConfigurationMutInner,
+        WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.
@@ -123,7 +123,7 @@ pub mod icmp {
         EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpIpTransportContext,
         IcmpRxCounters, IcmpRxCountersInner, IcmpState, IcmpStateContext, IcmpTxCounters,
         IcmpTxCountersInner, Icmpv4StateBuilder, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
-        NdpRxCounters, NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+        NdpMessage, NdpRxCounters, NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
     };
 
     /// ICMP test utilities.
@@ -157,7 +157,7 @@ pub mod nud {
         NudTimerId, NudUserConfig, NudUserConfigUpdate, Reachable, Stale, UseDelegateNudContext,
         MAX_ENTRIES,
     };
-    pub use crate::internal::device::state::RETRANS_TIMER_DEFAULT;
+    pub use crate::internal::device::state::IPV6_RETRANS_TIMER_DEFAULT;
 
     /// NUD test utilities.
     #[cfg(any(test, feature = "testutils"))]

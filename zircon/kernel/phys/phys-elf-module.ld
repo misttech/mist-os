@@ -12,6 +12,8 @@
  * orphans placement to place everything else in the segments created.
  */
 
+ENTRY(_start)  /* This is overridden by -e switches.  */
+
 SECTIONS {
   . = SIZEOF_HEADERS;
 

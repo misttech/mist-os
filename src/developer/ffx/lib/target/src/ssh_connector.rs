@@ -13,6 +13,7 @@ use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::Task;
 use futures::future::LocalBoxFuture;
+use netext::ScopedSocketAddr;
 use nix::sys::signal::kill;
 use nix::sys::signal::Signal::SIGKILL;
 use nix::sys::wait::waitpid;
@@ -32,11 +33,25 @@ impl From<SshError> for TargetConnectionError {
             // a device is actively rebooting while trying to reconnect to it.
             Unknown(_) | Timeout | ConnectionRefused | UnknownNameOrService | NoRouteToHost
             | NetworkUnreachable => TargetConnectionError::NonFatal(ssh_err.into()),
+            // Note: this error is encountered as a side-effect of trying to `ssh` into a device
+            // that is actively rebooting, and a user is invoking `ffx target wait`. The issue here
+            // is that the scope ID of the network interface for the device, if it is IPv6
+            // link-local, is deemed an invalid argument, because `ssh` thinks it cannot exist
+            // (since there is no interface available during reboot). Since this is working from a
+            // cached address, this causes this kind of error.
+            //
+            // This could be potentially hazardous, however, as it is not clear if all cases in
+            // which this error surfaces are the same. It should be made clear to the user _why_
+            // this continues to attempt connecting ot the device. We can presume we're going to
+            // reasonably not encounter this error since we have an array of tests for `ssh`
+            // connections, but this does not guarantee a lack of regression later on. That being
+            // said, we would like to move away from `ssh` as a transport layer altogether, so
+            // so hopefully this won't present itself as an issue.
+            InvalidArgument => TargetConnectionError::NonFatal(ssh_err.into()),
             // These errors are unrecoverable, as they are fundamental errors in an existing
             // configuration.
             PermissionDenied
             | KeyVerificationFailure
-            | InvalidArgument
             | TargetIncompatible
             | ConnectionClosedByRemoteHost => TargetConnectionError::Fatal(ssh_err.into()),
         }
@@ -51,19 +66,20 @@ enum FDomainConnectionError {
 #[derive(Debug)]
 pub struct SshConnector {
     pub(crate) overnet_cmd: Option<Child>,
-    target: SocketAddr,
+    target: ScopedSocketAddr,
     env_context: EnvironmentContext,
 }
 
 impl SshConnector {
-    pub async fn new(target: SocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
+    pub fn new(target: ScopedSocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
         Ok(Self { overnet_cmd: None, target, env_context: env_context.clone() })
     }
 }
 
 impl SshConnector {
     async fn connect_overnet(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
-        self.overnet_cmd = Some(start_overnet_ssh_command(self.target, &self.env_context).await?);
+        self.overnet_cmd =
+            Some(start_overnet_ssh_command(self.target.clone(), &self.env_context).await?);
         let cmd = self.overnet_cmd.as_mut().unwrap();
         let mut stdout = BufReader::with_capacity(
             BUFFER_SIZE,
@@ -80,7 +96,7 @@ impl SshConnector {
             match ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false, &self.env_context).await {
                 Ok(res) => res,
                 Err(e) => {
-                    tracing::warn!("SSH pipe error encountered {e:?}");
+                    log::warn!("SSH pipe error encountered {e:?}");
                     try_ssh_cmd_cleanup(
                         self.overnet_cmd.take().expect("ssh command must have started")
                     )
@@ -112,7 +128,7 @@ impl SshConnector {
 
     async fn connect_fdomain(&mut self) -> Result<FDomainConnection, FDomainConnectionError> {
         self.overnet_cmd = Some(
-            start_fdomain_ssh_command(self.target, &self.env_context)
+            start_fdomain_ssh_command(self.target.clone(), &self.env_context)
                 .await
                 .map_err(|x| FDomainConnectionError::ConnectionError(x.into()))?,
         );
@@ -181,29 +197,33 @@ impl TryFromEnvContext for SshConnector {
                     resolution,
                 )
             })?;
-            tracing::debug!("connecting to address {res}");
-            SshConnector::new(res, env).await.bug().map_err(Into::into)
+            let target = ScopedSocketAddr::from_socket_addr(res)
+                .user_message(format!("Failed to verify IP '{res}'"))?;
+            SshConnector::new(target, env).bug().map_err(Into::into)
         })
     }
 }
 
 async fn start_fdomain_ssh_command(
-    target: SocketAddr,
+    target: ScopedSocketAddr,
     env_context: &EnvironmentContext,
 ) -> Result<Child> {
     let args = vec!["fdomain_runner"];
     // Use ssh from the environment.
     let ssh_path = "ssh";
-    let mut ssh = tokio::process::Command::from(
-        build_ssh_command_with_env(ssh_path, target, env_context, args).await?,
-    );
-    tracing::debug!("SshConnector starting start_fdomain_ssh invoking:  {ssh:?}");
+    let mut ssh = tokio::process::Command::from(build_ssh_command_with_env(
+        ssh_path,
+        target,
+        env_context,
+        args,
+    )?);
+    log::debug!("SshConnector starting start_fdomain_ssh invoking:  {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
     Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
 }
 
 async fn start_overnet_ssh_command(
-    target: SocketAddr,
+    target: ScopedSocketAddr,
     env_context: &EnvironmentContext,
 ) -> Result<Child> {
     let rev: u64 =
@@ -223,10 +243,13 @@ async fn start_overnet_ssh_command(
     ];
     // Use ssh from the environment.
     let ssh_path = "ssh";
-    let mut ssh = tokio::process::Command::from(
-        build_ssh_command_with_env(ssh_path, target, env_context, args).await?,
-    );
-    tracing::debug!("SshConnector starting overnet invoking: {ssh:?}");
+    let mut ssh = tokio::process::Command::from(build_ssh_command_with_env(
+        ssh_path,
+        target,
+        env_context,
+        args,
+    )?);
+    log::debug!("SshConnector starting overnet invoking: {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
     Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
 }
@@ -237,14 +260,14 @@ async fn try_ssh_cmd_cleanup(mut cmd: Child) -> Result<()> {
         match status.code() {
             // Possible to catch more error codes here, hence the use of a match.
             Some(255) => {
-                tracing::warn!("SSH ret code: 255. Unexpected session termination.")
+                log::warn!("SSH ret code: 255. Unexpected session termination.")
             }
-            _ => tracing::error!("SSH exited with error code: {status}. "),
+            _ => log::error!("SSH exited with error code: {status}. "),
         }
     } else {
-        tracing::error!("ssh child has not ended, trying one more time then ignoring it.");
+        log::error!("ssh child has not ended, trying one more time then ignoring it.");
         fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
-        tracing::error!("ssh child status is {:?}", cmd.try_wait());
+        log::error!("ssh child status is {:?}", cmd.try_wait());
     }
     Ok(())
 }
@@ -269,7 +292,7 @@ impl TargetConnector for SshConnector {
                     // FDomain authoritative about whether the device is
                     // connectable. For now we'll fall through because it's less
                     // likely to cause breakages prior to migration.
-                    tracing::warn!("Connecting with FDomain encountered error {other:?}");
+                    log::warn!("Connecting with FDomain encountered error {other:?}");
                     None
                 }
             }
@@ -290,7 +313,7 @@ impl TargetConnector for SshConnector {
     }
 
     fn device_address(&self) -> Option<SocketAddr> {
-        Some(self.target.clone())
+        Some(*self.target.addr())
     }
 }
 
@@ -300,22 +323,20 @@ impl Drop for SshConnector {
             let pid = Pid::from_raw(cmd.id().unwrap() as i32);
             match cmd.try_wait() {
                 Ok(Some(result)) => {
-                    tracing::info!("FidlPipe exited with {}", result);
+                    log::info!("FidlPipe exited with {}", result);
                 }
                 Ok(None) => {
                     let _ = kill(pid, SIGKILL)
-                        .map_err(|e| tracing::warn!("failed to kill FidlPipe command: {:?}", e));
-                    let _ = waitpid(pid, None).map_err(|e| {
-                        tracing::warn!("failed to clean up FidlPipe command: {:?}", e)
-                    });
+                        .map_err(|e| log::warn!("failed to kill FidlPipe command: {:?}", e));
+                    let _ = waitpid(pid, None)
+                        .map_err(|e| log::warn!("failed to clean up FidlPipe command: {:?}", e));
                 }
                 Err(e) => {
-                    tracing::warn!("failed to soft-wait FidlPipe command: {:?}", e);
+                    log::warn!("failed to soft-wait FidlPipe command: {:?}", e);
                     let _ = kill(pid, SIGKILL)
-                        .map_err(|e| tracing::warn!("failed to kill FidlPipe command: {:?}", e));
-                    let _ = waitpid(pid, None).map_err(|e| {
-                        tracing::warn!("failed to clean up FidlPipe command: {:?}", e)
-                    });
+                        .map_err(|e| log::warn!("failed to kill FidlPipe command: {:?}", e));
+                    let _ = waitpid(pid, None)
+                        .map_err(|e| log::warn!("failed to clean up FidlPipe command: {:?}", e));
                 }
             };
         }
@@ -344,7 +365,7 @@ mod test {
         let err = NetworkUnreachable;
         assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = InvalidArgument;
-        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = TargetIncompatible;
         assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
         let err = Timeout;

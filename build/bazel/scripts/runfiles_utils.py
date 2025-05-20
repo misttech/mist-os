@@ -22,7 +22,7 @@ from pathlib import Path
 #
 _BAZEL_MAIN_WORKSPACE_NAME = "_main"
 
-RepoMappingTree: T.TypeAlias = T.Dict[str, T.Dict[str, str]]
+RepoMappingTree: T.TypeAlias = dict[str, dict[str, str]]
 
 
 class RepoMapping(object):
@@ -125,7 +125,7 @@ class RepoMapping(object):
 class RunfilesManifest(object):
     """A class grouping method to manage Bazel runfiles manifests."""
 
-    def __init__(self, file_map: T.Dict[str, str]) -> None:
+    def __init__(self, file_map: dict[str, str]) -> None:
         self._map = file_map
 
     @staticmethod
@@ -146,7 +146,7 @@ class RunfilesManifest(object):
             return RunfilesManifest.CreateFrom(probe_manifest.read_text())
 
         # Otherwise simple walk the directory for files and symlinks.
-        file_map: T.Dict[str, str] = {}
+        file_map: dict[str, str] = {}
         for root, dirnames, filenames in os.walk(runfiles_dir):
             for filename in filenames:
                 path = Path(os.path.join(root, filename))
@@ -245,7 +245,7 @@ class RunfilesManifest(object):
         return any(ch in " \n\\" for ch in path)
 
     @staticmethod
-    def parse_manifest(content: str) -> T.Dict[str, str]:
+    def parse_manifest(content: str) -> dict[str, str]:
         """Parse the content of a manifest file.
 
         Args:
@@ -254,7 +254,7 @@ class RunfilesManifest(object):
             A dictionary mapping runfiles relative source paths
             to their target location as recorded in the manifest.
         """
-        result: T.Dict[str, str] = {}
+        result: dict[str, str] = {}
         for line in content.splitlines():
             if not line:
                 # Stop parsing on empty line. This mimics the behavior
@@ -306,7 +306,7 @@ class RunfilesManifest(object):
         for p in paths_to_remove:
             self._map.pop(p, None)
 
-    def as_dict(self) -> T.Dict[str, str]:
+    def as_dict(self) -> dict[str, str]:
         """Return the content of this manifest as a {source_path -> target_path} dictionary."""
         return self._map.copy()
 

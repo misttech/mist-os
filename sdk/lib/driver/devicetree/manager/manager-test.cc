@@ -104,30 +104,28 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
   auto non_pbus_node_0 = env().SyncCall(&testing::FakeEnvWrapper::non_pbus_nodes_at, 0);
   ASSERT_TRUE(non_pbus_node_0->args().name().has_value());
   ASSERT_EQ(non_pbus_node_0->args().name(), "dt-root");
-  ASSERT_TRUE(non_pbus_node_0->args().properties().has_value());
+  ASSERT_TRUE(non_pbus_node_0->args().properties2().has_value());
 
   ASSERT_TRUE(testing::CheckHasProperties(
       {{{
-          .key = fuchsia_driver_framework::NodePropertyKey::WithStringValue(
-              bind_fuchsia_devicetree::FIRST_COMPATIBLE),
+          .key = std::string(bind_fuchsia_devicetree::FIRST_COMPATIBLE),
           .value =
               fuchsia_driver_framework::NodePropertyValue::WithStringValue("fuchsia,sample-dt"),
       }}},
-      *non_pbus_node_0->args().properties(), false));
+      *non_pbus_node_0->args().properties2(), false));
 
   auto non_pbus_node_1 = env().SyncCall(&testing::FakeEnvWrapper::non_pbus_nodes_at, 1);
   ASSERT_TRUE(non_pbus_node_1->args().name().has_value());
   ASSERT_NE(nullptr, strstr("example-device", non_pbus_node_1->args().name()->data()));
-  ASSERT_TRUE(non_pbus_node_1->args().properties().has_value());
+  ASSERT_TRUE(non_pbus_node_1->args().properties2().has_value());
 
   ASSERT_TRUE(testing::CheckHasProperties(
       {{{
-          .key = fuchsia_driver_framework::NodePropertyKey::WithStringValue(
-              bind_fuchsia_devicetree::FIRST_COMPATIBLE),
+          .key = std::string(bind_fuchsia_devicetree::FIRST_COMPATIBLE),
           .value =
               fuchsia_driver_framework::NodePropertyValue::WithStringValue("fuchsia,sample-device"),
       }}},
-      *non_pbus_node_1->args().properties(), false));
+      *non_pbus_node_1->args().properties2(), false));
 }
 
 TEST_F(ManagerTest, DriverVisitorTest) {
@@ -398,13 +396,13 @@ TEST_F(ManagerTest, TestNonPbusCompositeSpec) {
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       visited = true;
-      parent_spec.bind_rules({fdf::MakeAcceptBindRule(kTestKey, kTestProperty)});
-      parent_spec.properties({fdf::MakeProperty(kTestKey, kTestProperty)});
+      parent_spec.bind_rules({fdf::MakeAcceptBindRule2(kTestKey, kTestProperty)});
+      parent_spec.properties({fdf::MakeProperty2(kTestKey, kTestProperty)});
       node.AddNodeSpec(parent_spec);
       return zx::ok();
     }
     bool visited = false;
-    fuchsia_driver_framework::ParentSpec parent_spec;
+    fuchsia_driver_framework::ParentSpec2 parent_spec;
   };
 
   DefaultVisitors<TestDriverVisitor> visitor;
@@ -417,25 +415,26 @@ TEST_F(ManagerTest, TestNonPbusCompositeSpec) {
   ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_size));
 
   auto mgr_request = env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_at, 0);
-  ASSERT_TRUE(mgr_request.parents().has_value());
-  ASSERT_EQ(2lu, mgr_request.parents()->size());
+  ASSERT_TRUE(mgr_request.parents2().has_value());
+  ASSERT_EQ(2lu, mgr_request.parents2()->size());
 
-  EXPECT_TRUE(testing::CheckHasProperties(
-      {{
-          fdf::MakeProperty(bind_fuchsia_devicetree::FIRST_COMPATIBLE, SAMPLE_DEVICE_COMPATIBILITY),
-      }},
-      (*mgr_request.parents())[0].properties(), true));
+  EXPECT_TRUE(
+      testing::CheckHasProperties({{
+                                      fdf::MakeProperty2(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
+                                                         SAMPLE_DEVICE_COMPATIBILITY),
+                                  }},
+                                  (*mgr_request.parents2())[0].properties(), true));
   EXPECT_TRUE(testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
-                                  SAMPLE_DEVICE_COMPATIBILITY),
+          fdf::MakeAcceptBindRule2(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
+                                   SAMPLE_DEVICE_COMPATIBILITY),
       },
-      (*mgr_request.parents())[0].bind_rules(), true));
+      (*mgr_request.parents2())[0].bind_rules(), true));
 
-  EXPECT_TRUE(testing::CheckHasProperties({{fdf::MakeProperty(kTestKey, kTestProperty)}},
-                                          (*mgr_request.parents())[1].properties(), false));
-  EXPECT_TRUE(testing::CheckHasBindRules({{fdf::MakeAcceptBindRule(kTestKey, kTestProperty)}},
-                                         (*mgr_request.parents())[1].bind_rules(), false));
+  EXPECT_TRUE(testing::CheckHasProperties({{fdf::MakeProperty2(kTestKey, kTestProperty)}},
+                                          (*mgr_request.parents2())[1].properties(), false));
+  EXPECT_TRUE(testing::CheckHasBindRules({{fdf::MakeAcceptBindRule2(kTestKey, kTestProperty)}},
+                                         (*mgr_request.parents2())[1].bind_rules(), false));
 }
 
 TEST_F(ManagerTest, TestPbusCompositeSpec) {
@@ -449,8 +448,8 @@ TEST_F(ManagerTest, TestPbusCompositeSpec) {
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
       visited = true;
-      parent_spec.bind_rules({fdf::MakeAcceptBindRule(kTestKey, kTestProperty)});
-      parent_spec.properties({fdf::MakeProperty(kTestKey, kTestProperty)});
+      parent_spec.bind_rules({fdf::MakeAcceptBindRule2(kTestKey, kTestProperty)});
+      parent_spec.properties({fdf::MakeProperty2(kTestKey, kTestProperty)});
       node.AddNodeSpec(parent_spec);
       // This adds a pbus resource, making the one of the parent of the composite to be platform
       // device.
@@ -458,7 +457,7 @@ TEST_F(ManagerTest, TestPbusCompositeSpec) {
       return zx::ok();
     }
     bool visited = false;
-    fuchsia_driver_framework::ParentSpec parent_spec;
+    fuchsia_driver_framework::ParentSpec2 parent_spec;
   };
 
   DefaultVisitors<TestDriverVisitor> visitor;
@@ -471,25 +470,25 @@ TEST_F(ManagerTest, TestPbusCompositeSpec) {
   ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_size));
 
   auto mgr_request = env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_at, 0);
-  ASSERT_TRUE(mgr_request.parents().has_value());
-  ASSERT_EQ(2lu, mgr_request.parents()->size());
+  ASSERT_TRUE(mgr_request.parents2().has_value());
+  ASSERT_EQ(2lu, mgr_request.parents2()->size());
 
   EXPECT_TRUE(testing::CheckHasProperties(
       {{
-          fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeProperty2(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       }},
-      (*mgr_request.parents())[0].properties(), true));
+      (*mgr_request.parents2())[0].properties(), true));
   EXPECT_TRUE(testing::CheckHasBindRules(
       {
-          fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                  bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+          fdf::MakeAcceptBindRule2(bind_fuchsia::PROTOCOL,
+                                   bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       },
-      (*mgr_request.parents())[0].bind_rules(), true));
+      (*mgr_request.parents2())[0].bind_rules(), true));
 
-  EXPECT_TRUE(testing::CheckHasProperties({{fdf::MakeProperty(kTestKey, kTestProperty)}},
-                                          (*mgr_request.parents())[1].properties(), false));
-  EXPECT_TRUE(testing::CheckHasBindRules({{fdf::MakeAcceptBindRule(kTestKey, kTestProperty)}},
-                                         (*mgr_request.parents())[1].bind_rules(), false));
+  EXPECT_TRUE(testing::CheckHasProperties({{fdf::MakeProperty2(kTestKey, kTestProperty)}},
+                                          (*mgr_request.parents2())[1].properties(), false));
+  EXPECT_TRUE(testing::CheckHasBindRules({{fdf::MakeAcceptBindRule2(kTestKey, kTestProperty)}},
+                                         (*mgr_request.parents2())[1].bind_rules(), false));
 }
 
 TEST_F(ManagerTest, TestPublishOrder) {

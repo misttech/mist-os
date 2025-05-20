@@ -25,16 +25,24 @@ magma_status_t CppConnection::MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, ui
   return msd_connection_map_buffer(connection_, msd_buffer.buffer(), gpu_va, offset, length, flags);
 }
 
-void CppConnection::ReleaseBuffer(msd::Buffer& buffer) {
+void CppConnection::ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) {
   auto& msd_buffer = static_cast<CppBuffer&>(buffer);
 
-  msd_connection_release_buffer(connection_, msd_buffer.buffer());
+  msd_connection_release_buffer2(connection_, msd_buffer.buffer(), shutting_down);
 }
 
 std::unique_ptr<msd::Context> CppConnection::CreateContext() {
   struct MsdContext* msd_context = msd_connection_create_context(connection_);
   if (!msd_context)
     return MAGMA_DRETP(nullptr, "msd_connection_create_context failed");
+
+  return std::make_unique<CppContext>(msd_context);
+}
+
+std::unique_ptr<msd::Context> CppConnection::CreateContext2(uint64_t priority) {
+  struct MsdContext* msd_context = msd_connection_create_context2(connection_, priority);
+  if (!msd_context)
+    return MAGMA_DRETP(nullptr, "msd_connection_create_context2 failed");
 
   return std::make_unique<CppContext>(msd_context);
 }

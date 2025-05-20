@@ -15,7 +15,7 @@ pub struct AllInstants {
 }
 
 impl ::fidl_next::Encodable for AllInstants {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireAllInstants> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
                 && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
@@ -33,7 +33,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -47,30 +47,62 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.monotonic, encoder, monotonic)?;
+        ::fidl_next::Encode::encode(self.monotonic, encoder, monotonic)?;
 
-        ::fidl_next::Encode::encode(&mut self.boot, encoder, boot)?;
+        ::fidl_next::Encode::encode(self.boot, encoder, boot)?;
 
-        ::fidl_next::Encode::encode(&mut self.monotonic_ticks, encoder, monotonic_ticks)?;
+        ::fidl_next::Encode::encode(self.monotonic_ticks, encoder, monotonic_ticks)?;
 
-        ::fidl_next::Encode::encode(&mut self.boot_ticks, encoder, boot_ticks)?;
+        ::fidl_next::Encode::encode(self.boot_ticks, encoder, boot_ticks)?;
 
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<AllInstants> {
-    type EncodedOption = ::fidl_next::WireBox<WireAllInstants>;
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for AllInstants
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                monotonic,
+                boot,
+                monotonic_ticks,
+                boot_ticks,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.monotonic, encoder, monotonic)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.boot, encoder, boot)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.monotonic_ticks, encoder, monotonic_ticks)?;
+
+        ::fidl_next::EncodeRef::encode_ref(&self.boot_ticks, encoder, boot_ticks)?;
+
+        Ok(())
+    }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<AllInstants>
+impl ::fidl_next::EncodableOption for AllInstants {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireAllInstants>;
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for AllInstants
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     AllInstants: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -85,26 +117,67 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for AllInstants
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    AllInstants: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+impl ::fidl_next::FromWire<WireAllInstants> for AllInstants {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireAllInstants, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
-                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                    .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireAllInstants) -> Self {
+    fn from_wire(wire: WireAllInstants) -> Self {
         Self {
-            monotonic: ::fidl_next::TakeFrom::take_from(&from.monotonic),
+            monotonic: ::fidl_next::FromWire::from_wire(wire.monotonic),
 
-            boot: ::fidl_next::TakeFrom::take_from(&from.boot),
+            boot: ::fidl_next::FromWire::from_wire(wire.boot),
 
-            monotonic_ticks: ::fidl_next::TakeFrom::take_from(&from.monotonic_ticks),
+            monotonic_ticks: ::fidl_next::FromWire::from_wire(wire.monotonic_ticks),
 
-            boot_ticks: ::fidl_next::TakeFrom::take_from(&from.boot_ticks),
+            boot_ticks: ::fidl_next::FromWire::from_wire(wire.boot_ticks),
+        }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireAllInstants> for AllInstants {
+    #[inline]
+    fn from_wire_ref(wire: &WireAllInstants) -> Self {
+        Self {
+            monotonic: ::fidl_next::FromWireRef::from_wire_ref(&wire.monotonic),
+
+            boot: ::fidl_next::FromWireRef::from_wire_ref(&wire.boot),
+
+            monotonic_ticks: ::fidl_next::FromWireRef::from_wire_ref(&wire.monotonic_ticks),
+
+            boot_ticks: ::fidl_next::FromWireRef::from_wire_ref(&wire.boot_ticks),
         }
     }
 }
@@ -122,7 +195,9 @@ pub struct WireAllInstants {
     pub boot_ticks: ::fidl_next::WireI64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireAllInstants {
+unsafe impl ::fidl_next::Wire for WireAllInstants {
+    type Decoded<'de> = WireAllInstants;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -191,7 +266,7 @@ impl ComplexInstants {
 }
 
 impl ::fidl_next::Encodable for ComplexInstants {
-    type Encoded = WireComplexInstants;
+    type Encoded = WireComplexInstants<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
@@ -200,7 +275,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        mut self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -209,7 +284,7 @@ where
         let max_ord = self.__max_ordinal();
 
         let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
-        ::fidl_next::ZeroPadding::zero_padding(&mut out);
+        ::fidl_next::Wire::zero_padding(&mut out);
 
         let mut preallocated =
             ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
@@ -217,7 +292,7 @@ where
         for i in 1..=max_ord {
             match i {
                 4 => {
-                    if let Some(boot_ticks) = &mut self.boot_ticks {
+                    if let Some(boot_ticks) = self.boot_ticks.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             boot_ticks,
                             preallocated.encoder,
@@ -229,7 +304,7 @@ where
                 }
 
                 3 => {
-                    if let Some(monotonic_ticks) = &mut self.monotonic_ticks {
+                    if let Some(monotonic_ticks) = self.monotonic_ticks.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             monotonic_ticks,
                             preallocated.encoder,
@@ -241,7 +316,7 @@ where
                 }
 
                 2 => {
-                    if let Some(boot) = &mut self.boot {
+                    if let Some(boot) = self.boot.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             boot,
                             preallocated.encoder,
@@ -253,7 +328,7 @@ where
                 }
 
                 1 => {
-                    if let Some(monotonic) = &mut self.monotonic {
+                    if let Some(monotonic) = self.monotonic.take() {
                         ::fidl_next::WireEnvelope::encode_value(
                             monotonic,
                             preallocated.encoder,
@@ -277,28 +352,193 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireComplexInstants> for ComplexInstants {
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for ComplexInstants
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+{
     #[inline]
-    fn take_from(from: &WireComplexInstants) -> Self {
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let WireComplexInstants { table } = out);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut out = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        ::fidl_next::Wire::zero_padding(&mut out);
+
+        let mut preallocated =
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            match i {
+                4 => {
+                    if let Some(boot_ticks) = &self.boot_ticks {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            boot_ticks,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                3 => {
+                    if let Some(monotonic_ticks) = &self.monotonic_ticks {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            monotonic_ticks,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                2 => {
+                    if let Some(boot) = &self.boot {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            boot,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                1 => {
+                    if let Some(monotonic) = &self.monotonic {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            monotonic,
+                            preallocated.encoder,
+                            &mut out,
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(&mut out)
+                    }
+                }
+
+                _ => ::fidl_next::WireEnvelope::encode_zero(&mut out),
+            }
+            unsafe {
+                preallocated.write_next(out.assume_init_ref());
+            }
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+impl<'de> ::fidl_next::FromWire<WireComplexInstants<'de>> for ComplexInstants {
+    #[inline]
+    fn from_wire(wire: WireComplexInstants<'de>) -> Self {
+        let wire = ::core::mem::ManuallyDrop::new(wire);
+
+        let monotonic = wire.table.get(1);
+
+        let boot = wire.table.get(2);
+
+        let monotonic_ticks = wire.table.get(3);
+
+        let boot_ticks = wire.table.get(4);
+
         Self {
-            monotonic: from.monotonic().map(::fidl_next::TakeFrom::take_from),
+            monotonic: monotonic.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
 
-            boot: from.boot().map(::fidl_next::TakeFrom::take_from),
+            boot: boot.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireI64>>()
+                })
+            }),
 
-            monotonic_ticks: from.monotonic_ticks().map(::fidl_next::TakeFrom::take_from),
+            monotonic_ticks: monotonic_ticks.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
 
-            boot_ticks: from.boot_ticks().map(::fidl_next::TakeFrom::take_from),
+            boot_ticks: boot_ticks.map(|envelope| {
+                ::fidl_next::FromWire::from_wire(unsafe {
+                    envelope.read_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
+        }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireComplexInstants<'de>> for ComplexInstants {
+    #[inline]
+    fn from_wire_ref(wire: &WireComplexInstants<'de>) -> Self {
+        Self {
+            monotonic: wire.table.get(1).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
+
+            boot: wire.table.get(2).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireI64>>()
+                })
+            }),
+
+            monotonic_ticks: wire.table.get(3).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
+
+            boot_ticks: wire.table.get(4).map(|envelope| {
+                ::fidl_next::FromWireRef::from_wire_ref(unsafe {
+                    envelope.deref_unchecked::<[::fidl_next::WireI64; 10]>()
+                })
+            }),
         }
     }
 }
 
 /// The wire type corresponding to [`ComplexInstants`].
 #[repr(C)]
-pub struct WireComplexInstants {
-    table: ::fidl_next::WireTable,
+pub struct WireComplexInstants<'de> {
+    table: ::fidl_next::WireTable<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireComplexInstants {
+impl<'de> Drop for WireComplexInstants<'de> {
+    fn drop(&mut self) {
+        let _ = self
+            .table
+            .get(1)
+            .map(|envelope| unsafe { envelope.read_unchecked::<[::fidl_next::WireI64; 10]>() });
+
+        let _ = self.table.get(2).map(|envelope| unsafe {
+            envelope.read_unchecked::<::fidl_next::WireVector<'de, ::fidl_next::WireI64>>()
+        });
+
+        let _ = self
+            .table
+            .get(3)
+            .map(|envelope| unsafe { envelope.read_unchecked::<[::fidl_next::WireI64; 10]>() });
+
+        let _ = self
+            .table
+            .get(4)
+            .map(|envelope| unsafe { envelope.read_unchecked::<[::fidl_next::WireI64; 10]>() });
+    }
+}
+
+unsafe impl ::fidl_next::Wire for WireComplexInstants<'static> {
+    type Decoded<'de> = WireComplexInstants<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {
         ::fidl_next::munge!(let Self { table } = out);
@@ -306,7 +546,7 @@ unsafe impl ::fidl_next::ZeroPadding for WireComplexInstants {
     }
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireComplexInstants
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireComplexInstants<'static>
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -332,7 +572,7 @@ where
                 2 => {
                     ::fidl_next::WireEnvelope::decode_as::<
                         ___D,
-                        ::fidl_next::WireVector<::fidl_next::WireI64>,
+                        ::fidl_next::WireVector<'static, ::fidl_next::WireI64>,
                     >(slot.as_mut(), decoder)?;
 
                     Ok(())
@@ -362,12 +602,12 @@ where
     }
 }
 
-impl WireComplexInstants {
+impl<'de> WireComplexInstants<'de> {
     pub fn monotonic(&self) -> Option<&[::fidl_next::WireI64; 10]> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn boot(&self) -> Option<&::fidl_next::WireVector<::fidl_next::WireI64>> {
+    pub fn boot(&self) -> Option<&::fidl_next::WireVector<'de, ::fidl_next::WireI64>> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
 
@@ -380,7 +620,7 @@ impl WireComplexInstants {
     }
 }
 
-impl ::core::fmt::Debug for WireComplexInstants {
+impl<'de> ::core::fmt::Debug for WireComplexInstants<'de> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ComplexInstants")
             .field("monotonic", &self.monotonic())
@@ -392,37 +632,4 @@ impl ::core::fmt::Debug for WireComplexInstants {
 }
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
-pub mod compat {
-
-    impl ::fidl_next::TakeFrom<crate::WireAllInstants> for ::fidl_test_time::AllInstants {
-        #[inline]
-        fn take_from(from: &crate::WireAllInstants) -> Self {
-            Self {
-                monotonic: ::fidl_next::TakeFrom::take_from(&from.monotonic),
-
-                boot: ::fidl_next::TakeFrom::take_from(&from.boot),
-
-                monotonic_ticks: ::fidl_next::TakeFrom::take_from(&from.monotonic_ticks),
-
-                boot_ticks: ::fidl_next::TakeFrom::take_from(&from.boot_ticks),
-            }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireComplexInstants> for ::fidl_test_time::ComplexInstants {
-        #[inline]
-        fn take_from(from: &crate::WireComplexInstants) -> Self {
-            Self {
-                monotonic: from.monotonic().map(::fidl_next::TakeFrom::take_from),
-
-                boot: from.boot().map(::fidl_next::TakeFrom::take_from),
-
-                monotonic_ticks: from.monotonic_ticks().map(::fidl_next::TakeFrom::take_from),
-
-                boot_ticks: from.boot_ticks().map(::fidl_next::TakeFrom::take_from),
-
-                __source_breaking: ::fidl::marker::SourceBreaking,
-            }
-        }
-    }
-}
+pub mod compat {}

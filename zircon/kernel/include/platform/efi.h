@@ -11,7 +11,7 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <ktl/algorithm.h>
+#include <ktl/utility.h>
 #include <vm/vm_aspace.h>
 
 extern "C" {

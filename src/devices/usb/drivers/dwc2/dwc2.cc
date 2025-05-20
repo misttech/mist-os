@@ -989,7 +989,7 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   fdf::PDev pdev{std::move(pdev_client_end.value())};
 
   // Initialize mac address metadata server.
-  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(parent());
+  if (zx::result result = mac_address_metadata_server_.ForwardMetadataIfExists(parent(), "pdev");
       result.is_error()) {
     zxlogf(ERROR, "Failed to forward mac address metadata: %s", result.status_string());
     return result.status_value();
@@ -1001,7 +1001,7 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   }
 
   // Initialize serial number metadata server.
-  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(parent());
+  if (zx::result result = serial_number_metadata_server_.ForwardMetadataIfExists(parent(), "pdev");
       result.is_error()) {
     zxlogf(ERROR, "Failed to forward serial number metadata: %s", result.status_string());
     return result.status_value();
@@ -1098,10 +1098,6 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
   };
   status = DdkAdd(ddk::DeviceAddArgs("dwc2")
                       .set_str_props(props)
-                      // TODO(b/373918767): Don't forward once no longer retrieved.
-                      .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
-                      // TODO(b/373918767): Don't forward once no longer retrieved.
-                      .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
@@ -1341,7 +1337,8 @@ void Dwc2::DciIntfWrapSetConnected(bool connected) {
 
   fidl::Arena arena;
   auto result = std::get<DciInterfaceFidlClient>(*dci_intf_).buffer(arena)->SetConnected(connected);
-  ZX_ASSERT(result.ok());  // Never expected to fail.
+  ZX_ASSERT_MSG(result.ok(), "SetConnected failed: %s",
+                result.status_string());  // Never expected to fail.
 }
 
 zx_status_t Dwc2::DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* write_buffer,

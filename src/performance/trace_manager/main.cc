@@ -10,7 +10,6 @@
 
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
-#include "src/lib/fxl/macros.h"
 #include "src/performance/trace_manager/app.h"
 
 namespace {

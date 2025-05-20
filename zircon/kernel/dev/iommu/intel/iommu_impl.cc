@@ -21,8 +21,8 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/algorithm.h>
 #include <ktl/iterator.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object_paged.h>
 #include <vm/vm_object_physical.h>

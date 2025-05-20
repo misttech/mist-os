@@ -26,6 +26,12 @@ impl<T> Default for List<T> {
     }
 }
 
+impl<T: std::fmt::Debug> std::fmt::Debug for List<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
 impl<T> List<T> {
     /// Insert a new value into the list, returning an index that is guaranteed to be unique until
     /// the value is removed from the list.
@@ -89,6 +95,11 @@ impl<T> List<T> {
     /// before being returned to the user.
     fn to_call_index(internal: usize) -> Idx {
         internal + 1
+    }
+
+    /// Returns the number of calls in the call list.
+    pub fn len(&self) -> usize {
+        self.inner.iter().map(Option::as_ref).filter(Option::is_some).count()
     }
 }
 

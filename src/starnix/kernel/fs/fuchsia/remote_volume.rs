@@ -14,7 +14,6 @@ use starnix_logging::{log_error, log_info};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio, statfs};
-use std::sync::Arc;
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t, Zxio};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -258,7 +257,7 @@ pub fn new_remote_vol(
     let (remote_node, node_id) =
         match Zxio::create_with_on_representation(client_end.into(), Some(&mut attrs)) {
             Err(status) => return Err(from_status_like_fdio!(status)),
-            Ok(zxio) => (RemoteNode::new(Arc::new(zxio), rights), attrs.id),
+            Ok(zxio) => (RemoteNode::new(zxio, rights), attrs.id),
         };
 
     let use_remote_ids = remotefs.use_remote_ids();

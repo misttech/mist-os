@@ -869,8 +869,8 @@ impl<PS: ParseStrategy> Validate for InitialSids<PS> {
     fn validate(&self) -> Result<(), Self::Error> {
         for initial_sid in crate::InitialSid::all_variants() {
             self.iter()
-                .find(|initial| initial.id().get() == initial_sid as u32)
-                .ok_or(ValidateError::MissingInitialSid { initial_sid })?;
+                .find(|initial| initial.id().get() == *initial_sid as u32)
+                .ok_or(ValidateError::MissingInitialSid { initial_sid: *initial_sid })?;
         }
         Ok(())
     }

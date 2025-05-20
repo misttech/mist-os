@@ -216,7 +216,7 @@ other drivers loaded into the same driver host.
 You can pass one set of protocol ops for the device in `device_add_args_t`. If a
 device supports multiple protocols, implement the `get_protocol()` device op. A
 device can only have one protocol id. The protocol id corresponds to the class
-the device is published under in devfs.
+the device is published under if devfs is still enabled for that class.
 
 ## Driver operation
 

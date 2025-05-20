@@ -11,44 +11,47 @@
 namespace scheduling {
 
 // static
-zx::time FramePredictor::ComputeNextSyncTime(zx::time last_sync_time, zx::duration sync_interval,
-                                             zx::time min_sync_time) {
-  FX_DCHECK(sync_interval.get() > 0);
-  // If the last sync time is greater than or equal to the minimum acceptable
-  // sync time, just return the last sync.
-  // Note: in practice, these numbers will likely differ. The "equal to"
+zx::time FramePredictor::ComputeNextVsyncTime(zx::time base_vsync_time, zx::duration vsync_interval,
+                                              zx::time min_vsync_time) {
+  FX_DCHECK(vsync_interval.get() > 0);
+  // If the base sync time is greater than or equal to the minimum acceptable
+  // sync time, just return it.
+  // Note: in practice, these numbers are unlikely to be identical. The "equal to"
   // comparison is necessary for tests, which have much tighter control on time.
-  if (last_sync_time >= min_sync_time) {
-    return last_sync_time;
+  if (base_vsync_time >= min_vsync_time) {
+    return base_vsync_time;
   }
 
-  const int64_t num_intervals = (min_sync_time - last_sync_time) / sync_interval;
-  return last_sync_time + (sync_interval * (num_intervals + 1));
+  // The "-1" is so that `ComputeNextVsyncTime(5, 10, 15)` returns 15 instead of 25.
+  // The latter would be surprising, because the if-statement above causes
+  // `ComputeNextVsyncTime(5, 10, 5)` to return 5.
+  const int64_t num_intervals =
+      (min_vsync_time.get() - base_vsync_time.get() - 1) / vsync_interval.get();
+  return base_vsync_time + (vsync_interval * (num_intervals + 1));
 }
 
 // static
-PredictedTimes FramePredictor::ComputePredictionFromDuration(PredictionRequest request,
-                                                             zx::duration required_frame_duration) {
+PredictedTimes FramePredictor::ComputePredictionFromDuration(
+    PredictionRequest request, zx::duration frame_preparation_duration) {
   // Calculate minimum time this would sync to. It is last vsync time plus half
   // a vsync-interval (to allow for jitter for the VSYNC signal), or the current
   // time plus the expected render time, whichever is larger, so we know we have
   // enough time to render for that sync.
-  zx::time min_sync_time = std::max((request.last_vsync_time + (request.vsync_interval / 2)),
-                                    (request.now + required_frame_duration));
-  const zx::time target_vsync_time =
-      ComputeNextSyncTime(request.last_vsync_time, request.vsync_interval, min_sync_time);
+  const zx::time min_presentation_time =
+      std::max({// Guarantees a time at least one vsync interval greater than the last vsync time.
+                (request.last_vsync_time + (request.vsync_interval / 2)),
+                // Guarantees a time that (probably) gives enough time to prepare a frame.
+                (request.now + frame_preparation_duration),
+                // Guarantees a time that isn't earlier than the requested time.
+                request.requested_presentation_time});
 
-  // Ensure the requested presentation time is current.
-  zx::time target_presentation_time = std::max(request.requested_presentation_time, request.now);
-
-  // Compute the next presentation time from the target vsync time (inclusive),
-  // that is at least the current requested present time.
-  target_presentation_time =
-      ComputeNextSyncTime(target_vsync_time, request.vsync_interval, target_presentation_time);
+  // Clamp |min_presentation_time| to the subsequent predicted vsync time.
+  const zx::time target_presentation_time =
+      ComputeNextVsyncTime(request.last_vsync_time, request.vsync_interval, min_presentation_time);
 
   // Find time the client should latch and start rendering in order to
   // frame in time for the target present.
-  zx::time latch_point = target_presentation_time - required_frame_duration;
+  const zx::time latch_point = target_presentation_time - frame_preparation_duration;
 
   return {.latch_point_time = latch_point, .presentation_time = target_presentation_time};
 }

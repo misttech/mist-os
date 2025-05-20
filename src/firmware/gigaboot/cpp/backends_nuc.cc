@@ -24,7 +24,7 @@ static const PartitionMap::PartitionEntry kNucPartitions[] = {
 
 };
 
-const cpp20::span<const PartitionMap::PartitionEntry> GetPartitionCustomizations() {
+const std::span<const PartitionMap::PartitionEntry> GetPartitionCustomizations() {
   return kNucPartitions;
 }
 

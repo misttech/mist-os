@@ -34,7 +34,21 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::EncodeRef::encode_ref(&self, encoder, out)
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for BitsType
+where
+    ___E: ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
         _: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -50,10 +64,17 @@ impl ::core::convert::From<WireBitsType> for BitsType {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
+impl ::fidl_next::FromWire<WireBitsType> for BitsType {
     #[inline]
-    fn take_from(from: &WireBitsType) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireBitsType) -> Self {
+        Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireBitsType> for BitsType {
+    #[inline]
+    fn from_wire_ref(wire: &WireBitsType) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -64,7 +85,9 @@ pub struct WireBitsType {
     value: ::fidl_next::WireU32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireBitsType {
+unsafe impl ::fidl_next::Wire for WireBitsType {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire bits have no padding
@@ -114,6 +137,17 @@ pub enum EnumType {
 impl ::fidl_next::Encodable for EnumType {
     type Encoded = WireEnumType;
 }
+impl ::std::convert::TryFrom<i32> for EnumType {
+    type Error = ::fidl_next::UnknownStrictEnumMemberError;
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::Value),
+            2 => Ok(Self::True),
+
+            _ => Err(Self::Error::new(value.into())),
+        }
+    }
+}
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for EnumType
 where
@@ -121,8 +155,22 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
-        _: &mut ___E,
+        self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::EncodeRef::encode_ref(&self, encoder, out)
+    }
+}
+
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for EnumType
+where
+    ___E: ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnumType { value } = out);
@@ -148,10 +196,17 @@ impl ::core::convert::From<WireEnumType> for EnumType {
     }
 }
 
-impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
+impl ::fidl_next::FromWire<WireEnumType> for EnumType {
     #[inline]
-    fn take_from(from: &WireEnumType) -> Self {
-        Self::from(*from)
+    fn from_wire(wire: WireEnumType) -> Self {
+        Self::from(wire)
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireEnumType> for EnumType {
+    #[inline]
+    fn from_wire_ref(wire: &WireEnumType) -> Self {
+        Self::from(*wire)
     }
 }
 
@@ -162,7 +217,9 @@ pub struct WireEnumType {
     value: ::fidl_next::WireI32,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireEnumType {
+unsafe impl ::fidl_next::Wire for WireEnumType {
+    type Decoded<'de> = Self;
+
     #[inline]
     fn zero_padding(_: &mut ::core::mem::MaybeUninit<Self>) {
         // Wire enums have no padding
@@ -244,17 +301,17 @@ pub const ENUM_VAL: crate::EnumType = crate::EnumType::Value;
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireBitsType> for ::fidl_test_consts::BitsType {
+    impl ::core::convert::From<crate::BitsType> for ::fidl_test_consts::BitsType {
         #[inline]
-        fn take_from(from: &crate::WireBitsType) -> Self {
-            Self::from_bits_retain(from.value.into())
+        fn from(from: crate::BitsType) -> Self {
+            Self::from_bits_retain(from.bits())
         }
     }
 
-    impl ::fidl_next::TakeFrom<crate::WireEnumType> for ::fidl_test_consts::EnumType {
+    impl ::core::convert::From<crate::EnumType> for ::fidl_test_consts::EnumType {
         #[inline]
-        fn take_from(from: &crate::WireEnumType) -> Self {
-            match crate::EnumType::from(*from) {
+        fn from(from: crate::EnumType) -> Self {
+            match crate::EnumType::from(from) {
                 crate::EnumType::Value => Self::Value,
 
                 crate::EnumType::True => Self::True_,

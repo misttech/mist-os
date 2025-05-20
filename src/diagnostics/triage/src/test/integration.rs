@@ -117,18 +117,17 @@ fn verify_output(output: Output, status_code: i32, expected_text: StringMatch) {
     let output_status_code = output.status.code().expect("unable to unwrap status code");
     assert_eq!(
         output_status_code, status_code,
-        "unexpected status code: got {}, expected {}",
-        output_status_code, status_code
+        "unexpected status code: got {output_status_code}, expected {status_code}"
     );
 
     // validate the output text
     let stdout = std::str::from_utf8(&output.stdout).expect("Non-UTF8 return from command");
     match expected_text {
         StringMatch::Contains(s) => {
-            assert!(stdout.contains(s), "{} does not contain: {}", stdout, s)
+            assert!(stdout.contains(s), "{stdout} does not contain: {s}")
         }
         StringMatch::DoesNotContain(s) => {
-            assert!(!stdout.contains(s), "{} should not contain: {}", stdout, s)
+            assert!(!stdout.contains(s), "{stdout} should not contain: {s}")
         }
     };
 }

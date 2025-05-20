@@ -4,7 +4,8 @@
 
 use crate::subpackage_blobs_package::construct_subpackage_blobs_package;
 use anyhow::{Context, Result};
-use assembly_manifest::{AssemblyManifest, PackagesMetadata};
+use assembled_system::{AssembledSystem, PackagesMetadata};
+use assembly_container::AssemblyContainer;
 use assembly_partitions_config::PartitionsConfig;
 use assembly_tool::SdkToolProvider;
 use assembly_update_package::{Slot, UpdatePackageBuilder};
@@ -16,12 +17,12 @@ use fuchsia_url::RepositoryUrl;
 use std::collections::BTreeSet;
 
 pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
-    let partitions = PartitionsConfig::try_load_from(args.partitions)
+    let partitions = PartitionsConfig::from_dir(args.partitions)
         .context("Failed to parse the partitions config")?;
     let epoch: EpochFile = EpochFile::Version1 { epoch: args.epoch };
 
     let system_a_manifest =
-        args.system_a.as_ref().map(AssemblyManifest::try_load_from).transpose()?;
+        args.system_a.as_ref().map(AssembledSystem::try_load_from).transpose()?;
 
     let subpackage_blobs_package = if let Some(manifest) = &system_a_manifest {
         Some(construct_subpackage_blobs_package(
@@ -84,7 +85,7 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
 
     // Set the images to update in the recovery slot.
     if let Some(manifest) =
-        args.system_r.as_ref().map(AssemblyManifest::try_load_from).transpose()?
+        args.system_r.as_ref().map(AssembledSystem::try_load_from).transpose()?
     {
         builder.add_slot_images(Slot::Recovery(manifest));
     }
@@ -95,10 +96,10 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
 }
 
 fn create_update_packages_manifest(
-    assembly_manifest: &AssemblyManifest,
+    assembled_system: &AssembledSystem,
 ) -> Result<UpdatePackagesManifest> {
     let mut packages_manifest = UpdatePackagesManifest::V1(BTreeSet::new());
-    for image in &assembly_manifest.images {
+    for image in &assembled_system.images {
         if let Some(contents) = image.get_blobfs_contents() {
             let PackagesMetadata { base, cache } = &contents.packages;
 

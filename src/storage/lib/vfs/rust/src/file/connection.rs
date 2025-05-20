@@ -577,21 +577,13 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
             }
             #[cfg(not(target_os = "fuchsia"))]
             fio::FileRequest::Describe { responder } => {
-                responder.send(fio::FileInfo {
-                    stream: None,
-                    observer: self.file.event()?,
-                    ..Default::default()
-                })?;
+                responder.send(fio::FileInfo { stream: None, ..Default::default() })?;
             }
             #[cfg(target_os = "fuchsia")]
             fio::FileRequest::Describe { responder } => {
                 trace::duration!(c"storage", c"File::Describe");
                 let stream = self.file.duplicate_stream()?;
-                responder.send(fio::FileInfo {
-                    stream,
-                    observer: self.file.event()?,
-                    ..Default::default()
-                })?;
+                responder.send(fio::FileInfo { stream, ..Default::default() })?;
             }
             fio::FileRequest::LinkInto { dst_parent_token, dst, responder } => {
                 async move {
@@ -603,14 +595,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 }
                 .trace(trace::trace_future_args!(c"storage", c"File::LinkInto"))
                 .await?;
-            }
-            fio::FileRequest::GetConnectionInfo { responder } => {
-                trace::duration!(c"storage", c"File::GetConnectionInfo");
-                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-                responder.send(fio::ConnectionInfo {
-                    rights: Some(self.options.rights),
-                    ..Default::default()
-                })?;
             }
             fio::FileRequest::Sync { responder } => {
                 async move {
@@ -629,6 +613,17 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::GetAttr"))
                 .await?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::DeprecatedSetAttr { flags, attributes, responder } => {
+                async move {
+                    let result =
+                        self.handle_update_attributes(io1_to_io2_attrs(flags, attributes)).await;
+                    responder.send(Status::from_result(result).into_raw())
+                }
+                .trace(trace::trace_future_args!(c"storage", c"File::SetAttr"))
+                .await?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::SetAttr { flags, attributes, responder } => {
                 async move {
                     let result =
@@ -768,12 +763,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::Resize"))
                 .await?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"File::GetFlags");
                 responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::SetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::SetFlags");
                 // The only supported flag is APPEND.
@@ -784,12 +779,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                     responder.send(Err(Status::INVALID_ARGS.into_raw()))?;
                 }
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::DeprecatedGetFlags { responder } => {
                 trace::duration!(c"storage", c"File::DeprecatedGetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::FileRequest::DeprecatedSetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::DeprecatedSetFlags");
                 // The only supported flag is APPEND.
@@ -798,12 +793,12 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 let flags = if is_append { fio::Flags::FILE_APPEND } else { fio::Flags::empty() };
                 responder.send(Status::from_result(self.file.set_flags(flags)).into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::FileRequest::GetFlags { responder } => {
                 trace::duration!(c"storage", c"File::GetFlags");
                 responder.send(Status::OK.into_raw(), self.options.to_io1())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::FileRequest::SetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::SetFlags");
                 // The only supported flag is APPEND.
@@ -1069,7 +1064,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
     async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
         let option_this = self.get_mut();
         let this = option_this.as_mut().unwrap();
-        let _guard = this.scope.active_guard();
+        let Some(_guard) = this.scope.try_active_guard() else { return ControlFlow::Break(()) };
         let state = match request {
             Ok(request) => {
                 this.handle_request(request)
@@ -1118,8 +1113,9 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
     async fn stream_closed(self: Pin<&mut Self>) {
         let this = self.get_mut().as_mut().unwrap();
         if this.should_sync_before_close() {
-            let _guard = this.scope.active_guard();
-            let _ = this.file.sync(SyncMode::PreClose).await;
+            if let Some(_guard) = this.scope.try_active_guard() {
+                let _ = this.file.sync(SyncMode::PreClose).await;
+            }
         }
     }
 }
@@ -1136,7 +1132,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
         // TODO(https://fxbug.dev/324112547): Add support for connecting as Node.
         Ok(fio::Representation::File(fio::FileInfo {
             is_append: Some(self.options.is_append),
-            observer: self.file.event()?,
             #[cfg(target_os = "fuchsia")]
             stream: self.file.duplicate_stream()?,
             #[cfg(not(target_os = "fuchsia"))]
@@ -1155,7 +1150,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
         let stream = self.file.duplicate_stream()?;
         #[cfg(not(target_os = "fuchsia"))]
         let stream = None;
-        Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: self.file.event()?, stream }))
+        Ok(fio::NodeInfoDeprecated::File(fio::FileObject { event: None, stream }))
     }
 }
 

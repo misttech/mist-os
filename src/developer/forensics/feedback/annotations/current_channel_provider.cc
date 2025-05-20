@@ -14,10 +14,14 @@ Annotations CurrentChannelToAnnotations::operator()(const std::string& current_c
   };
 }
 
-std::set<std::string> CurrentChannelProvider::GetKeys() const {
+std::set<std::string> CurrentChannelProvider::GetAnnotationKeys() {
   return {
       kSystemUpdateChannelCurrentKey,
   };
+}
+
+std::set<std::string> CurrentChannelProvider::GetKeys() const {
+  return CurrentChannelProvider::GetAnnotationKeys();
 }
 
 }  // namespace forensics::feedback

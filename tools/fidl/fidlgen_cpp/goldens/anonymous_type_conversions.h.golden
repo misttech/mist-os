@@ -128,7 +128,6 @@ template <>
 struct WireTypeForNaturalType<::test_anonymous::FunctionApplication> {
   using type = ::test_anonymous::wire::FunctionApplication;
 };
-
 template <>
 struct WireNaturalConversionTraits<::test_anonymous::wire::TableMember, ::test_anonymous::TableMember> {
   static ::test_anonymous::TableMember ToNatural(::test_anonymous::wire::TableMember src);

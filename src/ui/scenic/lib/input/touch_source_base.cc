@@ -63,7 +63,10 @@ fuchsia::ui::pointer::TouchEvent NewTouchEvent(StreamId stream_id, const Interna
                                                bool is_end_of_stream) {
   fuchsia::ui::pointer::TouchEvent new_event;
   new_event.set_timestamp(event.timestamp);
-  new_event.set_trace_flow_id(TRACE_NONCE());
+  if (event.trace_flow_id.has_value()) {
+    new_event.set_trace_flow_id(event.trace_flow_id.value());
+  }
+
   {
     fuchsia::ui::pointer::TouchPointerSample pointer;
 
@@ -294,7 +297,7 @@ void TouchSourceBase::WatchBase(std::vector<fuchsia::ui::pointer::TouchResponse>
   size_t index = 0;
   for (const auto& response : responses) {
     if (response.has_trace_flow_id()) {
-      TRACE_FLOW_END("input", "received_response", response.trace_flow_id());
+      TRACE_FLOW_END("input", "dispatch_event_to_client", response.trace_flow_id());
     }
 
     const auto [stream_id, expects_response] = return_tickets_.at(index++);
@@ -366,7 +369,7 @@ void TouchSourceBase::UpdateResponseBase(fuchsia::ui::pointer::TouchInteractionI
   }
 
   if (response.has_trace_flow_id()) {
-    TRACE_FLOW_END("input", "received_response", response.trace_flow_id());
+    TRACE_FLOW_END("input", "dispatch_event_to_client", response.trace_flow_id());
   }
 
   const StreamId stream_id = stream_identifier.interaction_id;
@@ -382,12 +385,12 @@ void TouchSourceBase::SendPendingIfWaiting() {
     return;
   }
   FX_DCHECK(return_tickets_.empty());
+  TRACE_DURATION("input", "TouchSourceBase::SendPendingIfWaiting");
 
   std::vector<AugmentedTouchEvent> events;
   for (size_t i = 0; !pending_events_.empty() && i < fuchsia::ui::pointer::TOUCH_MAX_EVENT; ++i) {
     auto [stream_id, event] = std::move(pending_events_.front());
-    TRACE_FLOW_END("input", "input_event_in_scenic", event.touch_event.trace_flow_id());
-    TRACE_FLOW_BEGIN("input", "dispatch_event_to_client", event.touch_event.trace_flow_id());
+    TRACE_FLOW_STEP("input", "dispatch_event_to_client", event.touch_event.trace_flow_id());
 
     pending_events_.pop();
     return_tickets_.push_back(

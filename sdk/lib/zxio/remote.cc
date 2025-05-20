@@ -358,7 +358,7 @@ class Remote : public HasIo {
 
     // Operations we disallow "overloading" as this class manages the associated object's resources.
     ops.destroy = Remote::Destroy<T>;
-    ops.close2 = Adaptor<T>::template From<&T::Close>;
+    ops.close = Adaptor<T>::template From<&T::Close>;
     ops.release = Adaptor<T>::template From<&T::Release>;
     ops.borrow = Adaptor<T>::template From<&T::Borrow>;
     ops.clone = Adaptor<T>::template From<&T::Clone>;
@@ -523,9 +523,14 @@ zx::result<fio::wire::MutableNodeAttributes> BuildMutableAttributes(
       mutable_attrs->has.link_count) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+  if (mutable_attrs->has.change_time) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+#endif
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  if (mutable_attrs->has.change_time || mutable_attrs->has.fsverity_enabled ||
-      mutable_attrs->has.fsverity_options || mutable_attrs->has.fsverity_root_hash) {
+  if (mutable_attrs->has.fsverity_enabled || mutable_attrs->has.fsverity_options ||
+      mutable_attrs->has.fsverity_root_hash) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 #endif
@@ -658,7 +663,7 @@ zx_status_t Remote<Protocol>::AdvisoryLock(advisory_lock_req* req) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsGetDeprecated(uint32_t* out_flags) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   const fidl::WireResult result = client()->DeprecatedGetFlags();
 #else
   const fidl::WireResult result = client()->GetFlags();
@@ -676,7 +681,7 @@ zx_status_t Remote<Protocol>::FlagsGetDeprecated(uint32_t* out_flags) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsSetDeprecated(uint32_t flags) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   const fidl::WireResult result =
       client()->DeprecatedSetFlags(static_cast<fio::wire::OpenFlags>(flags));
 #else
@@ -691,7 +696,7 @@ zx_status_t Remote<Protocol>::FlagsSetDeprecated(uint32_t flags) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsGet(uint64_t* out_flags) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   const fidl::WireResult result = client()->GetFlags();
   if (result.ok()) {
     if (result->is_error()) {
@@ -721,7 +726,7 @@ zx_status_t Remote<Protocol>::FlagsGet(uint64_t* out_flags) {
 
 template <typename Protocol>
 zx_status_t Remote<Protocol>::FlagsSet(uint64_t flags) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
   const fidl::WireResult result = client()->SetFlags(fio::wire::Flags{flags});
   if (result.ok()) {
     if (result->is_error()) {
@@ -1131,7 +1136,7 @@ class Directory : public Remote<fio::Directory> {
       open_options = options_builder.Build();
     }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
     const fidl::Status result =
         client()->Open(fidl::StringView::FromExternal(path, path_len),
                        fio::Flags::kFlagSendRepresentation | fio::Flags{flags}, open_options,
@@ -1655,13 +1660,12 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     out->rdev = in.mutable_attributes.rdev();
     out->has.rdev = true;
   }
-#endif
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (in.immutable_attributes.has_change_time()) {
     out->change_time = in.immutable_attributes.change_time();
     out->has.change_time = true;
   }
-
+#endif
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (in.mutable_attributes.has_casefold()) {
     out->casefold = in.mutable_attributes.casefold();
     out->has.casefold = true;

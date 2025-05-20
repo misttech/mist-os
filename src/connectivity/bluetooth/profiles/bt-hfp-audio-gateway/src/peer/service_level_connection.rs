@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use at_commands::{DeserializeBytes, SerDe};
+use bt_hfp::codec_id::CodecId;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use fuchsia_async::Timer;
@@ -21,7 +22,7 @@ use super::procedure::{IProcedure, Procedure, ProcedureError, ProcedureMarker, P
 use super::slc_request::SlcRequest;
 use super::update::AgUpdate;
 
-use crate::features::{AgFeatures, CodecId, HfFeatures};
+use crate::features::{AgFeatures, HfFeatures};
 use crate::inspect::ServiceLevelConnectionInspect;
 
 /// The maximum number of concurrent procedures currently supported by this SLC.

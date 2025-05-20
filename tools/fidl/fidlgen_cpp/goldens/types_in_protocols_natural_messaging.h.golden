@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.typesinprotocols/cpp/markers.h>
 #include <fidl/test.typesinprotocols/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -15,10 +17,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-namespace fidl {
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::OneWayBasic> {
@@ -317,13 +315,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::E
   using Request = ::test_typesinprotocols::Resource;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic> final : public ::test_typesinprotocols::Basic {
  public:
   using ::test_typesinprotocols::Basic::Basic;
-  Response(::test_typesinprotocols::Basic v) : Basic(std::move(v)) {}
+  Response(::test_typesinprotocols::Basic v);
 };
 
 template <>
@@ -339,7 +335,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorBasic> final : public ::fit::result<uint32_t, ::test_typesinprotocols::Basic> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::Basic>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::Basic> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::Basic> v);
   Response() = delete;
 };
 template <>
@@ -347,13 +343,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorBasicResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorBasic>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorBasic>& m);
 };
 
 template <>
@@ -369,7 +359,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayCompound> final : public ::test_typesinprotocols::Compound {
  public:
   using ::test_typesinprotocols::Compound::Compound;
-  Response(::test_typesinprotocols::Compound v) : Compound(std::move(v)) {}
+  Response(::test_typesinprotocols::Compound v);
 };
 
 template <>
@@ -385,7 +375,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorCompound> final : public ::fit::result<uint32_t, ::test_typesinprotocols::Compound> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::Compound>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::Compound> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::Compound> v);
   Response() = delete;
 };
 template <>
@@ -393,13 +383,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorCompoundResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorCompound>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorCompound>& m);
 };
 
 template <>
@@ -415,7 +399,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayArrayBasic> final : public ::test_typesinprotocols::ArrayBasic {
  public:
   using ::test_typesinprotocols::ArrayBasic::ArrayBasic;
-  Response(::test_typesinprotocols::ArrayBasic v) : ArrayBasic(std::move(v)) {}
+  Response(::test_typesinprotocols::ArrayBasic v);
 };
 
 template <>
@@ -431,7 +415,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayBasic> final : public ::fit::result<uint32_t, ::test_typesinprotocols::ArrayBasic> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::ArrayBasic>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::ArrayBasic> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::ArrayBasic> v);
   Response() = delete;
 };
 template <>
@@ -439,13 +423,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayBasicResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayBasic>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayBasic>& m);
 };
 
 template <>
@@ -461,7 +439,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayArrayCompound> final : public ::test_typesinprotocols::ArrayCompound {
  public:
   using ::test_typesinprotocols::ArrayCompound::ArrayCompound;
-  Response(::test_typesinprotocols::ArrayCompound v) : ArrayCompound(std::move(v)) {}
+  Response(::test_typesinprotocols::ArrayCompound v);
 };
 
 template <>
@@ -477,7 +455,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayCompound> final : public ::fit::result<uint32_t, ::test_typesinprotocols::ArrayCompound> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::ArrayCompound>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::ArrayCompound> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::ArrayCompound> v);
   Response() = delete;
 };
 template <>
@@ -485,13 +463,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayCompoundResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayCompound>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayCompound>& m);
 };
 
 template <>
@@ -507,7 +479,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayVectorBasic> final : public ::test_typesinprotocols::VectorBasic {
  public:
   using ::test_typesinprotocols::VectorBasic::VectorBasic;
-  Response(::test_typesinprotocols::VectorBasic v) : VectorBasic(std::move(v)) {}
+  Response(::test_typesinprotocols::VectorBasic v);
 };
 
 template <>
@@ -523,7 +495,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorBasic> final : public ::fit::result<uint32_t, ::test_typesinprotocols::VectorBasic> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::VectorBasic>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::VectorBasic> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::VectorBasic> v);
   Response() = delete;
 };
 template <>
@@ -531,13 +503,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorBasicResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorBasic>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorBasic>& m);
 };
 
 template <>
@@ -553,7 +519,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayVectorCompound> final : public ::test_typesinprotocols::VectorCompound {
  public:
   using ::test_typesinprotocols::VectorCompound::VectorCompound;
-  Response(::test_typesinprotocols::VectorCompound v) : VectorCompound(std::move(v)) {}
+  Response(::test_typesinprotocols::VectorCompound v);
 };
 
 template <>
@@ -569,7 +535,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorCompound> final : public ::fit::result<uint32_t, ::test_typesinprotocols::VectorCompound> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::VectorCompound>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::VectorCompound> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::VectorCompound> v);
   Response() = delete;
 };
 template <>
@@ -577,13 +543,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorCompoundResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorCompound>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorCompound>& m);
 };
 
 template <>
@@ -599,7 +559,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayVectorOptional> final : public ::test_typesinprotocols::VectorOptional {
  public:
   using ::test_typesinprotocols::VectorOptional::VectorOptional;
-  Response(::test_typesinprotocols::VectorOptional v) : VectorOptional(std::move(v)) {}
+  Response(::test_typesinprotocols::VectorOptional v);
 };
 
 template <>
@@ -615,7 +575,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorOptional> final : public ::fit::result<uint32_t, ::test_typesinprotocols::VectorOptional> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::VectorOptional>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::VectorOptional> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::VectorOptional> v);
   Response() = delete;
 };
 template <>
@@ -623,13 +583,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorVectorOptionalResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorOptional>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorVectorOptional>& m);
 };
 
 template <>
@@ -645,7 +599,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested> final : public ::test_typesinprotocols::ArrayVectorNested {
  public:
   using ::test_typesinprotocols::ArrayVectorNested::ArrayVectorNested;
-  Response(::test_typesinprotocols::ArrayVectorNested v) : ArrayVectorNested(std::move(v)) {}
+  Response(::test_typesinprotocols::ArrayVectorNested v);
 };
 
 template <>
@@ -661,7 +615,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayVectorNested> final : public ::fit::result<uint32_t, ::test_typesinprotocols::ArrayVectorNested> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::ArrayVectorNested>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::ArrayVectorNested> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::ArrayVectorNested> v);
   Response() = delete;
 };
 template <>
@@ -669,13 +623,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>& m);
 };
 
 template <>
@@ -691,7 +639,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource> final : public ::test_typesinprotocols::Resource {
  public:
   using ::test_typesinprotocols::Resource::Resource;
-  Response(::test_typesinprotocols::Resource v) : Resource(std::move(v)) {}
+  Response(::test_typesinprotocols::Resource v);
 };
 
 template <>
@@ -707,7 +655,7 @@ template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::ErrorResource> final : public ::fit::result<uint32_t, ::test_typesinprotocols::Resource> {
  public:
   using ::fit::result<uint32_t, ::test_typesinprotocols::Resource>::result;
-  Response(::fit::result<uint32_t, ::test_typesinprotocols::Resource> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_typesinprotocols::Resource> v);
   Response() = delete;
 };
 template <>
@@ -715,13 +663,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protoc
   using DomainObject = ::test_typesinprotocols::ProtocolErrorResourceResult;
 
  public:
-  static DomainObject IntoDomainObject(::fidl::Response<::test_typesinprotocols::Protocol::ErrorResource> m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(::fidl::Response<::test_typesinprotocols::Protocol::ErrorResource> m);
 };
 
 template <>
@@ -792,10 +734,6 @@ class ::fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol> fin
   ::fit::result<::fidl::OneWayError> OneWayResource(::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource> request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>> {
@@ -855,15 +793,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>
   ::fit::result<::fidl::OneWayError> OneWayResource(::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource> request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_typesinprotocols::Protocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_typesinprotocols::Protocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_typesinprotocols::Protocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_typesinprotocols::Protocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -886,15 +817,15 @@ class ::fidl::AsyncEventHandler<::test_typesinprotocols::Protocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_typesinprotocols::Protocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void EventBasic(::fidl::Event<::test_typesinprotocols::Protocol::EventBasic>&) override {}
-  void EventCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventCompound>&) override {}
-  void EventArrayBasic(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayBasic>&) override {}
-  void EventArrayCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayCompound>&) override {}
-  void EventVectorBasic(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorBasic>&) override {}
-  void EventVectorCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorCompound>&) override {}
-  void EventVectorOptional(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorOptional>&) override {}
-  void EventArrayVectorNested(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayVectorNested>&) override {}
-  void EventResource(::fidl::Event<::test_typesinprotocols::Protocol::EventResource>&) override {}
+  void EventBasic(::fidl::Event<::test_typesinprotocols::Protocol::EventBasic>&) override;
+  void EventCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventCompound>&) override;
+  void EventArrayBasic(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayBasic>&) override;
+  void EventArrayCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayCompound>&) override;
+  void EventVectorBasic(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorBasic>&) override;
+  void EventVectorCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorCompound>&) override;
+  void EventVectorOptional(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorOptional>&) override;
+  void EventArrayVectorNested(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayVectorNested>&) override;
+  void EventResource(::fidl::Event<::test_typesinprotocols::Protocol::EventResource>&) override;
 };
 
 template <>
@@ -913,16 +844,12 @@ class ::fidl::SyncEventHandler<::test_typesinprotocols::Protocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_typesinprotocols::Protocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_typesinprotocols::Protocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_typesinprotocols::Protocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_typesinprotocols::Protocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_typesinprotocols::Protocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -971,8 +898,6 @@ class ::fidl::internal::NaturalEventSender<::test_typesinprotocols::Protocol>
 
   ::fit::result<::fidl::OneWayError> EventResource(::test_typesinprotocols::Resource payload);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayBasic> : public ::fidl::CompleterBase {
@@ -1307,19 +1232,13 @@ class ::fidl::Server<::test_typesinprotocols::Protocol> : public ::fidl::interna
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_typesinprotocols::Protocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protocol> final {
@@ -1335,6 +1254,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protoc
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

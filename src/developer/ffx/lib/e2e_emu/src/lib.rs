@@ -11,13 +11,13 @@ use ffx_executor::FfxExecutor;
 use ffx_isolate::Isolate;
 use futures::channel::mpsc::TrySendError;
 use futures::{Stream, StreamExt};
+use log::info;
 use serde::Deserialize;
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use tempfile::TempDir;
-use tracing::info;
 
 /// An isolated environment for testing ffx against a running emulator.
 pub struct IsolatedEmulator {
@@ -52,7 +52,7 @@ impl IsolatedEmulator {
     ) -> anyhow::Result<Self> {
         let emu_name = format!("{name}-emu");
 
-        info!(%name, "making ffx isolate");
+        info!(name:% = name; "making ffx isolate");
         let temp_dir = tempfile::TempDir::new().context("making temp dir")?;
 
         // Start with the non-isolated environment context - then build the isolate.
@@ -356,14 +356,14 @@ impl IsolatedEmulator {
         match self.ffx(&["repository", "server", "stop", &self.package_server_name]).await {
             Ok(_) => (),
             Err(e) => {
-                tracing::error!("Error stopping repo server {}: {e}.", self.package_server_name)
+                log::error!("Error stopping repo server {}: {e}.", self.package_server_name)
             }
         };
 
         match self.ffx(&["emu", "stop", &self.emu_name]).await {
             Ok(()) => return,
             Err(e) => {
-                tracing::error!("Error stopping {}: {e}.", self.emu_name);
+                log::error!("Error stopping {}: {e}.", self.emu_name);
             }
         }
     }

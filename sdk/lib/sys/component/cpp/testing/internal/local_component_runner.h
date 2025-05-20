@@ -78,7 +78,7 @@ class LocalComponentInstance final : public fuchsia::component::runner::Componen
   // immediately call `LocalComponentInstance::Exit()`. It will save the
   // provided status, and call `LocalComponentInstance::Exit()` after the
   // component has `started_`.
-  cpp17::optional<zx_status_t> pending_exit_status_;
+  std::optional<zx_status_t> pending_exit_status_;
 
   // Set to true at the beginning of `Start()`, and false at the completion
   // of `Start()`.
@@ -144,7 +144,7 @@ class LocalComponentInstance final : public fuchsia::component::runner::Componen
   // immediately call `LocalComponentInstance::Exit()`. It will save the
   // provided status, and call `LocalComponentInstance::Exit()` after the
   // component has `started_`.
-  cpp17::optional<zx_status_t> pending_exit_status_;
+  std::optional<zx_status_t> pending_exit_status_;
 
   // Set to true at the beginning of `Start()`, and false at the completion
   // of `Start()`.

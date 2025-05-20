@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 library test.suspendcontrol;
-using fuchsia.hardware.suspend;
+using fuchsia.hardware.power.suspend;
 using zx;
 
 type SuspendResult = table {
-    1: reason fuchsia.hardware.suspend.WakeReason;
+    1: reason fuchsia.hardware.power.suspend.WakeReason;
     2: suspend_duration zx.Duration;
     3: suspend_overhead zx.Duration;
 };
@@ -16,7 +16,7 @@ type SuspendResult = table {
 closed protocol Device {
     strict SetSuspendStates(table {
         1: suspend_states
-                vector<fuchsia.hardware.suspend.SuspendState>:fuchsia.hardware.suspend.MAX_SUSPEND_STATES;
+                vector<fuchsia.hardware.power.suspend.SuspendState>:fuchsia.hardware.power.suspend.MAX_SUSPEND_STATES;
     }) -> () error zx.Status;
 
     strict AwaitSuspend() -> (table {

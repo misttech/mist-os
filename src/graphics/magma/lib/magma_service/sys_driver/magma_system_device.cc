@@ -28,14 +28,14 @@ MagmaSystemDevice::~MagmaSystemDevice() {
 
 std::unique_ptr<msd::internal::PrimaryFidlServer> MagmaSystemDevice::Open(
     msd_client_id_t client_id, fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
-    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
+    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification, MagmaClientType client_type) {
   std::unique_ptr<msd::Connection> msd_connection = msd_dev()->Open(client_id);
   if (!msd_connection)
     return MAGMA_DRETP(nullptr, "msd_device_open failed");
 
   return msd::internal::PrimaryFidlServer::Create(
       std::make_unique<MagmaSystemConnection>(this, std::move(msd_connection)), client_id,
-      std::move(primary), std::move(notification));
+      std::move(primary), std::move(notification), client_type);
 }
 
 void MagmaSystemDevice::StartConnectionThread(
@@ -109,6 +109,11 @@ magma::Status MagmaSystemDevice::Query(uint64_t id, magma_handle_t* result_buffe
 
 magma_status_t MagmaSystemDevice::GetIcdList(std::vector<MsdIcdInfo>* icd_list_out) {
   return msd_dev()->GetIcdList(icd_list_out);
+}
+
+void MagmaSystemDevice::SetPowerState(int64_t power_state,
+                                      fit::callback<void(magma_status_t)> completer) {
+  msd_dev()->SetPowerState(power_state, std::move(completer));
 }
 
 }  // namespace msd

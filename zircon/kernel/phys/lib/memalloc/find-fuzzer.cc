@@ -4,12 +4,12 @@
 
 #include <lib/memalloc/range.h>
 #include <lib/memalloc/testing/range.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <vector>
 
 #include <fuzzer/FuzzedDataProvider.h>
@@ -42,7 +42,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   const Action action = provider.ConsumeEnum<Action>();
   std::vector<std::byte> bytes = provider.ConsumeRemainingBytes<std::byte>();
-  cpp20::span<Range> ranges = RangesFromBytes(bytes);
+  std::span<Range> ranges = RangesFromBytes(bytes);
 
   // Whether we are to exercise FindNormalizedRamRanges().
   if (action == Action::kFindRam || action == Action::kFindBothAndCompare) {

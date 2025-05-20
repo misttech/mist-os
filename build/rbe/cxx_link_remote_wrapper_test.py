@@ -175,39 +175,6 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
                 [fake_builddir / crash_dir],
             )
 
-    def test_thin_lto_local_only(self) -> None:
-        fake_root = Path("/usr/project")
-        fake_builddir = Path("build-it")
-        fake_cwd = fake_root / fake_builddir
-        compiler = Path("clang++")
-        source = Path("hello.o")
-        output = Path("hello")
-        command = _strs(
-            [
-                compiler,
-                "--target=riscv64-apple-darwin21",
-                "-flto=thin",
-                source,
-                "-o",
-                output,
-            ]
-        )
-        with mock.patch.object(remote_action, "PROJECT_ROOT", fake_root):
-            c = cxx_link_remote_wrapper.CxxLinkRemoteAction(
-                ["--", *command],
-                working_dir=fake_cwd,
-                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
-                auto_reproxy=False,
-            )
-            self.assertTrue(c.local_only)
-            with mock.patch.object(
-                cxx_link_remote_wrapper.CxxLinkRemoteAction,
-                "_run_locally",
-                return_value=0,
-            ) as mock_run:
-                self.assertEqual(c.run(), 0)
-            mock_run.assert_called_once_with()
-
     def test_remote_flag_back_propagating(self) -> None:
         compiler = Path("clang++")
         source = Path("hello.o")

@@ -69,6 +69,7 @@
 #include <platform/halt_helper.h>
 #include <platform/halt_token.h>
 #include <platform/timer.h>
+#include <vm/handoff-end.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>

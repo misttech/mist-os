@@ -385,7 +385,7 @@ macro_rules! fileops_impl_memory {
         }
     }
 }
-pub(crate) use fileops_impl_memory;
+pub use fileops_impl_memory;
 
 impl FileOps for MemoryRegularFile {
     fileops_impl_memory!(self, &self.memory);

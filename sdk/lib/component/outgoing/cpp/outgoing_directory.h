@@ -13,7 +13,6 @@
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/function.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/svc/dir.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -156,7 +155,7 @@ class OutgoingDirectory final {
   template <typename Protocol, typename ServerImpl,
             typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> AddProtocol(std::unique_ptr<ServerImpl> impl,
-                           cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+                           std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     return AddProtocolAt<Protocol>(kServiceDirectory, std::move(impl), name);
   }
 
@@ -172,7 +171,7 @@ class OutgoingDirectory final {
   template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> AddUnmanagedProtocol(
       TypedHandler<Protocol> handler,
-      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+      std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
 
     return AddUnmanagedProtocolAt<Protocol>(kServiceDirectory, std::move(handler), name);
@@ -180,14 +179,14 @@ class OutgoingDirectory final {
 
   // Same as above but is untyped. This method is generally discouraged but
   // is made available if a generic handler needs to be provided.
-  zx::result<> AddUnmanagedProtocol(AnyHandler handler, cpp17::string_view name);
+  zx::result<> AddUnmanagedProtocol(AnyHandler handler, std::string_view name);
 
   // Same as |AddProtocol| but allows setting the parent directory in
   // which the protocol will be installed.
   template <typename Protocol, typename ServerImpl,
             typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
-  zx::result<> AddProtocolAt(cpp17::string_view path, std::unique_ptr<ServerImpl> impl,
-                             cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  zx::result<> AddProtocolAt(std::string_view path, std::unique_ptr<ServerImpl> impl,
+                             std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
     if (impl == nullptr || inner().dispatcher_ == nullptr) {
       return zx::error(ZX_ERR_INVALID_ARGS);
@@ -213,8 +212,8 @@ class OutgoingDirectory final {
   // setting the parent directory in which the protocol will be installed.
   template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
   zx::result<> AddUnmanagedProtocolAt(
-      cpp17::string_view path, TypedHandler<Protocol> handler,
-      cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+      std::string_view path, TypedHandler<Protocol> handler,
+      std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     static_assert(fidl::IsProtocol<Protocol>(), "Type of |Protocol| must be FIDL protocol");
 
     auto bridge_func = [handler = std::move(handler)](zx::channel request) {
@@ -227,8 +226,8 @@ class OutgoingDirectory final {
 
   // Same as |AddProtocol| but is untyped and allows the usage of setting the
   // parent directory in which the protocol will be installed.
-  zx::result<> AddUnmanagedProtocolAt(AnyHandler handler, cpp17::string_view path,
-                                      cpp17::string_view name);
+  zx::result<> AddUnmanagedProtocolAt(AnyHandler handler, std::string_view path,
+                                      std::string_view name);
 
   // Adds an instance of a FIDL Service.
   //
@@ -250,28 +249,28 @@ class OutgoingDirectory final {
   // //sdk/lib/sys/component/cpp/outgoing_directory_test.cc
   template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
   zx::result<> AddService(ServiceInstanceHandler handler,
-                          cpp17::string_view instance = kDefaultServiceInstance) {
+                          std::string_view instance = kDefaultServiceInstance) {
     static_assert(fidl::IsService<Service>(), "Type of |Service| must be FIDL service");
 
     return AddService(std::move(handler), Service::Name, instance);
   }
 
   // Same as above but is untyped.
-  zx::result<> AddService(ServiceInstanceHandler handler, cpp17::string_view service,
-                          cpp17::string_view instance = kDefaultServiceInstance);
+  zx::result<> AddService(ServiceInstanceHandler handler, std::string_view service,
+                          std::string_view instance = kDefaultServiceInstance);
 
   template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
-  zx::result<> AddServiceAt(ServiceInstanceHandler handler, cpp17::string_view path,
-                            cpp17::string_view instance = kDefaultServiceInstance) {
+  zx::result<> AddServiceAt(ServiceInstanceHandler handler, std::string_view path,
+                            std::string_view instance = kDefaultServiceInstance) {
     static_assert(fidl::IsService<Service>(), "Type of |Service| must be FIDL service");
 
     return AddServiceAt(std::move(handler), path, Service::Name, instance);
   }
 
   // Same as above but is untyped.
-  zx::result<> AddServiceAt(ServiceInstanceHandler handler, cpp17::string_view path,
-                            cpp17::string_view service,
-                            cpp17::string_view instance = kDefaultServiceInstance);
+  zx::result<> AddServiceAt(ServiceInstanceHandler handler, std::string_view path,
+                            std::string_view service,
+                            std::string_view instance = kDefaultServiceInstance);
 
   // Serve a subdirectory at the root of this outgoing directory.
   //
@@ -287,12 +286,12 @@ class OutgoingDirectory final {
   //
   // ZX_ERR_INVALID_ARGS: |directory_name| is an empty string.
   zx::result<> AddDirectory(fidl::ClientEnd<fuchsia_io::Directory> remote_dir,
-                            cpp17::string_view directory_name);
+                            std::string_view directory_name);
 
   // Same as |AddDirectory| but allows setting the parent directory
   // in which the directory will be installed.
   zx::result<> AddDirectoryAt(fidl::ClientEnd<fuchsia_io::Directory> remote_dir,
-                              cpp17::string_view path, cpp17::string_view directory_name);
+                              std::string_view path, std::string_view directory_name);
 
   // Removes a FIDL Protocol entry with the path `/svc/{name}`.
   //
@@ -309,12 +308,12 @@ class OutgoingDirectory final {
   // outgoing.RemoveProtocol<lib_example::MyProtocol>();
   // ```
   template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
-  zx::result<> RemoveProtocol(cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  zx::result<> RemoveProtocol(std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     return RemoveProtocol(name);
   }
 
   // Same as above but untyped.
-  zx::result<> RemoveProtocol(cpp17::string_view name);
+  zx::result<> RemoveProtocol(std::string_view name);
 
   // Removes a FIDL Protocol entry located in the provided |directory|.
   // Unlike |RemoveProtocol| which looks for the protocol to remove in the
@@ -331,13 +330,13 @@ class OutgoingDirectory final {
   // outgoing.RemoveProtocolAt<lib_example::MyProtocol>("diagnostics");
   // ```
   template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
-  zx::result<> RemoveProtocolAt(
-      cpp17::string_view path, cpp17::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  zx::result<> RemoveProtocolAt(std::string_view path,
+                                std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
     return RemoveProtocolAt(path, name);
   }
 
   // Same as above but untyped.
-  zx::result<> RemoveProtocolAt(cpp17::string_view directory, cpp17::string_view name);
+  zx::result<> RemoveProtocolAt(std::string_view directory, std::string_view name);
 
   // Removes an instance of a FIDL Service.
   //
@@ -354,34 +353,34 @@ class OutgoingDirectory final {
   // outgoing.RemoveService<lib_example::MyService>("my-instance");
   // ```
   template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
-  zx::result<> RemoveService(cpp17::string_view instance = kDefaultServiceInstance) {
+  zx::result<> RemoveService(std::string_view instance = kDefaultServiceInstance) {
     return RemoveService(Service::Name, instance);
   }
 
   // Same as above but untyped.
-  zx::result<> RemoveService(cpp17::string_view service,
-                             cpp17::string_view instance = kDefaultServiceInstance);
+  zx::result<> RemoveService(std::string_view service,
+                             std::string_view instance = kDefaultServiceInstance);
 
   template <typename Service, typename = std::enable_if_t<fidl::IsServiceV<Service>>>
-  zx::result<> RemoveServiceAt(cpp17::string_view path,
-                               cpp17::string_view instance = kDefaultServiceInstance) {
+  zx::result<> RemoveServiceAt(std::string_view path,
+                               std::string_view instance = kDefaultServiceInstance) {
     return RemoveServiceAt(path, Service::Name, instance);
   }
 
-  zx::result<> RemoveServiceAt(cpp17::string_view path, cpp17::string_view service,
-                               cpp17::string_view instance);
+  zx::result<> RemoveServiceAt(std::string_view path, std::string_view service,
+                               std::string_view instance);
 
   // Removes the subdirectory on the provided |directory_name|.
   //
   // # Errors
   //
   // ZX_ERR_NOT_FOUND: No entry was found with provided name.
-  zx::result<> RemoveDirectory(cpp17::string_view directory_name);
+  zx::result<> RemoveDirectory(std::string_view directory_name);
 
   // Same as |RemoveDirectory| but allows specifying the parent directory
   // that the directory will be removed from. The parent directory, |path|,
   // will not be removed.
-  zx::result<> RemoveDirectoryAt(cpp17::string_view path, cpp17::string_view directory_name);
+  zx::result<> RemoveDirectoryAt(std::string_view path, std::string_view directory_name);
 
  private:
   // |svc_dir_add_service_by_path| takes in a void* |context| that is passed to
@@ -406,7 +405,7 @@ class OutgoingDirectory final {
                                              const std::string& name,
                                              UnbindConnectionCallback callback);
 
-  void UnbindAllConnections(cpp17::string_view name);
+  void UnbindAllConnections(std::string_view name);
 
   static std::string MakePath(std::vector<std::string_view> strings);
 

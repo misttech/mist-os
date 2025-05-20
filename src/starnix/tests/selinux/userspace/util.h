@@ -12,14 +12,13 @@
 
 #include <gmock/gmock.h>
 
-/// Loads the policy |name|.
-void LoadPolicy(const std::string& name);
+#include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
 
 /// Writes `data` to the file at `path`, returning the `errno` if any part of that process fails.
 fit::result<int> WriteExistingFile(const std::string& path, std::string_view data);
 
 /// Reads the contents of the file at `path`.
-fit::result<int, std::string> ReadFile(const std::string_view& path);
+fit::result<int, std::string> ReadFile(const std::string& path);
 
 /// Reads the specified security attribute (e.g. "current", "exec", etc) for the current task.
 fit::result<int, std::string> ReadTaskAttr(std::string_view attr_name);
@@ -83,6 +82,20 @@ class ScopedEnforcement {
   std::string previous_state_;
 };
 
+class ScopedTaskAttrResetter {
+ public:
+  /// Sets the specified security attribute for the current task while in scope, and restores its
+  /// previous value when deleted.  Callers should asssign the returned value and
+  /// `ASSERT_TRUE(is_ok())`.
+  static ScopedTaskAttrResetter SetTaskAttr(std::string_view attr_name, std::string_view new_value);
+  ~ScopedTaskAttrResetter();
+
+ private:
+  explicit ScopedTaskAttrResetter(std::string_view attr_name, std::string_view old_value);
+  std::string attr_name_;
+  std::string old_value_;
+};
+
 MATCHER_P(IsOk, expected_value, std::string("fit::result<> is fit::ok(") + expected_value + ")") {
   if (arg.is_error()) {
     *result_listener << "failed with error: " << arg.error_value();
@@ -90,27 +103,6 @@ MATCHER_P(IsOk, expected_value, std::string("fit::result<> is fit::ok(") + expec
   }
   ::testing::Matcher<fit::result<int, std::string>> expected = ::testing::Eq(expected_value);
   return expected.MatchAndExplain(arg, result_listener);
-}
-
-MATCHER(SyscallSucceeds, "syscall succeeds") {
-  if (arg != -1) {
-    return true;
-  }
-  *result_listener << "syscall failed with error " << strerror(errno);
-  return false;
-}
-
-MATCHER_P(SyscallFailsWithErrno, expected_errno,
-          std::string("syscall fails with error ") + strerror(expected_errno)) {
-  if (arg != -1) {
-    *result_listener << "syscall succeeded";
-    return false;
-  } else if (errno == expected_errno) {
-    return true;
-  } else {
-    *result_listener << "syscall failed with error " << strerror(errno);
-    return false;
-  }
 }
 
 namespace fit {

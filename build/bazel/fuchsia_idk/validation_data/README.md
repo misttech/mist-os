@@ -1,8 +1,8 @@
 # fuchsia_idk_repository() validation data
 
 This directory contains data that is used to validate the script
-at `//build/bazel/fuchsia_idk/generate_repository.py` which
-parses an input IDK, that follows the official IDK layout, and
+at `//build/bazel/fuchsia_idk/generate_repository.py`, which
+parses an input IDK that follows the official IDK layout and
 creates a new output IDK directory with atom metadata files that
 use Bazel target labels, instead of relative file paths, to
 reference Ninja-generated artifacts.
@@ -78,7 +78,7 @@ archive used for the documentation atom.
 
 # Usage
 
-The `//build/bazel/fuchsia_idk:regression_test` target can be built to
+The `//build/bazel/fuchsia_idk:integration_test` target can be built to
 run, at build time, the validation script, which invokes
 `generate_repository.py` to generate a new output IDK, and compare its
 results with the content of `expected_idk`.

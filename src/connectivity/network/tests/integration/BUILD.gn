@@ -7,6 +7,7 @@ import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/lib/testing/sharding/fuchsia_sharded_test_package.gni")
 
 tests = [
   {
@@ -48,6 +49,7 @@ tests = [
       "//src/connectivity/network/dns:component_with_fake_time",
       "//src/connectivity/policy/netcfg:component-advanced",
       "//src/connectivity/policy/netcfg:component-basic",
+      "//src/connectivity/policy/socket-proxy:component",
       "//src/connectivity/policy/tests/integration:netcfg-netemul-configs",
       "//src/lib/fake-clock/svc",
       "//src/sys/stash:stash_secure_v2",
@@ -91,11 +93,13 @@ tests = [
   {
     label = "socket"
     err_logs = true
+    long = true
   },
   {
     label = "multicast-forwarding"
     err_logs = true
     long = true
+    log_less = true
   },
 ]
 
@@ -107,8 +111,17 @@ common_package_deps = [
   "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
 
   # netstack3 is commonly under test.
-  "//src/connectivity/network/netstack3:component-debug",
   "//src/connectivity/network/netstack3:component-for-tests",
+]
+
+non_log_less_package_deps =
+    [ "//src/connectivity/network/netstack3:component-debug" ]
+
+log_less_package_deps = [
+  # :component-debug-less-logs is used instead of :component-debug to avoid
+  # forcing DEBUG logs to be included, which are too verbose and cause some
+  # longer suites to time out.
+  "//src/connectivity/network/netstack3:component-debug-less-logs",
 ]
 
 # RISC-V on Fuchsia does not support Golang.
@@ -143,6 +156,11 @@ foreach(test, tests) {
   if (defined(test.package_deps)) {
     _package_deps += test.package_deps
   }
+  if (defined(test.log_less) && test.log_less) {
+    _package_deps += log_less_package_deps
+  } else {
+    _package_deps += non_log_less_package_deps
+  }
   _subpackages = []
   if (defined(test.subpackages)) {
     _subpackages += test.subpackages
@@ -170,53 +188,83 @@ foreach(test, tests) {
 
     all_test_packages += [ ":${_package_label}" ]
   } else {
-    fuchsia_test_component(_component_label) {
-      component_name = _name
-      manifest = "meta/${_name}.cml"
-      deps = [ test.label ]
-    }
+    _no_err_logs_name = "${_name}-no-err-logs"
+    _with_err_logs_name = "${_name}-with-err-logs"
 
-    _no_err_logs_package_name = "${_name}-no-err-logs"
-    fuchsia_test_with_expectations_package(_no_err_logs_package_name) {
-      test_components = [ ":${_component_label}" ]
-      expectations = "expects/${_name}.json5"
-      treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
-      deps = _package_deps
-      subpackages = _subpackages
-      if (_long) {
+    if (_long) {
+      _component_attributes = {
+      }
+      _component_attributes = {
+        manifest = "meta/${_name}.cml"
+        deps = [ test.label ]
+        expectations = "expects/${_name}.json5"
+        num_shards = 10
+
+        # Matches the first `::`-delimited section of the test case name,
+        # or the whole name if there are no `::` delimiters.
+        shard_part_regex = "([^::]+)(?:::.*)?"
+      }
+
+      fuchsia_sharded_test_package(_no_err_logs_name) {
+        test_components = [
+          {
+            forward_variables_from(_component_attributes, "*")
+            name = _no_err_logs_name
+            treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+          },
+        ]
+        deps = _package_deps
+        subpackages = _subpackages
+      }
+      fuchsia_sharded_test_package(_with_err_logs_name) {
+        test_components = [
+          {
+            forward_variables_from(_component_attributes, "*")
+            name = _with_err_logs_name
+            treatment_of_cases_with_error_logs =
+                "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+          },
+        ]
+        deps = _package_deps
+        subpackages = _subpackages
         test_specs = {
-          # Longer timeout to reduce flake (https://fxbug.dev/42055260)
-          timeout_secs = 720
+          log_settings = {
+            max_severity = "ERROR"
+          }
         }
       }
-    }
-    _with_err_logs_package_name = "${_name}-with-err-logs"
-    fuchsia_test_with_expectations_package(_with_err_logs_package_name) {
-      test_components = [ ":${_component_label}" ]
-      expectations = "expects/${_name}.json5"
-      treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
-      deps = _package_deps
-      subpackages = _subpackages
-      test_specs = {
-        log_settings = {
-          max_severity = "ERROR"
-        }
-        if (_long) {
-          # Longer timeout to reduce flake (https://fxbug.dev/42055260)
-          timeout_secs = 720
+    } else {
+      fuchsia_test_component(_component_label) {
+        component_name = _name
+        manifest = "meta/${_name}.cml"
+        deps = [ test.label ]
+      }
+
+      fuchsia_test_with_expectations_package(_no_err_logs_name) {
+        test_components = [ ":${_component_label}" ]
+        expectations = "expects/${_name}.json5"
+        treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+        deps = _package_deps
+        subpackages = _subpackages
+      }
+      fuchsia_test_with_expectations_package(_with_err_logs_name) {
+        test_components = [ ":${_component_label}" ]
+        expectations = "expects/${_name}.json5"
+        treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+        deps = _package_deps
+        subpackages = _subpackages
+        test_specs = {
+          log_settings = {
+            max_severity = "ERROR"
+          }
         }
       }
     }
 
-    # TODO(https://fxbug.dev/42055260): Re-enable these tests when they pass
-    # in the coverage builders.
-    _skip = _long && is_coverage
-    if (!_skip) {
-      all_test_packages += [
-        ":${_no_err_logs_package_name}",
-        ":${_with_err_logs_package_name}",
-      ]
-    }
+    all_test_packages += [
+      ":${_no_err_logs_name}",
+      ":${_with_err_logs_name}",
+    ]
   }
 }
 

@@ -19,6 +19,8 @@
 
 namespace {
 
+using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
+
 constexpr size_t kTestAspaceSize = (1UL << 48);
 constexpr size_t kTestVirtualAddress = (1UL << 30);  // arbitrary address
 
@@ -46,8 +48,7 @@ bool arm64_test_perms() {
     // FUTURE ENHANCEMENT: use a private api to read the terminal page table entry
     // and validate the bits that were set.
 
-    EXPECT_EQ(ZX_OK,
-              aspace.Unmap(kTestVirtualAddress, 1, ArchVmAspace::EnlargeOperation::No, &count));
+    EXPECT_EQ(ZX_OK, aspace.Unmap(kTestVirtualAddress, 1, ArchUnmapOptions::None, &count));
     EXPECT_EQ(1u, count);
 
     return all_ok;

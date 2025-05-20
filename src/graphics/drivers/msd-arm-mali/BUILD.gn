@@ -138,7 +138,6 @@ group("tests") {
   public_deps = [
     ":msd_arm_bind_test",
     "tests",
-    "tools:mali-util-test",
   ]
 }
 

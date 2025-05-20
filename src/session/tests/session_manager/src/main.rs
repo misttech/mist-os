@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 use tsc::DeviceProxy;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_io as fio,
+    fidl_fuchsia_hardware_power_suspend as fhsuspend, fidl_fuchsia_io as fio,
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session as fsession,
     fidl_fuchsia_session_power as fpower, fidl_fuchsia_sys2 as fsys2,

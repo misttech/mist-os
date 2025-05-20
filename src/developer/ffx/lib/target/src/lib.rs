@@ -5,8 +5,8 @@ use addr::TargetIpAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
 use errors::ffx_bail;
-use ffx_config::keys::TARGET_DEFAULT_KEY;
-use ffx_config::EnvironmentContext;
+use ffx_config::keys::{STATELESS_DEFAULT_TARGET_CONFIGURATION, TARGET_DEFAULT_KEY};
+use ffx_config::{ConfigError, ConfigLevel, EnvironmentContext};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
@@ -18,17 +18,18 @@ use fidl_fuchsia_net as net;
 use fuchsia_async::Timer;
 use futures::future::{pending, Either};
 use futures::{select, Future, FutureExt, TryStreamExt};
+use log::{debug, info};
 use std::net::IpAddr;
 use std::time::Duration;
 use target_errors::FfxTargetError;
 use thiserror::Error;
 use timeout::timeout;
-use tracing::{debug, info};
 
 #[cfg(test)]
 use mockall::predicate::*;
 
 pub mod connection;
+pub mod fho;
 pub mod ssh_connector;
 
 mod fdomain_transport;
@@ -51,17 +52,12 @@ pub use target_connector::{
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
-const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
-
-/// The default target name if no target spec is given (for debugging, reporting to the user, etc).
-/// TODO(b/371222096): Use this everywhere (will require a bit of digging).
-pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
+pub use target_errors::{UNKNOWN_TARGET_NAME, UNSPECIFIED_TARGET_NAME};
 
 /// Attempt to connect to RemoteControl on a target device using a connection to a daemon.
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
-#[tracing::instrument]
 pub async fn get_remote_proxy(
     target_spec: Option<String>,
     daemon_proxy: DaemonProxy,
@@ -95,7 +91,7 @@ pub async fn get_remote_proxy(
                     _ => {
                         let retry_info =
                             format!("Retrying connection after non-fatal error encountered: {e}");
-                        tracing::info!("{}", retry_info.as_str());
+                        log::info!("{}", retry_info.as_str());
                         // Insert a small delay to prevent too tight of a spinning loop.
                         fuchsia_async::Timer::new(Duration::from_millis(20)).await;
                         continue;
@@ -122,7 +118,7 @@ async fn get_remote_proxy_impl(
     let mut target_spec =
         resolve::maybe_locally_resolve_target_spec(target_spec.clone(), context).await?;
     let (target_proxy, target_proxy_fut) =
-        open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout, context)?;
+        open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
     let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>();
     let mut open_remote_control_fut =
@@ -177,12 +173,10 @@ async fn get_remote_proxy_impl(
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
 /// fidl table.
-#[tracing::instrument]
 pub fn open_target_with_fut<'a, 'b: 'a>(
     target: Option<String>,
     daemon_proxy: DaemonProxy,
     target_timeout: Duration,
-    env_context: &'b EnvironmentContext,
 ) -> Result<(TargetProxy, impl Future<Output = Result<()>> + 'a)> {
     let (tc_proxy, tc_server_end) = create_proxy::<TargetCollectionMarker>();
     let (target_proxy, target_server_end) = create_proxy::<TargetMarker>();
@@ -199,14 +193,6 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     };
     let t_clone = target.clone();
     let target_handle_fut = async move {
-        let is_fastboot_inline = env_context.get(FASTBOOT_INLINE_TARGET).unwrap_or(false);
-        if is_fastboot_inline {
-            if let Some(ref serial_number) = target {
-                tracing::trace!("got serial number: {serial_number}");
-                timeout(target_timeout, tc_proxy.add_inline_fastboot_target(&serial_number))
-                    .await??;
-            }
-        }
         timeout(
             target_timeout,
             tc_proxy.open_target(
@@ -232,8 +218,7 @@ pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
     // with client-side discovery. (Currently re-enabled, but I want to validate the flake before resolving
     // this bug -slgrady 8/7/24)
     // true
-    !ffx_config::is_usb_discovery_disabled(ctx).await
-        || !ffx_config::is_mdns_discovery_disabled(ctx).await
+    !ffx_config::is_usb_discovery_disabled(ctx) || !ffx_config::is_mdns_discovery_disabled(ctx)
 }
 
 #[derive(Debug, Error)]
@@ -295,20 +280,19 @@ async fn wait_for_device_inner(
     behavior: WaitFor,
 ) -> Result<(), ffx_command_error::Error> {
     let target_spec_clone = target_spec.clone();
-    let env = env.clone();
     let knock_fut = async {
         loop {
             futures_lite::future::yield_now().await;
             break match knocker.knock_rcs(target_spec_clone.clone(), &env).await {
                 Err(e) => {
-                    tracing::debug!("unable to knock target: {e:?}");
+                    log::debug!("unable to knock target: {e:?}");
                     if let WaitFor::DeviceOffline = behavior {
                         Ok(())
                     } else {
                         if let KnockError::CriticalError(e) = e {
                             Err(ffx_command_error::Error::Unexpected(e.into()))
                         } else {
-                            tracing::debug!("error non-critical. retrying.");
+                            log::debug!("error non-critical. retrying.");
                             Timer::new(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                             continue;
                         }
@@ -332,9 +316,17 @@ async fn wait_for_device_inner(
     };
     futures_lite::FutureExt::or(knock_fut, async {
         timer.await;
-        Err(ffx_command_error::Error::User(
-            FfxTargetError::DaemonError { err: DaemonError::Timeout, target: target_spec }.into(),
-        ))
+        Err(ffx_command_error::Error::User(match behavior {
+            WaitFor::DeviceOnline => {
+                FfxTargetError::DaemonError { err: DaemonError::Timeout, target: target_spec }
+                    .into()
+            }
+            WaitFor::DeviceOffline => FfxTargetError::DaemonError {
+                err: DaemonError::ShutdownTimeout,
+                target: target_spec,
+            }
+            .into(),
+        }))
     })
     .await
 }
@@ -371,7 +363,7 @@ impl RcsKnocker for LocalRcsKnockerImpl {
                 Some(c) => format!("Received compat info: {c:?}"),
                 None => format!("No compat info received"),
             };
-            tracing::debug!("Knocked target. {msg}");
+            log::debug!("Knocked target. {msg}");
         })
     }
 }
@@ -453,7 +445,7 @@ pub async fn knock_target_daemonless(
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
     let knock_timeout = knock_timeout.unwrap_or(DEFAULT_RCS_KNOCK_TIMEOUT * 2);
     let res_future = async {
-        tracing::debug!("resolving target spec address from {target_spec:?}");
+        log::debug!("resolving target spec address from {target_spec:?}");
         let res =
             resolve::resolve_target_address(target_spec, context).await.map_err(|e| match e {
                 // When knocking, it's not critical if we have not yet found the target. The caller should just retry
@@ -463,16 +455,17 @@ pub async fn knock_target_daemonless(
                 } => KnockError::NonCriticalError(e.into()),
                 _ => KnockError::CriticalError(e.into()),
             })?;
-        tracing::debug!("daemonless knock connecting to address {}", res.addr()?);
+        log::debug!("daemonless knock connecting to address {}", res.addr()?);
         let conn = match res.connection {
             Some(c) => c,
             None => {
-                let conn = connection::Connection::new(
-                    ssh_connector::SshConnector::new(res.addr()?, context).await?,
-                )
+                let conn = connection::Connection::new(ssh_connector::SshConnector::new(
+                    netext::ScopedSocketAddr::from_socket_addr(res.addr()?)?,
+                    context,
+                )?)
                 .await
                 .map_err(|e| KnockError::CriticalError(e.into()))?;
-                tracing::debug!("daemonless knock connection established");
+                log::debug!("daemonless knock connection established");
                 let _ = conn
                     .rcs_proxy_fdomain()
                     .await
@@ -488,6 +481,26 @@ pub async fn knock_target_daemonless(
         .map_err(|e| KnockError::NonCriticalError(e.into()))?
 }
 
+/// Get the target specifier, bypassing stateful configuration
+/// (i.e. ConfigLevel::{User, Build, Global}).
+/// Should be gated behind the `STATELESS_DEFAULT_TARGET_CONFIGURATION`
+/// experimental config flag.
+fn get_target_specifier_stateless(
+    context: &EnvironmentContext,
+) -> Result<Option<String>, ConfigError> {
+    match context
+        .query(TARGET_DEFAULT_KEY)
+        .level(Some(ConfigLevel::Runtime))
+        .get_optional::<Option<String>>()
+    {
+        Ok(None) => context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Default))
+            .get_optional::<Option<String>>(),
+        runtime_result => runtime_result,
+    }
+}
+
 /// Get the target specifier.  This uses the normal config mechanism which
 /// supports flexible config values: it can be a string naming the target, or
 /// a list of strings, in which case the first valid entry is used. (The most
@@ -499,8 +512,18 @@ pub async fn knock_target_daemonless(
 /// for the purposes of error messages, etc.  E.g. The repo server only works if
 /// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
 /// to be a substring, a network address, etc.
+/// If the `STATELESS_DEFAULT_TARGET_CONFIGURATION` config value is enabled,
+/// only ConfigLevel::{Runtime, Default} will be queried, effectively omitting
+/// default targets set by `ffx config set`/`ffx target default set`.
 pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target_spec = context.get_optional(TARGET_DEFAULT_KEY)?;
+    // TODO(https://fxbug.dev/394619603): Remove the stateful codepath and
+    // cleanup this feature flag once we finish this migration.
+    let target_spec = if context.get(STATELESS_DEFAULT_TARGET_CONFIGURATION)? {
+        get_target_specifier_stateless(context)
+    } else {
+        context.get_optional(TARGET_DEFAULT_KEY)
+    }?;
+
     match target_spec {
         Some(ref target) => info!("Target specifier: ['{target:?}']"),
         None => debug!("No target specified"),
@@ -568,75 +591,161 @@ mod test {
     use super::*;
     use ffx_command_error::bug;
     use ffx_config::macro_deps::serde_json::Value;
-    use ffx_config::{test_init, ConfigLevel};
+    use ffx_config::{test_env, test_init, ConfigLevel, TestEnv};
     use futures_lite::future::{pending, ready};
+    use tempfile::tempdir;
+
+    async fn set_stateless_feature_flag(env: &TestEnv) {
+        env.context
+            .query(STATELESS_DEFAULT_TARGET_CONFIGURATION)
+            .level(Some(ConfigLevel::User))
+            .set(Value::Bool(true))
+            .await
+            .unwrap();
+    }
 
     #[fuchsia::test]
-    async fn test_target_wait_too_short_timeout() {
-        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
-        let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
-        assert!(res.is_err());
-        let res = knock_target_with_timeout(
-            &proxy,
-            rcs::RCS_KNOCK_TIMEOUT.checked_sub(Duration::new(0, 1)).unwrap(),
-        )
-        .await;
-        assert!(res.is_err());
+    async fn test_get_target_specifier_unset_stateless() {
+        // Explicitly initialize the test with no env vars.
+        // That way, $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are both unset.
+        let env = test_env().build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, None);
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_from_env_stateless() {
+        let env =
+            test_env().env_var("FUCHSIA_NODENAME", "stateless-default").build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("stateless-default".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_bypasses_state_stateless() {
+        let build_dir = tempdir().expect("temp dir");
+        let env = test_env().in_tree(build_dir.path()).build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        // Set stateful configuration.
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("stateful-user-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Build))
+            .set(Value::String("stateful-build-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Global))
+            .set(Value::String("stateful-global-default".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, None);
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_from_env_bypasses_state_stateless() {
+        let build_dir = tempdir().expect("temp dir");
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "stateless-default")
+            .in_tree(build_dir.path())
+            .build()
+            .await
+            .unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        // Set stateful configuration.
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("stateful-user-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Build))
+            .set(Value::String("stateful-build-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Global))
+            .set(Value::String("stateful-global-default".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("stateless-default".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_target_specifier_from_all_sources_stateless() {
+        let build_dir = tempdir().expect("temp dir");
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "stateless-env-default")
+            .runtime_config(TARGET_DEFAULT_KEY, "stateless-runtime-default")
+            .in_tree(build_dir.path())
+            .build()
+            .await
+            .unwrap();
+        set_stateless_feature_flag(&env).await;
+
+        // Set stateful configuration.
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("stateful-user-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Build))
+            .set(Value::String("stateful-build-default".to_owned()))
+            .await
+            .unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::Global))
+            .set(Value::String("stateful-global-default".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("stateless-runtime-default".into()));
     }
 
     #[fuchsia::test]
     async fn test_get_empty_default_target() {
-        let env = test_init().await.unwrap();
-        // Just in case, we need to remove the env variables mentioned
-        // in the default config for "default.target". Because of the way
-        // EnvironmentContext::env_var() works, we need to remove it from both
-        // the context and the actual environment.
-        const NODENAME_KEY: &str = "FUCHSIA_NODENAME";
-        const ADDR_KEY: &str = "FUCHSIA_DEVICE_ADDR";
-        let mut context = env.context.clone();
+        // Explicitly initialize the test with no env vars.
+        // That way, $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are both unset.
+        let env = test_env().build().await.unwrap();
 
-        context.remove_var(NODENAME_KEY);
-        let fuchsia_nodename = std::env::var_os(NODENAME_KEY);
-        if fuchsia_nodename.is_some() {
-            // UNSAFE: remove_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::remove_var(NODENAME_KEY);
-            }
-        }
-        context.remove_var(ADDR_KEY);
-        let fuchsia_device_addr = std::env::var_os(ADDR_KEY);
-        if fuchsia_device_addr.is_some() {
-            // UNSAFE: remove_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::remove_var(ADDR_KEY);
-            }
-        }
-        let target_spec = get_target_specifier(&context).await.unwrap();
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, None);
-        if let Some(nodename) = fuchsia_nodename {
-            // UNSAFE: set_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::set_var(NODENAME_KEY, &nodename);
-            }
-        }
-        if let Some(device_addr) = fuchsia_device_addr {
-            // UNSAFE: set_var() should not be called in multithreaded
-            // environments; this test is explicitly marked as single-threaded,
-            // so it is safe.
-            unsafe {
-                std::env::set_var(ADDR_KEY, &device_addr);
-            }
-        }
     }
 
     #[fuchsia::test]
-    async fn test_set_default_target() {
+    async fn test_get_default_target_from_env() {
+        let env = test_env().env_var("FUCHSIA_NODENAME", "foo-123").build().await.unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("foo-123".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_default_target_from_config() {
         let env = test_init().await.unwrap();
         env.context
             .query(TARGET_DEFAULT_KEY)
@@ -647,6 +756,21 @@ mod test {
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, Some("some_target".to_owned()));
+    }
+
+    #[fuchsia::test]
+    async fn test_get_default_target_from_runtime() {
+        let env =
+            test_env().runtime_config(TARGET_DEFAULT_KEY, "runtime-target").build().await.unwrap();
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(Value::String("some_target".to_owned()))
+            .await
+            .unwrap();
+
+        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        assert_eq!(target_spec, Some("runtime-target".to_owned()));
     }
 
     #[fuchsia::test]
@@ -682,8 +806,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_default_env_present() {
-        std::env::set_var("MY_LITTLE_TMPKEY", "t1");
-        let env = test_init().await.unwrap();
+        let env = test_env().env_var("MY_LITTLE_TMPKEY", "t1").build().await.unwrap();
         let ts: Vec<Value> =
             ["$MY_LITTLE_TMPKEY", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
         env.context
@@ -695,7 +818,19 @@ mod test {
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, Some("t1".to_owned()));
-        std::env::remove_var("MY_LITTLE_TMPKEY");
+    }
+
+    #[fuchsia::test]
+    async fn test_target_wait_too_short_timeout() {
+        let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>();
+        let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
+        assert!(res.is_err());
+        let res = knock_target_with_timeout(
+            &proxy,
+            rcs::RCS_KNOCK_TIMEOUT.checked_sub(Duration::new(0, 1)).unwrap(),
+        )
+        .await;
+        assert!(res.is_err());
     }
 
     #[fuchsia::test]
@@ -724,6 +859,32 @@ mod test {
         )
         .await;
         assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_timeout_on_shutdown() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(pending()));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        // This step is essential for converting the error properly. Otherwise converting it to top
+        // level anyhow error will lost context and turn the error into a string, making
+        // downcasting infeasible.
+        let anyhow_err: anyhow::Error =
+            res.unwrap_err().source().expect("should have an anyhow error source");
+        let FfxTargetError::DaemonError { err, .. } =
+            anyhow_err.downcast_ref::<FfxTargetError>().expect("expected target error")
+        else {
+            panic!("Received unexpected error: {anyhow_err:?}");
+        };
+        assert!(matches!(err, DaemonError::ShutdownTimeout));
     }
 
     #[fuchsia::test]

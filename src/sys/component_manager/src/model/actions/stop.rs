@@ -53,11 +53,11 @@ pub mod tests {
         let test = ActionsTest::new("root", components, None).await;
 
         // Start component so we can witness it getting stopped.
-        test.start(vec!["a"].try_into().unwrap()).await;
+        test.start(["a"].try_into().unwrap()).await;
 
         // Register `stopped` action, and wait for it. Component should be stopped.
         let component_root = test.look_up(Moniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
         ActionsManager::register(component_a.clone(), StopAction::new(false))
             .await
             .expect("stop failed");
@@ -72,7 +72,7 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())],);
+            assert_eq!(events, vec![Lifecycle::Stop(["a"].try_into().unwrap())],);
         }
 
         // Execute action again, same state and no new events.
@@ -90,7 +90,7 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())],);
+            assert_eq!(events, vec![Lifecycle::Stop(["a"].try_into().unwrap())],);
         }
     }
 
@@ -150,8 +150,7 @@ pub mod tests {
         // Cause Stop to be interrupted so we can inspect state.
         let (stopped_tx, stopped_rx) = oneshot::channel::<()>();
         let (continue_tx, continue_rx) = oneshot::channel::<()>();
-        let stop_hook =
-            Arc::new(StopHook::new(vec!["a"].try_into().unwrap(), stopped_tx, continue_rx));
+        let stop_hook = Arc::new(StopHook::new(["a"].try_into().unwrap(), stopped_tx, continue_rx));
         let components = vec![
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
             ("a", component_decl_with_test_runner()),
@@ -159,13 +158,13 @@ pub mod tests {
         let test = ActionsTest::new_with_hooks("root", components, None, stop_hook.hooks()).await;
 
         // Start component so we can witness it getting stopped.
-        test.start(vec!["a"].try_into().unwrap()).await;
+        test.start(["a"].try_into().unwrap()).await;
 
         // Register `stopped` action, and make sure there are two clients waiting on the action
         // (the test, and the task spawned by the exit listener), plus the reference in
         // ActionsManager, plus a reference we take to check the count from, for a total of 4
         let component_root = test.look_up(Moniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
         let nf = component_a.actions().register_no_wait(StopAction::new(false)).await;
         stopped_rx.await.unwrap();
 
@@ -186,7 +185,7 @@ pub mod tests {
                     _ => false,
                 })
                 .collect();
-            assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())],);
+            assert_eq!(events, vec![Lifecycle::Stop(["a"].try_into().unwrap())],);
         }
     }
 }

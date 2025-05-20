@@ -1,0 +1,374 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""
+IMPORTANT: This file is only used when BzlMod is NOT enabled when generating
+the Bazel workspace used by the Fuchsia platform build. Keep its content in
+sync with toplevel.MODULE.bazel whenever possible!!
+"""
+
+# LINT.IfChange
+workspace(name = "main")
+# LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+
+load(
+    "//:third_party/pigweed/repositories.bzl",
+    "setup_pigweed_repository_dependencies",
+)
+
+setup_pigweed_repository_dependencies()
+
+local_repository(
+    name = "rules_cc",
+    path = "third_party/bazel_rules_cc",
+)
+
+local_repository(
+    name = "rules_rust",
+    path = "third_party/bazel_rules_rust",
+)
+
+# A dependency of rules_rust
+new_local_repository(
+    name = "rules_rust_tinyjson",
+    path = "third_party/rust_crates/vendor/tinyjson-2.5.1",
+    build_file = "@rules_rust//util/process_wrapper:BUILD.tinyjson.bazel",
+)
+
+local_repository(
+    name = "rules_python",
+    path = "third_party/bazel_rules_python",
+)
+
+# buildifier: disable=load-on-top
+load("@rules_python//python:repositories.bzl", "py_repositories")
+
+py_repositories()
+
+# @rules_proto is the deprecated set of rules to generate protobuf-related
+# actions. @com_google_protobuf should be used instead, but many other
+# repositories still depend on it implicitly.
+local_repository(
+    name = "rules_proto",
+    path = "third_party/bazel_rules_proto",
+)
+
+# @com_google_protobuf is the new set of rules for protobuf actions.
+# This is now required by pigweed.
+local_repository(
+    name = "com_google_protobuf",
+    path = "third_party/protobuf",
+)
+
+local_repository(
+    name = "pigweed",
+    path = "third_party/pigweed/src",
+)
+
+# This is a @pigweed dependency.
+local_repository(
+    name = "com_google_emboss",
+    path = "third_party/github.com/google/emboss/src",
+)
+
+# Create the @@rules_fuchsia repository which contains Bazel SDK rules
+# without any SDK atom data. Including shared definitions used by the
+# platform build in its common/ sub-directory.
+local_repository(
+    name = "rules_fuchsia",
+    path = "build/bazel_sdk/bazel_rules_fuchsia",
+)
+
+# Create the @fuchsia_build_config repository which contains the defs.bzl file
+# exporting a `build_config` struct of configuration information specific to
+# the Fuchsia platform build.
+# buildifier: disable=load-on-top
+load(
+    "@rules_fuchsia//common:fuchsia_platform_build.bzl",
+    "fuchsia_build_config_repository",
+)
+
+fuchsia_build_config_repository(
+    name = "fuchsia_build_config",
+)
+
+# buildifier: disable=load-on-top
+load("@fuchsia_build_config//:defs.bzl", "build_config")
+
+fuchsia_host_tag = build_config.host_tag
+fuchsia_host_tag_alt = build_config.host_tag_alt
+fuchsia_host_os = build_config.host_os
+ninja_output_dir = build_config.ninja_output_dir
+
+# Create the @fuchsia_icu_config repository which contains the constants.bzl file
+# exporting generating configuration constants related to the ICU library flavors
+# buildifier: disable=load-on-top
+load(
+    "//build/bazel/icu:repository_rules.bzl",
+    "fuchsia_icu_config_repository",
+)
+
+fuchsia_icu_config_repository(
+    name = "fuchsia_icu_config",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/fuchsia_icu_config.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+# buildifier: disable=load-on-top
+load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies")
+
+rules_rust_dependencies()
+
+# buildifier: disable=load-on-top
+load(
+    "//build/bazel/toolchains/rust:repository_rules.bzl",
+    "generate_prebuilt_rust_toolchain_repository",
+)
+
+generate_prebuilt_rust_toolchain_repository(
+    name = "fuchsia_prebuilt_rust",
+    rust_install_dir = "prebuilt/third_party/rust/" + fuchsia_host_tag,
+)
+
+register_toolchains(
+    "@fuchsia_prebuilt_rust//:rust_" + fuchsia_host_tag_alt,
+    "@fuchsia_prebuilt_rust//:rust_fuchsia_x64",
+    "@fuchsia_prebuilt_rust//:rust_fuchsia_arm64",
+    "@fuchsia_prebuilt_rust//:rust_fuchsia_riscv64",
+)
+
+# buildifier: disable=load-on-top
+load(
+    "@io_bazel_rules_go//go:deps.bzl",
+    "go_register_toolchains",
+    "go_rules_dependencies",
+    "go_wrap_sdk",
+)
+
+go_wrap_sdk(
+    name = "go_sdk",
+    root_file = "//:prebuilt/third_party/go/%s/README.md" % fuchsia_host_tag,
+)
+
+go_rules_dependencies()
+go_register_toolchains()
+
+# com_google_absl is a dependency of com_google_googletest
+local_repository(
+    name = "com_google_absl",
+    path = "third_party/abseil-cpp",
+)
+
+# buildifier: disable=load-on-top
+local_repository(
+    name = "fuchsia_build_info",
+    path = "%s/regenerator_outputs/fuchsia_build_info" % ninja_output_dir,
+)
+
+# googletest is a dependency from @fuchsia_sdk amd requires a local
+# patch for now for Fuchsia support, which is handled by a repository rule.
+
+# buildifier: disable=load-on-top
+load("//build/bazel/repository_rules:googletest_repository.bzl", "googletest_repository")
+
+googletest_repository(
+    name = "com_google_googletest",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/com_google_googletest.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+# buildifier: disable=load-on-top
+load("//build/bazel/repository_rules:boringssl_repository.bzl", "boringssl_repository")
+
+boringssl_repository(
+    name = "boringssl",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/boringssl.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+# buildifier: disable=load-on-top
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
+# buildifier: disable=load-on-top
+load("@fuchsia_build_info//:args.bzl", "clang_prefix")
+
+# If clang_prefix is set in GN, it'll point to the "bin" directory under clang root.
+_clang_dir = paths.dirname(clang_prefix)
+
+# buildifier: disable=load-on-top
+load(
+    "//build/bazel/toolchains/clang:repository_rules.bzl",
+    "generate_prebuilt_clang_toolchain_repository",
+    "generate_prebuilt_llvm_repository",
+)
+
+generate_prebuilt_clang_toolchain_repository(
+    name = "prebuilt_clang",
+    clang_install_dir = _clang_dir,
+    # LINT.IfChange
+    repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
+register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchsia_host_os)
+
+generate_prebuilt_llvm_repository(
+    name = "prebuilt_llvm",
+    # NOTE: We don't have Fuchsia variant of LLVM libraries yet, so always use
+    # host_platform's prebuilts for now. Currently, this repository is only used
+    # to expose headers from prebuilt LLVM, so it should make no difference as
+    # headers are the same across different platforms.
+    #
+    # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
+    llvm_install_dir = "prebuilt/third_party/llvm/" + fuchsia_host_tag,
+)
+
+# buildifier: disable=load-on-top
+load(
+    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
+    "compact_python_runtime_repository",
+)
+
+compact_python_runtime_repository(
+    name = "prebuilt_python",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+register_toolchains("@prebuilt_python//:py_toolchain")
+
+### FUCHSIA_SDK_CUTOFF ====================================================================
+# Everything after the line above is omitted from WORKSPACE.no_sdk.bazel, which is used
+# as a symlink destination for WORKSPACE.bazel when running `fx bazel-no-sdk`. This
+# prevents any repository related to GN artifacts (@gn_targets) or the Fuchsia IDK/SDK
+# (e.g. @fuchsia_sdk but also @fuchsia_clang) from being visible.
+
+# fuchsia_build_generated/gn_target_dir is a symlink to the content
+# of the @gn_targets repository. At `fx gen` time, it will point to
+# an empty repository, but bazel_action.py will update it just before
+# invoking Bazel to point to a directory whose content matches the
+# current `bazel_action()` target.
+local_repository(
+    name = "gn_targets",
+    # LINT.IfChange
+    path = "fuchsia_build_generated/gn_targets_dir",
+    # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+)
+
+# buildifier: disable=load-on-top
+load(
+    "//build/bazel/fuchsia_idk:repository_rules.bzl",
+    "fuchsia_idk_repository",
+)
+
+# The location of symlinks to the content hash files used to cover the in-tree IDK
+# and its internal-only variant.
+# LINT.IfChange
+fuchsia_in_tree_idk_hash_label = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash"
+fuchsia_internal_only_idk_hash_label = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash"
+# LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
+
+# A repository that wraps the in-tree IDK, which is generated by regenerator.py,
+# in the Bazel graph. This is used to populate the @fuchsia_sdk repository.
+local_repository(
+    # LINT.IfChange
+    name = "fuchsia_in_tree_idk",
+    path = "%s/regenerator_outputs/fuchsia_in_tree_idk" % ninja_output_dir,
+    # LINT.ThenChange(//build/regenerator.py)
+)
+
+# A repository that wraps //sdk:bazel_internal_only_idk in the Bazel graph.
+# This is used to populate the @internal_sdk repository only.
+fuchsia_idk_repository(
+    name = "fuchsia_internal_only_idk",
+    idk_export_dir = "%s/sdk/exported/bazel_internal_only_idk" % ninja_output_dir,
+    ninja_build_dir = ninja_output_dir,
+    python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
+    content_hash_file = fuchsia_internal_only_idk_hash_label,
+)
+
+# buildifier: disable=load-on-top
+load(
+    "@rules_fuchsia//fuchsia:deps.bzl",
+    "fuchsia_sdk_repository",
+    "register_fuchsia_sdk_toolchain",
+    "rules_fuchsia_deps",
+)
+
+rules_fuchsia_deps()
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk",
+    local_paths = ["@fuchsia_in_tree_idk"],
+    # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk.
+    local_sdk_version_file = fuchsia_in_tree_idk_hash_label,
+    buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
+    visibility_templates = {
+        "hlcpp": [
+            # Limit the scope of hlcpp to the sdk itself
+            "@internal_sdk//:__subpackages__",
+            "@fuchsia_sdk//:__subpackages__",
+            "@@//vendor/*/build:hlcpp_allowlist",
+        ],
+    },
+)
+
+# A repository used to expose SDK atoms that are not yet ready to be
+# distributed to partners, but required by some Fuchsia in-tree targets.
+# TODO(https://fxbug.dev/333907192): Remove this
+fuchsia_sdk_repository(
+    name = "internal_sdk",
+    local_paths = ["@fuchsia_internal_only_idk"],
+    # The @internal_sdk repository is populated from the same content as @fuchsia_internal_only_idk.
+    local_sdk_version_file = fuchsia_internal_only_idk_hash_label,
+    parent_sdk = "@fuchsia_sdk",
+    parent_sdk_local_paths = ["@fuchsia_in_tree_idk"],
+    visibility_templates = {
+        "hlcpp": [
+            # Limit the scope of hlcpp to the sdk itself
+            "@internal_sdk//:__subpackages__",
+            "@fuchsia_sdk//:__subpackages__",
+            "@@//vendor/*/build:hlcpp_allowlist",
+        ],
+    },
+)
+
+# Register the fuchsia toolchain for the fuchsia SDK
+register_fuchsia_sdk_toolchain()
+
+register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
+
+# buildifier: disable=load-on-top
+load(
+    "@rules_fuchsia//fuchsia:clang.bzl",
+    "fuchsia_clang_repository",
+)
+
+fuchsia_clang_repository(
+    name = "fuchsia_clang",
+    local_path = _clang_dir,
+    local_version_file = "//:fuchsia_build_generated/fuchsia_clang.hash",
+)
+
+# buildifier: disable=load-on-top
+load(
+    "@fuchsia_clang//:defs.bzl",
+    "register_clang_toolchains",
+)
+
+register_clang_toolchains()
+
+load(
+    "//build/bazel/assembly:developer_overrides/repository_rules.bzl",
+    "assembly_developer_overrides_repository",
+)
+
+assembly_developer_overrides_repository(
+    name = "assembly_developer_overrides",
+    overrides_map_from_gn = "fuchsia_build_generated/assembly_developer_overrides.json",
+)

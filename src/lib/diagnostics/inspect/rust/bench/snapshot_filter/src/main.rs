@@ -20,7 +20,7 @@ fn generate_selectors_till_level(depth: usize) -> Vec<String> {
     let mut selector: String = String::from("*:root");
     (0..depth)
         .map(|_| {
-            let current_selector = format!("{}:*", selector);
+            let current_selector = format!("{selector}:*");
             selector.push_str("/*");
             current_selector
         })

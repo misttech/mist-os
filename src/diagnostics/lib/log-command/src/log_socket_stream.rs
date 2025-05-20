@@ -255,7 +255,7 @@ mod test {
                     severity: Severity::Info,
                     timestamp: Timestamp::from_nanos(BOOT_TS),
                 })
-                .set_message(format!("Hello world! {}", value))
+                .set_message(format!("Hello world! {value}"))
                 .add_tag("Some tag")
                 .build()
             })

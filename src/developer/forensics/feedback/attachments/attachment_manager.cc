@@ -18,7 +18,7 @@ namespace {
 template <typename T>
 void EraseNotAllowlisted(std::map<std::string, T>& c, const std::set<std::string>& allowlist) {
   for (auto it = c.begin(); it != c.end();) {
-    if (allowlist.count(it->first) == 0) {
+    if (!allowlist.contains(it->first)) {
       FX_LOGS(INFO) << "Attachment \"" << it->first << "\" not allowlisted, dropping";
       c.erase(it++);
     } else {

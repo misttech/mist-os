@@ -61,9 +61,6 @@ zx_library("async-cpp") {
 
     # <lib/async/cpp/task.h> has #include <lib/fit/function.h>.
     "//sdk/lib/fit:headers",
-
-    # <lib/async/cpp/sequence_checker.h> has #include <lib/stdcompat/variant.h>.
-    "//sdk/lib/stdcompat:headers",
   ]
   sources = [
     "executor.cc",

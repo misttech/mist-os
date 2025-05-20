@@ -116,7 +116,7 @@ rustc_test("test_bin") {
 
   deps = [
     ":fuchsia.example.power_rust",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_rust",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",

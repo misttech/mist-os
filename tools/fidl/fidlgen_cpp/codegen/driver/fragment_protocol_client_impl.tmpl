@@ -5,7 +5,6 @@
 */}}
 
 {{- define "Protocol:ClientImpl:driver/MessagingHeader" }}
-{{- IfdefFuchsia -}}
 {{- EnsureNamespace "" }}
 
 template<>
@@ -52,13 +51,11 @@ class {{ .WireWeakSyncClientImpl }} final : public {{ .WireWeakOnewayClientImpl 
   {{- end }}
 };
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Protocol:ClientImpl:driver/MessagingSource" }}
-  {{- IfdefFuchsia -}}
   {{ EnsureNamespace ""}}
 
   {{- range .OneWayMethods }}
@@ -75,12 +72,10 @@ class {{ .WireWeakSyncClientImpl }} final : public {{ .WireWeakOnewayClientImpl 
     {{- template "Method:WireWeakSyncClientImpl:driver/WireMessagingSource" . }}
   {{- end }}
 
-  {{- EndifFuchsia -}}
 {{- end }}
 
 
 {{- define "Protocol:Client:driver/NaturalMessagingHeader" }}
-{{- IfdefFuchsia -}}
 
 {{- range .TwoWayMethods }}
 
@@ -116,13 +111,11 @@ class {{ .NaturalClientImpl }} final : public ::fidl::internal::NaturalClientBas
   {{- end }}
 };
 
-{{- EndifFuchsia -}}
 {{- end }}
 
 
 
 {{- define "Protocol:Client:driver/NaturalMessagingSource" }}
-{{- IfdefFuchsia }}
 
 {{- range .TwoWayMethods }}
 
@@ -181,7 +174,4 @@ class {{ .NaturalClientImpl }} final : public ::fidl::internal::NaturalClientBas
 }
 {{ end }}
 
-
-
-{{- EndifFuchsia }}
 {{- end }}

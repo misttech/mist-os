@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -4388,42 +4386,40 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_strict_one_way: typing.TypeAlias = None
+    StrictOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_one_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_one_way]
-        | _MethodResponse_strict_one_way
+        typing.Coroutine[typing.Any, typing.Any, StrictOneWayResponse]
+        | StrictOneWayResponse
     ):
         ...
 
-    _MethodResponse_flexible_one_way: typing.TypeAlias = None
+    FlexibleOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def flexible_one_way(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_one_way
-        ]
-        | _MethodResponse_flexible_one_way
+        typing.Coroutine[typing.Any, typing.Any, FlexibleOneWayResponse]
+        | FlexibleOneWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way: typing.TypeAlias = None
+    StrictTwoWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_two_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_two_way]
-        | _MethodResponse_strict_two_way
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayResponse]
+        | StrictTwoWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields: typing.TypeAlias = (
+    StrictTwoWayFieldsResponse: typing.TypeAlias = (
         UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
     )
 
@@ -4431,14 +4427,12 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     def strict_two_way_fields(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields
-        ]
-        | _MethodResponse_strict_two_way_fields
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsResponse]
+        | StrictTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_union: typing.TypeAlias = (
+    StrictTwoWayUnionResponse: typing.TypeAlias = (
         UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
     )
 
@@ -4446,14 +4440,12 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     def strict_two_way_union(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_union
-        ]
-        | _MethodResponse_strict_two_way_union
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayUnionResponse]
+        | StrictTwoWayUnionResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_table: typing.TypeAlias = (
+    StrictTwoWayTableResponse: typing.TypeAlias = (
         UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
     )
 
@@ -4461,14 +4453,12 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     def strict_two_way_table(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_table
-        ]
-        | _MethodResponse_strict_two_way_table
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayTableResponse]
+        | StrictTwoWayTableResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         None,
     ]
@@ -4477,14 +4467,12 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     def strict_two_way_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_err
-        ]
-        | _MethodResponse_strict_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayErrResponse]
+        | StrictTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayFieldsErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
     ]
@@ -4493,14 +4481,12 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     def strict_two_way_fields_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields_err
-        ]
-        | _MethodResponse_strict_two_way_fields_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsErrResponse]
+        | StrictTwoWayFieldsErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_union_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayUnionErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
     ]
@@ -4509,14 +4495,12 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     def strict_two_way_union_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_union_err
-        ]
-        | _MethodResponse_strict_two_way_union_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayUnionErrResponse]
+        | StrictTwoWayUnionErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_table_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayTableErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
     ]
@@ -4525,10 +4509,8 @@ class UnknownInteractionsAjarProtocolServer(ServerBase, ABC):
     def strict_two_way_table_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_table_err
-        ]
-        | _MethodResponse_strict_two_way_table_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayTableErrResponse]
+        | StrictTwoWayTableErrResponse
     ):
         ...
 
@@ -5015,29 +4997,29 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_strict_one_way: typing.TypeAlias = None
+    StrictOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_one_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_one_way]
-        | _MethodResponse_strict_one_way
+        typing.Coroutine[typing.Any, typing.Any, StrictOneWayResponse]
+        | StrictOneWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way: typing.TypeAlias = None
+    StrictTwoWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_two_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_two_way]
-        | _MethodResponse_strict_two_way
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayResponse]
+        | StrictTwoWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields: typing.TypeAlias = (
+    StrictTwoWayFieldsResponse: typing.TypeAlias = (
         UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
     )
 
@@ -5045,14 +5027,12 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     def strict_two_way_fields(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields
-        ]
-        | _MethodResponse_strict_two_way_fields
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsResponse]
+        | StrictTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_union: typing.TypeAlias = (
+    StrictTwoWayUnionResponse: typing.TypeAlias = (
         UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
     )
 
@@ -5060,14 +5040,12 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     def strict_two_way_union(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_union
-        ]
-        | _MethodResponse_strict_two_way_union
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayUnionResponse]
+        | StrictTwoWayUnionResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_table: typing.TypeAlias = (
+    StrictTwoWayTableResponse: typing.TypeAlias = (
         UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
     )
 
@@ -5075,14 +5053,12 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     def strict_two_way_table(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_table
-        ]
-        | _MethodResponse_strict_two_way_table
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayTableResponse]
+        | StrictTwoWayTableResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         None,
     ]
@@ -5091,14 +5067,12 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     def strict_two_way_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_err
-        ]
-        | _MethodResponse_strict_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayErrResponse]
+        | StrictTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayFieldsErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
     ]
@@ -5107,14 +5081,12 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     def strict_two_way_fields_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields_err
-        ]
-        | _MethodResponse_strict_two_way_fields_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsErrResponse]
+        | StrictTwoWayFieldsErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_union_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayUnionErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
     ]
@@ -5123,14 +5095,12 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     def strict_two_way_union_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_union_err
-        ]
-        | _MethodResponse_strict_two_way_union_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayUnionErrResponse]
+        | StrictTwoWayUnionErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_table_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayTableErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
     ]
@@ -5139,10 +5109,8 @@ class UnknownInteractionsClosedProtocolServer(ServerBase, ABC):
     def strict_two_way_table_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_table_err
-        ]
-        | _MethodResponse_strict_two_way_table_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayTableErrResponse]
+        | StrictTwoWayTableErrResponse
     ):
         ...
 
@@ -5594,42 +5562,40 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_strict_one_way: typing.TypeAlias = None
+    StrictOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_one_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_one_way]
-        | _MethodResponse_strict_one_way
+        typing.Coroutine[typing.Any, typing.Any, StrictOneWayResponse]
+        | StrictOneWayResponse
     ):
         ...
 
-    _MethodResponse_flexible_one_way: typing.TypeAlias = None
+    FlexibleOneWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def flexible_one_way(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_one_way
-        ]
-        | _MethodResponse_flexible_one_way
+        typing.Coroutine[typing.Any, typing.Any, FlexibleOneWayResponse]
+        | FlexibleOneWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way: typing.TypeAlias = None
+    StrictTwoWayResponse: typing.TypeAlias = None
 
     @abstractmethod
     def strict_two_way(
         self,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_strict_two_way]
-        | _MethodResponse_strict_two_way
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayResponse]
+        | StrictTwoWayResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields: typing.TypeAlias = (
+    StrictTwoWayFieldsResponse: typing.TypeAlias = (
         UnknownInteractionsProtocolStrictTwoWayFieldsResponse
     )
 
@@ -5637,14 +5603,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def strict_two_way_fields(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields
-        ]
-        | _MethodResponse_strict_two_way_fields
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsResponse]
+        | StrictTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_union: typing.TypeAlias = (
+    StrictTwoWayUnionResponse: typing.TypeAlias = (
         UnknownInteractionsProtocolStrictTwoWayUnionResponse
     )
 
@@ -5652,14 +5616,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def strict_two_way_union(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_union
-        ]
-        | _MethodResponse_strict_two_way_union
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayUnionResponse]
+        | StrictTwoWayUnionResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_table: typing.TypeAlias = (
+    StrictTwoWayTableResponse: typing.TypeAlias = (
         UnknownInteractionsProtocolStrictTwoWayTableResponse
     )
 
@@ -5667,14 +5629,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def strict_two_way_table(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_table
-        ]
-        | _MethodResponse_strict_two_way_table
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayTableResponse]
+        | StrictTwoWayTableResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         None,
     ]
@@ -5683,14 +5643,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def strict_two_way_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_err
-        ]
-        | _MethodResponse_strict_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayErrResponse]
+        | StrictTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_fields_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayFieldsErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
     ]
@@ -5699,14 +5657,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def strict_two_way_fields_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_fields_err
-        ]
-        | _MethodResponse_strict_two_way_fields_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayFieldsErrResponse]
+        | StrictTwoWayFieldsErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_union_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayUnionErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
     ]
@@ -5715,14 +5671,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def strict_two_way_union_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_union_err
-        ]
-        | _MethodResponse_strict_two_way_union_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayUnionErrResponse]
+        | StrictTwoWayUnionErrResponse
     ):
         ...
 
-    _MethodResponse_strict_two_way_table_err: typing.TypeAlias = typing.Union[
+    StrictTwoWayTableErrResponse: typing.TypeAlias = typing.Union[
         DomainError,
         UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
     ]
@@ -5731,14 +5685,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def strict_two_way_table_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_strict_two_way_table_err
-        ]
-        | _MethodResponse_strict_two_way_table_err
+        typing.Coroutine[typing.Any, typing.Any, StrictTwoWayTableErrResponse]
+        | StrictTwoWayTableErrResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         None,
     ]
@@ -5747,14 +5699,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def flexible_two_way(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way
-        ]
-        | _MethodResponse_flexible_two_way
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayResponse]
+        | FlexibleTwoWayResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_fields: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayFieldsResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
     ]
@@ -5763,14 +5713,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def flexible_two_way_fields(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_fields
-        ]
-        | _MethodResponse_flexible_two_way_fields
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayFieldsResponse]
+        | FlexibleTwoWayFieldsResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_union: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayUnionResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ]
@@ -5779,14 +5727,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def flexible_two_way_union(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_union
-        ]
-        | _MethodResponse_flexible_two_way_union
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayUnionResponse]
+        | FlexibleTwoWayUnionResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_table: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayTableResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
     ]
@@ -5795,14 +5741,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def flexible_two_way_table(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_table
-        ]
-        | _MethodResponse_flexible_two_way_table
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayTableResponse]
+        | FlexibleTwoWayTableResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_err: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayErrResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         DomainError,
         None,
@@ -5812,33 +5756,29 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def flexible_two_way_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_err
-        ]
-        | _MethodResponse_flexible_two_way_err
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayErrResponse]
+        | FlexibleTwoWayErrResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_fields_err: typing.TypeAlias = (
-        typing.Union[
-            FrameworkError,
-            DomainError,
-            UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
-        ]
-    )
+    FlexibleTwoWayFieldsErrResponse: typing.TypeAlias = typing.Union[
+        FrameworkError,
+        DomainError,
+        UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
+    ]
 
     @abstractmethod
     def flexible_two_way_fields_err(
         self,
     ) -> (
         typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_fields_err
+            typing.Any, typing.Any, FlexibleTwoWayFieldsErrResponse
         ]
-        | _MethodResponse_flexible_two_way_fields_err
+        | FlexibleTwoWayFieldsErrResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_union_err: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayUnionErrResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         DomainError,
         UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
@@ -5848,14 +5788,12 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def flexible_two_way_union_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_union_err
-        ]
-        | _MethodResponse_flexible_two_way_union_err
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayUnionErrResponse]
+        | FlexibleTwoWayUnionErrResponse
     ):
         ...
 
-    _MethodResponse_flexible_two_way_table_err: typing.TypeAlias = typing.Union[
+    FlexibleTwoWayTableErrResponse: typing.TypeAlias = typing.Union[
         FrameworkError,
         DomainError,
         UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
@@ -5865,10 +5803,8 @@ class UnknownInteractionsProtocolServer(ServerBase, ABC):
     def flexible_two_way_table_err(
         self,
     ) -> (
-        typing.Coroutine[
-            typing.Any, typing.Any, _MethodResponse_flexible_two_way_table_err
-        ]
-        | _MethodResponse_flexible_two_way_table_err
+        typing.Coroutine[typing.Any, typing.Any, FlexibleTwoWayTableErrResponse]
+        | FlexibleTwoWayTableErrResponse
     ):
         ...
 

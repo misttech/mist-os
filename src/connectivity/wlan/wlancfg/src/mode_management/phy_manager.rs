@@ -1080,7 +1080,7 @@ mod tests {
             ))) => {
                 responder
                     .send(return_status)
-                    .unwrap_or_else(|e| panic!("sending fake response: {}: {:?}", return_status, e));
+                    .unwrap_or_else(|e| panic!("sending fake response: {return_status}: {e:?}"));
             }
         );
     }
@@ -2934,8 +2934,8 @@ mod tests {
         }
 
         let phy_ids = phy_manager.get_phy_ids();
-        assert!(phy_ids.contains(&1), "expected phy_ids to contain `1`, but phy_ids={:?}", phy_ids);
-        assert!(phy_ids.contains(&2), "expected phy_ids to contain `2`, but phy_ids={:?}", phy_ids);
+        assert!(phy_ids.contains(&1), "expected phy_ids to contain `1`, but phy_ids={phy_ids:?}");
+        assert!(phy_ids.contains(&2), "expected phy_ids to contain `2`, but phy_ids={phy_ids:?}");
     }
 
     /// Tests log_phy_add_failure() to ensure the appropriate inspect count is incremented by 1.

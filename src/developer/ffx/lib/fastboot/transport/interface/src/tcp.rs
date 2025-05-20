@@ -114,7 +114,7 @@ where
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
         if self.write_header_task.is_none() && !self.wrote_header {
-            tracing::trace!("About to start header task");
+            log::trace!("About to start header task");
             let mut stream = self.stream.clone();
             let mut data = vec![];
             data.extend(TryInto::<u64>::try_into(buf.len()).unwrap().to_be_bytes());
@@ -122,7 +122,7 @@ where
         }
 
         if self.write_header_task.is_some() {
-            tracing::trace!("Checking header task status");
+            log::trace!("Checking header task status");
             let task = self.write_header_task.as_mut().unwrap();
             let res = match task.as_mut().poll(cx) {
                 Poll::Ready(Ok(())) => {
@@ -138,7 +138,7 @@ where
                 }
                 Poll::Pending => Poll::Pending,
             };
-            tracing::trace!("Header Check: returning: {:#?}", res);
+            log::trace!("Header Check: returning: {:#?}", res);
             return res;
         }
 
@@ -215,13 +215,11 @@ pub async fn open_once(
 ) -> Result<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>> {
     let mut addr: SocketAddr = target.clone();
     if addr.port() == 0 {
-        tracing::debug!(
-            "Address does not have port set ({addr:?}. Using default:  {FASTBOOT_PORT}"
-        );
+        log::debug!("Address does not have port set ({addr:?}. Using default:  {FASTBOOT_PORT}");
         addr.set_port(FASTBOOT_PORT);
     }
 
-    tracing::debug!("Trying to establish TCP Connection to address: {addr:?}");
+    log::debug!("Trying to establish TCP Connection to address: {addr:?}");
     timeout(handshake_timeout, async {
         let mut stream = TcpStream::connect(addr)
             .await

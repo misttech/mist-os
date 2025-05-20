@@ -93,7 +93,7 @@ pub enum EngineState {
     ///
     /// When the --stage flag is included, this is where the `start` subcommand terminates. This is
     /// also the state of an emulator that was running but has been stopped by some means, such as
-    /// `ffx emu stop --persist`, or `dm poweroff` in the serial console. A Staged instance can be
+    /// `ffx emu stop --persist`, or `power off` in the serial console. A Staged instance can be
     /// (re)started with `ffx emu start --reuse`.
     Staged,
 

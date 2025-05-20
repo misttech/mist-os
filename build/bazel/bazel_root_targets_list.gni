@@ -1,0 +1,69 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+declare_args() {
+  # A list of scopes describing Bazel host targets that can be built directly
+  # with Bazel, without invoking Ninja. These *cannot* depend on any Ninja
+  # artifact. Schema is:
+  #
+  #    bazel_label [string]: A Bazel target label, must begin with @
+  #
+  #    bazel_name [string]: Optional filename of Bazel artifact file, in case
+  #       it does not match the label.
+  #
+  #    ninja_name [GN path]: Optional filename for Ninja hard-link to Bazel
+  #       artifact, which will appear under $NINJA_BUILD_DIR/bazel_artifacts/,
+  #       defaults to bazel_name.
+  #
+  #    install_host_tool [boolean]: Optional, set to true to make it available
+  #       to the `fx host-tool <ninja_name>` command.
+  #
+  default_bazel_root_host_targets = []
+
+  # A similar list to extend the list above for custom build configuration
+  # in args.gn.
+  bazel_root_host_targets = []
+}
+
+# A resolved view of all root bazel targets. This computes the default
+# argument values of each entries, and augments it with new arguments used
+# internally by the Fuchsia build:
+#
+#   - gn_label: The GN label of the target to be used from GN to use its
+#        artifact.
+#
+#   - ninja_output: The GN path to the artifact visible from the Ninja
+#        build directory (i.e. outside of the Bazel output base).
+#
+resolved_bazel_root_targets = []
+
+foreach(_root_target,
+        default_bazel_root_host_targets + bazel_root_host_targets) {
+  if (defined(_root_target.bazel_name)) {
+    _bazel_name = _root_target.bazel_name
+  } else {
+    _bazel_name = get_label_info(_root_target.bazel_label, "name")
+  }
+
+  if (defined(_root_target.ninja_name)) {
+    _ninja_name = _root_target.ninja_name
+  } else {
+    _ninja_name = _bazel_name
+  }
+
+  _install_host_tool =
+      defined(_root_target.install_host_tool) && _root_target.install_host_tool
+
+  resolved_bazel_root_targets += [
+    {
+      bazel_label = _root_target.bazel_label
+      bazel_name = _bazel_name
+      ninja_name = _ninja_name
+      gn_label = "//build/bazel:root_target.${_ninja_name}($default_toolchain)"
+      ninja_output =
+          get_label_info(gn_label, "target_out_dir") + "/${_ninja_name}"
+      install_host_tool = _install_host_tool
+    },
+  ]
+}

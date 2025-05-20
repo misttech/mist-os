@@ -30,12 +30,15 @@ https://fuchsia.dev/internal/intree/concepts/remote-builds""",
 Set `NINJA_STATUS_REFRESH_MILLIS=t` to change the refresh rate.""",
     """Set `FX_BUILD_RBE_STATS=1` in your environment to remote execution statistics after each build.""",
     """Publish build results to ResultStore (go/fxbtx) by setting in args.gn:
-  bazel_upload_build_events = \"resultstore\" """
+  bazel_upload_build_events = \"resultstore\" """,
     # fx
     """Help with fx commands: fx help COMMAND""",
     """Build service authentication errors?  Troubleshoot with `fx rbe auth`.""",
     """`fx repro BBID` prints instructions on how to reproduce a build from infra.""",
     """`fx format-code` reformats changed code.  Do this before `jiri upload`.""",
+    """`fx test-remote` runs tests in infra with locally built artifacts.
+    go/fx-test-remote-docs for more details.""",
+    """`fx doc-preview` (Googler only) lets you preview documentation on fuchsia.dev.""",
     # ffx
     # editors
     # Infra

@@ -7,7 +7,7 @@ use crate::common::PrincipalIdMap;
 use crate::resources::{Job, KernelResources};
 use attribution_processing::{
     Attribution, AttributionData, AttributionDataProvider, Principal, PrincipalDescription,
-    PrincipalType, ResourceReference,
+    PrincipalType, ResourceReference, ResourcesVisitor,
 };
 use fuchsia_sync::Mutex;
 use fuchsia_trace::duration;
@@ -106,28 +106,33 @@ impl AttributionDataProvider for AttributionDataProviderImpl {
                 }
             }
 
-            let mut resource_names =
-                kernel_resources.resource_names.into_iter().collect::<Vec<(String, u64)>>();
-            resource_names.sort_unstable_by_key(|(_, index)| *index);
-
             Ok(AttributionData {
                 principals_vec: principals,
                 resources_vec: kernel_resources.resources.into_values().map(|r| r.into()).collect(),
-                resource_names: resource_names.into_iter().map(|(name, _)| name).collect(),
+                resource_names: kernel_resources.resource_names,
                 attributions,
             })
         }
         .boxed()
     }
+
+    fn for_each_resource(&self, visitor: &mut impl ResourcesVisitor) -> Result<(), anyhow::Error> {
+        let attribution_state = self.attribution_client.get_attributions();
+        crate::resources::KernelResourcesExplorer::default().explore_root_job(
+            visitor,
+            self.root_job.lock().as_ref(),
+            &attribution_state,
+        )?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use attribution_processing::{PrincipalIdentifier, ZXName};
     use core::assert_eq;
-    use std::collections::HashSet;
-
-    use attribution_processing::PrincipalIdentifier;
     use fidl_fuchsia_memory_attribution as fattribution;
+    use std::collections::HashSet;
 
     use super::*;
     use crate::attribution_client::{AttributionProvider, PrincipalDefinition};
@@ -306,14 +311,14 @@ mod tests {
         );
 
         assert_eq!(
-            capture.resource_names.into_iter().collect::<HashSet<String>>(),
+            capture.resource_names.into_iter().collect::<HashSet<ZXName>>(),
             HashSet::from([
-                "job1".to_owned(),
-                "job2".to_owned(),
-                "process3".to_owned(),
-                "vmo4".to_owned(),
-                "process5".to_owned(),
-                "vmo6".to_owned()
+                ZXName::from_string_lossy("job1"),
+                ZXName::from_string_lossy("job2"),
+                ZXName::from_string_lossy("process3"),
+                ZXName::from_string_lossy("vmo4"),
+                ZXName::from_string_lossy("process5"),
+                ZXName::from_string_lossy("vmo6")
             ])
         );
     }

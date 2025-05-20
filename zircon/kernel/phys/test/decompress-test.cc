@@ -32,17 +32,14 @@ constexpr uint32_t kTestPayloadSize = sizeof(kTestPayload) - 1;
 
 }  // namespace
 
-int TestMain(void* zbi_ptr, arch::EarlyTicks) {
+int TestMain(void* zbi_ptr, ktl::optional<EarlyBootZbi> early_zbi, arch::EarlyTicks) {
   MainSymbolize symbolize("decompress-test");
 
   // Initialize memory for allocation/free.
   AddressSpace aspace;
-  InitMemory(zbi_ptr, &aspace);
+  InitMemory(zbi_ptr, ktl::move(early_zbi), &aspace);
 
-  // Fetch ZBI.
-  zbitl::View<zbitl::ByteView> zbi(
-      zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi_ptr)));
-
+  zbitl::View zbi{zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi_ptr))};
   printf("Scanning ZBI of %zu bytes...\n", zbi.size_bytes());
 
   // Search for a payload of type ZBI_TYPE_STORAGE_RAMDISK.

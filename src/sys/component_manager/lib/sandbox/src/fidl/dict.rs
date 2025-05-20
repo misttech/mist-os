@@ -115,8 +115,6 @@ impl RemotableCapability for Dict {
             }
             UpdateNotifierRetention::Retain
         }));
-        let _self_clone = self.clone();
-        let not_found = self.lock().not_found.clone();
         directory.clone().set_not_found_handler(Box::new(move |path| {
             // We hold a reference to the dictionary in this closure to solve an ownership problem.
             // In `try_into_directory_entry` we return a `pfs::Simple` that provides a directory
@@ -132,9 +130,7 @@ impl RemotableCapability for Dict {
             // Ideally at least one reference to the dictionary would be kept alive as long as the
             // directory exists. We accomplish that by giving the directory ownership over a
             // reference to the dictionary here.
-            let _self_clone = &_self_clone;
-
-            not_found(path);
+            self.not_found(path);
         }));
         if let Some(Ok(error)) = error_receiver.now_or_never() {
             // We encountered an error processing the initial contents of this dictionary. Let's
@@ -1051,7 +1047,7 @@ mod tests {
         }
     }
     impl RemoteLike for MockDir {
-        fn open(
+        fn deprecated_open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _flags: fio::OpenFlags,
@@ -1062,7 +1058,7 @@ mod tests {
             self.0.inc();
         }
 
-        fn open3(
+        fn open(
             self: Arc<Self>,
             _scope: ExecutionScope,
             relative_path: Path,

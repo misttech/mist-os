@@ -15,7 +15,6 @@ use netstack3_ip::device::{IpDeviceIpExt, IpDeviceTimerId};
 use netstack3_ip::IpLayerTimerId;
 
 use crate::context::CoreCtx;
-use crate::ip::integration::IpAddrCtxSpec;
 use crate::transport::TransportLayerTimerId;
 use crate::BindingsTypes;
 
@@ -50,9 +49,9 @@ pub enum TimerIdInner<BT: BindingsTypes> {
     /// A timer event in the IP layer.
     IpLayer(IpLayerTimerId),
     /// A timer event for an IPv4 device.
-    Ipv4Device(IpDeviceTimerId<Ipv4, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>),
+    Ipv4Device(IpDeviceTimerId<Ipv4, WeakDeviceId<BT>, BT>),
     /// A timer event for an IPv6 device.
-    Ipv6Device(IpDeviceTimerId<Ipv6, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>),
+    Ipv6Device(IpDeviceTimerId<Ipv6, WeakDeviceId<BT>, BT>),
 }
 
 impl<BT: BindingsTypes> From<DeviceLayerTimerId<BT>> for TimerId<BT> {
@@ -73,10 +72,10 @@ impl<BT: BindingsTypes> From<TransportLayerTimerId<BT>> for TimerId<BT> {
     }
 }
 
-impl<BT: BindingsTypes, I: IpDeviceIpExt>
-    From<IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>> for TimerId<BT>
+impl<BT: BindingsTypes, I: IpDeviceIpExt> From<IpDeviceTimerId<I, WeakDeviceId<BT>, BT>>
+    for TimerId<BT>
 {
-    fn from(value: IpDeviceTimerId<I, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>) -> Self {
+    fn from(value: IpDeviceTimerId<I, WeakDeviceId<BT>, BT>) -> Self {
         I::map_ip(
             value,
             |v4| TimerId(TimerIdInner::Ipv4Device(v4)),
@@ -91,8 +90,8 @@ where
     CC: TimerHandler<BT, DeviceLayerTimerId<BT>>
         + TimerHandler<BT, TransportLayerTimerId<BT>>
         + TimerHandler<BT, IpLayerTimerId>
-        + TimerHandler<BT, IpDeviceTimerId<Ipv4, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>>
-        + TimerHandler<BT, IpDeviceTimerId<Ipv6, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>>,
+        + TimerHandler<BT, IpDeviceTimerId<Ipv4, WeakDeviceId<BT>, BT>>
+        + TimerHandler<BT, IpDeviceTimerId<Ipv6, WeakDeviceId<BT>, BT>>,
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT, timer: BT::UniqueTimerId) {
         trace!("handle_timer: dispatching timerid: {self:?}");

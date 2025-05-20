@@ -11,7 +11,6 @@
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/bridge.h>
-#include <lib/stdcompat/optional.h>
 #include <lib/zx/time.h>
 
 #include <thread>
@@ -131,7 +130,7 @@ class RealLoop {
 template <typename PromiseType>
 typename PromiseType::result_type RealLoop::RunPromise(PromiseType promise) {
   async::Executor e(dispatcher());
-  cpp17::optional<typename PromiseType::result_type> res;
+  std::optional<typename PromiseType::result_type> res;
   e.schedule_task(
       promise.then([&res](typename PromiseType::result_type& v) { res = std::move(v); }));
 

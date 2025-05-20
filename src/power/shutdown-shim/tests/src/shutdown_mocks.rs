@@ -103,7 +103,7 @@ async fn run_activity_governor(
                 .detach();
                 send_signals
                     .unbounded_send(Signal::ShutdownControlLease(LeaseState::Acquired))
-                    .expect("receiver dropped");
+                    .expect("receiver acquired");
                 responder.send(client_token).unwrap();
             }
             _ => unreachable!("Unexpected request to ActivityGovernor"),

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use at_commands as at;
+use bt_hfp::codec_id::CodecId;
 use std::iter::once;
 
 use super::calls::Call;
@@ -13,7 +14,7 @@ use super::procedure::query_current_calls::build_clcc_response;
 use super::procedure::subscriber_number_information::build_cnum_response;
 use super::procedure::ProcedureRequest;
 
-use crate::features::{AgFeatures, CodecId};
+use crate::features::AgFeatures;
 
 // TODO(https://fxbug.dev/42153736): Add multiparty support.
 // TODO(https://fxbug.dev/42153738): Add Explicit Call Transfer support.
@@ -111,14 +112,17 @@ impl From<AgUpdate> for ProcedureRequest {
                 vec![at::success(at::Success::Chld { commands }), at::Response::Ok]
             }
             AgUpdate::IndicatorStatus(status) => vec![
-                at::success(at::Success::Cind {
-                    service: status.service,
-                    call: (&status.call).into(),
-                    callsetup: (&status.callsetup).into(),
-                    callheld: (&status.callheld).into(),
-                    signal: status.signal as i64,
-                    roam: status.roam,
-                    battchg: status.battchg.into(),
+                at::success(at::Success::CindRead {
+                    ordered_values: vec![
+                        // The order here must match the order we specified in in the +CIND test response.
+                        status.service.into(),
+                        (&status.call).into(),
+                        (&status.callsetup).into(),
+                        (&status.callheld).into(),
+                        status.signal.into(),
+                        status.roam.into(),
+                        status.battchg.into(),
+                    ],
                 }),
                 at::Response::Ok,
             ],

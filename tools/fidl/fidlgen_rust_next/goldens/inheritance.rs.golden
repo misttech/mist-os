@@ -8,7 +8,7 @@ pub struct SuperFooRequest {
 }
 
 impl ::fidl_next::Encodable for SuperFooRequest {
-    type Encoded = WireSuperFooRequest;
+    type Encoded = WireSuperFooRequest<'static>;
 }
 
 unsafe impl<___E> ::fidl_next::Encode<___E> for SuperFooRequest
@@ -19,7 +19,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -30,24 +30,49 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
+        ::fidl_next::Encode::encode(self.s, encoder, s)?;
 
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<SuperFooRequest> {
-    type EncodedOption = ::fidl_next::WireBox<WireSuperFooRequest>;
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for SuperFooRequest
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+    ___E: ::fidl_next::Encoder,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                s,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.s, encoder, s)?;
+
+        Ok(())
+    }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooRequest>
+impl ::fidl_next::EncodableOption for SuperFooRequest {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireSuperFooRequest<'static>>;
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for SuperFooRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     SuperFooRequest: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -62,26 +87,57 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireSuperFooRequest> for SuperFooRequest {
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for SuperFooRequest
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    SuperFooRequest: ::fidl_next::EncodeRef<___E>,
+{
     #[inline]
-    fn take_from(from: &WireSuperFooRequest) -> Self {
-        Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+impl<'de> ::fidl_next::FromWire<WireSuperFooRequest<'de>> for SuperFooRequest {
+    #[inline]
+    fn from_wire(wire: WireSuperFooRequest<'de>) -> Self {
+        Self { s: ::fidl_next::FromWire::from_wire(wire.s) }
+    }
+}
+
+impl<'de> ::fidl_next::FromWireRef<WireSuperFooRequest<'de>> for SuperFooRequest {
+    #[inline]
+    fn from_wire_ref(wire: &WireSuperFooRequest<'de>) -> Self {
+        Self { s: ::fidl_next::FromWireRef::from_wire_ref(&wire.s) }
     }
 }
 
 /// The wire type corresponding to [`SuperFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireSuperFooRequest {
-    pub s: ::fidl_next::WireString,
+pub struct WireSuperFooRequest<'de> {
+    pub s: ::fidl_next::WireString<'de>,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireSuperFooRequest {
+unsafe impl ::fidl_next::Wire for WireSuperFooRequest<'static> {
+    type Decoded<'de> = WireSuperFooRequest<'de>;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
 
-unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooRequest<'static>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -111,7 +167,7 @@ pub struct SuperFooResponse {
 }
 
 impl ::fidl_next::Encodable for SuperFooResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireSuperFooResponse> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
         )
@@ -126,7 +182,7 @@ where
 {
     #[inline]
     fn encode(
-        &mut self,
+        self,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -137,24 +193,47 @@ where
             } = out;
         }
 
-        ::fidl_next::Encode::encode(&mut self.y, encoder, y)?;
+        ::fidl_next::Encode::encode(self.y, encoder, y)?;
 
         Ok(())
     }
 }
 
-impl ::fidl_next::EncodableOption for Box<SuperFooResponse> {
-    type EncodedOption = ::fidl_next::WireBox<WireSuperFooResponse>;
+unsafe impl<___E> ::fidl_next::EncodeRef<___E> for SuperFooResponse
+where
+    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+{
+    #[inline]
+    fn encode_ref(
+        &self,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge! {
+            let Self::Encoded {
+                y,
+
+            } = out;
+        }
+
+        ::fidl_next::EncodeRef::encode_ref(&self.y, encoder, y)?;
+
+        Ok(())
+    }
 }
 
-unsafe impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooResponse>
+impl ::fidl_next::EncodableOption for SuperFooResponse {
+    type EncodedOption = ::fidl_next::WireBox<'static, WireSuperFooResponse>;
+}
+
+unsafe impl<___E> ::fidl_next::EncodeOption<___E> for SuperFooResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
     SuperFooResponse: ::fidl_next::Encode<___E>,
 {
     #[inline]
     fn encode_option(
-        this: Option<&mut Self>,
+        this: Option<Self>,
         encoder: &mut ___E,
         out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
@@ -169,16 +248,46 @@ where
     }
 }
 
-impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+unsafe impl<___E> ::fidl_next::EncodeOptionRef<___E> for SuperFooResponse
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    SuperFooResponse: ::fidl_next::EncodeRef<___E>,
+{
+    #[inline]
+    fn encode_option_ref(
+        this: Option<&Self>,
+        encoder: &mut ___E,
+        out: &mut ::core::mem::MaybeUninit<Self::EncodedOption>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        if let Some(inner) = this {
+            ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
+            ::fidl_next::WireBox::encode_present(out);
+        } else {
+            ::fidl_next::WireBox::encode_absent(out);
+        }
+
+        Ok(())
+    }
+}
+
+impl ::fidl_next::FromWire<WireSuperFooResponse> for SuperFooResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireSuperFooResponse, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+            true && <i64 as ::fidl_next::FromWire<::fidl_next::WireI64>>::COPY_OPTIMIZATION
+                .is_enabled(),
         )
     };
 
     #[inline]
-    fn take_from(from: &WireSuperFooResponse) -> Self {
-        Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
+    fn from_wire(wire: WireSuperFooResponse) -> Self {
+        Self { y: ::fidl_next::FromWire::from_wire(wire.y) }
+    }
+}
+
+impl ::fidl_next::FromWireRef<WireSuperFooResponse> for SuperFooResponse {
+    #[inline]
+    fn from_wire_ref(wire: &WireSuperFooResponse) -> Self {
+        Self { y: ::fidl_next::FromWireRef::from_wire_ref(&wire.y) }
     }
 }
 
@@ -189,7 +298,9 @@ pub struct WireSuperFooResponse {
     pub y: ::fidl_next::WireI64,
 }
 
-unsafe impl ::fidl_next::ZeroPadding for WireSuperFooResponse {
+unsafe impl ::fidl_next::Wire for WireSuperFooResponse {
+    type Decoded<'de> = WireSuperFooResponse;
+
     #[inline]
     fn zero_padding(out: &mut ::core::mem::MaybeUninit<Self>) {}
 }
@@ -238,7 +349,7 @@ pub mod super_ {
 
         type Protocol = crate::Super;
 
-        type Request = crate::WireSuperFooRequest;
+        type Request = crate::WireSuperFooRequest<'static>;
 
         type Response = crate::WireSuperFooResponse;
     }
@@ -250,7 +361,7 @@ pub trait SuperClientSender {
 
     fn foo<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, super_::Foo>,
         ::fidl_next::EncodeError,
@@ -258,7 +369,7 @@ pub trait SuperClientSender {
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest,
+            Encoded = crate::WireSuperFooRequest<'static>,
         >;
 }
 
@@ -270,7 +381,7 @@ where
 
     fn foo<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<
         ::fidl_next::ResponseFuture<'_, Self::Transport, super_::Foo>,
         ::fidl_next::EncodeError,
@@ -278,7 +389,7 @@ where
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest,
+            Encoded = crate::WireSuperFooRequest<'static>,
         >,
     {
         self.as_untyped()
@@ -334,7 +445,7 @@ pub trait SuperServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Super>,
 
-        request: ::fidl_next::RequestBuffer<___T, super_::Foo>,
+        request: ::fidl_next::Request<___T, super_::Foo>,
 
         responder: ::fidl_next::Responder<super_::Foo>,
     );
@@ -345,7 +456,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SuperServerHandler<___T>,
 
-    crate::WireSuperFooRequest: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <super_::Foo as ::fidl_next::Method>::Request:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
@@ -371,8 +483,12 @@ where
             7540745593380780216 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.foo(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.foo(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {
@@ -404,7 +520,7 @@ pub mod sub {
 
         type Protocol = crate::Sub;
 
-        type Request = crate::WireSuperFooRequest;
+        type Request = crate::WireSuperFooRequest<'static>;
 
         type Response = crate::WireSuperFooResponse;
     }
@@ -416,12 +532,12 @@ pub trait SubClientSender {
 
     fn foo<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::ResponseFuture<'_, Self::Transport, sub::Foo>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest,
+            Encoded = crate::WireSuperFooRequest<'static>,
         >;
 }
 
@@ -433,12 +549,12 @@ where
 
     fn foo<___R>(
         &self,
-        request: &mut ___R,
+        request: ___R,
     ) -> Result<::fidl_next::ResponseFuture<'_, Self::Transport, sub::Foo>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
             <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest,
+            Encoded = crate::WireSuperFooRequest<'static>,
         >,
     {
         self.as_untyped()
@@ -494,7 +610,7 @@ pub trait SubServerHandler<___T: ::fidl_next::Transport> {
         &mut self,
         sender: &::fidl_next::ServerSender<___T, Sub>,
 
-        request: ::fidl_next::RequestBuffer<___T, sub::Foo>,
+        request: ::fidl_next::Request<___T, sub::Foo>,
 
         responder: ::fidl_next::Responder<sub::Foo>,
     );
@@ -505,7 +621,8 @@ where
     ___T: ::fidl_next::Transport,
     ___H: SubServerHandler<___T>,
 
-    crate::WireSuperFooRequest: ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
+    <sub::Foo as ::fidl_next::Method>::Request:
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
@@ -531,8 +648,12 @@ where
             7540745593380780216 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
-                handler.foo(sender, buffer, responder);
+                match ::fidl_next::DecoderExt::decode(buffer) {
+                    Ok(decoded) => handler.foo(sender, decoded, responder),
+                    Err(e) => {
+                        sender.close();
+                    }
+                }
             }
 
             ordinal => {
@@ -545,33 +666,15 @@ where
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 
-    impl ::fidl_next::TakeFrom<crate::WireSuperFooRequest>
-        for ::fidl_test_inheritance::SuperFooRequest
-    {
-        #[inline]
-        fn take_from(from: &crate::WireSuperFooRequest) -> Self {
-            Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
-        }
-    }
-
-    impl ::fidl_next::TakeFrom<crate::WireSuperFooResponse>
-        for ::fidl_test_inheritance::SuperFooResponse
-    {
-        #[inline]
-        fn take_from(from: &crate::WireSuperFooResponse) -> Self {
-            Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
-        }
-    }
-
     #[cfg(target_os = "fuchsia")]
     /// An alias for a client sender over `zx::Channel` for the `Super`
     /// protocol.
     pub type SuperProxy =
         ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Super>;
 
-    impl ::fidl_next::TakeFrom<crate::Super> for ::fidl_test_inheritance::Super_Marker {
+    impl ::core::convert::From<crate::Super> for ::fidl_test_inheritance::Super_Marker {
         #[inline]
-        fn take_from(from: &crate::Super) -> Self {
+        fn from(_: crate::Super) -> Self {
             Self
         }
     }
@@ -581,9 +684,9 @@ pub mod compat {
     /// protocol.
     pub type SubProxy = ::fidl_next::ClientSender<::fidl_next::fuchsia::zx::Channel, crate::Sub>;
 
-    impl ::fidl_next::TakeFrom<crate::Sub> for ::fidl_test_inheritance::SubMarker {
+    impl ::core::convert::From<crate::Sub> for ::fidl_test_inheritance::SubMarker {
         #[inline]
-        fn take_from(from: &crate::Sub) -> Self {
+        fn from(_: crate::Sub) -> Self {
             Self
         }
     }

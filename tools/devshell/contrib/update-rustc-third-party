@@ -108,6 +108,19 @@ function prepare_bazel_workspace {
   # used in the platform build.
   mkdir "${workspace_dir}/third_party"
   ln -s "${FUCHSIA_DIR}/third_party/rust_crates" "${workspace_dir}/third_party/rust_crates"
+
+  # Download the cargo-bazel from upstream release. This avoids the bootstrap
+  # process from crate_universe, which always does a slow full rebuild of
+  # cargo-bazel.
+  cargo_bazel_version=$(cat "${workspace_dir}/rules_rust/version.bzl" | grep 'VERSION =' | awk -F ' = ' '{print $2}' | tr -d '"')
+  case "$(uname -s)" in
+    Linux*)
+      curl -sSL "https://github.com/bazelbuild/rules_rust/releases/download/${cargo_bazel_version}/cargo-bazel-x86_64-unknown-linux-gnu" -o "${workspace_dir}/cargo-bazel";;
+    Darwin*)
+      curl -sSL "https://github.com/bazelbuild/rules_rust/releases/download/${cargo_bazel_version}/cargo-bazel-aarch64-apple-darwin" -o "${workspace_dir}/cargo-bazel";;
+    *) fx-error "unrecognized OS"; exit 1;;
+  esac
+  chmod +x "${workspace_dir}/cargo-bazel"
 }
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?

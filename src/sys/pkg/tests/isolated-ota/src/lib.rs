@@ -26,9 +26,8 @@ use mock_omaha_server::OmahaResponse;
 use mock_paver::{hooks as mphooks, PaverEvent};
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
-use vfs::directory::entry_container::Directory;
+use vfs::directory::helper::DirectlyMutable as _;
 use vfs::file::vmo::read_only;
-use vfs::ToObjectRequest as _;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const OUT_DIR_FLAGS: fio::Flags =
@@ -117,15 +116,13 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                         .lock()
                         .take()
                         .expect("mock component should only be launched once");
-                    let scope = vfs::execution_scope::ExecutionScope::new();
-                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        directories_out_dir.open3(
-                            scope.clone(),
-                            vfs::Path::dot(),
-                            OUT_DIR_FLAGS,
-                            request,
-                        )
-                    });
+                    let scope = vfs::ExecutionScope::new();
+                    vfs::directory::serve_on(
+                        directories_out_dir,
+                        OUT_DIR_FLAGS,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
                     async move {
                         scope.wait().await;
                         Ok(())
@@ -231,6 +228,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
 
         let blobfs_proxy_clone = blobfs_client_end_clone.into_proxy();
         let blobfs_vfs = vfs::remote::remote_dir(blobfs_proxy_clone);
+        let blobfs_svc = blobfs_ramdisk.as_ref().map(|blobfs| blobfs.svc_dir().unwrap().unwrap());
         let blobfs_reflector = realm_builder
             .add_local_child(
                 "pkg_cache_blobfs",
@@ -239,10 +237,23 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                     let out_dir = vfs::pseudo_directory! {
                         "blob" => blobfs_vfs,
                     };
-                    let scope = vfs::execution_scope::ExecutionScope::new();
-                    OUT_DIR_FLAGS.to_object_request(handles.outgoing_dir).handle(|request| {
-                        out_dir.open3(scope.clone(), vfs::Path::dot(), OUT_DIR_FLAGS, request)
-                    });
+                    if let Some(svc) = &blobfs_svc {
+                        let svc = fuchsia_fs::directory::open_directory_async(
+                            svc,
+                            ".",
+                            fio::PERM_READABLE,
+                        )
+                        .context("opening svc dir")
+                        .unwrap();
+                        out_dir.add_entry("svc", vfs::remote::remote_dir(svc)).unwrap();
+                    }
+                    let scope = vfs::ExecutionScope::new();
+                    vfs::directory::serve_on(
+                        out_dir,
+                        OUT_DIR_FLAGS,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
                     async move {
                         scope.wait().await;
                         Ok(())
@@ -262,6 +273,24 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
                             .path("/blob")
                             .rights(fio::RW_STAR_DIR | fio::Operations::EXECUTE),
                     )
+                    .from(&blobfs_reflector)
+                    .to(&pkg_component),
+            )
+            .await
+            .unwrap();
+        realm_builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.fxfs.BlobCreator"))
+                    .from(&blobfs_reflector)
+                    .to(&pkg_component),
+            )
+            .await
+            .unwrap();
+        realm_builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("fuchsia.fxfs.BlobReader"))
                     .from(&blobfs_reflector)
                     .to(&pkg_component),
             )

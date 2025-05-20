@@ -119,7 +119,7 @@ class RoundTripTestBase {
 
  protected:
   zx::result<fdf::Dispatcher> CreateDispatcher(void* owner, uint32_t options,
-                                               cpp17::string_view name) {
+                                               std::string_view name) {
     if ((options & FDF_DISPATCHER_OPTION_SYNCHRONIZATION_MASK) ==
         FDF_DISPATCHER_OPTION_SYNCHRONIZED) {
       return fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(

@@ -9,16 +9,16 @@
 #include <lib/fit/result.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <span>
 #include <utility>
 
 #include <fbl/algorithm.h>
@@ -32,7 +32,7 @@ namespace {
 constexpr uint64_t kMax = std::numeric_limits<uint64_t>::max();
 
 constexpr std::optional<uint64_t> Align(uint64_t addr, uint64_t alignment) {
-  ZX_DEBUG_ASSERT(cpp20::has_single_bit(alignment));
+  ZX_DEBUG_ASSERT(std::has_single_bit(alignment));
 
   // If `addr + alignment - 1` overflows, then that means addr lies within
   // [2^64 - alignment + 1, 2^64), from which it should be clear that it is not
@@ -69,7 +69,7 @@ auto FindContainingRangeAmong(Ranges&& ranges, uint64_t addr, uint64_t size)
 
 }  // namespace
 
-fit::result<fit::failed> Pool::Init(cpp20::span<internal::RangeIterationContext> state,
+fit::result<fit::failed> Pool::Init(std::span<internal::RangeIterationContext> state,
                                     uint64_t min_addr, uint64_t max_addr) {
   RangeStream ranges(state);
 
@@ -101,13 +101,16 @@ fit::result<fit::failed> Pool::Init(cpp20::span<internal::RangeIterationContext>
     return fit::failed();
   }
 
+  // Make the prospective bookkeeping region accessible before any access.
+  access_callback_(*bookkeeping_addr, bookkeeping_size);
+
   // Convert our bookkeeping space before actual use, and zero out the mapped
   // area to be able to recast as Nodes in the valid, initial fbl linked list
   // node state. `[0, bookkeeping.size() - scratch_size)` of that space will
   // then be turned into unused nodes. The tail of FindNormalizedRanges()
   // scratch space will be reclaimed after we are done with it.
   std::byte* bookkeeping_ptr = bookkeeping_pointer_(*bookkeeping_addr, bookkeeping_size);
-  cpp20::span<void*> find_scratch = {
+  std::span<void*> find_scratch = {
       reinterpret_cast<void**>(bookkeeping_ptr + bookkeeping_size - scratch_size),
       scratch_size / sizeof(void*),
   };
@@ -196,6 +199,8 @@ fit::result<fit::failed, uint64_t> Pool::Allocate(Type type, uint64_t size, uint
     auto it = std::move(result).value();
     Coalesce(it);
   }
+
+  access_callback_(addr, size);
   return fit::ok(addr);
 }
 
@@ -298,7 +303,7 @@ fit::result<fit::failed> Pool::MarkAsPeripheral(const memalloc::Range& range) {
   return fit::success();
 }
 
-fit::result<fit::failed> Pool::CoalescePeripherals(cpp20::span<const size_t> alignments) {
+fit::result<fit::failed> Pool::CoalescePeripherals(std::span<const size_t> alignments) {
   for (auto curr = ranges_.begin(), prev = ranges_.end(); curr != ranges_.end();) {
     if (curr->type != memalloc::Type::kPeripheral) {
       prev = curr++;
@@ -437,7 +442,7 @@ fit::result<fit::failed, uint64_t> Pool::Resize(const Range& original, uint64_t 
                                                 uint64_t min_alignment) {
   ZX_ASSERT(new_size > 0);
   ZX_ASSERT(IsAllocatedType(original.type));
-  ZX_ASSERT(cpp20::has_single_bit(min_alignment));
+  ZX_ASSERT(std::has_single_bit(min_alignment));
   ZX_ASSERT(original.addr % min_alignment == 0);
 
   auto it = FindContainingRange(original.addr, original.size);
@@ -740,6 +745,9 @@ void Pool::TryToEnsureTwoBookkeepingNodes() {
   } else {
     addr = std::move(result).value();
   }
+
+  // Make the prospective bookkeeping region accessible before any access.
+  access_callback_(addr, kBookkeepingChunkSize);
 
   std::byte* ptr = bookkeeping_pointer_(addr, kBookkeepingChunkSize);
   ZX_ASSERT(ptr);

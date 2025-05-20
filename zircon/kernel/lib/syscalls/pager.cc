@@ -9,7 +9,7 @@
 #include <zircon/syscalls-next.h>
 
 #include <fbl/ref_ptr.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/pager_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
 #include <vm/vm_object_paged.h>

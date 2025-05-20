@@ -56,7 +56,8 @@ use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
 use runner::component::StopInfo;
 use sandbox::{
-    Capability, Connector, Data, Dict, DirEntry, Message, Request, Routable, Router, RouterResponse,
+    Capability, Connector, Data, Dict, DirConnector, DirEntry, Message, Request, Routable, Router,
+    RouterResponse,
 };
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
@@ -542,17 +543,12 @@ impl ComponentInstance {
             };
             let child_dict_entries = child_input.capabilities();
             for (key, value) in dict.drain() {
-                // The child/collection Dict normally contains Routers created by component manager.
-                // ChildArgs.dict may contain capabilities created by an external client.
-                //
-                // Currently there is no way to create a Router externally, so assume these
-                // are Connector capabilities and convert them to Router here.
-                //
-                // TODO(https://fxbug.dev/319542502): Consider using the external router types
                 let router: Capability = match value {
                     Capability::Connector(s) => Router::<Connector>::new_ok(s).into(),
+                    Capability::DirConnector(s) => Router::<DirConnector>::new_ok(s).into(),
+                    Capability::Dictionary(s) => Router::<Dict>::new_ok(s).into(),
                     Capability::Data(d) => Router::<Data>::new_ok(d).into(),
-                    _ => return Err(AddDynamicChildError::InvalidDictionary),
+                    c => c,
                 };
 
                 if let Err(_) = child_dict_entries.insert(key.clone(), router) {
@@ -1640,8 +1636,8 @@ pub mod tests {
 
         let stop_event_stream = test.new_event_stream(vec![EventType::Stopped]).await;
 
-        let a_moniker: Moniker = vec!["a"].try_into().unwrap();
-        let b_moniker: Moniker = vec!["a", "b"].try_into().unwrap();
+        let a_moniker: Moniker = ["a"].try_into().unwrap();
+        let b_moniker: Moniker = ["a", "b"].try_into().unwrap();
 
         let component_b = test.look_up(b_moniker.clone()).await;
 
@@ -1707,19 +1703,19 @@ pub mod tests {
 
         // Resolve each component.
         test.look_up(Moniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let _component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let _component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let _component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let _component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let _component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+        let _component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
 
         // Just unresolve component a and children
         assert_matches!(component_a.unresolve().await, Ok(()));
         // component a is now resolved
         assert!(is_discovered(&component_a).await);
         // Component a no longer has children, due to not being resolved
-        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
-        assert_matches!(component_a.find(&vec!["b", "c"].try_into().unwrap()).await, None);
-        assert_matches!(component_a.find(&vec!["b", "d"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b", "c"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b", "d"].try_into().unwrap()).await, None);
 
         // Unresolve again, which is ok because UnresolveAction is idempotent.
         assert_matches!(component_a.unresolve().await, Ok(()));
@@ -1763,7 +1759,7 @@ pub mod tests {
         assert_eq!(instance_id, *root_realm.instance_id().unwrap());
 
         let a_realm = root
-            .start_instance(&Moniker::try_from(vec!["a"]).unwrap(), &StartReason::Root)
+            .start_instance(&Moniker::try_from(["a"]).unwrap(), &StartReason::Root)
             .await
             .unwrap();
         assert_eq!(None, a_realm.instance_id());
@@ -2530,7 +2526,7 @@ pub mod tests {
         root_out_dir.add_entry("/svc/fuchsia.logger.LogSink".parse().unwrap(), host(serve_logsink));
         test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
-        let child = test_topology.look_up(vec![TEST_CHILD_NAME].try_into().unwrap()).await;
+        let child = test_topology.look_up([TEST_CHILD_NAME].try_into().unwrap()).await;
 
         // Start the child.
         ActionsManager::register(
@@ -2573,39 +2569,29 @@ pub mod tests {
         let root = test.model.root();
 
         // Not resolved, so not found.
-        assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, None);
-        assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, None);
-        assert_matches!(root.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await, None);
-        assert_matches!(root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&["a"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&["a", "b"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&["a", "b", "c"].try_into().unwrap()).await, None);
+        assert_matches!(root.find_resolved(&["a", "b", "d"].try_into().unwrap()).await, None);
 
         // Resolve each component.
         test.look_up(Moniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        let _component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-        let _component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-        let _component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+        let component_a = test.look_up(["a"].try_into().unwrap()).await;
+        let _component_b = test.look_up(["a", "b"].try_into().unwrap()).await;
+        let _component_c = test.look_up(["a", "b", "c"].try_into().unwrap()).await;
+        let _component_d = test.look_up(["a", "b", "d"].try_into().unwrap()).await;
 
         // Now they can all be found.
-        assert_matches!(root.find_resolved(&vec!["a"].try_into().unwrap()).await, Some(_));
+        assert_matches!(root.find_resolved(&["a"].try_into().unwrap()).await, Some(_));
         assert_eq!(
-            root.find_resolved(&vec!["a"].try_into().unwrap())
-                .await
-                .unwrap()
-                .component_url
-                .as_str(),
+            root.find_resolved(&["a"].try_into().unwrap()).await.unwrap().component_url.as_str(),
             "test:///a",
         );
-        assert_matches!(root.find_resolved(&vec!["a", "b"].try_into().unwrap()).await, Some(_));
+        assert_matches!(root.find_resolved(&["a", "b"].try_into().unwrap()).await, Some(_));
+        assert_matches!(root.find_resolved(&["a", "b", "c"].try_into().unwrap()).await, Some(_));
+        assert_matches!(root.find_resolved(&["a", "b", "d"].try_into().unwrap()).await, Some(_));
         assert_matches!(
-            root.find_resolved(&vec!["a", "b", "c"].try_into().unwrap()).await,
-            Some(_)
-        );
-        assert_matches!(
-            root.find_resolved(&vec!["a", "b", "d"].try_into().unwrap()).await,
-            Some(_)
-        );
-        assert_matches!(
-            root.find_resolved(&vec!["a", "b", "nonesuch"].try_into().unwrap()).await,
+            root.find_resolved(&["a", "b", "nonesuch"].try_into().unwrap()).await,
             None
         );
 
@@ -2616,9 +2602,9 @@ pub mod tests {
             .expect("unresolve failed");
 
         // Because component a is not resolved, it does not have children
-        assert_matches!(component_a.find(&vec!["b"].try_into().unwrap()).await, None);
-        assert_matches!(component_a.find(&vec!["b", "c"].try_into().unwrap()).await, None);
-        assert_matches!(component_a.find(&vec!["b", "d"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b", "c"].try_into().unwrap()).await, None);
+        assert_matches!(component_a.find(&["b", "d"].try_into().unwrap()).await, None);
     }
 
     /// If a component is not started, a call to `open_outgoing` should start the component

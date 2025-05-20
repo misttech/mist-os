@@ -7,7 +7,7 @@
 
 #include <lib/mistos/zx/vmo.h>
 
-#include <phys/handoff.h>
+#include <vm/handoff-end.h>
 
 #ifdef _KERNEL
 

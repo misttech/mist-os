@@ -10,6 +10,7 @@ use futures::{Future, StreamExt as _, TryStreamExt as _};
 use std::cmp::min;
 use std::collections::HashSet;
 use std::convert::TryInto as _;
+use vfs::attributes;
 use zx::{self as zx, AsHandleRef as _, HandleBased as _, Status};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -38,7 +39,9 @@ impl Mock {
             })) => {
                 assert_eq!(path, merkle.to_string());
                 assert!(flags.contains(fio::PERM_READABLE));
-                assert!(!flags.intersects(fio::Flags::PERM_WRITE | fio::Flags::FLAG_MAYBE_CREATE));
+                assert!(
+                    !flags.intersects(fio::Flags::PERM_WRITE_BYTES | fio::Flags::FLAG_MAYBE_CREATE)
+                );
 
                 let stream =
                     fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(object))
@@ -169,9 +172,8 @@ impl Mock {
                     control_handle: _,
                 })) => {
                     assert!(flags.contains(fio::PERM_READABLE));
-                    assert!(
-                        !flags.intersects(fio::Flags::PERM_WRITE | fio::Flags::FLAG_MAYBE_CREATE)
-                    );
+                    assert!(!flags
+                        .intersects(fio::Flags::PERM_WRITE_BYTES | fio::Flags::FLAG_MAYBE_CREATE));
                     let path: Hash = path.parse().unwrap();
 
                     let stream =
@@ -394,18 +396,21 @@ impl Blob {
                     let count = min(count.try_into().unwrap(), avail);
                     responder.send(Ok(&data[pos..pos + count])).unwrap();
                 }
-                Some(Ok(fio::FileRequest::GetAttr { responder })) => {
-                    let mut attr = fio::NodeAttributes {
-                        mode: 0,
-                        id: 0,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 0,
-                    };
-                    attr.content_size = data.len().try_into().unwrap();
-                    responder.send(Status::OK.into_raw(), &attr).unwrap();
+                Some(Ok(fio::FileRequest::GetAttributes { query, responder })) => {
+                    let attrs = attributes!(
+                        query,
+                        Mutable { creation_time: 0, modification_time: 0, mode: 0 },
+                        Immutable {
+                            protocols: fio::NodeProtocolKinds::FILE,
+                            content_size: data.len() as u64,
+                            storage_size: 0,
+                            link_count: 0,
+                            id: 0,
+                        }
+                    );
+                    responder
+                        .send(Ok((&attrs.mutable_attributes, &attrs.immutable_attributes)))
+                        .unwrap();
                 }
                 Some(Ok(fio::FileRequest::Close { responder })) => {
                     let _ = responder.send(Ok(()));

@@ -18,7 +18,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/testing/sl4f/fidl:fuchsia.test.audio.recording_rust",
+    "//src/testing/sl4f/fidl:fuchsia.test.audio_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:futures",
@@ -27,5 +27,6 @@ rustc_binary("bin") {
   sources = [
     "src/audio_facade.rs",
     "src/main.rs",
+    "src/server.rs",
   ]
 }

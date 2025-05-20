@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -10,39 +11,87 @@ use crate::vfs::socket::{
     SocketType,
 };
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileHandle, FileObject, FileOps,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
+    FsNodeInfo,
 };
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use zx::HandleBased;
 
-pub fn new_socket_file<L>(
-    locked: &mut Locked<'_, L>,
-    current_task: &CurrentTask,
-    domain: SocketDomain,
-    socket_type: SocketType,
-    open_flags: OpenFlags,
-    protocol: SocketProtocol,
-    kernel_private: bool,
-) -> Result<FileHandle, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-{
-    Ok(Socket::new_file(
-        locked,
-        current_task,
-        Socket::new(current_task, domain, socket_type, protocol)?,
-        open_flags,
-        kernel_private,
-    ))
-}
+use super::socket_fs;
 
 pub struct SocketFile {
     pub(super) socket: SocketHandle,
+}
+
+impl SocketFile {
+    /// Creates a `FileHandle` referring to a socket.
+    ///
+    /// # Parameters
+    /// - `current_task`: The current task.
+    /// - `socket`: The socket to refer to.
+    /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
+    /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
+    ///   therefore not be security labeled nor access-checked.
+    pub fn from_socket<L>(
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        socket: SocketHandle,
+        open_flags: OpenFlags,
+        kernel_private: bool,
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        let fs = socket_fs(current_task.kernel());
+        // Ensure sockfs gets labeled if mounted after the SELinux policy has been loaded.
+        security::file_system_resolve_security(locked, &current_task, &fs)
+            .expect("resolve fs security");
+        security::check_socket_create_access(
+            current_task,
+            socket.domain,
+            socket.socket_type,
+            socket.protocol,
+            &fs,
+            kernel_private,
+        )?;
+        let mode = mode!(IFSOCK, 0o777);
+        let node = fs.create_node(
+            current_task,
+            Anon::new_for_socket(kernel_private),
+            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
+        );
+        socket.set_fs_node(&node);
+        security::socket_post_create(&socket);
+        Ok(FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags))
+    }
+
+    /// Shortcut for Socket::new plus SocketFile::from_socket.
+    pub fn new_socket<L>(
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        domain: SocketDomain,
+        socket_type: SocketType,
+        open_flags: OpenFlags,
+        protocol: SocketProtocol,
+        kernel_private: bool,
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        SocketFile::from_socket(
+            locked,
+            current_task,
+            Socket::new(current_task, domain, socket_type, protocol)?,
+            open_flags,
+            kernel_private,
+        )
+    }
 }
 
 impl FileOps for SocketFile {

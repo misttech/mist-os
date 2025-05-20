@@ -3,6 +3,12 @@
 Fish completion support for the `fx` tool. Subcommands, their short and long
 options and descriptions for both are parsed from help documentation.
 
+## Adding support for fx subcommands
+
+If you would like to add support for fx subcommands, create a file in this
+directory named fx-<command>.fish which handles more specific completions
+for the given subcommand.
+
 ## Use
 
 Sourcing the `fx-env.fish` will load completions for you:

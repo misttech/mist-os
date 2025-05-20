@@ -50,7 +50,10 @@ use netstack3_device::{
     self as device, for_any_device_id, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
     DeviceLayerTypes, DeviceProvider, DeviceSendFrameError, WeakDeviceId,
 };
-use netstack3_filter::{FilterBindingsTypes, FilterTimerId};
+use netstack3_filter::{
+    FilterBindingsTypes, FilterIpExt, FilterTimerId, IpPacket, SocketEgressFilterResult,
+    SocketOpsFilter, SocketOpsFilterBindingContext,
+};
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 use netstack3_ip::device::{
     IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
@@ -754,6 +757,28 @@ impl FilterBindingsTypes for FakeBindingsCtx {
     type DeviceClass = ();
 }
 
+struct NoOpSocketOpsFilter;
+
+impl<D: netstack3_base::StrongDeviceIdentifier, T> SocketOpsFilter<D, T> for NoOpSocketOpsFilter {
+    fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
+        &self,
+        _packet: &P,
+        _device: &D,
+        _tx_metadata: &T,
+        _marks: &Marks,
+    ) -> SocketEgressFilterResult {
+        SocketEgressFilterResult::Pass { congestion: false }
+    }
+}
+
+impl SocketOpsFilterBindingContext<DeviceId<FakeBindingsCtx>> for FakeBindingsCtx {
+    fn socket_ops_filter(
+        &self,
+    ) -> impl SocketOpsFilter<DeviceId<FakeBindingsCtx>, TxMetadata<FakeBindingsCtx>> {
+        NoOpSocketOpsFilter
+    }
+}
+
 impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeBindingsCtx {
     fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<TimerId<FakeBindingsCtx>>) -> O>(
         &self,
@@ -1435,6 +1460,7 @@ pub struct PureIpDeviceAndIpVersion<BT: DeviceLayerTypes> {
 }
 
 /// A frame that's been dispatched to Bindings to be sent out the device driver.
+#[derive(Debug)]
 pub enum DispatchedFrame {
     /// A frame that's been dispatched to an Ethernet device.
     Ethernet(EthernetWeakDeviceId<FakeBindingsCtx>),

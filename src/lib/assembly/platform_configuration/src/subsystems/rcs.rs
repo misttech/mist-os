@@ -4,7 +4,7 @@
 
 use super::{
     BoardInformationExt, BuildType, ConfigurationBuilder, ConfigurationContext,
-    DefineSubsystemConfiguration, FeatureSupportLevel,
+    DefineSubsystemConfiguration, FeatureSetLevel,
 };
 
 pub struct RcsSubsystemConfig;
@@ -17,7 +17,7 @@ impl DefineSubsystemConfiguration<()> for RcsSubsystemConfig {
         if matches!(
             (context.feature_set_level, context.build_type),
             (
-                FeatureSupportLevel::Utility | FeatureSupportLevel::Standard,
+                FeatureSetLevel::Utility | FeatureSetLevel::Standard,
                 BuildType::UserDebug | BuildType::Eng
             )
         ) && context.board_info.provides_feature("fuchsia::usb_peripheral_support")

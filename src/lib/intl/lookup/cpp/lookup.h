@@ -42,6 +42,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "gtest/gtest_prod.h"
 #include "src/lib/intl/lookup/rust/lookup.h"

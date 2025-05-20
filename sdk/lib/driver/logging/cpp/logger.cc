@@ -16,7 +16,7 @@ namespace fdf {
 namespace {
 std::atomic<Logger*> g_instance = nullptr;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 using FidlSeverity = fuchsia_diagnostics_types::wire::Severity;
 using FidlInterest = fuchsia_diagnostics_types::wire::Interest;
 #else
@@ -42,8 +42,8 @@ bool Logger::FlushRecord(flog::LogBuffer& buffer, uint32_t dropped) {
 }
 
 void Logger::BeginRecord(flog::LogBuffer& buffer, FuchsiaLogSeverity severity,
-                         cpp17::optional<cpp17::string_view> file_name, unsigned int line,
-                         cpp17::optional<cpp17::string_view> message, uint32_t dropped) {
+                         std::optional<std::string_view> file_name, unsigned int line,
+                         std::optional<std::string_view> message, uint32_t dropped) {
   static zx_koid_t pid = GetKoid(zx_process_self());
   static thread_local zx_koid_t tid = GetKoid(zx_thread_self());
   buffer.BeginRecord(severity, file_name, line, message, socket_.borrow(), dropped, pid, tid);
@@ -152,7 +152,7 @@ void Logger::HandleInterest(FidlInterest interest) {
       case FidlSeverity::kFatal:
         severity_ = FUCHSIA_LOG_FATAL;
         return;
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
       default:
         severity_ = FUCHSIA_LOG_INFO;
         return;

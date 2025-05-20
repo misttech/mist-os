@@ -6,11 +6,11 @@
 
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/devicetree/devicetree.h>
-#include <lib/stdcompat/array.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
 
+#include <array>
 #include <optional>
 #include <string_view>
 
@@ -50,8 +50,7 @@ concept Watchdog = WatchdogMmioHelper<MmioHelper> &&
 
 struct QualcomMsmWatchdog {
   // List of devicetree compatible strings that this `Watchdog` item should be matched to.
-  static constexpr auto kCompatibleDevices =
-      cpp20::to_array<std::string_view>({"qcom,msm-watchdog"});
+  static constexpr auto kCompatibleDevices = std::to_array<std::string_view>({"qcom,msm-watchdog"});
 
   static constexpr uint32_t kResetOffset = 0x4;
   static constexpr uint32_t kEnableOffset = 0x8;

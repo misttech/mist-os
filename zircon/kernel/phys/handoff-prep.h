@@ -16,13 +16,13 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/intrusive_single_list.h>
+#include <ktl/algorithm.h>
 #include <ktl/byte.h>
 #include <ktl/concepts.h>
 #include <ktl/initializer_list.h>
-#include <ktl/move.h>
-#include <ktl/pair.h>
 #include <ktl/span.h>
 #include <ktl/tuple.h>
+#include <ktl/utility.h>
 #include <phys/handoff-ptr.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
@@ -277,6 +277,9 @@ class HandoffPrep {
 
   // Publishes a PhysVmar with a single mapping covering its extent.
   void PublishSingleMappingVmar(PhysMapping mapping, MappingType type);
+
+  // This constructs a PhysElfImage from an ELF file in the KernelStorage.
+  PhysElfImage MakePhysElfImage(KernelStorage::Bootfs::iterator file, ktl::string_view name);
 
   // Do final handoff of the VM object lists.  The contents are already in
   // place so this does not invalidate any pointers to the objects (e.g., from

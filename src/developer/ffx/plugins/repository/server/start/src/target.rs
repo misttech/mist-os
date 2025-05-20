@@ -101,7 +101,7 @@ async fn inner_connect_loop(
     let rcs_proxy = timeout(
         connect_timeout,
         rcs_proxy.try_connect(|target, _err| {
-            tracing::info!(
+            log::info!(
                 "RCS proxy: Waiting for target '{}' to return",
                 match target {
                     Some(s) => s,
@@ -125,7 +125,7 @@ async fn inner_connect_loop(
     let mut target_spec_from_target_proxy: Option<String> = None;
     let target_proxy = target_proxy
         .try_connect(|target, _err| {
-            tracing::info!(
+            log::info!(
                 "Target proxy: Waiting for target '{}' to return",
                 match target {
                     Some(s) => s,
@@ -175,9 +175,9 @@ async fn inner_connect_loop(
                 }
             };
             if let Err(e) = writeln!(writer, "{}", s) {
-                tracing::error!("Failed to write to output: {:?}", e);
+                log::error!("Failed to write to output: {:?}", e);
             }
-            tracing::info!("{}", s);
+            log::info!("{}", s);
             loop {
                 fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
                 match knock_target(&target_proxy).await {
@@ -187,9 +187,9 @@ async fn inner_connect_loop(
                     Err(e) => {
                         let s = format!("Connection to target lost, retrying. Error: {}", e);
                         if let Err(e) = writeln!(writer, "{}", s) {
-                            tracing::error!("Failed to write to output: {:?}", e);
+                            log::error!("Failed to write to output: {:?}", e);
                         }
-                        tracing::warn!(s);
+                        log::warn!("{}", s);
                         break;
                     }
                 }
@@ -258,7 +258,7 @@ pub(crate) async fn main_connect_loop(
                         attempts = 0;
                     }
                     Err(e) => {
-                        tracing::info!("Attempt {attempts}: {}", e);
+                        log::info!("Attempt {attempts}: {}", e);
                     }
                 }
             },

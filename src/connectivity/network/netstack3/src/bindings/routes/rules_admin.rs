@@ -7,8 +7,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::ops::ControlFlow;
 use std::pin::pin;
 
-use assert_matches::assert_matches;
-use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
+use async_utils::fold::{FoldResult, FoldWhile};
+use fidl::endpoints::ControlHandle as _;
 use fnet_routes_ext::rules::{
     FidlRuleAdminIpExt, InstalledRule, InterfaceMatcher, MarkMatcher, RuleAction, RuleIndex,
     RuleMatcher, RuleSetPriority, RuleSetRequest, RuleTableRequest,
@@ -19,10 +19,10 @@ use futures::TryStreamExt as _;
 use net_types::ip::Ip;
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_async as fasync,
 };
 
-use crate::bindings::util::{IntoCore as _, TaskWaitGroupSpawner, TryFromFidl, TryIntoCore as _};
+use crate::bindings::util::{IntoCore as _, ScopeExt as _, TryFromFidl, TryIntoCore as _};
 use crate::bindings::{routes, Ctx};
 pub(super) use witness::AddableMatcher;
 
@@ -263,6 +263,7 @@ struct UserRuleSet<I: Ip> {
 #[derive(Debug)]
 enum ApplyRuleWorkError<E> {
     RuleSetClosed,
+    ScopeCanceled,
     RuleWorkError(E),
 }
 
@@ -278,7 +279,7 @@ impl<E> ApplyRuleWorkError<E> {
         responder: R,
     ) -> Result<ControlFlow<R::ControlHandle>, fidl::Error> {
         match result {
-            Err(ApplyRuleWorkError::RuleSetClosed) => {
+            Err(ApplyRuleWorkError::RuleSetClosed | ApplyRuleWorkError::ScopeCanceled) => {
                 Ok(ControlFlow::Break(responder.control_handle().clone()))
             }
             Err(ApplyRuleWorkError::RuleWorkError(err)) => {
@@ -338,7 +339,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                     Err(err) => {
                         log::warn!("error addding a rule: {err:?}");
                         return responder
-                            .send(Err(fnet_routes_admin::RuleSetError::BaseMatcherMissing))
+                            .send(Err(fnet_routes_admin::RuleSetError::InvalidMatcher))
                             .map(ControlFlow::Continue);
                     }
                 };
@@ -363,75 +364,65 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
         &self,
         op: RuleOp<I>,
     ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
+        // The rule worker gets unhappy with us if we drop the receiver. Ensure
+        // we're going to stay alive until a response comes in.
+        let scope_guard =
+            fasync::Scope::current().active_guard().ok_or(ApplyRuleWorkError::ScopeCanceled)?;
+
         let (responder, receiver) = oneshot::channel();
         self.rule_work_sink
             .unbounded_send(RuleWorkItem::RuleOp { op, responder })
             .map_err(|mpsc::TrySendError { .. }| ApplyRuleWorkError::RuleSetClosed)?;
-        receiver
+        let result = receiver
             .await
             .expect("responder should not be dropped")
-            .map_err(ApplyRuleWorkError::RuleWorkError)
+            .map_err(ApplyRuleWorkError::RuleWorkError);
+        drop(scope_guard);
+        result
     }
 }
 
 async fn serve_rule_set<I: FidlRuleAdminIpExt>(
     stream: I::RuleSetRequestStream,
     mut set: UserRuleSet<I>,
-) {
-    let mut stream = pin!(stream);
-
-    let control_handle = loop {
-        match stream.try_next().await {
-            Err(err) => {
-                if !err.is_closed() {
-                    log::error!("error serving {}: {err:?}", I::RuleSetMarker::DEBUG_NAME);
-                    break None;
-                }
-            }
-            Ok(None) => break None,
-            Ok(Some(request)) => {
-                match set.handle_request(I::into_rule_set_request(request)).await {
-                    Ok(ControlFlow::Continue(())) => {}
-                    Ok(ControlFlow::Break(control_handle)) => break Some(control_handle),
-                    Err(err) => {
-                        let level =
-                            if err.is_closed() { log::Level::Warn } else { log::Level::Error };
-                        log::log!(
-                            level,
-                            "error serving {}: {:?}",
-                            I::RuleSetMarker::DEBUG_NAME,
-                            err
-                        );
-                        break None;
-                    }
-                }
-            }
+) -> Result<(), fidl::Error> {
+    let result = async_utils::fold::try_fold_while(stream, &mut set, |set, req| async move {
+        match set.handle_request(I::into_rule_set_request(req)).await? {
+            ControlFlow::Continue(()) => Ok(FoldWhile::Continue(set)),
+            ControlFlow::Break(control_handle) => Ok(FoldWhile::Done(control_handle)),
         }
-    };
+    })
+    .await
+    .map(|r| match r {
+        FoldResult::ShortCircuited(control_handle) => Some(control_handle),
+        FoldResult::StreamEnded(_set) => None,
+    });
 
     match set.apply_rule_op(RuleOp::RemoveSet { priority: set.priority }).await {
         Ok(()) => {}
-        Err(err) => {
-            assert_matches!(err, ApplyRuleWorkError::RuleSetClosed);
-            log::warn!(
-                "rule set was already removed when finish serving {}",
-                I::RuleSetMarker::DEBUG_NAME
-            )
-        }
+        Err(err) => match err {
+            e @ ApplyRuleWorkError::RuleSetClosed | e @ ApplyRuleWorkError::ScopeCanceled => {
+                log::warn!("rule set removal skipped: {e:?}");
+            }
+            ApplyRuleWorkError::RuleWorkError(e) => {
+                panic!("unexpected rule set removal error {e:?}")
+            }
+        },
     }
 
-    // This shutdown does nothing because the stream is never polled again, we
-    // are actually relying on the drop impl to close the channel. This is just
-    // to be explicit that a Close was called.
-    if let Some(control_handle) = control_handle {
-        control_handle.shutdown();
-    }
+    result.map(|control_handle| {
+        // This shutdown does nothing because the stream is never polled again, we
+        // are actually relying on the drop impl to close the channel. This is just
+        // to be explicit that a Close was called.
+        if let Some(control_handle) = control_handle {
+            control_handle.shutdown();
+        }
+    })
 }
 
 pub(crate) async fn serve_rule_table<I: FidlRuleAdminIpExt>(
     stream: I::RuleTableRequestStream,
-    spawner: TaskWaitGroupSpawner,
-    ctx: &Ctx,
+    ctx: Ctx,
 ) -> Result<(), fidl::Error> {
     let mut stream = pin!(stream);
 
@@ -447,7 +438,10 @@ pub(crate) async fn serve_rule_table<I: FidlRuleAdminIpExt>(
                             priority,
                             route_table_authorization_set: Default::default(),
                         };
-                        spawner.spawn(serve_rule_set::<I>(rule_set_request_stream, rule_set));
+                        fasync::Scope::current()
+                            .spawn_request_stream_handler(rule_set_request_stream, |rs| {
+                                serve_rule_set::<I>(rs, rule_set)
+                            });
                     }
                     Err(err) => {
                         log::warn!(

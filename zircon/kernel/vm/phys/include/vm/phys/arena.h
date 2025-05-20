@@ -9,13 +9,13 @@
 
 #include <lib/fit/result.h>
 #include <lib/memalloc/range.h>
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
+#include <bit>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -130,7 +130,7 @@ struct PmmArenaSelectionError {
 //     allocation choices.
 //
 template <uint64_t PageSize, typename ArenaCallback, typename ErrorCallback>  //
-constexpr void SelectPmmArenas(cpp20::span<const memalloc::Range> ranges,     //
+constexpr void SelectPmmArenas(std::span<const memalloc::Range> ranges,       //
                                ArenaCallback&& arenas,                        //
                                ErrorCallback&& errors,                        //
                                uint64_t max_wasted_bytes = kMaxWastedArenaBytes);
@@ -144,7 +144,7 @@ constexpr void SelectPmmArenas(cpp20::span<const memalloc::Range> ranges,     //
 // This routine is of interest to the PMM, as we wish to wire all such ranges
 // that fall within an arena.
 template <uint64_t PageSize, typename Callback>
-void ForEachAlignedAllocationOrHole(cpp20::span<const memalloc::Range> ranges, Callback&& cb) {
+void ForEachAlignedAllocationOrHole(std::span<const memalloc::Range> ranges, Callback&& cb) {
   auto align = [](memalloc::Range& range) {
     uint64_t start = range.addr & -PageSize;
     range.size = ((range.addr - start) + range.size + PageSize - 1) & -PageSize;
@@ -218,15 +218,15 @@ namespace internal {
 // some shared, private helper routines.
 template <uint64_t PageSize>
 class PmmArenaSelector {
-  static_assert(cpp20::has_single_bit(PageSize));
-  static_assert(cpp20::has_single_bit(kArenaPageBookkeepingAlignment));
+  static_assert(std::has_single_bit(PageSize));
+  static_assert(std::has_single_bit(kArenaPageBookkeepingAlignment));
 
   // Page boundaries should be appropriate places to put bookkeeping.
   static_assert(kArenaPageBookkeepingAlignment <= PageSize);
 
  public:
   template <typename ArenaCallback, typename ErrorCallback>
-  static constexpr void Select(cpp20::span<const memalloc::Range> ranges, ArenaCallback&& arenas,
+  static constexpr void Select(std::span<const memalloc::Range> ranges, ArenaCallback&& arenas,
                                ErrorCallback&& errors, uint64_t max_wasted_bytes) {
     auto it = ranges.begin();
     while (it != ranges.end()) {
@@ -251,7 +251,7 @@ class PmmArenaSelector {
 
  private:
   using ErrorType = PmmArenaSelectionError::Type;
-  using RangeIterator = cpp20::span<const memalloc::Range>::iterator;
+  using RangeIterator = std::span<const memalloc::Range>::iterator;
 
   static constexpr uint64_t RoundDown(uint64_t addr) { return addr & -PageSize; }
   static constexpr uint64_t RoundUp(uint64_t addr) { return (addr + PageSize - 1) & -PageSize; }
@@ -407,7 +407,7 @@ class PmmArenaSelector {
 }  // namespace internal
 
 template <uint64_t PageSize, typename ArenaCallback, typename ErrorCallback>  //
-constexpr void SelectPmmArenas(cpp20::span<const memalloc::Range> ranges,     //
+constexpr void SelectPmmArenas(std::span<const memalloc::Range> ranges,       //
                                ArenaCallback&& arenas,                        //
                                ErrorCallback&& errors,                        //
                                uint64_t max_wasted_bytes) {

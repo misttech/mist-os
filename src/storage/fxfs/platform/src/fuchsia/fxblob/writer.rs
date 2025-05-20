@@ -6,8 +6,9 @@
 
 use crate::fuchsia::directory::FxDirectory;
 use crate::fuchsia::errors::map_to_status;
+use crate::fuchsia::fxblob::blob::{CompressionInfo, FxBlob};
 use crate::fuchsia::fxblob::BlobDirectory;
-use crate::fuchsia::node::FxNode;
+use crate::fuchsia::node::{FxNode, GetResult};
 use crate::fuchsia::volume::FxVolume;
 use anyhow::{Context as _, Error};
 use base64::prelude::{Engine as _, BASE64_STANDARD};
@@ -66,6 +67,28 @@ fn on_decompression_error(
     });
 }
 
+enum Stage {
+    Writing(DataObjectHandle<FxVolume>),
+    Complete,
+}
+
+impl Stage {
+    fn complete(&mut self) -> DataObjectHandle<FxVolume> {
+        let old = std::mem::replace(self, Stage::Complete);
+        match old {
+            Stage::Writing(handle) => handle,
+            Stage::Complete => panic!("Called complete twice!"),
+        }
+    }
+
+    fn handle(&self) -> &DataObjectHandle<FxVolume> {
+        match self {
+            Stage::Writing(handle) => handle,
+            Stage::Complete => panic!("Tried to access handle after completion"),
+        }
+    }
+}
+
 /// Represents an RFC-0207 compliant delivery blob that is being written. Used to implement the
 /// fuchisa.fxfs/BlobWriter protocol (see [`Self::handle_requests`]).
 ///
@@ -74,12 +97,11 @@ fn on_decompression_error(
 pub struct DeliveryBlobWriter {
     /// The expected hash for this blob. **MUST** match the Merkle root from [`Self::tree_builder`].
     hash: Hash,
-    /// Handle to this blob within the filesystem.
-    handle: DataObjectHandle<FxVolume>,
     /// The parent directory we will add this blob to once verified.
     parent: Arc<FxDirectory>,
-    /// Set to true once we have verified the blob and ensured it was added to the blob directory.
-    is_completed: bool,
+    /// Either Stage::Writing with an associated Handle to this blob within the filesystem, or
+    /// Stage::Complete once the blob has finished writing.
+    stage: Stage,
     /// Total number of bytes we expect for this delivery blob (via fuchsia.fxfs/BlobWriter.GetVmo).
     /// This is checked against the header + payload size encoded within the delivery blob.
     expected_size: Option<u64>,
@@ -134,9 +156,8 @@ impl DeliveryBlobWriter {
         transaction.commit().await.context("Failed to commit transaction.")?;
         Ok(Self {
             hash,
-            handle,
             parent,
-            is_completed: false,
+            stage: Stage::Writing(handle),
             expected_size: None,
             total_written: 0,
             vmo: None,
@@ -154,12 +175,12 @@ impl DeliveryBlobWriter {
 impl Drop for DeliveryBlobWriter {
     /// Tombstone the object if we didn't finish writing the blob or the hash didn't match.
     fn drop(&mut self) {
-        if !self.is_completed {
-            let store = self.handle.store();
+        if let Stage::Writing(handle) = &self.stage {
+            let store = handle.store();
             store
                 .filesystem()
                 .graveyard()
-                .queue_tombstone_object(store.store_object_id(), self.handle.object_id());
+                .queue_tombstone_object(store.store_object_id(), handle.object_id());
         }
     }
 }
@@ -197,7 +218,7 @@ impl DeliveryBlobWriter {
         })?;
         let final_write =
             (self.payload_persisted as usize + self.buffer.len()) == self.header().payload_length;
-        let block_size = self.handle.block_size() as usize;
+        let block_size = self.stage.handle().block_size() as usize;
         let flush_threshold = std::cmp::max(block_size, PAYLOAD_BUFFER_FLUSH_THRESHOLD);
         // If we expect more data but haven't met the flush threshold, wait for more.
         if !final_write && self.buffer.len() < flush_threshold {
@@ -224,13 +245,14 @@ impl DeliveryBlobWriter {
 
         // Copy data into transfer buffer, zero pad if required.
         let aligned_len = round_up(len, block_size).ok_or(FxfsError::OutOfRange)?;
-        let mut buffer = self.handle.allocate_buffer(aligned_len).await;
+        let mut buffer = self.stage.handle().allocate_buffer(aligned_len).await;
         buffer.as_mut_slice()[..len].copy_from_slice(&self.buffer[..len]);
         buffer.as_mut_slice()[len..].fill(0);
 
         // Overwrite allocated bytes in the object's handle.
         let overwrite_fut = async {
-            self.handle
+            self.stage
+                .handle()
                 .overwrite(self.payload_persisted - self.payload_offset, buffer.as_mut(), false)
                 .await
                 .context("Failed to write data to object handle.")
@@ -244,7 +266,7 @@ impl DeliveryBlobWriter {
         Ok(())
     }
 
-    fn generate_metadata(&self, merkle_tree: MerkleTree) -> Result<Option<BlobMetadata>, Error> {
+    fn generate_metadata(&self, merkle_tree: &MerkleTree) -> Result<Option<BlobMetadata>, Error> {
         // We only write metadata if the Merkle tree has multiple levels or the data is compressed.
         let is_compressed = self.header().is_compressed;
         // Special case: handle empty compressed archive.
@@ -274,22 +296,23 @@ impl DeliveryBlobWriter {
         if self.allocated_space {
             return Ok(());
         }
+        let handle = self.stage.handle();
         let size = self.storage_size() as u64;
-        let mut range = 0..round_up(size, self.handle.block_size()).ok_or(FxfsError::OutOfRange)?;
+        let mut range = 0..round_up(size, handle.block_size()).ok_or(FxfsError::OutOfRange)?;
         let mut first_time = true;
         while range.start < range.end {
             let mut transaction =
-                self.handle.new_transaction().await.context("Failed to create transaction.")?;
+                handle.new_transaction().await.context("Failed to create transaction.")?;
             if first_time {
-                self.handle
+                handle
                     .grow(&mut transaction, 0, size)
                     .await
                     .with_context(|| format!("Failed to grow handle to {} bytes.", size))?;
                 first_time = false;
             }
-            self.handle.preallocate_range(&mut transaction, &mut range).await.with_context(
-                || format!("Failed to allocate range ({} to {}).", range.start, range.end),
-            )?;
+            handle.preallocate_range(&mut transaction, &mut range).await.with_context(|| {
+                format!("Failed to allocate range ({} to {}).", range.start, range.end)
+            })?;
             transaction.commit().await.context("Failed to commit transaction.")?;
         }
         self.allocated_space = true;
@@ -310,19 +333,28 @@ impl DeliveryBlobWriter {
             });
         }
         // Write metadata to disk.
-        let metadata =
-            self.generate_metadata(merkle_tree).context("Failed to generate metadata for blob.")?;
-        if let Some(metadata) = metadata {
-            let mut serialized = vec![];
-            bincode::serialize_into(&mut serialized, &metadata)?;
-            self.handle
-                .write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized)
-                .await
-                .context("Failed to write metadata for blob.")?;
-        }
+        let compression_info = match self
+            .generate_metadata(&merkle_tree)
+            .context("Failed to generate metadata for blob.")?
+        {
+            Some(metadata) => {
+                let mut serialized = vec![];
+                bincode::serialize_into(&mut serialized, &metadata)?;
+                self.stage
+                    .handle()
+                    .write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized)
+                    .await
+                    .context("Failed to write metadata for blob.")?;
+                CompressionInfo::from_metadata(metadata)?
+            }
+            None => None,
+        };
 
-        let volume = self.handle.owner();
-        let store = self.handle.store();
+        let name = format!("{}", self.hash);
+        let (volume, store, object_id) = {
+            let handle = self.stage.handle();
+            (handle.owner().clone(), handle.store(), handle.object_id())
+        };
         let dir = volume
             .cache()
             .get(store.root_directory_object_id())
@@ -331,7 +363,6 @@ impl DeliveryBlobWriter {
             .downcast::<BlobDirectory>()
             .expect("Expected blob directory");
 
-        let name = format!("{}", self.hash);
         let mut transaction = dir
             .directory()
             .directory()
@@ -340,10 +371,9 @@ impl DeliveryBlobWriter {
             .context("Failed to acquire context for replacement.")?
             .transaction;
 
-        let object_id = self.handle.object_id();
         store.remove_from_graveyard(&mut transaction, object_id);
 
-        match replace_child_with_object(
+        let replacing = match replace_child_with_object(
             &mut transaction,
             Some((object_id, ObjectDescriptor::File)),
             (dir.directory().directory(), &name),
@@ -353,18 +383,31 @@ impl DeliveryBlobWriter {
         .await
         .context("Replacing child failed.")?
         {
-            ReplacedChild::None => {}
-            _ => {
-                return Err(FxfsError::AlreadyExists)
-                    .with_context(|| format!("Blob {} already exists", self.hash));
+            ReplacedChild::None => None,
+            ReplacedChild::Object(old) => {
+                let reservation = match volume.cache().get_or_reserve(object_id).await {
+                    GetResult::Placeholder(p) => p,
+                    _ => unreachable!(),
+                };
+                Some(((old), reservation))
             }
-        }
+            _ => return Err(FxfsError::Inconsistent.into()),
+        };
 
         transaction
             .commit_with_callback(|_| {
-                self.is_completed = true;
-                // This can't actually add the node to the cache, because it hasn't been created
-                // ever at this point. Passes in None for now as a result.
+                let handle = self.stage.complete();
+                if let Some((old_id, reservation)) = replacing {
+                    self.parent.did_remove(&name);
+                    // If the blob is in the cache, then we need to swap it.
+                    if let Some(old_blob) = handle.owner().cache().get(old_id) {
+                        let old_blob = old_blob.into_any().downcast::<FxBlob>().unwrap();
+                        let new_blob =
+                            old_blob.overwrite_me(handle, compression_info) as Arc<dyn FxNode>;
+                        old_blob.mark_to_be_purged();
+                        reservation.commit(&new_blob);
+                    }
+                }
                 self.parent.did_add(&name, None);
             })
             .await
@@ -606,9 +649,10 @@ mod tests {
     use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
     use core::ops::Range;
     use delivery_blob::CompressionMode;
-    use fidl_fuchsia_fxfs::CreateBlobError;
+    use fidl_fuchsia_fxfs::{BlobCreatorMarker, CreateBlobError};
     use fidl_fuchsia_io::UnlinkOptions;
-    use fuchsia_async as fasync;
+    use fuchsia_async::{self as fasync, TimeoutExt as _};
+    use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use rand::{thread_rng, Rng};
 
     fn generate_list_of_writes(compressed_data_len: u64) -> Vec<Range<u64>> {
@@ -761,7 +805,7 @@ mod tests {
     }
 
     #[fasync::run(10, test)]
-    async fn test_new_rewrite_fails() {
+    async fn test_new_rewrite_succeeds() {
         let fixture = new_blob_fixture().await;
 
         let mut data = vec![1; 196608];
@@ -805,7 +849,6 @@ mod tests {
                 write_offset += len;
             }
 
-            let mut count = 0;
             write_offset = 0;
             for range in &list_of_writes {
                 let len = range.end - range.start;
@@ -815,25 +858,12 @@ mod tests {
                         write_offset % vmo_size,
                     )
                     .expect("failed to write to vmo");
-                if count == list_of_writes.len() - 1 {
-                    assert_eq!(
-                        writer_2
-                            .bytes_ready(len)
-                            .await
-                            .expect("transport error on bytes_ready")
-                            .map_err(Status::from_raw)
-                            .expect_err("write unexpectedly succeeded"),
-                        zx::Status::ALREADY_EXISTS
-                    );
-                } else {
-                    let _ = writer_2
-                        .bytes_ready(len)
-                        .await
-                        .expect("transport error on bytes_ready")
-                        .expect("failed to write data to vmo");
-                }
+                writer_2
+                    .bytes_ready(len)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .expect("failed to write data to vmo");
                 write_offset += len;
-                count += 1;
             }
         }
         assert_eq!(fixture.read_blob(hash).await, data);
@@ -1104,6 +1134,171 @@ mod tests {
                 .expect("transport error on bytes_ready")
                 .expect_err("should fail writing blob if size passed to get_vmo is incorrect");
         }
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn allow_existing_cleans_up_old() {
+        let fixture = new_blob_fixture().await;
+
+        let data = vec![1; 65536];
+
+        let hash = fuchsia_merkle::from_slice(&data).root();
+        let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
+
+        {
+            let writer =
+                fixture.create_blob(&hash.into(), true).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+            writer
+                .bytes_ready(delivery_data.len() as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect("failed to write data to vmo");
+
+            assert_eq!(fixture.read_blob(hash).await, data);
+        };
+        {
+            let blob_dir =
+                fixture.volume().root().clone().into_any().downcast::<BlobDirectory>().unwrap();
+            let old_blob = blob_dir.lookup_blob(hash).await.expect("Looking up blob");
+            let old_id = old_blob.object_id();
+
+            let writer =
+                fixture.create_blob(&hash.into(), true).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+            writer
+                .bytes_ready(delivery_data.len() as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect("failed to write data to vmo");
+
+            let new_blob = blob_dir.lookup_blob(hash).await.expect("Looking up blob");
+            assert_ne!(new_blob.object_id(), old_id);
+            // The old blob isn't gone yet and it should be in the cache, because we're holding a
+            // reference.
+            fixture.volume().volume().cache().get(old_id).unwrap();
+
+            // Wait for our Arc to be the last strong ref, then it gets dropped. Nothing else
+            // should be referencing it here after the tasks complete.
+            assert!(
+                async move {
+                    while Arc::strong_count(&old_blob) > 1 {
+                        fasync::Timer::new(std::time::Duration::from_millis(25)).await;
+                    }
+                    true
+                }
+                .on_timeout(std::time::Duration::from_secs(10), || false)
+                .await
+            );
+            fixture.fs().graveyard().flush().await;
+            fixture
+                .volume()
+                .volume()
+                .get_or_load_node(old_id, ObjectDescriptor::File, None)
+                .await
+                .unwrap_err();
+
+            // Blob is still readable.
+            assert_eq!(fixture.read_blob(hash).await, data);
+        };
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn allow_existing_page_in_smoke_test() {
+        let fixture = new_blob_fixture().await;
+
+        const SIZE: usize = 65536;
+        let data = vec![1; SIZE];
+
+        let hash = fuchsia_merkle::from_slice(&data).root();
+        let delivery_data = Type1Blob::generate(&data, CompressionMode::Never);
+
+        // Create the initial blob.
+        {
+            let writer =
+                fixture.create_blob(&hash.into(), false).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(delivery_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+
+            vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+            writer
+                .bytes_ready(delivery_data.len() as u64)
+                .await
+                .expect("transport error on bytes_ready")
+                .expect("failed to write data to vmo");
+        };
+
+        let finished = Arc::new(AtomicBool::new(false));
+        let stop_looping = finished.clone();
+        let creator_proxy =
+            connect_to_protocol_at_dir_svc::<BlobCreatorMarker>(fixture.volume_out_dir())
+                .expect("failed to connect to the BlobCreator service");
+        let hash_cpy = hash;
+        // Repeatedly overwrite the blob.
+        let overwrite_loop = fasync::Task::spawn(async move {
+            let hash = hash_cpy;
+            while !stop_looping.load(Ordering::Relaxed) {
+                let writer = creator_proxy
+                    .create(&hash.into(), true)
+                    .await
+                    .expect("transport error on create")
+                    .unwrap()
+                    .into_proxy();
+                let vmo = writer
+                    .get_vmo(delivery_data.len() as u64)
+                    .await
+                    .expect("transport error on get_vmo")
+                    .expect("failed to get vmo");
+
+                vmo.write(&delivery_data, 0).expect("failed to write to vmo");
+                writer
+                    .bytes_ready(delivery_data.len() as u64)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .expect("failed to write data to vmo");
+            }
+        });
+
+        let mut last_koid = 0;
+        let mut reopen_count = 0;
+        for _ in 0..1000 {
+            // Flush the cache first. This is racy and doesn't always cause the blob to get dropped
+            // if it happens during overwrite completion.
+            fixture.volume().volume().dirent_cache().clear();
+
+            let child_vmo = fixture.get_blob_vmo(hash).await;
+            let koid = child_vmo.info().unwrap().parent_koid.raw_koid();
+            if last_koid != koid {
+                last_koid = koid;
+                reopen_count += 1;
+            }
+            assert_eq!(child_vmo.read_to_vec(0, SIZE as u64).expect("vmo read failed"), data);
+        }
+        finished.store(true, Ordering::Relaxed);
+        overwrite_loop.await;
+
+        // If this never reopens, then we're probably not clearing cache correctly anymore and this
+        // test will not be hitting the code paths required. This is technically racy, but it would
+        // require overwrite to be as fast or faster than open read and close every one of the
+        // thousand iterations.
+        assert_ne!(reopen_count, 0);
         fixture.close().await;
     }
 }

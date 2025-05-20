@@ -171,7 +171,7 @@ process has been started), `userboot` no longer has anything to do.
 
 If [the `userboot.shutdown` option was given on the kernel command line](/docs/reference/kernel/kernel_cmdline.md#userboot-shutdown),
 then `userboot` waits for the process it started to exit, and then shuts
-down the system (as if by the `dm shutdown` command).  This can be useful
+down the system (as if by the `power shutdown` command).  This can be useful
 to run a single test program and then shut down the machine (or emulator).
 For example, the command line `userboot.next=bin/core-tests userboot.shutdown`
 runs the Zircon core tests and then shuts down.

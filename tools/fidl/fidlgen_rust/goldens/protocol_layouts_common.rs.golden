@@ -254,6 +254,41 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
 
 impl fidl::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
+pub mod main_protocol_ordinals {
+    pub const ONE_WAY_ANON_COMPOSED: u64 = 0x67da05e1ae3f5e1;
+    pub const TWO_WAY_ANON_COMPOSED: u64 = 0x16afa17ea70d3370;
+    pub const TWO_WAY_ANON_COMPOSED_WITH_ERROR: u64 = 0x2ed33746b7bb119d;
+    pub const ON_ANON_COMPOSED: u64 = 0x7fa8a0bf08128a0b;
+    pub const ONE_WAY_NAMED_COMPOSED: u64 = 0x5d78ce13958eee58;
+    pub const TWO_WAY_NAMED_COMPOSED: u64 = 0xf67f27cae663810;
+    pub const TWO_WAY_NAMED_COMPOSED_WITH_ERROR: u64 = 0x30dac4182813ef7f;
+    pub const ON_NAMED_COMPOSED: u64 = 0x5e68f92a5b28cdea;
+    pub const ONE_WAY_IMPORT: u64 = 0x530db65f2691d3b;
+    pub const TWO_WAY_IMPORT: u64 = 0x2bf680c8f0d40604;
+    pub const TWO_WAY_IMPORT_WITH_ERROR: u64 = 0x432093586084ff0a;
+    pub const ON_IMPORT: u64 = 0x5b61e3156b09acd0;
+    pub const ONE_WAY_LOCAL: u64 = 0x54759b55efd60f43;
+    pub const TWO_WAY_LOCAL: u64 = 0x6bbeeb18f39c539b;
+    pub const TWO_WAY_LOCAL_WITH_ERROR: u64 = 0x4dd8e7287c4c9b57;
+    pub const ON_LOCAL: u64 = 0x3a46c48153f0437c;
+    pub const ONE_WAY_ANON: u64 = 0x3a552f30c77c76ec;
+    pub const TWO_WAY_ANON: u64 = 0x672eb5e71efdabcf;
+    pub const TWO_WAY_ANON_WITH_ERROR: u64 = 0x6bd5fcf6f7b46df1;
+    pub const ON_ANON: u64 = 0x64f7b1ec1ba0810b;
+}
+
+pub mod open_protocol_ordinals {
+    pub const FLEXIBLE_ONE_WAY: u64 = 0x30ce1cc0e7e88521;
+    pub const FLEXIBLE_TWO_WAY_NO_ERROR: u64 = 0x4d5655754da320d8;
+    pub const FLEXIBLE_TWO_WAY_WITH_ERROR: u64 = 0x30a12dd4f7823782;
+    pub const FLEXIBLE_EVENT: u64 = 0x7f038af71aad17d4;
+    pub const STRICT_ONE_WAY: u64 = 0x79fce2c7f5b1bfa7;
+    pub const STRICT_TWO_WAY_NO_ERROR: u64 = 0x3338d68165132184;
+    pub const STRICT_TWO_WAY_WITH_ERROR: u64 = 0x4a72f997c7db5037;
+    pub const STRICT_EVENT: u64 = 0x366a73eb0b37159d;
+    pub const FLEXIBLE_ONE_WAY_NAMED_PAYLOAD: u64 = 0x152c0b4acb5c0570;
+}
+
 mod internal {
     use super::*;
 

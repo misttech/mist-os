@@ -50,6 +50,11 @@ std::vector<debug_ipc::AddressRegion> MockProcessHandle::GetAddressSpace(uint64_
   return {};
 }
 
+std::optional<debug_ipc::AddressRegion> MockProcessHandle::GetSharedAddressSpace() const {
+  // Not currently implemented in this mock.
+  return std::nullopt;
+}
+
 std::vector<debug_ipc::Module> MockProcessHandle::GetModules() const {
   // Not currently implemented in this mock.
   return {};

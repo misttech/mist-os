@@ -12,7 +12,6 @@ use std::net::SocketAddr;
 #[derive(Debug, Clone)]
 pub enum TargetInfoQuery {
     /// Attempts to match the nodename, falling back to serial (in that order).
-    /// TODO(b/299345828): Make this an exact match by default, fall back to substring matching
     NodenameOrSerial(String),
     Serial(String),
     Addr(SocketAddr),
@@ -54,15 +53,14 @@ impl TargetInfoQuery {
     }
 
     pub fn match_description(&self, t: &Description) -> bool {
-        tracing::debug!("Matching description {t:?} against query {self:?}");
+        log::debug!("Matching description {t:?} against query {self:?}");
         match self {
             Self::NodenameOrSerial(arg) => {
                 if let Some(ref nodename) = t.nodename {
-                    if nodename.contains(arg) {
+                    if nodename == arg {
                         return true;
                     }
                 }
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial {
                     if serial == arg {
                         return true;
@@ -71,7 +69,6 @@ impl TargetInfoQuery {
                 false
             }
             Self::Serial(arg) => {
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial {
                     if serial == arg {
                         return true;
@@ -94,11 +91,10 @@ impl TargetInfoQuery {
         match self {
             Self::NodenameOrSerial(arg) => {
                 if let Some(ref nodename) = t.nodename {
-                    if nodename.contains(arg) {
+                    if nodename == arg {
                         return true;
                     }
                 }
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial_number {
                     if serial == arg {
                         return true;
@@ -107,7 +103,6 @@ impl TargetInfoQuery {
                 false
             }
             Self::Serial(arg) => {
-                // Serial numbers require an exact match
                 if let Some(ref serial) = t.serial_number {
                     if serial == arg {
                         return true;
@@ -201,7 +196,6 @@ impl From<&str> for TargetInfoQuery {
 impl From<String> for TargetInfoQuery {
     /// If the string can be parsed as some kind of IP address, will attempt to
     /// match based on that, else fall back to the nodename or serial matches.
-    #[tracing::instrument]
     fn from(s: String) -> Self {
         if s == "" {
             return Self::First;
@@ -225,7 +219,7 @@ impl From<String> for TargetInfoQuery {
         let (addr, scope, port) = match netext::parse_address_parts(s.as_str()) {
             Ok(r) => r,
             Err(e) => {
-                tracing::trace!(
+                log::trace!(
                     "Failed to parse address from '{s}'. Interpreting as nodename: {:?}",
                     e
                 );

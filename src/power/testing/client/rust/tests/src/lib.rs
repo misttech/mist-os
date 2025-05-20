@@ -8,7 +8,7 @@ use fuchsia_component_test::RealmBuilder;
 use power_framework_test_realm::{PowerFrameworkTestRealmBuilder, PowerFrameworkTestRealmInstance};
 
 use {
-    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
+    fidl_fuchsia_hardware_power_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
     fidl_test_sagcontrol as ftsagcontrol, fidl_test_suspendcontrol as tsc,
 };

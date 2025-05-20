@@ -52,12 +52,12 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
 
   // Set up gArchPhysInfo as early as possible, as the boot hart ID needs to
   // be supplied to the CPU topology devicetree matcher.
-  ArchSetUp(nullptr);
+  ArchSetUp({});
 
   // Explicitly provide `nullptr` address space, so the MMU is not set up.
   // We do not know yet the supported features/extension in riscv, avoid possibly setting
   // invalid bits in the page tables by not setting up the MMU at all.
-  InitMemory(fdt, nullptr);
+  InitMemory(fdt, {}, nullptr);
 
   MainSymbolize symbolize(kShimName);
 

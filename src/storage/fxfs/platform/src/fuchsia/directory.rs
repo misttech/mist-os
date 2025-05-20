@@ -98,8 +98,12 @@ impl FxDirectory {
         mut path: Path,
         request: &ObjectRequest,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
-        if path.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
-            return Ok(OpenedNode::new(self.clone()));
+        if path.is_empty() {
+            return if protocols.create_unnamed_temporary_in_directory_path() {
+                self.create_unnamed_temporary_file(request.create_attributes()).await
+            } else {
+                Ok(OpenedNode::new(self.clone()))
+            };
         }
         let store = self.store();
         let fs = store.filesystem();
@@ -108,12 +112,7 @@ impl FxDirectory {
             let last_segment = path.is_single_component();
             let current_dir =
                 current_node.into_any().downcast::<FxDirectory>().map_err(|_| FxfsError::NotDir)?;
-            let name = path.next().unwrap_or_default();
-            // The only situation where we expect the name to be empty is when we are creating a
-            // temporary unnamed file.
-            if name.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
-                bail!(FxfsError::InvalidArgs);
-            }
+            let name = path.next().unwrap();
 
             // Create the transaction here if we might need to create the object so that we have a
             // lock in place.
@@ -121,12 +120,11 @@ impl FxDirectory {
                 store.store_object_id(),
                 current_dir.directory.object_id()
             )];
-            let create_object = match protocols.creation_mode() {
-                vfs::CreationMode::AllowExisting | vfs::CreationMode::Always => last_segment,
-                vfs::CreationMode::UnnamedTemporary
-                | vfs::CreationMode::UnlinkableUnnamedTemporary => name.is_empty(),
-                vfs::CreationMode::Never => false,
-            };
+            let create_object = last_segment
+                && matches!(
+                    protocols.creation_mode(),
+                    vfs::CreationMode::AllowExisting | vfs::CreationMode::Always
+                );
             let transaction_or_guard = if create_object {
                 Left(fs.clone().new_transaction(keys, Options::default()).await?)
             } else {
@@ -136,11 +134,7 @@ impl FxDirectory {
                 Right(fs.lock_manager().read_lock(keys).await)
             };
 
-            let create_unnamed_temporary_file_in_this_segment =
-                create_object && protocols.create_unnamed_temporary_in_directory_path();
-            let child_descriptor = if create_unnamed_temporary_file_in_this_segment {
-                None
-            } else {
+            let child_descriptor = {
                 match self.directory.owner().dirent_cache().lookup(&(current_dir.object_id(), name))
                 {
                     Some(node) => {
@@ -185,6 +179,19 @@ impl FxDirectory {
                         bail!(FxfsError::AlreadyExists);
                     }
                     if last_segment {
+                        if protocols.create_unnamed_temporary_in_directory_path() {
+                            if !matches!(object_descriptor, ObjectDescriptor::Directory) {
+                                bail!(FxfsError::WrongType);
+                            }
+                            let dir = child_node
+                                .into_any()
+                                .downcast::<FxDirectory>()
+                                .map_err(|_| FxfsError::Inconsistent)?;
+                            return dir
+                                .create_unnamed_temporary_file(request.create_attributes())
+                                .await;
+                        }
+
                         match object_descriptor {
                             ObjectDescriptor::Directory => {
                                 if !protocols.is_node() && !protocols.is_dir_allowed() {
@@ -221,34 +228,26 @@ impl FxDirectory {
                 }
                 None => {
                     if let Left(mut transaction) = transaction_or_guard {
-                        let new_node = if create_unnamed_temporary_file_in_this_segment {
-                            current_dir
-                                .create_unnamed_temporary_file(
-                                    &mut transaction,
-                                    request.create_attributes(),
-                                )
-                                .await?
-                        } else {
-                            current_dir
-                                .create_child(
-                                    &mut transaction,
-                                    name,
-                                    protocols.create_directory(),
-                                    request.create_attributes(),
-                                )
-                                .await?
-                        };
-                        let node = OpenedNode::new(new_node.clone());
+                        let new_node = current_dir
+                            .create_child(
+                                &mut transaction,
+                                name,
+                                protocols.create_directory(),
+                                request.create_attributes(),
+                            )
+                            .await?;
                         if let GetResult::Placeholder(p) =
-                            self.volume().cache().get_or_reserve(node.object_id()).await
+                            self.volume().cache().get_or_reserve(new_node.object_id()).await
                         {
-                            transaction
+                            return transaction
                                 .commit_with_callback(|_| {
-                                    p.commit(&node);
-                                    current_dir.did_add(name, Some(new_node));
+                                    p.commit(&new_node);
+                                    current_dir.did_add(name, Some(new_node.clone()));
+                                    // NOTE: We don't take the open count until here in case the
+                                    // transaction fails.
+                                    OpenedNode::new(new_node)
                                 })
-                                .await?;
-                            return Ok(node);
+                                .await;
                         } else {
                             // We created a node, but the object ID was already used in the cache,
                             // which suggests a object ID was reused (which would either be a bug or
@@ -293,20 +292,33 @@ impl FxDirectory {
 
     async fn create_unnamed_temporary_file(
         self: &Arc<Self>,
-        transaction: &mut Transaction<'_>,
         create_attributes: Option<&fio::MutableNodeAttributes>,
-    ) -> Result<Arc<dyn FxNode>, Error> {
-        let file = FxFile::new_unnamed_temporary(
-            self.directory.create_child_unnamed_temporary_file(transaction).await?,
+    ) -> Result<OpenedNode<dyn FxNode>, Error> {
+        let store = self.store();
+        let fs = store.filesystem();
+        let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
+        let mut transaction = fs.clone().new_transaction(keys, Options::default()).await?;
+        let file = FxFile::new(
+            self.directory.create_child_unnamed_temporary_file(&mut transaction).await?,
         );
         if let Some(attrs) = create_attributes {
             file.handle()
                 .uncached_handle()
-                .update_attributes(transaction, Some(&attrs), None)
+                .update_attributes(&mut transaction, Some(&attrs), None)
                 .await?;
         }
-
-        Ok(file as Arc<dyn FxNode>)
+        let GetResult::Placeholder(p) =
+            self.volume().cache().get_or_reserve(file.object_id()).await
+        else {
+            bail!(FxfsError::Inconsistent);
+        };
+        transaction
+            .commit_with_callback(|_| {
+                let file = file.open_as_temporary();
+                p.commit(&file);
+                file
+            })
+            .await
     }
 
     /// Called to indicate a file or directory was removed from this directory.
@@ -555,6 +567,11 @@ impl FxDirectory {
                         self.did_remove(dst);
                     }
                     ReplacedChild::Directory(id) => {
+                        let store = self.store();
+                        store
+                            .filesystem()
+                            .graveyard()
+                            .queue_tombstone_object(store.store_object_id(), id);
                         self.did_remove(dst);
                         self.volume().mark_directory_deleted(id);
                     }
@@ -647,7 +664,7 @@ impl MutableDirectory for FxDirectory {
                     .commit_with_callback(|_| self.did_remove(name))
                     .await
                     .map_err(map_to_status)?;
-                // If purging fails , we should still return success, since the file will appear
+                // If purging fails, we should still return success, since the file will appear
                 // unlinked at this point anyways.  The file should be cleaned up on a later mount.
                 if let Err(e) = self.volume().maybe_purge_file(id).await {
                     warn!(error:? = e; "Failed to purge file");
@@ -656,6 +673,11 @@ impl MutableDirectory for FxDirectory {
             ReplacedChild::Directory(id) => {
                 transaction
                     .commit_with_callback(|_| {
+                        let store = self.store();
+                        store
+                            .filesystem()
+                            .graveyard()
+                            .queue_tombstone_object(store.store_object_id(), id);
                         self.did_remove(name);
                         self.volume().mark_directory_deleted(id);
                     })
@@ -856,7 +878,7 @@ impl vfs::node::Node for FxDirectory {
 }
 
 impl VfsDirectory for FxDirectory {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         _scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -918,7 +940,7 @@ impl VfsDirectory for FxDirectory {
         ));
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -926,12 +948,12 @@ impl VfsDirectory for FxDirectory {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
         self.volume().scope().clone().spawn(object_request.take().handle_async(
-            async move |object_request| self.open3_async(scope, path, flags, object_request).await,
+            async move |object_request| self.open_async(scope, path, flags, object_request).await,
         ));
         Ok(())
     }
 
-    async fn open3_async(
+    async fn open_async(
         self: Arc<Self>,
         _scope: ExecutionScope,
         path: Path,
@@ -1092,27 +1114,45 @@ mod tests {
         close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
         open_file_checked, TestFixture, TestFixtureOptions,
     };
+    use anyhow::bail;
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
     use futures::{join, StreamExt};
+    use fxfs::lsm_tree::types::{ItemRef, LayerIterator};
+    use fxfs::lsm_tree::Query;
     use fxfs::object_store::transaction::{lock_keys, LockKey};
-    use fxfs::object_store::Timestamp;
+    use fxfs::object_store::{ObjectKey, ObjectKeyData, ObjectValue, Timestamp};
     use fxfs_crypto::FSCRYPT_PADDING;
     use fxfs_insecure_crypto::InsecureCrypt;
     use rand::Rng;
+    use std::future::poll_fn;
     use std::os::fd::AsRawFd;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
+    use std::task::Poll;
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
-    use vfs::common::rights_to_posix_mode_bits;
     use vfs::node::Node;
     use vfs::path::Path;
     use vfs::ObjectRequest;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+    async fn yield_to_executor() {
+        let mut done = false;
+        poll_fn(|cx| {
+            if done {
+                Poll::Ready(())
+            } else {
+                done = true;
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        })
+        .await;
+    }
 
     #[fuchsia::test]
     async fn test_open_root_dir() {
@@ -1128,12 +1168,7 @@ mod tests {
         for i in 0..2 {
             let fixture = TestFixture::open(
                 device,
-                TestFixtureOptions {
-                    format: i == 0,
-                    encrypted: true,
-                    as_blob: false,
-                    serve_volume: false,
-                },
+                TestFixtureOptions { format: i == 0, ..Default::default() },
             )
             .await;
             let root = fixture.root();
@@ -3252,7 +3287,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_set_attrs() {
+    async fn test_deprecated_set_attrs() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
@@ -3277,7 +3312,7 @@ mod tests {
         attrs.creation_time = crtime;
         attrs.modification_time = mtime;
         let status = dir
-            .set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
+            .deprecated_set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
             .await
             .expect("FIDL call failed");
         zx::Status::ok(status).expect("set_attr failed");
@@ -3292,7 +3327,7 @@ mod tests {
         attrs.creation_time = 0u64; // This should be ignored since we don't set the flag.
         attrs.modification_time = mtime;
         let status = dir
-            .set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
+            .deprecated_set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
             .await
             .expect("FIDL call failed");
         zx::Status::ok(status).expect("set_attr failed");
@@ -4192,8 +4227,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-            let mode = fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
             let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes {
@@ -4281,8 +4315,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-            let mode = fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
             let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes {
@@ -4331,8 +4364,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::FileMarker>();
-            let mode = fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let uid = 1;
             let gid = 2;
             let rdev = 3;
@@ -4429,8 +4461,7 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-            let mode = fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let mode: u32 = 0o123;
             let uid = 1;
             let gid = 2;
             let rdev = 3;
@@ -4812,16 +4843,9 @@ mod tests {
             fixture.close().await
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let dir = open_dir_checked(
             &root,
@@ -4917,16 +4941,9 @@ mod tests {
             (fixture.close().await, mutable_attributes.access_time, initial_ctime)
         };
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                format: false,
-                as_blob: false,
-                encrypted: true,
-                serve_volume: false,
-            },
-        )
-        .await;
+        let fixture =
+            TestFixture::open(device, TestFixtureOptions { format: false, ..Default::default() })
+                .await;
         let root = fixture.root();
         let dir = open_dir_checked(
             &root,
@@ -4946,6 +4963,119 @@ mod tests {
             .expect("get_attributes failed");
         assert_eq!(immutable_attributes.change_time, expected_ctime);
         assert_eq!(mutable_attributes.access_time, expected_atime);
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_directory_immediately_tombstoned() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let dir = open_dir_checked(
+            &root,
+            "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            fio::Options::default(),
+        )
+        .await;
+
+        let (_mutable, immutable) = dir
+            .get_attributes(fio::NodeAttributesQuery::ID)
+            .await
+            .expect("transport error on get_attributes")
+            .expect("get_attributes failed");
+        let foo_object_id = immutable.id.unwrap();
+
+        let dir = open_dir_checked(
+            &root,
+            "bar",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            fio::Options::default(),
+        )
+        .await;
+
+        let (_mutable, immutable) = dir
+            .get_attributes(fio::NodeAttributesQuery::ID)
+            .await
+            .expect("transport error on get_attributes")
+            .expect("get_attributes failed");
+        let bar_object_id = immutable.id.unwrap();
+
+        // Check rename.
+        let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_token failed");
+        root.rename("foo", zx::Event::from(dst_token.unwrap()), "bar")
+            .await
+            .expect("FIDL call failed")
+            .expect("rename failed");
+
+        // Allow the graveyard to run.
+        yield_to_executor().await;
+
+        // The easiest way to verify the object has been deleted is to scan the LSM tree.
+        let assert_not_found = async |oid| {
+            let tree = fixture.volume().volume().store().tree();
+            let layer_set = tree.layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = merger.query(Query::FullScan).await.unwrap();
+            while let Some(item) = iter.get() {
+                match item {
+                    ItemRef { value: ObjectValue::None, .. } => {}
+                    ItemRef {
+                        key: ObjectKey { object_id, data: ObjectKeyData::Object }, ..
+                    } => {
+                        assert_ne!(*object_id, oid);
+                    }
+                    _ => {}
+                }
+                iter.advance().await.unwrap();
+            }
+        };
+
+        assert_not_found(bar_object_id).await;
+
+        // Now check unlink.
+        root.unlink("bar", &Default::default())
+            .await
+            .expect("FIDL call failed")
+            .expect("unlink failed");
+
+        assert_not_found(foo_object_id).await;
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_failed_create_unnamed_file_transaction() {
+        let fail = Arc::new(AtomicU64::new(0));
+        let fail_clone = fail.clone();
+        let fixture = TestFixture::open(
+            DeviceHolder::new(FakeDevice::new(16384, 512)),
+            TestFixtureOptions {
+                pre_commit_hook: Some(Box::new(move |_| {
+                    if fail_clone.load(Ordering::Relaxed) > 0 {
+                        fail_clone.fetch_sub(1, Ordering::Relaxed);
+                        bail!("Aborted transaction");
+                    }
+                    Ok(())
+                })),
+                ..Default::default()
+            },
+        )
+        .await;
+        let root = fixture.root();
+
+        fail.fetch_add(1, Ordering::Relaxed);
+
+        let _dir = open_file(
+            &root,
+            ".",
+            fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY,
+            &fio::Options::default(),
+        )
+        .await
+        .expect_err("Create unexpectedly succeeded");
+
         fixture.close().await;
     }
 }

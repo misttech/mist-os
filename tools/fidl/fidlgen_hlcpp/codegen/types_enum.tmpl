@@ -80,7 +80,7 @@ template <>
 struct CodingTraits<{{ . }}> {
   static constexpr size_t kInlineSize = sizeof({{ . }});
   static void Encode(Encoder* encoder, {{ . }}* value, size_t offset,
-                     cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                     std::optional<::fidl::HandleInformation> maybe_handle_info) {
     ZX_DEBUG_ASSERT(!maybe_handle_info);
     {{ .Type }} underlying = static_cast<{{ .Type }}>(*value);
     ::fidl::Encode(encoder, &underlying, offset);

@@ -5,6 +5,7 @@ use crate::init_connection_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_command_error::{FfxContext as _, Result};
+use ffx_target::fho::target_interface;
 use fho::{FhoEnvironment, TryFromEnv};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use std::ops::Deref;
@@ -29,11 +30,12 @@ impl From<ffx_fidl::TargetProxy> for TargetProxyHolder {
 #[async_trait(?Send)]
 impl TryFromEnv for TargetProxyHolder {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
+        let target_env = target_interface(env);
+        if target_env.behavior().is_none() {
             let b = init_connection_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
+            target_env.set_behavior(b);
         }
-        match env.injector::<Self>().await?.target_factory().await.map_err(|e| {
+        match target_env.injector::<Self>(env).await?.target_factory().await.map_err(|e| {
             // This error case happens when there are multiple targets in target list.
             // So let's print out the ffx error message directly (which comes from OpenTargetError::QueryAmbiguous)
             // rather than just returning "Failed to create target proxy" which is not helpful.

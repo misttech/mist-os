@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_transitivedependencies_BazTable;
 const fidl_type_t* Baz::FidlType = &test_transitivedependencies_BazTable;
 
 void Baz::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<Baz>::value) {
     memcpy(_encoder->template GetPtr<Baz>(_offset), this, sizeof(Baz));
   } else {

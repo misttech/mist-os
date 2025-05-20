@@ -21,7 +21,8 @@ use packet::records::{AlignedRecordSequenceBuilder, Records, RecordsRaw};
 use packet::{
     BufferAlloc, BufferProvider, BufferView, BufferViewMut, EmptyBuf, FragmentedBytesMut, FromRaw,
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
-    ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
+    ParsablePacket, ParseMetadata, PartialPacketBuilder, ReusableBuffer, SerializeError,
+    SerializeTarget, Serializer,
 };
 use zerocopy::byteorder::network_endian::{U16, U32};
 use zerocopy::{
@@ -896,6 +897,21 @@ pub struct Ipv6PacketRaw<B> {
     body_proto: Result<(MaybeParsed<B, B>, Ipv6Proto), ExtHdrParseError>,
 }
 
+impl<B> Ipv6PacketRaw<B> {
+    /// Returns a mutable reference to the body bytes of this [`Ipv6PacketRaw`].
+    ///
+    /// Might not be complete if a full packet was not received.
+    pub fn body_mut(&mut self) -> Option<&mut B> {
+        match self.body_proto {
+            Ok(ref mut b) => match b {
+                (MaybeParsed::Complete(ref mut b), _) => Some(b),
+                (MaybeParsed::Incomplete(ref mut b), _) => Some(b),
+            },
+            Err(_) => None,
+        }
+    }
+}
+
 impl<B: SplitByteSlice> Ipv6Header for Ipv6PacketRaw<B> {
     fn get_fixed_header(&self) -> &FixedHeader {
         &self.fixed_hdr
@@ -1133,6 +1149,17 @@ macro_rules! impl_packet_builder {
     }
 }
 
+macro_rules! impl_partial_packet_builder {
+    {} => {
+        fn partial_serialize(&self, body_len: usize, mut buffer: &mut [u8]) {
+            self.serialize_header(
+                &mut &mut buffer,
+                NextHeader::NextLayer(self.fixed_header().proto()),
+                body_len,
+            );
+        }
+    }
+}
 /// A builder for IPv6 packets.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ipv6PacketBuilder {
@@ -1225,6 +1252,10 @@ impl Ipv6HeaderBuilder for Ipv6PacketBuilder {
 
 impl PacketBuilder for Ipv6PacketBuilder {
     impl_packet_builder! {}
+}
+
+impl PartialPacketBuilder for Ipv6PacketBuilder {
+    impl_partial_packet_builder! {}
 }
 
 /// A builder for Ipv6 packets with HBH Options.
@@ -1347,6 +1378,14 @@ where
     impl_packet_builder! {}
 }
 
+impl<'a, I> PartialPacketBuilder for Ipv6PacketBuilderWithHbhOptions<'a, I>
+where
+    I: Iterator + Clone,
+    I::Item: Borrow<HopByHopOption<'a>>,
+{
+    impl_partial_packet_builder! {}
+}
+
 impl<'a, I> IpPacketBuilder<Ipv6> for Ipv6PacketBuilderWithHbhOptions<'a, I>
 where
     I: Iterator<Item: Borrow<HopByHopOption<'a>>> + Debug + Default + Clone,
@@ -1464,6 +1503,10 @@ impl<B: Ipv6HeaderBuilder> Ipv6HeaderBuilder for Ipv6PacketBuilderWithFragmentHe
 
 impl<B: Ipv6HeaderBuilder> PacketBuilder for Ipv6PacketBuilderWithFragmentHeader<B> {
     impl_packet_builder! {}
+}
+
+impl<B: Ipv6HeaderBuilder> PartialPacketBuilder for Ipv6PacketBuilderWithFragmentHeader<B> {
+    impl_partial_packet_builder! {}
 }
 
 /// Reassembles a fragmented packet into a parsed IP packet.

@@ -8,7 +8,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/dispatcher.h>
 #include <object/event_pair_dispatcher.h>
 

@@ -231,6 +231,7 @@ mod tests {
             let request = stream.try_next().await.unwrap();
             if let Some(fpower::BatteryInfoWatcherRequest::OnChangeBatteryInfo {
                 info,
+                wake_lease: _,
                 responder,
             }) = request
             {
@@ -244,6 +245,7 @@ mod tests {
             let request = stream.try_next().await.unwrap();
             if let Some(fpower::BatteryInfoWatcherRequest::OnChangeBatteryInfo {
                 info,
+                wake_lease: _,
                 responder,
             }) = request
             {

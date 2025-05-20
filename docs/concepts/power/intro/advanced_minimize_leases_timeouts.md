@@ -27,7 +27,7 @@ observes the system suspending it must see if the current time is less than the
 last interrupt arrival time plus the timeout and if so, acquire a wake lease and
 hold it until the timeout for the last received interrupt arrives.
 
-Note: There is a [helper][wake_lease] class that implements this strategy in C++
+Note: The [`TimeoutWakeLease`][wake_lease] class implements this strategy in C++
 with the use of its `HandleInterrupt` method.
 
 Using timeouts as a solution here is challenging because we must guess how long

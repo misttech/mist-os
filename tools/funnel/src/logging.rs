@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use logging::LogFormat;
+use log::LevelFilter;
+use logging::log_based::{FfxLog, FfxLogSink, FormatOpts, LogSinkTrait, TargetsFilter};
 use rand::Rng;
-
-use tracing_subscriber::filter::{self, LevelFilter};
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::Layer;
+use std::sync::{Arc, Mutex};
 
 lazy_static::lazy_static! {
     static ref LOGGING_ID: u64 = generate_id();
@@ -24,20 +22,20 @@ pub fn init(level: LevelFilter) -> Result<()> {
     Ok(())
 }
 
-fn target_levels() -> Vec<(String, LevelFilter)> {
-    vec![]
+struct OnFilter;
+
+impl logging::log_based::Filter for OnFilter {
+    fn should_emit(&self, _record: &log::Metadata<'_>) -> bool {
+        true
+    }
 }
 
 fn configure_subscribers(level: LevelFilter) {
-    let filter_targets = filter::Targets::new().with_targets(target_levels()).with_default(level);
-
-    let include_spans = true;
-    let stdio_layer = {
-        let event_format = LogFormat::new(*LOGGING_ID, include_spans);
-        let format =
-            tracing_subscriber::fmt::layer().event_format(event_format).with_filter(filter_targets);
-        Some(format)
-    };
-
-    tracing_subscriber::registry().with(stdio_layer).init();
+    let sinks: Vec<Box<dyn LogSinkTrait>> =
+        vec![FfxLogSink::new(Arc::new(Mutex::new(std::io::stdout()))).boxed()];
+    let targets_filter = TargetsFilter::new(vec![]);
+    let format = FormatOpts::new(*LOGGING_ID);
+    let logger = FfxLog::new(sinks, format, OnFilter {}, level, targets_filter);
+    let _ = log::set_boxed_logger(Box::new(logger))
+        .map(|()| log::set_max_level(log::LevelFilter::Trace));
 }

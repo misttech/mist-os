@@ -9,9 +9,7 @@
 //!
 //! Full details at https://docs.kernel.org/admin-guide/cgroup-v2.html#core-interface-files
 
-use std::sync::{Arc, Weak};
-
-use starnix_core::task::{CgroupOps, CurrentTask, ProcessEntryRef};
+use starnix_core::task::{CgroupOps, CurrentTask, Kernel, ProcessEntryRef};
 use starnix_core::vfs::{
     AppendLockGuard, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode,
     FsNodeOps, InputBuffer,
@@ -24,6 +22,7 @@ use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, pid_t};
+use std::sync::{Arc, Weak};
 
 pub struct ControlGroupNode {
     cgroup: Weak<dyn CgroupOps>,
@@ -42,10 +41,10 @@ impl FsNodeOps for ControlGroupNode {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(ControlGroupFile::new(self.cgroup.clone())))
+        Ok(Box::new(ControlGroupFile::new(current_task.kernel(), self.cgroup.clone())))
     }
 
     fn truncate(
@@ -61,6 +60,7 @@ impl FsNodeOps for ControlGroupNode {
 }
 
 struct ControlGroupFileSource {
+    kernel: Weak<Kernel>,
     cgroup: Weak<dyn CgroupOps>,
 }
 
@@ -68,12 +68,16 @@ impl ControlGroupFileSource {
     fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
         self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
     }
+
+    fn kernel(&self) -> Result<Arc<Kernel>, Errno> {
+        self.kernel.upgrade().ok_or_else(|| errno!(ENODEV))
+    }
 }
 
 impl DynamicFileSource for ControlGroupFileSource {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let cgroup = self.cgroup()?;
-        for pid in cgroup.get_pids() {
+        for pid in cgroup.get_pids(self.kernel()?.as_ref()) {
             write!(sink, "{pid}\n")?;
         }
         Ok(())
@@ -88,10 +92,13 @@ pub struct ControlGroupFile {
 }
 
 impl ControlGroupFile {
-    fn new(cgroup: Weak<dyn CgroupOps>) -> Self {
+    fn new(kernel: &Arc<Kernel>, cgroup: Weak<dyn CgroupOps>) -> Self {
         Self {
             cgroup: cgroup.clone(),
-            dynamic_file: DynamicFile::new(ControlGroupFileSource { cgroup: cgroup.clone() }),
+            dynamic_file: DynamicFile::new(ControlGroupFileSource {
+                kernel: Arc::downgrade(kernel),
+                cgroup: cgroup.clone(),
+            }),
         }
     }
 
@@ -125,7 +132,7 @@ impl FileOps for ControlGroupFile {
             return error!(EINVAL);
         };
 
-        self.cgroup()?.add_process(pid, &thread_group)?;
+        self.cgroup()?.add_process(&thread_group)?;
 
         Ok(bytes.len())
     }

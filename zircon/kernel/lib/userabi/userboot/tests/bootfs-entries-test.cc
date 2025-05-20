@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.boot/cpp/wire_types.h>
 #include <lib/standalone-test/standalone.h>
-#include <lib/stdcompat/array.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/process.h>
 #include <link.h>

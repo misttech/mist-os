@@ -40,11 +40,3 @@ fshost_component_and_config("test-fshost-storage-host-netboot") {
     gpt_all = true
   }
 }
-
-# The device should use an all-0's master key, as we lack support for any
-# secure on-device storage.  This is only for use with test fshost packages.
-generated_resource("test_zxcrypt_config") {
-  testonly = true
-  outputs = [ "config/zxcrypt" ]
-  contents = "null"
-}

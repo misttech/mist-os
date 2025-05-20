@@ -34,13 +34,8 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
         builder.platform_bundle("driver_framework");
 
-        match driver_framework.use_rust_driver_host {
-            true => builder.platform_bundle("driver_host_rust"),
-            false => builder.platform_bundle("driver_host_cpp"),
-        };
-
         let enable_ephemeral_drivers = match (context.build_type, context.feature_set_level) {
-            (BuildType::Eng, FeatureSupportLevel::Standard) => {
+            (BuildType::Eng, FeatureSetLevel::Standard) => {
                 builder.platform_bundle("full_drivers");
                 true
             }
@@ -49,7 +44,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
 
         let delay_fallback = matches!(
             context.feature_set_level,
-            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+            FeatureSetLevel::Utility | FeatureSetLevel::Standard
         );
 
         let test_fuzzing_config =
@@ -135,7 +130,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
             software_names.push("ram-disk");
             software_ids.push(bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK);
         }
-        if *context.feature_set_level == FeatureSupportLevel::Standard
+        if *context.feature_set_level == FeatureSetLevel::Standard
             && *context.build_type == BuildType::Eng
         {
             software_names.push("virtual-audio");
@@ -147,7 +142,7 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         if context.board_info.provides_feature("fuchsia::fake_battery")
             && matches!(
                 context.feature_set_level,
-                FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
+                FeatureSetLevel::Utility | FeatureSetLevel::Standard
             )
         {
             software_names.push("fake-battery");
@@ -194,6 +189,11 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         }
         if bus_kpci {
             builder.platform_bundle("bus_kpci_driver");
+        }
+
+        let interconnect = context.board_info.provides_feature("fuchsia::interconnect");
+        if interconnect {
+            builder.platform_bundle("interconnect_driver");
         }
 
         Ok(())

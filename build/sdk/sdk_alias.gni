@@ -66,5 +66,18 @@ template("sdk_alias") {
     if (defined(invoker.non_sdk_deps)) {
       public_deps += invoker.non_sdk_deps
     }
+
+    if (is_atom) {
+      metadata = {
+        # Used by idk_prebuild_manifest() template.
+        idk_atom_prebuild_info = [
+          {
+            atom_type = "alias"
+            atom_label = get_label_info(":${target_name}", "label_no_toolchain")
+            atom_actual = get_label_info(invoker.target, "label_no_toolchain")
+          },
+        ]
+      }
+    }
   }
 }

@@ -19,7 +19,12 @@ use storage_device::DeviceHolder;
 pub async fn new_blob_fixture() -> TestFixture {
     TestFixture::open(
         DeviceHolder::new(FakeDevice::new(16384, 512)),
-        TestFixtureOptions { encrypted: false, as_blob: true, format: true, serve_volume: true },
+        TestFixtureOptions {
+            encrypted: false,
+            as_blob: true,
+            serve_volume: true,
+            ..Default::default()
+        },
     )
     .await
 }
@@ -27,7 +32,13 @@ pub async fn new_blob_fixture() -> TestFixture {
 pub async fn open_blob_fixture(device_holder: DeviceHolder) -> TestFixture {
     TestFixture::open(
         device_holder,
-        TestFixtureOptions { encrypted: false, as_blob: true, format: false, serve_volume: true },
+        TestFixtureOptions {
+            encrypted: false,
+            as_blob: true,
+            format: false,
+            serve_volume: true,
+            ..Default::default()
+        },
     )
     .await
 }

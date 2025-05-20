@@ -19,7 +19,8 @@ To capture the output and additional logs:
 
     $ ffx doctor --record
 
-By default, this outputs the zip in the current directory.
+By default, this outputs the zip in the current directory. Enabling `--record`
+also sets the `--verbose` flag to true.
 
 To override output dir:
 

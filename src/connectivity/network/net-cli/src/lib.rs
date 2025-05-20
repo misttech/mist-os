@@ -1017,6 +1017,18 @@ async fn do_route_list<C: NetCliDepsConnector>(
     .await;
     let mut v4_routes = v4_routes.context("failed to collect all existing IPv4 routes")?;
     let mut v6_routes = v6_routes.context("failed to collect all existing IPv6 routes")?;
+
+    fn group_by_table_id_and_sort<I: net_types::ip::Ip>(
+        routes: &mut Vec<froutes_ext::InstalledRoute<I>>,
+    ) {
+        routes.sort_unstable_by_key(|r| r.table_id);
+        for chunk in routes.chunk_by_mut(|a, b| a.table_id == b.table_id) {
+            chunk.sort();
+        }
+    }
+    group_by_table_id_and_sort(&mut v4_routes);
+    group_by_table_id_and_sort(&mut v6_routes);
+
     if out.is_machine() {
         fn to_ser<I: net_types::ip::Ip>(
             route: froutes_ext::InstalledRoute<I>,
@@ -1056,11 +1068,9 @@ async fn do_route_list<C: NetCliDepsConnector>(
             let () = add_row(t, row![destination, next_hop, device_id, metric, table_id]);
         }
 
-        v4_routes.sort();
         for route in v4_routes {
             write_route(&mut t, route);
         }
-        v6_routes.sort();
         for route in v6_routes {
             write_route(&mut t, route);
         }
@@ -3235,32 +3245,58 @@ mac               -
     fn wanted_route_list_json() -> String {
         json!([
             {
+                "destination":{"addr":"0.0.0.0","prefix_len":0},
+                "gateway":"127.0.0.1",
+                "metric":4,
+                "nicid":3,
+                "table_id":0,
+            },
+            {
                 "destination":{"addr":"1.1.1.0","prefix_len":24},
                 "gateway":"1.1.1.2",
                 "metric":4,
-                "nicid":3
+                "nicid":3,
+                "table_id":0,
             },
             {
                 "destination":{"addr":"10.10.10.0","prefix_len":24},
                 "gateway":"10.10.10.20",
                 "metric":40,
-                "nicid":30
+                "nicid":30,
+                "table_id":1,
+            },
+            {
+                "destination":{"addr":"11.11.11.0","prefix_len":28},
+                "gateway":null,
+                "metric":40,
+                "nicid":30,
+                "table_id":1,
+            },
+            {
+                "destination":{"addr":"ff00::","prefix_len":8},
+                "gateway":null,
+                "metric":400,
+                "nicid":300,
+                "table_id":2,
             },
             {
                 "destination":{"addr":"fe80::","prefix_len":64},
-                "gateway":serde_json::Value::Null,
+                "gateway":null,
                 "metric":400,
-                "nicid":300
-            }
-
+                "nicid":300,
+                "table_id":2,
+            },
         ])
         .to_string()
     }
 
     fn wanted_route_list_tabular() -> String {
         "Destination      Gateway        NICID    Metric    TableId
+         0.0.0.0/0        127.0.0.1      3        4         0
          1.1.1.0/24       1.1.1.2        3        4         0
          10.10.10.0/24    10.10.10.20    30       40        1
+         11.11.11.0/28    -              30       40        1
+         ff00::/8         -              300      400       2
          fe80::/64        -              300      400       2
          "
         .to_string()
@@ -3335,12 +3371,78 @@ mac               -
                 table_id: Some(1),
                 ..Default::default()
             }),
+            froutes::EventV4::Existing(froutes::InstalledRouteV4 {
+                route: Some(froutes::RouteV4 {
+                    destination: net_declare::fidl_ip_v4_with_prefix!("0.0.0.0/0"),
+                    action: froutes::RouteActionV4::Forward(froutes::RouteTargetV4 {
+                        outbound_interface: 3,
+                        next_hop: Some(Box::new(net_declare::fidl_ip_v4!("127.0.0.1"))),
+                    }),
+                    properties: froutes::RoutePropertiesV4 {
+                        specified_properties: Some(froutes::SpecifiedRouteProperties {
+                            metric: Some(froutes::SpecifiedMetric::ExplicitMetric(4)),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                }),
+                effective_properties: Some(froutes::EffectiveRouteProperties {
+                    metric: Some(4),
+                    ..Default::default()
+                }),
+                table_id: Some(0),
+                ..Default::default()
+            }),
+            froutes::EventV4::Existing(froutes::InstalledRouteV4 {
+                route: Some(froutes::RouteV4 {
+                    destination: net_declare::fidl_ip_v4_with_prefix!("11.11.11.0/28"),
+                    action: froutes::RouteActionV4::Forward(froutes::RouteTargetV4 {
+                        outbound_interface: 30,
+                        next_hop: None,
+                    }),
+                    properties: froutes::RoutePropertiesV4 {
+                        specified_properties: Some(froutes::SpecifiedRouteProperties {
+                            metric: Some(froutes::SpecifiedMetric::ExplicitMetric(40)),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                }),
+                effective_properties: Some(froutes::EffectiveRouteProperties {
+                    metric: Some(40),
+                    ..Default::default()
+                }),
+                table_id: Some(1),
+                ..Default::default()
+            }),
             froutes::EventV4::Idle(froutes::Empty),
         ];
         let v6_route_events = vec![
             froutes::EventV6::Existing(froutes::InstalledRouteV6 {
                 route: Some(froutes::RouteV6 {
                     destination: net_declare::fidl_ip_v6_with_prefix!("fe80::/64"),
+                    action: froutes::RouteActionV6::Forward(froutes::RouteTargetV6 {
+                        outbound_interface: 300,
+                        next_hop: None,
+                    }),
+                    properties: froutes::RoutePropertiesV6 {
+                        specified_properties: Some(froutes::SpecifiedRouteProperties {
+                            metric: Some(froutes::SpecifiedMetric::ExplicitMetric(400)),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                }),
+                effective_properties: Some(froutes::EffectiveRouteProperties {
+                    metric: Some(400),
+                    ..Default::default()
+                }),
+                table_id: Some(2),
+                ..Default::default()
+            }),
+            froutes::EventV6::Existing(froutes::InstalledRouteV6 {
+                route: Some(froutes::RouteV6 {
+                    destination: net_declare::fidl_ip_v6_with_prefix!("ff00::/8"),
                     action: froutes::RouteActionV6::Forward(froutes::RouteTargetV6 {
                         outbound_interface: 300,
                         next_hop: None,

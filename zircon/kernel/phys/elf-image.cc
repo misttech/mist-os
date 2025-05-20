@@ -12,11 +12,14 @@
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/link.h>
 #include <lib/fit/defer.h>
+#include <lib/zbitl/error-stdio.h>
+#include <string.h>
 #include <zircon/assert.h>
 #include <zircon/limits.h>
 
 #include <ktl/atomic.h>
-#include <ktl/move.h>
+#include <ktl/span.h>
+#include <ktl/utility.h>
 #include <ktl/variant.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
@@ -52,64 +55,66 @@ auto GetDiagnostics() { return NoWarnings(); }
 
 fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string_view name,
                                             bool relocated) {
-  name_ = name;
-
-  auto read_file = [this, &dir]() -> fit::result<Error> {
-    if (auto found = dir.find(name_); found != dir.end()) {
-      // Singleton ELF file, no patches.
-      dir.ignore_error();
-      image_.set_image(found->data);
-      return fit::ok();
-    }
-
-    BootfsDir subdir;
-    if (auto result = dir.subdir(name_); result.is_ok()) {
-      subdir = ktl::move(result).value();
-    } else {
-      return result.take_error();
-    }
-
-    // Find the ELF file in the directory.
-    auto it = subdir.find(kImageName);
-    if (it == subdir.end()) {
-      if (auto result = subdir.take_error(); result.is_error()) {
-        return result.take_error();
-      }
-      return fit::error{Error{
-          .reason = "ELF file not found in image directory"sv,
-          .filename = kImageName,
-      }};
-    }
-    subdir.ignore_error();
-    image_.set_image(it->data);
-
-    // Now find the code patches.
-    if (auto result = patcher_.Init(subdir); result.is_error()) {
-      return result.take_error();
-    }
-
-    return fit::ok();
-  };
-
-  if (auto result = read_file(); result.is_error()) {
+  if (auto found = dir.find(name); found != dir.end()) {
+    // Singleton ELF file, no patches.
+    dir.ignore_error();
+    auto result = InitFromFile(found, relocated);
+    package_ = dir.directory();
+    name_ = name;
     return result;
   }
 
+  auto subdir = dir.subdir(name);
+  if (subdir.is_error()) {
+    return subdir.take_error();
+  }
+  return InitFromDir(*subdir, name, relocated);
+}
+
+fit::result<ElfImage::Error> ElfImage::InitFromDir(ElfImage::BootfsDir subdir,
+                                                   ktl::string_view name, bool relocated) {
+  // Find the ELF file in the directory.
+  auto it = subdir.find(kImageName);
+  if (it == subdir.end()) {
+    if (auto result = subdir.take_error(); result.is_error()) {
+      return result.take_error();
+    }
+    return fit::error{Error{
+        .reason = "ELF file not found in image directory"sv,
+        .filename = kImageName,
+    }};
+  }
+  subdir.ignore_error();
+
+  // Now find the code patches.
+  if (auto result = patcher_.Init(subdir); result.is_error()) {
+    return result.take_error();
+  }
+
+  auto result = InitFromFile(it, relocated);
+  name_ = name;
+  return result;
+}
+
+fit::result<ElfImage::Error> ElfImage::InitFromFile(ElfImage::BootfsDir::iterator file,
+                                                    bool relocated) {
+  package_ = file.view().directory();
+  name_ = file->name;
+  image_.set_image(file->data);
+
   auto diagnostics = GetDiagnostics();
-  auto phdr_allocator = elfldltl::NoArrayFromFile<elfldltl::Elf<>::Phdr>();
-  auto headers =
-      elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(diagnostics, image_, phdr_allocator);
+  auto phdr_allocator = elfldltl::NoArrayFromFile<Elf::Phdr>();
+  auto headers = elfldltl::LoadHeadersFromFile<Elf>(diagnostics, image_, phdr_allocator);
   auto [ehdr, phdrs] = *headers;
 
-  ktl::optional<elfldltl::Elf<>::Phdr> relro, dynamic, interp;
+  ktl::optional<Elf::Phdr> relro, dynamic, interp;
   elfldltl::DecodePhdrs(  //
       diagnostics, phdrs, load_info_.GetPhdrObserver(ZX_PAGE_SIZE),
       elfldltl::PhdrFileNoteObserver(  //
-          elfldltl::Elf<>(), image_, elfldltl::NoArrayFromFile<ktl::byte>(),
+          Elf(), image_, elfldltl::NoArrayFromFile<ktl::byte>(),
           elfldltl::ObserveBuildIdNote(build_id_)),
-      elfldltl::PhdrRelroObserver<elfldltl::Elf<>>(relro),
-      elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dynamic),
-      elfldltl::PhdrInterpObserver<elfldltl::Elf<>>(interp));
+      elfldltl::PhdrRelroObserver<Elf>(relro), elfldltl::PhdrDynamicObserver<Elf>(dynamic),
+      elfldltl::PhdrStackObserver<Elf>(stack_size_), elfldltl::PhdrInterpObserver<Elf>(interp));
 
   image_.set_base(load_info_.vaddr_start());
   entry_ = ehdr.entry;
@@ -122,8 +127,7 @@ fit::result<ElfImage::Error> ElfImage::Init(ElfImage::BootfsDir dir, ktl::string
   }
 
   if (dynamic) {
-    dynamic_ = *image_.ReadArray<elfldltl::Elf<>::Dyn>(
-        dynamic->offset, dynamic->filesz / sizeof(elfldltl::Elf<>::Dyn));
+    dynamic_ = *image_.ReadArray<Elf::Dyn>(dynamic->offset, dynamic->filesz / sizeof(Elf::Dyn));
   }
 
   if (interp) {
@@ -213,7 +217,7 @@ void ElfImage::Relocate() {
   ZX_DEBUG_ASSERT(load_bias_);  // The load address has already been chosen.
   if (!dynamic_.empty()) {
     auto diagnostics = GetDiagnostics();
-    elfldltl::RelocationInfo<elfldltl::Elf<>> reloc_info;
+    elfldltl::RelocationInfo<Elf> reloc_info;
     elfldltl::DecodeDynamic(diagnostics, image_, dynamic_,
                             elfldltl::DynamicRelocationInfoObserver(reloc_info));
     ZX_ASSERT(reloc_info.rel_symbolic().empty());
@@ -268,8 +272,7 @@ void ElfImage::AssertInterpMatchesBuildId(ktl::string_view prefix,
 }
 
 void ElfImage::InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, uintptr_t load_bias,
-                        const elfldltl::Elf<>::Phdr& load_segment,
-                        ktl::span<const ktl::byte> build_id_note) {
+                        const Elf::Phdr& load_segment, ktl::span<const ktl::byte> build_id_note) {
   image_.set_image(memory.image());
   image_.set_base(memory.base());
   load_bias_ = load_bias;
@@ -296,4 +299,67 @@ void ElfImage::PrintPatch(const code_patching::Directive& patch,
   }
   printf(": [%#" PRIx64 ", %#" PRIx64 ")\n", patch.range_start,
          patch.range_start + patch.range_size);
+}
+
+fit::result<ElfImage::Error> ElfImage::SeparateZeroFill() {
+  for (auto it = load_info_.segments().begin(); it != load_info_.segments().end(); ++it) {
+    auto* segment = ktl::get_if<LoadInfo::DataWithZeroFillSegment>(&*it);
+    if (!segment) {  // Not a DataWithZeroFillSegment.
+      continue;
+    }
+
+    size_t partial_page = segment->filesz() % ZX_PAGE_SIZE;
+    if (partial_page > 0) {
+      // Zero the partial page that is part of the zero-fill area but will
+      // remain in the original segment transformed into plain DataSegment.
+      partial_page = ZX_PAGE_SIZE - partial_page;
+      size_t fill_start = segment->offset() + segment->filesz();
+      ktl::span fill_bytes = image_.image().subspan(fill_start, partial_page);
+      memset(fill_bytes.data(), 0, fill_bytes.size_bytes());
+    }
+
+    size_t new_filesz = segment->filesz() + partial_page;
+    size_t zero_fill_vaddr = segment->vaddr() + new_filesz;
+    size_t zero_fill_size = segment->memsz() - new_filesz;
+
+    // Recharacterize the original segment as a shorter plain DataSegment.
+    *it = LoadInfo::DataSegment{
+        segment->offset(),
+        segment->vaddr(),
+        new_filesz,
+        new_filesz,
+    };
+
+    if (zero_fill_size > 0) {
+      // Insert a second segment for the whole pages of zero-fill.
+      auto diagnostics = GetDiagnostics();
+      auto inserted = load_info_.segments().insert(
+          diagnostics, "ELF segments for zero-fill normalization", ++it,
+          LoadInfo::ZeroFillSegment{zero_fill_vaddr, zero_fill_size});
+      if (!inserted) {
+        return fit::error{ElfImage::Error{"allocation failure"}};
+      }
+      it = *inserted;
+    }
+  }
+  return fit::ok();
+}
+
+void ElfImage::Printf() const {
+  printf("%s: In ELF file \"%.*s/%.*s\" from STORAGE_KERNEL item BOOTFS: ", gSymbolize->name(),
+         static_cast<int>(package_.size()), package_.data(), static_cast<int>(name_.size()),
+         name_.data());
+}
+
+void ElfImage::Printf(const char* fmt, ...) const {
+  Printf();
+  va_list args;
+  va_start(args, fmt);
+  vprintf(fmt, args);
+  va_end(args);
+}
+
+void ElfImage::Printf(Error error) const {
+  Printf();
+  zbitl::PrintBootfsError(error);
 }

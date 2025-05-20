@@ -59,14 +59,14 @@ class StringReference final {
   explicit StringReference(const char* data);
 
   // Access the data referenced by `this`.
-  cpp17::string_view Data() const;
+  std::string_view Data() const;
 
   // Access the state ID of the StringReference.
   uint64_t ID() const;
 
  private:
   StringReference() = delete;
-  const cpp17::string_view data_;
+  const std::string_view data_;
   const uint64_t reference_id_;
 
 } ZX_DEPRECATED_SINCE(1, 26, "strings are interned automatically: https://fxbug.dev/300003477");

@@ -45,14 +45,14 @@ fn bench_json_packet_serializer(b: &mut criterion::Bencher, total_logs: u64) {
         .map(|i| {
             LogsDataBuilder::new(BuilderArgs {
                 component_url: Some(
-                    format!("fuchsia-pkg://fuchsia.com/testing#meta/bench-{}.cm", i).into(),
+                    format!("fuchsia-pkg://fuchsia.com/testing#meta/bench-{i}.cm").into(),
                 ),
                 moniker: format!("moniker-{i}").as_str().try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp: Timestamp::from_nanos(i as i64),
             })
-            .set_message(format!("Benching #{}", i))
-            .set_file(format!("bench-{}.rs", i))
+            .set_message(format!("Benching #{i}"))
+            .set_file(format!("bench-{i}.rs"))
             .set_line(400 + i)
             .set_pid(100 + i)
             .set_tid(2000 + i)
@@ -106,7 +106,7 @@ fn main() {
             [("5x5", 5, 5), ("10x10", 10, 10), ("100x100", 100, 100), ("1000x500", 1000, 500)]
                 .iter()
         {
-            let label = format!("Formatter/{}/Fill/{}", format_name, size_name);
+            let label = format!("Formatter/{format_name}/Fill/{size_name}");
             bench = bench.with_function(&label, move |b| {
                 bench_serialization(b, *n, *m, *format);
             });

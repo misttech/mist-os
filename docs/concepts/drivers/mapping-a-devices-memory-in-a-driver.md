@@ -59,8 +59,8 @@ represents a device’s memory:
   register ([BAR][bar]{:.external}) from a device.
 - The ACPI FIDL protocol provides [`GetMmio()`][acpi-getmmio] for retrieving a device’s
   memory region.
-- The platform device protocol (based on [Banjo][banjo]) provides
-  [`GetMmio()`][banjo-getmmio] for retrieving a device’s memory region.
+- The platform device FIDL protocol provides [`GetMmio()`][fidl-getmmio] for
+  retrieving a device’s memory region.
 
 Once a driver obtains a device’s VMO, the driver maps the VMO to a region of a
 virtual address space in the driver host. This setup is necessary for the driver to
@@ -169,8 +169,7 @@ should consider this approach.
 [pci-getbar]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.hardware.pci/pci.fidl;l=339
 [bar]: https://wiki.osdev.org/PCI#Base_Address_Registers
 [acpi-getmmio]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.hardware.acpi/device.fidl;l=324
-[banjo-getmmio]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/banjo/fuchsia.hardware.platform.device/platform-device.fidl;l=44
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
+[fidl-getmmio]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.hardware.platform.device/platform-device.fidl;l=59
 [zx-vmo-create-physical]: /reference/syscalls/vmo_create_physical.md
 [acpi]: /docs/contribute/governance/rfcs/0112_acpi_support_on_x86.md
 [device-trees]: /docs/contribute/governance/rfcs/0192_device_trees_on_fuchsia.md

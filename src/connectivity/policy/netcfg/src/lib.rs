@@ -37,9 +37,9 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_name as fnet_name,
-    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_virtualization as fnet_virtualization,
-    fuchsia_async as fasync,
+    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync,
 };
 
 use anyhow::{anyhow, Context as _};
@@ -387,6 +387,9 @@ struct Config {
     /// the influence of `interface_naming_policy`.
     #[serde(default)]
     pub blackhole_interfaces: Vec<String>,
+    // Whether to use protocols provided by the socketproxy component.
+    #[serde(default)]
+    pub enable_socket_proxy: bool,
 }
 
 impl Config {
@@ -632,6 +635,8 @@ pub struct NetCfg<'a> {
     interface_naming_config: interface::InterfaceNamingConfig,
     // Policy configuration to determine whether to provision an interface.
     interface_provisioning_policy: Vec<interface::ProvisioningRule>,
+
+    enable_socket_proxy: bool,
 }
 
 /// Returns a [`fnet_name::DnsServer_`] with a static source from a [`std::net::IpAddr`].
@@ -860,6 +865,7 @@ impl<'a> NetCfg<'a> {
         allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
         interface_naming_policy: Vec<interface::NamingRule>,
         interface_provisioning_policy: Vec<interface::ProvisioningRule>,
+        enable_socket_proxy: bool,
     ) -> Result<NetCfg<'a>, anyhow::Error> {
         let svc_dir = clone_namespace_svc().context("error cloning svc directory handle")?;
         let stack = svc_connect::<fnet_stack::StackMarker>(&svc_dir)
@@ -941,6 +947,7 @@ impl<'a> NetCfg<'a> {
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
             interface_provisioning_policy,
+            enable_socket_proxy,
         })
     }
 
@@ -1078,6 +1085,10 @@ impl<'a> NetCfg<'a> {
                     }
                 }
             }
+            DnsServersUpdateSource::SocketProxy => {
+                // Remove the SocketProxy DNS servers when the server watcher is complete.
+                Ok(self.update_dns_servers(source, vec![]).await)
+            }
         }
     }
 
@@ -1125,6 +1136,26 @@ impl<'a> NetCfg<'a> {
                 .is_none(),
             "dns watchers should be empty"
         );
+
+        if self.enable_socket_proxy {
+            let socketproxy_dns_server_watcher = fuchsia_component::client::connect_to_protocol::<
+                fnp_socketproxy::DnsServerWatcherMarker,
+            >()
+            .context("error connecting to socketproxy dns server watcher")?;
+            let socketproxy_dns_server_stream =
+                dns_server_watcher::new_dns_server_stream_socketproxy(
+                    socketproxy_dns_server_watcher,
+                )
+                .boxed();
+
+            assert!(
+                dns_watchers
+                    .get_mut()
+                    .insert(DnsServersUpdateSource::SocketProxy, socketproxy_dns_server_stream)
+                    .is_none(),
+                "dns watchers should be empty"
+            );
+        }
 
         let mut masquerade_handler = MasqueradeHandler::default();
 
@@ -3396,7 +3427,11 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         interface_naming_policy,
         interface_provisioning_policy,
         blackhole_interfaces,
+        enable_socket_proxy,
     } = Config::load(config_data)?;
+
+    info!("using naming policy: {interface_naming_policy:?}");
+    info!("using provisioning policy: {interface_provisioning_policy:?}");
 
     let mut netcfg = NetCfg::new(
         filter_enabled_interface_types,
@@ -3406,6 +3441,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         &allowed_upstream_device_classes,
         interface_naming_policy,
         interface_provisioning_policy,
+        enable_socket_proxy,
     )
     .await
     .context("error creating new netcfg instance")?;
@@ -3695,6 +3731,7 @@ mod tests {
                     vec![],
                 ),
                 interface_provisioning_policy: Default::default(),
+                enable_socket_proxy: false,
             },
             ServerEnds {
                 lookup_admin: lookup_admin_server.into_stream(),
@@ -5556,7 +5593,8 @@ mod tests {
         "matchers": [ {"interface_name": "xyz" } ],
         "provisioning": "local"
     } ],
-   "blackhole_interfaces": [ "ifb0" ]
+   "blackhole_interfaces": [ "ifb0" ],
+   "enable_socket_proxy": true
 }
 "#;
 
@@ -5572,6 +5610,7 @@ mod tests {
             interface_naming_policy,
             interface_provisioning_policy,
             blackhole_interfaces,
+            enable_socket_proxy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(vec!["8.8.8.8".parse::<std::net::IpAddr>().unwrap()], servers);
@@ -5659,7 +5698,9 @@ mod tests {
         ]);
         assert_eq!(interface_provisioning_policy, expected_provisioning_policy);
 
-        assert_eq!(blackhole_interfaces, vec!["ifb0".to_string()])
+        assert_eq!(blackhole_interfaces, vec!["ifb0".to_string()]);
+
+        assert_eq!(enable_socket_proxy, true)
     }
 
     #[test]
@@ -5688,6 +5729,7 @@ mod tests {
             interface_naming_policy,
             interface_provisioning_policy,
             blackhole_interfaces,
+            enable_socket_proxy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(allowed_upstream_device_classes, Default::default());
@@ -5697,6 +5739,7 @@ mod tests {
         assert_eq!(interface_naming_policy.len(), 0);
         assert_eq!(interface_provisioning_policy.len(), 0);
         assert_eq!(blackhole_interfaces, Vec::<String>::new());
+        assert_eq!(enable_socket_proxy, false);
     }
 
     #[test_case(
@@ -5738,6 +5781,7 @@ mod tests {
             interface_naming_policy: _,
             interface_provisioning_policy: _,
             blackhole_interfaces: _,
+            enable_socket_proxy: _,
         } = Config::load_str(&config_str).unwrap();
 
         let expected_metrics =

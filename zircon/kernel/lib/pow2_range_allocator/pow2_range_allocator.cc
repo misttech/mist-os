@@ -15,7 +15,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <kernel/lockdep.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

@@ -61,7 +61,7 @@ TableWithHandle& TableWithHandle::set_h(::zx::vmo _value) {
 }
 
 void TableWithHandle::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -147,10 +147,6 @@ zx_status_t TableWithHandle::Clone(TableWithHandle* result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_UnionWithHandleTable;
 const fidl_type_t* UnionWithHandle::FidlType = &test_handlesintypes_UnionWithHandleTable;
 
@@ -202,7 +198,7 @@ UnionWithHandle UnionWithHandle::WithH(::zx::vmo&& val) {
 }
 
 void UnionWithHandle::Encode(::fidl::Encoder* encoder, size_t offset,
-                             cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                             std::optional<::fidl::HandleInformation> maybe_handle_info) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
 
@@ -331,15 +327,11 @@ void UnionWithHandle::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
   }
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_HandlesInTypesTable;
 const fidl_type_t* HandlesInTypes::FidlType = &test_handlesintypes_HandlesInTypesTable;
 
 void HandlesInTypes::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                            cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                            std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<HandlesInTypes>::value) {
     memcpy(_encoder->template GetPtr<HandlesInTypes>(_offset), this, sizeof(HandlesInTypes));
   } else {
@@ -402,15 +394,11 @@ zx_status_t HandlesInTypes::Clone(HandlesInTypes* _result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
 const fidl_type_t* EmptyResourceStruct::FidlType = &test_handlesintypes_EmptyResourceStructTable;
 
 void EmptyResourceStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<EmptyResourceStruct>::value) {
     memcpy(_encoder->template GetPtr<EmptyResourceStruct>(_offset), this, sizeof(EmptyResourceStruct));
   } else {
@@ -433,10 +421,6 @@ zx_status_t EmptyResourceStruct::Clone(EmptyResourceStruct* _result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
 const fidl_type_t* EmptyResourceTable::FidlType = &test_handlesintypes_EmptyResourceTableTable;
 
@@ -458,7 +442,7 @@ bool EmptyResourceTable::IsEmpty() const {
 }
 
 void EmptyResourceTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                std::optional<::fidl::HandleInformation> maybe_handle_info) {
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
@@ -499,10 +483,6 @@ zx_status_t EmptyResourceTable::Clone(EmptyResourceTable* result) const {
   return ZX_OK;
 }
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
 const fidl_type_t* EmptyResourceUnion::FidlType = &test_handlesintypes_EmptyResourceUnionTable;
 
@@ -540,7 +520,7 @@ EmptyResourceUnion& EmptyResourceUnion::operator=(EmptyResourceUnion&& other) {
 }
 
 void EmptyResourceUnion::Encode(::fidl::Encoder* encoder, size_t offset,
-                                cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                std::optional<::fidl::HandleInformation> maybe_handle_info) {
   switch (Which()) {
     case ::test::handlesintypes::EmptyResourceUnion::Tag::kUnknown: {
       ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_union_t, envelope));

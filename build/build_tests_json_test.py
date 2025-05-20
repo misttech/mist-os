@@ -38,7 +38,10 @@ class BuildTestsJsonTest(unittest.TestCase):
         self._td.cleanup()
 
     def _test(
-        self, tests_from_metadata: T.Dict, test_groups: T.Dict
+        self,
+        tests_from_metadata: T.Dict,
+        test_groups: T.Dict,
+        product_bundles: T.Dict,
     ) -> (T.Set[Path], T.Dict):
         tests_from_metadata = json.dumps(tests_from_metadata)
         tests_from_metadata_path = self.build_dir / "tests_from_metadata.json"
@@ -49,6 +52,10 @@ class BuildTestsJsonTest(unittest.TestCase):
             self.build_dir / "obj" / "tests" / "product_bundle_test_groups.json"
         )
         test_groups_path.write_text(test_groups)
+
+        product_bundles = json.dumps(product_bundles)
+        product_bundles_path = self.build_dir / "product_bundles.json"
+        product_bundles_path.write_text(product_bundles)
 
         inputs = build_tests_json.build_tests_json(self.build_dir)
 
@@ -62,7 +69,8 @@ class BuildTestsJsonTest(unittest.TestCase):
             {"test": {"name": "test1"}},
             {"test": {"name": "test2"}},
         ]
-        (_, tests) = self._test(tests_from_metadata, [])
+        product_bundles = [{"name": "my_pb"}]
+        (_, tests) = self._test(tests_from_metadata, [], product_bundles)
         self.assertEqual(tests_from_metadata, tests)
 
     def test_only_test_groups(self):
@@ -74,13 +82,31 @@ class BuildTestsJsonTest(unittest.TestCase):
         test_groups = [
             {"product_bundle_name": "my_pb", "tests_json": str(tests_json_path)}
         ]
-        (_, tests) = self._test([], test_groups)
+        product_bundles = [{"name": "my_pb"}]
+        (_, tests) = self._test([], test_groups, product_bundles)
 
         expected_tests_json = [
             {"product_bundle": "my_pb", "test": {"name": "test1-my_pb"}},
             {"product_bundle": "my_pb", "test": {"name": "test2-my_pb"}},
         ]
         self.assertEqual(expected_tests_json, tests)
+
+    def test_incorrect_product_bundle_name(self):
+        tests_json = [{"test": {"name": "test1"}}, {"test": {"name": "test2"}}]
+        tests_json = json.dumps(tests_json)
+        tests_json_path = self.build_dir / "pb_tests.json"
+        tests_json_path.write_text(tests_json)
+
+        test_groups = [
+            {
+                "product_bundle_name": "my_pb_incorrect",
+                "tests_json": str(tests_json_path),
+            }
+        ]
+        product_bundles = [{"name": "my_pb"}]
+
+        with self.assertRaises(SystemExit):
+            self._test([], test_groups, product_bundles)
 
     def test_full(self):
         tests_from_metadata = [
@@ -91,6 +117,7 @@ class BuildTestsJsonTest(unittest.TestCase):
         tests_json = json.dumps(tests_json)
         tests_json_path = self.build_dir / "pb_tests.json"
         tests_json_path.write_text(tests_json)
+        product_bundles = [{"name": "my_pb"}]
 
         env = {"dimensions": {"device_type": "Vim3"}}
         test_groups = [
@@ -100,7 +127,9 @@ class BuildTestsJsonTest(unittest.TestCase):
                 "tests_json": str(tests_json_path),
             }
         ]
-        (_, tests) = self._test(tests_from_metadata, test_groups)
+        (_, tests) = self._test(
+            tests_from_metadata, test_groups, product_bundles
+        )
 
         expected_tests_json = [
             {"test": {"name": "test1"}},
@@ -119,7 +148,7 @@ class BuildTestsJsonTest(unittest.TestCase):
         self.assertEqual(expected_tests_json, tests)
 
     def test_ninja_inputs(self):
-        (inputs, _) = self._test([], [])
+        (inputs, _) = self._test([], [], [])
         self.assertEqual(
             {
                 Path(self.build_dir / "tests_from_metadata.json"),
@@ -143,7 +172,7 @@ class BuildTestsJsonTest(unittest.TestCase):
         tests_json_path.write_text(tests_json)
         previous_write_time = os.path.getmtime(tests_json_path)
 
-        self._test(tests_from_metadata, [])
+        self._test(tests_from_metadata, [], [])
 
         # ensure the file did not change
         current_write_time = os.path.getmtime(tests_json_path)

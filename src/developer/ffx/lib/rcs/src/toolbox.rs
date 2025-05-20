@@ -15,9 +15,10 @@ use {
 
 #[cfg(not(feature = "fdomain"))]
 use {
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy, fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys2 as sys2, fidl_fuchsia_sys2::OpenDirType,
+    fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasDomain},
+    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2,
+    fidl_fuchsia_sys2::OpenDirType,
 };
 
 pub const MONIKER: &str = "toolbox";
@@ -57,6 +58,30 @@ async fn connect_realm_query(
     Ok(query)
 }
 
+// Note: this function is copied from component_debug, so we don't need to
+// depend on it (and therefore slow down the entire build). The only difference
+// is that it does not map errors into component_debug's OpenError.
+// Not so great that this is duplicating code.. but this is "legacy"
+// (non-FDomain) code, so its lifetime is limited.
+// Note: do not make this function pub: that way the compiler will remind us to
+// remove it once we get rid of the non-FDomain code path.
+// Opens the specified directory type in a component instance identified by `moniker`.
+#[cfg(not(feature = "fdomain"))]
+async fn open_instance_directory(
+    moniker: &moniker::Moniker,
+    dir_type: OpenDirType,
+    realm: &sys2::RealmQueryProxy,
+) -> Result<fio::DirectoryProxy> {
+    let moniker_str = moniker.to_string();
+    let (dir_client, dir_server) = realm.domain().create_proxy::<fio::DirectoryMarker>();
+    realm
+        .open_directory(&moniker_str, dir_type.clone().into(), dir_server)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e:?}"))?
+        .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+    Ok(dir_client)
+}
+
 /// Open the service directory of the toolbox.
 #[cfg(not(feature = "fdomain"))]
 pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
@@ -69,12 +94,8 @@ pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProx
         }
     };
     let moniker = moniker::Moniker::try_from(moniker)?;
-    let namespace_dir = component_debug::dirs::open_instance_dir_root_readable(
-        &moniker,
-        sys2::OpenDirType::NamespaceDir.into(),
-        &query,
-    )
-    .await?;
+    let namespace_dir =
+        open_instance_directory(&moniker, sys2::OpenDirType::NamespaceDir.into(), &query).await?;
     let (ret, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     namespace_dir.open(
         "svc",

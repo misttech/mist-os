@@ -408,6 +408,18 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 				})
 			}
 		}
+		// The LUCI_CONTEXT is needed by OTA tests to run the artifacts tool
+		// which requires authentication.
+		if luciCtx := os.Getenv("LUCI_CONTEXT"); luciCtx != "" {
+			absPath, err := filepath.Abs(luciCtx)
+			if err != nil {
+				testResult.FailReason = err.Error()
+				return testResult, nil
+			}
+			testCmdBuilder.MountPoints = append(testCmdBuilder.MountPoints, &MountPt{
+				Src: absPath,
+			})
+		}
 		testCmdBuilder.AddDefaultMounts()
 		testCmd, err = testCmdBuilder.Build(testCmd)
 		if err != nil {

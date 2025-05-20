@@ -174,7 +174,7 @@ TEST_fx-rbe-enabled-enabled() {
   BT_EXPECT fx-rbe-enabled
 }
 
-# Test parsing valid and invalid device names passed to "fx -d"
+# Test parsing valid and invalid device names passed to "fx -t"
 TEST_fx-getdeviceraw-and-isvaliddevice() {
   # Use subshells (parenthesis) in calls to get-device-raw to avoid premature exit
   local valids=(
@@ -207,9 +207,8 @@ TEST_fx-getdeviceraw-and-isvaliddevice() {
   done
 }
 
-# Test extracting port from device name passed to "fx -d"
+# Test extracting port from device name passed to "fx -t"
 TEST_fx-get-device-ssh-port() {
-
   FUCHSIA_NODENAME="127.0.0.1"
   echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
   BT_EXPECT_EQ "$(get-device-ssh-port)" ""
@@ -245,7 +244,6 @@ TEST_fx-get-device-ssh-port() {
 }
 
 TEST_fx-get-device-addr-resource() {
-
   FUCHSIA_NODENAME="127.0.0.1"
   echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
   BT_EXPECT_EQ "$(get-device-addr-resource)" "127.0.0.1"
@@ -287,6 +285,15 @@ TEST_fx-get-device-addr-url() {
  FUCHSIA_NODENAME="[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%enx44070ba0044e]"
   echo "${FUCHSIA_NODENAME}" > "${ffx}.mock_stdout"
   BT_EXPECT_EQ "$(get-device-addr-url)" "[2001:db8:aaaa:bbbb:cccc:dddd:0:44f%25enx44070ba0044e]"
+}
+
+# `ffx target default get` gives stderr when no default target is set.
+# This stderr should be suppressed.
+TEST_fx-unset-device-stderr() {
+  echo "No default target set." > "${ffx}.mock_stderr"
+  BT_EXPECT_EQ "$(get-device-raw 2>&1)" ""
+  BT_EXPECT_EQ "$(get-device-name 2>&1)" ""
+  BT_EXPECT_EQ "$(get-device-ssh-port 2>&1)" ""
 }
 
 TEST_fx-export-device-address() {

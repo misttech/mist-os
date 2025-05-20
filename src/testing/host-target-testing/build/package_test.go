@@ -20,9 +20,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/pkg"
 	far "go.fuchsia.dev/fuchsia/src/sys/pkg/lib/far/go"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/merkle"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/pkg"
 )
 
 // Verifies package manifests can be properly loaded.

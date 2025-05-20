@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/uart.h>
@@ -30,20 +30,19 @@ void PhysMain(void* bootloader_data, arch::EarlyTicks ticks) {
   boot_opts.serial = uart::qemu::kConfig;
   gBootOptions = &boot_opts;
 
-  ArchSetUp(nullptr);
+  ArchSetUp({});
 
   // Early boot may have filled the screen with logs. Add a newline to
   // terminate any previous line, and another newline to leave a blank.
   printf("\n\n");
 
   // Run the test.
-  int status = TestMain(bootloader_data, ticks);
+  int status = TestMain(bootloader_data, {}, ticks);
   if (status == 0) {
     printf("\n*** Test succeeded ***\n%s\n\n", BOOT_TEST_SUCCESS_STRING);
   } else {
     printf("\n*** Test FAILED: status %d ***\n\n", status);
   }
 
-  // No way to shut down.
-  abort();
+  ArchPanicReset();
 }

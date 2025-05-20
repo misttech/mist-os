@@ -33,11 +33,12 @@ uint64_t arm64_cpu_list[SMP_MAX_CPUS];
 
 }  // namespace
 
+// Per cpu structures, each cpu will point to theirs using the fixed register.
+// Global scope because referenced in assembly.
+arm64_percpu arm64_percpu_array[SMP_MAX_CPUS];
+
 // total number of detected cpus
 uint arm_num_cpus = 1;
-
-// per cpu structures, each cpu will point to theirs using the fixed register
-arm64_percpu arm64_percpu_array[SMP_MAX_CPUS];
 
 void arch_register_mpid(uint cpu_id, uint64_t mpid) {
   arm64_percpu_array[cpu_id].cpu_num = cpu_id;
@@ -66,12 +67,6 @@ uint64_t arch_cpu_num_to_mpidr(cpu_num_t cpu_num) {
   return arm64_cpu_list[cpu_num];
 }
 
-// do the 'slow' lookup by mpidr to cpu number
-static cpu_num_t arch_curr_cpu_num_slow() {
-  uint64_t mpidr = __arm_rsr64("mpidr_el1");
-  return arm64_mpidr_to_cpu_num(mpidr);
-}
-
 void arch_mp_reschedule(cpu_mask_t mask) {
   arch_mp_send_ipi(MP_IPI_TARGET_MASK, mask, MP_IPI_RESCHEDULE);
 }
@@ -95,7 +90,8 @@ void arch_mp_send_ipi(mp_ipi_target_t target, cpu_mask_t mask, mp_ipi_t ipi) {
 
 void arm64_init_percpu_early(void) {
   // slow lookup the current cpu id and setup the percpu structure
-  cpu_num_t cpu = arch_curr_cpu_num_slow();
+  uint64_t mpidr = __arm_rsr64("mpidr_el1");
+  cpu_num_t cpu = arm64_mpidr_to_cpu_num(mpidr);
   arm64_write_percpu_ptr(&arm64_percpu_array[cpu]);
 
   // read the midr and set the microarch of this cpu in the percpu array

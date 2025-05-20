@@ -87,7 +87,7 @@ extern "C" fn callback(
     let name = unsafe { core::slice::from_raw_parts(name, name_len) };
     let name = String::from_utf8(name.iter().map(|ch| *ch as u8).collect());
 
-    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    #[cfg(not(fuchsia_api_level_at_least = "27"))]
     let _unused = (vaddr, name); // avoid "unused variable" warnings
 
     output_vec.push(fheapdump_client::ExecutableRegion {
@@ -95,9 +95,9 @@ extern "C" fn callback(
         size: Some(size),
         file_offset: Some(file_offset),
         build_id: Some(fheapdump_client::BuildId { value: build_id }),
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         vaddr: Some(vaddr),
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         name: name.ok(),
         ..Default::default()
     })

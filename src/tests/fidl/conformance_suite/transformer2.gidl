@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 success("TableNoFields") {
+    bindings_denylist = [rust_next],
     value = StructTableNoFields{
         t: TableNoFields{},
     },

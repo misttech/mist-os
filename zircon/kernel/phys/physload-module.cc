@@ -6,7 +6,7 @@
 
 #include <lib/boot-options/boot-options.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/elf-image.h>

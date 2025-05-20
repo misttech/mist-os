@@ -99,13 +99,13 @@ var dhcpv6ClientExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{29, 13}: Pass,
 	{30, 1}:  Pass,
 	{30, 2}:  Inconclusive,
-	{31, 1}:  AnvlSkip,
-	{31, 2}:  AnvlSkip,
-	{31, 3}:  AnvlSkip,
-	{31, 4}:  AnvlSkip,
-	{31, 5}:  AnvlSkip,
+	{31, 1}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary addrs).
+	{31, 2}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary addrs).
+	{31, 3}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary addrs).
+	{31, 4}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary addrs).
+	{31, 5}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary addrs).
 	{32, 1}:  Pass,
-	{32, 2}:  AnvlSkip,
+	{32, 2}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary addrs).
 	{32, 3}:  Pass,
 	{33, 1}:  Pass,
 	{34, 1}:  Pass,
@@ -208,13 +208,13 @@ var dhcpv6ClientExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCas
 	{29, 13}: Pass,
 	{30, 1}:  Pass,
 	{30, 2}:  Inconclusive,
-	{31, 1}:  AnvlSkip,
-	{31, 2}:  AnvlSkip,
-	{31, 3}:  AnvlSkip,
-	{31, 4}:  AnvlSkip,
-	{31, 5}:  AnvlSkip,
+	{31, 1}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary adrs).
+	{31, 2}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary adrs).
+	{31, 3}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary adrs).
+	{31, 4}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary adrs).
+	{31, 5}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary adrs).
 	{32, 1}:  Pass,
-	{32, 2}:  AnvlSkip,
+	{32, 2}:  AnvlSkip, // TODO(https://fxbug.dev/413417404): Support IATA (temporary adrs).
 	{32, 3}:  Pass,
 	{33, 1}:  Pass,
 	{34, 1}:  Pass,

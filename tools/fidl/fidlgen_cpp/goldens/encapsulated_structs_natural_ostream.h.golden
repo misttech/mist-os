@@ -35,10 +35,6 @@ struct fidl::ostream::Formatter<::test_encapsulatedstructs::NonInlineStructTestS
   static std::ostream& Format(std::ostream& os, const ::test_encapsulatedstructs::NonInlineStructTestStruct& value);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 struct fidl::ostream::Formatter<::test_encapsulatedstructs::TopLevelStruct> {
   static std::ostream& Format(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value);
@@ -60,18 +56,10 @@ std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::Str
 
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::NonInlineStructTestStruct& value);
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value);
 
 #endif  // __Fuchsia__
 
 }  // namespace test_encapsulatedstructs
-
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

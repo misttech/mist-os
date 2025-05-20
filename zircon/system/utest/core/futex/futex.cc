@@ -4,7 +4,6 @@
 
 #include <inttypes.h>
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/atomic.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/suspend_token.h>
 #include <lib/zx/thread.h>

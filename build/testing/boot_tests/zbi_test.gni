@@ -74,6 +74,10 @@ template("zbi_test") {
     entries += invoker.args
   }
 
+  if ((defined(invoker.cpu) && invoker.cpu == "x64") || current_cpu == "x64") {
+    entries += [ "kernel.serial=legacy" ]
+  }
+
   if (entries != []) {
     input_target = "${target_name}_input"
     input_deps += [ ":$input_target" ]

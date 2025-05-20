@@ -4,7 +4,7 @@
 
 use crate::{Partition, PartitionsConfig, RecoveryStyle, Slot};
 use anyhow::{bail, Context, Result};
-use assembly_manifest::Image;
+use assembled_system::Image;
 use assembly_util::write_json_file;
 use camino::Utf8PathBuf;
 use serde_json::json;
@@ -252,7 +252,7 @@ fn try_digest(path: &Utf8PathBuf) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::{AssemblyManifest, BlobfsContents};
+    use assembled_system::{AssembledSystem, BlobfsContents};
     use assembly_util::read_config;
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;
@@ -274,7 +274,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
@@ -284,7 +284,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_b = AssemblyManifest {
+        let images_b = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/b/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
@@ -294,7 +294,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_r = AssemblyManifest {
+        let images_r = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
@@ -365,7 +365,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
@@ -375,7 +375,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_b = AssemblyManifest {
+        let images_b = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/b/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
@@ -385,7 +385,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_r = AssemblyManifest {
+        let images_r = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
@@ -445,7 +445,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
@@ -457,7 +457,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_b = AssemblyManifest {
+        let images_b = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/b/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
@@ -469,7 +469,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_r = AssemblyManifest {
+        let images_r = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
@@ -529,7 +529,7 @@ mod tests {
     #[test]
     fn test_no_slots() {
         let partitions = PartitionsConfig { partitions: vec![], ..Default::default() };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
@@ -555,7 +555,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
@@ -565,7 +565,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_b = AssemblyManifest {
+        let images_b = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/b/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
@@ -575,7 +575,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_r = AssemblyManifest {
+        let images_r = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
@@ -627,7 +627,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
@@ -637,7 +637,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
         };
-        let images_r = AssemblyManifest {
+        let images_r = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
@@ -695,10 +695,10 @@ mod tests {
             ..Default::default()
         };
         let images_one =
-            AssemblyManifest { images: vec![Image::Dtbo(dtbo_one)], board_name: "my_board".into() };
+            AssembledSystem { images: vec![Image::Dtbo(dtbo_one)], board_name: "my_board".into() };
         let images_two =
-            AssemblyManifest { images: vec![Image::Dtbo(dtbo_two)], board_name: "my_board".into() };
-        let images_three = AssemblyManifest {
+            AssembledSystem { images: vec![Image::Dtbo(dtbo_two)], board_name: "my_board".into() };
+        let images_three = AssembledSystem {
             images: vec![Image::Dtbo(dtbo_three)],
             board_name: "my_board".into(),
         };
@@ -730,7 +730,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: zbi_path, signed: false },
                 Image::VBMeta(vbmeta_path),
@@ -777,14 +777,14 @@ mod tests {
             ],
             ..Default::default()
         };
-        let images_a = AssemblyManifest {
+        let images_a = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
             ],
             board_name: "my_board".into(),
         };
-        let images_r = AssemblyManifest {
+        let images_r = AssembledSystem {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),

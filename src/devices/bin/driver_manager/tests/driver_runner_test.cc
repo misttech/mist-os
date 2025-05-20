@@ -374,13 +374,13 @@ TEST_P(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
   });
 
   bool did_bind = false;
-  auto on_bind = [&did_bind]() { did_bind = true; };
+  auto on_bind = [&did_bind](std::optional<zx::event>&) { did_bind = true; };
   std::shared_ptr<CreatedChild> child =
       root_driver->driver->AddChild(std::move(args), false, false, std::move(on_bind));
   EXPECT_TRUE(RunLoopUntilIdle());
-  EXPECT_TRUE(did_bind);
 
   auto [driver, controller] = StartSecondDriver();
+  EXPECT_TRUE(did_bind);
 
   driver->CloseBinding();
   driver->DropNode();
@@ -422,11 +422,10 @@ TEST_P(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   });
 
   bool did_bind = false;
-  auto on_bind = [&did_bind]() { did_bind = true; };
+  auto on_bind = [&did_bind](std::optional<zx::event>&) { did_bind = true; };
   std::shared_ptr<CreatedChild> child =
       root_driver->driver->AddChild(std::move(args), false, false, std::move(on_bind));
   EXPECT_TRUE(RunLoopUntilIdle());
-  EXPECT_TRUE(did_bind);
 
   auto second_driver_config = kDefaultSecondDriverPkgConfig;
   std::string binary = std::string(second_driver_config.main_module.open_path);
@@ -450,6 +449,7 @@ TEST_P(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   driver->CloseBinding();
   driver->DropNode();
   StopDriverComponent(std::move(root_driver->controller));
+  EXPECT_TRUE(did_bind);
   realm().AssertDestroyedChildren(
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
 }
@@ -459,14 +459,11 @@ TEST_P(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
 TEST_P(DriverRunnerTest, StartSecondDriver_UseProperties) {
   FakeDriverIndex driver_index(
       dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
-        if (args.has_properties() && args.properties()[0].key.is_string_value() &&
-            args.properties()[0].key.string_value().get() == "second_node_prop" &&
+        if (args.has_properties() && args.properties()[0].key.get() == "second_node_prop" &&
             args.properties()[0].value.is_int_value() &&
             args.properties()[0].value.int_value() == 0x2301
 
-            && args.properties()[1].key.is_string_value() &&
-            args.properties()[1].key.string_value().get() ==
-                bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION &&
+            && args.properties()[1].key.get() == bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION &&
             args.properties()[1].value.is_int_value() && args.properties()[1].value.int_value() == 2
 
         ) {
@@ -498,6 +495,51 @@ TEST_P(DriverRunnerTest, StartSecondDriver_UseProperties) {
   EXPECT_TRUE(RunLoopUntilIdle());
 
   auto [driver, controller] = StartSecondDriver(true);
+
+  driver->CloseBinding();
+  driver->DropNode();
+  StopDriverComponent(std::move(root_driver->controller));
+  realm().AssertDestroyedChildren(
+      {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
+}
+
+TEST_P(DriverRunnerTest, CheckOnBindNode) {
+  SetupDriverRunner();
+
+  auto root_driver = StartRootDriver();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  PrepareRealmForSecondDriverComponentStart();
+  fdfw::NodeAddArgs args({
+      .name = "second",
+      .properties =
+          {
+              {
+                  fdf::MakeProperty("second_node_prop", 0x2301u),
+              },
+          },
+  });
+
+  std::optional<zx::event> node_token;
+  std::shared_ptr<CreatedChild> child = root_driver->driver->AddChild(
+      std::move(args), false, false,
+      [&node_token](std::optional<zx::event>& token) { node_token = std::move(token); });
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  auto [driver, controller] = StartSecondDriver(true);
+
+  ASSERT_TRUE(node_token.has_value());
+  zx_info_handle_basic_t info;
+  ASSERT_EQ(node_token->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr),
+            ZX_OK);
+
+  ASSERT_TRUE(driver->node_token().has_value());
+  zx_info_handle_basic_t info2;
+  ASSERT_EQ(
+      driver->node_token()->get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(info2), nullptr, nullptr),
+      ZX_OK);
+
+  ASSERT_EQ(info.koid, info2.koid);
 
   driver->CloseBinding();
   driver->DropNode();

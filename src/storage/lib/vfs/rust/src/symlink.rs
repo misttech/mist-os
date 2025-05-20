@@ -124,12 +124,6 @@ impl<T: Symlink> Connection<T> {
                     self.handle_link_into(dst_parent_token, dst).await.map_err(|s| s.into_raw()),
                 )?;
             }
-            fio::SymlinkRequest::GetConnectionInfo { responder } => {
-                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-                let rights = fio::Operations::GET_ATTRIBUTES;
-                responder
-                    .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
-            }
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(Ok(()))?;
             }
@@ -142,6 +136,11 @@ impl<T: Symlink> Connection<T> {
                 .await;
                 responder.send(status.into_raw(), &attrs)?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedSetAttr { responder, .. } => {
+                responder.send(Status::ACCESS_DENIED.into_raw())?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::SetAttr { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
@@ -185,27 +184,27 @@ impl<T: Symlink> Connection<T> {
                     return Ok(true);
                 }
             },
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::GetFlags { responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::SetFlags { flags: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::DeprecatedGetFlags { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             fio::SymlinkRequest::DeprecatedSetFlags { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::SymlinkRequest::GetFlags { responder } => {
                 responder.send(Status::NOT_SUPPORTED.into_raw(), fio::OpenFlags::empty())?;
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             fio::SymlinkRequest::SetFlags { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
@@ -327,13 +326,16 @@ impl<T: Symlink> RequestHandler for Connection<T> {
 
     async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
         let this = self.get_mut();
-        let _guard = this.scope.active_guard();
-        match request {
-            Ok(request) => match this.handle_request(request).await {
-                Ok(false) => ControlFlow::Continue(()),
-                Ok(true) | Err(_) => ControlFlow::Break(()),
-            },
-            Err(_) => ControlFlow::Break(()),
+        if let Some(_guard) = this.scope.try_active_guard() {
+            match request {
+                Ok(request) => match this.handle_request(request).await {
+                    Ok(false) => ControlFlow::Continue(()),
+                    Ok(true) | Err(_) => ControlFlow::Break(()),
+                },
+                Err(_) => ControlFlow::Break(()),
+            }
+        } else {
+            ControlFlow::Break(())
         }
     }
 }
@@ -393,7 +395,6 @@ pub fn serve(
 #[cfg(test)]
 mod tests {
     use super::{Connection, Symlink};
-    use crate::common::rights_to_posix_mode_bits;
     use crate::directory::entry::{EntryInfo, GetEntryInfo};
     use crate::execution_scope::ExecutionScope;
     use crate::node::Node;
@@ -550,21 +551,22 @@ mod tests {
     async fn test_get_attr() {
         let client_end = serve_test_symlink().await;
 
-        assert_matches!(
-            client_end.get_attr().await.expect("fidl failed"),
-            (
-                0,
-                fio::NodeAttributes {
-                    mode,
-                    id: fio::INO_UNKNOWN,
-                    content_size: 6,
-                    storage_size: 6,
-                    link_count: 1,
-                    creation_time: 0,
-                    modification_time: 0,
-                }
-            ) if mode == fio::MODE_TYPE_SYMLINK
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false)
+        let (mutable_attrs, immutable_attrs) = client_end
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .expect("fidl failed")
+            .expect("GetAttributes failed");
+
+        assert_eq!(mutable_attrs, Default::default());
+        assert_eq!(
+            immutable_attrs,
+            fio::ImmutableNodeAttributes {
+                content_size: Some(TARGET.len() as u64),
+                storage_size: Some(TARGET.len() as u64),
+                protocols: Some(fio::NodeProtocolKinds::SYMLINK),
+                abilities: Some(fio::Abilities::GET_ATTRIBUTES),
+                ..Default::default()
+            }
         );
     }
 

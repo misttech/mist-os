@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -130,27 +128,26 @@ class ChildServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_first: typing.TypeAlias = None
+    FirstResponse: typing.TypeAlias = None
 
     @abstractmethod
     def first(
         self,
         request: ParentFirstRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_first]
-        | _MethodResponse_first
+        typing.Coroutine[typing.Any, typing.Any, FirstResponse] | FirstResponse
     ):
         ...
 
-    _MethodResponse_second: typing.TypeAlias = None
+    SecondResponse: typing.TypeAlias = None
 
     @abstractmethod
     def second(
         self,
         request: ChildSecondRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_second]
-        | _MethodResponse_second
+        typing.Coroutine[typing.Any, typing.Any, SecondResponse]
+        | SecondResponse
     ):
         ...
 
@@ -260,15 +257,14 @@ class ParentServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_first: typing.TypeAlias = None
+    FirstResponse: typing.TypeAlias = None
 
     @abstractmethod
     def first(
         self,
         request: ParentFirstRequest,
     ) -> (
-        typing.Coroutine[typing.Any, typing.Any, _MethodResponse_first]
-        | _MethodResponse_first
+        typing.Coroutine[typing.Any, typing.Any, FirstResponse] | FirstResponse
     ):
         ...
 

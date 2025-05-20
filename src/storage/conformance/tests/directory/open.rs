@@ -67,9 +67,9 @@ async fn deprecated_open_epitaph_no_describe() {
     // Since Open1 is asynchronous, we need to invoke another method on the channel to check that
     // opening failed.
     let e = client
-        .get_connection_info()
+        .get_attributes(Default::default())
         .await
-        .expect_err("GetConnectionInfo should fail on a nonexistent file.");
+        .expect_err("GetAttributes should fail on a nonexistent file.");
     assert_matches!(e, fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. });
 }
 
@@ -426,33 +426,30 @@ async fn open_rights() {
     let dir = harness.get_directory(vec![file(TEST_FILE, CONTENT.to_vec())], fio::PERM_READABLE);
     // Should fail to open the file if the rights exceed those allowed by the directory.
     let status = dir
-        .open_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PERM_WRITE, None)
+        .open_node::<fio::NodeMarker>(&TEST_FILE, fio::PERM_WRITABLE, None)
         .await
         .expect_err("open should fail if rights exceed those of the parent connection");
     assert_eq!(status, zx::Status::ACCESS_DENIED);
 
-    // Calling open3 with no rights set is the same as calling open3 with empty rights.
+    // Calling open with no rights set is the same as calling open with empty rights.
     let proxy = dir
         .open_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::PROTOCOL_FILE, None)
         .await
         .unwrap();
-    assert_eq!(
-        proxy.get_connection_info().await.expect("get_connection_info failed").rights,
-        Some(fio::Rights::empty())
-    );
+    assert_eq!(proxy.get_flags().await.unwrap().unwrap(), fio::Flags::PROTOCOL_FILE);
 
     // Opening with rights that the connection has should succeed.
     let proxy = dir
         .open_node::<fio::FileMarker>(
             &TEST_FILE,
-            fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
+            fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
             None,
         )
         .await
         .unwrap();
     assert_eq!(
-        proxy.get_connection_info().await.expect("get_connection_info failed").rights,
-        Some(fio::Rights::READ_BYTES | fio::Operations::GET_ATTRIBUTES)
+        proxy.get_flags().await.unwrap().unwrap(),
+        fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ_BYTES
     );
     // We should be able to read from the file, but not write.
     assert_eq!(&fuchsia_fs::file::read(&proxy).await.expect("read failed"), CONTENT);
@@ -666,7 +663,7 @@ async fn open_file_append() {
     let proxy = dir
         .open_node::<fio::FileMarker>(
             "file",
-            fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_APPEND,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::FILE_APPEND,
             None,
         )
         .await
@@ -713,7 +710,7 @@ async fn open_file_truncate() {
     let proxy = dir
         .open_node::<fio::FileMarker>(
             "file",
-            fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_TRUNCATE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::FILE_TRUNCATE,
             None,
         )
         .await
@@ -811,22 +808,17 @@ async fn open_dir_inherit_rights() {
         .open_node::<fio::DirectoryMarker>(
             ".",
             fio::Flags::PROTOCOL_DIRECTORY
-                | fio::Flags::PERM_READ
+                | fio::PERM_READABLE
                 | fio::Flags::PERM_INHERIT_WRITE
                 | fio::Flags::PERM_INHERIT_EXECUTE,
             None,
         )
         .await
         .unwrap();
-
+    // We should inherit only write rights since the parent connection lacks executable rights.
     assert_eq!(
-        proxy.get_connection_info().await.expect("get_connection_info failed").rights.unwrap(),
-        fio::Operations::READ_BYTES | fio::INHERITED_WRITE_PERMISSIONS,
-    );
-    let inherited_flags = fio::Flags::from_bits_truncate(fio::INHERITED_WRITE_PERMISSIONS.bits());
-    assert_eq!(
-        proxy.get_flags().await.expect("get_flags failed").map_err(zx::Status::from_raw),
-        Ok(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ | inherited_flags),
+        proxy.get_flags().await.unwrap().unwrap(),
+        fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE,
     );
 }
 

@@ -184,7 +184,7 @@ async fn fresh_run() -> Result<(), Error> {
         .dir("svc")
         .add_fidl_service(Services::CommitStatusProvider);
     let fs = fs.until_stalled(idle_timeout);
-    let active_guard = fs.active_guard();
+    let active_guard = fs.try_active_guard().unwrap();
 
     let mut service_fut = async move {
         let out_dir = fuchsia_sync::Mutex::new(None);

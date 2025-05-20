@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use component_debug::cli::{list_cmd_print, list_cmd_serialized};
-use component_debug::realm::Instance;
+use component_debug_fdomain::cli::{list_cmd_print, list_cmd_serialized};
+use component_debug_fdomain::realm::Instance;
 use errors::ffx_error;
-use ffx_component::rcs::connect_to_realm_query;
+use ffx_component::rcs::connect_to_realm_query_f;
 use ffx_component_list_args::ComponentListCommand;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
 use fho::{FfxMain, FfxTool};
 use schemars::JsonSchema;
 use serde::Serialize;
-use target_holders::RemoteControlProxyHolder;
+use target_holders::fdomain::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]
 pub struct ListTool {
@@ -34,7 +34,7 @@ impl FfxMain for ListTool {
     type Writer = VerifiedMachineWriter<ListOutput>;
 
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let realm_query = connect_to_realm_query(&self.rcs).await?;
+        let realm_query = connect_to_realm_query_f(&self.rcs).await?;
         // All errors from component_debug library are user-visible.
         if writer.is_machine() {
             let instances = list_cmd_serialized(self.cmd.filter, realm_query)
@@ -57,21 +57,25 @@ mod test {
     use crate::ListTool;
 
     use anyhow::Result;
-    use component_debug::realm::ResolvedInfo;
+    use component_debug_fdomain::realm::ResolvedInfo;
+    use fdomain_client::fidl::ServerEnd;
+    use fdomain_fuchsia_developer_remotecontrol::{
+        RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
+    };
     use ffx_component_list_args::ComponentListCommand;
     use ffx_writer::{Format, TestBuffers};
     use fho::FfxMain;
-    use fidl::endpoints::ServerEnd;
-    use fidl_fuchsia_developer_remotecontrol::{
-        RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
-    };
     use futures::TryStreamExt;
     use moniker::Moniker;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use std::rc::Rc;
+    use std::sync::Arc;
 
-    pub fn setup_fake_rcs(components: Vec<&str>) -> RemoteControlProxy {
+    pub fn setup_fake_rcs(
+        components: Vec<&str>,
+        client: Arc<fdomain_client::Client>,
+    ) -> RemoteControlProxy {
         let mut mock_realm_query_builder = iquery_test_support::MockRealmQueryBuilder::prefilled();
         for c in components {
             mock_realm_query_builder =
@@ -79,8 +83,9 @@ mod test {
         }
 
         let mock_realm_query = mock_realm_query_builder.build();
-        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>();
+        let (proxy, mut stream) = client.create_proxy_and_stream::<RemoteControlMarker>();
         fuchsia_async::Task::local(async move {
+            let _client = client;
             let querier = Rc::new(mock_realm_query);
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
@@ -95,7 +100,7 @@ mod test {
                         assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                         assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
                         let querier = Rc::clone(&querier);
-                        fuchsia_async::Task::local(querier.serve(ServerEnd::new(server_channel)))
+                        fuchsia_async::Task::local(querier.serve_f(ServerEnd::new(server_channel)))
                             .detach();
                         responder.send(Ok(())).unwrap();
                     }
@@ -109,8 +114,9 @@ mod test {
 
     #[fuchsia::test]
     async fn test_schema() -> Result<()> {
+        let client = fdomain_local::local_client(|| Err(zx_status::Status::NOT_SUPPORTED));
         let cmd = ComponentListCommand { filter: None, verbose: false };
-        let tool = ListTool { cmd, rcs: setup_fake_rcs(vec![]).into() };
+        let tool = ListTool { cmd, rcs: setup_fake_rcs(vec![], client).into() };
         let buffers = TestBuffers::default();
 
         let writer = <ListTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);

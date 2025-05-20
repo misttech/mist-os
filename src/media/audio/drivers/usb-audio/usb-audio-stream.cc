@@ -15,6 +15,7 @@
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -235,7 +236,8 @@ void UsbAudioStream::ReleaseRingBufferLocked() {
 void UsbAudioStream::Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   if (shutting_down_) {
-    return completer.Close(ZX_ERR_BAD_STATE);
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
   }
 
   // Attempt to allocate a new driver channel and bind it to us.  If we don't
@@ -492,7 +494,8 @@ void UsbAudioStream::CreateRingBuffer(StreamChannel* channel, audio_fidl::wire::
 
   fbl::AutoLock req_lock(&lock_);
   if (shutting_down_) {
-    return completer.Close(ZX_ERR_BAD_STATE);
+    completer.Close(ZX_ERR_BAD_STATE);
+    return;
   }
 
   // Looks like we are going ahead with this format change.  Tear down any
@@ -659,29 +662,38 @@ void UsbAudioStream::SetGain(audio_fidl::wire::GainState state,
   auto& path = *(ifc_->path());
   bool illegal_mute = state.has_muted() && state.muted() && !path.has_mute();
   bool illegal_agc = state.has_agc_enabled() && state.agc_enabled() && !path.has_agc();
-  bool illegal_gain = state.has_gain_db() && (state.gain_db() != 0) && !path.has_gain();
+  bool illegal_gain =
+      state.has_gain_db() &&
+      (
+          // If the path has no gain control, then setting gain_db to a non-zero value is illegal.
+          (!path.has_gain() && state.gain_db() != 0) ||
+          // It is also illegal to set it to NAN or +/-INFINITY...
+          !std::isfinite(state.gain_db()) ||
+          // ...or to set it out-of-range...
+          state.gain_db() > path.max_gain() || state.gain_db() < path.min_gain());
 
   if (illegal_mute || illegal_agc || illegal_gain) {
-    // If this request is illegal, make no changes.
-  } else {
-    if (state.has_muted()) {
-      state.muted() = path.SetMute(parent_.usb_proto(), state.muted());
-    }
+    // If this request is illegal in any way, make no changes.
+    return;
+  }
 
-    if (state.has_agc_enabled()) {
-      state.agc_enabled() = path.SetAgc(parent_.usb_proto(), state.agc_enabled());
-    }
+  if (state.has_muted()) {
+    state.muted() = path.SetMute(parent_.usb_proto(), state.muted());
+  }
 
-    if (state.has_gain_db()) {
-      state.gain_db() = path.SetGain(parent_.usb_proto(), state.gain_db());
-    }
+  if (state.has_agc_enabled()) {
+    state.agc_enabled() = path.SetAgc(parent_.usb_proto(), state.agc_enabled());
+  }
 
-    fbl::AutoLock channel_lock(&lock_);
-    for (auto& channel : stream_channels_) {
-      if (channel.gain_completer_) {
-        channel.gain_completer_->Reply(state);
-        channel.gain_completer_.reset();
-      }
+  if (state.has_gain_db()) {
+    state.gain_db() = path.SetGain(parent_.usb_proto(), state.gain_db());
+  }
+
+  fbl::AutoLock channel_lock(&lock_);
+  for (auto& channel : stream_channels_) {
+    if (channel.gain_completer_) {
+      channel.gain_completer_->Reply(state);
+      channel.gain_completer_.reset();
     }
   }
 }

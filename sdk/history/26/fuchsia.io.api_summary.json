@@ -182,14 +182,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.GetExtendedAttribute",
         "strictness": "strict",
         "ordinal": "5043930208506967771",
@@ -811,14 +803,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/File.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.io/File.GetExtendedAttribute",
         "strictness": "strict",
         "ordinal": "5043930208506967771",
@@ -1306,18 +1290,13 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_MODIFY",
+        "name": "fuchsia.io/Flags.PERM_MODIFY_DIRECTORY",
         "value": "256"
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_READ",
+        "name": "fuchsia.io/Flags.PERM_READ_BYTES",
         "value": "2"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_SET_ATTRIBUTES",
-        "value": "32"
     },
     {
         "kind": "bits/member",
@@ -1326,7 +1305,12 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.io/Flags.PERM_WRITE",
+        "name": "fuchsia.io/Flags.PERM_UPDATE_ATTRIBUTES",
+        "value": "32"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_WRITE_BYTES",
         "value": "4"
     },
     {
@@ -1377,6 +1361,12 @@
         "name": "fuchsia.io/ImmutableNodeAttributes.abilities",
         "ordinal": "2",
         "type": "fuchsia.io/Operations"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.io/ImmutableNodeAttributes.change_time",
+        "ordinal": "7",
+        "type": "uint64"
     },
     {
         "kind": "table/member",
@@ -1664,14 +1654,6 @@
         "request": "fuchsia.io/NodeGetAttributesRequest",
         "response": "fuchsia.io/NodeAttributes2",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Node.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",
@@ -2555,14 +2537,6 @@
         "request": "fuchsia.io/NodeGetAttributesRequest",
         "response": "fuchsia.io/NodeAttributes2",
         "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.io/Symlink.GetConnectionInfo",
-        "strictness": "strict",
-        "ordinal": "6362521381364198667",
-        "direction": "two_way",
-        "response": "fuchsia.io/ConnectionInfo"
     },
     {
         "kind": "protocol/member",

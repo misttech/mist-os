@@ -11,6 +11,7 @@ include /src/connectivity/network/dhcpv4/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/connectivity/wlan/tools/wlantool/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
+include /src/developer/ffx/lib/profiler/OWNERS
 include /src/developer/ffx/lib/symbolize/OWNERS
 include /src/developer/ffx/plugins/assembly/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
@@ -27,4 +28,6 @@ include /src/sys/lib/component_id_index/OWNERS
 include /src/sys/lib/fidl-fuchsia-pkg-ext/OWNERS
 include /src/sys/pkg/OWNERS
 include /src/testing/sl4f/OWNERS
+include /third_party/rust_crates/vendor/mock-omaha-server-0.3.4/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.2/OWNERS
 include /tools/update_crates/OWNERS

@@ -7,6 +7,7 @@
 mod channel;
 mod handle;
 
+use zx::sys::zx_handle_t;
 use zx::Handle;
 
 use crate::decoder::InternalHandleDecoder;
@@ -19,8 +20,10 @@ pub use zx;
 
 /// A decoder which support Zircon handles.
 pub trait HandleDecoder: InternalHandleDecoder {
-    /// Takes the next handle from the decoder.
-    fn take_handle(&mut self) -> Result<Handle, DecodeError>;
+    /// Takes the next raw handle from the decoder.
+    ///
+    /// The returned raw handle must not be considered owned until the decoder is committed.
+    fn take_raw_handle(&mut self) -> Result<zx_handle_t, DecodeError>;
 
     /// Returns the number of handles remaining in the decoder.
     fn handles_remaining(&mut self) -> usize;

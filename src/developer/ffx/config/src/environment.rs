@@ -6,6 +6,7 @@ use crate::storage::Config;
 use crate::{ConfigLevel, ConfigMap};
 use anyhow::{bail, Context, Result};
 use fuchsia_lockfile::{Lockfile, LockfileCreateError};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -14,7 +15,6 @@ use std::io::{BufReader, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tracing::info;
 
 mod context;
 mod kind;
@@ -89,12 +89,12 @@ impl Environment {
         Ok(checked)
     }
 
-    pub async fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<()> {
         let path = self.context.env_file_path()?;
 
         Self::save_env_file(path, &self.files)?;
 
-        crate::cache::invalidate(&self.context.cache).await;
+        crate::cache::invalidate(&self.context.cache);
 
         Ok(())
     }
@@ -281,30 +281,30 @@ impl Environment {
 
     /// Checks the config files at the requested level to make sure they exist and are configured
     /// properly.
-    pub async fn populate_defaults(&mut self, level: &ConfigLevel) -> Result<()> {
+    pub fn populate_defaults(&mut self, level: &ConfigLevel) -> Result<()> {
         match level {
             ConfigLevel::User => {
-                tracing::debug!("Populating user defaults");
+                log::debug!("Populating user defaults");
                 if let None = self.files.user {
-                    tracing::debug!("Getting user default file");
+                    log::debug!("Getting user default file");
                     let default_path = self.context.get_default_user_file_path()?;
 
-                    tracing::debug!("Creating new user default file");
+                    log::debug!("Creating new user default file");
                     match create_new_file(&default_path) {
                         Ok(mut file) => {
-                            tracing::debug!("Doing write_all");
+                            log::debug!("Doing write_all");
                             file.write_all(b"{}")
                                 .context("writing default user configuration file")?;
-                            tracing::debug!("Syncing block cache with underlying storage");
+                            log::debug!("Syncing block cache with underlying storage");
                             if !self.context().env_kind().is_isolated() {
                                 file.sync_all().context(
                                     "syncing default user configuration file to filesystem",
                                 )?;
                             }
-                            tracing::debug!("Done syncing");
+                            log::debug!("Done syncing");
                         }
                         Err(e) if e.kind() == ErrorKind::AlreadyExists => {
-                            tracing::debug!("File already exists");
+                            log::debug!("File already exists");
                         }
                         other => {
                             other.context("creating default user configuration file").map(|_| ())?
@@ -314,7 +314,7 @@ impl Environment {
                 }
             }
             ConfigLevel::Global => {
-                tracing::debug!("Populating global defaults");
+                log::debug!("Populating global defaults");
                 if let None = self.files.global {
                     bail!(
                         "Global configuration not set. Use 'ffx config env set' command \
@@ -324,7 +324,7 @@ impl Environment {
             }
             ConfigLevel::Build => match self.build_dir().map(Path::to_owned) {
                 Some(b_dir) => {
-                    tracing::debug!("Populating build defaults");
+                    log::debug!("Populating build defaults");
                     let build_dirs = match &mut self.files.build {
                         Some(build_dirs) => build_dirs,
                         None => self.files.build.get_or_insert_with(Default::default),
@@ -334,15 +334,15 @@ impl Environment {
                         reason = "mass allow for https://fxbug.dev/381896734"
                     )]
                     if !build_dirs.contains_key(&b_dir) {
-                        tracing::debug!("Getting build dir config path");
+                        log::debug!("Getting build dir config path");
                         let config = self.context.get_default_build_dir_config_path(&b_dir)?;
                         if !config.is_file() {
                             info!("Build configuration file for '{b_dir}' does not exist yet, will create it by default at '{config}' if a value is set", b_dir=b_dir.display(), config=config.display());
                         }
-                        tracing::debug!("Saving build dir config path");
+                        log::debug!("Saving build dir config path");
                         build_dirs.insert(b_dir, config);
                     }
-                    tracing::debug!("Build defaults populated");
+                    log::debug!("Build defaults populated");
                 }
                 None => bail!("Cannot set a build configuration without a build directory."),
             },
@@ -399,7 +399,7 @@ mod test {
         std::fs::remove_file(&tmp_path).expect("Temporary env file wasn't available to remove");
 
         // Save the environment, then read the saved file and make sure it's correct.
-        env_load.save().await.unwrap();
+        env_load.save().unwrap();
         test_env.env_file.flush().unwrap();
 
         let env_file = fs::read(&tmp_path).unwrap();
@@ -409,7 +409,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn build_config_autoconfigure() {
+    fn build_config_autoconfigure() {
         let temp = tempfile::tempdir().expect("temporary build directory");
         let temp_dir = std::fs::canonicalize(temp.path()).expect("canonical temp path");
         let build_dir_path = temp_dir.join("build");
@@ -427,7 +427,6 @@ mod test {
         let mut env = context.load().expect("Should be able to load the environment");
 
         env.populate_defaults(&ConfigLevel::Build)
-            .await
             .expect("Setting build level environment to automatic path should work");
         drop(env);
         let config = context
@@ -440,7 +439,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn build_config_manual_configure() {
+    fn build_config_manual_configure() {
         let temp = tempfile::tempdir().expect("temporary build directory");
         let temp_dir = std::fs::canonicalize(temp.path()).expect("canonical temp path");
         let build_dir_path = temp_dir.join("build");
@@ -460,10 +459,9 @@ mod test {
         let mut config_map = std::collections::HashMap::new();
         config_map.insert(build_dir_path.clone(), build_dir_config.clone());
         env.files.build = Some(config_map);
-        env.save().await.expect("Should be able to save the configured environment");
+        env.save().expect("Should be able to save the configured environment");
 
         env.populate_defaults(&ConfigLevel::Build)
-            .await
             .expect("Setting build level environment to automatic path should work");
         drop(env);
 

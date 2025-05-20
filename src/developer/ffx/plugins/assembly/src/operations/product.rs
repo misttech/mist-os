@@ -8,9 +8,7 @@ use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
-use assembly_config_schema::{
-    AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSupportLevel,
-};
+use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSetLevel};
 use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
 use assembly_container::AssemblyContainer;
 use assembly_file_relative_path::SupportsFileRelativePaths;
@@ -20,7 +18,7 @@ use assembly_util::read_config;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use fuchsia_pkg::PackageManifest;
-use tracing::info;
+use log::info;
 
 mod assembly_builder;
 
@@ -33,6 +31,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         input_bundles_dir,
         package_validation,
         custom_kernel_aib,
+        custom_boot_shim_aib,
         suppress_overrides_warning,
         developer_overrides,
     } = args;
@@ -163,8 +162,12 @@ Resulting product is not supported and may misbehave!
     // Now that all the configuration has been determined, create the builder
     // and start doing the work of creating the image assembly config.
     let image_mode = platform.storage.filesystems.image_mode;
-    let mut builder =
-        ImageAssemblyConfigBuilder::new(platform.build_type, board_config.name.clone(), image_mode);
+    let mut builder = ImageAssemblyConfigBuilder::new(
+        platform.build_type,
+        board_config.name.clone(),
+        image_mode,
+        platform.feature_set_level,
+    );
 
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {
@@ -183,10 +186,32 @@ Resulting product is not supported and may misbehave!
         .add_bundle(&kernel_aib_path)
         .with_context(|| format!("Adding kernel input bundle ({kernel_aib_path})"))?;
 
-    // Set the info used for BoardDriver arguments.
+    // The emulator support bundle is always added, even to an empty build.
+    // The emulator support bundle contains only a QEMU boot shim.
+    // Kernel tests can customize this bundle to provide an alternate boot shim.
+    //
+    // TODO(https://fxbug.dev/408223995): Determine whether we want to expose alternate boot shims via the platform
+    // and refactor this if we decide to.
+    let emulator_support_aib_path;
+    if let Some(custom_boot_shim_aib_path) = custom_boot_shim_aib {
+        if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+            bail!("emulator test support can only be enabled at FeatureSetLevel::TestKernelOnly");
+        }
+        emulator_support_aib_path = custom_boot_shim_aib_path;
+    } else {
+        emulator_support_aib_path = make_bundle_path(&input_bundles_dir, "emulator_support");
+    }
+
     builder
-        .set_board_driver_arguments(&board_config)
-        .context("Setting arguments for the Board Driver")?;
+        .add_bundle(&emulator_support_aib_path)
+        .with_context(|| format!("Adding emulator support bundle ({emulator_support_aib_path})"))?;
+
+    // Set the info used for BoardDriver arguments.
+    if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+        builder
+            .set_board_driver_arguments(&board_config)
+            .context("Setting arguments for the Board Driver")?;
+    }
 
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
@@ -205,14 +230,16 @@ Resulting product is not supported and may misbehave!
     builder.add_configuration_capabilities(configuration.configuration_capabilities)?;
 
     // Add the board's Board Input Bundles, if it has them.
-    for (bundle_path, bundle) in board_input_bundles {
-        builder
-            .add_board_input_bundle(
-                bundle,
-                platform.feature_set_level == FeatureSupportLevel::Bootstrap
-                    || platform.feature_set_level == FeatureSupportLevel::Embeddable,
-            )
-            .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
+    if platform.feature_set_level != FeatureSetLevel::TestKernelOnly {
+        for (bundle_path, bundle) in board_input_bundles {
+            builder
+                .add_board_input_bundle(
+                    bundle,
+                    platform.feature_set_level == FeatureSetLevel::Bootstrap
+                        || platform.feature_set_level == FeatureSetLevel::Embeddable,
+                )
+                .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
+        }
     }
 
     // Add the platform Assembly Input Bundles that were chosen by the configuration.
@@ -246,9 +273,9 @@ Resulting product is not supported and may misbehave!
     // Add product-specified packages and configuration
     if product.bootfs_files_package.is_some() || !product.packages.bootfs.is_empty() {
         match platform.feature_set_level {
-            FeatureSupportLevel::Empty
-            | FeatureSupportLevel::Embeddable
-            | FeatureSupportLevel::Bootstrap => {
+            FeatureSetLevel::TestNoPlatform
+            | FeatureSetLevel::Embeddable
+            | FeatureSetLevel::Bootstrap => {
                 // these are the only valid feature set levels for adding these files.
             }
             _ => {

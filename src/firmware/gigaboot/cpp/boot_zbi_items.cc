@@ -5,7 +5,6 @@
 #include "boot_zbi_items.h"
 
 #include <lib/ddk/platform-defs.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/graphics.h>
@@ -23,6 +22,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 #include <efi/boot-services.h>
 #include <efi/protocol/graphics-output.h>
@@ -102,8 +102,8 @@ class MemDynamicViewer {
 
 bool AppendSmbiosPtr(zbi_header_t* image, size_t capacity) {
   uint64_t smbios = 0;
-  cpp20::span<const efi_configuration_table> entries(gEfiSystemTable->ConfigurationTable,
-                                                     gEfiSystemTable->NumberOfTableEntries);
+  std::span<const efi_configuration_table> entries(gEfiSystemTable->ConfigurationTable,
+                                                   gEfiSystemTable->NumberOfTableEntries);
 
   for (const efi_configuration_table& entry : entries) {
     if ((entry.VendorGuid == kSmbiosTableGUID &&
@@ -347,10 +347,10 @@ zbi_result_t AddBootloaderFiles(const char* name, const void* data, size_t len) 
 
 void ClearBootloaderFiles() { zbi_file_is_initialized = false; }
 
-cpp20::span<uint8_t> GetZbiFiles() { return zbi_files; }
+std::span<uint8_t> GetZbiFiles() { return zbi_files; }
 
-zx::result<cpp20::span<zbi_mem_range_t>> CollectPeripheralMemoryItems(
-    const ZbiContext* context, cpp20::span<zbi_mem_range_t>& out) {
+zx::result<std::span<zbi_mem_range_t>> CollectPeripheralMemoryItems(
+    const ZbiContext* context, std::span<zbi_mem_range_t>& out) {
   if (!context) {
     return zx::ok(out.first(0));
   }
@@ -484,7 +484,7 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* 
     };
   }
 
-  cpp20::span<zbi_mem_range_t> peripheral_mems = cpp20::span{current_zbi, zbi_mem.end()};
+  std::span<zbi_mem_range_t> peripheral_mems = std::span{current_zbi, zbi_mem.end()};
   auto res = CollectPeripheralMemoryItems(context, peripheral_mems);
   if (res.is_error()) {
     return res.take_error();

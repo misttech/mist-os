@@ -7,7 +7,7 @@
 #include <trace.h>
 
 #include <fbl/vector.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #define LOCAL_TRACE 0
 

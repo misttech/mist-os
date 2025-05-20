@@ -25,7 +25,7 @@ class Metadata {
  public:
   Metadata(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
            UtcClockReadyWatcherBase* utc_clock_ready_watcher, RedactorBase* redactor,
-           bool is_first_instance, const std::set<std::string>& annotation_allowlist,
+           bool is_first_instance, const std::set<std::string>& default_snapshot_annotations,
            const feedback::AttachmentKeys& attachment_allowlist);
 
   // Return a JSON metadata string.
@@ -41,7 +41,7 @@ class Metadata {
 
  private:
   std::string log_redaction_canary_;
-  std::set<std::string> annotation_allowlist_;
+  std::set<std::string> default_snapshot_annotations_;
   feedback::AttachmentKeys attachment_allowlist_;
 
   UtcTimeProvider utc_provider_;

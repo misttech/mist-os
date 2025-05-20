@@ -31,6 +31,7 @@
 #include <kernel/timer.h>
 #include <ktl/algorithm.h>
 #include <lk/init.h>
+#include <vm/compression.h>
 #include <vm/physmap.h>
 #include <vm/pmm_arena.h>
 #include <vm/pmm_checker.h>

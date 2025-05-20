@@ -11,9 +11,8 @@ use starnix_core::device::mem::{mem_device_init, DevRandom};
 use starnix_core::device::{simple_device_ops, DeviceMode};
 use starnix_core::fs::devpts::{dev_pts_fs, tty_device_init};
 use starnix_core::fs::devtmpfs::dev_tmp_fs;
-use starnix_core::fs::fuchsia::nmfs::{fuchsia_network_monitor_fs, nmfs};
+use starnix_core::fs::fuchsia::nmfs::fuchsia_network_monitor_fs;
 use starnix_core::fs::fuchsia::{new_remote_fs, new_remote_vol};
-use starnix_core::fs::proc::proc_fs;
 use starnix_core::fs::sysfs::{sys_fs, DeviceDirectory};
 use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -26,6 +25,8 @@ use starnix_modules_functionfs::FunctionFs;
 use starnix_modules_fuse::{new_fuse_fs, new_fusectl_fs, open_fuse_device};
 use starnix_modules_loop::{create_loop_control_device, loop_device_init};
 use starnix_modules_overlayfs::new_overlay_fs;
+use starnix_modules_procfs::proc_fs;
+use starnix_modules_pstore::pstore_fs;
 use starnix_modules_selinuxfs::selinux_fs;
 use starnix_modules_tracefs::trace_fs;
 use starnix_modules_tun::DevTun;
@@ -118,12 +119,10 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     registry.register(b"functionfs".into(), FunctionFs::new_fs);
     registry.register(b"fuse".into(), new_fuse_fs);
     registry.register(b"fusectl".into(), new_fusectl_fs);
-    // TODO(https://fxbug.dev/399181238): Remove Nmfs once the system has migrated to using
-    // the updated `fuchsia_network_monitor_fs` name.
-    registry.register(b"nmfs".into(), nmfs);
     registry.register(b"overlay".into(), new_overlay_fs);
     register_pipe_fs(registry.as_ref());
     registry.register(b"proc".into(), proc_fs);
+    registry.register(b"pstore".into(), pstore_fs);
     registry.register(b"remotefs".into(), new_remote_fs);
     registry.register(b"remotevol".into(), new_remote_vol);
     registry.register(b"selinuxfs".into(), selinux_fs);

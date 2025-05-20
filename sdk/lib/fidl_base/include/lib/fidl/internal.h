@@ -347,7 +347,7 @@ struct fidl_type {
   constexpr const FidlCodedVector& coded_vector() const;
 
 // This prevents designated initializers from working in C++20
-#if __cplusplus <= 201703L
+#if __cplusplus < 202002L
  private:
   // Prevent instances of this class from being accidentally used standalone
   // as a value.
@@ -355,7 +355,9 @@ struct fidl_type {
 #endif
 };
 
-#define FIDL_INTERNAL_INHERIT_TYPE_T final : fidl_type
+#define FIDL_INTERNAL_INHERIT_TYPE_T \
+  final:                             \
+  fidl_type
 
 #else  // __cplusplus
 

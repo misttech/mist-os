@@ -23,8 +23,4 @@ std::ostream& operator<<(std::ostream& os, const ::test_vectors::ExampleUseOfVec
 
 }  // namespace test_vectors
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop

@@ -18,7 +18,7 @@
 #include <kernel/mutex.h>
 #include <ktl/iterator.h>
 #include <ktl/limits.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/vm_aspace.h>
 
 #include <ktl/enforce.h>

@@ -59,29 +59,29 @@ zx_status_t AddTas5720Device(fdf::WireSyncClient<fuchsia_hardware_platform_bus::
   };
 
   const auto gpio_init_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
   const auto gpio_init_props = std::vector{
-      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+      fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
 
   const auto i2c_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,
-                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(SHERLOCK_I2C_A0_0)),
-      fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, i2c_address),
+      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
+                               bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(SHERLOCK_I2C_A0_0)),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_ADDRESS, i2c_address),
   };
   const auto i2c_props = std::vector{
-      fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
-                        bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
+                         bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
   };
 
-  std::vector<fuchsia_driver_framework::ParentSpec> parents = {
-      fuchsia_driver_framework::ParentSpec{{
+  std::vector<fuchsia_driver_framework::ParentSpec2> parents = {
+      fuchsia_driver_framework::ParentSpec2{{
           .bind_rules = std::move(gpio_init_rules),
           .properties = std::move(gpio_init_props),
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      fuchsia_driver_framework::ParentSpec2{{
           .bind_rules = std::move(i2c_rules),
           .properties = std::move(i2c_props),
       }}};
@@ -91,7 +91,7 @@ zx_status_t AddTas5720Device(fdf::WireSyncClient<fuchsia_hardware_platform_bus::
   auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
-                                   {.name = device_name, .parents = parents}}));
+                                   {.name = device_name, .parents2 = parents}}));
 
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send AddComposite request: %s", result.status_string());
@@ -149,26 +149,26 @@ zx_status_t Sherlock::AudioInit() {
   const char* product_name = "sherlock";
   constexpr size_t device_name_max_length = 32;
 
-  std::vector<fdf::ParentSpec> sherlock_tdm_i2s_parents;
+  std::vector<fdf::ParentSpec2> sherlock_tdm_i2s_parents;
   sherlock_tdm_i2s_parents.reserve(6);
 
   const auto gpio_init_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
   const auto gpio_init_props = std::vector{
-      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+      fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
 
   const auto clock_init_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
   };
   const auto clock_init_props = std::vector{
-      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+      fdf::MakeProperty2(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
   };
 
   const auto init_parents = std::vector{
-      fdf::ParentSpec{{gpio_init_rules, gpio_init_props}},
-      fdf::ParentSpec{{clock_init_rules, clock_init_props}},
+      fdf::ParentSpec2{{gpio_init_rules, gpio_init_props}},
+      fdf::ParentSpec2{{clock_init_rules, clock_init_props}},
   };
 
   sherlock_tdm_i2s_parents.insert(sherlock_tdm_i2s_parents.end(), init_parents.begin(),
@@ -176,16 +176,16 @@ zx_status_t Sherlock::AudioInit() {
 
   // Add a spec for the enable audio GPIO pin.
   auto enable_audio_gpio_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                              bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
+      fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpio::SERVICE,
+                               bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeAcceptBindRule2(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
   };
   auto enable_audio_gpio_props = std::vector{
-      fdf::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                        bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_ENABLE),
+      fdf::MakeProperty2(bind_fuchsia_hardware_gpio::SERVICE,
+                         bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
+      fdf::MakeProperty2(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_ENABLE),
   };
-  sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{
+  sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec2{{
       .bind_rules = enable_audio_gpio_rules,
       .properties = enable_audio_gpio_props,
   }});
@@ -193,20 +193,20 @@ zx_status_t Sherlock::AudioInit() {
   // Add a composite for each codec instance.
   for (size_t i = 0; i < 3; i++) {
     auto codec_rules = std::vector{
-        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_audio::CODECSERVICE,
-                                bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
-        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
-                                bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
-        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
-                                bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS5720),
-        fdf::MakeAcceptBindRule(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
+        fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_audio::CODECSERVICE,
+                                 bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_VID,
+                                 bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::PLATFORM_DEV_DID,
+                                 bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS5720),
+        fdf::MakeAcceptBindRule2(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
     };
     auto codec_props = std::vector{
-        fdf::MakeProperty(bind_fuchsia_hardware_audio::CODECSERVICE,
-                          bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
-        fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
+        fdf::MakeProperty2(bind_fuchsia_hardware_audio::CODECSERVICE,
+                           bind_fuchsia_hardware_audio::CODECSERVICE_ZIRCONTRANSPORT),
+        fdf::MakeProperty2(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(i + 1)),
     };
-    sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{
+    sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec2{{
         .bind_rules = codec_rules,
         .properties = codec_props,
     }});
@@ -355,7 +355,7 @@ zx_status_t Sherlock::AudioInit() {
     fdf::Arena arena('AUDI');
     auto sherlock_tdm_i2s_spec = fdf::CompositeNodeSpec{{
         .name = "aml_tdm",
-        .parents = sherlock_tdm_i2s_parents,
+        .parents2 = sherlock_tdm_i2s_parents,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
         fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, sherlock_tdm_i2s_spec));
@@ -423,8 +423,8 @@ zx_status_t Sherlock::AudioInit() {
 
     {
       auto tdm_spec = fdf::CompositeNodeSpec{{
-          "aml_tdm_dai_out",
-          init_parents,
+          .name = "aml_tdm_dai_out",
+          .parents2 = init_parents,
       }};
       auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                               fidl::ToWire(fidl_arena, tdm_spec));
@@ -492,8 +492,8 @@ zx_status_t Sherlock::AudioInit() {
 
     {
       auto pdm_spec = fdf::CompositeNodeSpec{{
-          "aml_pdm",
-          init_parents,
+          .name = "aml_pdm",
+          .parents2 = init_parents,
       }};
       auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev_in),
                                                               fidl::ToWire(fidl_arena, pdm_spec));
@@ -562,8 +562,8 @@ zx_status_t Sherlock::AudioInit() {
 
     {
       auto tdm_spec = fdf::CompositeNodeSpec{{
-          "aml_tdm_dai_in",
-          init_parents,
+          .name = "aml_tdm_dai_in",
+          .parents2 = init_parents,
       }};
       auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                               fidl::ToWire(fidl_arena, tdm_spec));

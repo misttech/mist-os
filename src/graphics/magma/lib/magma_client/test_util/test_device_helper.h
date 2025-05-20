@@ -52,6 +52,33 @@ class TestDeviceBase {
     GTEST_FAIL();
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  static zx::result<fidl::ClientEnd<fuchsia_gpu_magma::TestDevice2>> GetTestFromVendorId(
+      uint64_t id) {
+    for (auto& p : std::filesystem::directory_iterator("/svc/fuchsia.gpu.magma.TestService")) {
+      std::string device_name = static_cast<std::string>(p.path()) + "/device";
+      zx::result magma_client = component::Connect<fuchsia_gpu_magma::TestDevice>(device_name);
+      if (magma_client.is_error()) {
+        return magma_client.take_error();
+      }
+      magma_device_t device = 0;
+      if (magma_device_import(magma_client->TakeChannel().release(), &device) != MAGMA_STATUS_OK) {
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+      uint64_t vendor_id;
+      magma_status_t magma_status =
+          magma_device_query(device, MAGMA_QUERY_VENDOR_ID, NULL, &vendor_id);
+      magma_device_release(device);
+
+      if (magma_status == MAGMA_STATUS_OK && vendor_id == id) {
+        return component::Connect<fuchsia_gpu_magma::TestDevice2>(
+            (static_cast<std::string>(p.path()) + "/test_device"));
+      }
+    }
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+#endif
+
   static void RestartDFv2Driver(const std::string& driver_url, uint32_t gpu_vendor_id) {
     auto manager = component::Connect<fuchsia_driver_development::Manager>();
 

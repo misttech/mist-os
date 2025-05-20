@@ -58,8 +58,8 @@ impl Socket {
         let avail = self.socket.outstanding_read_bytes()?;
         let len = out.len();
         out.resize(len + avail, 0);
-        let (_, mut tail) = out.split_at_mut(len);
-        match ready!(self.socket.poll_read(&mut tail, cx)) {
+        let (_, tail) = out.split_at_mut(len);
+        match ready!(self.socket.poll_read(tail, cx)) {
             Err(zx_status::Status::PEER_CLOSED) => Poll::Ready(Ok(0)),
             Err(e) => Poll::Ready(Err(e)),
             Ok(bytes) => {

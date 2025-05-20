@@ -24,6 +24,7 @@ BT_MKDIR_DEPS=(
 BT_SET_UP() {
     source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
     fx="$(btf::setup_fx)"
+    ffx="$(btf::make_installed_hosttools_mock ffx)"
     FUCHSIA_DIR="${BT_TEMP_DIR}"
 }
 
@@ -33,8 +34,8 @@ TEST_fx-set-device-writes-file() {
     BT_EXPECT ${fx} set-device ${device_name} 2>/dev/null
 
     local device_file="${FUCHSIA_DIR}/out/default.device"
-    BT_EXPECT_FILE_EXISTS ${device_file}
-    BT_EXPECT_FILE_CONTAINS "${FUCHSIA_DIR}/out/default.device" "${device_name}"
+    BT_EXPECT_FILE_EXISTS "${device_file}"
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device_name}"
 }
 
 # Check that the device file is written when setting the device with a non-default build-dir
@@ -55,24 +56,234 @@ EOF
     BT_EXPECT_FILE_CONTAINS ${device_file} "${device_name}"
 }
 
-# Check that the command fails if used with -d
-TEST_fx-set-device-fails-with-device-flag() {
-    BT_EXPECT_FAIL ${fx} -d foo set-device foo 2>/dev/null
+# Check that the command fails if used with -t
+TEST_fx-set-device-fails-with-target-flag() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+
+    BT_EXPECT_FAIL ${fx} -t foo set-device bar >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "ERROR: The -t flag is not supported when calling this function"
+    BT_EXPECT_FILE_DOES_NOT_EXIST ${device_file}
 }
 
-# test that we warn the user if the set command will be a noop
-TEST_fx-set-device-warns-if-nodename-env-var-set-already() {
+# fx set-device should print an error if FUCHSIA_NODENAME is set outside of fx.
+TEST_fx-set-device-errors-if-nodename-env-var-set-already() {
     local out="${BT_TEMP_DIR}/_fx_set_device_output"
     export FUCHSIA_NODENAME="bar"
     local device="foo"
 
-    # Do not fail, just warn
+    BT_EXPECT_FAIL ${fx} set-device "${device}" >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo
+ERROR: However, you've overriden this value by setting \$FUCHSIA_NODENAME=\"bar\".
+ERROR: If you want to use \"foo\", please unset the \$FUCHSIA_NODENAME environment variable."
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS ${device_file}
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device}"
+}
+
+# fx set-device should print an error if FUCHSIA_DEVICE_ADDR is set outside of fx.
+TEST_fx-set-device-errors-if-device-addr-env-var-set() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    export FUCHSIA_DEVICE_ADDR="baz"
+    local device="foo"
+
+    BT_EXPECT_FAIL ${fx} set-device "${device}" >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo
+ERROR: However, you've overriden this value by setting \$FUCHSIA_DEVICE_ADDR=\"baz\".
+ERROR: If you want to use \"foo\", please unset the \$FUCHSIA_DEVICE_ADDR environment variable."
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS ${device_file}
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device}"
+}
+
+# fx set-device should print an error if FUCHSIA_NODENAME and
+# FUCHSIA_DEVICE_ADDR are both set outside of fx.
+TEST_fx-set-device-errors-if-both-env-vars-set() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    export FUCHSIA_NODENAME="bar"
+    export FUCHSIA_DEVICE_ADDR="baz"
+    local device="foo"
+
+    BT_EXPECT_FAIL ${fx} set-device "${device}" >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo
+ERROR: However, you've overriden this value by setting \$FUCHSIA_NODENAME=\"bar\" and \$FUCHSIA_DEVICE_ADDR=\"baz\".
+ERROR: If you want to use \"foo\", please unset the \$FUCHSIA_NODENAME and \$FUCHSIA_DEVICE_ADDR environment variable."
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS ${device_file}
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device}"
+}
+
+# fx set-device should print an warning if ffx hasn't been built yet.
+TEST_fx-set-device-warns-if-ffx-not-built() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    local device_name="foo"
+    rm -f "${ffx}"
+    BT_EXPECT ${fx} set-device ${device_name} >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo
+WARNING: ffx not found in build directory, skipping verification that effective target device is foo.
+WARNING: Please run \`ffx target default get\` after the build to confirm."
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS "${device_file}"
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device_name}"
+}
+
+# fx set-device should print an warning if ffx hasn't been built yet, but should
+# still check env vars.
+TEST_fx-set-device-errors-if-ffx-not-built-with-env() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    local device_name="foo"
+    export FUCHSIA_DEVICE_ADDR="baz"
+    rm -f "${ffx}"
+    BT_EXPECT_FAIL ${fx} set-device ${device_name} >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo
+ERROR: However, you've overriden this value by setting \$FUCHSIA_DEVICE_ADDR=\"baz\".
+ERROR: If you want to use \"foo\", please unset the \$FUCHSIA_DEVICE_ADDR environment variable.
+
+WARNING: ffx not found in build directory, skipping verification that effective target device is foo.
+WARNING: Please run \`ffx target default get\` after the build to confirm."
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS "${device_file}"
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device_name}"
+}
+
+# fx set-device writes the file successfully with a mocked ffx.
+TEST_fx-set-device-writes-file-ffx-default-target-unset() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    local device="foo"
+
+    echo > "${ffx}.mock_errors"
+    cat >"${ffx}.mock_side_effects" <<INPUT
+if [[ \${@: -1} == "get" ]]; then
+  if [[ -n "\$FUCHSIA_DEVICE_ADDR" ]]; then
+    echo "\$FUCHSIA_DEVICE_ADDR"
+  elif [[ -n "\$FUCHSIA_NODENAME" ]]; then
+    echo "\$FUCHSIA_NODENAME"
+  else
+    echo "No default target." >&2
+    echo "If exactly one target is connected, ffx will use that." >&2
+  fi
+else
+  echo "Disallowed command: \$*" >> ${ffx}.mock_errors
+fi
+INPUT
     BT_EXPECT ${fx} set-device "${device}" >"$out" 2>&1
 
-    # Check that the output contains the text
-    BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "WARNING: FUCHSIA_NODENAME is already set to ${FUCHSIA_NODENAME}"
-    BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "WARNING: Calling fx set-device ${device} will have no effect"
-    BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "If you would like to use this command, first unset the FUCHSIA_NODENAME variable and try again"
+    # Check that the stdout contains the text
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo"
+    BT_EXPECT_FILE_CONTAINS "${ffx}.mock_errors" ""
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS ${device_file}
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device}"
+}
+
+# fx set-device should unset any default targets on the ffx level.
+TEST_fx-set-device-fixes-ffx-default-target-set() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    local device="foo"
+
+    echo > "${ffx}.mock_errors"
+    touch "${ffx}.configured_target"
+    cat >"${ffx}.mock_side_effects" <<INPUT
+if [[ \${@: -1} == "get" ]]; then
+  if [[ -e "${ffx}.configured_target" ]]; then
+    echo "ffx-default-target"
+  else
+    echo "No default target." >&2
+    echo "If exactly one target is connected, ffx will use that." >&2
+  fi
+elif [[ \${@: -1} == "unset" ]]; then
+  if [[ -n "\$FUCHSIA_DEVICE_ADDR" ]] || [[ -n "\$FUCHSIA_NODENAME" ]]; then
+    echo "TEST FAIL: Unexpected default target unset env vars values: <\$FUCHSIA_DEVICE_ADDR,\$FUCHSIA_NODENAME>" >&2
+  fi
+  echo "<unset stderr should propagate>" >&2
+  if [[ -e "${ffx}.configured_target" ]]; then
+    rm "${ffx}.configured_target"
+  else
+    echo "No default targets to unset." >&2
+  fi
+else
+  echo "Disallowed command: \$*" >> ${ffx}.mock_errors
+fi
+INPUT
+    BT_EXPECT ${fx} set-device "${device}" >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo
+WARNING: The build level device foo is overridden by the user level device \"ffx-default-target\".
+WARNING: Attempting to fix this by running \`ffx target default unset\`...
+<unset stderr should propagate>"
+    BT_EXPECT_FILE_CONTAINS "${ffx}.mock_errors" ""
+    BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.configured_target"
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS ${device_file}
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device}"
+}
+
+# fx set-device should attempt to unset the default ffx value.
+TEST_fx-set-device-errors-if-ffx-default-target-and-env-set() {
+    local out="${BT_TEMP_DIR}/_fx_set_device_output"
+    export FUCHSIA_NODENAME="bar"
+    export FUCHSIA_DEVICE_ADDR="baz"
+    local device="foo"
+
+    echo > "${ffx}.mock_errors"
+    touch "${ffx}.configured_target"
+    cat >"${ffx}.mock_side_effects" <<INPUT
+if [[ \${@: -1} == "get" ]]; then
+  if [[ -e "${ffx}.configured_target" ]]; then
+    echo "ffx-default-target"
+  else
+    echo "No default target." >&2
+    echo "If exactly one target is connected, ffx will use that." >&2
+  fi
+elif [[ \${@: -1} == "unset" ]]; then
+  if [[ -n "\$FUCHSIA_DEVICE_ADDR" ]] || [[ -n "\$FUCHSIA_NODENAME" ]]; then
+    echo "TEST FAIL: Unexpected default target unset env vars values: <\$FUCHSIA_DEVICE_ADDR,\$FUCHSIA_NODENAME>" >&2
+  fi
+  echo "<unset stderr should propagate>" >&2
+  if [[ -e "${ffx}.configured_target" ]]; then
+    rm "${ffx}.configured_target"
+  else
+    echo "No default targets to unset." >&2
+  fi
+else
+  echo "Disallowed command: \$*" >> ${ffx}.mock_errors
+fi
+INPUT
+    BT_EXPECT_FAIL ${fx} set-device "${device}" >"$out" 2>&1
+
+    # Check that the output has the right message
+    BT_EXPECT_FILE_CONTAINS "${out}" "Default device for '${FUCHSIA_DIR}/out/default' is now foo
+ERROR: However, you've overriden this value by setting \$FUCHSIA_NODENAME=\"bar\" and \$FUCHSIA_DEVICE_ADDR=\"baz\".
+ERROR: If you want to use \"foo\", please unset the \$FUCHSIA_NODENAME and \$FUCHSIA_DEVICE_ADDR environment variable.
+
+WARNING: The build level device foo is overridden by the user level device \"ffx-default-target\".
+WARNING: Attempting to fix this by running \`ffx target default unset\`...
+<unset stderr should propagate>"
+    BT_EXPECT_FILE_CONTAINS "${ffx}.mock_errors" ""
+    BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.configured_target"
+
+    local device_file="${FUCHSIA_DIR}/out/default.device"
+    BT_EXPECT_FILE_EXISTS ${device_file}
+    BT_EXPECT_FILE_CONTAINS "${device_file}" "${device}"
 }
 
 BT_RUN_TESTS "$@"

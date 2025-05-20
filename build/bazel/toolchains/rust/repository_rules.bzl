@@ -7,13 +7,11 @@
 def _generate_prebuilt_rust_toolchain_repository_impl(repo_ctx):
     repo_ctx.file("WORKSPACE.bazel", content = "")
 
-    workspace_dir = str(repo_ctx.workspace_root)
-
     # Symlink the content of the Rust installation directory into the repository.
     # This allows us to add Bazel-specific files in this location.
     repo_ctx.execute(
         [
-            workspace_dir + "/build/bazel/scripts/symlink-directory.py",
+            repo_ctx.path(Label("@//build/bazel/scripts:symlink-directory.py")),
             repo_ctx.attr.rust_install_dir,
             ".",
         ],
@@ -22,7 +20,7 @@ def _generate_prebuilt_rust_toolchain_repository_impl(repo_ctx):
 
     # Symlink the BUILD.bazel file.
     repo_ctx.symlink(
-        workspace_dir + "/build/bazel/toolchains/rust/rust.BUILD.bazel",
+        repo_ctx.workspace_root.get_child("build/bazel/toolchains/rust/rust.BUILD.bazel"),
         "BUILD.bazel",
     )
 

@@ -190,7 +190,7 @@ pub mod ioctl {
         L: LockBefore<FileOpsCore>,
     {
         let header_ref = UserRef::<uapi::fsverity_digest>::new(arg);
-        let digest_addr = header_ref.next().addr();
+        let digest_addr = header_ref.next()?.addr();
         let header = task.read_object(header_ref.clone())?;
         match &*file.node().fsverity.lock() {
             FsVerityState::FsVerity => {

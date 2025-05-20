@@ -99,7 +99,6 @@ exceedingly rare, and as such the workflow is not particularly well refined.
 First, find the project you want to test, in the case of Scudo it looks like:
 ```
 <project name="scudo"
-         gitsubmoduleof="fuchsia"
          path="third_party/scudo/src"
          remote="https://llvm.googlesource.com/scudo"
          revision="b0c7c7b80b6dfa2cd0b5dae98cb1ea33d31d2497"/>

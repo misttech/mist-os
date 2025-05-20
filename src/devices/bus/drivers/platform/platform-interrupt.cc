@@ -42,11 +42,7 @@ zx::result<> PlatformInterruptFragment::Add(std::string_view name, PlatformDevic
   std::vector<fuchsia_driver_framework::NodeProperty2> props;
 
   if (const auto& irq_props = irq.properties(); irq_props.has_value()) {
-    std::transform(irq_props->cbegin(), irq_props->cend(), std::back_inserter(props),
-                   [](const fuchsia_driver_framework::NodeProperty& property) {
-                     return fuchsia_driver_framework::NodeProperty2{
-                         {.key = property.key().string_value().value(), .value = property.value()}};
-                   });
+    std::copy(irq_props->cbegin(), irq_props->cend(), std::back_inserter(props));
   } else {
     props = {
         fdf::MakeProperty2(bind_fuchsia::PLATFORM_DEV_VID, pdev->vid()),

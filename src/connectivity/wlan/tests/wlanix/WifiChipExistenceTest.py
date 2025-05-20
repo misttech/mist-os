@@ -8,7 +8,6 @@ Test that the device has at least one WifiChip.
 import asyncio
 
 import fidl_fuchsia_wlan_wlanix as fidl_wlanix
-from antlion import base_test
 from fuchsia_controller_py import Channel
 from mobly import test_runner
 from mobly.asserts import assert_greater, assert_is_not

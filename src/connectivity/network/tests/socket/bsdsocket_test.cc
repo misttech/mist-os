@@ -2206,7 +2206,7 @@ class ZxioSocketCreationOptions : public testing::TestWithParam<SocketKindAndMar
     ASSERT_EQ(out_code, 0);
   }
 
-  void TearDown() override { zxio_close(&storage_.io, true); }
+  void TearDown() override { zxio_destroy(&storage_.io); }
 
   const std::vector<zxio_socket_mark_t>& marks() const { return marks_; }
   zxio_t* zxio() { return &storage_.io; }

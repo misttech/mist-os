@@ -58,8 +58,8 @@
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 #include <ktl/iterator.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>

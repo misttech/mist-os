@@ -22,9 +22,12 @@ rustc_library("iquery_test_support") {
 
   deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_fdomain",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_fdomain",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/rust/zx-status",
+    "//src/lib/fdomain/client",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/sys/lib/moniker",

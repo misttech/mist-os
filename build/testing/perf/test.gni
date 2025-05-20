@@ -35,8 +35,10 @@ performance_testing_environments = [
 #     Type: list(string)
 #     Default: empty list
 #
-#   target_deps (optional)
-#     Fuchsia dependencies to bring into the build graph that the test needs.
+#   package_deps (optional)
+#     Fuchsia package dependencies to bring into the build graph that
+#     the test needs, which are passed through to the test_spec.
+#     See //build/testing/test_spec.gni for more details.
 #     Type: list(string)
 #     Default: empty list
 #
@@ -169,11 +171,6 @@ template("python_perf_test") {
     if (defined(invoker.expected_metric_names_filepaths)) {
       deps += [ ":${target_name}_test_verify($host_toolchain)" ]
     }
-    if (defined(invoker.target_deps)) {
-      foreach(target_dep, invoker.target_deps) {
-        deps += [ "${target_dep}($target_toolchain)" ]
-      }
-    }
   }
 }
 
@@ -293,21 +290,19 @@ template("fuchsia_component_perf_test") {
     # LINT.IfChange
     data_package_name = "test_data"
 
-    # LINT.ThenChange(//src/performance/lib/perf_test/fuchsia_component_perf_test.py)
+    # LINT.ThenChange(//src/performance/lib/host_driven/fuchsia_component_perf_test.py)
     expected_metric_names_filepaths = [ invoker.expected_metric_names_filepath ]
     main_source =
-        "//src/performance/lib/perf_test/fuchsia_component_perf_test.py"
+        "//src/performance/lib/host_driven/fuchsia_component_perf_test.py"
     params = _params
     libraries = [
+      "//src/performance/lib/host_driven",
       "//src/performance/lib/perf_publish",
-      "//src/performance/lib/py_test_utils:perf_test_utils",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//third_party/mobly",
     ]
 
-    # TODO(https://fxbug.dev/407117303): Add this to package_deps after
-    # fixing some tests that don't pass in the exact package target.
-    target_deps = [ invoker.package ]
+    package_deps = [ invoker.package ]
   }
 }

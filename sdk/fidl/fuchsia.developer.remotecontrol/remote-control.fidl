@@ -28,7 +28,7 @@ type TunnelError = flexible enum {
 
 // Strict methods in this protocol are due to them predating the introduction of
 // API levels and being hard to migrate.
-@discoverable
+@discoverable(server="platform")
 open protocol RemoteControl {
     /// Returns the input.
     strict EchoString(struct {
@@ -37,7 +37,7 @@ open protocol RemoteControl {
         response string:255;
     });
 
-    @available(replaced=NEXT)
+    @available(replaced=27)
     strict LogMessage(struct {
         tag string:MAX;
         message string:MAX;
@@ -45,7 +45,7 @@ open protocol RemoteControl {
     }) -> ();
 
     /// Writes a string to the syslog on the device.
-    @available(added=NEXT)
+    @available(added=27)
     strict LogMessage(struct {
         tag string:MAX;
         message string:MAX;
@@ -98,7 +98,20 @@ open protocol RemoteControl {
     ///
     /// Connects a channel to a service, given a moniker and a channel iff the component identified
     /// by the given moniker exposes a capability of the requested name.
-    @available(added=26, removed=NEXT)
+    //
+    // TODO(https://fxbug.dev/384994764): In an ideal world, we'd be able to say
+    // `removed=26, renamed="DeprecatedOpenCapability"` on `OpenCapability` to
+    // get this for free, but unfortunately that doesn't work.
+    //
+    // TODO(https://fxbug.dev/324081103): Once all in-tree calls to
+    // `DeprecatedOpenCapability` have been removed, delete this method and
+    // change the annotation on `OpenCapability` to:
+    //
+    //     @available(
+    //         deprecated=25,
+    //         removed=26,
+    //         note="Use ConnectCapability instead.")
+    @available(added=26)
     @selector("OpenCapability")
     flexible DeprecatedOpenCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;

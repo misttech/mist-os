@@ -5,7 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <dev/iommu/intel.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include "iommu_impl.h"
 

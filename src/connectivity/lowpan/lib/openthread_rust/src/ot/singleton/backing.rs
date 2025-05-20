@@ -28,6 +28,7 @@ pub(crate) struct InstanceBacking {
     pub nat64_receive_fn: Cell<Option<std::boxed::Box<dyn FnMut(OtMessageBox<'_>)>>>,
     pub dhcp6pd_state_change_callback_fn:
         Cell<Option<std::boxed::Box<dyn FnMut(BorderRoutingDhcp6PdState)>>>,
+    pub ephemeral_key_callback: Cell<Option<std::boxed::Box<dyn FnMut()>>>,
 }
 
 impl InstanceBacking {
@@ -47,6 +48,7 @@ impl InstanceBacking {
             multicast_listener_callback: Cell::new(None),
             nat64_receive_fn: Cell::new(None),
             dhcp6pd_state_change_callback_fn: Cell::new(None),
+            ephemeral_key_callback: Cell::new(None),
         }
     }
 }

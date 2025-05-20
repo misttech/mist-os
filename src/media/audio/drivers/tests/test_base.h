@@ -129,8 +129,7 @@ class TestBase : public media::audio::test::TestFixture {
   DeviceType device_type() const { return device_entry_.device_type; }
   DriverType driver_type() const { return device_entry_.driver_type; }
 
-  std::optional<bool> IsIncoming(
-      std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id = std::nullopt);
+  std::optional<bool> IsIncoming();
 
   void RequestHealthAndExpectHealthy();
   void GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb);
@@ -144,7 +143,7 @@ class TestBase : public media::audio::test::TestFixture {
 
   // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
   // know the supported formats, so this is implemented in this shared parent class.
-  void RetrieveDaiFormats();
+  virtual void RetrieveDaiFormats();
   static void ValidateDaiFormatSets(
       const std::vector<fuchsia::hardware::audio::DaiSupportedFormats>& dai_format_sets);
   static void LogDaiFormatSets(
@@ -157,7 +156,7 @@ class TestBase : public media::audio::test::TestFixture {
   void GetMaxDaiFormat(fuchsia::hardware::audio::DaiFormat& max_dai_format_out);
   const std::vector<fuchsia::hardware::audio::DaiSupportedFormats>& dai_formats() const;
 
-  void RetrieveRingBufferFormats();
+  virtual void RetrieveRingBufferFormats();
   static void ValidateRingBufferFormatSets(
       const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& rb_format_sets);
   static void ValidateRingBufferFormat(const fuchsia::hardware::audio::PcmFormat& rb_format);
@@ -165,18 +164,19 @@ class TestBase : public media::audio::test::TestFixture {
                                   const std::string& tag = {});
   const fuchsia::hardware::audio::PcmFormat& min_ring_buffer_format() const;
   const fuchsia::hardware::audio::PcmFormat& max_ring_buffer_format() const;
-  const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& ring_buffer_pcm_formats() const;
+  const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& ring_buffer_pcm_formats()
+      const {
+    return ring_buffer_pcm_formats_;
+  }
 
-  // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
-  // connect to fuchsia.hardware.audio.signalprocessing and query the supported topologies, so
-  // this is implemented in this shared parent class.
-  void SignalProcessingConnect();
-  void RequestElements();
-  void RequestTopologies();
-  void RequestTopology();
+  std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& ring_buffer_pcm_formats() {
+    return ring_buffer_pcm_formats_;
+  }
 
-  bool ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id);
-  bool RingBufferElementIsIncoming(fuchsia::hardware::audio::ElementId element_id);
+  std::vector<fuchsia::hardware::audio::DaiSupportedFormats>& dai_formats() { return dai_formats_; }
+
+  void SetMinMaxRingBufferFormats();
+  void SetMinMaxDaiFormats();
 
   fidl::InterfacePtr<fuchsia::hardware::audio::Codec>& codec() { return codec_; }
   fidl::InterfacePtr<fuchsia::hardware::audio::Composite>& composite() { return composite_; }
@@ -186,9 +186,9 @@ class TestBase : public media::audio::test::TestFixture {
   }
 
   void WaitForError(zx::duration wait_duration = kWaitForErrorDuration) {
-    RunLoopWithTimeoutOrUntil([]() { return HasFailure() || IsSkipped(); }, wait_duration);
+    // Instead of just polling for disconnect, we proactively confirm with a basic call & response.
+    RequestHealthAndExpectHealthy();
   }
-  std::optional<uint64_t>& ring_buffer_id() { return ring_buffer_id_; }
 
   // The union of [CodecProperties, CompositeProperties, DaiProperties, StreamProperties].
   struct BaseProperties {
@@ -210,20 +210,13 @@ class TestBase : public media::audio::test::TestFixture {
   std::optional<BaseProperties>& properties() { return properties_; }
   const std::optional<BaseProperties>& properties() const { return properties_; }
 
-  const std::vector<fuchsia::hardware::audio::signalprocessing::Topology>& topologies() const {
-    return topologies_;
-  }
-  const std::vector<fuchsia::hardware::audio::signalprocessing::Element>& elements() const {
-    return elements_;
-  }
-
  private:
   static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);
+  static constexpr zx::duration kDriverDisconnectCooldownDuration = zx::msec(10);
+
+  static void CooldownAfterDriverDisconnect();
 
   std::optional<BaseProperties> properties_;
-
-  void SetMinMaxRingBufferFormats();
-  void SetMinMaxDaiFormats();
 
   std::optional<component_testing::RealmRoot> realm_;
   fuchsia::component::BinderPtr audio_binder_;
@@ -243,17 +236,9 @@ class TestBase : public media::audio::test::TestFixture {
   fuchsia::hardware::audio::PcmFormat max_ring_buffer_format_{};
   std::optional<fuchsia::hardware::audio::DaiFormat> min_dai_format_;
   std::optional<fuchsia::hardware::audio::DaiFormat> max_dai_format_;
-
-  fidl::InterfacePtr<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_;
-  std::optional<bool> signalprocessing_is_supported_ = std::nullopt;
-  std::vector<fuchsia::hardware::audio::signalprocessing::Topology> topologies_;
-  std::vector<fuchsia::hardware::audio::signalprocessing::Element> elements_;
-  std::optional<fuchsia::hardware::audio::TopologyId> topology_id_ = std::nullopt;
-
-  std::optional<uint64_t> ring_buffer_id_;  // Ring buffer process element id.
-  std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.
 };
 
+// ostream formatting for DriverType
 inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
   switch (dev_dir) {
     case DriverType::Codec:
@@ -269,6 +254,7 @@ inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
   }
 }
 
+// ostream formatting for DeviceType
 inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type) {
   switch (device_type) {
     case DeviceType::A2DP:
@@ -280,6 +266,7 @@ inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type
   }
 }
 
+// ostream formatting for optional<PlugDetectCapabilities>
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>& plug_caps) {
@@ -294,6 +281,7 @@ inline std::ostream& operator<<(
   }
 }
 
+// ostream formatting for DaiSampleFormat
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiSampleFormat sample_format) {
   switch (sample_format) {
@@ -308,6 +296,7 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 
+// ostream formatting for DaiFrameFormatStandard
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiFrameFormatStandard format) {
   switch (format) {
@@ -328,6 +317,7 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 
+// ostream formatting for DaiFrameFormatCustom
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiFrameFormatCustom format) {
   return (out << "[left_justified " << format.left_justified << ", sclk_on_raising "
@@ -336,6 +326,7 @@ inline std::ostream& operator<<(std::ostream& out,
               << static_cast<uint16_t>(format.frame_sync_size) << "]");
 }
 
+// ostream formatting for DaiFrameFormat
 inline std::ostream& operator<<(std::ostream& out,
                                 fuchsia::hardware::audio::DaiFrameFormat format) {
   if (format.is_frame_format_standard()) {
@@ -348,6 +339,7 @@ inline std::ostream& operator<<(std::ostream& out,
   return (out << "[invalid frame_format union: neither standard nor custom]");
 }
 
+// ostream formatting for optional<UniqueId>
 inline std::ostream& operator<<(std::ostream& out, std::optional<std::array<uint8_t, 16>> id) {
   if (!id.has_value()) {
     return (out << "NONE");

@@ -259,6 +259,16 @@ void FakeWlanix::Disconnect(DisconnectCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceDisconnect});
 }
 
+void FakeWlanix::GetMacAddress(GetMacAddressCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaIfaceGetMacAddress});
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_wlanix::wire::SupplicantStaIfaceGetMacAddressResponse::Builder(arena);
+  fidl::Array<uint8_t, 6> mac_addr = {13, 37, 13, 37, 13, 37};
+  builder.mac_addr(mac_addr);
+  auto response = builder.Build();
+  completer.Reply(fit::ok(&response));
+}
+
 void FakeWlanix::SetPowerSave(
     fuchsia_wlan_wlanix::wire::SupplicantStaIfaceSetPowerSaveRequest* request,
     SetPowerSaveCompleter::Sync& completer) {

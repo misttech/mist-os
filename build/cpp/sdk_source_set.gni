@@ -35,13 +35,8 @@ import("//build/sdk/sdk_atom.gni")
 #     If not specified, the path will be "<sdk_name>.api".
 #     Not allowed when `stable` is false.
 #
-#   sdk_name (required for non-internal libraries)
+#   sdk_name (required)
 #     Name of the library in the SDK.
-#
-#   source_dir (optional)
-#     If set, path to the base directory of the sources.
-#     This is useful if the sources are generated and therefore not hosted
-#     directly under the directory where the GN rules are declared.
 #
 #   include_base (optional)
 #     Path to the root directory for includes.
@@ -79,11 +74,13 @@ import("//build/sdk/sdk_atom.gni")
 #     Whether this source library is stabilized.
 #     When true, an .api file is generated. When false, the atom is marked as
 #     unstable in the final IDK.
-#     Must be specified when `sdk_category` is defined and not "internal";
+#     Must be specified when `category` is defined and not "internal";
 #     otherwise, must not be specified.
 #
 template("sdk_source_set") {
   assert(defined(invoker.category), "Must define an SDK category")
+  assert(defined(invoker.sdk_name),
+         "Must specify a name that is meaningful in the IDK context.")
 
   valid_categories = [
     # "internal" is deprecated; only specific legacy cases below are allowed.
@@ -109,26 +106,8 @@ template("sdk_source_set") {
           valid_categories || make_internal_atom,
       "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
 
-  # Internal source sets may also specify an sdk_name.
-  assert(
-      defined(invoker.sdk_name) || make_internal_atom,
-      "Source sets in the IDK must specify a name that is meaningful in that context.")
-
-  if (defined(invoker.sdk_name)) {
-    sdk_name = invoker.sdk_name
-    sdk_root_path = "pkg/${sdk_name}"
-  } else {
-    # if not defined by the invoker, the sdk_name is the fully qualified target name with some tweaks. For example:
-    #    //src/lib/fxl:fxl            sdk_name = //src/lib/fxl_fxl          sdk_root_path= src/lib/fxl_fxl
-    #    //src/lib/fxl:functional     sdk_name = //src/lib/fxl_functional   sdk_root_path= src/lib/fxl_functional
-    #    //src/lib/fxl/files:files    sdk_name = //src/lib/fxl/files_files  sdk_root_path= src/lib/fxl/files_files
-    full_label = get_label_info(":${invoker.target_name}", "label_no_toolchain")
-    path = get_label_info(full_label, "dir")
-    path = "${path}_${invoker.target_name}"
-
-    sdk_name = path
-    sdk_root_path = string_replace(path, "//", "")
-  }
+  sdk_name = invoker.sdk_name
+  sdk_root_path = "pkg/${sdk_name}"
 
   sdk_id = "sdk://${sdk_root_path}"
 
@@ -160,18 +139,12 @@ template("sdk_source_set") {
                              "category",
                              "sdk_area",
                              "include_base",
-                             "metadata",
                              "non_sdk_deps",
                              "non_sdk_public_deps",
                              "non_sdk_local_deps",
                              "sdk_headers_for_internal_use",
-                             "source_dir",
                              "stable",
                            ])
-
-    if (defined(visibility)) {
-      visibility += [ ":${sdk_target_name}" ]
-    }
 
     if (defined(invoker.non_sdk_deps)) {
       deps += invoker.non_sdk_deps
@@ -204,12 +177,6 @@ template("sdk_source_set") {
     }
 
     configs += [ "//build/config:sdk_extra_warnings" ]
-
-    metadata = {
-      if (defined(invoker.metadata)) {
-        forward_variables_from(invoker.metadata, "*")
-      }
-    }
   }
 
   # Walk over dependencies (deps and public_deps) and collect their names (dep_names), labels (all_deps), labels of corresponding
@@ -270,17 +237,8 @@ template("sdk_source_set") {
   if (defined(invoker.include_base)) {
     include_base = invoker.include_base
   } else {
-    if (is_internal) {
-      # by default, we want internal SDK elements to have their include path similar when used through
-      # an SDK (eg Bazel SDk) or directly (GN/Ninja), so that source code doesn't need to be changed
-      # when switching from one to the other.
-      include_base = "//"
-    } else {
-      include_base = "include"
-    }
+    include_base = "include"
   }
-  assert(include_base != "")  # Work around for unused variable warning when
-                              # all_headers is empty
 
   include_dest = "${sdk_root_path}/include"
 
@@ -327,7 +285,6 @@ template("sdk_source_set") {
     plasa_fragment_cc(_plasa_artifacts_target_name) {
       forward_variables_from(invoker,
                              [
-                               "source_dir",
                                "testonly",
                                "all_headers",
                                "all_deps",
@@ -375,6 +332,18 @@ template("sdk_source_set") {
     deps = sdk_deps
   }
 
+  # LINT.IfChange
+  _prebuild_info = {
+    include_dir = include_dest
+    sources = sdk_metadata_sources
+    headers = sdk_metadata_headers
+    deps = sdk_deps
+    library_name = sdk_name
+    file_base = sdk_root_path
+  }
+
+  # LINT.ThenChange(//build/sdk/idk_prebuild_manifest.gni)
+
   sdk_atom(sdk_target_name) {
     # As described at the top of this file, this atom does NOT build the
     # underlying source files.
@@ -391,7 +360,6 @@ template("sdk_source_set") {
 
     forward_variables_from(invoker,
                            [
-                             "source_dir",
                              "testonly",
                              "sdk_area",
                            ])
@@ -421,8 +389,9 @@ template("sdk_source_set") {
 
     meta = {
       source = metadata_file
+      source_prebuild_info = _prebuild_info
       dest = "$sdk_root_path/meta.json"
-      schema = "cc_source_library"
+      type = "cc_source_library"
       stable = is_stable
     }
 

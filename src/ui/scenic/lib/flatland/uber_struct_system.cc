@@ -65,8 +65,8 @@ UberStructSystem::UpdateResults UberStructSystem::UpdateInstances(
     while (pending_struct.has_value()) {
       ++present_credits_returned;
       if (pending_struct->present_id == present_id) {
-        FLATLAND_VERBOSE_LOG << "    Updating UberStruct for session_id: " << session_id
-                             << " present_id: " << present_id;
+        FLATLAND_VERBOSE_LOG << "    Updating UberStruct for session_id=" << session_id
+                             << " present_id=" << present_id;
         uber_struct_map_[session_id] = std::move(pending_struct->uber_struct);
         successful_update = true;
         break;

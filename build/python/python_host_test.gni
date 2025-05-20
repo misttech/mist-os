@@ -70,6 +70,15 @@ import("//build/testing/host_test_data.gni")
 #  test_data_deps (optional)
 #    The dependencies used only at runtime for this test.
 #
+#  package_deps (optional)
+#    List of `fuchsia_package` labels that are needed at runtime. These are forwarded
+#    to the host_test() template which forwards it to the test_spec() template and may
+#    also need to be included in the build graph separately in universe to be included
+#    in the package repo because the package repo doesn't depend on tests that are
+#    included in host_labels.
+#    Type: list(string)
+#    Default: empty list
+#
 #  deps
 #  environments
 #  visibility

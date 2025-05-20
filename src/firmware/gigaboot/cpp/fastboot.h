@@ -7,12 +7,12 @@
 
 #include <lib/abr/ops.h>
 #include <lib/fastboot/fastboot_base.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zircon_boot/zircon_boot.h>
 #include <stdarg.h>
 
 #include <functional>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <variant>
 
@@ -24,7 +24,7 @@ namespace gigaboot {
 
 class Fastboot : public fastboot::FastbootBase {
  public:
-  Fastboot(cpp20::span<uint8_t> download_buffer, ZirconBootOps zb_ops,
+  Fastboot(std::span<uint8_t> download_buffer, ZirconBootOps zb_ops,
            EfiVariables *efi_variables = nullptr)
       : download_buffer_(download_buffer), zb_ops_(zb_ops), efi_variables_(efi_variables) {
     if (!efi_variables_) {
@@ -66,7 +66,7 @@ class Fastboot : public fastboot::FastbootBase {
                                              const Responder &);
   struct VarFuncAndArgs {
     VarFunc func;
-    cpp20::span<const std::string_view> arg_list = {};
+    std::span<const std::string_view> arg_list = {};
   };
 
   struct VariableEntry {
@@ -74,14 +74,14 @@ class Fastboot : public fastboot::FastbootBase {
     std::variant<VarFuncAndArgs, std::string_view> var;
   };
 
-  cpp20::span<VariableEntry> GetVariableTable();
+  std::span<VariableEntry> GetVariableTable();
 
   struct CommandCallbackEntry {
     std::string_view name;
     zx::result<> (Fastboot::*cmd)(std::string_view, fastboot::Transport *);
   };
 
-  cpp20::span<CommandCallbackEntry> GetCommandCallbackTable();
+  std::span<CommandCallbackEntry> GetCommandCallbackTable();
 
   zx::result<> GetVarAll(const CommandArgs &, fastboot::Transport *, const Responder &);
   zx::result<> GetVarMaxDownloadSize(const CommandArgs &, fastboot::Transport *, const Responder &);
@@ -152,7 +152,7 @@ class Fastboot : public fastboot::FastbootBase {
   int printer_(const char *fmt, ...);
   friend void hexdump_printer_printf(void *printf_arg, const char *fmt, ...);
 
-  cpp20::span<uint8_t> download_buffer_;
+  std::span<uint8_t> download_buffer_;
   ZirconBootOps zb_ops_;
   bool continue_ = false;
 

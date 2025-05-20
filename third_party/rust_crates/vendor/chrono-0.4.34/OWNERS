@@ -26,7 +26,7 @@ include /src/sys/pkg/bin/omaha-client/OWNERS
 include /src/sys/time/OWNERS
 include /third_party/rust_crates/forks/fatfs/OWNERS
 include /third_party/rust_crates/vendor/chrono-english-0.1.7/OWNERS
-include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.2/OWNERS
 include /third_party/rust_crates/vendor/schemars-0.8.10/OWNERS
 include /third_party/rust_crates/vendor/simplelog-0.10.2/OWNERS
 include /third_party/rust_crates/vendor/toml_edit-0.2.1/OWNERS

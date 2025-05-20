@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.emptystruct/cpp/markers.h>
 #include <fidl/test.emptystruct/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -15,10 +17,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-namespace fidl {
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_emptystruct::EmptyProtocol::Send> {
@@ -43,13 +41,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_emptystruct::EmptyProtocol::S
       ::fit::callback<void(::fidl::Result<::test_emptystruct::EmptyProtocol::SendAndReceive>&)>;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_emptystruct::EmptyProtocol::SendAndReceive> final : public ::test_emptystruct::EmptyProtocolSendAndReceiveResponse {
  public:
   using ::test_emptystruct::EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse;
-  Response(::test_emptystruct::EmptyProtocolSendAndReceiveResponse v) : EmptyProtocolSendAndReceiveResponse(std::move(v)) {}
+  Response(::test_emptystruct::EmptyProtocolSendAndReceiveResponse v);
 };
 
 template <>
@@ -70,10 +66,6 @@ class ::fidl::internal::NaturalClientImpl<::test_emptystruct::EmptyProtocol> fin
   ::fit::result<::fidl::OneWayError> Send(const ::fidl::Request<::test_emptystruct::EmptyProtocol::Send>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_emptystruct::EmptyProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_emptystruct::EmptyProtocol>> {
@@ -83,15 +75,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_emptystruct::EmptyProtocol>
   ::fit::result<::fidl::OneWayError> Send(const ::fidl::Request<::test_emptystruct::EmptyProtocol::Send>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_emptystruct::EmptyProtocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_emptystruct::EmptyProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -106,7 +91,7 @@ class ::fidl::AsyncEventHandler<::test_emptystruct::EmptyProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_emptystruct::EmptyProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void Receive(::fidl::Event<::test_emptystruct::EmptyProtocol::Receive>&) override {}
+  void Receive(::fidl::Event<::test_emptystruct::EmptyProtocol::Receive>&) override;
 };
 
 template <>
@@ -125,16 +110,12 @@ class ::fidl::SyncEventHandler<::test_emptystruct::EmptyProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_emptystruct::EmptyProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_emptystruct::EmptyProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_emptystruct::EmptyProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_emptystruct::EmptyProtocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_emptystruct::EmptyProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -151,8 +132,6 @@ class ::fidl::internal::NaturalEventSender<::test_emptystruct::EmptyProtocol>
 
   ::fit::result<::fidl::OneWayError> Receive(const ::test_emptystruct::EmptyProtocolReceiveRequest& payload);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_emptystruct::EmptyProtocol::SendAndReceive> : public ::fidl::CompleterBase {
@@ -193,19 +172,13 @@ class ::fidl::Server<::test_emptystruct::EmptyProtocol> : public ::fidl::interna
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_emptystruct::EmptyProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_emptystruct::EmptyProtocol> final {
@@ -221,6 +194,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_emptystruct::EmptyProtoc
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

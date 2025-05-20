@@ -56,7 +56,6 @@ sdk_source_set("fidl_base") {
 
   deps = [
     "//sdk/lib/fit",
-    "//sdk/lib/stdcompat",
     "//sdk/lib/utf-utils",
   ]
 

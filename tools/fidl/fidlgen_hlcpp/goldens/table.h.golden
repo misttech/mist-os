@@ -43,7 +43,7 @@ class EmptyTable final {
   static inline ::std::unique_ptr<EmptyTable> New() { return ::std::make_unique<EmptyTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, EmptyTable* _value, size_t _offset);
   zx_status_t Clone(EmptyTable* _result) const;
 
@@ -137,7 +137,7 @@ class SimpleTable final {
   static inline ::std::unique_ptr<SimpleTable> New() { return ::std::make_unique<SimpleTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SimpleTable* _value, size_t _offset);
   zx_status_t Clone(SimpleTable* _result) const;
 
@@ -223,7 +223,7 @@ class OlderSimpleTable final {
   static inline ::std::unique_ptr<OlderSimpleTable> New() { return ::std::make_unique<OlderSimpleTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, OlderSimpleTable* _value, size_t _offset);
   zx_status_t Clone(OlderSimpleTable* _result) const;
 
@@ -349,7 +349,7 @@ class NewerSimpleTable final {
   static inline ::std::unique_ptr<NewerSimpleTable> New() { return ::std::make_unique<NewerSimpleTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, NewerSimpleTable* _value, size_t _offset);
   zx_status_t Clone(NewerSimpleTable* _result) const;
 
@@ -491,7 +491,7 @@ class ReverseOrdinalTable final {
   static inline ::std::unique_ptr<ReverseOrdinalTable> New() { return ::std::make_unique<ReverseOrdinalTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ReverseOrdinalTable* _value, size_t _offset);
   zx_status_t Clone(ReverseOrdinalTable* _result) const;
 
@@ -585,7 +585,7 @@ class TableWithAttributes final {
   static inline ::std::unique_ptr<TableWithAttributes> New() { return ::std::make_unique<TableWithAttributes>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TableWithAttributes* _value, size_t _offset);
   zx_status_t Clone(TableWithAttributes* _result) const;
 
@@ -639,7 +639,7 @@ class ExtensionTable final {
   static inline ::std::unique_ptr<ExtensionTable> New() { return ::std::make_unique<ExtensionTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ExtensionTable* _value, size_t _offset);
   zx_status_t Clone(ExtensionTable* _result) const;
 
@@ -2221,7 +2221,7 @@ class SixtyFourOrdinalTable final {
   static inline ::std::unique_ptr<SixtyFourOrdinalTable> New() { return ::std::make_unique<SixtyFourOrdinalTable>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, SixtyFourOrdinalTable* _value, size_t _offset);
   zx_status_t Clone(SixtyFourOrdinalTable* _result) const;
 

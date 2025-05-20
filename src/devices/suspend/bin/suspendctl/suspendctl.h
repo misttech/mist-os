@@ -6,9 +6,9 @@
 #define SRC_DEVICES_SUSPEND_BIN_SUSPENDCTL_SUSPENDCTL_H_
 
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <fidl/fuchsia.hardware.suspend/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.suspend/cpp/natural_ostream.h>
-#include <fidl/fuchsia.hardware.suspend/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/natural_ostream.h>
+#include <fidl/fuchsia.hardware.power.suspend/cpp/natural_types.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 
@@ -18,7 +18,7 @@
 
 namespace suspendctl {
 
-namespace fh_suspend = fuchsia_hardware_suspend;
+namespace fh_suspend = fuchsia_hardware_power_suspend;
 
 enum class Action {
   Suspend,

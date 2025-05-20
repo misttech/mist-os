@@ -468,6 +468,28 @@ inline std::ostream& operator<<(std::ostream& out,
   }
 }
 
+inline std::string to_string(std::optional<bool> selector, const std::string& true_str,
+                             const std::string& false_str, const std::string& null_str) {
+  if (selector.has_value()) {
+    return (*selector ? true_str : false_str);
+  }
+  return null_str;
+}
+
+inline std::string to_string(const std::optional<std::string>& str, const std::string& null_str) {
+  if (str.has_value()) {
+    return "'" + *str + "'";
+  }
+  return null_str;
+}
+
+inline std::string to_string(const std::optional<uint64_t>& val, const std::string& null_str) {
+  if (val.has_value()) {
+    return std::to_string(*val);
+  }
+  return null_str;
+}
+
 }  // namespace media_audio
 
 #endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_

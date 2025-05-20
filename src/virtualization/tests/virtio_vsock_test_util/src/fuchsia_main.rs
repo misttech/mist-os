@@ -79,7 +79,8 @@ async fn main() -> Result<(), Error> {
     client_end.shutdown()?;
     data_stream
         .as_handle_ref()
-        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)?;
+        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+        .to_result()?;
 
     // Wait for a connection
     let AcceptorRequest::Accept { addr: _, responder } =
@@ -91,7 +92,8 @@ async fn main() -> Result<(), Error> {
     test_read_write(&mut data_stream, &client_end).await?;
     data_stream
         .as_handle_ref()
-        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)?;
+        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+        .to_result()?;
 
     // Get next connection
     let AcceptorRequest::Accept { addr: _, responder } = acceptor2

@@ -46,7 +46,6 @@ if (is_fuchsia) {
       defines = [ "ARM64_USERCOPY_FN=${main_target_name}" ]
       deps = [
                ":user-copy-asm",
-               "//sdk/lib/stdcompat",
                "//src/lib/fxl/test:gtest_main",
                "//third_party/googletest:gtest",
                "//zircon/kernel/lib/arch",
@@ -63,7 +62,6 @@ if (is_fuchsia) {
                ":user-copy-asm",
                "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
                "//sdk/lib/component/incoming/cpp",
-               "//sdk/lib/stdcompat",
                "//zircon/kernel/lib/arch",
                "//zircon/system/ulib/fbl",
                "//zircon/system/ulib/zx",

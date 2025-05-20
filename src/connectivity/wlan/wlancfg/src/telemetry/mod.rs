@@ -37,7 +37,7 @@ use std::cmp::{max, min, Reverse};
 use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 use wlan_common::channel::Channel;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
@@ -143,7 +143,7 @@ impl DisconnectSourceExt for fidl_sme::DisconnectSource {
     fn inspect_string(&self) -> String {
         match self {
             fidl_sme::DisconnectSource::User(reason) => {
-                format!("source: user, reason: {:?}", reason)
+                format!("source: user, reason: {reason:?}")
             }
             fidl_sme::DisconnectSource::Ap(cause) => format!(
                 "source: ap, reason: {:?}, mlme_event_name: {:?}",
@@ -284,7 +284,7 @@ pub enum TelemetryEvent {
     Disconnected {
         /// Indicates whether subsequent period should be used to increment the downtime counters.
         track_subsequent_downtime: bool,
-        info: DisconnectInfo,
+        info: Option<DisconnectInfo>,
     },
     OnSignalReport {
         ind: fidl_internal::SignalReportIndication,
@@ -514,7 +514,7 @@ const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::f
 /// the appropriate stats.
 pub fn serve_telemetry(
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     inspect_node: InspectNode,
     external_inspect_node: InspectNode,
     persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -535,7 +535,7 @@ pub fn serve_telemetry(
         let mut telemetry = Telemetry::new(
             cloned_sender,
             monitor_svc_proxy,
-            cobalt_1dot1_proxy,
+            cobalt_proxy,
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -611,7 +611,7 @@ struct ConnectedState {
 #[derive(Debug)]
 pub struct DisconnectedState {
     disconnected_since: fasync::MonotonicInstant,
-    disconnect_info: DisconnectInfo,
+    disconnect_info: Option<DisconnectInfo>,
     connect_start_time: Option<fasync::MonotonicInstant>,
     /// The latest time when the device's no saved neighbor duration was accounted.
     /// If this has a value, then conceptually we say that "no saved neighbor" flag
@@ -812,9 +812,22 @@ macro_rules! fn_log_per_antenna_histograms {
                     let antenna_node = self.create_or_get_antenna_node(antenna_id);
 
                     let samples = &histogram.$field;
+                    // We expect the driver to send sparse histograms, but filter just in case.
+                    let samples: Vec<_> = samples.iter().filter(|s| s.num_samples > 0).collect();
+                    let array_size = samples.len() * 2;
                     let histogram_prop_name = concat!(stringify!($name), "_histogram");
                     let histogram_prop =
-                        antenna_node.create_int_array(histogram_prop_name, samples.len() * 2);
+                        antenna_node.create_int_array(histogram_prop_name, array_size);
+
+                    static ONCE: Once = Once::new();
+                    const INSPECT_ARRAY_SIZE_LIMIT: usize = 254;
+                    if array_size > INSPECT_ARRAY_SIZE_LIMIT {
+                        ONCE.call_once(|| {
+                            warn!("{} array size {} > {}. Array may not show up in Inspect",
+                                  histogram_prop_name, array_size, INSPECT_ARRAY_SIZE_LIMIT);
+                        })
+                    }
+
                     for (i, sample) in samples.iter().enumerate() {
                         let $sample = sample;
                         histogram_prop.set(i * 2, $sample_index_expr);
@@ -874,7 +887,7 @@ impl HistogramsNode {
 
 // Macro wrapper for logging simple events (occurrence, integer, histogram, string)
 // and log a warning when the status is not Ok
-macro_rules! log_cobalt_1dot1 {
+macro_rules! log_cobalt {
     ($cobalt_proxy:expr, $method_name:ident, $metric_id:expr, $value:expr, $event_codes:expr $(,)?) => {{
         let status = $cobalt_proxy.$method_name($metric_id, $value, $event_codes).await;
         match status {
@@ -885,7 +898,7 @@ macro_rules! log_cobalt_1dot1 {
     }};
 }
 
-macro_rules! log_cobalt_1dot1_batch {
+macro_rules! log_cobalt_batch {
     ($cobalt_proxy:expr, $events:expr, $context:expr $(,)?) => {{
         let status = $cobalt_proxy.log_metric_events($events).await;
         match status {
@@ -908,6 +921,7 @@ const INSPECT_SCAN_EVENTS_LIMIT: usize = 7;
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 7;
 const INSPECT_DISCONNECT_EVENTS_LIMIT: usize = 7;
 const INSPECT_EXTERNAL_DISCONNECT_EVENTS_LIMIT: usize = 2;
+const INSPECT_ROAM_EVENTS_LIMIT: usize = 7;
 
 /// Inspect node with properties queried by external entities.
 /// Do not change or remove existing properties that are still used.
@@ -945,6 +959,7 @@ pub struct Telemetry {
     scan_events_node: Mutex<AutoPersist<BoundedListNode>>,
     connect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     disconnect_events_node: Mutex<AutoPersist<BoundedListNode>>,
+    roam_events_node: Mutex<AutoPersist<BoundedListNode>>,
     external_inspect_node: ExternalInspectNode,
 
     // Auto-persistence on various client stats counters
@@ -965,18 +980,19 @@ impl Telemetry {
     pub fn new(
         telemetry_sender: TelemetrySender,
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: InspectNode,
         external_inspect_node: InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
         defect_sender: mpsc::Sender<Defect>,
     ) -> Self {
-        let stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
+        let stats_logger = StatsLogger::new(cobalt_proxy, &inspect_node);
         inspect_record_connection_status(&inspect_node, telemetry_sender.clone());
         let get_iface_stats_fail_count = inspect_node.create_uint("get_iface_stats_fail_count", 0);
         let scan_events = inspect_node.create_child("scan_events");
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
+        let roam_events = inspect_node.create_child("roam_events");
         let external_inspect_node = ExternalInspectNode::new(external_inspect_node);
         inspect_record_external_data(
             &external_inspect_node,
@@ -1003,6 +1019,11 @@ impl Telemetry {
             disconnect_events_node: Mutex::new(AutoPersist::new(
                 BoundedListNode::new(disconnect_events, INSPECT_DISCONNECT_EVENTS_LIMIT),
                 "wlancfg-disconnect-events",
+                persistence_req_sender.clone(),
+            )),
+            roam_events_node: Mutex::new(AutoPersist::new(
+                BoundedListNode::new(roam_events, INSPECT_ROAM_EVENTS_LIMIT),
+                "wlancfg-roam-events",
                 persistence_req_sender.clone(),
             )),
             external_inspect_node,
@@ -1230,13 +1251,18 @@ impl Telemetry {
                             total_downtime - state.accounted_no_saved_neighbor_duration,
                             zx::MonotonicDuration::from_seconds(0),
                         );
-                        self.stats_logger
-                            .log_downtime_cobalt_metrics(adjusted_downtime, &state.disconnect_info)
-                            .await;
-                        let disconnect_source = state.disconnect_info.disconnect_source;
-                        self.stats_logger
-                            .log_reconnect_cobalt_metrics(total_downtime, disconnect_source)
-                            .await;
+
+                        if let Some(disconnect_info) = state.disconnect_info.as_ref() {
+                            self.stats_logger
+                                .log_downtime_cobalt_metrics(adjusted_downtime, disconnect_info)
+                                .await;
+                            self.stats_logger
+                                .log_reconnect_cobalt_metrics(
+                                    total_downtime,
+                                    disconnect_info.disconnect_source,
+                                )
+                                .await;
+                        }
                     }
 
                     // Log successful post-recovery connection attempt if relevant.
@@ -1353,6 +1379,9 @@ impl Telemetry {
                             self.last_checked_connection_state = now;
                             // TODO(https://fxbug.dev/135975) Log roam success to Cobalt and Inspect.
                         }
+                        // Log roam event to Inspect
+                        self.log_roam_event_inspect(iface_id, &result, &request);
+
                         // Log metrics following a roam result
                         self.stats_logger
                             .log_roam_result_metrics(
@@ -1370,38 +1399,40 @@ impl Telemetry {
                 }
             }
             TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
-                // Any completed SME operation tells us the SME is operational.
-                self.report_sme_timeout_resolved().await;
+                let mut connect_start_time = None;
 
-                self.log_disconnect_event_inspect(&info);
-                self.stats_logger
-                    .log_stat(StatOp::AddDisconnectCount(info.disconnect_source))
-                    .await;
-                self.stats_logger
-                    .log_pre_disconnect_score_deltas_by_signal(
-                        info.connected_duration,
-                        info.signals.clone(),
-                    )
-                    .await;
-                self.stats_logger
-                    .log_pre_disconnect_rssi_deltas(info.connected_duration, info.signals.clone())
-                    .await;
-                let duration = now - self.last_checked_connection_state;
-                match &self.connection_state {
-                    ConnectionState::Connected(state) => {
+                // Disconnect info is expected to be None when something unexpectedly fails beneath
+                // the SME. This case is very rare, so we're ok with missing metrics in this case.
+                if let Some(info) = info.as_ref() {
+                    // Any completed SME operation tells us the SME is operational.
+                    // A caveat here is that empty disconnect info indicates that something beneath
+                    // SME has failed.
+                    self.report_sme_timeout_resolved().await;
+
+                    self.log_disconnect_event_inspect(info);
+                    self.stats_logger
+                        .log_stat(StatOp::AddDisconnectCount(info.disconnect_source))
+                        .await;
+                    self.stats_logger
+                        .log_pre_disconnect_score_deltas_by_signal(
+                            info.connected_duration,
+                            info.signals.clone(),
+                        )
+                        .await;
+                    self.stats_logger
+                        .log_pre_disconnect_rssi_deltas(
+                            info.connected_duration,
+                            info.signals.clone(),
+                        )
+                        .await;
+
+                    // If we are in the connected state, log the disconnect and short connection
+                    // metric if applicable.
+                    if let ConnectionState::Connected(state) = &self.connection_state {
                         self.stats_logger
-                            .log_disconnect_cobalt_metrics(&info, state.multiple_bss_candidates)
+                            .log_disconnect_cobalt_metrics(info, state.multiple_bss_candidates)
                             .await;
-                        self.stats_logger.queue_stat_op(StatOp::AddConnectedDuration(duration));
-                        // Log device connected to AP metrics right now in case we have not logged it
-                        // to Cobalt yet today.
-                        self.stats_logger
-                            .log_device_connected_cobalt_metrics(
-                                state.multiple_bss_candidates,
-                                &state.ap_state,
-                                state.network_is_likely_hidden,
-                            )
-                            .await;
+
                         // Log metrics if connection had a short duration.
                         if info.connected_duration < METRICS_SHORT_CONNECT_DURATION {
                             self.stats_logger
@@ -1413,22 +1444,36 @@ impl Telemetry {
                                 .await;
                         }
                     }
+
+                    // If `is_sme_reconnecting` is true, we already know that the process of
+                    // establishing connection is already started at the moment of disconnect,
+                    // so set the connect_start_time to now.
+                    if info.is_sme_reconnecting {
+                        connect_start_time = Some(now);
+                    } else if let ConnectionState::Connected(state) = &self.connection_state {
+                        connect_start_time = state.new_connect_start_time
+                    }
+                }
+
+                let duration = now - self.last_checked_connection_state;
+                match &self.connection_state {
+                    ConnectionState::Connected(state) => {
+                        self.stats_logger.queue_stat_op(StatOp::AddConnectedDuration(duration));
+                        // Log device connected to AP metrics right now in case we have not logged it
+                        // to Cobalt yet today.
+                        self.stats_logger
+                            .log_device_connected_cobalt_metrics(
+                                state.multiple_bss_candidates,
+                                &state.ap_state,
+                                state.network_is_likely_hidden,
+                            )
+                            .await;
+                    }
                     _ => {
                         warn!("Received disconnect event while not connected. Metric may not be logged");
                     }
                 }
 
-                let connect_start_time = if info.is_sme_reconnecting {
-                    // If `is_sme_reconnecting` is true, we already know that the process of
-                    // establishing connection is already started at the moment of disconnect,
-                    // so set the connect_start_time to now.
-                    Some(now)
-                } else {
-                    match &self.connection_state {
-                        ConnectionState::Connected(state) => state.new_connect_start_time,
-                        _ => None,
-                    }
-                };
                 self.connection_state = if track_subsequent_downtime {
                     ConnectionState::Disconnected(DisconnectedState {
                         disconnected_since: now,
@@ -1672,6 +1717,24 @@ impl Telemetry {
         });
     }
 
+    pub fn log_roam_event_inspect(
+        &self,
+        iface_id: u16,
+        result: &fidl_sme::RoamResult,
+        request: &PolicyRoamRequest,
+    ) {
+        inspect_log!(self.roam_events_node.lock().get_mut(), {
+            iface_id: iface_id,
+            target: {
+                ssid: request.candidate.network.ssid.to_string(),
+                bssid: request.candidate.bss.bssid.to_string(),
+            },
+            reasons: InspectList(request.reasons.iter().map(|reason| format!("{reason:?}")).collect::<Vec<String>>().as_slice()),
+            status: result.status_code.into_primitive(),
+            original_association_maintained: result.original_association_maintained,
+        });
+    }
+
     pub async fn log_daily_cobalt_metrics(&mut self) {
         self.stats_logger.log_daily_cobalt_metrics().await;
         if let ConnectionState::Connected(state) = &self.connection_state {
@@ -1718,11 +1781,11 @@ fn round_to_nearest_second(duration: zx::MonotonicDuration) -> i64 {
 
 pub async fn connect_to_metrics_logger_factory(
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy, Error> {
-    let cobalt_1dot1_svc = fuchsia_component::client::connect_to_protocol::<
+    let cobalt_svc = fuchsia_component::client::connect_to_protocol::<
         fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
     >()
     .context("failed to connect to metrics service")?;
-    Ok(cobalt_1dot1_svc)
+    Ok(cobalt_svc)
 }
 
 // Communicates with the MetricEventLoggerFactory service to create a MetricEventLoggerProxy for
@@ -1730,7 +1793,7 @@ pub async fn connect_to_metrics_logger_factory(
 pub async fn create_metrics_logger(
     factory_proxy: &fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
-    let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
+    let (cobalt_proxy, cobalt_server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
     let project_spec = fidl_fuchsia_metrics::ProjectSpec {
@@ -1740,12 +1803,12 @@ pub async fn create_metrics_logger(
     };
 
     let status = factory_proxy
-        .create_metric_event_logger(&project_spec, cobalt_1dot1_server)
+        .create_metric_event_logger(&project_spec, cobalt_server)
         .await
         .context("failed to create metrics event logger")?;
 
     match status {
-        Ok(_) => Ok(cobalt_1dot1_proxy),
+        Ok(_) => Ok(cobalt_proxy),
         Err(err) => Err(format_err!("failed to create metrics event logger: {:?}", err)),
     }
 }
@@ -1834,7 +1897,7 @@ async fn diff_and_log_tx_counters(
 }
 
 struct StatsLogger {
-    cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+    cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     time_series_stats: Arc<Mutex<TimeSeriesStats>>,
     last_1d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
     last_7d_stats: Arc<Mutex<WindowedStats<StatCounters>>>,
@@ -1861,7 +1924,7 @@ struct StatsLogger {
 
 impl StatsLogger {
     pub fn new(
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         inspect_node: &InspectNode,
     ) -> Self {
         let time_series_stats = Arc::new(Mutex::new(TimeSeriesStats::new()));
@@ -1880,7 +1943,7 @@ impl StatsLogger {
             inspect_create_counters(inspect_node, "7d_counters", Arc::clone(&last_7d_stats));
 
         Self {
-            cobalt_1dot1_proxy,
+            cobalt_proxy,
             time_series_stats,
             last_1d_stats,
             last_7d_stats,
@@ -2251,8 +2314,8 @@ impl StatsLogger {
             }
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_daily_1d_cobalt_metrics",
         ));
@@ -2271,8 +2334,8 @@ impl StatsLogger {
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(dpdc_ratio)),
             });
 
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+                self.cobalt_proxy,
                 &metric_events,
                 "log_daily_7d_cobalt_metrics",
             ));
@@ -2380,8 +2443,8 @@ impl StatsLogger {
             }
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_daily_detailed_cobalt_metrics",
         ));
@@ -2403,8 +2466,8 @@ impl StatsLogger {
     // Send out the RSSI and RSSI velocity metrics that have been collected over the last hour.
     async fn log_hourly_rssi_histogram_metrics(&mut self) {
         let rssi_buckets: Vec<_> = self.rssi_hist.values().copied().collect();
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer_histogram,
             metrics::CONNECTION_RSSI_METRIC_ID,
             &rssi_buckets,
@@ -2413,8 +2476,8 @@ impl StatsLogger {
         self.rssi_hist.clear();
 
         let velocity_buckets: Vec<_> = self.rssi_velocity_hist.values().copied().collect();
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer_histogram,
             metrics::RSSI_VELOCITY_METRIC_ID,
             &velocity_buckets,
@@ -2471,8 +2534,8 @@ impl StatsLogger {
             payload: MetricEventPayload::IntegerValue(c.no_rx_duration.into_micros()),
         });
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_hourly_fleetwise_quality_cobalt_metrics",
         ));
@@ -2641,8 +2704,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_disconnect_cobalt_metrics",
         ));
@@ -2660,8 +2723,8 @@ impl StatsLogger {
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
             101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::ACTIVE_SCAN_REQUESTED_FOR_NETWORK_SELECTION_MIGRATED_METRIC_ID,
             1,
@@ -2684,8 +2747,8 @@ impl StatsLogger {
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
             101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::ACTIVE_SCAN_REQUESTED_FOR_POLICY_API_METRIC_ID,
             1,
@@ -2734,8 +2797,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_saved_network_counts",
         ));
@@ -2745,8 +2808,8 @@ impl StatsLogger {
         &mut self,
         time_since_last_scan: zx::MonotonicDuration,
     ) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::LAST_SCAN_AGE_WHEN_SCAN_REQUESTED_MIGRATED_METRIC_ID,
             time_since_last_scan.into_micros(),
@@ -2812,8 +2875,8 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_connection_selection_scan_results",
         ));
@@ -2834,8 +2897,8 @@ impl StatsLogger {
             ap_state,
             connect_start_time,
         );
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_establish_connection_cobalt_metrics",
         ));
@@ -2944,8 +3007,8 @@ impl StatsLogger {
     ) {
         let disconnect_source_dim =
             convert::convert_disconnect_source(&disconnect_info.disconnect_source);
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::DOWNTIME_BREAKDOWN_BY_DISCONNECT_REASON_METRIC_ID,
             downtime.into_micros(),
@@ -2992,8 +3055,8 @@ impl StatsLogger {
             _ => {}
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_reconnect_cobalt_metrics",
         ));
@@ -3093,8 +3156,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_device_connected_cobalt_metrics",
         ));
@@ -3105,24 +3168,24 @@ impl StatsLogger {
 
         append_device_connected_channel_cobalt_metrics(&mut metric_events, primary_channel);
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_device_connected_channel_cobalt_metrics",
         ));
     }
 
     async fn log_policy_roam_scan_metrics(&mut self, reasons: Vec<RoamReason>) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_SCAN_COUNT_METRIC_ID,
             1,
             &[],
         ));
         for reason in reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_SCAN_COUNT_BY_ROAM_REASON_METRIC_ID,
                 1,
@@ -3136,23 +3199,23 @@ impl StatsLogger {
         request: PolicyRoamRequest,
         connected_duration: zx::MonotonicDuration,
     ) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_ATTEMPT_COUNT_METRIC_ID,
             1,
             &[],
         ));
         for reason in &request.reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_ATTEMPT_COUNT_BY_ROAM_REASON_METRIC_ID,
                 1,
                 &[convert::convert_roam_reason_dimension(*reason) as u32],
             ));
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_integer,
                 metrics::POLICY_ROAM_CONNECTED_DURATION_BEFORE_ROAM_ATTEMPT_METRIC_ID,
                 connected_duration.into_minutes(),
@@ -3189,8 +3252,8 @@ impl StatsLogger {
             (false, false) => NonDfsToNonDfs as u32,
         };
         for reason in &request.reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_ATTEMPT_COUNT_DETAILED_METRIC_ID,
                 1,
@@ -3209,8 +3272,8 @@ impl StatsLogger {
         }
 
         // Log a disconnect, since the device left the original AP.
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_DISCONNECT_COUNT_METRIC_ID,
             1,
@@ -3221,8 +3284,8 @@ impl StatsLogger {
 
         // Log with roam reasons
         for reason in &request.reasons {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::POLICY_ROAM_DISCONNECT_COUNT_BY_ROAM_REASON_METRIC_ID,
                 1,
@@ -3232,8 +3295,8 @@ impl StatsLogger {
 
         if result.status_code == fidl_ieee80211::StatusCode::Success {
             self.log_stat(StatOp::AddPolicyRoamSuccessfulCount(request.reasons)).await;
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_integer,
                 metrics::POLICY_ROAM_RECONNECT_DURATION_METRIC_ID,
                 fasync::MonotonicDuration::from(result_time - request_time).into_micros(),
@@ -3245,8 +3308,8 @@ impl StatsLogger {
     /// Log metrics that will be used to analyze when roaming would happen before roams are
     /// enabled.
     async fn log_would_roam_connect(&mut self) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::POLICY_ROAM_ATTEMPT_COUNT_METRIC_ID,
             1,
@@ -3259,8 +3322,8 @@ impl StatsLogger {
         disabled_duration: zx::MonotonicDuration,
     ) {
         if disabled_duration < USER_RESTART_TIME_THRESHOLD {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::CLIENT_CONNECTIONS_STOP_AND_START_METRIC_ID,
                 1,
@@ -3273,8 +3336,8 @@ impl StatsLogger {
         &mut self,
         enabled_duration: zx::MonotonicDuration,
     ) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::CLIENT_CONNECTIONS_ENABLED_DURATION_MIGRATED_METRIC_ID,
             enabled_duration.into_micros(),
@@ -3283,8 +3346,8 @@ impl StatsLogger {
     }
 
     async fn log_stop_ap_cobalt_metrics(&mut self, enabled_duration: zx::MonotonicDuration) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::ACCESS_POINT_ENABLED_DURATION_MIGRATED_METRIC_ID,
             enabled_duration.into_micros(),
@@ -3326,8 +3389,8 @@ impl StatsLogger {
 
     async fn log_iface_creation_result(&mut self, result: Result<(), ()>) {
         if result.is_err() {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::INTERFACE_CREATION_FAILURE_METRIC_ID,
                 1,
@@ -3345,8 +3408,8 @@ impl StatsLogger {
 
     async fn log_iface_destruction_result(&mut self, result: Result<(), ()>) {
         if result.is_err() {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::INTERFACE_DESTRUCTION_FAILURE_METRIC_ID,
                 1,
@@ -3389,8 +3452,8 @@ impl StatsLogger {
 
         // Log general occurrence metrics for any observed defects
         for issue in issues {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 issue.as_metric_id(),
                 1,
@@ -3400,8 +3463,8 @@ impl StatsLogger {
     }
 
     async fn log_connection_failure(&mut self) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::CONNECTION_FAILURES_METRIC_ID,
             1,
@@ -3411,8 +3474,8 @@ impl StatsLogger {
 
     async fn log_ap_start_result(&mut self, result: Result<(), ()>) {
         if result.is_err() {
-            self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-                self.cobalt_1dot1_proxy,
+            self.throttled_error_logger.throttle_error(log_cobalt!(
+                self.cobalt_proxy,
                 log_occurrence,
                 metrics::AP_START_FAILURE_METRIC_ID,
                 1,
@@ -3460,8 +3523,8 @@ impl StatsLogger {
                 ScanReason::RoamSearch => ProactiveRoaming,
             }
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::SUCCESSFUL_SCAN_REQUEST_FULFILLMENT_TIME_METRIC_ID,
             1,
@@ -3499,8 +3562,8 @@ impl StatsLogger {
                 15.. => FifteenOrMore,
             }
         };
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::SCAN_QUEUE_STATISTICS_AFTER_COMPLETED_SCAN_METRIC_ID,
             1,
@@ -3509,8 +3572,8 @@ impl StatsLogger {
     }
 
     async fn log_consecutive_counter_stats_failures(&mut self, count: i64) {
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             // TODO(https://fxbug.dev/404889275): Consider renaming the Cobalt
             // metric name to no longer to refer to "counter"
@@ -3582,8 +3645,8 @@ impl StatsLogger {
         let avg_score = sum_score / (signals.len() + 1) as u32;
 
         let delta = (avg_score as i64).saturating_sub(baseline_score as i64);
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            &self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            &self.cobalt_proxy,
             log_integer,
             metric_id,
             delta,
@@ -3636,8 +3699,8 @@ impl StatsLogger {
         let average_rssi = sum_rssi / (signals.len() + 1) as i64;
 
         let delta = (average_rssi).saturating_sub(baseline_signal.rssi_dbm as i64);
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            &self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            &self.cobalt_proxy,
             log_integer,
             metric_id,
             delta,
@@ -3903,8 +3966,8 @@ impl StatsLogger {
                     }
                 ];
 
-                self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-                    self.cobalt_1dot1_proxy,
+                self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+                    self.cobalt_proxy,
                     &metric_events,
                     "log_short_duration_connection_metrics",
                 ));
@@ -3963,8 +4026,8 @@ impl StatsLogger {
             _ => (),
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_network_selection_metrics",
         ));
@@ -4085,8 +4148,8 @@ impl StatsLogger {
             });
         }
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1_batch!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt_batch!(
+            self.cobalt_proxy,
             &metric_events,
             "log_bss_selection_cobalt_metrics",
         ));
@@ -4118,8 +4181,8 @@ impl StatsLogger {
             sum_scores = sum_scores.saturating_add(&(score as u32));
         }
         let avg = sum_scores / (signals.len()) as u32;
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::CONNECTION_SCORE_AVERAGE_METRIC_ID,
             avg as i64,
@@ -4141,8 +4204,8 @@ impl StatsLogger {
             sum_rssi = sum_rssi.saturating_add(s.signal.rssi_dbm as i64);
         }
         let average_rssi = sum_rssi / (signals.len()) as i64;
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_integer,
             metrics::CONNECTION_RSSI_AVERAGE_METRIC_ID,
             average_rssi,
@@ -4178,8 +4241,8 @@ impl StatsLogger {
             }
         };
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::RECOVERY_OCCURRENCE_METRIC_ID,
             1,
@@ -4194,7 +4257,7 @@ impl StatsLogger {
             metric_id: u32,
             event_codes: &[u32],
         ) {
-            throttled_error_logger.throttle_error(log_cobalt_1dot1!(
+            throttled_error_logger.throttle_error(log_cobalt!(
                 proxy,
                 log_occurrence,
                 metric_id,
@@ -4212,7 +4275,7 @@ impl StatsLogger {
             RecoveryReason::CreateIfaceFailure(_) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::INTERFACE_CREATION_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code()],
                 )
@@ -4221,7 +4284,7 @@ impl StatsLogger {
             RecoveryReason::DestroyIfaceFailure(_) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code()],
                 )
@@ -4230,7 +4293,7 @@ impl StatsLogger {
             RecoveryReason::Timeout(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4239,7 +4302,7 @@ impl StatsLogger {
             RecoveryReason::ConnectFailure(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::CONNECT_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4248,7 +4311,7 @@ impl StatsLogger {
             RecoveryReason::StartApFailure(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::START_ACCESS_POINT_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4257,7 +4320,7 @@ impl StatsLogger {
             RecoveryReason::ScanFailure(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::SCAN_FAILURE_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4266,7 +4329,7 @@ impl StatsLogger {
             RecoveryReason::ScanCancellation(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::SCAN_CANCELLATION_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4275,7 +4338,7 @@ impl StatsLogger {
             RecoveryReason::ScanResultsEmpty(mechanism) => {
                 log_post_recovery_metric(
                     &mut self.throttled_error_logger,
-                    &mut self.cobalt_1dot1_proxy,
+                    &mut self.cobalt_proxy,
                     metrics::EMPTY_SCAN_RESULTS_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
@@ -4320,8 +4383,8 @@ impl StatsLogger {
             }
         };
 
-        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
+        self.throttled_error_logger.throttle_error(log_cobalt!(
+            self.cobalt_proxy,
             log_occurrence,
             metrics::SME_OPERATION_TIMEOUT_METRIC_ID,
             1,
@@ -4826,7 +4889,7 @@ mod tests {
         let (sender, _receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
         let (monitor_svc_proxy, _monitor_svc_stream) =
             create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
-        let (cobalt_1dot1_proxy, _cobalt_1dot1_stream) =
+        let (cobalt_proxy, _cobalt_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");
@@ -4837,7 +4900,7 @@ mod tests {
         let mut telemetry = Telemetry::new(
             TelemetrySender::new(sender),
             monitor_svc_proxy,
-            cobalt_1dot1_proxy.clone(),
+            cobalt_proxy.clone(),
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -4977,7 +5040,7 @@ mod tests {
 
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: fake_disconnect_info(),
+            info: Some(fake_disconnect_info()),
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
@@ -5017,6 +5080,86 @@ mod tests {
                 }
             }
         });
+    }
+
+    #[fuchsia::test]
+    fn test_log_disconnect_on_recovery() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Boilerplate for creating a Telemetry struct
+        let (sender, _receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
+        let (monitor_svc_proxy, _monitor_svc_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
+        let (cobalt_1dot1_proxy, mut cobalt_1dot1_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
+        let inspector = Inspector::default();
+        let inspect_node = inspector.root().create_child("stats");
+        let external_inspect_node = inspector.root().create_child("external");
+        let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
+
+        // Create a telemetry struct and initialize it to be in the connected state.
+        let mut telemetry = Telemetry::new(
+            TelemetrySender::new(sender),
+            monitor_svc_proxy,
+            cobalt_1dot1_proxy.clone(),
+            inspect_node,
+            external_inspect_node,
+            persistence_req_sender,
+            defect_sender,
+        );
+
+        telemetry.connection_state = ConnectionState::Connected(ConnectedState {
+            iface_id: 0,
+            new_connect_start_time: None,
+            prev_connection_stats: None,
+            multiple_bss_candidates: false,
+            ap_state: generate_random_ap_state(),
+            network_is_likely_hidden: false,
+            last_signal_report: fasync::MonotonicInstant::now(),
+            num_consecutive_get_counter_stats_failures: InspectableU64::new(
+                0,
+                &telemetry.inspect_node,
+                "num_consecutive_get_counter_stats_failures",
+            ),
+            is_driver_unresponsive: InspectableBool::new(
+                false,
+                &telemetry.inspect_node,
+                "is_driver_unresponsive",
+            ),
+            telemetry_proxy: None,
+        });
+
+        {
+            // Send a disconnect event with empty disconnect info.
+            let fut = telemetry.handle_telemetry_event(TelemetryEvent::Disconnected {
+                track_subsequent_downtime: false,
+                info: None,
+            });
+            let mut fut = pin!(fut);
+
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+            // There should be a single batch logging event.
+            assert_variant!(
+                exec.run_until_stalled(&mut cobalt_1dot1_stream.next()),
+                Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogMetricEvents {
+                    events: _,
+                    responder
+                }))) => {
+                    responder.send(Ok(())).expect("failed to send response");
+                }
+            );
+
+            // And then the future should run to completion.
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // Verify that the telemetry state has transitioned to idle.
+        assert_variant!(
+            telemetry.connection_state,
+            ConnectionState::Idle(IdleState { connect_start_time: None })
+        );
     }
 
     #[fuchsia::test]
@@ -5074,9 +5217,10 @@ mod tests {
 
         // Disconnect now
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(8), test_fut.as_mut());
@@ -5286,9 +5430,10 @@ mod tests {
 
         // Disconnect but not track downtime. Downtime counter should not increase.
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(10), test_fut.as_mut());
@@ -5310,9 +5455,10 @@ mod tests {
 
         // Disconnect and track downtime. Downtime counter should now increase
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(15), test_fut.as_mut());
@@ -5343,9 +5489,10 @@ mod tests {
 
         // Disconnect but not track downtime. Downtime counter should not increase.
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         // The 5 seconds connected duration is not accounted for yet.
@@ -5391,9 +5538,10 @@ mod tests {
 
         // Disconnect and track downtime.
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(5), test_fut.as_mut());
@@ -5481,9 +5629,10 @@ mod tests {
 
         // Disconnect but don't track downtime
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
 
         // Indicate that there's no saved neighbor in vicinity
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
@@ -5613,9 +5762,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5639,9 +5789,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5667,9 +5818,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
@@ -5706,9 +5858,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         let time_series = test_helper.get_time_series(&mut test_fut);
@@ -6174,9 +6327,10 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(6), test_fut.as_mut());
@@ -6210,9 +6364,10 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_hours(6), test_fut.as_mut());
 
         let info = DisconnectInfo { disconnect_source, ..fake_disconnect_info() };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.drain_cobalt_events(&mut test_fut);
     }
@@ -6342,9 +6497,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
@@ -6370,9 +6526,10 @@ mod tests {
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_hours(23), test_fut.as_mut());
@@ -6551,9 +6708,10 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
 
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(15), test_fut.as_mut());
@@ -6877,7 +7035,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: true,
-            info: info.clone(),
+            info: Some(info.clone()),
         });
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
@@ -6892,7 +7050,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: true,
-            info: info.clone(),
+            info: Some(info.clone()),
         });
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
@@ -6906,7 +7064,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: true,
-            info: info.clone(),
+            info: Some(info.clone()),
         });
 
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -6953,9 +7111,10 @@ mod tests {
             ap_state,
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         let policy_disconnection_reasons =
@@ -7089,9 +7248,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Check that a count was logged for a disconnect from a user requested network change.
@@ -7647,9 +7807,10 @@ mod tests {
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(4), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7678,9 +7839,10 @@ mod tests {
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
         test_helper.telemetry_sender.send(TelemetryEvent::ClearEstablishConnectionStartTime);
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper
             .telemetry_sender
@@ -7707,9 +7869,10 @@ mod tests {
         test_helper.cobalt_events.clear();
 
         let info = DisconnectInfo { is_sme_reconnecting: true, ..fake_disconnect_info() };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7736,9 +7899,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(42), test_fut.as_mut());
@@ -7790,9 +7954,10 @@ mod tests {
             }),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(zx::MonotonicDuration::from_seconds(3), test_fut.as_mut());
@@ -7830,9 +7995,10 @@ mod tests {
             ),
             ..fake_disconnect_info()
         };
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: true,
+            info: Some(info),
+        });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         let downtime = 5_000_000;
         test_helper.advance_by(zx::MonotonicDuration::from_micros(downtime), test_fut.as_mut());
@@ -8045,9 +8211,10 @@ mod tests {
         test_helper.cobalt_events.clear();
 
         let info = fake_disconnect_info();
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: Some(info),
+        });
         test_helper.drain_cobalt_events(&mut test_fut);
 
         // Verify that on disconnect, device connected metric is also logged.
@@ -8353,12 +8520,12 @@ mod tests {
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(5), test_fut.as_mut());
 
         let tags = test_helper.get_persistence_reqs();
-        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {:?}", tags);
+        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {tags:?}");
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.advance_by(zx::MonotonicDuration::from_minutes(5), test_fut.as_mut());
         let tags = test_helper.get_persistence_reqs();
-        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {:?}", tags);
+        assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {tags:?}");
     }
 
     #[derive(PartialEq)]
@@ -8547,7 +8714,7 @@ mod tests {
 
         // Expect that Cobalt has been notified of the recovery event
         assert_variant!(
-            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_1dot1_stream.next()),
+            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
             }))) => {
@@ -8806,13 +8973,13 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         // Construct a StatsLogger
-        let (cobalt_1dot1_proxy, mut cobalt_1dot1_stream) =
+        let (cobalt_proxy, mut cobalt_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let inspector = Inspector::default();
         let inspect_node = inspector.root().create_child("stats");
 
-        let mut stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
+        let mut stats_logger = StatsLogger::new(cobalt_proxy, &inspect_node);
 
         // Log the test telemetry event.
         let fut = stats_logger.log_post_recovery_result(reason, outcome);
@@ -8821,7 +8988,7 @@ mod tests {
 
         // Verify the metric that was emitted.
         assert_variant!(
-            exec.run_until_stalled(&mut cobalt_1dot1_stream.next()),
+            exec.run_until_stalled(&mut cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
             }))) => {
@@ -9378,11 +9545,11 @@ mod tests {
         },
         TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: fake_disconnect_info(),
+            info: Some(fake_disconnect_info()),
         },
         TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: fake_disconnect_info(),
+            info: Some(fake_disconnect_info()),
         },
         metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
         vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
@@ -9643,7 +9810,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: disconnect_info,
+            info: Some(disconnect_info),
         });
 
         // Catch logged score delta metrics
@@ -9721,7 +9888,7 @@ mod tests {
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
             track_subsequent_downtime: false,
-            info: disconnect_info,
+            info: Some(disconnect_info),
         });
         test_helper.drain_cobalt_events(&mut test_fut);
 
@@ -10116,7 +10283,7 @@ mod tests {
 
         // Expect that Cobalt has been notified of the timeout
         assert_variant!(
-            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_1dot1_stream.next()),
+            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_stream.next()),
             Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
                 metric_id, event_codes, responder, ..
             }))) => {
@@ -10132,7 +10299,7 @@ mod tests {
         inspector: Inspector,
         monitor_svc_stream: fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
         telemetry_svc_stream: Option<fidl_fuchsia_wlan_sme::TelemetryRequestStream>,
-        cobalt_1dot1_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
+        cobalt_stream: fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
         persistence_stream: mpsc::Receiver<String>,
         iface_stats_resp:
             Option<Box<dyn Fn() -> fidl_fuchsia_wlan_sme::TelemetryGetIfaceStatsResult>>,
@@ -10169,7 +10336,7 @@ mod tests {
                         self.telemetry_svc_stream = Some(telemetry_stream);
                         self.exec.run_until_stalled(test_fut)
                     }
-                    _ => panic!("Unexpected device monitor request: {:?}", req),
+                    _ => panic!("Unexpected device monitor request: {req:?}"),
                 }
             } else {
                 result
@@ -10187,8 +10354,7 @@ mod tests {
             assert_eq!(
                 duration.into_nanos() % STEP_INCREMENT.into_nanos(),
                 0,
-                "duration {:?} is not divisible by STEP_INCREMENT",
-                duration,
+                "duration {duration:?} is not divisible by STEP_INCREMENT",
             );
             const_assert_eq!(
                 TELEMETRY_QUERY_INTERVAL.into_nanos() % STEP_INCREMENT.into_nanos(),
@@ -10248,7 +10414,7 @@ mod tests {
                 let _result = self.advance_test_fut(test_fut);
                 made_progress = false;
                 while let Poll::Ready(Some(Ok(req))) =
-                    self.exec.run_until_stalled(&mut self.cobalt_1dot1_stream.next())
+                    self.exec.run_until_stalled(&mut self.cobalt_stream.next())
                 {
                     self.cobalt_events.append(&mut req.respond_to_metric_req(Ok(())));
                     made_progress = true;
@@ -10331,7 +10497,7 @@ mod tests {
                         .expect("expect sending GetIfaceStats response to succeed");
                 }
                 _ => {
-                    panic!("unexpected request: {:?}", request);
+                    panic!("unexpected request: {request:?}");
                 }
             }
         }
@@ -10353,7 +10519,7 @@ mod tests {
                         .expect("expect sending GetHistogramStats response to succeed");
                 }
                 _ => {
-                    panic!("unexpected request: {:?}", request);
+                    panic!("unexpected request: {request:?}");
                 }
             }
         }
@@ -10466,7 +10632,7 @@ mod tests {
         let (monitor_svc_proxy, monitor_svc_stream) =
             create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>();
 
-        let (cobalt_1dot1_proxy, cobalt_1dot1_stream) =
+        let (cobalt_proxy, cobalt_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
 
         let inspector = Inspector::default();
@@ -10476,7 +10642,7 @@ mod tests {
         let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let (telemetry_sender, test_fut) = serve_telemetry(
             monitor_svc_proxy,
-            cobalt_1dot1_proxy.clone(),
+            cobalt_proxy.clone(),
             inspect_node,
             external_inspect_node.create_child("stats"),
             persistence_req_sender,
@@ -10492,7 +10658,7 @@ mod tests {
             inspector,
             monitor_svc_stream,
             telemetry_svc_stream: None,
-            cobalt_1dot1_stream,
+            cobalt_stream,
             persistence_stream,
             iface_stats_resp: None,
             cobalt_events: vec![],
@@ -10531,10 +10697,12 @@ mod tests {
                 freq: fidl_fuchsia_wlan_stats::AntennaFreq::Antenna2G,
                 index: 0,
             })),
-            noise_floor_samples: vec![fidl_fuchsia_wlan_stats::HistBucket {
-                bucket_index: 200,
-                num_samples: 999,
-            }],
+            noise_floor_samples: vec![
+                // We normally don't expect the driver to send buckets with zero samples, but
+                // mock them here anyway so we can test that we filter them out if they exist.
+                fidl_fuchsia_wlan_stats::HistBucket { bucket_index: 199, num_samples: 0 },
+                fidl_fuchsia_wlan_stats::HistBucket { bucket_index: 200, num_samples: 999 },
+            ],
             invalid_samples: 44,
         }]
     }

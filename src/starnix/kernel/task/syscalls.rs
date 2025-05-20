@@ -1,4 +1,3 @@
-// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -6,18 +5,12 @@
 use crate::execution::execute_task;
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
-#[cfg(not(feature = "starnix_lite"))]
+use crate::signals::syscalls::RUsagePtr;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
     PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, SyslogAccess, Task,
     ThreadGroup, PR_SET_PTRACER_ANY,
-};
-#[cfg(feature = "starnix_lite")]
-use crate::task::{
-    max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
-    ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
-    PtraceOptions, SchedulerPolicy, Task, PR_SET_PTRACER_ANY,
 };
 use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
@@ -44,7 +37,6 @@ use starnix_uapi::user_address::{
     UserCStringPtr, UserRef,
 };
 use starnix_uapi::vfs::ResolveFlags;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
     gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, uapi, uid_t, AT_EMPTY_PATH,
@@ -62,20 +54,6 @@ use starnix_uapi::{
     SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER,
     SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2,
     _LINUX_CAPABILITY_VERSION_3,
-};
-#[cfg(feature = "starnix_lite")]
-use starnix_uapi::{
-    __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
-    gid_t, pid_t, rlimit, rusage, sched_param, uid_t, AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW,
-    CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1, CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_FS,
-    CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS,
-    PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL,
-    PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER,
-    PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECUREBITS,
-    PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS,
-    PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA,
-    PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
-    _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 use static_assertions::const_assert;
 use std::cmp;
@@ -99,6 +77,12 @@ uapi::arch_map_data! {
     BidiTryFrom<SockFProg, sock_fprog> {
         len = len;
         filter = filter;
+    }
+}
+
+uapi::check_arch_independent_layout! {
+    sched_param {
+        sched_priority,
     }
 }
 
@@ -202,7 +186,7 @@ fn read_c_string_vector(
             return error!(E2BIG);
         }
         vector.push(cstring);
-        user_current = user_current.next();
+        user_current = user_current.next()?;
     }
     Ok((vector, vec_size))
 }
@@ -449,8 +433,7 @@ pub fn sys_setpgid(
     let weak = get_task_or_current(current_task, pid);
     let task = Task::from_weak(&weak)?;
 
-    security::check_setpgid_access(current_task, &task)?;
-    current_task.thread_group().setpgid(locked, &task, pgid)?;
+    current_task.thread_group().setpgid(locked, current_task, &task, pgid)?;
     Ok(())
 }
 
@@ -766,7 +749,7 @@ pub fn sys_sched_setscheduler(
     current_task: &CurrentTask,
     pid: pid_t,
     policy: u32,
-    param: UserAddress,
+    param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
@@ -777,7 +760,7 @@ pub fn sys_sched_setscheduler(
     let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
 
     security::check_setsched_access(current_task, &target_task)?;
-    let param: sched_param = current_task.read_object(param.into())?;
+    let param = current_task.read_object(param)?;
     let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
     target_task.set_scheduler_policy(policy)?;
 
@@ -895,7 +878,7 @@ pub fn sys_sched_getparam(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
-    param: UserAddress,
+    param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
@@ -904,7 +887,7 @@ pub fn sys_sched_getparam(
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
     let param_value = target_task.read().scheduler_policy.raw_params();
-    current_task.write_object(param.into(), &param_value)?;
+    current_task.write_object(param, &param_value)?;
     Ok(())
 }
 
@@ -912,7 +895,7 @@ pub fn sys_sched_setparam(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
-    param: UserAddress,
+    param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
@@ -1083,7 +1066,6 @@ pub fn sys_prctl(
             }
             Ok(current_task.read().no_new_privs().into())
         }
-        #[cfg(not(feature = "starnix_lite"))]
         PR_GET_SECCOMP => {
             if current_task.seccomp_filter_state.get() == SeccompStateValue::None {
                 Ok(0.into())
@@ -1091,7 +1073,6 @@ pub fn sys_prctl(
                 Ok(2.into())
             }
         }
-        #[cfg(not(feature = "starnix_lite"))]
         PR_SET_SECCOMP => {
             if arg2 == SECCOMP_MODE_STRICT as u64 {
                 return sys_seccomp(
@@ -1259,7 +1240,7 @@ pub fn sys_getrusage(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     who: i32,
-    user_usage: UserRef<rusage>,
+    user_usage: RUsagePtr,
 ) -> Result<(), Errno> {
     const RUSAGE_SELF: i32 = starnix_uapi::uapi::RUSAGE_SELF as i32;
     const RUSAGE_THREAD: i32 = starnix_uapi::uapi::RUSAGE_THREAD as i32;
@@ -1276,7 +1257,7 @@ pub fn sys_getrusage(
         ru_stime: timeval_from_duration(time_stats.system_time),
         ..rusage::default()
     };
-    current_task.write_object(user_usage, &usage)?;
+    current_task.write_multi_arch_object(user_usage, usage)?;
 
     Ok(())
 }
@@ -1531,7 +1512,6 @@ pub fn sys_capset(
     Ok(())
 }
 
-#[cfg(not(feature = "starnix_lite"))]
 pub fn sys_seccomp(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -1998,17 +1978,29 @@ pub fn sys_vhangup(
 #[cfg(feature = "arch32")]
 mod arch32 {
     pub use super::{
-        sys_execve as sys_arch32_execve, sys_geteuid as sys_arch32_geteuid32,
-        sys_getgid as sys_arch32_getgid32, sys_getppid as sys_arch32_getppid,
+        sys_execve as sys_arch32_execve, sys_getegid as sys_arch32_getegid32,
+        sys_geteuid as sys_arch32_geteuid32, sys_getgid as sys_arch32_getgid32,
+        sys_getgroups as sys_arch32_getgroups32, sys_getpgid as sys_arch32_getpgid,
+        sys_getppid as sys_arch32_getppid, sys_getpriority as sys_arch32_getpriority,
         sys_getresgid as sys_arch32_getresgid32, sys_getresuid as sys_arch32_getresuid32,
-        sys_getrlimit as sys_arch32_ugetrlimit, sys_getuid as sys_arch32_getuid32,
-        sys_ptrace as sys_arch32_ptrace, sys_sched_getaffinity as sys_arch32_sched_getaffinity,
-        sys_sched_setaffinity as sys_arch32_sched_setaffinity, sys_seccomp as sys_arch32_seccomp,
+        sys_getrlimit as sys_arch32_ugetrlimit, sys_getrusage as sys_arch32_getrusage,
+        sys_getuid as sys_arch32_getuid32, sys_ioprio_set as sys_arch32_ioprio_set,
+        sys_ptrace as sys_arch32_ptrace, sys_quotactl as sys_arch32_quotactl,
+        sys_sched_get_priority_max as sys_arch32_sched_get_priority_max,
+        sys_sched_get_priority_min as sys_arch32_sched_get_priority_min,
+        sys_sched_getaffinity as sys_arch32_sched_getaffinity,
+        sys_sched_getparam as sys_arch32_sched_getparam,
+        sys_sched_setaffinity as sys_arch32_sched_setaffinity,
+        sys_sched_setparam as sys_arch32_sched_setparam,
+        sys_sched_setscheduler as sys_arch32_sched_setscheduler, sys_seccomp as sys_arch32_seccomp,
         sys_setfsuid as sys_arch32_setfsuid, sys_setfsuid as sys_arch32_setfsuid32,
-        sys_setgroups as sys_arch32_setgroups32, sys_setpgid as sys_arch32_setpgid,
-        sys_setpriority as sys_arch32_setpriority, sys_setresgid as sys_arch32_setresgid32,
-        sys_setresuid as sys_arch32_setresuid32, sys_setrlimit as sys_arch32_setrlimit,
-        sys_setsid as sys_arch32_setsid, sys_syslog as sys_arch32_syslog,
+        sys_setgid as sys_arch32_setgid32, sys_setgroups as sys_arch32_setgroups32,
+        sys_setns as sys_arch32_setns, sys_setpgid as sys_arch32_setpgid,
+        sys_setpriority as sys_arch32_setpriority, sys_setregid as sys_arch32_setregid32,
+        sys_setresgid as sys_arch32_setresgid32, sys_setresuid as sys_arch32_setresuid32,
+        sys_setreuid as sys_arch32_setreuid32, sys_setreuid as sys_arch32_setreuid,
+        sys_setrlimit as sys_arch32_setrlimit, sys_setsid as sys_arch32_setsid,
+        sys_syslog as sys_arch32_syslog, sys_unshare as sys_arch32_unshare,
     };
 }
 
@@ -2030,7 +2022,7 @@ mod tests {
 
         let mapped_address =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        let name_addr = mapped_address + 128u64;
+        let name_addr = (mapped_address + 128u64).unwrap();
         let name = "test-name\0";
         current_task.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
         sys_prctl(
@@ -2044,19 +2036,21 @@ mod tests {
         )
         .expect("failed to set name");
         assert_eq!(
-            Some("test-name".into()),
+            "test-name",
             current_task
                 .mm()
                 .unwrap()
-                .get_mapping_name(mapped_address + 24u64)
+                .get_mapping_name((mapped_address + 24u64).unwrap())
                 .expect("failed to get address")
+                .unwrap()
+                .to_string(),
         );
 
         sys_munmap(&mut locked, &current_task, mapped_address, *PAGE_SIZE as usize)
             .expect("failed to unmap memory");
         assert_eq!(
             error!(EFAULT),
-            current_task.mm().unwrap().get_mapping_name(mapped_address + 24u64)
+            current_task.mm().unwrap().get_mapping_name((mapped_address + 24u64).unwrap())
         );
     }
 
@@ -2348,14 +2342,16 @@ mod tests {
         let requested_params = sched_param { sched_priority: 15 };
         current_task.write_object(mapped_address.into(), &requested_params).unwrap();
 
-        sys_sched_setscheduler(&mut locked, &current_task, 0, SCHED_FIFO, mapped_address).unwrap();
+        sys_sched_setscheduler(&mut locked, &current_task, 0, SCHED_FIFO, mapped_address.into())
+            .unwrap();
 
         let new_scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
         assert_eq!(new_scheduler, SCHED_FIFO, "task should have been assigned fifo scheduler");
 
         let mapped_address =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
+        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address.into())
+            .expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
         assert_eq!(param_value.sched_priority, 15);
@@ -2366,7 +2362,8 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mapped_address =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
+        sys_sched_getparam(&mut locked, &current_task, 0, mapped_address.into())
+            .expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
         assert_eq!(param_value.sched_priority, 0);
@@ -2441,7 +2438,7 @@ mod tests {
             .write_multi_arch_ptr(argv_addr.addr(), arg_usercstr)
             .expect("failed to write UserCString");
         current_task
-            .write_multi_arch_ptr(argv_addr.next().addr(), null_usercstr)
+            .write_multi_arch_ptr(argv_addr.next().unwrap().addr(), null_usercstr)
             .expect("failed to write UserCString");
 
         // The arguments size limit should include the null terminator.

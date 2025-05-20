@@ -14,7 +14,7 @@ _LOGGER: logging.Logger = logging.getLogger("ScenicMetricsProcessor")
 _EVENT_CATEGORY: str = "gfx"
 _SCENIC_START_EVENT_NAME: str = "ApplyScheduledSessionUpdates"
 _SCENIC_RENDER_EVENT_NAME: str = "RenderFrame"
-_DISPLAY_VSYNC_READY_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
+_DISPLAY_VSYNC_READY_EVENT_NAME: str = "Flatland::DisplayCompositor::OnVsync"
 
 
 class _ScenicTracingEvent:
@@ -81,7 +81,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
         )
         tracing_events: list[_ScenicTracingEvent] = []
         for e in scenic_start_events:
-            render_event = trace_utils.get_nearest_following_event(
+            render_event = trace_utils.get_nearest_following_flow_event(
                 e, _EVENT_CATEGORY, _SCENIC_RENDER_EVENT_NAME
             )
             if render_event is None:
@@ -89,7 +89,7 @@ class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
             assert isinstance(render_event, trace_model.DurationEvent)
             if not render_event.duration:
                 continue
-            vsync_ready_event = trace_utils.get_nearest_following_event(
+            vsync_ready_event = trace_utils.get_nearest_following_flow_event(
                 render_event, _EVENT_CATEGORY, _DISPLAY_VSYNC_READY_EVENT_NAME
             )
             if vsync_ready_event is None:

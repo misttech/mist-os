@@ -21,7 +21,7 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/array.h>
 #include <ktl/byte.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <vm/vm_address_region.h>

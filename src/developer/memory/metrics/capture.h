@@ -21,6 +21,8 @@
 
 #include <ffl/fixed.h>
 
+#include "src/performance/memory/scudo/mallopt.h"
+
 class TestMonitor;
 
 namespace memory {
@@ -182,6 +184,11 @@ class OS {
 // Returns an OS implementation querying Zircon Kernel.
 std::unique_ptr<OS> CreateDefaultOS();
 
+class MallocPurgeGuard {
+ public:
+  ~MallocPurgeGuard() { mallopt(M_PURGE, /*not used*/ 0); }
+};
+
 class Capture {
  public:
   static const std::vector<std::string> kDefaultRootedVmoNames;
@@ -204,6 +211,7 @@ class Capture {
   const Vmo& vmo_for_koid(zx_koid_t koid) const { return koid_to_vmo_.at(koid); }
 
  private:
+  MallocPurgeGuard purge_guard_;
   zx_instant_boot_t time_;
   zx_info_kmem_stats_t kmem_ = {};
   std::optional<zx_info_kmem_stats_extended_t> kmem_extended_;

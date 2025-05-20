@@ -19,6 +19,7 @@ const TYPE: &'static str = "TYPE";
 const STATE: &'static str = "STATE";
 const ADDRS: &'static str = "ADDRS/IP";
 const RCS: &'static str = "RCS";
+const MANUAL: &'static str = "MANUAL";
 
 const UNKNOWN: &'static str = "<unknown>";
 
@@ -63,7 +64,7 @@ fn nodename_to_string(index: Option<usize>, nodename: Option<String>) -> String 
         Some(name) => name,
         None => match index {
             Some(index) => format!("<unknown-{}>", index),
-            None => UNKNOWN.to_string(),
+            None => target_errors::UNKNOWN_TARGET_NAME.to_owned(),
         },
     }
 }
@@ -392,6 +393,7 @@ macro_rules! make_structs_and_support_functions {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(tag = "type")]
 pub enum JsonTargetAddress {
     Ip { ip: String, ssh_port: u16 },
     VSock { cid: u32 },
@@ -421,6 +423,7 @@ pub struct JsonTarget {
     target_state: String,
     addresses: Vec<JsonTargetAddress>,
     is_default: bool,
+    is_manual: bool,
 }
 // Second field is printed last in this implementation, everything else is printed in order.
 make_structs_and_support_functions!(
@@ -430,6 +433,7 @@ make_structs_and_support_functions!(
     target_type,
     target_state,
     addresses,
+    is_manual,
 );
 
 #[derive(Debug, PartialEq, Eq)]
@@ -492,6 +496,10 @@ impl StringifiedTarget {
             ffx::TargetState::Zedboot => "Zedboot (R)".to_string(),
         }
     }
+
+    fn from_is_manual(is_manual: Option<bool>) -> String {
+        String::from(if is_manual.unwrap_or(false) { "Y" } else { "N" })
+    }
 }
 
 impl TryFrom<(Option<usize>, ffx::TargetInfo)> for StringifiedTarget {
@@ -516,6 +524,9 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for StringifiedTarget {
             target_type: StringifiedField::String(target_type),
             target_state: StringifiedField::String(StringifiedTarget::from_target_state(
                 target.target_state.ok_or(StringifyError::MissingTargetState)?,
+            )),
+            is_manual: StringifiedField::String(StringifiedTarget::from_is_manual(
+                target.is_manual,
             )),
             ..Default::default()
         })
@@ -546,6 +557,7 @@ impl TryFrom<(Option<usize>, ffx::TargetInfo)> for JsonTarget {
                 target.target_state.ok_or(StringifyError::MissingTargetState)?,
             ),
             is_default: false.into(),
+            is_manual: target.is_manual.unwrap_or(false),
         })
     }
 }
@@ -576,6 +588,7 @@ impl TryFrom<Vec<ffx::TargetInfo>> for TabularTargetFormatter {
             serial: StringifiedField::String(SERIAL.to_string()),
             addresses: StringifiedField::String(ADDRS.to_string()),
             rcs_state: StringifiedField::String(RCS.to_string()),
+            is_manual: StringifiedField::String(MANUAL.to_string()),
             target_type: StringifiedField::String(TYPE.to_string()),
             target_state: StringifiedField::String(STATE.to_string()),
             ..Default::default()

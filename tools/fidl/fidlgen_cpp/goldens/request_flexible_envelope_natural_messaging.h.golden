@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.requestflexibleenvelope/cpp/markers.h>
 #include <fidl/test.requestflexibleenvelope/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -15,10 +17,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-namespace fidl {
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> {
@@ -42,13 +40,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_requestflexibleenvelope::Prot
       ::fit::callback<void(::fidl::Result<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>&)>;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> final : public ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse {
  public:
   using ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse;
-  Response(::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse v) : ProtocolRequestStrictResponseFlexibleResponse(std::move(v)) {}
+  Response(::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse v);
 };
 
 template <>
@@ -64,7 +60,7 @@ template <>
 class ::fidl::Response<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> final : public ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse {
  public:
   using ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse;
-  Response(::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse v) : ProtocolRequestFlexibleResponseStrictResponse(std::move(v)) {}
+  Response(::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse v);
 };
 
 template <>
@@ -85,10 +81,6 @@ class ::fidl::internal::NaturalClientImpl<::test_requestflexibleenvelope::Protoc
   ::fidl::internal::NaturalThenable<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> RequestFlexibleResponseStrict(const ::fidl::Request<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Protocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Protocol>> {
@@ -98,15 +90,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_requestflexibleenvelope::Pr
   ::fidl::Result<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> RequestFlexibleResponseStrict(const ::fidl::Request<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_requestflexibleenvelope::Protocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_requestflexibleenvelope::Protocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_requestflexibleenvelope::Protocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_requestflexibleenvelope::Protocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -138,13 +123,9 @@ class ::fidl::SyncEventHandler<::test_requestflexibleenvelope::Protocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_requestflexibleenvelope::Protocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_requestflexibleenvelope::Protocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_requestflexibleenvelope::Protocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_requestflexibleenvelope::Protocol>* event_handler);
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_requestflexibleenvelope::Protocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -157,8 +138,6 @@ class ::fidl::internal::NaturalEventSender<::test_requestflexibleenvelope::Proto
  public:
   using SyncEndpointManagedVeneer::SyncEndpointManagedVeneer;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> : public ::fidl::CompleterBase {
@@ -208,19 +187,13 @@ class ::fidl::Server<::test_requestflexibleenvelope::Protocol> : public ::fidl::
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_requestflexibleenvelope::Protocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_requestflexibleenvelope::Protocol> final {
@@ -236,6 +209,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_requestflexibleenvelope:
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

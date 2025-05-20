@@ -27,7 +27,6 @@ namespace internal {
       .val = WireNaturalConversionTraits<::fidl::VectorView<int32_t>, ::std::optional<::std::vector<int32_t>>>::ToWire(arena, std::move(src.val())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_nullable::StructWithNullableHandle WireNaturalConversionTraits<::test_nullable::wire::StructWithNullableHandle, ::test_nullable::StructWithNullableHandle>::ToNatural(::test_nullable::wire::StructWithNullableHandle src) {
@@ -62,7 +61,6 @@ namespace internal {
       .sum = WireNaturalConversionTraits<int32_t, int32_t>::ToWire(arena, std::move(src.sum())),
   };
 }
-
 #ifdef __Fuchsia__
 
 ::test_nullable::StructWithNullableProtocol WireNaturalConversionTraits<::test_nullable::wire::StructWithNullableProtocol, ::test_nullable::StructWithNullableProtocol>::ToNatural(::test_nullable::wire::StructWithNullableProtocol src) {
@@ -73,10 +71,6 @@ namespace internal {
       .val = WireNaturalConversionTraits<::fidl::ClientEnd<::test_nullable::SimpleProtocol>, ::fidl::ClientEnd<::test_nullable::SimpleProtocol>>::ToWire(arena, std::move(src.val())),
   };
 }
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 ::test_nullable::StructWithNullableRequest WireNaturalConversionTraits<::test_nullable::wire::StructWithNullableRequest, ::test_nullable::StructWithNullableRequest>::ToNatural(::test_nullable::wire::StructWithNullableRequest src) {
   return ::test_nullable::StructWithNullableRequest(WireNaturalConversionTraits<::fidl::ServerEnd<::test_nullable::SimpleProtocol>, ::fidl::ServerEnd<::test_nullable::SimpleProtocol>>::ToNatural(std::move(src.val)));

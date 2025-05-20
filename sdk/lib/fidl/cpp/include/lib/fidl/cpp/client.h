@@ -257,12 +257,12 @@ class Client {
   }
 
   internal::ClientController controller_;
-  cpp17::optional<NaturalClientImpl> natural_client_impl_;
+  std::optional<NaturalClientImpl> natural_client_impl_;
 };
 
 template <typename Protocol, typename AsyncEventHandlerReference>
-Client(fidl::ClientEnd<Protocol>, async_dispatcher_t*,
-       AsyncEventHandlerReference&&) -> Client<Protocol>;
+Client(fidl::ClientEnd<Protocol>, async_dispatcher_t*, AsyncEventHandlerReference&&)
+    -> Client<Protocol>;
 
 template <typename Protocol>
 Client(fidl::ClientEnd<Protocol>, async_dispatcher_t*) -> Client<Protocol>;
@@ -527,8 +527,8 @@ SharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*, AsyncEventHandlerRe
              fidl::AnyTeardownObserver) -> SharedClient<Protocol>;
 
 template <typename Protocol, typename AsyncEventHandlerReference>
-SharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*,
-             AsyncEventHandlerReference&&) -> SharedClient<Protocol>;
+SharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*, AsyncEventHandlerReference&&)
+    -> SharedClient<Protocol>;
 
 template <typename Protocol>
 SharedClient(fidl::ClientEnd<Protocol>, async_dispatcher_t*) -> SharedClient<Protocol>;

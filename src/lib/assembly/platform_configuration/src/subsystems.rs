@@ -16,7 +16,7 @@ pub(crate) mod prelude {
     #[allow(unused)]
     pub(crate) use crate::common::{
         BoardInformationExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
-        DefaultByBuildType, DefineSubsystemConfiguration, FeatureSupportLevel,
+        DefaultByBuildType, DefineSubsystemConfiguration, FeatureSetLevel,
         OptionDefaultByBuildTypeExt,
     };
 
@@ -58,7 +58,7 @@ mod storage;
 mod swd;
 mod sysmem;
 mod system_sounds;
-mod tee_clients;
+mod tee;
 mod thermal;
 mod timekeeper;
 mod trusted_apps;
@@ -84,10 +84,7 @@ pub fn define_configuration(
     let icu_config = &platform.icu;
     let mut builder = ConfigurationBuilderImpl::new(icu_config.clone());
 
-    // The emulator support bundle is always added, even to an empty build.
-    builder.platform_bundle("emulator_support");
-
-    let feature_set_level = FeatureSupportLevel::from_deserialized(&platform.feature_set_level);
+    let feature_set_level = FeatureSetLevel::from_deserialized(&platform.feature_set_level);
 
     // Only perform configuration if the feature_set_level is not None (ie, Empty).
     if let Some(feature_set_level) = &feature_set_level {
@@ -124,7 +121,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
     ) -> anyhow::Result<()> {
         // Set up the platform's common AIBs by feature_set_level and build_type.
         for bundle_name in match (context.feature_set_level, context.build_type) {
-            (FeatureSupportLevel::Embeddable, BuildType::Eng) => {
+            (FeatureSetLevel::Embeddable, BuildType::Eng) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -133,7 +130,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_realm_development_access",
                 ]
             }
-            (FeatureSupportLevel::Embeddable, BuildType::UserDebug) => {
+            (FeatureSetLevel::Embeddable, BuildType::UserDebug) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -141,10 +138,10 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_realm_development_access",
                 ]
             }
-            (FeatureSupportLevel::Embeddable, BuildType::User) => {
+            (FeatureSetLevel::Embeddable, BuildType::User) => {
                 vec!["embeddable", "component_manager"]
             }
-            (FeatureSupportLevel::Bootstrap, _) => {
+            (FeatureSetLevel::Bootstrap, _) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -156,7 +153,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap_realm_development_access",
                 ]
             }
-            (FeatureSupportLevel::Utility, BuildType::Eng) => {
+            (FeatureSetLevel::Utility, BuildType::Eng) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -169,9 +166,10 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_development_access",
                     "core_realm_development_access_eng",
                     "core_realm_eng",
+                    "mdns",
                 ]
             }
-            (FeatureSupportLevel::Utility, BuildType::UserDebug) => {
+            (FeatureSetLevel::Utility, BuildType::UserDebug) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -182,9 +180,10 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_development_access",
                     "core_realm_development_access_userdebug",
                     "core_realm_user_and_userdebug",
+                    "mdns",
                 ]
             }
-            (FeatureSupportLevel::Utility, BuildType::User) => {
+            (FeatureSetLevel::Utility, BuildType::User) => {
                 vec![
                     "embeddable",
                     "component_manager",
@@ -193,7 +192,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm_user_and_userdebug",
                 ]
             }
-            (FeatureSupportLevel::Standard, BuildType::Eng) => {
+            (FeatureSetLevel::Standard, BuildType::Eng) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -211,9 +210,10 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "standard_userdebug_and_eng",
                     "testing_support",
                     "tracing",
+                    "mdns",
                 ]
             }
-            (FeatureSupportLevel::Standard, BuildType::UserDebug) => {
+            (FeatureSetLevel::Standard, BuildType::UserDebug) => {
                 vec![
                     "embeddable",
                     "embeddable_userdebug",
@@ -227,9 +227,10 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "common_standard",
                     "standard_userdebug",
                     "standard_userdebug_and_eng",
+                    "mdns",
                 ]
             }
-            (FeatureSupportLevel::Standard, BuildType::User) => {
+            (FeatureSetLevel::Standard, BuildType::User) => {
                 vec![
                     "embeddable",
                     "component_manager",
@@ -237,7 +238,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm",
                     "core_realm_user_and_userdebug",
                     "common_standard",
-                    "standard_user",
+                    "mdns",
                 ]
             }
         } {
@@ -536,15 +537,12 @@ fn configure_subsystems(
     )
     .context("Configuring the 'usb' subsystem")?;
 
-    tee_clients::TeeClientsConfig::define_configuration(
-        &context_base.for_subsystem("tee_clients"),
-        &(
-            &product.tee_clients,
-            &context_base.for_subsystem("tee_clients").board_info.tee_trusted_app_guids,
-        ),
+    tee::TeeConfig::define_configuration(
+        &context_base.for_subsystem("tee"),
+        &(&product.tee, &product.tee_clients, &platform.session),
         builder,
     )
-    .context("configuring the 'tee_clients' subsystem")?;
+    .context("configuring the 'tee' subsystem")?;
 
     Ok(())
 }

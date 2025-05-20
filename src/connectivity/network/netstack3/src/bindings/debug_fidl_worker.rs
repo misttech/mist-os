@@ -5,8 +5,8 @@
 //! A Netstack3 worker to serve fuchsia.net.debug.Interfaces API requests.
 
 use fidl::endpoints::{ProtocolMarker as _, ServerEnd};
-use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
-use log::{debug, error, warn};
+use futures::{StreamExt as _, TryStreamExt as _};
+use log::{error, warn};
 use {fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug};
 
 use crate::bindings::devices::BindingId;
@@ -15,14 +15,13 @@ use crate::bindings::{DeviceIdExt as _, DeviceSpecificInfo};
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single
 // channel (e.g. a single client connection).
 pub(crate) async fn serve_interfaces(
-    bindings_ctx: &crate::bindings::BindingsCtx,
+    ctx: crate::bindings::Ctx,
     rs: fnet_debug::InterfacesRequestStream,
 ) -> Result<(), fidl::Error> {
-    debug!("serving {}", fnet_debug::InterfacesMarker::DEBUG_NAME);
     rs.try_for_each(|req| async {
         match req {
             fnet_debug::InterfacesRequest::GetPort { id, port, control_handle: _ } => {
-                handle_get_port(bindings_ctx, id, port);
+                handle_get_port(ctx.bindings_ctx(), id, port);
             }
         }
         Ok(())
@@ -57,13 +56,13 @@ fn handle_get_port(
 
 struct DiagnosticsInner {
     thread: std::thread::JoinHandle<()>,
-    sender: futures::channel::mpsc::Sender<ServerEnd<fnet_debug::DiagnosticsMarker>>,
+    sender: futures::channel::mpsc::UnboundedSender<ServerEnd<fnet_debug::DiagnosticsMarker>>,
 }
 
 impl DiagnosticsInner {
     fn new() -> Self {
         let (sender, mut receiver) =
-            futures::channel::mpsc::channel::<ServerEnd<fnet_debug::DiagnosticsMarker>>(0);
+            futures::channel::mpsc::unbounded::<ServerEnd<fnet_debug::DiagnosticsMarker>>();
         let thread = std::thread::spawn(move || {
             let mut executor = fuchsia_async::LocalExecutor::new();
             let fut = async move {
@@ -119,19 +118,10 @@ impl Drop for DiagnosticsHandler {
 }
 
 impl DiagnosticsHandler {
-    pub(crate) async fn serve_diagnostics(
-        &self,
-        server_end: ServerEnd<fnet_debug::DiagnosticsMarker>,
-    ) {
+    pub(crate) fn serve_diagnostics(&self, server_end: ServerEnd<fnet_debug::DiagnosticsMarker>) {
         let Self { inner } = self;
-        let mut sender = {
-            let DiagnosticsInner { sender, thread: _ } = inner.get_or_init(DiagnosticsInner::new);
-            // Clone the sender, we don't have mutable access to it behind the
-            // cell.
-            sender.clone()
-        };
-
-        sender.send(server_end).await.expect("sender was orphaned unexpectedly");
+        let DiagnosticsInner { sender, thread: _ } = inner.get_or_init(DiagnosticsInner::new);
+        sender.unbounded_send(server_end).expect("sender was orphaned unexpectedly");
     }
 
     async fn serve_request_stream(rs: fnet_debug::DiagnosticsRequestStream) {
@@ -162,7 +152,6 @@ impl DiagnosticsHandler {
 mod tests {
     use super::DiagnosticsHandler;
 
-    use futures::StreamExt as _;
     use test_case::test_case;
 
     // DiagnosticsHandler has a nontrivial Drop path that isn't really exercised
@@ -176,14 +165,13 @@ mod tests {
         // Attach channels.
         let channels = {
             let handler = &handler;
-            futures::stream::repeat_with(|| fidl::endpoints::create_endpoints())
-                .then(|(client, server)| async move {
-                    handler.serve_diagnostics(server).await;
+            core::iter::repeat_with(|| fidl::endpoints::create_endpoints())
+                .map(|(client, server)| {
+                    handler.serve_diagnostics(server);
                     client.into_channel()
                 })
                 .take(streams)
                 .collect::<Vec<_>>()
-                .await
         };
 
         // Dropping the handler should stop the alternative executor and join

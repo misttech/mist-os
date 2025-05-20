@@ -15,6 +15,7 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.platform.bus.Service" },
+        { service: "fuchsia.hardware.platform.bus.ObservabilityService" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.sysinfo.Service" },
         { service: "fuchsia.boot.metadata.SerialNumberMetadata" },
@@ -69,6 +70,10 @@
     expose: [
         {
             service: "fuchsia.hardware.platform.bus.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.platform.bus.ObservabilityService",
             from: "self",
         },
         {

@@ -153,9 +153,6 @@ if (is_fuchsia) {
              "Need to define partitions_config_label")
       _partitions_config = partitions_config_label
     }
-    _partitions_config_file =
-        get_label_info(_partitions_config, "target_out_dir") + "/" +
-        get_label_info(_partitions_config, "name") + "/partitions_config.json"
 
     update_epoch = update_platform_epoch + update_product_epoch
     update_package("update") {
@@ -163,10 +160,9 @@ if (is_fuchsia) {
       deps = [
         ":fuchsia_assembly",
         "//build/info:build_info_files",
-        _partitions_config,
         recovery_label,
       ]
-      partitions = _partitions_config_file
+      partitions = _partitions_config
       system_a = files.images_json
       system_r = files.recovery_images_json
       board_name = board_name
@@ -181,7 +177,6 @@ if (is_fuchsia) {
       deps = [
         ":fuchsia_assembly",
         "//build/info:build_info_files",
-        _partitions_config,
         recovery_label,
       ]
 
@@ -190,7 +185,7 @@ if (is_fuchsia) {
         epoch = "${update_epoch}"
       }
 
-      partitions = _partitions_config_file
+      partitions = _partitions_config
       system_a = files.images_json
       system_r = files.recovery_images_json
 

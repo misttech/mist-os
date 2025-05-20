@@ -238,8 +238,7 @@ template("ffx_tool") {
 
       meta = {
         dest = "$file_base-meta.json"
-        schema = "ffx_tool"
-        additional_schema_files = [ "//build/sdk/meta/host_tool.json" ]
+        type = "ffx_tool"
         value = {
           type = "ffx_tool"
           name = output_name

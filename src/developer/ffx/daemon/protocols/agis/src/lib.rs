@@ -56,12 +56,12 @@ impl FidlProtocol for ListenerProtocol {
                     let mut path: String = "/tmp/agis".to_owned();
                     path.push_str(&global_id.to_string());
                     let socket_path = Path::new(&path);
-                    tracing::info!("FFX Daemon Agis is listening on {:?}", socket_path);
+                    log::info!("FFX Daemon Agis is listening on {:?}", socket_path);
 
                     let unix_stream = match UnixStream::connect(socket_path).await {
                         Ok(stream) => stream,
                         Err(_) => {
-                            tracing::error!("UnixStream::connect failed at {:?}", socket_path);
+                            log::error!("UnixStream::connect failed at {:?}", socket_path);
                             return;
                         }
                     };
@@ -86,10 +86,10 @@ impl FidlProtocol for ListenerProtocol {
                         // Read from ffx side, write to unix side.
                         match futures::io::copy_buf(ffx_reader, &mut write_half_unix).await {
                             Ok(_) => {
-                                tracing::info!("ffx_to_unix copy succeeded");
+                                log::info!("ffx_to_unix copy succeeded");
                             }
                             Err(_) => {
-                                tracing::error!("agis daemon: ffx_to_unix copy failed");
+                                log::error!("agis daemon: ffx_to_unix copy failed");
                             }
                         }
                     };
@@ -98,10 +98,10 @@ impl FidlProtocol for ListenerProtocol {
                     let unix_copier = async {
                         match futures::io::copy_buf(unix_reader, &mut write_half_ffx).await {
                             Ok(_) => {
-                                tracing::info!("unix_to_ffx copy succeeded");
+                                log::info!("unix_to_ffx copy succeeded");
                             }
                             Err(_) => {
-                                tracing::error!("agis daemon: unix_to_ffx copy failed");
+                                log::error!("agis daemon: unix_to_ffx copy failed");
                             }
                         }
                     };
@@ -115,12 +115,12 @@ impl FidlProtocol for ListenerProtocol {
 
             ffx::ListenerRequest::Shutdown { responder } => {
                 if self.task_manager.num_tasks() == 0 {
-                    tracing::info!("no tasks to cancel");
+                    log::info!("no tasks to cancel");
                     return Ok(());
                 }
                 let tasks = self.task_manager.drain();
                 for t in tasks {
-                    tracing::info!("cancelling task {:?}", t);
+                    log::info!("cancelling task {:?}", t);
                 }
                 responder.send(Ok(()))?;
                 Ok(())

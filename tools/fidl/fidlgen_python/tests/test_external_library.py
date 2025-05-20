@@ -7,9 +7,7 @@ import unittest
 import fidl_test_python_otherstruct as test_python_otherstruct
 import fidl_test_python_struct as test_python_struct
 from fidl import construct_response_object
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import decode_standalone  # type: ignore
+from fidl_codec import decode_standalone
 
 
 class ExternalLibraryTestsuite(unittest.TestCase):

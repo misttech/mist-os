@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 #include <fidl/test/misc/cpp/fidl.h>
-#include <lib/stdcompat/optional.h>
+
+#include <optional>
 
 #include <zxtest/zxtest.h>
 
@@ -162,10 +163,10 @@ TEST(FlexibleBits, TryFrom) {
   using BitsType = fidl::test::misc::FlexibleBits;
   // The bits type only has 2, 4, and 8 defined.
   auto result = BitsType::TryFrom(1);
-  EXPECT_EQ(result, cpp17::nullopt);
+  EXPECT_EQ(result, std::nullopt);
 
   auto result_ok = BitsType::TryFrom(2);
-  EXPECT_EQ(result_ok, cpp17::optional<BitsType>(BitsType::B));
+  EXPECT_EQ(result_ok, std::optional<BitsType>(BitsType::B));
 }
 
 TEST(FlexibleBits, QueryingUnknown) {

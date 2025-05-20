@@ -132,6 +132,29 @@ class FakeWlanPhyImpl : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl
     completer.buffer(arena).ReplySuccess(builder.Build());
     test_completion_.Signal();
   }
+  void PowerDown(fdf::Arena& arena, PowerDownCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
+    test_completion_.Signal();
+  }
+  void PowerUp(fdf::Arena& arena, PowerUpCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
+    test_completion_.Signal();
+  }
+  void Reset(fdf::Arena& arena, ResetCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
+    test_completion_.Signal();
+  }
+  void GetPowerState(fdf::Arena& arena, GetPowerStateCompleter::Sync& completer) override {
+    fidl::Arena fidl_arena;
+    auto builder =
+        fuchsia_wlan_phyimpl::wire::WlanPhyImplGetPowerStateResponse::Builder(fidl_arena);
+    builder.power_on(true);
+    completer.buffer(arena).ReplySuccess(builder.Build());
+    test_completion_.Signal();
+  }
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_wlan_phyimpl::WlanPhyImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   void WaitForCompletion() { test_completion_.Wait(); }
 
@@ -343,5 +366,33 @@ TEST_F(WlanphyDeviceTest, GetPowerSaveMode) {
                 [](TestEnvironment& env) { return env.fake_phyimpl_parent_.kFakePsMode; }),
             result->value()->resp);
 }
+
+TEST_F(WlanphyDeviceTest, PowerDown) {
+  auto result = client_phy_->PowerDown();
+  ASSERT_TRUE(result.ok());
+  WaitForCommandCompletion();
+}
+
+TEST_F(WlanphyDeviceTest, PowerUp) {
+  auto result = client_phy_->PowerUp();
+  ASSERT_TRUE(result.ok());
+  WaitForCommandCompletion();
+}
+
+TEST_F(WlanphyDeviceTest, Reset) {
+  auto result = client_phy_->Reset();
+  ASSERT_TRUE(result.ok());
+  WaitForCommandCompletion();
+}
+
+TEST_F(WlanphyDeviceTest, GetPowerState) {
+  auto result = client_phy_->GetPowerState();
+  ASSERT_TRUE(result.ok());
+  WaitForCommandCompletion();
+  EXPECT_EQ(
+      driver_test().RunInEnvironmentTypeContext<bool>([](TestEnvironment& env) { return true; }),
+      result->value()->power_on);
+}
+
 }  // namespace
 }  // namespace wlanphy

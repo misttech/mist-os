@@ -1196,7 +1196,7 @@ void MsdArmAbiConnection::SetNotificationCallback(msd::NotificationHandler* hand
   ptr()->SetNotificationCallback(handler);
 }
 
-void MsdArmAbiConnection::ReleaseBuffer(msd::Buffer& buffer) {}
+void MsdArmAbiConnection::ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) {}
 
 magma_status_t MsdArmAbiConnection::EnablePerformanceCounters(
     cpp20::span<const uint64_t> counters) {

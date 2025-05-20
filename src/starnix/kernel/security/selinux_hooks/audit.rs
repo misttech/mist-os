@@ -41,6 +41,7 @@ pub(super) enum Auditable<'a> {
     FileObject(&'a FileObject),
     FileSystem(&'a FileSystem),
     FsNode(&'a FsNode),
+    IoctlCommand(u16),
     Name(&'a FsStr),
     Task(&'a Task),
     // keep-sorted end
@@ -186,11 +187,14 @@ impl Display for Auditable<'_> {
             Auditable::FileObject(file) => {
                 write!(f, " path=\"{}\"", file.name.path_escaping_chroot())
             }
+            Auditable::FileSystem(fs) => {
+                write!(f, " dev=\"{}\"", fs.options.source)
+            }
             Auditable::FsNode(node) => {
                 write!(f, " ino={}", node.node_id)
             }
-            Auditable::FileSystem(fs) => {
-                write!(f, " dev=\"{}\"", fs.options.source)
+            Auditable::IoctlCommand(ioctl) => {
+                write!(f, " ioctlcmd={:#x}", ioctl)
             }
             Auditable::Name(name) => {
                 write!(f, " name=\"{}\"", name)

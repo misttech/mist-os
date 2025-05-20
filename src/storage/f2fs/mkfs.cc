@@ -113,12 +113,12 @@ zx::result<> MkfsWorker::SetSpace() {
   uint32_t main_sections = LeToCpu(super_block_.segment_count_main) / segs_per_sec;
   uint32_t reserved_sections = params_.reserved_segments / segs_per_sec;
 
-  // TODO(b/374811602): Add an mkfs option for users to set a larger space for reserved sections by
-  // 2 * (100 / calc_op + 1) + kNrCursegType. The option sets reserved space inversely proportional
-  // to a OP value in order to secure enough GC buffer space and minimize the number of checkpoint
-  // writes during GC while sacrificing user space.
+  // Linux f2fs sets a large space for reserved sections by (100 / calc_op + 1) + kNrCursegType.
+  // The option sets reserved space inversely proportional to a OP value in order to secure enough
+  // GC buffer space and minimize the number of checkpoint writes during GC while sacrificing user
+  // space. Unlike Linux f2fs, it uses a fixed number of reserved segments and provides more space
+  // to users or OP.
   if (main_sections <= reserved_sections) {
-    // TODO(b/374811602): If there is not enough space, retry it with IPU and single temperature.
     return zx::error(ZX_ERR_NO_SPACE);
   }
   size_t user_sections = main_sections - reserved_sections;
@@ -131,7 +131,6 @@ zx::result<> MkfsWorker::SetSpace() {
     --op_sections;
   }
   if (!op_sections || user_sections < kNrCursegType) {
-    // TODO(b/374811602): If there is not enough space, retry it with IPU and single temperature.
     return zx::error(ZX_ERR_NO_SPACE);
   }
   params_.op_segments = safemath::checked_cast<uint32_t>(op_sections * segs_per_sec);

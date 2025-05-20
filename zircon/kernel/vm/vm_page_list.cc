@@ -12,7 +12,7 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/compression.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>
@@ -407,7 +407,7 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   // Helper to mint new sentinel values for the split. Only creates zero ranges. If we support
   // other page interval types in the future, we will need to modify this to support them.
   auto mint_new_sentinel =
-      [&found_interval](VmPageOrMarker::IntervalSentinel sentinel) -> VmPageOrMarker {
+      [&found_interval](VmPageOrMarker::SentinelType sentinel) -> VmPageOrMarker {
     // We only support zero intervals for now.
     DEBUG_ASSERT(found_interval->IsIntervalZero());
     // Preserve dirty state across the split.
@@ -420,25 +420,25 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   if (new_start) {
     if (new_start->IsIntervalEnd()) {
       // If an interval was ending at the next slot, change it into a Slot sentinel.
-      new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      new_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(new_start->IsEmpty());
-      *new_start = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::Start);
+      *new_start = mint_new_sentinel(VmPageOrMarker::SentinelType::Start);
     }
   }
   if (new_end) {
     if (new_end->IsIntervalStart()) {
       // If an interval was starting at the previous slot, change it into a Slot sentinel.
-      new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(new_end->IsEmpty());
-      *new_end = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::End);
+      *new_end = mint_new_sentinel(VmPageOrMarker::SentinelType::End);
     }
   }
 
   // Finally, install a slot sentinel at offset.
   if (slot->IsEmpty()) {
-    *slot = mint_new_sentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    *slot = mint_new_sentinel(VmPageOrMarker::SentinelType::Slot);
   } else {
     DEBUG_ASSERT(slot->IsIntervalStart() || slot->IsIntervalEnd());
     // If we're overwriting the start or end sentinel, carry over any relevant state information to
@@ -458,7 +458,7 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
         slot->SetZeroIntervalAwaitingCleanLength(PAGE_SIZE);
       }
     }
-    slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    slot->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
   }
 
   return {slot, true};
@@ -600,7 +600,7 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
          (node_offset == last_node_offset ? last_node_index : VmPageListNode::kPageFanOut - 1);
          index++) {
       auto cur = &pln->Lookup(index);
-      *cur = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot,
+      *cur = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Slot,
                                           start_slot->GetZeroIntervalDirtyState());
       if (awaiting_clean_len > 0) {
         cur->SetZeroIntervalAwaitingCleanLength(PAGE_SIZE);
@@ -818,12 +818,12 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
       // old interval slot into an interval start.
       DEBUG_ASSERT(prev_slot->IsIntervalSlot());
       DEBUG_ASSERT(prev_slot->GetZeroIntervalDirtyState() == dirty_state);
-      prev_slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+      prev_slot->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Start);
     }
   } else {
     // We could not merge with an interval to the left. Start a new interval.
     DEBUG_ASSERT(new_start->IsEmpty());
-    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, dirty_state);
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start, dirty_state);
     if (awaiting_clean_len > 0) {
       final_start = VmPageOrMarkerRef(new_start);
       final_start_offset = interval_start;
@@ -862,7 +862,7 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
       DEBUG_ASSERT(next_slot->IsIntervalSlot());
       DEBUG_ASSERT(next_slot->GetZeroIntervalDirtyState() == dirty_state);
       next_slot->SetZeroIntervalAwaitingCleanLength(0);
-      next_slot->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+      next_slot->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::End);
     }
   } else {
     // We could not merge with an interval to the right. Install an interval end sentinel.
@@ -870,10 +870,10 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
     // so change it to a slot sentinel.
     if (new_end->IsIntervalStart()) {
       DEBUG_ASSERT(new_end->GetZeroIntervalDirtyState() == dirty_state);
-      new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(new_end->IsEmpty());
-      *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End, dirty_state);
+      *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End, dirty_state);
     }
   }
 
@@ -987,10 +987,10 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
       return ZX_ERR_NO_MEMORY;
     }
     if (clipped_start->IsIntervalEnd()) {
-      clipped_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      clipped_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(clipped_start->IsEmpty());
-      *clipped_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
+      *clipped_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start,
                                                     old_start->GetZeroIntervalDirtyState());
     }
 
@@ -1025,10 +1025,10 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
       return ZX_ERR_NO_MEMORY;
     }
     if (clipped_end->IsIntervalStart()) {
-      clipped_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+      clipped_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
     } else {
       DEBUG_ASSERT(clipped_end->IsEmpty());
-      *clipped_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
+      *clipped_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End,
                                                   old_end->GetZeroIntervalDirtyState());
     }
 
@@ -1039,12 +1039,10 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
   }
 
   if (new_start == new_end) {
-    *new_start =
-        VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot, new_dirty_state);
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Slot, new_dirty_state);
   } else {
-    *new_start =
-        VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, new_dirty_state);
-    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End, new_dirty_state);
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start, new_dirty_state);
+    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End, new_dirty_state);
   }
 
   if (try_merge_left) {
@@ -1052,14 +1050,14 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
     VmPageOrMarker* left = lookup_slot(new_start_offset - PAGE_SIZE);
     if (left && left->IsIntervalZero() && left->GetZeroIntervalDirtyState() == new_dirty_state) {
       if (left->IsIntervalSlot()) {
-        left->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+        left->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Start);
       } else {
         DEBUG_ASSERT(left->IsIntervalEnd());
         *left = VmPageOrMarker::Empty();
         ReturnEmptySlot(new_start_offset - PAGE_SIZE);
       }
       if (new_start->IsIntervalSlot()) {
-        new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+        new_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::End);
       } else {
         DEBUG_ASSERT(new_start->IsIntervalStart());
         *new_start = VmPageOrMarker::Empty();
@@ -1073,14 +1071,14 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
     VmPageOrMarker* right = lookup_slot(new_end_offset + PAGE_SIZE);
     if (right && right->IsIntervalZero() && right->GetZeroIntervalDirtyState() == new_dirty_state) {
       if (right->IsIntervalSlot()) {
-        right->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+        right->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::End);
       } else {
         DEBUG_ASSERT(right->IsIntervalStart());
         *right = VmPageOrMarker::Empty();
         ReturnEmptySlot(new_end_offset + PAGE_SIZE);
       }
       if (new_end->IsIntervalSlot()) {
-        new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+        new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Start);
       } else {
         DEBUG_ASSERT(new_end->IsIntervalEnd());
         *new_end = VmPageOrMarker::Empty();
@@ -1121,12 +1119,12 @@ zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len)
   // It is possible that we are moving the start all the way to the end, leaving behind a single
   // interval slot.
   if (new_start->IsIntervalEnd()) {
-    new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    new_start->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
   } else {
     DEBUG_ASSERT(new_start->IsEmpty());
     // We only support zero intervals for now.
     DEBUG_ASSERT(old_start->IsIntervalZero());
-    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
+    *new_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::Start,
                                               old_start->GetZeroIntervalDirtyState());
   }
 
@@ -1171,136 +1169,17 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
   // It is possible that we are moving the end all the way to the start, leaving behind a single
   // interval slot.
   if (new_end->IsIntervalStart()) {
-    new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    new_end->ChangeIntervalSentinel(VmPageOrMarker::SentinelType::Slot);
   } else {
     DEBUG_ASSERT(new_end->IsEmpty());
     // We only support zero intervals for now.
     DEBUG_ASSERT(old_end->IsIntervalZero());
-    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
+    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::SentinelType::End,
                                             old_end->GetZeroIntervalDirtyState());
   }
   // Free up the old end.
   RemoveContent(interval_end);
   return ZX_OK;
-}
-
-void VmPageList::MergeFrom(
-    VmPageList& other, const uint64_t offset, const uint64_t end_offset,
-    fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset), 3 * sizeof(void*)> release_fn,
-    fit::inline_function<void(VmPageOrMarker* p, uint64_t offset)> migrate_fn) {
-  constexpr uint64_t kNodeSize = PAGE_SIZE * VmPageListNode::kPageFanOut;
-  // The skewed |offset| in |other| must be equal to 0 skewed in |this|. This allows
-  // nodes to moved directly between the lists, without having to worry about allocations.
-  DEBUG_ASSERT((other.list_skew_ + offset) % kNodeSize == list_skew_);
-
-  // We should not be starting or ending partway inside an interval, either for the source or the
-  // target. Note that entire intervals that fall completely inside the range will be checked for
-  // later while we're doing the migration.
-  DEBUG_ASSERT(!other.IsOffsetInInterval(offset));
-  DEBUG_ASSERT(!other.IsOffsetInInterval(end_offset - 1));
-  DEBUG_ASSERT(!IsOffsetInInterval(end_offset - offset - 1));
-
-  auto release_fn_wrapper = [&release_fn](VmPageOrMarker* page_or_marker, uint64_t offset) {
-    if (!page_or_marker->IsEmpty()) {
-      DEBUG_ASSERT(!page_or_marker->IsInterval());
-      release_fn(ktl::move(*page_or_marker), offset);
-    }
-    return ZX_ERR_NEXT;
-  };
-
-  // Free pages outside of [|offset|, |end_offset|) so that the later code
-  // doesn't have to worry about dealing with this.
-  if (offset) {
-    other.RemovePages(release_fn_wrapper, 0, offset);
-  }
-  other.RemovePages(release_fn_wrapper, end_offset, MAX_SIZE);
-
-  // Calculate how much we need to shift nodes so that the node in |other| which contains
-  // |offset| gets mapped to offset 0 in |this|.
-  const uint64_t node_shift = other.NodeOffset(offset);
-
-  auto other_iter = other.list_.lower_bound(node_shift);
-  while (other_iter.IsValid()) {
-    DEBUG_ASSERT(other_iter->HasNoIntervalSentinel());
-    uint64_t other_offset = other_iter->GetKey();
-    // Any such nodes should have already been freed.
-    DEBUG_ASSERT(other_offset < (end_offset + other.list_skew_));
-
-    auto cur = other_iter++;
-    auto other_node = other.list_.erase(cur);
-    other_node->set_offset(other_offset - node_shift);
-
-    auto target = list_.find(other_offset - node_shift);
-    if (target.IsValid()) {
-      DEBUG_ASSERT(target->HasNoIntervalSentinel());
-      // If there's already a node at the desired location, then merge the two nodes.
-      for (unsigned i = 0; i < VmPageListNode::kPageFanOut; i++) {
-        uint64_t src_offset = other_offset - other.list_skew_ + i * PAGE_SIZE;
-        VmPageOrMarker page = ktl::move(other_node->Lookup(i));
-        VmPageOrMarker& target_page = target->Lookup(i);
-        if (target_page.IsEmpty()) {
-          if (page.IsPageOrRef()) {
-            migrate_fn(&page, src_offset);
-          }
-          target_page = ktl::move(page);
-        } else if (!page.IsEmpty()) {
-          release_fn(ktl::move(page), src_offset);
-        }
-
-        // In all cases if we still have a page add it to the free list.
-        DEBUG_ASSERT(!page.IsPageOrRef());
-      }
-    } else {
-      // If there's no node at the desired location, then directly insert the node.
-      list_.insert_or_find(ktl::move(other_node), &target);
-      bool has_page = false;
-      for (unsigned i = 0; i < VmPageListNode::kPageFanOut; i++) {
-        VmPageOrMarker& page = target->Lookup(i);
-        if (page.IsPageOrRef()) {
-          migrate_fn(&page, other_offset - other.list_skew_ + i * PAGE_SIZE);
-          if (page.IsPageOrRef()) {
-            has_page = true;
-          }
-        } else if (page.IsMarker()) {
-          has_page = true;
-        }
-      }
-      if (!has_page) {
-        list_.erase(target);
-      }
-    }
-  }
-}
-
-void VmPageList::MergeOnto(
-    VmPageList& other, fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset)> release_fn) {
-  DEBUG_ASSERT(other.list_skew_ == list_skew_);
-
-  auto iter = list_.begin();
-  while (iter.IsValid()) {
-    DEBUG_ASSERT(iter->HasNoIntervalSentinel());
-    auto node = list_.erase(iter++);
-    auto target = other.list_.find(node->GetKey());
-    if (target.IsValid()) {
-      DEBUG_ASSERT(target->HasNoIntervalSentinel());
-      // If there's already a node at the desired location, then merge the two nodes.
-      for (unsigned i = 0; i < VmPageListNode::kPageFanOut; i++) {
-        VmPageOrMarker page = ktl::move(node->Lookup(i));
-        if (page.IsEmpty()) {
-          continue;
-        }
-        VmPageOrMarker& old_page = target->Lookup(i);
-        VmPageOrMarker removed = ktl::move(old_page);
-        old_page = ktl::move(page);
-        if (!removed.IsEmpty()) {
-          uint64_t target_offset = target->GetKey() - other.list_skew_ + i * PAGE_SIZE;
-          release_fn(ktl::move(removed), target_offset);
-        }
-      }
-    } else {
-      other.list_.insert(ktl::move(node));
-    }
-  }
 }
 
 VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {

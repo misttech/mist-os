@@ -30,12 +30,12 @@
             ],
         },
         {
-            service: [ "fuchsia.hardware.suspend.SuspendService" ],
+            service: [ "fuchsia.hardware.power.suspend.SuspendService" ],
         },
         {
             config: "fuchsia.power.UseSuspender",
 
-            // If set, SAG blocks until the fuchsia.hardware.suspend.SuspendService
+            // If set, SAG blocks until the fuchsia.hardware.power.suspend.SuspendService
             // service exposes a Suspender. Otherwise, it will not attempt to
             // connect to SuspendService and suspension will be disabled.
             from: "parent",

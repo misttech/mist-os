@@ -51,12 +51,14 @@ IntlProvider::IntlProvider(async_dispatcher_t* dispatcher,
   GetInternationalization();
 }
 
-std::set<std::string> IntlProvider::GetKeys() const {
+std::set<std::string> IntlProvider::GetAnnotationKeys() {
   return {
       kSystemLocalePrimaryKey,
       kSystemTimezonePrimaryKey,
   };
 }
+
+std::set<std::string> IntlProvider::GetKeys() const { return IntlProvider::GetAnnotationKeys(); }
 
 void IntlProvider::OnUpdate() {
   Annotations annotations;

@@ -11,9 +11,11 @@
 #include <lib/zx/task.h>
 #include <lib/zx/thread.h>
 #include <zircon/compiler.h>
+#include <zircon/system/ulib/elf-search/include/elf-search.h>
 
 #include "component.h"
 #include "sampler.h"
+#include "src/lib/fxl/memory/ref_ptr.h"
 #include "targets.h"
 
 namespace profiler {
@@ -39,10 +41,11 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
     Stopped,
   };
   async_dispatcher_t* dispatcher_;
-  std::unique_ptr<Sampler> sampler_;
+  fxl::RefPtr<Sampler> sampler_;
   ProfilingState state_ = ProfilingState::Unconfigured;
 
   TargetTree targets_;
+  elf_search::Searcher searcher_;
   std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs_;
   std::unique_ptr<ComponentTarget> component_target_;
 };

@@ -12,7 +12,7 @@ use zx_status;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Foo {
-    pub field: fidl_test_dependent::MyEnum,
+    pub field: fidl_test_dependent__common::MyEnum,
 }
 
 impl fidl::Persistable for Foo {}
@@ -52,7 +52,7 @@ mod internal {
             encoder.debug_check_bounds::<Foo>(offset);
             // Delegate to tuple encoding.
             fidl::encoding::Encode::<Foo, D>::encode(
-                (<fidl_test_dependent::MyEnum as fidl::encoding::ValueTypeMarker>::borrow(
+                (<fidl_test_dependent__common::MyEnum as fidl::encoding::ValueTypeMarker>::borrow(
                     &self.field,
                 ),),
                 encoder,
@@ -63,7 +63,7 @@ mod internal {
     }
     unsafe impl<
             D: fidl::encoding::ResourceDialect,
-            T0: fidl::encoding::Encode<fidl_test_dependent::MyEnum, D>,
+            T0: fidl::encoding::Encode<fidl_test_dependent__common::MyEnum, D>,
         > fidl::encoding::Encode<Foo, D> for (T0,)
     {
         #[inline]
@@ -85,7 +85,7 @@ mod internal {
     impl<D: fidl::encoding::ResourceDialect> fidl::encoding::Decode<Self, D> for Foo {
         #[inline(always)]
         fn new_empty() -> Self {
-            Self { field: fidl::new_empty!(fidl_test_dependent::MyEnum, D) }
+            Self { field: fidl::new_empty!(fidl_test_dependent__common::MyEnum, D) }
         }
 
         #[inline]
@@ -98,7 +98,7 @@ mod internal {
             decoder.debug_check_bounds::<Self>(offset);
             // Verify that padding bytes are zero.
             fidl::decode!(
-                fidl_test_dependent::MyEnum,
+                fidl_test_dependent__common::MyEnum,
                 D,
                 &mut self.field,
                 decoder,

@@ -28,6 +28,7 @@ include /src/connectivity/policy/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/connectivity/wlan/drivers/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
+include /src/developer/ffx/OWNERS
 include /src/developer/ffx/plugins/audio/OWNERS
 include /src/developer/ffx/plugins/setui/OWNERS
 include /src/diagnostics/OWNERS

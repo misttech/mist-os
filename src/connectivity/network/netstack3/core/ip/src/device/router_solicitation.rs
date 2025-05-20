@@ -18,7 +18,7 @@ use netstack3_base::{
     StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TimerHandler,
     WeakDeviceIdentifier,
 };
-use packet::{EitherSerializer, EmptyBuf, InnerPacketBuilder as _, Serializer};
+use packet::{EitherSerializer, EmptyBuf, InnerPacketBuilder as _, PartialSerializer, Serializer};
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
 use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterSolicitation};
 use rand::Rng as _;
@@ -108,7 +108,7 @@ pub trait RsContext<BC: RsBindingsTypes>:
     /// The callback is called with a source address suitable for an outgoing
     /// router solicitation message and returns the message body.
     fn send_rs_packet<
-        S: Serializer<Buffer = EmptyBuf>,
+        S: Serializer<Buffer = EmptyBuf> + PartialSerializer,
         F: FnOnce(Option<UnicastAddr<Ipv6Addr>>) -> S,
     >(
         &mut self,

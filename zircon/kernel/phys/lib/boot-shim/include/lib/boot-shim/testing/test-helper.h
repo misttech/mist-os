@@ -7,10 +7,9 @@
 #ifndef ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_TEST_HELPER_H_
 #define ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_TEST_HELPER_H_
 
-#include <lib/stdcompat/span.h>
-
-#include <cstdint>
-#include <cstdio>
+#include <cstddef>
+#include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,7 +19,7 @@ namespace boot_shim::testing {
 struct BufferOwner {
   static BufferOwner New(size_t);
 
-  cpp20::span<std::byte> buffer;
+  std::span<std::byte> buffer;
   std::unique_ptr<std::byte[]> owner;
 };
 
@@ -53,16 +52,16 @@ class TestHelper {
   FILE* log_ = nullptr;
 };
 
-inline cpp20::span<const std::byte> Payload(std::string_view str) {
+inline std::span<const std::byte> Payload(std::string_view str) {
   return {reinterpret_cast<const std::byte*>(str.data()), str.size()};
 }
 
 template <typename T>
-inline cpp20::span<const std::byte> Payload(cpp20::span<T> data) {
-  return cpp20::as_bytes(data);
+inline std::span<const std::byte> Payload(std::span<T> data) {
+  return std::as_bytes(data);
 }
 
-inline std::string_view StringPayload(cpp20::span<std::byte> payload) {
+inline std::string_view StringPayload(std::span<std::byte> payload) {
   return {reinterpret_cast<const char*>(payload.data()), payload.size()};
 }
 

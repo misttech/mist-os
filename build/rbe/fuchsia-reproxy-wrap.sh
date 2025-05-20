@@ -40,7 +40,7 @@ readonly check_loas_script="$script_dir"/check_loas_restrictions.sh
 readonly build_summary_script="$script_dir"/build_summary.py
 
 # location of reclient binaries relative to output directory where build is run
-reclient_bindir="$project_root_rel"/prebuilt/proprietary/third_party/reclient/"$PREBUILT_SUBDIR"
+reclient_bindir="$project_root_rel"/prebuilt/third_party/reclient/"$PREBUILT_SUBDIR"
 
 # Configuration for RBE metrics and logs collection.
 readonly fx_build_metrics_config="$project_root_rel"/.fx/config/build-metrics
@@ -328,6 +328,15 @@ then
   [[ "$verbose" != 1 ]] || {
     echo "concatenated reproxy cfg: $bootstrap_reproxy_cfg"
   }
+fi
+
+# Diagnostics: report any RBE_ environment variables, as these may
+# override configured settings for reclient.
+if env | grep -q "^RBE_"
+then
+  echo "WARNING: detected the following reclient overrides in the environment:"
+  echo "  (if you encounter RBE-related errors, try unsetting these.)"
+  env | grep "^RBE" || :
 fi
 
 # Startup reproxy.

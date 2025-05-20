@@ -18,13 +18,7 @@ pub trait ChannelEpitaphExt {
     fn close_with_epitaph(self, status: zx_status::Status) -> Result<(), Error>;
 }
 
-impl ChannelEpitaphExt for Channel {
-    fn close_with_epitaph(self, status: zx_status::Status) -> Result<(), Error> {
-        write_epitaph_impl(&self, status)
-    }
-}
-
-impl ChannelEpitaphExt for AsyncChannel {
+impl<T: ChannelLike> ChannelEpitaphExt for T {
     fn close_with_epitaph(self, status: zx_status::Status) -> Result<(), Error> {
         write_epitaph_impl(&self, status)
     }

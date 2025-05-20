@@ -22,7 +22,7 @@
 #include <kernel/timer.h>
 #include <kernel/wait_queue_internal.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 
 #include <ktl/enforce.h>
 

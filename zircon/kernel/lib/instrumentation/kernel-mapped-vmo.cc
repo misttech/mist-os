@@ -7,7 +7,7 @@
 #include <align.h>
 #include <lib/instrumentation/kernel-mapped-vmo.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/vm_object_dispatcher.h>
 #include <vm/vm_aspace.h>
 

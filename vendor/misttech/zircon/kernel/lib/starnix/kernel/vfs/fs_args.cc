@@ -9,7 +9,7 @@
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/util/error_propagation.h>
 
-#include <ktl/pair.h>
+#include <ktl/utility.h>
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
 

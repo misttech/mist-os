@@ -60,7 +60,6 @@ sdk_source_set("hlcpp") {
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
     "//zircon/system/ulib/zx",
   ]
 
@@ -139,7 +138,6 @@ sdk_source_set("hlcpp_base") {
     "//sdk/lib/fidl_base",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
   ]
 
   if (is_fuchsia || is_mistos) {

@@ -225,7 +225,7 @@ impl LinkState {
                 let (transition, mut state) = state.release_data();
                 match process_eapol_event(context, &mut state.rsna, &eapol_event) {
                     RsnaStatus::Failed(failure_reason) => {
-                        state_change_msg.set_msg(format!("{:?}", failure_reason));
+                        state_change_msg.set_msg(format!("{failure_reason:?}"));
                         Err(failure_reason)
                     }
                     RsnaStatus::Progressed {
@@ -417,7 +417,7 @@ fn inspect_log_key(context: &mut Context, key: &Key) {
     };
     inspect_log!(context.inspect.rsn_events.lock(), {
         derived_key: key.name(),
-        cipher?: cipher.map(|c| format!("{:?}", c)),
+        cipher?: cipher.map(|c| format!("{c:?}")),
         key_index?: key_index,
     });
 }

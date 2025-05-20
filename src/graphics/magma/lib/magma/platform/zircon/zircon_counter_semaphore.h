@@ -42,7 +42,7 @@ class ZirconCounterSemaphore : public PlatformSemaphore {
 
   bool WaitAsync(PlatformPort* port, uint64_t key) override;
 
-  zx_signals_t GetZxSignal() const override { return ZX_USER_SIGNAL_0; }
+  zx_signals_t GetZxSignal() const override { return ZX_COUNTER_SIGNALED | ZX_USER_SIGNAL_0; }
 
   bool GetTimestamp(uint64_t* timestamp_ns_out) override;
 

@@ -1,0 +1,109 @@
+[
+    {
+        "name": "Linux",
+        "tests": [
+            {
+                "name": "host_x64/bar",
+                "path": "host_x64/bar",
+                "label": "//tools/other:bar(//build/toolchain/host_x64)",
+                "os": "linux",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ],
+                "metadata": {}
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
+                "os": "Linux"
+            },
+            "virtual_device_spec": {
+                "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
+            }
+        },
+        "deps": [
+            "host_x64/bar",
+            "host_x64/dep1",
+            "host_x64/dep2"
+        ],
+        "timeout_secs": 0,
+        "summary": {
+            "tests": null
+        },
+        "build_metadata": {}
+    },
+    {
+        "name": "QEMU",
+        "tests": [
+            {
+                "name": "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+                "package_url": "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm",
+                "path": "",
+                "label": "//src/something:foo(//build/toolchain/fuchsia:x64)",
+                "os": "fuchsia",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ],
+                "metadata": {}
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
+                "device_type": "QEMU"
+            },
+            "virtual_device_spec": {
+                "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
+            }
+        },
+        "deps": [
+            "host_x64/ffx",
+            "images.json",
+            "product_bundle/zbi",
+            "product_bundles.json",
+            "sdk/manifest/core"
+        ],
+        "timeout_secs": 0,
+        "summary": {
+            "tests": null
+        },
+        "product_bundle": "core.x64",
+        "expects_ssh": true,
+        "cipd_packages": [
+            {
+                "name": "fuchsia/third_party/qemu/${platform}",
+                "version": "qemu_version",
+                "subdir": "qemu"
+            },
+            {
+                "name": "fuchsia/third_party/edk2",
+                "version": "edk2_version",
+                "subdir": "edk2"
+            }
+        ],
+        "build_metadata": {}
+    }
+]

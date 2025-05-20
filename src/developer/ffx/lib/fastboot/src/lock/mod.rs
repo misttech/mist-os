@@ -30,7 +30,7 @@ pub async fn lock<F: FastbootInterface>(fastboot_interface: &mut F) -> Result<()
 mod test {
     use super::*;
     use crate::common::vars::LOCKED_VAR;
-    use crate::test::setup;
+    use ffx_fastboot_interface::test::setup;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_locked_device_throws_err() -> Result<()> {

@@ -8,7 +8,7 @@
 #include <lib/mistos/userloader/userloader_internal.h>
 #include <zircon/assert.h>
 
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <object/handle.h>
 #include <object/resource_dispatcher.h>
 

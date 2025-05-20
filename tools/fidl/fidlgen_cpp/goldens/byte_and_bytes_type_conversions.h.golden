@@ -35,9 +35,6 @@ struct WireTypeForNaturalType<::test_byteandbytes::ByteAndBytes> {
   using type = ::test_byteandbytes::wire::ByteAndBytes;
 };
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
 #pragma clang diagnostic pop
 
 }  // namespace internal

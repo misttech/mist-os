@@ -35,12 +35,12 @@ constexpr ktl::string_view kNamespace = "basic-elf-loading-test-data";
 
 }  // namespace
 
-int TestMain(void* zbi_ptr, arch::EarlyTicks) {
+int TestMain(void* zbi_ptr, ktl::optional<EarlyBootZbi> early_zbi, arch::EarlyTicks) {
   MainSymbolize symbolize("basic-elf-loading-test");
 
   // Initialize memory for allocation/free.
   AddressSpace aspace;
-  InitMemory(zbi_ptr, &aspace);
+  InitMemory(zbi_ptr, ktl::move(early_zbi), &aspace);
 
   zbitl::View zbi(
       zbitl::StorageFromRawHeader<ktl::span<ktl::byte>>(static_cast<zbi_header_t*>(zbi_ptr)));

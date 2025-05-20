@@ -73,9 +73,8 @@ impl<R: Read + Seek> SparseReader<R> {
         Ok(res)
     }
 
-    #[cfg(test)]
-    pub(crate) fn chunks(self) -> Vec<(Chunk, Option<u64>)> {
-        self.chunks
+    pub(crate) fn chunks(&self) -> &Vec<(Chunk, Option<u64>)> {
+        &self.chunks
     }
 }
 

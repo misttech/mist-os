@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <getopt.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/thread.h>
@@ -20,6 +18,7 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/profile.h>
 
+#include <array>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
@@ -27,6 +26,7 @@
 #include <memory>
 #include <new>
 #include <ostream>
+#include <span>
 #include <thread>
 #include <tuple>
 #include <vector>
@@ -41,7 +41,7 @@ constexpr size_t kExtraPadding = 16;
 
 constexpr int kSampleCount = 30;
 
-void RandomizeBuffers(cpp20::span<uint8_t> buffer, unsigned int& seed) {
+void RandomizeBuffers(std::span<uint8_t> buffer, unsigned int& seed) {
   for (auto& b : buffer) {
     b = static_cast<uint8_t>(rand_r(&seed));
   }
@@ -112,10 +112,10 @@ int64_t SampleCopy(int cpu_num, size_t block_size, size_t src_alignment, size_t 
   std::unique_ptr<uint8_t[]> dst_raw(new (std::align_val_t(16))
                                          uint8_t[block_size + 2 * kExtraPadding + dst_alignment]);
 
-  auto src = cpp20::span(src_raw.get(), 2 * kExtraPadding + src_alignment + block_size);
+  auto src = std::span(src_raw.get(), 2 * kExtraPadding + src_alignment + block_size);
   RandomizeBuffers(src, seed);
 
-  auto dst = cpp20::span(dst_raw.get(), 2 * kExtraPadding + dst_alignment + block_size);
+  auto dst = std::span(dst_raw.get(), 2 * kExtraPadding + dst_alignment + block_size);
   RandomizeBuffers(dst, seed);
 
   // Keep the original contents for verification after sampling.
@@ -174,15 +174,15 @@ int64_t SampleCopy(int cpu_num, size_t block_size, size_t src_alignment, size_t 
 }
 
 constexpr auto kBlockSize =
-    cpp20::to_array<size_t>({1,  2,   3,   4,   8,   15,  16,  31,  32,   63,   64,   95,   96,
-                             97, 127, 128, 255, 256, 257, 511, 512, 1023, 1024, 2048, 4096, 8192});
+    std::to_array<size_t>({1,  2,   3,   4,   8,   15,  16,  31,  32,   63,   64,   95,   96,
+                           97, 127, 128, 255, 256, 257, 511, 512, 1023, 1024, 2048, 4096, 8192});
 
-constexpr auto kAlignments = cpp20::to_array<size_t>({0, 1, 7, 8, 9, 15});
+constexpr auto kAlignments = std::to_array<size_t>({0, 1, 7, 8, 9, 15});
 
 }  // namespace
 
 int main(int argc, char** argv) {
-  auto long_opts = cpp20::to_array<struct option>({
+  auto long_opts = std::to_array<struct option>({
       {"cpu", required_argument, nullptr, 'c'},
       {"output", required_argument, nullptr, 'o'},
       {"seed", required_argument, nullptr, 's'},

@@ -114,7 +114,7 @@ impl From<FormatError> for Error {
 
 impl Error {
     pub fn fidl(err: anyhow::Error) -> Self {
-        Self::Fidl(format!("{}", err))
+        Self::Fidl(format!("{err}"))
     }
 
     pub fn free(value_type: &'static str, index: BlockIndex, error: Error) -> Self {

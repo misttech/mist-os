@@ -109,7 +109,8 @@ TEST(Tty, Basic) {
   EXPECT_EQ(42, width);
   EXPECT_EQ(57, height);
 
-  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(io));
+  zxio_destroy(io);
 
   device_control_loop.Shutdown();
 }

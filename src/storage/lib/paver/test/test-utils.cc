@@ -255,15 +255,14 @@ void FakeBootArgs::GetBools(GetBoolsRequestView request, GetBoolsCompleter::Sync
 void FakeBootArgs::Collect(CollectRequestView request, CollectCompleter::Sync& completer) {}
 
 fbl::Array<uint8_t> CreateZbiHeader(paver::Arch arch, size_t payload_size,
-                                    arch::ZbiKernelImage** result_header,
-                                    std::span<uint8_t>* span) {
+                                    ZbiKernelImage** result_header, std::span<uint8_t>* span) {
   // Allocate raw memory.
-  const size_t data_size = sizeof(arch::ZbiKernelImage) + payload_size;
+  const size_t data_size = sizeof(ZbiKernelImage) + payload_size;
   auto data = fbl::Array<uint8_t>(new uint8_t[data_size], data_size);
   memset(data.get(), 0xee, data_size);
 
   // Set up header for outer ZBI header.
-  auto header = reinterpret_cast<arch::ZbiKernelImage*>(data.get());
+  auto header = reinterpret_cast<ZbiKernelImage*>(data.get());
   header->hdr_file.type = ZBI_TYPE_CONTAINER;
   header->hdr_file.extra = ZBI_CONTAINER_MAGIC;
   header->hdr_file.magic = ZBI_ITEM_MAGIC;
@@ -284,7 +283,7 @@ fbl::Array<uint8_t> CreateZbiHeader(paver::Arch arch, size_t payload_size,
     *span = std::span<uint8_t>(data.get(), data_size);
   }
   if (result_header != nullptr) {
-    *result_header = reinterpret_cast<arch::ZbiKernelImage*>(data.get());
+    *result_header = reinterpret_cast<ZbiKernelImage*>(data.get());
   }
 
   return data;

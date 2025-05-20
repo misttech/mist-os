@@ -14,7 +14,7 @@
 #include <zircon/tls.h>
 
 #include <ktl/array.h>
-#include <ktl/integer_sequence.h>
+#include <ktl/utility.h>
 #include <phys/exception.h>
 #include <phys/main.h>
 #include <phys/stack.h>
@@ -540,7 +540,7 @@ void SetUpIdt() {
 // that needs to go there. But the pointer variable needs to exist.
 ArchPhysInfo* gArchPhysInfo;
 
-void ArchSetUp(void* zbi) {
+void ArchSetUp(ktl::optional<EarlyBootZbi> zbi) {
   gStandardSegments.Load();
   SetUpIdt();
 }

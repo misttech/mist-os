@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
-from fidl_codec import add_ir_path, encode_fidl_object  # type: ignore
+from fidl_codec import add_ir_path, encode_fidl_object
 import sys
 import typing
 import enum
@@ -364,7 +362,7 @@ class ProtocolServer(ServerBase, ABC):
             response_ident, response_obj
         )
 
-    _MethodResponse_request_strict_response_flexible: typing.TypeAlias = (
+    RequestStrictResponseFlexibleResponse: typing.TypeAlias = (
         ProtocolRequestStrictResponseFlexibleResponse
     )
 
@@ -374,15 +372,13 @@ class ProtocolServer(ServerBase, ABC):
         request: ProtocolRequestStrictResponseFlexibleRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_request_strict_response_flexible,
+            typing.Any, typing.Any, RequestStrictResponseFlexibleResponse
         ]
-        | _MethodResponse_request_strict_response_flexible
+        | RequestStrictResponseFlexibleResponse
     ):
         ...
 
-    _MethodResponse_request_flexible_response_strict: typing.TypeAlias = (
+    RequestFlexibleResponseStrictResponse: typing.TypeAlias = (
         ProtocolRequestFlexibleResponseStrictResponse
     )
 
@@ -392,11 +388,9 @@ class ProtocolServer(ServerBase, ABC):
         request: ProtocolRequestFlexibleResponseStrictRequest,
     ) -> (
         typing.Coroutine[
-            typing.Any,
-            typing.Any,
-            _MethodResponse_request_flexible_response_strict,
+            typing.Any, typing.Any, RequestFlexibleResponseStrictResponse
         ]
-        | _MethodResponse_request_flexible_response_strict
+        | RequestFlexibleResponseStrictResponse
     ):
         ...
 

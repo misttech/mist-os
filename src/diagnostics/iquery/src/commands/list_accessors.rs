@@ -29,7 +29,7 @@ pub struct ListAccessorsResult(Vec<String>);
 impl fmt::Display for ListAccessorsResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for item in self.0.iter() {
-            writeln!(f, "{}", item)?;
+            writeln!(f, "{item}")?;
         }
         Ok(())
     }

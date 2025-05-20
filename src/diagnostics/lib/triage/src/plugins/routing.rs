@@ -50,9 +50,8 @@ impl Plugin for RoutingErrorsPlugin {
             }
             let log_line: &str = pattern_match.remove(0).into();
             results.push(Action::new_synthetic_warning(format!(
-                "[WARNING]: Error routing capability \"{}\" to component identified as \"{}\" \
-                 with moniker \"{}\". Original error log:\n{}",
-                protocol, name, moniker, log_line
+                "[WARNING]: Error routing capability \"{protocol}\" to component identified as \
+                \"{name}\" with moniker \"{moniker}\". Original error log:\n{log_line}",
             )));
         });
         results

@@ -32,7 +32,7 @@ var icmpv6RouterExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{5, 3}:  Fail,
 	{5, 4}:  Fail,
 	{5, 5}:  Fail,
-	{5, 6}:  AnvlSkip,
+	{5, 6}:  AnvlSkip, // NB: Tests PPP so not relevant.
 	{5, 7}:  Pass,
 	{5, 8}:  Fail,
 	{5, 9}:  Fail,
@@ -81,7 +81,7 @@ var icmpv6RouterExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCas
 	{5, 3}:  Fail,
 	{5, 4}:  Fail,
 	{5, 5}:  Fail,
-	{5, 6}:  AnvlSkip,
+	{5, 6}:  AnvlSkip, // NB: Tests PPP so not relevant.
 	{5, 7}:  Pass,
 	{5, 8}:  Fail,
 	{5, 9}:  Fail,

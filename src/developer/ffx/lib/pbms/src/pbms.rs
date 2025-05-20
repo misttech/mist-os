@@ -49,7 +49,7 @@ where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface,
 {
-    tracing::debug!("fetch_from_url {:?}", product_url);
+    log::debug!("fetch_from_url {:?}", product_url);
     if product_url.scheme() == GS_SCHEME {
         fetch_from_gcs(product_url.as_str(), &local_dir, auth_flow, progress, ui, client)
             .await
@@ -60,7 +60,7 @@ where
             .context("fetching from http(s)")?;
     } else if let Some(_) = &path_from_file_url(product_url) {
         // Since the file is already local, no fetch is necessary.
-        tracing::debug!("Found local file path {:?}", product_url);
+        log::debug!("Found local file path {:?}", product_url);
     } else {
         bail!("Unexpected URI scheme in ({:?})", product_url);
     }
@@ -77,7 +77,7 @@ where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface,
 {
-    tracing::debug!("fetch_from_web");
+    log::debug!("fetch_from_web");
     let name = if let Some((_, name)) = product_uri.path().rsplit_once('/') {
         name
     } else {

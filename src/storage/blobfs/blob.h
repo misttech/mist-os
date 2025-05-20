@@ -44,6 +44,7 @@ namespace blobfs {
 
 class Blobfs;
 class BlobDataProducer;
+class BlobWriter;
 
 enum class BlobState : uint8_t {
   kEmpty,      // After open.
@@ -140,16 +141,27 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
                            const std::function<zx::result<>()>& transaction_completion)
       __TA_EXCLUDES(mutex_);
 
-  // Sets the blob in a status of being overwritten. Returns ZX_ERR_ALREADY_EXISTS if the flag is
+  // Sets the blob overwriting this one. Returns ZX_ERR_ALREADY_EXISTS if the flag is
   // already set.
-  zx_status_t SetOverwriting() __TA_EXCLUDES(mutex_);
+  zx_status_t SetOverwritingBy(Blob* overwriter) __TA_EXCLUDES(mutex_);
+
+  // Return the blob that is overwriting this one. May be nullptr if there is not one active.
+  Blob* GetOverwritingBy() __TA_EXCLUDES(mutex_);
 
   // Clears the status of being overwritten. Returns ZX_ERR_NOT_FOUND if the flag is not already
   // set.
-  zx_status_t ClearOverwriting() __TA_EXCLUDES(mutex_);
+  zx_status_t ClearOverwritingBy() __TA_EXCLUDES(mutex_);
 
   // Reference the blob that is being overwritten by this one.
   void SetBlobToOverwrite(fbl::RefPtr<Blob> to_overwrite) __TA_EXCLUDES(mutex_);
+
+  //  the back-reference to the handler for the BlobWriter protocol. Set to nullptr when there is
+  // no valid handler left.
+  void SetBlobWriterHandler(BlobWriter* writer_handler) __TA_EXCLUDES(mutex_);
+
+  // Get the back-reference to the handler for the BlobWriter protocol. Returns nullptr when there
+  // is no valid handler.
+  BlobWriter* GetBlobWriterHandler() __TA_EXCLUDES(mutex_);
 
  private:
   friend class BlobLoaderTest;
@@ -163,8 +175,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // Note that this *must* be called on the main dispatch thread; otherwise the underlying state of
   // the blob could change after (or during) the call, and the blob might not really be purgeable.
   bool Purgeable() const __TA_REQUIRES_SHARED(mutex_) {
-    return !HasReferences() && (deletable_ || state_ != BlobState::kReadable) &&
-           !being_overwritten_;
+    return !HasReferences() && (deletable_ || state_ != BlobState::kReadable) && !overwritten_by_;
   }
 
   // Vnode protected overrides:
@@ -284,12 +295,16 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   uint64_t blob_size_ __TA_GUARDED(mutex_) = 0;
   uint64_t block_count_ __TA_GUARDED(mutex_) = 0;
 
-  // If the Blob is currently being overwritten. Used to prevent multiple in-flight overwrites.
-  bool being_overwritten_ __TA_GUARDED(mutex_) = false;
+  // If the Blob is currently being overwritten keep a loose ref to it. Used to prevent multiple
+  // in-flight overwrites.
+  Blob* overwritten_by_ __TA_GUARDED(mutex_) = nullptr;
 
   // Data used exclusively during writeback. Only used by Write()/Append().
   class Writer;
   std::unique_ptr<Writer> writer_ __TA_GUARDED(mutex_);
+
+  // A back-reference to the handler for the BlobWriter protocol.
+  BlobWriter* blob_writer_handler_ __TA_GUARDED(mutex_) = nullptr;
 };
 
 // Verifies the integrity of the null blob (i.e. that |digest| is correct). On failure, the |blobfs|

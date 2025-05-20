@@ -136,19 +136,42 @@ pub(super) async fn delete_storage(routed_storage: RoutedStorage) -> Result<(), 
 /// ErrorReporter that calls report_routing_failure.
 #[derive(Clone)]
 pub struct RoutingFailureErrorReporter {
-    target: WeakComponentInstance,
+    /// The component at which the error occurred
+    error_component: WeakComponentInstance,
 }
 
 impl RoutingFailureErrorReporter {
-    pub fn new(target: WeakComponentInstance) -> Self {
-        Self { target }
+    pub fn new(error_component: WeakComponentInstance) -> Self {
+        Self { error_component }
     }
 }
 
 #[async_trait]
 impl ErrorReporter for RoutingFailureErrorReporter {
-    async fn report(&self, request: &RouteRequestErrorInfo, err: &RouterError) {
-        match self.target.upgrade() {
+    async fn report(
+        &self,
+        request: &RouteRequestErrorInfo,
+        err: &RouterError,
+        target: Option<sandbox::WeakInstanceToken>,
+    ) {
+        let component_to_log_at = match target.map(WeakComponentInstance::try_from) {
+            Some(Ok(target)) => target,
+            Some(Err(())) => {
+                error!(
+                    err:%;
+                    "Failed to convert WeakInstanceToken to WeakComponentInstance while reporting \
+                    routing error."
+                );
+                return;
+            }
+            // If the target of the route is not known, then we're likely at the start of the route
+            // (for example, this can happen if we're routing from a fuchsia.io.Directory/Open call
+            // into an exposed directory). In this case we report the error as coming from the
+            // component at which the routing error occurs instead of the component which initiated
+            // the routing operation, and hopefully they're the same.
+            None => self.error_component.clone(),
+        };
+        match component_to_log_at.upgrade() {
             Ok(target) => {
                 report_routing_failure(request, Some(request.availability()), &target, err).await;
             }

@@ -33,7 +33,7 @@ def _fuchsia_update_package_impl(ctx):
         "assembly",
         "create-update",
         "--partitions",
-        partitions_configuration.config.path,
+        partitions_configuration.directory,
         "--board-name",
         ctx.attr.board_name,
         "--version-file",

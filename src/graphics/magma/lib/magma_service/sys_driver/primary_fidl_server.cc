@@ -105,7 +105,7 @@ void PrimaryFidlServer::Bind() {
         if (unbind_info.reason() == fidl::Reason::kDispatcherError)
           return;
 
-        self->server_binding_ = cpp17::nullopt;
+        self->server_binding_ = std::nullopt;
         self->async_loop()->Quit();
       };
 
@@ -188,8 +188,6 @@ void PrimaryFidlServer::ImportObject(ImportObjectRequestView request,
     case fuchsia_gpu_magma::ObjectType::kSemaphore:
       if (request->object().is_semaphore()) {
         handle = std::move(request->object().semaphore());
-      } else if (request->object().is_vmo_semaphore()) {
-        handle = std::move(request->object().vmo_semaphore());
       }
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
       else if (request->object().is_counter_semaphore()) {
@@ -253,6 +251,23 @@ void PrimaryFidlServer::CreateContext(CreateContextRequestView request,
   FlowControl();
 
   magma::Status status = delegate_->CreateContext(request->context_id);
+  if (!status.ok())
+    SetError(&completer, status.get());
+}
+
+void PrimaryFidlServer::CreateContext2(CreateContext2RequestView request,
+                                       CreateContext2Completer::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::CreateContext2");
+  MAGMA_DLOG("PrimaryFidlServer: CreateContext2");
+  FlowControl();
+
+  uint64_t priority = static_cast<uint64_t>(request->priority);
+  if (client_type_ != MagmaClientType::kTrusted && priority > MAGMA_PRIORITY_MEDIUM) {
+    SetError(&completer, MAGMA_STATUS_ACCESS_DENIED);
+    return;
+  }
+
+  magma::Status status = delegate_->CreateContext2(request->context_id, priority);
   if (!status.ok())
     SetError(&completer, status.get());
 }
@@ -511,12 +526,12 @@ void PrimaryFidlServer::ClearPerformanceCounters(
 std::unique_ptr<PrimaryFidlServer> PrimaryFidlServer::Create(
     std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
     fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
-    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
+    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification, MagmaClientType client_type) {
   if (!delegate)
     return MAGMA_DRETP(nullptr, "attempting to create PlatformConnection with null delegate");
 
   auto connection = std::make_unique<PrimaryFidlServer>(
-      std::move(delegate), client_id, std::move(primary), std::move(notification));
+      std::move(delegate), client_id, std::move(primary), std::move(notification), client_type);
 
   return connection;
 }

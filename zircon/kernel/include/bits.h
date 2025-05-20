@@ -39,6 +39,7 @@
 #define BITMAP_INT(x) ((x) / BITMAP_BITS_PER_INT)
 
 #define BIT_MASK(x) (((x) >= sizeof(unsigned long) * 8) ? (0UL - 1) : ((1UL << (x)) - 1))
+#define BIT_MASK32(x) (((x) >= sizeof(unsigned) * 8) ? (0U - 1) : ((1U << (x)) - 1))
 
 static inline void bitmap_set(unsigned long *bitmap, int start, int nr) {
   unsigned long *p = bitmap + BITMAP_WORD(start);

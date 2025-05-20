@@ -956,7 +956,7 @@ mod tests {
     fn open_dir(execution_scope: ExecutionScope, dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
         let (dir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
 
-        dir.open(
+        dir.deprecated_open(
             execution_scope,
             fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
@@ -1178,9 +1178,9 @@ mod tests {
 
         let root = test.model.root();
         let baz_component =
-            root.find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll2:baz"].try_into().unwrap()).await.unwrap();
         let static_a_component =
-            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["static_a"].try_into().unwrap()).await.unwrap();
 
         // Add entries from the children again. This should be a no-op since all of them are
         // already there and we prevent duplicates.
@@ -1847,7 +1847,7 @@ mod tests {
 
         let root = test.model.root();
         let foo_component =
-            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         // Test that starting an instance results in the collection service directory adding the
         // relevant instances.
@@ -1856,7 +1856,7 @@ mod tests {
         assert_eq!(entries.len(), 1);
 
         let baz_component =
-            root.find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll2:baz"].try_into().unwrap()).await.unwrap();
 
         // Test with second collection
         baz_component.ensure_started(&StartReason::Eager).await.unwrap();
@@ -1864,7 +1864,7 @@ mod tests {
         assert_eq!(entries.len(), 3);
 
         let static_a_component =
-            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["static_a"].try_into().unwrap()).await.unwrap();
 
         // Test with static child
         static_a_component.ensure_started(&StartReason::Eager).await.unwrap();
@@ -1886,7 +1886,7 @@ mod tests {
 
         let root = test.model.root();
         let foo_component =
-            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         // Test that removal of instances works
         foo_component.stop().await.unwrap();
@@ -1894,7 +1894,7 @@ mod tests {
         assert_eq!(entries.len(), 5);
 
         let baz_component =
-            root.find_and_maybe_resolve(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll2:baz"].try_into().unwrap()).await.unwrap();
 
         // Test with second collection
         baz_component.stop().await.unwrap();
@@ -1902,7 +1902,7 @@ mod tests {
         assert_eq!(entries.len(), 3);
 
         let static_a_component =
-            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["static_a"].try_into().unwrap()).await.unwrap();
 
         // Test with static child
         static_a_component.stop().await.unwrap();
@@ -1938,7 +1938,7 @@ mod tests {
         test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("foo")).await;
         test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("bar")).await;
         let foo_component =
-            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: Arc::new(Mutex::new(hashmap! {
@@ -2002,11 +2002,11 @@ mod tests {
         test.create_dynamic_child(&Moniker::root(), "coll1", ChildBuilder::new().name("foo")).await;
         test.create_dynamic_child(&Moniker::root(), "coll2", ChildBuilder::new().name("bar")).await;
         let foo_component =
-            root.find_and_maybe_resolve(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll1:foo"].try_into().unwrap()).await.unwrap();
         let bar_component =
-            root.find_and_maybe_resolve(&vec!["coll2:bar"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["coll2:bar"].try_into().unwrap()).await.unwrap();
         let static_a_component =
-            root.find_and_maybe_resolve(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+            root.find_and_maybe_resolve(&["static_a"].try_into().unwrap()).await.unwrap();
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: Arc::new(Mutex::new(hashmap! {

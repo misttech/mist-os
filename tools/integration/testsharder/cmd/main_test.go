@@ -91,6 +91,29 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
+			name: "disabled device types",
+			params: &proto.Params{
+				DisabledDeviceTypes: []string{"QEMU"},
+			},
+			testSpecs: []build.TestSpec{
+				fuchsiaTestSpec("foo", "AEMU", "QEMU"),
+				hostTestSpec("bar"),
+			},
+		},
+		{
+			name: "allowed device types",
+			flags: testsharderFlags{
+				allowedDeviceTypes: []string{"QEMU", "NUC"},
+			},
+			params: &proto.Params{
+				DisabledDeviceTypes: []string{"NUC"},
+			},
+			testSpecs: []build.TestSpec{
+				fuchsiaTestSpec("foo", "AEMU", "QEMU", "NUC"),
+				hostTestSpec("bar"),
+			},
+		},
+		{
 			// Two tests whose dimensions differ only by some random dimension
 			// ("other_dimension") should still be sharded separately.
 			name: "arbitrary dimensions",
@@ -649,6 +672,12 @@ func (m *fakeModules) Platforms() []build.DimensionSet {
 			"device_type": "AEMU",
 		},
 		{
+			"device_type": "QEMU",
+		},
+		{
+			"device_type": "NUC",
+		},
+		{
 			"cpu": "x64",
 			"os":  "Linux",
 		},
@@ -728,7 +757,18 @@ func packageURL(basename string) string {
 	return fmt.Sprintf("fuchsia-pkg://fuchsia.com/%s#meta/%s.cm", basename, basename)
 }
 
-func fuchsiaTestSpec(basename string) build.TestSpec {
+func fuchsiaTestSpec(basename string, deviceTypes ...string) build.TestSpec {
+	var envs []build.Environment
+	if len(deviceTypes) == 0 {
+		deviceTypes = []string{"AEMU"}
+	}
+	for _, d := range deviceTypes {
+		envs = append(envs, build.Environment{
+			Dimensions: build.DimensionSet{
+				"device_type": d,
+			},
+		})
+	}
 	return build.TestSpec{
 		Test: build.Test{
 			Name:       packageURL(basename),
@@ -737,13 +777,7 @@ func fuchsiaTestSpec(basename string) build.TestSpec {
 			CPU:        "x64",
 			Label:      fmt.Sprintf("//src/something:%s(//build/toolchain/fuchsia:x64)", basename),
 		},
-		Envs: []build.Environment{
-			{
-				Dimensions: build.DimensionSet{
-					"device_type": "AEMU",
-				},
-			},
-		},
+		Envs:       envs,
 		ExpectsSSH: true,
 	}
 }

@@ -6,7 +6,6 @@
 
 
 {{- define "Method:Types:WireMessagingHeader" }}
-{{ IfdefFuchsia }}
 
 {{ EnsureNamespace "" }}
 template<>
@@ -57,7 +56,6 @@ struct {{ .WireMethodTypes }} {
   {{- end }}
 };
 
-{{ EndifFuchsia }}
 {{- end }}
 
 

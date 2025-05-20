@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import("//build/board.gni")
+import("//build/config/fuchsia/target_api_level.gni")
 import("//build/group_with_inputs.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/platforms.gni")
@@ -271,11 +272,6 @@ if (allowed_device_types == []) {
 #     [bool] Indicates that test_manager should create no exception channels as it would
 #     otherwise do to detect panics. Some tests that create exception channels at the job
 #     level will fail if test_manager creates its customary exception channels.
-#   disable_fastboot (optional)
-#     [bool] Indicates that the test is associated with bringup builders and
-#     should be run on zedboot devices. This allows us to identify which bringup tests should and
-#     should not run on NUCs in fastboot.
-#     TODO (betramlalusha): Remove once b/406524915 is fixed.
 #
 template("test_spec") {
   testonly = true
@@ -374,18 +370,6 @@ template("test_spec") {
           !defined(dim.dimensions),
           "found nested dimensions environment field. Did you set `dimensions = some_env`? It should be `dimensions = some_env.dimensions`")
 
-      # The General Bootloader on fastboot devices does not support fastboot boot.
-      # This causes boot tests to fail on NUCs in fastboot TCP.
-      # For now, boot tests should only run on NUCs in zedboot.
-      # TODO (betramlalusha): Remove once b/406524915 is fixed.
-      if (defined(dim.device_type) &&
-          dim.device_type == "Intel NUC Kit NUC11TNHv5" &&
-          defined(invoker.disable_fastboot) && invoker.disable_fastboot) {
-        dim.fastboot_enabled = "0"
-        env.dimensions = {
-        }
-        env.dimensions = dim
-      }
       foreach(key, all_dimension_keys) {
         dims += [
           {
@@ -428,6 +412,7 @@ template("test_spec") {
   }
 
   target_name_deps = []
+  target_name_data_deps = []
 
   # Rely on metadata reachable through deps to determine any runtime
   # dependencies of the test; record them to a file.
@@ -458,14 +443,33 @@ template("test_spec") {
   # Some tests depend on other packages so get the paths to the
   # package_manifests of those package dependencies to attach to
   # the test_spec of the test so we know what blobs it depends on.
+  # Most target tests use debug_agent to get backtraces so include
+  # it by default. A target test can be defined by a test that has a
+  # package_manifests field.
   pkg_manifest_deps_file = ""
-  if (defined(invoker.package_deps) && invoker.package_deps != []) {
+  package_deps = []
+  if (defined(invoker.package_deps)) {
+    package_deps = invoker.package_deps
+  }
+  if (package_deps != [] || defined(invoker.package_label)) {
+    if (target_cpu != "riscv64" &&
+        current_build_target_api_level == "PLATFORM") {
+      # TODO(https://fxbug.dev/42074048): Remove conditional once
+      # debug_agent works for riscv64.
+      package_deps += [ "//src/developer/debug/debug_agent" ]
+    }
     pkg_manifest_deps_file = "$target_gen_dir/${target_name}.pkg_manifests.json"
     pkg_manifest_deps_target_name = "${target_name}_pkg_manifest_deps"
 
     _manifest_entries = []
     _manifest_inputs = []
-    foreach(package_target, invoker.package_deps) {
+    _package_deps_with_toolchain = []
+    foreach(package_dep, package_deps) {
+      _package_deps_with_toolchain +=
+          [ get_label_info(package_dep, "label_no_toolchain") +
+            "(${target_toolchain})" ]
+    }
+    foreach(package_target, _package_deps_with_toolchain) {
       _package_out_dir = get_label_info(package_target, "target_out_dir")
       _package_name = get_label_info(package_target, "name")
       _manifest_path =
@@ -476,17 +480,17 @@ template("test_spec") {
     }
     generated_file(pkg_manifest_deps_target_name) {
       forward_variables_from(invoker, [ "testonly" ])
-      deps = invoker.package_deps
+      deps = _package_deps_with_toolchain
       outputs = [ pkg_manifest_deps_file ]
       output_conversion = "json"
       contents = _manifest_entries
     }
     pkg_manifest_deps_inputs_name = "${target_name}.pkg_manifest_deps.inputs"
     group_with_inputs(pkg_manifest_deps_inputs_name) {
-      deps = invoker.package_deps
+      deps = _package_deps_with_toolchain
       inputs = _manifest_inputs
     }
-    target_name_deps += [
+    target_name_data_deps += [
       ":${pkg_manifest_deps_inputs_name}",
       ":${pkg_manifest_deps_target_name}",
     ]
@@ -532,7 +536,6 @@ template("test_spec") {
                              "expects_ssh",
                              "is_boot_test",
                            ])
-    not_needed(invoker, [ "disable_fastboot" ])
     if (!defined(expects_ssh)) {
       expects_ssh = true
     }
@@ -629,22 +632,33 @@ template("test_spec") {
       tests = [ test_spec ]
     }
     deps = target_name_deps
+    data_deps = target_name_data_deps
     if (defined(invoker.isolated) && invoker.isolated &&
         # Tests that use product bundles, primarily boot tests, must necessarily
         # run in isolated mode, so they need not be explicitly included in the
         # isolated allowlist.
         !defined(invoker.product_bundle)) {
-      deps += [ "//build/testing/isolated:isolated_test_spec_allowlist" ]
+      isolated_dir =
+          string_replace(get_label_info(invoker.target, "dir"), "//", "")
+      isolated_split = string_split(isolated_dir, "/")
+      if (isolated_split[0] == "vendor") {
+        # Use the vendor repo's allowlist.
+        deps += [ "//vendor/" + isolated_split[1] +
+                  "/build/testing/isolated:isolated_test_spec_allowlist" ]
+      } else {
+        deps += [ "//build/testing/isolated:isolated_test_spec_allowlist" ]
+      }
     }
     if (defined(invoker.timeout_secs) &&
         # Tests that use product bundles, primarily boot tests, are known to
         # run slower, so they need not be explicitly included in the allowlist.
         !defined(invoker.product_bundle)) {
-      dir = string_replace(get_label_info(invoker.target, "dir"), "//", "")
-      split = string_split(dir, "/")
-      if (split[0] == "vendor") {
+      timeout_secs_dir =
+          string_replace(get_label_info(invoker.target, "dir"), "//", "")
+      timeout_secs_split = string_split(timeout_secs_dir, "/")
+      if (timeout_secs_split[0] == "vendor") {
         # Use the vendor repo's allowlist.
-        deps += [ "//vendor/" + split[1] +
+        deps += [ "//vendor/" + timeout_secs_split[1] +
                   "/build/testing/timeouts:per_test_timeout_allowlist" ]
       } else {
         deps += [ "//build/testing/timeouts:per_test_timeout_allowlist" ]

@@ -43,4 +43,11 @@ closed protocol Counter {
     strict TryOpenDirectory(struct {
         path string:fuchsia.component.MAX_PATH_LENGTH;
     }) -> () error zx.Status;
+    /// Controls whether this component crashes (via abort) after receiving a
+    /// shutdown signal.
+    ///
+    /// + request `abort` whether or not to abort on shutdown.
+    strict SetAbortOnShutdown(struct {
+        abort bool;
+    }) -> ();
 };

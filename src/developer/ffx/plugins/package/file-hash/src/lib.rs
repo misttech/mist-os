@@ -5,7 +5,7 @@
 use anyhow::Context;
 use ffx_package_file_hash_args::FileHashCommand;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
-use fho::{return_user_error, user_error, Error, FfxMain, FfxTool, Result};
+use fho::{return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result};
 use fuchsia_merkle::MerkleTree;
 use rayon::prelude::*;
 use schemars::JsonSchema;
@@ -56,19 +56,18 @@ impl FileHashTool {
 
         if writer.is_machine() {
             // Fails if any of the files don't exist.
-            let entries: Vec<_> = entries.collect::<Result<_>>().map_err(|e| user_error!(e))?;
+            let entries: Vec<_> = entries.collect::<Result<_>>()?;
             return Ok(entries);
         } else {
             // Only fails if writing to stdout/stderr fails.
             for entry in entries.collect::<Vec<_>>() {
                 match entry {
                     Ok(FileHashEntry { path, hash }) => {
-                        writeln!(writer, "{}  {}", hash, path.display())
-                            .map_err(|e| user_error!(e))?;
+                        writeln!(writer, "{}  {}", hash, path.display()).bug()?;
                     }
                     Err(e) => {
                         // Display the error and continue.
-                        writeln!(writer.stderr(), "{e}").map_err(|e| user_error!("{e}"))?;
+                        writeln!(writer.stderr(), "{e}").bug()?;
                     }
                 }
             }
@@ -243,7 +242,7 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         let res = tool.main(writer).await;
         let (out, err) = buffers.into_strings();
         match res {
-            Ok(_) => assert!(false,"Unexpected success"),
+            Ok(_) => panic!("Unexpected success"),
             Err(_) => assert_eq!(out, format!("{{\"user_error\":\"failed to open file {NAME}: No such file or directory (os error 2)\"}}\n"))
         };
 

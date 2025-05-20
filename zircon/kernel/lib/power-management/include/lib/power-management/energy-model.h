@@ -8,23 +8,26 @@
 #define ZIRCON_KERNEL_LIB_POWER_MANAGEMENT_INCLUDE_LIB_POWER_MANAGEMENT_ENERGY_MODEL_H_
 
 #include <lib/fit/function.h>
-#include <lib/stdcompat/array.h>
-#include <lib/stdcompat/span.h>
-#include <lib/stdcompat/utility.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+// TODO(https://fxbug.dev/415033686): Stop using `syscalls-next.h` on host.
+#define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/syscalls-next.h>
+#undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <span>
 #include <string_view>
+#include <utility>
 
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_counted.h>
@@ -65,7 +68,7 @@ constexpr const char* ToString(ControlInterface control_interface) {
 }
 
 // List of support control interfaces.
-static constexpr auto kSupportedControlInterfaces = cpp20::to_array(
+static constexpr auto kSupportedControlInterfaces = std::to_array(
     {ControlInterface::kArmPsci, ControlInterface::kArmWfi, ControlInterface::kRiscvSbi,
      ControlInterface::kRiscvWfi, ControlInterface::kCpuDriver});
 
@@ -230,13 +233,13 @@ struct TransitionMatrix {
  public:
   constexpr TransitionMatrix(const TransitionMatrix& other) = default;
 
-  constexpr cpp20::span<const PowerLevelTransition> operator[](size_t index) const {
+  constexpr std::span<const PowerLevelTransition> operator[](size_t index) const {
     return transitions_.subspan(index * num_rows_, num_rows_);
   }
 
  private:
   friend EnergyModel;
-  TransitionMatrix(cpp20::span<const PowerLevelTransition> transitions, size_t num_rows)
+  TransitionMatrix(std::span<const PowerLevelTransition> transitions, size_t num_rows)
       : transitions_(transitions), num_rows_(num_rows) {
     ZX_DEBUG_ASSERT(transitions_.size() != 0);
     ZX_DEBUG_ASSERT(num_rows_ != 0);
@@ -244,7 +247,7 @@ struct TransitionMatrix {
     ZX_DEBUG_ASSERT(transitions.size() / num_rows_ == num_rows_);
   }
 
-  const cpp20::span<const PowerLevelTransition> transitions_;
+  const std::span<const PowerLevelTransition> transitions_;
   const size_t num_rows_;
 };
 
@@ -261,8 +264,8 @@ struct TransitionMatrix {
 class EnergyModel {
  public:
   static zx::result<EnergyModel> Create(
-      cpp20::span<const zx_processor_power_level_t> levels,
-      cpp20::span<const zx_processor_power_level_transition_t> transitions);
+      std::span<const zx_processor_power_level_t> levels,
+      std::span<const zx_processor_power_level_transition_t> transitions);
 
   EnergyModel() = default;
   EnergyModel(const EnergyModel&) = delete;
@@ -275,11 +278,11 @@ class EnergyModel {
   //
   // (2) The energy cost of power level i is less or equal than the processing rate of power level
   // j, where i <= j.
-  constexpr cpp20::span<const PowerLevel> levels() const { return power_levels_; }
+  constexpr std::span<const PowerLevel> levels() const { return power_levels_; }
 
   // Following the same rules as `levels()` but returns only the set of power levels whose type is
   // `PowerLevel::Type::kIdle`. This set may be empty.
-  constexpr cpp20::span<const PowerLevel> idle_levels() const {
+  constexpr std::span<const PowerLevel> idle_levels() const {
     return levels().subspan(0, idle_power_levels_);
   }
 
@@ -311,7 +314,7 @@ class EnergyModel {
 
   // Following the same rules as `levels()` but returns only the set of power levels whose type is
   // `PowerLevel::Type::kActive`. This set may be empty.
-  constexpr cpp20::span<const PowerLevel> active_levels() const {
+  constexpr std::span<const PowerLevel> active_levels() const {
     return levels().subspan(idle_power_levels_);
   }
 

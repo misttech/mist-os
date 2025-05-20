@@ -10,8 +10,8 @@
 #include <lib/zbitl/view.h>
 #include <stdio.h>
 
-#include <ktl/move.h>
 #include <ktl/string_view.h>
+#include <ktl/utility.h>
 #include <phys/efi/file.h>
 #include <phys/symbolize.h>
 

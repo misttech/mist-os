@@ -14,7 +14,7 @@ executable("suspendctl") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",
     "//zircon/system/ulib/zx",
@@ -34,7 +34,7 @@ test("suspendctl-test-bin") {
   include_dirs = [ "." ]
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_testing",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp_testing",
+    "//sdk/fidl/fuchsia.hardware.power.suspend:fuchsia.hardware.power.suspend_cpp_testing",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/cpp/wire",

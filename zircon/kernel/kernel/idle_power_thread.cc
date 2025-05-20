@@ -24,8 +24,8 @@
 #include <kernel/percpu.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
-#include <ktl/algorithm.h>
 #include <ktl/atomic.h>
+#include <ktl/utility.h>
 #include <lk/init.h>
 #include <object/interrupt_dispatcher.h>
 #include <platform/timer.h>
@@ -508,17 +508,20 @@ LK_INIT_HOOK(idle_power_thread, IdlePowerThread::InitHook, LK_INIT_LEVEL_EARLIES
 #include <lib/console.h>
 
 static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
-  if (argc < 2) {
-  notenoughargs:
-    printf("not enough arguments\n");
-  badunits:
+  auto usage = [&argv]() -> int {
+    printf("usage:\n");
     printf("%s enter <resume delay> <m|s|ms|us|ns>\n", argv[0].str);
-    return -1;
+    printf("%s wake-events\n", argv[0].str);
+    return ZX_ERR_INTERNAL;
+  };
+
+  if (argc < 2) {
+    return usage();
   }
 
   if (!strcmp(argv[1].str, "enter")) {
     if (argc < 4) {
-      goto notenoughargs;
+      return usage();
     }
 
     zx_duration_boot_t delay = argv[2].i;
@@ -535,7 +538,7 @@ static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
       delay = ZX_NSEC(delay);
     } else {
       printf("Invalid units: %s\n", units);
-      goto badunits;
+      return usage();
     }
 
     const zx_instant_boot_t resume_at = zx_time_add_duration(current_boot_time(), delay);
@@ -543,12 +546,17 @@ static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   if (!strcmp(argv[1].str, "wake-events")) {
+    if (argc != 2) {
+      return usage();
+    }
+
     printf("Wake events:\n");
     wake_vector::WakeEvent::Dump(stdout, 0);
     return 0;
   }
 
-  return 0;
+  printf("unknown command\n");
+  return usage();
 }
 
 STATIC_COMMAND_START

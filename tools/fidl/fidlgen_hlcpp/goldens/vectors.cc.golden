@@ -16,7 +16,7 @@ extern "C" const fidl_type_t test_vectors_ExampleUseOfVectorsTable;
 const fidl_type_t* ExampleUseOfVectors::FidlType = &test_vectors_ExampleUseOfVectorsTable;
 
 void ExampleUseOfVectors::Encode(::fidl::Encoder* _encoder, size_t _offset,
-                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+                                 std::optional<::fidl::HandleInformation> maybe_handle_info) {
   if (::fidl::IsMemcpyCompatible<ExampleUseOfVectors>::value) {
     memcpy(_encoder->template GetPtr<ExampleUseOfVectors>(_offset), this, sizeof(ExampleUseOfVectors));
   } else {

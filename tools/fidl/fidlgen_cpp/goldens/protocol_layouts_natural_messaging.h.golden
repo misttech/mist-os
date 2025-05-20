@@ -5,6 +5,9 @@
 #pragma once
 
 #include <fidl/test.protocollayouts.imported/cpp/markers.h>
+
+#ifdef __Fuchsia__
+
 #include <fidl/test.protocollayouts/cpp/markers.h>
 #include <fidl/test.protocollayouts/cpp/natural_types.h>
 #include <lib/fidl/cpp/channel.h>
@@ -16,10 +19,6 @@
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
-
-namespace fidl {
-
-}  // namespace fidl
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol::OneWayAnonComposed> {
@@ -196,13 +195,11 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::MainProtocol
   using Request = ::test_protocollayouts::MainProtocolOnAnonRequest;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposed> final : public ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse {
  public:
   using ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse;
-  Response(::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
+  Response(::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedResponse v);
 };
 
 template <>
@@ -218,7 +215,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError> final : public ::fit::result<uint32_t, ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResponse> v);
   Response() = delete;
 };
 template <>
@@ -226,13 +223,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainPro
   using DomainObject = ::test_protocollayouts_imported::ComposedProtocolTwoWayAnonComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonComposedWithError>& m);
 };
 
 template <>
@@ -248,7 +239,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayNamedComposed> final : public ::test_protocollayouts_imported::ImportTablePayload {
  public:
   using ::test_protocollayouts_imported::ImportTablePayload::ImportTablePayload;
-  Response(::test_protocollayouts_imported::ImportTablePayload v) : ImportTablePayload(std::move(v)) {}
+  Response(::test_protocollayouts_imported::ImportTablePayload v);
 };
 
 template <>
@@ -264,7 +255,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError> final : public ::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload> v);
   Response() = delete;
 };
 template <>
@@ -272,13 +263,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainPro
   using DomainObject = ::test_protocollayouts_imported::ComposedProtocolTwoWayNamedComposedWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayNamedComposedWithError>& m);
 };
 
 template <>
@@ -294,7 +279,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayImport> final : public ::test_protocollayouts_imported::ImportTablePayload {
  public:
   using ::test_protocollayouts_imported::ImportTablePayload::ImportTablePayload;
-  Response(::test_protocollayouts_imported::ImportTablePayload v) : ImportTablePayload(std::move(v)) {}
+  Response(::test_protocollayouts_imported::ImportTablePayload v);
 };
 
 template <>
@@ -310,7 +295,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayImportWithError> final : public ::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocollayouts_imported::ImportUnionPayload> v);
   Response() = delete;
 };
 template <>
@@ -318,13 +303,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainPro
   using DomainObject = ::test_protocollayouts::MainProtocolTwoWayImportWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayImportWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayImportWithError>& m);
 };
 
 template <>
@@ -340,7 +319,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayLocal> final : public ::test_protocollayouts::LocalTablePayload {
  public:
   using ::test_protocollayouts::LocalTablePayload::LocalTablePayload;
-  Response(::test_protocollayouts::LocalTablePayload v) : LocalTablePayload(std::move(v)) {}
+  Response(::test_protocollayouts::LocalTablePayload v);
 };
 
 template <>
@@ -356,7 +335,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayLocalWithError> final : public ::fit::result<uint32_t, ::test_protocollayouts::LocalUnionPayload> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayouts::LocalUnionPayload>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayouts::LocalUnionPayload> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocollayouts::LocalUnionPayload> v);
   Response() = delete;
 };
 template <>
@@ -364,13 +343,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainPro
   using DomainObject = ::test_protocollayouts::MainProtocolTwoWayLocalWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayLocalWithError>& m);
 };
 
 template <>
@@ -386,7 +359,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnon> final : public ::test_protocollayouts::MainProtocolTwoWayAnonResponse {
  public:
   using ::test_protocollayouts::MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse;
-  Response(::test_protocollayouts::MainProtocolTwoWayAnonResponse v) : MainProtocolTwoWayAnonResponse(std::move(v)) {}
+  Response(::test_protocollayouts::MainProtocolTwoWayAnonResponse v);
 };
 
 template <>
@@ -402,7 +375,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonWithError> final : public ::fit::result<uint32_t, ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> {
  public:
   using ::fit::result<uint32_t, ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse>::result;
-  Response(::fit::result<uint32_t, ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<uint32_t, ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResponse> v);
   Response() = delete;
 };
 template <>
@@ -410,13 +383,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::MainPro
   using DomainObject = ::test_protocollayouts::MainProtocolTwoWayAnonWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::MainProtocol::TwoWayAnonWithError>& m);
 };
 
 template <>
@@ -463,10 +430,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayouts::MainProtocol> 
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnon>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtocol>> {
@@ -502,15 +465,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::MainProtoc
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayouts::MainProtocol::OneWayAnon>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocollayouts::MainProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocollayouts::MainProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocollayouts::MainProtocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::MainProtocol> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -529,11 +485,11 @@ class ::fidl::AsyncEventHandler<::test_protocollayouts::MainProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::MainProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void OnAnonComposed(::fidl::Event<::test_protocollayouts::MainProtocol::OnAnonComposed>&) override {}
-  void OnNamedComposed(::fidl::Event<::test_protocollayouts::MainProtocol::OnNamedComposed>&) override {}
-  void OnImport(::fidl::Event<::test_protocollayouts::MainProtocol::OnImport>&) override {}
-  void OnLocal(::fidl::Event<::test_protocollayouts::MainProtocol::OnLocal>&) override {}
-  void OnAnon(::fidl::Event<::test_protocollayouts::MainProtocol::OnAnon>&) override {}
+  void OnAnonComposed(::fidl::Event<::test_protocollayouts::MainProtocol::OnAnonComposed>&) override;
+  void OnNamedComposed(::fidl::Event<::test_protocollayouts::MainProtocol::OnNamedComposed>&) override;
+  void OnImport(::fidl::Event<::test_protocollayouts::MainProtocol::OnImport>&) override;
+  void OnLocal(::fidl::Event<::test_protocollayouts::MainProtocol::OnLocal>&) override;
+  void OnAnon(::fidl::Event<::test_protocollayouts::MainProtocol::OnAnon>&) override;
 };
 
 template <>
@@ -552,16 +508,12 @@ class ::fidl::SyncEventHandler<::test_protocollayouts::MainProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocollayouts::MainProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::MainProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::MainProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::MainProtocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocollayouts::MainProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -594,8 +546,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayouts::MainProtocol>
 
   ::fit::result<::fidl::OneWayError> OnAnon(const ::test_protocollayouts::MainProtocolOnAnonRequest& payload);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocollayouts::MainProtocol::TwoWayAnonComposed> : public ::fidl::CompleterBase {
@@ -795,19 +745,13 @@ class ::fidl::Server<::test_protocollayouts::MainProtocol> : public ::fidl::inte
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocollayouts::MainProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayouts::MainProtocol> final {
@@ -822,8 +766,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayouts::MainPro
   static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
-
-#endif  // __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::OpenProtocol::FlexibleOneWay> {
@@ -902,22 +844,18 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayouts::OpenProtocol
   using Completer = fidl::Completer<>;
 };
 
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError> final : public ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse {
  public:
   using ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse;
-  Response(::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse v) : ComposedOpenProtocolFlexibleTwoWayNoErrorResponse(std::move(v)) {}
+  Response(::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResponse v);
 };
 template <>
 class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError> {
   using DomainObject = ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayNoErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>& m) {
-    return DomainObject::WithResponse(std::move(m));
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError>& m);
 };
 
 template <>
@@ -933,7 +871,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError> final : public ::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse> {
  public:
   using ::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse>::result;
-  Response(::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResponse> v);
   Response() = delete;
 };
 template <>
@@ -941,13 +879,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::OpenPro
   using DomainObject = ::test_protocollayouts_imported::ComposedOpenProtocolFlexibleTwoWayWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::OpenProtocol::FlexibleTwoWayWithError>& m);
 };
 
 template <>
@@ -963,7 +895,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayNoError> final : public ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse {
  public:
   using ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse::ComposedOpenProtocolStrictTwoWayNoErrorResponse;
-  Response(::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse v) : ComposedOpenProtocolStrictTwoWayNoErrorResponse(std::move(v)) {}
+  Response(::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayNoErrorResponse v);
 };
 
 template <>
@@ -979,7 +911,7 @@ template <>
 class ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError> final : public ::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse> {
  public:
   using ::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse>::result;
-  Response(::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse> v) : result(std::move(v)) {}
+  Response(::fit::result<int32_t, ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResponse> v);
   Response() = delete;
 };
 template <>
@@ -987,13 +919,7 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocollayouts::OpenPro
   using DomainObject = ::test_protocollayouts_imported::ComposedOpenProtocolStrictTwoWayWithErrorResult;
 
  public:
-  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>& m) {
-    if (m.is_error()) {
-      return DomainObject::WithErr(m.error_value());
-    } else {
-      return DomainObject::WithResponse(std::move(m.value()));
-    }
-  }
+  static DomainObject IntoDomainObject(const ::fidl::Response<::test_protocollayouts::OpenProtocol::StrictTwoWayWithError>& m);
 };
 
 template <>
@@ -1024,10 +950,6 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayouts::OpenProtocol> 
   ::fit::result<::fidl::OneWayError> FlexibleOneWayNamedPayload(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleOneWayNamedPayload>& request) const;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
-
 template <>
 class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol> final
     : public ::fidl::internal::SyncEndpointManagedVeneer<::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtocol>> {
@@ -1047,15 +969,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_protocollayouts::OpenProtoc
   ::fit::result<::fidl::OneWayError> FlexibleOneWayNamedPayload(const ::fidl::Request<::test_protocollayouts::OpenProtocol::FlexibleOneWayNamedPayload>& request);
 
  private:
-  ::fidl::UnownedClientEnd<::test_protocollayouts::OpenProtocol> _client_end() const {
-    return ::fidl::UnownedClientEnd<::test_protocollayouts::OpenProtocol>(
-        _transport().get<::fidl::internal::ChannelTransport>());
-  }
+  ::fidl::UnownedClientEnd<::test_protocollayouts::OpenProtocol> _client_end() const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::OpenProtocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_protocollayouts::OpenProtocol> {
@@ -1071,8 +986,8 @@ class ::fidl::AsyncEventHandler<::test_protocollayouts::OpenProtocol>
     : public ::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::OpenProtocol>, public ::fidl::internal::AsyncEventHandler {
  public:
   AsyncEventHandler() = default;
-  void FlexibleEvent(::fidl::Event<::test_protocollayouts::OpenProtocol::FlexibleEvent>&) override {}
-  void StrictEvent(::fidl::Event<::test_protocollayouts::OpenProtocol::StrictEvent>&) override {}
+  void FlexibleEvent(::fidl::Event<::test_protocollayouts::OpenProtocol::FlexibleEvent>&) override;
+  void StrictEvent(::fidl::Event<::test_protocollayouts::OpenProtocol::StrictEvent>&) override;
 };
 
 template <>
@@ -1091,16 +1006,12 @@ class ::fidl::SyncEventHandler<::test_protocollayouts::OpenProtocol>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_protocollayouts::OpenProtocol> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::OpenProtocol>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::OpenProtocol>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_protocollayouts::OpenProtocol>* event_handler);
   ::fidl::Status DispatchEvent(
       ::fidl::IncomingHeaderAndMessage& msg,
       internal::MessageStorageViewBase* storage_view) override;
 };
 
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 template <>
 class ::fidl::internal::NaturalWeakEventSender<::test_protocollayouts::OpenProtocol> : public ::fidl::internal::WeakEventSenderBase {
  public:
@@ -1121,8 +1032,6 @@ class ::fidl::internal::NaturalEventSender<::test_protocollayouts::OpenProtocol>
 
   ::fit::result<::fidl::OneWayError> StrictEvent(const ::test_protocollayouts_imported::ComposedOpenProtocolStrictEventRequest& payload);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalCompleterBase<::test_protocollayouts::OpenProtocol::FlexibleTwoWayNoError> : public ::fidl::CompleterBase {
@@ -1220,19 +1129,13 @@ class ::fidl::Server<::test_protocollayouts::OpenProtocol> : public ::fidl::inte
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(async_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fidl::ServerEnd<::test_protocollayouts::OpenProtocol> request) {
-      (void)::fidl::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(async_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenProtocol> final {
@@ -1247,6 +1150,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_protocollayouts::OpenPro
   static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

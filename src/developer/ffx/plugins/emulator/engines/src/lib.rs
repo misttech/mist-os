@@ -178,7 +178,7 @@ impl EngineBuilder {
             if all_instances.len() == 1 {
                 *name = Some(all_instances.pop().unwrap().get_name().to_string());
             } else if all_instances.len() == 0 {
-                tracing::debug!("No emulators are running.");
+                log::debug!("No emulators are running.");
                 return Ok(None);
             } else {
                 return_user_error!(
@@ -224,7 +224,7 @@ pub(crate) fn finalize_port_mapping(emu_config: &mut EmulatorConfiguration) -> R
                 return_user_error!("Host port {} was mapped to multiple guest ports.", value);
             }
         } else {
-            tracing::warn!(
+            log::warn!(
                 "No host-side port specified for '{:?}', a host port will be dynamically \
                 assigned. Check `ffx emu show {}` to see which port is assigned.",
                 name,
@@ -241,10 +241,10 @@ pub(crate) fn finalize_port_mapping(emu_config: &mut EmulatorConfiguration) -> R
                         used_ports.push(value);
                         break;
                     } else {
-                        tracing::warn!("pick unused port returned: {} multiple times\n", value);
+                        log::warn!("pick unused port returned: {} multiple times\n", value);
                     }
                 } else {
-                    tracing::warn!("pick unused port returned: None\n");
+                    log::warn!("pick unused port returned: None\n");
                 }
             }
             if !port.host.is_some() {
@@ -252,6 +252,6 @@ pub(crate) fn finalize_port_mapping(emu_config: &mut EmulatorConfiguration) -> R
             }
         }
     }
-    tracing::debug!("Port map finalized: {:?}\n", &emu_config.host.port_map);
+    log::debug!("Port map finalized: {:?}\n", &emu_config.host.port_map);
     Ok(())
 }

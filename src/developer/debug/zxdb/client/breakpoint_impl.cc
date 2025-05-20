@@ -10,6 +10,7 @@
 #include <map>
 #include <sstream>
 
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
 #include "src/developer/debug/shared/zx_status.h"
@@ -24,6 +25,7 @@
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/expr/permissive_input_location.h"
 #include "src/developer/debug/zxdb/symbols/loaded_module_symbols.h"
+#include "src/developer/debug/zxdb/symbols/module_symbol_status.h"
 #include "src/developer/debug/zxdb/symbols/module_symbols.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols.h"
 #include "src/developer/debug/zxdb/symbols/resolve_options.h"
@@ -206,8 +208,27 @@ void BreakpointImpl::DidLoadModuleSymbols(Process* process, LoadedModuleSymbols*
   ResolveOptions options = GetResolveOptions();
   bool needs_sync = false;
   for (const auto& loc : ExpandPermissiveInputLocationNames(find_context, settings_.locations)) {
-    needs_sync |=
-        procs_[process].AddLocations(this, process, module->ResolveInputLocation(loc, options));
+    auto resolved_locations = module->ResolveInputLocation(loc, options);
+
+    needs_sync |= procs_[process].AddLocations(this, process, resolved_locations);
+
+    if (settings_.type == debug_ipc::BreakpointType::kSoftware &&
+        IsResolvedLocationInSharedAddressSpace(process, resolved_locations)) {
+      // Software breakpoints will cause issues in processes that access the shared address space
+      // when the debugger is not attached (causing restricted mode processes to crash
+      // starnix_kernel due to an unhandled breakpoint instruction for example). Hardware
+      // breakpoints don't have this problem because it's not a fatal error for these to go
+      // unhandled. The tradeoff is that there are a limited number of hardware breakpoints for a
+      // given target architecture, so we have to be careful about installing too many. Because of
+      // that we restrict the scope of this breakpoint to just this process, otherwise we could blow
+      // the hardware breakpoint limits with a single breakpoint.
+      //
+      // TODO(https://fxbug.dev/413338075): Handle installing many HW breakpoints better.
+      settings_.type = debug_ipc::BreakpointType::kHardware;
+      settings_.scope = ExecutionScope(process->GetTarget());
+      for (auto& observer : session()->breakpoint_observers())
+        observer.OnBreakpointImplicitUpdate(this, BreakpointObserver::What::kType);
+    }
   }
 
   if (needs_sync) {
@@ -393,10 +414,29 @@ bool BreakpointImpl::RegisterProcess(Process* process) {
   ResolveOptions options = GetResolveOptions();
   FindNameContext find_context(process->GetSymbols());
 
-  changed |=
-      record.AddLocations(this, process,
-                          ResolvePermissiveInputLocations(process->GetSymbols(), options,
-                                                          find_context, settings_.locations));
+  auto resolved_locations = ResolvePermissiveInputLocations(process->GetSymbols(), options,
+                                                            find_context, settings_.locations);
+
+  changed |= record.AddLocations(this, process, resolved_locations);
+
+  if (settings_.type == debug_ipc::BreakpointType::kSoftware &&
+      IsResolvedLocationInSharedAddressSpace(process, resolved_locations)) {
+    // Software breakpoints will cause issues in processes that access the shared address space
+    // when the debugger is not attached (causing restricted mode processes to crash starnix_kernel
+    // due to an unhandled breakpoint instruction for example). Hardware breakpoints don't have this
+    // problem because it's not a fatal error for these to go unhandled. The tradeoff is that there
+    // are a limited number of hardware breakpoints for a given target architecture, so we have to
+    // be careful about installing too many. Because of that we restrict the scope of this
+    // breakpoint to just this process, otherwise we could blow the hardware breakpoint limits with
+    // a single breakpoint.
+    //
+    // TODO(https://fxbug.dev/413338075): Handle installing many HW breakpoints better.
+    settings_.type = debug_ipc::BreakpointType::kHardware;
+    settings_.scope = ExecutionScope(process->GetTarget());
+    for (auto& observer : session()->breakpoint_observers())
+      observer.OnBreakpointImplicitUpdate(this, BreakpointObserver::What::kType);
+  }
+
   return changed;
 }
 
@@ -423,6 +463,51 @@ ResolveOptions BreakpointImpl::GetResolveOptions() const {
   }
 
   return options;
+}
+
+bool BreakpointImpl::IsResolvedLocationInSharedAddressSpace(
+    Process* process, const std::vector<Location>& locations) const {
+  std::optional<debug_ipc::AddressRegion> maybe_shared_aspace;
+
+  if (maybe_shared_aspace = process->GetSharedAddressSpace(); !maybe_shared_aspace) {
+    return false;
+  }
+
+  const debug_ipc::AddressRegion* shared_aspace = &*maybe_shared_aspace;
+
+  auto addr_is_in_region = fit::function<bool(uint64_t, const debug_ipc::AddressRegion*)>(
+      [](uint64_t addr, const debug_ipc::AddressRegion* region) -> bool {
+        FX_DCHECK(region);
+        uint64_t end = 0;
+
+        // Care for overflow.
+        if (__builtin_add_overflow(region->base, region->size, &end)) {
+          return false;
+        }
+
+        return region->base <= addr && addr < end;
+      });
+
+  const std::vector<ModuleSymbolStatus>& module_status = process->GetSymbols()->GetStatus();
+  for (const auto& location : locations) {
+    if (location.has_symbols()) {
+      const LoadedModuleSymbols* loaded_module =
+          process->GetSymbols()->GetModuleForAddress(location.address());
+
+      FX_DCHECK(loaded_module);
+
+      auto found = std::find_if(module_status.begin(), module_status.end(),
+                                [loaded_module](const ModuleSymbolStatus& status) {
+                                  return loaded_module->load_address() == status.base;
+                                });
+
+      if (found != module_status.end() && addr_is_in_region(found->base, shared_aspace)) {
+        // TODO(https://fxbug.dev/396421111): Make software breakpoints work for starnix_kernel.
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 bool BreakpointImpl::AllLocationsAddresses() const {

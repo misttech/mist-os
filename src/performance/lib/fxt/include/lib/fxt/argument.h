@@ -61,7 +61,6 @@ class Argument<ArgumentType::kNull, name_type> {
   StringRef<name_type> name_;
 };
 
-#if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>) -> Argument<ArgumentType::kNull, name_type>;
 
@@ -70,7 +69,6 @@ Argument(T&& name) -> Argument<ArgumentType::kNull, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name) -> Argument<ArgumentType::kNull, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kBool, name_type> {
@@ -113,7 +111,6 @@ class Argument<ArgumentType::kBool, name_type> {
   bool value_;
 };
 
-#if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, bool) -> Argument<ArgumentType::kBool, name_type>;
 
@@ -122,7 +119,6 @@ Argument(T&& name, bool) -> Argument<ArgumentType::kBool, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, bool) -> Argument<ArgumentType::kBool, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kInt32, name_type> {
@@ -164,7 +160,7 @@ class Argument<ArgumentType::kInt32, name_type> {
   StringRef<name_type> name_;
   int32_t value_;
 };
-#if __cplusplus >= 201703L
+
 template <RefType name_type>
 Argument(StringRef<name_type>, int32_t) -> Argument<ArgumentType::kInt32, name_type>;
 
@@ -173,7 +169,6 @@ Argument(T&& name, int32_t) -> Argument<ArgumentType::kInt32, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, int32_t) -> Argument<ArgumentType::kInt32, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kUint32, name_type> {
@@ -215,7 +210,7 @@ class Argument<ArgumentType::kUint32, name_type> {
   StringRef<name_type> name_;
   uint32_t value_;
 };
-#if __cplusplus >= 201703L
+
 template <RefType name_type>
 Argument(StringRef<name_type>, uint32_t) -> Argument<ArgumentType::kUint32, name_type>;
 
@@ -224,7 +219,6 @@ Argument(T&& name, uint32_t) -> Argument<ArgumentType::kUint32, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, uint32_t) -> Argument<ArgumentType::kUint32, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kInt64, name_type> {
@@ -266,7 +260,7 @@ class Argument<ArgumentType::kInt64, name_type> {
   StringRef<name_type> name_;
   int64_t value_;
 };
-#if __cplusplus >= 201703L
+
 template <RefType name_type>
 Argument(StringRef<name_type>, int64_t) -> Argument<ArgumentType::kInt64, name_type>;
 
@@ -275,7 +269,6 @@ Argument(T&& name, int64_t) -> Argument<ArgumentType::kInt64, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, int64_t) -> Argument<ArgumentType::kInt64, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kUint64, name_type> {
@@ -317,7 +310,7 @@ class Argument<ArgumentType::kUint64, name_type> {
   StringRef<name_type> name_;
   uint64_t value_;
 };
-#if __cplusplus >= 201703L
+
 template <RefType name_type>
 Argument(StringRef<name_type>, uint64_t) -> Argument<ArgumentType::kUint64, name_type>;
 
@@ -326,7 +319,6 @@ Argument(T&& name, uint64_t) -> Argument<ArgumentType::kUint64, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, uint64_t) -> Argument<ArgumentType::kUint64, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kDouble, name_type> {
@@ -368,7 +360,7 @@ class Argument<ArgumentType::kDouble, name_type> {
   StringRef<name_type> name_;
   double value_;
 };
-#if __cplusplus >= 201703L
+
 template <RefType name_type>
 Argument(StringRef<name_type>, double) -> Argument<ArgumentType::kDouble, name_type>;
 
@@ -377,7 +369,6 @@ Argument(T&& name, double) -> Argument<ArgumentType::kDouble, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, double) -> Argument<ArgumentType::kDouble, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kPointer, name_type> {
@@ -420,7 +411,6 @@ class Argument<ArgumentType::kPointer, name_type> {
   Pointer value_;
 };
 
-#if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, Pointer) -> Argument<ArgumentType::kPointer, name_type>;
 
@@ -429,7 +419,6 @@ Argument(T&& name, Pointer) -> Argument<ArgumentType::kPointer, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, Pointer) -> Argument<ArgumentType::kPointer, RefType::kInline>;
-#endif
 
 template <RefType name_type>
 class Argument<ArgumentType::kKoid, name_type> {
@@ -470,7 +459,7 @@ class Argument<ArgumentType::kKoid, name_type> {
   StringRef<name_type> name_;
   Koid value_;
 };
-#if __cplusplus >= 201703L
+
 template <RefType name_type>
 Argument(StringRef<name_type>, Koid) -> Argument<ArgumentType::kKoid, name_type>;
 
@@ -479,7 +468,6 @@ Argument(T&& name, Koid) -> Argument<ArgumentType::kKoid, RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 Argument(T&& name, Koid) -> Argument<ArgumentType::kKoid, RefType::kInline>;
-#endif
 
 template <RefType name_type, RefType val_type>
 class Argument<ArgumentType::kString, name_type, val_type> {
@@ -525,7 +513,7 @@ class Argument<ArgumentType::kString, name_type, val_type> {
   StringRef<name_type> name_;
   StringRef<val_type> value_;
 };
-#if __cplusplus >= 201703L
+
 Argument(StringRef<RefType::kInline>, StringRef<RefType::kId>)
     -> Argument<ArgumentType::kString, RefType::kInline, RefType::kId>;
 
@@ -554,7 +542,6 @@ Argument(T&& name, U&& value)
 template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kId> = true,
           EnableIfConvertibleToStringRef<U, RefType::kInline> = true>
 Argument(T&& name, U&& value) -> Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
-#endif
 
 // Builds an instance of Argument from the given parameters. Each overload uses explicit
 // instantiations of StringRef to avoid limitations in type deduction from convertible types. Since

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#ifdef __Fuchsia__
+
 #include <fidl/test.driveroneway/cpp/driver/wire_messaging.h>
 #include <fidl/test.driveroneway/cpp/markers.h>
 #include <fidl/test.driveroneway/cpp/natural_types.h>
@@ -12,17 +14,12 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
 template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_driveroneway::OneWay::Send> {
   using Request = ::test_driveroneway::OneWaySendRequest;
 
   using Completer = fidl::Completer<>;
 };
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_driveroneway::OneWay> final : public ::fidl::internal::NaturalClientBase {
@@ -30,10 +27,6 @@ class ::fidl::internal::NaturalClientImpl<::test_driveroneway::OneWay> final : p
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> Send(const ::fidl::Request<::test_driveroneway::OneWay::Send>& request) const;
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 class ::fidl::internal::NaturalEventHandlerInterface<::test_driveroneway::OneWay> : public ::fidl::internal::BaseEventHandlerInterface {
@@ -52,11 +45,8 @@ class ::fdf::AsyncEventHandler<::test_driveroneway::OneWay>
 template <>
 class ::fidl::internal::NaturalEventDispatcher<::test_driveroneway::OneWay> final : public ::fidl::internal::IncomingEventDispatcher<::fidl::internal::NaturalEventHandlerInterface<::test_driveroneway::OneWay>> {
  public:
-  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driveroneway::OneWay>* event_handler)
-      : IncomingEventDispatcher(event_handler) {}
+  explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_driveroneway::OneWay>* event_handler);
 };
-
-#endif  // __Fuchsia__
 
 template <>
 class ::fdf::Server<::test_driveroneway::OneWay> : public ::fidl::internal::IncomingMessageDispatcher {
@@ -82,18 +72,13 @@ class ::fdf::Server<::test_driveroneway::OneWay> : public ::fidl::internal::Inco
   // The server must outlive the provided |dispatcher|. Only after
   // the dispatcher is shutdown will it be safe to destroy the servers.
   // The server should not be moved.
-  Handler bind_handler(fdf_dispatcher_t* dispatcher) {
-    return [impl = this, dispatcher = dispatcher](::fdf::ServerEnd<::test_driveroneway::OneWay> request) {
-      (void)::fdf::BindServer(dispatcher, std::move(request), impl);
-    };
-  }
+  Handler bind_handler(fdf_dispatcher_t* dispatcher);
 
  private:
   void dispatch_message(
       ::fidl::IncomingHeaderAndMessage&& msg, ::fidl::Transaction* txn,
       ::fidl::internal::MessageStorageViewBase* storage_view) final;
 };
-#ifdef __Fuchsia__
 
 template <>
 struct ::fidl::internal::NaturalServerDispatcher<::test_driveroneway::OneWay> final {
@@ -109,6 +94,6 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_driveroneway::OneWay> fi
       ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
 };
 
-#endif  // __Fuchsia__
-
 #pragma clang diagnostic pop
+
+#endif  // __Fuchsia__

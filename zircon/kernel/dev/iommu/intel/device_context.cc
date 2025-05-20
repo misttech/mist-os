@@ -14,8 +14,8 @@
 
 #include <kernel/range_check.h>
 #include <ktl/algorithm.h>
-#include <ktl/move.h>
 #include <ktl/unique_ptr.h>
+#include <ktl/utility.h>
 #include <vm/vm.h>
 #include <vm/vm_object_paged.h>
 
@@ -243,8 +243,8 @@ zx::result<uint64_t> DeviceContext::SecondLevelMapDiscontiguous(const fbl::RefPt
   auto cleanup_partial = fit::defer([&]() {
     size_t allocated = base - region->base;
     size_t unmapped;
-    second_level_pt_.UnmapPages(base, allocated / PAGE_SIZE, ArchVmAspace::EnlargeOperation::No,
-                                &unmapped);
+    second_level_pt_.UnmapPages(base, allocated / PAGE_SIZE,
+                                ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
     DEBUG_ASSERT(unmapped == allocated / PAGE_SIZE);
   });
 
@@ -396,8 +396,9 @@ zx_status_t DeviceContext::SecondLevelUnmap(paddr_t virt_paddr, size_t size) {
     size_t unmapped;
     LTRACEF("Unmap(%02x:%02x.%1x): [%p, %p)\n", bdf_.bus(), bdf_.dev(), bdf_.func(),
             (void*)region->base, (void*)(region->base + region->size));
-    zx_status_t status = second_level_pt_.UnmapPages(region->base, region->size / PAGE_SIZE,
-                                                     ArchVmAspace::EnlargeOperation::No, &unmapped);
+    zx_status_t status =
+        second_level_pt_.UnmapPages(region->base, region->size / PAGE_SIZE,
+                                    ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
     // Unmap should only be able to fail if an input was invalid
     ASSERT(status == ZX_OK);
     allocated_regions_.erase(i);

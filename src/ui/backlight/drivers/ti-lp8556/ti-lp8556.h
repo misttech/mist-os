@@ -128,11 +128,6 @@ class Lp8556Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_BA
   void SetStateAbsolute(SetStateAbsoluteRequestView request,
                         SetStateAbsoluteCompleter::Sync& completer) override;
   void GetMaxAbsoluteBrightness(GetMaxAbsoluteBrightnessCompleter::Sync& completer) override;
-  void SetNormalizedBrightnessScale(
-      SetNormalizedBrightnessScaleRequestView request,
-      SetNormalizedBrightnessScaleCompleter::Sync& completer) override;
-  void GetNormalizedBrightnessScale(
-      GetNormalizedBrightnessScaleCompleter::Sync& completer) override;
 
   void GetPowerWatts(GetPowerWattsCompleter::Sync& completer) override;
 

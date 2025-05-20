@@ -59,7 +59,7 @@ TEST(MemallocPoolMemConfigTests, Ranges) {
           .type = memalloc::Type::kPeripheral,
       },
   };
-  EXPECT_TRUE(pool.Init(std::array{cpp20::span<memalloc::Range>(test_pool_ranges)}).is_ok());
+  EXPECT_TRUE(pool.Init(std::array{std::span<memalloc::Range>(test_pool_ranges)}).is_ok());
   auto alloc_result = pool.Allocate(memalloc::Type::kPoolTestPayload, kChunkSize * 100);
   ASSERT_TRUE(alloc_result.is_ok());
   EXPECT_EQ(kChunkSize * 105, alloc_result.value());

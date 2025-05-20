@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <fidl/test.escaping/cpp/common_types.h>
+#include <fidl/test.escaping/cpp/markers.h>
 #include <lib/fidl/cpp/wire/array.h>
 #include <lib/fidl/cpp/wire/envelope.h>
 #include <lib/fidl/cpp/wire/internal/framework_err.h>
@@ -16,12 +18,6 @@
 #include <lib/stdcompat/optional.h>
 
 #include <cinttypes>
-#ifdef __Fuchsia__
-
-#endif  // __Fuchsia__
-
-#include <fidl/test.escaping/cpp/common_types.h>
-#include <fidl/test.escaping/cpp/markers.h>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
@@ -76,9 +72,6 @@ template <>
 struct IsWire<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type {};
 template <>
 struct IsStruct<::test_escaping::wire::DocCommentWithQuotes> : public std::true_type {};
-static_assert(std::is_standard_layout_v<::test_escaping::wire::DocCommentWithQuotes>);
-static_assert(offsetof(::test_escaping::wire::DocCommentWithQuotes, __reserved) == 0);
-static_assert(sizeof(::test_escaping::wire::DocCommentWithQuotes) == TypeTraits<::test_escaping::wire::DocCommentWithQuotes>::kPrimarySize);
 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_escaping::wire::DocCommentWithQuotes, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive> {
@@ -89,23 +82,9 @@ struct ::fidl::internal::WireCodingTraits<::test_escaping::wire::DocCommentWithQ
   static constexpr bool kIsMemcpyCompatible = Base::kIsMemcpyCompatible;
 
   static void Encode(
-      internal::WireEncoder* encoder, ::test_escaping::wire::DocCommentWithQuotes* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (kIsMemcpyCompatible) {
-      memcpy(position.As<void>(), value, sizeof(::test_escaping::wire::DocCommentWithQuotes));
-    } else {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Encode(encoder, &value->__reserved, position + 0, recursion_depth);
-    }
-  }
+      internal::WireEncoder* encoder, ::test_escaping::wire::DocCommentWithQuotes* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
   static void Decode(
-      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    if constexpr (!Base::are_members_memcpy_compatible) {
-      internal::WireCodingTraits<uint8_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::Decode(
-          decoder, position + 0, recursion_depth);
-    }
-    if (*position.As<uint8_t>() != 0) {
-      decoder->SetError(kCodingErrorInvalidPaddingBytes);
-    }
-  }
+      internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth);
 };
 
 #pragma clang diagnostic pop

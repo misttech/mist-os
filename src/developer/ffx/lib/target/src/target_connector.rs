@@ -9,6 +9,7 @@ use ffx_ssh::parse::HostAddr;
 use fuchsia_async::Task;
 use std::fmt::Debug;
 use std::future::Future;
+use std::net::SocketAddr;
 use std::pin::Pin;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite, BufReader};
 
@@ -43,7 +44,7 @@ pub trait TargetConnector: Debug {
     /// re-attempt connecting when receiving a NonFatal error.
     fn connect(&mut self) -> impl Future<Output = Result<TargetConnection, TargetConnectionError>>;
 
-    fn device_address(&self) -> Option<std::net::SocketAddr> {
+    fn device_address(&self) -> Option<SocketAddr> {
         None
     }
 }

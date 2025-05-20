@@ -23,7 +23,7 @@ use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_debug, log_error, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock, Unlocked};
-use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef};
+use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef, WeakRefKey};
 use starnix_types::stats::TaskTimeStats;
 use starnix_types::time::{itimerspec_from_itimerval, timeval_from_duration};
 use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
@@ -43,6 +43,42 @@ use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use zx::AsHandleRef;
+
+/// A weak reference to a thread group that can be used in set and maps.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ThreadGroupKey {
+    pid: pid_t,
+    key: WeakRefKey<ThreadGroup>,
+}
+
+impl ThreadGroupKey {
+    /// The pid of the thread group keyed by this object.
+    ///
+    /// As the key is weak (and pid are not unique due to pid namespaces), this should not be used
+    /// as an unique identifier of the thread group.
+    pub fn pid(&self) -> pid_t {
+        self.pid
+    }
+}
+
+impl std::ops::Deref for ThreadGroupKey {
+    type Target = WeakRef<ThreadGroup>;
+    fn deref(&self) -> &Self::Target {
+        &self.key
+    }
+}
+
+impl From<&ThreadGroup> for ThreadGroupKey {
+    fn from(tg: &ThreadGroup) -> Self {
+        Self { pid: tg.leader, key: tg.weak_thread_group.clone().into() }
+    }
+}
+
+impl<T: AsRef<ThreadGroup>> From<T> for ThreadGroupKey {
+    fn from(tg: T) -> Self {
+        tg.as_ref().into()
+    }
+}
 
 /// Values used for waiting on the [ThreadGroup] lifecycle wait queue.
 #[repr(u64)]
@@ -297,7 +333,7 @@ impl<I: Into<WeakRef<ThreadGroup>>> From<I> for ThreadGroupParent {
 
 /// A selector that can match a process. Works as a representation of the pid argument to syscalls
 /// like wait and kill.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ProcessSelector {
     /// Matches any process at all.
     Any,
@@ -305,6 +341,8 @@ pub enum ProcessSelector {
     Pid(pid_t),
     /// Matches all the processes in the given process group
     Pgid(pid_t),
+    /// Match the thread group with the given key
+    Process(ThreadGroupKey),
 }
 
 impl ProcessSelector {
@@ -320,6 +358,7 @@ impl ProcessSelector {
                     false
                 }
             }
+            ProcessSelector::Process(ref key) => pid == key.pid(),
         }
     }
 }
@@ -828,6 +867,7 @@ impl ThreadGroup {
     pub fn setpgid<L>(
         &self,
         locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
         target: &Task,
         pgid: pid_t,
     ) -> Result<(), Errno>
@@ -882,7 +922,9 @@ impl ThreadGroup {
                     if new_process_group.session != target_process_group.session {
                         return error!(EPERM);
                     }
+                    security::check_setpgid_access(current_task, target)?;
                 } else {
+                    security::check_setpgid_access(current_task, target)?;
                     // Create a new process group
                     new_process_group =
                         ProcessGroup::new(target_pgid, Some(target_process_group.session.clone()));
@@ -1234,7 +1276,7 @@ impl ThreadGroup {
     /// given function.
     pub fn get_ptracees_and(
         &self,
-        selector: ProcessSelector,
+        selector: &ProcessSelector,
         pids: &PidTable,
         f: &mut dyn FnMut(WeakRef<Task>, &TaskMutableState),
     ) {
@@ -1260,7 +1302,7 @@ impl ThreadGroup {
     /// PTRACE_LISTEN.
     pub fn get_waitable_ptracee(
         &self,
-        selector: ProcessSelector,
+        selector: &ProcessSelector,
         options: &WaitingOptions,
         pids: &mut PidTable,
     ) -> Option<WaitResult> {
@@ -1650,15 +1692,16 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     pub fn get_waitable_zombie(
         &mut self,
         zombie_list: &dyn Fn(&mut ThreadGroupMutableState) -> &mut Vec<OwnedRef<ZombieProcess>>,
-        selector: ProcessSelector,
+        selector: &ProcessSelector,
         options: &WaitingOptions,
         pids: &mut PidTable,
     ) -> Option<WaitResult> {
         // The zombies whose pid matches the pid selector queried.
-        let zombie_matches_pid_selector = |zombie: &OwnedRef<ZombieProcess>| match selector {
+        let zombie_matches_pid_selector = |zombie: &OwnedRef<ZombieProcess>| match *selector {
             ProcessSelector::Any => true,
             ProcessSelector::Pid(pid) => zombie.pid == pid,
             ProcessSelector::Pgid(pgid) => zombie.pgid == pgid,
+            ProcessSelector::Process(ref key) => key.pid() == zombie.pid,
         };
 
         // The zombies whose exit signal matches the waiting options queried.
@@ -1704,17 +1747,18 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
 
     fn get_waitable_running_children(
         &self,
-        selector: ProcessSelector,
+        selector: &ProcessSelector,
         options: &WaitingOptions,
         pids: &PidTable,
     ) -> WaitableChildResult {
         // The children whose pid matches the pid selector queried.
-        let filter_children_by_pid_selector = |child: &ThreadGroup| match selector {
+        let filter_children_by_pid_selector = |child: &ThreadGroup| match *selector {
             ProcessSelector::Any => true,
             ProcessSelector::Pid(pid) => child.leader == pid,
             ProcessSelector::Pgid(pgid) => {
                 pids.get_process_group(pgid).as_ref() == Some(&child.read().process_group)
             }
+            ProcessSelector::Process(ref key) => *key == ThreadGroupKey::from(child),
         };
 
         // The children whose exit signal matches the waiting options queried.
@@ -1753,12 +1797,13 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             .peekable();
         if selected_children.peek().is_none() {
             // There still might be a process that ptrace hasn't looked at yet.
-            if self.deferred_zombie_ptracers.iter().any(|&(_, tracee)| match selector {
+            if self.deferred_zombie_ptracers.iter().any(|&(_, tracee)| match *selector {
                 ProcessSelector::Any => true,
                 ProcessSelector::Pid(pid) => tracee == pid,
                 ProcessSelector::Pgid(pgid) => {
                     pids.get_process_group(pgid).as_ref() == pids.get_process_group(tracee).as_ref()
                 }
+                ProcessSelector::Process(ref key) => key.pid() == tracee,
             }) {
                 return WaitableChildResult::ShouldWait;
             }
@@ -1817,7 +1862,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     /// Will remove the waitable status from the child depending on `options`.
     pub fn get_waitable_child(
         &mut self,
-        selector: ProcessSelector,
+        selector: &ProcessSelector,
         options: &WaitingOptions,
         pids: &mut PidTable,
     ) -> WaitableChildResult {
@@ -2045,45 +2090,59 @@ mod test {
         assert_eq!(other_session_child_task.thread_group().setsid(&mut locked), Ok(()));
 
         assert_eq!(
-            child_task1.thread_group().setpgid(&mut locked, &current_task, 0),
+            child_task1.thread_group().setpgid(&mut locked, &current_task, &current_task, 0),
             error!(ESRCH)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &execd_child_task, 0),
+            current_task.thread_group().setpgid(&mut locked, &current_task, &execd_child_task, 0),
             error!(EACCES)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &current_task, 0),
-            error!(EPERM)
-        );
-        assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &other_session_child_task, 0),
-            error!(EPERM)
-        );
-        assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &child_task1, -1),
-            error!(EINVAL)
-        );
-        assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &child_task1, 255),
+            current_task.thread_group().setpgid(&mut locked, &current_task, &current_task, 0),
             error!(EPERM)
         );
         assert_eq!(
             current_task.thread_group().setpgid(
                 &mut locked,
+                &current_task,
+                &other_session_child_task,
+                0
+            ),
+            error!(EPERM)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(&mut locked, &current_task, &child_task1, -1),
+            error!(EINVAL)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(&mut locked, &current_task, &child_task1, 255),
+            error!(EPERM)
+        );
+        assert_eq!(
+            current_task.thread_group().setpgid(
+                &mut locked,
+                &current_task,
                 &child_task1,
                 other_session_child_task.id
             ),
             error!(EPERM)
         );
 
-        assert_eq!(child_task1.thread_group().setpgid(&mut locked, &child_task1, 0), Ok(()));
+        assert_eq!(
+            child_task1.thread_group().setpgid(&mut locked, &current_task, &child_task1, 0),
+            Ok(())
+        );
         assert_eq!(child_task1.thread_group().read().process_group.session.leader, current_task.id);
         assert_eq!(child_task1.thread_group().read().process_group.leader, child_task1.id);
 
         let old_process_group = child_task2.thread_group().read().process_group.clone();
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &child_task2, child_task1.id),
+            current_task.thread_group().setpgid(
+                &mut locked,
+                &current_task,
+                &child_task2,
+                child_task1.id
+            ),
             Ok(())
         );
         assert_eq!(child_task2.thread_group().read().process_group.leader, child_task1.id);

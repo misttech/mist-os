@@ -515,25 +515,25 @@ fn iowned_into_inner() {
 #[fuchsia::test]
 fn iowned_debug() {
     let mut v = IValue::new(1337u64);
-    assert_eq!(format!("{:?}", v).as_str(), "1337");
+    assert_eq!(format!("{v:?}").as_str(), "1337");
     v.iset(1338);
-    assert_eq!(format!("{:?}", v).as_str(), "1338");
+    assert_eq!(format!("{v:?}").as_str(), "1338");
     let mut d = IDebug::new("hello".to_string());
-    assert_eq!(format!("{:?}", d).as_str(), "\"hello\"");
+    assert_eq!(format!("{d:?}").as_str(), "\"hello\"");
     d.iset("hello, world".to_string());
-    assert_eq!(format!("{:?}", d).as_str(), "\"hello, world\"");
+    assert_eq!(format!("{d:?}").as_str(), "\"hello, world\"");
 }
 
 #[fuchsia::test]
 fn iowned_display() {
     let mut v = IValue::new(1337u64);
-    assert_eq!(format!("{}", v).as_str(), "1337");
+    assert_eq!(format!("{v}").as_str(), "1337");
     v.iset(1338);
-    assert_eq!(format!("{}", v).as_str(), "1338");
+    assert_eq!(format!("{v}").as_str(), "1338");
     let mut d = IDebug::new("hello".to_string());
-    assert_eq!(format!("{}", d).as_str(), "hello");
+    assert_eq!(format!("{d}").as_str(), "hello");
     d.iset("hello, world".to_string());
-    assert_eq!(format!("{}", d).as_str(), "hello, world");
+    assert_eq!(format!("{d}").as_str(), "hello, world");
 }
 
 #[fasync::run_until_stalled(test)]

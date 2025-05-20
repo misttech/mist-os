@@ -117,7 +117,7 @@ zx::result<> sampler::ThreadSamplerDispatcher::CreateImpl(
   // per_cpu_states.
   for (unsigned i = 0; i < num_cpus; i++) {
     if (zx::result<> setup_result = write_dispatcher.dispatcher()->per_cpu_state_[i].SetUp(
-            config, ktl::move(pinned_buffers[i]));
+            config, ktl::move(pinned_buffers[i]), i);
         setup_result.is_error()) {
       return setup_result.take_error();
     }

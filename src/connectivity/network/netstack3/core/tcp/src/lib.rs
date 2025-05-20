@@ -28,7 +28,8 @@ mod internal {
 }
 
 pub use internal::base::{
-    BufferSizes, ConnectionError, SocketOptions, TcpState, DEFAULT_FIN_WAIT2_TIMEOUT,
+    BufferSizes, ConnectionError, SocketOptions, TcpSocketTxMetadata, TcpState,
+    DEFAULT_FIN_WAIT2_TIMEOUT,
 };
 pub use internal::buffer::{Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 pub use internal::counters::{

@@ -9,69 +9,74 @@ import("//build/dist/generated_resource.gni")
 import("//build/dist/resource.gni")
 import("//build/toolchain/toolchain_environment.gni")
 
-assert(toolchain_environment == "kernel")
-
-declare_args() {
-  # Version string embedded in the kernel for `zx_system_get_version_string`.
-  # If set to the default "", a string is generated based on the
-  # status of the fuchsia git repository.
-  kernel_version_string = ""
-}
-
-library_headers("headers") {
-  headers = [ "lib/version.h" ]
-  public_deps = [
-    "//zircon/kernel/lib/ktl:headers",
-    "//zircon/kernel/lib/libc:headers",
-  ]
-}
-
-# Any resource() targets in data_deps would roll up into the kernel's ELF image
-# like the code-patches files do.  But version-string.txt should appear
-# directly in the kernel package next to the ELF image subdirectory, so it must
-# have a direct dependency from the kernel package target.
-if (kernel_version_string != "") {
-  generated_resource("version-string.txt") {
-    visibility = [ "//zircon/kernel:*" ]
-    outputs = [ "version-string.txt" ]
-    contents = kernel_version_string  # Not a list so no newline added.
+if (toolchain_environment != "kernel") {
+  group("version-string.txt") {
+    visibility = [ "//zircon/kernel/*" ]
+    public_deps = [ ":$target_name(//zircon/kernel:kernel_$current_cpu)" ]
   }
 } else {
-  action("version-string.txt") {
-    visibility = [ "//zircon/kernel:*" ]
-    script = "git-version-string.sh"
-    inputs = [
-      # Regenerate version if HEAD moves
-      "//.git/HEAD",
+  declare_args() {
+    # Version string embedded in the kernel for `zx_system_get_version_string`.
+    # If set to the default "", a string is generated based on the
+    # status of the fuchsia git repository.
+    kernel_version_string = ""
+  }
 
-      # Add "-dirty" suffix as needed
-      "//.git/index",
+  library_headers("headers") {
+    headers = [ "lib/version.h" ]
+    public_deps = [
+      "//zircon/kernel/lib/ktl:headers",
+      "//zircon/kernel/lib/libc:headers",
     ]
-    outputs = [ "$target_gen_dir/version-string.txt" ]
-    hermetic_deps = false
+  }
 
-    args = rebase_path(outputs + [ "//" ], root_build_dir)
+  # Any resource() targets in data_deps would roll up into the kernel's ELF
+  # image like the code-patches files do.  But version-string.txt should appear
+  # directly in the kernel package next to the ELF image subdirectory, so it
+  # must have a direct dependency from the kernel package target.
+  if (kernel_version_string != "") {
+    generated_resource("version-string.txt") {
+      visibility = [ "//zircon/kernel/*" ]
+      outputs = [ "version-string.txt" ]
+      contents = kernel_version_string  # Not a list so no newline added.
+    }
+  } else {
+    action("version-string.txt") {
+      visibility = [ "//zircon/kernel/*" ]
+      script = "git-version-string.sh"
+      inputs = [
+        # Regenerate version if HEAD moves
+        "//.git/HEAD",
 
-    metadata = {
-      # This is what resource() does.
-      distribution_entries = [
-        {
-          source = rebase_path(outputs[0], root_build_dir)
-          destination = "version-string.txt"
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
+        # Add "-dirty" suffix as needed
+        "//.git/index",
       ]
+      outputs = [ "$target_gen_dir/version-string.txt" ]
+      hermetic_deps = false
+
+      args = rebase_path(outputs + [ "//" ], root_build_dir)
+
+      metadata = {
+        # This is what resource() does.
+        distribution_entries = [
+          {
+            source = rebase_path(outputs[0], root_build_dir)
+            destination = "version-string.txt"
+            label = get_label_info(":$target_name", "label_with_toolchain")
+          },
+        ]
+      }
     }
   }
-}
 
-source_set("version") {
-  sources = [ "version.cc" ]
-  defines = [ "ARCH=\"$current_cpu\"" ]
-  deps = [
-    "//zircon/kernel/lib/arch",
-    "//zircon/kernel/lib/console",
-    "//zircon/kernel/lib/init",
-    "//zircon/kernel/phys:handoff",
-  ]
+  source_set("version") {
+    sources = [ "version.cc" ]
+    defines = [ "ARCH=\"$current_cpu\"" ]
+    deps = [
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/console",
+      "//zircon/kernel/lib/init",
+      "//zircon/kernel/phys:handoff",
+    ]
+  }
 }

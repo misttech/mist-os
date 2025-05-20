@@ -5908,6 +5908,113 @@ pub const XATTR_POSIX_ACL_ACCESS: &'static std::ffi::CStr = c"posix_acl_access";
 pub const XATTR_NAME_POSIX_ACL_ACCESS: &'static std::ffi::CStr = c"system.posix_acl_access";
 pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr = c"posix_acl_default";
 pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr = c"system.posix_acl_default";
+pub const __KERNEL__: u32 = 1;
+pub const __HAS_KERNEL__: u32 = 0;
+pub const FUSE_KERNEL_VERSION: u32 = 7;
+pub const FUSE_KERNEL_MINOR_VERSION: u32 = 36;
+pub const FUSE_ROOT_ID: u32 = 1;
+pub const FATTR_MODE: u32 = 1;
+pub const FATTR_UID: u32 = 2;
+pub const FATTR_GID: u32 = 4;
+pub const FATTR_SIZE: u32 = 8;
+pub const FATTR_ATIME: u32 = 16;
+pub const FATTR_MTIME: u32 = 32;
+pub const FATTR_FH: u32 = 64;
+pub const FATTR_ATIME_NOW: u32 = 128;
+pub const FATTR_MTIME_NOW: u32 = 256;
+pub const FATTR_LOCKOWNER: u32 = 512;
+pub const FATTR_CTIME: u32 = 1024;
+pub const FATTR_KILL_SUIDGID: u32 = 2048;
+pub const FOPEN_DIRECT_IO: u32 = 1;
+pub const FOPEN_KEEP_CACHE: u32 = 2;
+pub const FOPEN_NONSEEKABLE: u32 = 4;
+pub const FOPEN_CACHE_DIR: u32 = 8;
+pub const FOPEN_STREAM: u32 = 16;
+pub const FOPEN_NOFLUSH: u32 = 32;
+pub const FUSE_ASYNC_READ: u32 = 1;
+pub const FUSE_POSIX_LOCKS: u32 = 2;
+pub const FUSE_FILE_OPS: u32 = 4;
+pub const FUSE_ATOMIC_O_TRUNC: u32 = 8;
+pub const FUSE_EXPORT_SUPPORT: u32 = 16;
+pub const FUSE_BIG_WRITES: u32 = 32;
+pub const FUSE_DONT_MASK: u32 = 64;
+pub const FUSE_SPLICE_WRITE: u32 = 128;
+pub const FUSE_SPLICE_MOVE: u32 = 256;
+pub const FUSE_SPLICE_READ: u32 = 512;
+pub const FUSE_FLOCK_LOCKS: u32 = 1024;
+pub const FUSE_HAS_IOCTL_DIR: u32 = 2048;
+pub const FUSE_AUTO_INVAL_DATA: u32 = 4096;
+pub const FUSE_DO_READDIRPLUS: u32 = 8192;
+pub const FUSE_READDIRPLUS_AUTO: u32 = 16384;
+pub const FUSE_ASYNC_DIO: u32 = 32768;
+pub const FUSE_WRITEBACK_CACHE: u32 = 65536;
+pub const FUSE_NO_OPEN_SUPPORT: u32 = 131072;
+pub const FUSE_PARALLEL_DIROPS: u32 = 262144;
+pub const FUSE_HANDLE_KILLPRIV: u32 = 524288;
+pub const FUSE_POSIX_ACL: u32 = 1048576;
+pub const FUSE_ABORT_ERROR: u32 = 2097152;
+pub const FUSE_MAX_PAGES: u32 = 4194304;
+pub const FUSE_CACHE_SYMLINKS: u32 = 8388608;
+pub const FUSE_NO_OPENDIR_SUPPORT: u32 = 16777216;
+pub const FUSE_EXPLICIT_INVAL_DATA: u32 = 33554432;
+pub const FUSE_MAP_ALIGNMENT: u32 = 67108864;
+pub const FUSE_SUBMOUNTS: u32 = 134217728;
+pub const FUSE_HANDLE_KILLPRIV_V2: u32 = 268435456;
+pub const FUSE_SETXATTR_EXT: u32 = 536870912;
+pub const FUSE_INIT_EXT: u32 = 1073741824;
+pub const FUSE_INIT_RESERVED: u32 = 2147483648;
+pub const FUSE_SECURITY_CTX: u64 = 4294967296;
+pub const FUSE_HAS_INODE_DAX: u64 = 8589934592;
+pub const FUSE_PASSTHROUGH: i64 = -9223372036854775808;
+pub const CUSE_UNRESTRICTED_IOCTL: u32 = 1;
+pub const FUSE_RELEASE_FLUSH: u32 = 1;
+pub const FUSE_RELEASE_FLOCK_UNLOCK: u32 = 2;
+pub const FUSE_GETATTR_FH: u32 = 1;
+pub const FUSE_LK_FLOCK: u32 = 1;
+pub const FUSE_WRITE_CACHE: u32 = 1;
+pub const FUSE_WRITE_LOCKOWNER: u32 = 2;
+pub const FUSE_WRITE_KILL_SUIDGID: u32 = 4;
+pub const FUSE_WRITE_KILL_PRIV: u32 = 4;
+pub const FUSE_READ_LOCKOWNER: u32 = 2;
+pub const FUSE_IOCTL_COMPAT: u32 = 1;
+pub const FUSE_IOCTL_UNRESTRICTED: u32 = 2;
+pub const FUSE_IOCTL_RETRY: u32 = 4;
+pub const FUSE_IOCTL_32BIT: u32 = 8;
+pub const FUSE_IOCTL_DIR: u32 = 16;
+pub const FUSE_IOCTL_COMPAT_X32: u32 = 32;
+pub const FUSE_IOCTL_MAX_IOV: u32 = 256;
+pub const FUSE_POLL_SCHEDULE_NOTIFY: u32 = 1;
+pub const FUSE_FSYNC_FDATASYNC: u32 = 1;
+pub const FUSE_ATTR_SUBMOUNT: u32 = 1;
+pub const FUSE_ATTR_DAX: u32 = 2;
+pub const FUSE_OPEN_KILL_SUIDGID: u32 = 1;
+pub const FUSE_SETXATTR_ACL_KILL_SGID: u32 = 1;
+pub const FUSE_MIN_READ_BUFFER: u32 = 8192;
+pub const FUSE_COMPAT_ENTRY_OUT_SIZE: u32 = 120;
+pub const FUSE_ACTION_KEEP: u32 = 0;
+pub const FUSE_ACTION_REMOVE: u32 = 1;
+pub const FUSE_ACTION_REPLACE: u32 = 2;
+pub const FUSE_COMPAT_ATTR_OUT_SIZE: u32 = 96;
+pub const FUSE_COMPAT_MKNOD_IN_SIZE: u32 = 8;
+pub const FUSE_COMPAT_WRITE_IN_SIZE: u32 = 24;
+pub const FUSE_COMPAT_STATFS_SIZE: u32 = 48;
+pub const FUSE_COMPAT_SETXATTR_IN_SIZE: u32 = 8;
+pub const FUSE_COMPAT_INIT_OUT_SIZE: u32 = 8;
+pub const FUSE_COMPAT_22_INIT_OUT_SIZE: u32 = 24;
+pub const CUSE_INIT_INFO_MAX: u32 = 4096;
+pub const FUSE_DEV_IOC_MAGIC: u32 = 229;
+pub const FUSE_SETUPMAPPING_FLAG_WRITE: u32 = 1;
+pub const FUSE_SETUPMAPPING_FLAG_READ: u32 = 2;
+pub const FUSE_MAX_IN_ARGS: u32 = 5;
+pub const FUSE_MAX_OUT_ARGS: u32 = 3;
+pub const FUSE_BPF_FORCE: u32 = 1;
+pub const FUSE_BPF_OUT_ARGVAR: u32 = 64;
+pub const FUSE_BPF_USER_FILTER: u32 = 1;
+pub const FUSE_BPF_BACKING: u32 = 2;
+pub const FUSE_BPF_POST_FILTER: u32 = 4;
+pub const FUSE_OPCODE_FILTER: u32 = 65535;
+pub const FUSE_PREFILTER: u32 = 65536;
+pub const FUSE_POSTFILTER: u32 = 131072;
 pub const KGSL_VERSION_MAJOR: u32 = 3;
 pub const KGSL_VERSION_MINOR: u32 = 14;
 pub const KGSL_CONTEXT_SAVE_GMEM: u32 = 1;
@@ -6251,8 +6358,8 @@ pub type socklen_t = u32;
 )]
 pub struct ucred {
     pub pid: __kernel_pid_t,
-    pub uid: __kernel_uid_t,
-    pub gid: __kernel_gid_t,
+    pub uid: __kernel_uid32_t,
+    pub gid: __kernel_gid32_t,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -17374,6 +17481,672 @@ pub struct sockaddr_vm {
     pub svm_flags: __u8,
     pub svm_zero: [crate::types::arch32::c_uchar; 3usize],
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_attr {
+    pub ino: u64,
+    pub size: u64,
+    pub blocks: u64,
+    pub atime: u64,
+    pub mtime: u64,
+    pub ctime: u64,
+    pub atimensec: u32,
+    pub mtimensec: u32,
+    pub ctimensec: u32,
+    pub mode: u32,
+    pub nlink: u32,
+    pub uid: u32,
+    pub gid: u32,
+    pub rdev: u32,
+    pub blksize: u32,
+    pub flags: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_kstatfs {
+    pub blocks: u64,
+    pub bfree: u64,
+    pub bavail: u64,
+    pub files: u64,
+    pub ffree: u64,
+    pub bsize: u32,
+    pub namelen: u32,
+    pub frsize: u32,
+    pub padding: u32,
+    pub spare: [u32; 6usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_file_lock {
+    pub start: u64,
+    pub end: u64,
+    pub type_: u32,
+    pub pid: u32,
+}
+pub const fuse_opcode_FUSE_LOOKUP: fuse_opcode = 1;
+pub const fuse_opcode_FUSE_FORGET: fuse_opcode = 2;
+pub const fuse_opcode_FUSE_GETATTR: fuse_opcode = 3;
+pub const fuse_opcode_FUSE_SETATTR: fuse_opcode = 4;
+pub const fuse_opcode_FUSE_READLINK: fuse_opcode = 5;
+pub const fuse_opcode_FUSE_SYMLINK: fuse_opcode = 6;
+pub const fuse_opcode_FUSE_MKNOD: fuse_opcode = 8;
+pub const fuse_opcode_FUSE_MKDIR: fuse_opcode = 9;
+pub const fuse_opcode_FUSE_UNLINK: fuse_opcode = 10;
+pub const fuse_opcode_FUSE_RMDIR: fuse_opcode = 11;
+pub const fuse_opcode_FUSE_RENAME: fuse_opcode = 12;
+pub const fuse_opcode_FUSE_LINK: fuse_opcode = 13;
+pub const fuse_opcode_FUSE_OPEN: fuse_opcode = 14;
+pub const fuse_opcode_FUSE_READ: fuse_opcode = 15;
+pub const fuse_opcode_FUSE_WRITE: fuse_opcode = 16;
+pub const fuse_opcode_FUSE_STATFS: fuse_opcode = 17;
+pub const fuse_opcode_FUSE_RELEASE: fuse_opcode = 18;
+pub const fuse_opcode_FUSE_FSYNC: fuse_opcode = 20;
+pub const fuse_opcode_FUSE_SETXATTR: fuse_opcode = 21;
+pub const fuse_opcode_FUSE_GETXATTR: fuse_opcode = 22;
+pub const fuse_opcode_FUSE_LISTXATTR: fuse_opcode = 23;
+pub const fuse_opcode_FUSE_REMOVEXATTR: fuse_opcode = 24;
+pub const fuse_opcode_FUSE_FLUSH: fuse_opcode = 25;
+pub const fuse_opcode_FUSE_INIT: fuse_opcode = 26;
+pub const fuse_opcode_FUSE_OPENDIR: fuse_opcode = 27;
+pub const fuse_opcode_FUSE_READDIR: fuse_opcode = 28;
+pub const fuse_opcode_FUSE_RELEASEDIR: fuse_opcode = 29;
+pub const fuse_opcode_FUSE_FSYNCDIR: fuse_opcode = 30;
+pub const fuse_opcode_FUSE_GETLK: fuse_opcode = 31;
+pub const fuse_opcode_FUSE_SETLK: fuse_opcode = 32;
+pub const fuse_opcode_FUSE_SETLKW: fuse_opcode = 33;
+pub const fuse_opcode_FUSE_ACCESS: fuse_opcode = 34;
+pub const fuse_opcode_FUSE_CREATE: fuse_opcode = 35;
+pub const fuse_opcode_FUSE_INTERRUPT: fuse_opcode = 36;
+pub const fuse_opcode_FUSE_BMAP: fuse_opcode = 37;
+pub const fuse_opcode_FUSE_DESTROY: fuse_opcode = 38;
+pub const fuse_opcode_FUSE_IOCTL: fuse_opcode = 39;
+pub const fuse_opcode_FUSE_POLL: fuse_opcode = 40;
+pub const fuse_opcode_FUSE_NOTIFY_REPLY: fuse_opcode = 41;
+pub const fuse_opcode_FUSE_BATCH_FORGET: fuse_opcode = 42;
+pub const fuse_opcode_FUSE_FALLOCATE: fuse_opcode = 43;
+pub const fuse_opcode_FUSE_READDIRPLUS: fuse_opcode = 44;
+pub const fuse_opcode_FUSE_RENAME2: fuse_opcode = 45;
+pub const fuse_opcode_FUSE_LSEEK: fuse_opcode = 46;
+pub const fuse_opcode_FUSE_COPY_FILE_RANGE: fuse_opcode = 47;
+pub const fuse_opcode_FUSE_SETUPMAPPING: fuse_opcode = 48;
+pub const fuse_opcode_FUSE_REMOVEMAPPING: fuse_opcode = 49;
+pub const fuse_opcode_FUSE_SYNCFS: fuse_opcode = 50;
+pub const fuse_opcode_FUSE_CANONICAL_PATH: fuse_opcode = 2016;
+pub const fuse_opcode_CUSE_INIT: fuse_opcode = 4096;
+pub const fuse_opcode_CUSE_INIT_BSWAP_RESERVED: fuse_opcode = 1048576;
+pub const fuse_opcode_FUSE_INIT_BSWAP_RESERVED: fuse_opcode = 436207616;
+pub type fuse_opcode = crate::types::arch32::c_uint;
+pub const fuse_notify_code_FUSE_NOTIFY_POLL: fuse_notify_code = 1;
+pub const fuse_notify_code_FUSE_NOTIFY_INVAL_INODE: fuse_notify_code = 2;
+pub const fuse_notify_code_FUSE_NOTIFY_INVAL_ENTRY: fuse_notify_code = 3;
+pub const fuse_notify_code_FUSE_NOTIFY_STORE: fuse_notify_code = 4;
+pub const fuse_notify_code_FUSE_NOTIFY_RETRIEVE: fuse_notify_code = 5;
+pub const fuse_notify_code_FUSE_NOTIFY_DELETE: fuse_notify_code = 6;
+pub const fuse_notify_code_FUSE_NOTIFY_CODE_MAX: fuse_notify_code = 7;
+pub type fuse_notify_code = crate::types::arch32::c_uint;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_entry_out {
+    pub nodeid: u64,
+    pub generation: u64,
+    pub entry_valid: u64,
+    pub attr_valid: u64,
+    pub entry_valid_nsec: u32,
+    pub attr_valid_nsec: u32,
+    pub attr: fuse_attr,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_entry_bpf_out {
+    pub backing_action: u64,
+    pub backing_fd: u64,
+    pub bpf_action: u64,
+    pub bpf_fd: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_forget_in {
+    pub nlookup: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_forget_one {
+    pub nodeid: u64,
+    pub nlookup: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_batch_forget_in {
+    pub count: u32,
+    pub dummy: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_getattr_in {
+    pub getattr_flags: u32,
+    pub dummy: u32,
+    pub fh: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_attr_out {
+    pub attr_valid: u64,
+    pub attr_valid_nsec: u32,
+    pub dummy: u32,
+    pub attr: fuse_attr,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_mknod_in {
+    pub mode: u32,
+    pub rdev: u32,
+    pub umask: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_mkdir_in {
+    pub mode: u32,
+    pub umask: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_rename_in {
+    pub newdir: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_rename2_in {
+    pub newdir: u64,
+    pub flags: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_link_in {
+    pub oldnodeid: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_setattr_in {
+    pub valid: u32,
+    pub padding: u32,
+    pub fh: u64,
+    pub size: u64,
+    pub lock_owner: u64,
+    pub atime: u64,
+    pub mtime: u64,
+    pub ctime: u64,
+    pub atimensec: u32,
+    pub mtimensec: u32,
+    pub ctimensec: u32,
+    pub mode: u32,
+    pub unused4: u32,
+    pub uid: u32,
+    pub gid: u32,
+    pub unused5: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_open_in {
+    pub flags: u32,
+    pub open_flags: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_create_in {
+    pub flags: u32,
+    pub mode: u32,
+    pub umask: u32,
+    pub open_flags: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_open_out {
+    pub fh: u64,
+    pub open_flags: u32,
+    pub passthrough_fh: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_release_in {
+    pub fh: u64,
+    pub flags: u32,
+    pub release_flags: u32,
+    pub lock_owner: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_flush_in {
+    pub fh: u64,
+    pub unused: u32,
+    pub padding: u32,
+    pub lock_owner: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_read_in {
+    pub fh: u64,
+    pub offset: u64,
+    pub size: u32,
+    pub read_flags: u32,
+    pub lock_owner: u64,
+    pub flags: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_read_out {
+    pub offset: u64,
+    pub again: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_passthrough_out_v0 {
+    pub fd: u32,
+    pub len: u32,
+    pub vec: crate::uaddr32,
+}
+impl Default for fuse_passthrough_out_v0 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_write_in {
+    pub fh: u64,
+    pub offset: u64,
+    pub size: u32,
+    pub write_flags: u32,
+    pub lock_owner: u64,
+    pub flags: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_write_out {
+    pub size: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_statfs_out {
+    pub st: fuse_kstatfs,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_fsync_in {
+    pub fh: u64,
+    pub fsync_flags: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_setxattr_in {
+    pub size: u32,
+    pub flags: u32,
+    pub setxattr_flags: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_getxattr_in {
+    pub size: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_getxattr_out {
+    pub size: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_lk_in {
+    pub fh: u64,
+    pub owner: u64,
+    pub lk: fuse_file_lock,
+    pub lk_flags: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_lk_out {
+    pub lk: fuse_file_lock,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_access_in {
+    pub mask: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_init_in {
+    pub major: u32,
+    pub minor: u32,
+    pub max_readahead: u32,
+    pub flags: u32,
+    pub flags2: u32,
+    pub unused: [u32; 11usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_init_out {
+    pub major: u32,
+    pub minor: u32,
+    pub max_readahead: u32,
+    pub flags: u32,
+    pub max_background: u16,
+    pub congestion_threshold: u16,
+    pub max_write: u32,
+    pub time_gran: u32,
+    pub max_pages: u16,
+    pub map_alignment: u16,
+    pub flags2: u32,
+    pub unused: [u32; 7usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct cuse_init_in {
+    pub major: u32,
+    pub minor: u32,
+    pub unused: u32,
+    pub flags: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct cuse_init_out {
+    pub major: u32,
+    pub minor: u32,
+    pub unused: u32,
+    pub flags: u32,
+    pub max_read: u32,
+    pub max_write: u32,
+    pub dev_major: u32,
+    pub dev_minor: u32,
+    pub spare: [u32; 10usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_interrupt_in {
+    pub unique: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_bmap_in {
+    pub block: u64,
+    pub blocksize: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_bmap_out {
+    pub block: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_ioctl_in {
+    pub fh: u64,
+    pub flags: u32,
+    pub cmd: u32,
+    pub arg: u64,
+    pub in_size: u32,
+    pub out_size: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_ioctl_iovec {
+    pub base: u64,
+    pub len: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_ioctl_out {
+    pub result: i32,
+    pub flags: u32,
+    pub in_iovs: u32,
+    pub out_iovs: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_poll_in {
+    pub fh: u64,
+    pub kh: u64,
+    pub flags: u32,
+    pub events: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_poll_out {
+    pub revents: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_notify_poll_wakeup_out {
+    pub kh: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_fallocate_in {
+    pub fh: u64,
+    pub offset: u64,
+    pub length: u64,
+    pub mode: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_in_header {
+    pub len: u32,
+    pub opcode: u32,
+    pub unique: u64,
+    pub nodeid: u64,
+    pub uid: u32,
+    pub gid: u32,
+    pub pid: u32,
+    pub error_in: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_out_header {
+    pub len: u32,
+    pub error: i32,
+    pub unique: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, KnownLayout, Clone, IntoBytes, FromBytes, Immutable)]
+pub struct fuse_dirent {
+    pub ino: u64,
+    pub off: u64,
+    pub namelen: u32,
+    pub type_: u32,
+    pub name: __IncompleteArrayField<crate::types::arch32::c_char>,
+}
+#[repr(C)]
+#[derive(Debug, Default, KnownLayout, Clone, IntoBytes, FromBytes, Immutable)]
+pub struct fuse_direntplus {
+    pub entry_out: fuse_entry_out,
+    pub dirent: fuse_dirent,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_notify_inval_inode_out {
+    pub ino: u64,
+    pub off: i64,
+    pub len: i64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_notify_inval_entry_out {
+    pub parent: u64,
+    pub namelen: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_notify_delete_out {
+    pub parent: u64,
+    pub child: u64,
+    pub namelen: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_notify_store_out {
+    pub nodeid: u64,
+    pub offset: u64,
+    pub size: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_notify_retrieve_out {
+    pub notify_unique: u64,
+    pub nodeid: u64,
+    pub offset: u64,
+    pub size: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_notify_retrieve_in {
+    pub dummy1: u64,
+    pub offset: u64,
+    pub size: u32,
+    pub dummy2: u32,
+    pub dummy3: u64,
+    pub dummy4: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_lseek_in {
+    pub fh: u64,
+    pub offset: u64,
+    pub whence: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_lseek_out {
+    pub offset: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_copy_file_range_in {
+    pub fh_in: u64,
+    pub off_in: u64,
+    pub nodeid_out: u64,
+    pub fh_out: u64,
+    pub off_out: u64,
+    pub len: u64,
+    pub flags: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_setupmapping_in {
+    pub fh: u64,
+    pub foffset: u64,
+    pub len: u64,
+    pub flags: u64,
+    pub moffset: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_removemapping_in {
+    pub count: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_removemapping_one {
+    pub moffset: u64,
+    pub len: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_syncfs_in {
+    pub padding: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_secctx {
+    pub size: u32,
+    pub padding: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_secctx_header {
+    pub size: u32,
+    pub nr_secctx: u32,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_mount {
+    _unused: [u8; 0],
+}
+#[doc = " One input argument of a request"]
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_bpf_in_arg {
+    pub size: u32,
+    pub value: crate::uaddr32,
+    pub end_offset: crate::uaddr32,
+}
+impl Default for fuse_bpf_in_arg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[doc = " One output argument of a request"]
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_bpf_arg {
+    pub size: u32,
+    pub value: crate::uaddr32,
+    pub end_offset: crate::uaddr32,
+}
+impl Default for fuse_bpf_arg {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_bpf_args {
+    pub nodeid: u64,
+    pub opcode: u32,
+    pub error_in: u32,
+    pub in_numargs: u32,
+    pub out_numargs: u32,
+    pub flags: u32,
+    pub in_args: [fuse_bpf_in_arg; 5usize],
+    pub out_args: [fuse_bpf_arg; 3usize],
+    pub __bindgen_padding_0: [u8; 4usize],
+}
+impl Default for fuse_bpf_args {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_PMEM: kgsl_user_mem_type = 0;
 pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_ASHMEM: kgsl_user_mem_type = 1;
 pub const kgsl_user_mem_type_KGSL_USER_MEM_TYPE_ADDR: kgsl_user_mem_type = 2;
@@ -18485,6 +19258,76 @@ pub const FS_IOC_ADD_ENCRYPTION_KEY: __u32 = 3226494487;
 pub const FS_IOC_SET_ENCRYPTION_POLICY: __u32 = 2148296211;
 pub const FS_IOC_GET_ENCRYPTION_POLICY: __u32 = 1074554389;
 pub const FS_IOC_REMOVE_ENCRYPTION_KEY: __u32 = 3225445912;
+pub const KGSL_MEMFLAGS_USERMEM_PMEM: __u32 = 32;
+pub const KGSL_MEMFLAGS_USERMEM_ASHMEM: __u32 = 64;
+pub const KGSL_MEMFLAGS_USERMEM_ADDR: __u32 = 96;
+pub const KGSL_MEMFLAGS_USERMEM_ION: __u32 = 128;
+pub const IOCTL_KGSL_DEVICE_GETPROPERTY: __u32 = 3222014210;
+pub const IOCTL_KGSL_DEVICE_WAITTIMESTAMP: __u32 = 1074268422;
+pub const IOCTL_KGSL_DEVICE_WAITTIMESTAMP_CTXTID: __u32 = 1074530567;
+pub const IOCTL_KGSL_RINGBUFFER_ISSUEIBCMDS: __u32 = 3222538512;
+pub const IOCTL_KGSL_CMDSTREAM_READTIMESTAMP_OLD: __u32 = 2148010257;
+pub const IOCTL_KGSL_CMDSTREAM_READTIMESTAMP: __u32 = 3221752081;
+pub const IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP: __u32 = 1074530578;
+pub const IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP_OLD: __u32 = 2148272402;
+pub const IOCTL_KGSL_DRAWCTXT_CREATE: __u32 = 3221752083;
+pub const IOCTL_KGSL_DRAWCTXT_DESTROY: __u32 = 1074006292;
+pub const IOCTL_KGSL_MAP_USER_MEM: __u32 = 3223062805;
+pub const IOCTL_KGSL_CMDSTREAM_READTIMESTAMP_CTXTID: __u32 = 3222014230;
+pub const IOCTL_KGSL_CMDSTREAM_FREEMEMONTIMESTAMP_CTXTID: __u32 = 1074792727;
+pub const IOCTL_KGSL_SHAREDMEM_FROM_PMEM: __u32 = 3222276384;
+pub const IOCTL_KGSL_SHAREDMEM_FREE: __u32 = 1074006305;
+pub const IOCTL_KGSL_CFF_USER_EVENT: __u32 = 1075841329;
+pub const IOCTL_KGSL_DRAWCTXT_BIND_GMEM_SHADOW: __u32 = 1077676322;
+pub const IOCTL_KGSL_SHAREDMEM_FROM_VMALLOC: __u32 = 3222014243;
+pub const IOCTL_KGSL_SHAREDMEM_FLUSH_CACHE: __u32 = 1074006308;
+pub const IOCTL_KGSL_DRAWCTXT_SET_BIN_BASE_OFFSET: __u32 = 1074268453;
+pub const IOCTL_KGSL_CMDWINDOW_WRITE: __u32 = 1074530606;
+pub const IOCTL_KGSL_GPUMEM_ALLOC: __u32 = 3222014255;
+pub const IOCTL_KGSL_CFF_SYNCMEM: __u32 = 1074792752;
+pub const IOCTL_KGSL_TIMESTAMP_EVENT_OLD: __u32 = 1075054897;
+pub const IOCTL_KGSL_SETPROPERTY: __u32 = 1074530610;
+pub const IOCTL_KGSL_TIMESTAMP_EVENT: __u32 = 3222538547;
+pub const IOCTL_KGSL_GPUMEM_ALLOC_ID: __u32 = 3223062836;
+pub const IOCTL_KGSL_GPUMEM_FREE_ID: __u32 = 3221752117;
+pub const IOCTL_KGSL_GPUMEM_GET_INFO: __u32 = 3223849270;
+pub const IOCTL_KGSL_GPUMEM_SYNC_CACHE: __u32 = 1075054903;
+pub const IOCTL_KGSL_PERFCOUNTER_GET: __u32 = 3222538552;
+pub const IOCTL_KGSL_PERFCOUNTER_PUT: __u32 = 1074792761;
+pub const IOCTL_KGSL_PERFCOUNTER_QUERY: __u32 = 3222800698;
+pub const IOCTL_KGSL_PERFCOUNTER_READ: __u32 = 3222276411;
+pub const IOCTL_KGSL_GPUMEM_SYNC_CACHE_BULK: __u32 = 3222538556;
+pub const IOCTL_KGSL_SUBMIT_COMMANDS: __u32 = 3224111421;
+pub const IOCTL_KGSL_SYNCSOURCE_CREATE: __u32 = 3222276416;
+pub const IOCTL_KGSL_SYNCSOURCE_DESTROY: __u32 = 3222276417;
+pub const IOCTL_KGSL_SYNCSOURCE_CREATE_FENCE: __u32 = 3222800706;
+pub const IOCTL_KGSL_SYNCSOURCE_SIGNAL_FENCE: __u32 = 3222800707;
+pub const IOCTL_KGSL_CFF_SYNC_GPUOBJ: __u32 = 1075317060;
+pub const IOCTL_KGSL_GPUOBJ_ALLOC: __u32 = 3224373573;
+pub const IOCTL_KGSL_GPUOBJ_FREE: __u32 = 1075841350;
+pub const IOCTL_KGSL_GPUOBJ_INFO: __u32 = 3224373575;
+pub const IOCTL_KGSL_GPUOBJ_IMPORT: __u32 = 3223325000;
+pub const IOCTL_KGSL_GPUOBJ_SYNC: __u32 = 1074792777;
+pub const IOCTL_KGSL_GPU_COMMAND: __u32 = 3225422154;
+pub const IOCTL_KGSL_PREEMPTIONCOUNTER_QUERY: __u32 = 3222800715;
+pub const IOCTL_KGSL_GPUOBJ_SET_INFO: __u32 = 1075841356;
+pub const IOCTL_KGSL_SPARSE_PHYS_ALLOC: __u32 = 3223325008;
+pub const IOCTL_KGSL_SPARSE_PHYS_FREE: __u32 = 1074006353;
+pub const IOCTL_KGSL_SPARSE_VIRT_ALLOC: __u32 = 3223849298;
+pub const IOCTL_KGSL_SPARSE_VIRT_FREE: __u32 = 1074006355;
+pub const IOCTL_KGSL_SPARSE_BIND: __u32 = 1075317076;
+pub const IOCTL_KGSL_GPU_SPARSE_COMMAND: __u32 = 3224897877;
+pub const IOCTL_KGSL_GPUMEM_BIND_RANGES: __u32 = 3223325014;
+pub const IOCTL_KGSL_GPU_AUX_COMMAND: __u32 = 3224373591;
+pub const IOCTL_KGSL_TIMELINE_CREATE: __u32 = 3222276440;
+pub const IOCTL_KGSL_TIMELINE_WAIT: __u32 = 1076365657;
+pub const IOCTL_KGSL_TIMELINE_QUERY: __u32 = 3222276442;
+pub const IOCTL_KGSL_TIMELINE_SIGNAL: __u32 = 1074792795;
+pub const IOCTL_KGSL_TIMELINE_FENCE_GET: __u32 = 3222276444;
+pub const IOCTL_KGSL_TIMELINE_DESTROY: __u32 = 1074006365;
+pub const IOCTL_KGSL_GET_FAULT_REPORT: __u32 = 3222800734;
+pub const IOCTL_KGSL_RECURRING_COMMAND: __u32 = 3224373599;
+pub const IOCTL_KGSL_READ_CALIBRATED_TIMESTAMPS: __u32 = 3223325024;
 pub const UI_DEV_CREATE: __u32 = 21761;
 pub const UI_DEV_DESTROY: __u32 = 21762;
 pub const UI_DEV_SETUP: __u32 = 1079792899;
@@ -18540,6 +19383,18 @@ pub const UFFDIO_COPY_MODE_DONTWAKE: __u32 = 1;
 pub const UFFDIO_COPY_MODE_WP: __u32 = 2;
 pub const UFFDIO_ZEROPAGE_MODE_DONTWAKE: __u32 = 1;
 pub const UFFDIO_CONTINUE_MODE_DONTWAKE: __u32 = 1;
+pub const PERF_EVENT_IOC_ENABLE: __u32 = 9216;
+pub const PERF_EVENT_IOC_DISABLE: __u32 = 9217;
+pub const PERF_EVENT_IOC_REFRESH: __u32 = 9218;
+pub const PERF_EVENT_IOC_RESET: __u32 = 9219;
+pub const PERF_EVENT_IOC_PERIOD: __u32 = 1074275332;
+pub const PERF_EVENT_IOC_SET_OUTPUT: __u32 = 9221;
+pub const PERF_EVENT_IOC_SET_FILTER: __u32 = 1074013190;
+pub const PERF_EVENT_IOC_ID: __u32 = 2147755015;
+pub const PERF_EVENT_IOC_SET_BPF: __u32 = 1074013192;
+pub const PERF_EVENT_IOC_PAUSE_OUTPUT: __u32 = 1074013193;
+pub const PERF_EVENT_IOC_QUERY_BPF: __u32 = 3221496842;
+pub const PERF_EVENT_IOC_MODIFY_ATTRIBUTES: __u32 = 1074013195;
 pub type utsname = new_utsname;
 pub type gid_t = __kernel_gid_t;
 pub type ino_t = __kernel_ino_t;

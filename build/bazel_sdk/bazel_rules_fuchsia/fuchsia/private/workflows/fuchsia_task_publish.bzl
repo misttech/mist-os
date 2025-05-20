@@ -54,7 +54,7 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
             doc = "The publish_packages tool.",
             default = "//fuchsia/tools:publish_packages",
             executable = True,
-            cfg = "target",
+            cfg = "exec",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

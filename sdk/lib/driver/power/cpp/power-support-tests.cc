@@ -11,6 +11,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
@@ -19,6 +20,7 @@
 #include <lib/driver/power/cpp/testing/fake_topology.h>
 #include <lib/driver/power/cpp/testing/fidl_bound_server.h>
 #include <lib/driver/power/cpp/testing/scoped_background_loop.h>
+#include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
@@ -34,9 +36,12 @@
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/event.h>
+#include <lib/zx/eventpair.h>
+#include <lib/zx/time.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls/object.h>
+#include <zircon/time.h>
 
 #include <optional>
 #include <vector>
@@ -47,6 +52,8 @@
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 #include <src/storage/lib/vfs/cpp/service.h>
 #include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
+
+#include "testing-common.h"
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
@@ -1454,38 +1461,6 @@ class CpuElementManager : public fidl::testing::TestBase<fuchsia_power_system::C
   zx::event cpu_dep_token_;
 };
 
-class SystemActivityGovernor
-    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
- public:
-  SystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
-      : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
-        wake_handling_assertive_(std::move(wake_handling_assertive)) {}
-
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
-    fuchsia_power_system::PowerElements elements;
-    zx::event execution_element;
-    exec_state_opportunistic_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
-
-    fuchsia_power_system::ExecutionState exec_state = {
-        {.opportunistic_dependency_token = std::move(execution_element)}};
-
-    elements = {{.execution_state = std::move(exec_state)}};
-
-    completer.Reply({{std::move(elements)}});
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    ADD_FAILURE() << name << " is not implemented";
-  }
-
- private:
-  zx::event exec_state_opportunistic_;
-  zx::event wake_handling_assertive_;
-};
-
 /// Test getting dependency tokens for an element that depends on SAG's power
 /// elements.
 TEST_F(PowerLibTest, TestSagElements) {
@@ -1500,7 +1475,7 @@ TEST_F(PowerLibTest, TestSagElements) {
   wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe);
 
   SystemActivityGovernor sag_server(std::move(exec_opportunistic_dupe),
-                                    std::move(wake_assertive_dupe));
+                                    std::move(wake_assertive_dupe), loop.dispatcher());
 
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings;
   fbl::RefPtr<fs::Service> sag = fbl::MakeRefCounted<fs::Service>(
@@ -1889,7 +1864,8 @@ TEST_F(PowerLibTest, TestAllParentElementTypes) {
   zx::event::create(0, &wake_assertive);
   zx::event exec_opportunistic_dupe;
   exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe);
-  SystemActivityGovernor sag(std::move(exec_opportunistic_dupe), std::move(wake_assertive));
+  SystemActivityGovernor sag(std::move(exec_opportunistic_dupe), std::move(wake_assertive),
+                             loop.dispatcher());
 
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> sag_bindings;
   fbl::RefPtr<fs::Service> sag_server = fbl::MakeRefCounted<fs::Service>(
@@ -1978,7 +1954,7 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
   wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe);
 
   SystemActivityGovernor sag_server(std::move(exec_opportunistic_dupe),
-                                    std::move(wake_assertive_dupe));
+                                    std::move(wake_assertive_dupe), loop.dispatcher());
 
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings;
   fbl::RefPtr<fs::Service> sag = fbl::MakeRefCounted<fs::Service>(
@@ -2143,9 +2119,9 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
       .get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(zx_info_handle_basic_t), nullptr, nullptr);
   EXPECT_EQ(info1.koid, info2.koid);
 }
-
 // TODO(https://fxbug.dev/328527466) This dependency is invalid because it has
 // no level deps add a test that checks we return a proper error
+
 }  // namespace power_lib_test
 
 #endif

@@ -46,6 +46,7 @@ if (zircon_toolchain == false) {
 # the `ld` namespace, which isn't itself part of of the passive ABI.
 library_headers("headers") {
   headers = [
+    "lib/ld/bootstrap.h",
     "lib/ld/decoded-module-in-memory.h",
     "lib/ld/decoded-module.h",
     "lib/ld/diagnostics.h",
@@ -107,7 +108,7 @@ static_library("ld-log-zircon") {
   public_deps = [ ":ld-log-zircon.headers" ]
   sources = [ "log-zircon.cc" ]
   deps = [
-    "//sdk/lib/fdio:headers",
+    "//sdk/lib/fdio:constants",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
@@ -347,16 +348,16 @@ source_set("abi") {
   deps = [ ":headers" ]
 }
 
-source_set("bootstrap") {
+source_set("startup-bootstrap") {
   visibility = [ ":*" ]
 
-  public = [ "bootstrap.h" ]
+  public = [ "startup-bootstrap.h" ]
   public_deps = [
     ":headers",
     "//src/lib/elfldltl",
 
-    # TODO(https://fxbug.dev/42080826): This gets users of bootstrap.h the config that
-    # plumbs the HAVE_LLVM_PROFDATA predefine used there.
+    # TODO(https://fxbug.dev/42080826): This gets users of startup-bootstrap.h
+    # the config that plumbs the HAVE_LLVM_PROFDATA predefine used there.
     "//src/lib/llvm-profdata",
   ]
 }
@@ -371,7 +372,7 @@ static_library("standalone") {
     "./*",
     "//src/devices/bin/driver_manager/tests/modules/*",
     "//src/devices/lib/driver-host-passive-abi/*",
-    "//zircon/kernel/lib/userabi/vdso/*",
+    "//zircon/kernel/lib/userabi/*",
   ]
 
   complete_static_lib = true
@@ -435,8 +436,8 @@ source_set("startup-load") {
   public_deps = [
     ":abi",
     ":allocator",
-    ":bootstrap",
     ":headers",
+    ":startup-bootstrap",
     ":startup-diagnostics.headers",
     "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",

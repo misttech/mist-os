@@ -18,7 +18,6 @@ pub struct Type {
     #[serde(flatten)]
     pub kind: TypeKind,
     #[serde(rename = "type_shape_v2")]
-    #[expect(dead_code)]
     pub shape: TypeShape,
 }
 

@@ -241,6 +241,12 @@ async fn bench<N: Netstack, I: TestIpExt>(
         )
         .expect("create realm");
 
+    // Ignore 'crashes' from iperf, since it reports things in its exit code
+    // that can be seen as crashes in CF world and netemul.
+    realm.ignore_checked_shutdown_monikers(
+        (0..flows).map(|i| [client_moniker(i), server_moniker(i)].into_iter()).flatten(),
+    );
+
     // Start the iPerf client until a successful run is observed.
     let realm_ref = &realm;
     let mut servers = futures::future::select_all((0..flows).map(|i| {

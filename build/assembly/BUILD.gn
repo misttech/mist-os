@@ -53,7 +53,7 @@ if (is_host) {
     testonly = true
     deps = [
       "scripts:tests($host_toolchain)",
-      "tools/generate_config:generate_config_test($host_toolchain)",
+      "tools/assembly_config:assembly_config_test($host_toolchain)",
     ]
   }
 }

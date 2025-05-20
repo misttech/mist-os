@@ -15,8 +15,6 @@ if (zircon_toolchain == false) {
 library_headers("range.headers") {
   headers = [ "lib/memalloc/range.h" ]
   public_deps = [
-    "//sdk/lib/stdcompat$_headers",
-
     # <lib/memalloc/range.h> has #include <lib/zbi-format/zbi.h>.
     "//sdk/lib/zbi-format",
   ]
@@ -39,7 +37,6 @@ library_headers("headers") {
 
   public_deps = [
     ":range.headers",
-    "//sdk/lib/stdcompat$_headers",
 
     # <lib/memalloc/pool.h> has #include <lib/fit/function.h>.
     "//sdk/lib/fit$_headers",
@@ -63,7 +60,6 @@ source_set("memalloc") {
   deps = [
     ":range",
     "//sdk/lib/fit",
-    "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
@@ -151,7 +147,6 @@ if (!is_kernel) {
     deps = [
       ":memalloc",
       ":testing",
-      "//sdk/lib/stdcompat",
     ]
   }
 

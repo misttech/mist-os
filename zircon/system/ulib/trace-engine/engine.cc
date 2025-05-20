@@ -755,9 +755,9 @@ EXPORT bool trace_is_category_enabled(const char* category_literal) {
   return result;
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 EXPORT bool trace_is_category_bytestring_enabled(const unsigned char* bytes, size_t length)
-    ZX_AVAILABLE_SINCE(NEXT) {
+    ZX_AVAILABLE_SINCE(27) {
   trace_context_t* context = trace_acquire_context();
   if (likely(!context))
     return false;
@@ -809,11 +809,11 @@ EXPORT trace_context_t* trace_acquire_context_for_category(const char* category_
 }
 
 // thread-safe, fail-fast, lock-free
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 EXPORT trace_context_t* trace_acquire_context_for_category_bytestring(const unsigned char* bytes,
                                                                       size_t length,
                                                                       trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT) {
+    ZX_AVAILABLE_SINCE(27) {
   // This is marked likely because tracing is usually disabled and we want
   // to return as quickly as possible from this function.
   trace_context_t* context = trace_acquire_context();
@@ -857,10 +857,10 @@ static __NO_INLINE trace_context_t* trace_acquire_context_for_category_cached_wo
   return context;
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 static __NO_INLINE trace_context_t* trace_acquire_context_for_category_bytestring_cached_worker(
     const unsigned char* bytes, size_t length, trace_site_t* site, trace_string_ref_t* out_ref,
-    trace_site_state_t current_state) ZX_AVAILABLE_SINCE(NEXT) {
+    trace_site_state_t current_state) ZX_AVAILABLE_SINCE(27) {
   trace_context_t* context = trace_acquire_context_for_category_bytestring(bytes, length, out_ref);
 
   if (likely((current_state & kSiteStateFlagsMask) != kSiteStateUnknown)) {
@@ -890,11 +890,11 @@ EXPORT trace_context_t* trace_acquire_context_for_category_cached(const char* ca
                                                           current_state);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(27)
 // thread-safe, fail-fast, lock-free
 EXPORT trace_context_t* trace_acquire_context_for_category_bytestring_cached(
     const unsigned char* bytes, size_t length, trace_site_t* site, trace_string_ref_t* out_ref)
-    ZX_AVAILABLE_SINCE(NEXT) {
+    ZX_AVAILABLE_SINCE(27) {
   trace_site_atomic_state_t* state_ptr = get_trace_site_state_as_atomic(site);
 
   trace_site_state_t current_state = state_ptr->load(std::memory_order_relaxed);

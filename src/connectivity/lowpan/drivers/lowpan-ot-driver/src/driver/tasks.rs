@@ -331,8 +331,8 @@ where
         // Enable the receive filter.
         driver_state.ot_instance.ip6_set_receive_filter_enabled(true);
 
-        // Turn off ICMPv6 ping auto-reply.
-        driver_state.ot_instance.icmp6_set_echo_mode(ot::Icmp6EchoMode::HandleDisabled);
+        // Turn off ICMPv6 ping auto-reply except for RLOC and ALOC address.
+        driver_state.ot_instance.icmp6_set_echo_mode(ot::Icmp6EchoMode::HandleRlocAlocOnly);
 
         // Enable SRP Server
         driver_state.ot_instance.srp_server_set_auto_enable_mode(true);

@@ -89,7 +89,7 @@ if (current_toolchain == default_toolchain) {
     ]
 
     inputs = [
-      target_out_dir + "/test_zbi/test_zbi.zbi",
+      target_out_dir + "/test_zbi_gen/test_zbi.zbi",
       zbi_tool_path,
     ]
     outputs = [ output_file ]
@@ -98,7 +98,8 @@ if (current_toolchain == default_toolchain) {
       "--zbi",
       rebase_path(zbi_tool_path, root_build_dir),
       "--zbi-image",
-      rebase_path(target_out_dir + "/test_zbi/test_zbi.zbi", root_build_dir),
+      rebase_path(target_out_dir + "/test_zbi_gen/test_zbi.zbi",
+                  root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]

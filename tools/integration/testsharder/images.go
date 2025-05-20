@@ -119,17 +119,10 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 		// need to get any deps from the images.json.
 		return false
 	}
-	if isFlashingDep(image) {
-		return true
-	}
 	// TODO(https://fxbug.dev/42124288): Remove zedboot/paving images once we switch to flashing.
 	return ((pave && len(image.PaveArgs) != 0) ||
 		(!pave && len(image.NetbootArgs) != 0) ||
 		(len(image.PaveZedbootArgs) != 0) ||
 		(pave && len(image.FastbootFlashArgs) != 0) ||
 		(!pave && len(image.FastbootBootArgs) != 0))
-}
-
-func isFlashingDep(image build.Image) bool {
-	return image.Name == "fastboot"
 }

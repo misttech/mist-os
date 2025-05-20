@@ -9,7 +9,7 @@
 #include <fbl/alloc_checker.h>
 #include <hypervisor/aspace.h>
 #include <kernel/range_check.h>
-#include <ktl/move.h>
+#include <ktl/utility.h>
 #include <vm/fault.h>
 #include <vm/page_source.h>
 #include <vm/physmap.h>
@@ -221,7 +221,7 @@ zx::result<DirectPhysicalAspace> DirectPhysicalAspace::Create() {
 DirectPhysicalAspace::~DirectPhysicalAspace() {
   if (physical_aspace_ != nullptr) {
     zx_status_t status = physical_aspace_->arch_aspace().Unmap(
-        0, kNumPhysmapPages, ArchVmAspace::EnlargeOperation::Yes, nullptr);
+        0, kNumPhysmapPages, ArchVmAspaceInterface::ArchUnmapOptions::Enlarge, nullptr);
     DEBUG_ASSERT(status == ZX_OK);
     physical_aspace_->Destroy();
   }

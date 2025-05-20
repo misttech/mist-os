@@ -48,18 +48,18 @@ TEST(MaliGpuVisitorTest, TestBindProperty) {
       auto mgr_request =
           mali_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, 0);
 
-      ASSERT_EQ(2lu, mgr_request.parents()->size());
+      ASSERT_EQ(2lu, mgr_request.parents2()->size());
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpu_mali::SERVICE,
-                                    bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)}},
-          (*mgr_request.parents())[1].bind_rules(), false));
+          {{fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_gpu_mali::SERVICE,
+                                     bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)}},
+          (*mgr_request.parents2())[1].bind_rules(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
           {{
-              fdf::MakeProperty(bind_fuchsia_hardware_gpu_mali::SERVICE,
-                                bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT),
+              fdf::MakeProperty2(bind_fuchsia_hardware_gpu_mali::SERVICE,
+                                 bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT),
           }},
-          (*mgr_request.parents())[1].properties(), false));
+          (*mgr_request.parents2())[1].properties(), false));
     }
   }
 

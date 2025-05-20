@@ -12,9 +12,9 @@ use std::io::Cursor;
 use std::ops::Deref;
 use thiserror::Error;
 
-#[cfg(fuchsia_api_level_less_than = "NEXT")]
+#[cfg(fuchsia_api_level_less_than = "27")]
 use fidl_fuchsia_diagnostics::Severity;
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "27")]
 use fidl_fuchsia_diagnostics_types::Severity;
 
 /// An `Encoder` wraps any value implementing `MutableBuffer` and writes diagnostic stream records

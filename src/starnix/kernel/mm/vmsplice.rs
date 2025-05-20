@@ -34,13 +34,15 @@ impl VmsplicePayloadSegment {
             return None;
         }
 
-        let orig_length = self.length;
-        self.length = index;
-
         let mut mapping = self.clone();
-        mapping.length = orig_length - index;
-        mapping.addr_offset += index;
+        mapping.length = self.length - index;
+        mapping.addr_offset = match mapping.addr_offset + index {
+            Ok(new_addr) => new_addr,
+            Err(_) => return None,
+        };
         mapping.memory_offset += index as u64;
+
+        self.length = index;
         Some(mapping)
     }
 
@@ -301,7 +303,8 @@ impl InflightVmsplicedPayloads {
 
             for segment in segments.iter() {
                 let mut segment = segment.clone();
-                let segment_range = segment.addr_offset..segment.addr_offset + segment.length;
+                let segment_end = (segment.addr_offset + segment.length)?;
+                let segment_range = segment.addr_offset..segment_end;
                 let segment_unmapped_range = unmapped_range.intersect(&segment_range);
 
                 if &segment.memory != unmapped_memory || segment_unmapped_range.is_empty() {

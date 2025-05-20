@@ -17,15 +17,8 @@ use std::sync::Arc;
 use zx_status::Status;
 
 pub trait RemoteLike {
+    /// Called when a fuchsia.io/Directory.Open request should be forwarded to the remote node.
     fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    );
-
-    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
@@ -40,16 +33,26 @@ pub trait RemoteLike {
     fn lazy(&self, _path: &Path) -> bool {
         false
     }
+
+    /// DEPRECATED - Do not implement unless required for backwards compatibility. Called when
+    /// forwarding fuchsia.io/Directory.DeprecatedOpen requests.
+    fn deprecated_open(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        _path: Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        flags.to_object_request(server_end.into_channel()).shutdown(Status::NOT_SUPPORTED);
+    }
 }
 
-/// Create a new [`Remote`] node that forwards open requests to the provided [`DirectoryProxy`],
-/// effectively handing off the handling of any further requests to the remote fidl server.
+/// Creates a new node that forwards open requests a remote directory server.
 pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<impl DirectoryEntry + RemoteLike> {
     Arc::new(RemoteDir { dir })
 }
 
-/// [`RemoteDir`] implements [`RemoteLike`]` which forwards open/open2 requests to a remote
-/// directory.
+/// [`RemoteDir`] implements [`RemoteLike`]` by forwarding open requests to a remote directory.
 struct RemoteDir {
     dir: fio::DirectoryProxy,
 }
@@ -79,7 +82,7 @@ impl<T: GetRemoteDir + Send + Sync + 'static> DirectoryEntry for T {
 }
 
 impl<T: GetRemoteDir> RemoteLike for T {
-    fn open(
+    fn deprecated_open(
         self: Arc<Self>,
         _scope: ExecutionScope,
         flags: fio::OpenFlags,
@@ -87,14 +90,14 @@ impl<T: GetRemoteDir> RemoteLike for T {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         flags.to_object_request(server_end).handle(|object_request| {
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "27")]
             let _ = self.get_remote_dir()?.deprecated_open(
                 flags,
                 fio::ModeType::empty(),
                 path.as_ref(),
                 object_request.take().into_server_end(),
             );
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "27"))]
             let _ = self.get_remote_dir()?.open(
                 flags,
                 fio::ModeType::empty(),
@@ -105,7 +108,7 @@ impl<T: GetRemoteDir> RemoteLike for T {
         });
     }
 
-    fn open3(
+    fn open(
         self: Arc<Self>,
         _scope: ExecutionScope,
         path: Path,
@@ -114,14 +117,14 @@ impl<T: GetRemoteDir> RemoteLike for T {
     ) -> Result<(), Status> {
         // There is nowhere to propagate any errors since we take the `object_request`. This is okay
         // as the channel will be dropped and closed if the wire call fails.
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "27")]
         let _ = self.get_remote_dir()?.open(
             path.as_ref(),
             flags,
             &object_request.options(),
             object_request.take().into_channel(),
         );
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "27"))]
         let _ = self.get_remote_dir()?.open3(
             path.as_ref(),
             flags,

@@ -366,7 +366,7 @@ impl TouchInjectorHandler {
         };
         let data = pointerinjector::Data::PointerSample(pointer_sample);
 
-        let trace_flow_id = fuchsia_trace::Id::new();
+        let trace_flow_id = fuchsia_trace::Id::random();
         let event = pointerinjector::Event {
             timestamp: Some(event_time.into_nanos()),
             data: Some(data),
@@ -436,7 +436,7 @@ impl TouchInjectorHandler {
                         let events = &[pointerinjector::Event {
                             timestamp: Some(fuchsia_async::MonotonicInstant::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
-                            trace_flow_id: Some(fuchsia_trace::Id::new().into()),
+                            trace_flow_id: Some(fuchsia_trace::Id::random().into()),
                             ..Default::default()
                         }];
                         injector.inject(events).await.expect("Failed to inject updated viewport.");

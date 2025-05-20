@@ -60,7 +60,7 @@ impl FfxMain for ConfigTool {
                 exec_check_ssh_keys(&self.ctx, check_ssh_cmd, &mut writer).await
             }
             SubCommand::Env(env) => exec_env(&self.ctx, env, writer).await,
-            SubCommand::Get(get_cmd) => exec_get(&self.ctx, get_cmd, writer).await,
+            SubCommand::Get(get_cmd) => exec_get(&self.ctx, get_cmd, writer),
             SubCommand::Set(set_cmd) => exec_set(&self.ctx, set_cmd).await,
             SubCommand::Remove(remove_cmd) => exec_remove(&self.ctx, remove_cmd).await,
             SubCommand::Add(add_cmd) => exec_add(&self.ctx, add_cmd).await,
@@ -118,11 +118,7 @@ fn output_first_element<W: Write>(mut writer: W, value: Option<Value>) -> Result
     }
 }
 
-async fn exec_get<W: Write>(
-    ctx: &EnvironmentContext,
-    get_cmd: &GetCommand,
-    writer: W,
-) -> Result<()> {
+fn exec_get<W: Write>(ctx: &EnvironmentContext, get_cmd: &GetCommand, writer: W) -> Result<()> {
     match get_cmd.name.as_ref() {
         Some(_) => match get_cmd.process {
             MappingMode::Raw => {
@@ -134,18 +130,16 @@ async fn exec_get<W: Write>(
                 output_array(writer, value)
             }
             MappingMode::File => {
-                let value = get_cmd.query(ctx).get_file().await?;
+                let value = get_cmd.query(ctx).get_file()?;
                 output_first_element(writer, value)
             }
         },
-        None => {
-            print_config(ctx, writer /*, get_cmd.query().get_build_dir().await.as_deref()*/)
-        }
+        None => print_config(ctx, writer),
     }
 }
 
 async fn exec_set(ctx: &EnvironmentContext, set_cmd: &SetCommand) -> Result<()> {
-    tracing::debug!("Set command running...");
+    log::debug!("Set command running...");
     set_cmd.query(ctx).set(set_cmd.value.clone()).await
 }
 
@@ -190,7 +184,7 @@ async fn exec_env_set<W: Write>(
         ConfigLevel::Global => env.set_global(Some(&s.file)),
         _ => ffx_bail!("This configuration is not stored in the environment."),
     }
-    env.save().await
+    env.save()
 }
 
 async fn exec_env<W: Write>(
@@ -314,7 +308,7 @@ mod test {
         };
 
         let mut writer = Vec::<u8>::new();
-        exec_get(&test_env.context, &get_cmd, &mut writer).await.expect("getting value");
+        exec_get(&test_env.context, &get_cmd, &mut writer).expect("getting value");
         assert_eq!(String::from_utf8(writer).unwrap(), "\"a value\"\n".to_string());
     }
 
@@ -340,7 +334,7 @@ mod test {
         exec_remove(&test_env.context, &remove_cmd).await.expect("remove");
 
         let mut writer = Vec::<u8>::new();
-        match exec_get(&test_env.context, &get_cmd, &mut writer).await {
+        match exec_get(&test_env.context, &get_cmd, &mut writer) {
             Ok(_) => panic!("Expected error getting removed key"),
             Err(e) => assert_eq!(e.to_string(), "Value not found"),
         };
@@ -394,7 +388,6 @@ mod test {
             },
             &mut writer,
         )
-        .await
         .expect("exec_get");
         let got = String::from_utf8_lossy(&writer);
         let want = serde_json::to_string_pretty(&json!([
@@ -436,7 +429,6 @@ mod test {
             },
             &mut writer,
         )
-        .await
         .expect("exec_get");
         let got = String::from_utf8_lossy(&writer);
         let want = serde_json::to_string_pretty(&json!([private_path1, private_path2]))
@@ -479,7 +471,6 @@ mod test {
             },
             &mut writer,
         )
-        .await
         .expect("exec_get");
         let got = String::from_utf8_lossy(&writer);
         let want = serde_json::to_string_pretty(&json!(["private_path1", private_path2]))
@@ -512,7 +503,6 @@ mod test {
             },
             &mut writer,
         )
-        .await
         .expect("exec_get");
         let got = String::from_utf8_lossy(&writer);
         assert_eq!(got, format!("{}\n", json!(private_path1)));
@@ -548,7 +538,6 @@ mod test {
             },
             &mut writer,
         )
-        .await
         .expect("exec_get");
         let got = String::from_utf8_lossy(&writer);
         assert_eq!(got, format!("{}\n", json!(private_path1)));
@@ -587,7 +576,6 @@ mod test {
             },
             &mut writer,
         )
-        .await
         .expect("exec_get");
         let got = String::from_utf8_lossy(&writer);
         assert_eq!(got, format!("{}\n", json!(private_path1.path())));

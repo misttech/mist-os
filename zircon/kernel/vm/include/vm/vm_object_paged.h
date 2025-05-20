@@ -84,35 +84,35 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return ktl::min(cow_pages_locked()->size_locked(), cow_range_.len);
   }
 
-  // Queries the user defined content size, which is distinct from the VMO size. Content size is
+  // Queries the user defined stream size, which is distinct from the VMO size. Stream size is
   // byte-aligned and is not guaranteed to be in the range of the VMO. The lock does not not guard
   // the user changing the value via a syscall, so multiple calls under the same lock acquisition
   // can have different results.
-  ktl::optional<uint64_t> user_content_size_locked() TA_REQ(lock()) {
-    if (!user_content_size_) {
+  ktl::optional<uint64_t> user_stream_size_locked() TA_REQ(lock()) {
+    if (!user_stream_size_) {
       return ktl::nullopt;
     }
 
-    return user_content_size_->GetContentSize();
+    return user_stream_size_->GetContentSize();
   }
 
-  // Calculates the minimum of the VMO size and the page-aligned user content size.
-  ktl::optional<uint64_t> saturating_content_size_locked() TA_REQ(lock()) {
-    if (!user_content_size_) {
+  // Calculates the minimum of the VMO size and the page-aligned user stream size.
+  ktl::optional<uint64_t> saturating_stream_size_locked() TA_REQ(lock()) {
+    if (!user_stream_size_) {
       return ktl::nullopt;
     }
 
-    uint64_t user_content_size = user_content_size_->GetContentSize();
+    uint64_t user_stream_size = user_stream_size_->GetContentSize();
     uint64_t vmo_size = size_locked();
 
-    // If user content size is larger, trim to the VMO.
+    // If user stream size is larger, trim to the VMO.
     // TODO(https://fxbug.dev/380960681): remove check when stream size <= VMO size invariant is
     // enforced.
-    if (user_content_size > vmo_size) {
+    if (user_stream_size > vmo_size) {
       return vmo_size;
     }
 
-    return ROUNDUP_PAGE_SIZE(user_content_size);
+    return ROUNDUP_PAGE_SIZE(user_stream_size);
   }
 
   bool is_contiguous() const override { return (options_ & kContiguous); }
@@ -262,10 +262,10 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // See VmObject::SetUserContentSize
-  void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) override {
+  // See VmObject::SetUserStreamSize
+  void SetUserStreamSize(fbl::RefPtr<ContentSizeManager> csm) override {
     Guard<VmoLockType> guard{lock()};
-    user_content_size_ = ktl::move(csm);
+    user_stream_size_ = ktl::move(csm);
   }
 
   void Dump(uint depth, bool verbose) override {
@@ -367,12 +367,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // Constructs and returns a |DeferredOps| that can be passed into other methods on this VMO that
   // require one.
   VmCowPages::DeferredOps MakeDeferredOps() { return VmCowPages::DeferredOps(cow_pages_.get()); }
-
-  // TODO(https://fxbug.dev/338300943): This is a temporary method to allow constructing a
-  // |DeferredOps| under the lock. See the related comments on |DeferredOps::LockedTag|.
-  VmCowPages::DeferredOps MakeDeferredOpsLocked() TA_REQ(lock()) {
-    return VmCowPages::DeferredOps(cow_pages_.get(), VmCowPages::DeferredOps::LockedTag{});
-  }
 
  private:
   // private constructor (use Create())
@@ -491,9 +485,9 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // This range can be less than the whole VmCowPage for a slice reference.
   const VmCowRange cow_range_;
 
-  // A user supplied content size that can be queried. By itself this has no semantic meaning and is
-  // only read and used specifically when requested by the user. See VmObject::SetUserContentSize.
-  fbl::RefPtr<ContentSizeManager> user_content_size_ TA_GUARDED(lock());
+  // A user supplied stream size that can be queried. By itself this has no semantic meaning and is
+  // only read and used specifically when requested by the user. See VmObject::SetUserStreamSize.
+  fbl::RefPtr<ContentSizeManager> user_stream_size_ TA_GUARDED(lock());
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_OBJECT_PAGED_H_

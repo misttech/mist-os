@@ -6,11 +6,10 @@
 
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
 
-#include <iostream>
 #include <optional>
+#include <span>
 
 #include <zxtest/zxtest.h>
 
@@ -174,11 +173,11 @@ class TestMixin : public zxtest::Test, public Base... {
   }
 };
 
-void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
-                      cpp20::span<const zbi_topology_node_t> expected_nodes);
+void CheckCpuTopology(std::span<const zbi_topology_node_t> actual_nodes,
+                      std::span<const zbi_topology_node_t> expected_nodes);
 
-void CheckMmioRanges(cpp20::span<const boot_shim::DevicetreeMmioRange> actual,
-                     cpp20::span<const boot_shim::DevicetreeMmioRange> expected);
+void CheckMmioRanges(std::span<const boot_shim::DevicetreeMmioRange> actual,
+                     std::span<const boot_shim::DevicetreeMmioRange> expected);
 
 }  // namespace boot_shim::testing
 

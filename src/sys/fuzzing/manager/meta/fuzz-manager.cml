@@ -16,7 +16,7 @@
         {
             protocol: [
                 "fuchsia.fuzzer.Registry",
-                "fuchsia.test.manager.RunBuilder",
+                "fuchsia.test.manager.SuiteRunner",
             ],
         },
     ],

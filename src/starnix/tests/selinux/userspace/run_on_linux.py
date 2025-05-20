@@ -43,7 +43,7 @@ def build_initrd(
 
     output_dir = pathlib.Path(
         subprocess.check_output(
-            ["fx", "get-build-dir"], cwd=fuchsia_dir, text=True
+            ["scripts/fx", "get-build-dir"], cwd=fuchsia_dir, text=True
         ).strip()
     )
     container_manifest = (
@@ -186,7 +186,7 @@ def build_and_run_tests(
     print("Re-building tests...")
     subprocess.run(
         [
-            "fx",
+            "scripts/fx",
             "build",
             "//src/starnix/tests/selinux/userspace:sestarnix_userspace_tests",
         ],

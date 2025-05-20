@@ -5,6 +5,7 @@
 import json
 import logging
 import os
+import pathlib
 import re
 import stat
 import subprocess
@@ -14,7 +15,6 @@ from importlib.resources import as_file, files
 from typing import Any, Iterable, Self
 
 from perf_publish import data, metrics_allowlist, summarize
-from perf_test_utils import utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -150,9 +150,7 @@ class CatapultConverter:
         if runtime_deps_dir:
             self._runtime_deps_dir = runtime_deps_dir
         else:
-            self._runtime_deps_dir = utils.get_associated_runtime_deps_dir(
-                __file__
-            )
+            self._runtime_deps_dir = get_associated_runtime_deps_dir(__file__)
 
         self._upload_enabled: bool = True
         if master is None and bot is None:
@@ -460,3 +458,22 @@ class CatapultConverter:
             ]
 
         return args
+
+
+def get_associated_runtime_deps_dir(
+    search_dir: str | os.PathLike[str],
+) -> os.PathLike[str]:
+    """Return the directory that contains runtime dependencies.
+
+    Args:
+      search_dir: Absolute path to directory where runtime_deps dir is an
+        ancestor of.
+
+    Returns: Path to runtime_deps directory
+    """
+    cur_path: str = os.path.dirname(search_dir)
+    while not os.path.isdir(os.path.join(cur_path, "runtime_deps")):
+        cur_path = os.path.dirname(cur_path)
+        if cur_path == "/":
+            raise ValueError("Couldn't find required runtime_deps directory")
+    return pathlib.Path(cur_path) / "runtime_deps"

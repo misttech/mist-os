@@ -20,7 +20,9 @@
 #include "src/developer/forensics/feedback_data/constants.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/controller.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/production_encoding.h"
+#include "src/developer/forensics/feedback_data/system_log_recorder/shutdown_message.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/system_log_recorder.h"
+#include "src/lib/timekeeper/system_clock.h"
 
 namespace forensics {
 namespace feedback_data {
@@ -90,7 +92,7 @@ int main() {
       &controller, std::move(lifecycle_channel), main_loop.dispatcher());
 
   controller.SetStop([&] {
-    recorder.Flush(kStopMessageStr);
+    recorder.Flush(ShutdownMessage(timekeeper::SystemClock().BootNow()));
     lifecycle_binding.Close(ZX_OK);
     // Don't stop the loop so incoming logs can be persisted while waiting to terminate
     // components.

@@ -259,13 +259,13 @@ impl RealSymbolizerProcess {
     /// Constructs a new symbolizer.
     pub fn new(enable_prettification: bool) -> Result<Self, LogError> {
         let sdk = global_env_context().unwrap().get_sdk().map_err(|err| {
-            tracing::warn!(?err, "Failed to get SDK");
+            log::warn!("Failed to get SDK. {}", err);
             LogError::SdkNotAvailable { msg: "not found" }
         })?;
         if let Err(e) = ensure_symbol_index_registered(
             &global_env_context().ok_or_else(|| anyhow!("Failed to get global context"))?,
         ) {
-            tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+            log::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
         let mut args = vec![
             "--symbol-server",
@@ -279,7 +279,7 @@ impl RealSymbolizerProcess {
             args.push("--prettify-backtrace");
         }
         let path = ffx_config::get_host_tool(&sdk, "symbolizer").map_err(|err| {
-            tracing::warn!(?err, "Failed to get symbolizer binary");
+            log::warn!("Failed to get symbolizer binary {}", err);
             LogError::SdkNotAvailable { msg: "symbolizer not found" }
         })?;
         let c = Command::new(path)

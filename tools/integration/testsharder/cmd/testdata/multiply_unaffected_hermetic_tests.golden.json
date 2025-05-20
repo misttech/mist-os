@@ -21,7 +21,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "0"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -31,6 +32,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [
@@ -81,7 +87,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "0"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -91,6 +98,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "timeout_secs": 0,
@@ -100,6 +112,7 @@
                     "name": "fuchsia-pkg://fuchsia.com/unaffected-hermetic-test#meta/unaffected-hermetic-test.cm",
                     "gn_label": "//src/something:unaffected-hermetic-test(//build/toolchain/fuchsia:x64)",
                     "output_files": null,
+                    "output_dir": "",
                     "result": "SKIP",
                     "cases": null,
                     "start_time": "0001-01-01T00:00:00Z",
@@ -115,7 +128,8 @@
                             "key": "expected_duration_milliseconds",
                             "value": "0"
                         }
-                    ]
+                    ],
+                    "metadata": {}
                 }
             ]
         },
@@ -144,7 +158,8 @@
                         "key": "expected_duration_milliseconds",
                         "value": "0"
                     }
-                ]
+                ],
+                "metadata": {}
             }
         ],
         "environment": {
@@ -154,6 +169,11 @@
             },
             "virtual_device_spec": {
                 "name": ""
+            },
+            "gpt_uefi_disk": {
+                "name": "",
+                "vbmeta_key_path": "",
+                "vbmeta_key_metadata_path": ""
             }
         },
         "deps": [

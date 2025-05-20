@@ -5,10 +5,10 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/devicetree/devicetree.h>
-#include <lib/stdcompat/span.h>
 
 #include <array>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -21,7 +21,7 @@ using Comparison = devicetree::NodePath::Comparison;
 auto as_bytes = [](auto& val) {
   using byte_type = std::conditional_t<std::is_const_v<std::remove_reference_t<decltype(val)>>,
                                        const uint8_t, uint8_t>;
-  return cpp20::span<byte_type>(reinterpret_cast<byte_type*>(&val), sizeof(val));
+  return std::span<byte_type>(reinterpret_cast<byte_type*>(&val), sizeof(val));
 };
 
 auto append = [](auto& vec, auto&& other) { vec.insert(vec.end(), other.begin(), other.end()); };
@@ -49,9 +49,9 @@ struct AliasContext {
 
     // Add the null terminator.
     uint32_t len = static_cast<uint32_t>(absolute_path.size()) + 1;
-    cpp20::span<const uint8_t> padding;
+    std::span<const uint8_t> padding;
     if (auto remainder = len % sizeof(uint32_t); remainder != 0) {
-      padding = cpp20::span(kPadding).subspan(0, sizeof(uint32_t) - remainder);
+      padding = std::span(kPadding).subspan(0, sizeof(uint32_t) - remainder);
     }
     len = AsBigEndian(len);
 

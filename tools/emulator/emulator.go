@@ -556,7 +556,7 @@ func (d *Distribution) runNonInteractive(
 	// shuts down.
 	script := `DEV=$(waitfor class=block topo=/00:06.0/00_06_0/virtio-block/block timeout=60000 print)
 run-with-logs "$DEV" ` + toRun + `
-dm poweroff
+power off
 `
 	runcmds := filepath.Join(root, "runcmds.txt")
 	if err := os.WriteFile(runcmds, []byte(script), 0666); err != nil {

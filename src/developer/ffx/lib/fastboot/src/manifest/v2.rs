@@ -2,35 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::cmd::ManifestParams;
 use crate::common::crypto::unlock_device;
 use crate::common::{
     finish, flash_bootloader, flash_product, is_locked, lock_device, verify_hardware, Boot, Flash,
     Unlock, MISSING_CREDENTIALS, MISSING_PRODUCT,
 };
 use crate::file_resolver::FileResolver;
-use crate::manifest::v1::FlashManifest as FlashManifestV1;
 use crate::unlock::unlock;
 use crate::util::Event;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
-use serde::{Deserialize, Serialize};
+use ffx_flash_manifest::v2::FlashManifest;
+use ffx_flash_manifest::ManifestParams;
 use tokio::sync::mpsc::Sender;
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct FlashManifest {
-    pub hw_revision: String,
-    #[serde(default)]
-    pub credentials: Vec<String>,
-    #[serde(rename = "products")]
-    pub v1: FlashManifestV1,
-}
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
-    #[tracing::instrument(skip(self, file_resolver, cmd))]
     async fn flash<F, T>(
         &self,
         messenger: &Sender<Event>,
@@ -106,9 +95,10 @@ impl Boot for FlashManifest {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::common::cmd::{BootParams, Command};
     use crate::common::vars::{IS_USERSPACE_VAR, LOCKED_VAR, MAX_DOWNLOAD_SIZE_VAR, REVISION_VAR};
-    use crate::test::{setup, TestResolver};
+    use crate::file_resolver::test::TestResolver;
+    use ffx_fastboot_interface::test::setup;
+    use ffx_flash_manifest::{BootParams, Command};
     use serde_json::{from_str, json};
     use std::path::PathBuf;
     use tempfile::NamedTempFile;

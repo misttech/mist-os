@@ -43,10 +43,7 @@
             as: "fuchsia.component.PersistenceBinder",
         },
         {
-            protocol: [
-                "fuchsia.diagnostics.persist.DataPersistence-netstack",
-                "fuchsia.diagnostics.persist.DataPersistence-wlan",
-            ],
+            dictionary: "diagnostics-persist-capabilities",
             from: "#persistence",
         },
         {

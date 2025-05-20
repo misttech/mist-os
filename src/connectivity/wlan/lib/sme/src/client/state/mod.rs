@@ -214,7 +214,7 @@ impl Idle {
         let protection_ie = match build_protection_ie(&cmd.protection) {
             Ok(ie) => ie,
             Err(e) => {
-                let msg = format!("Failed to build protection IEs: {}", e);
+                let msg = format!("Failed to build protection IEs: {e}");
                 error!("{}", msg);
                 let _ = state_change_ctx.replace(StateChangeContext::Connect {
                     msg,
@@ -360,7 +360,7 @@ impl Connecting {
                 }
             }
             other => {
-                let msg = format!("Connect request failed: {:?}", other);
+                let msg = format!("Connect request failed: {other:?}");
                 warn!("{}", msg);
                 state_change_ctx.set_msg(msg);
                 send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
@@ -486,7 +486,7 @@ impl Connecting {
             Err(e) => {
                 // An error in handling a timeout means that we may have no way to abort a
                 // failed handshake. Drop to idle.
-                let msg = format!("failed to handle SAE timeout: {:?}", e);
+                let msg = format!("failed to handle SAE timeout: {e:?}");
                 error!("{}", msg);
                 send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
                 let timeout = context.timer.schedule(event::DeauthenticateTimeout);
@@ -986,7 +986,7 @@ impl Roaming {
             Err(e) => {
                 // An error in handling a timeout means that we may have no way to abort a failed
                 // handshake. Drop to idle.
-                let msg = format!("failed to handle SAE timeout: {:?}", e);
+                let msg = format!("failed to handle SAE timeout: {e:?}");
                 let disconnect_info = make_roam_disconnect_info(
                     fidl_sme::DisconnectMlmeEventName::SaeHandshakeResponse,
                     None,
@@ -1493,7 +1493,7 @@ impl ClientState {
         );
 
         let msg =
-            format!("received disconnect command from user; reason {:?}", user_disconnect_reason);
+            format!("received disconnect command from user; reason {user_disconnect_reason:?}");
         let state_change_ctx = Some(if disconnected_from_link_up {
             StateChangeContext::Disconnect { msg, disconnect_source }
         } else {
@@ -5473,7 +5473,7 @@ mod tests {
         let bssid = match &state {
             ClientState::Connecting(state) => state.cmd.bss.bssid,
             ClientState::Associated(state) => state.latest_ap_state.bssid,
-            other => panic!("Unexpected state {:?} when disconnecting", other),
+            other => panic!("Unexpected state {other:?} when disconnecting"),
         };
         let (mut disconnect_fut, responder) = make_disconnect_request(h);
         state = state.disconnect(&mut h.context, reason, responder);

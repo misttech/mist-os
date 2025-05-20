@@ -22,18 +22,12 @@ TEST(WorkloadTest, ParseTracingTranslatesStringsToGroupMasksCorrectly) {
   const std::string test_json_filepath = "tmp/trace_config_parse_test.json";
 
   std::map<std::string, uint32_t> corresponding_string = {
-      {"KTRACE_GRP_ALL", KTRACE_GRP_ALL},
-      {"KTRACE_GRP_META", KTRACE_GRP_META},
-      {"KTRACE_GRP_LIFECYCLE", KTRACE_GRP_LIFECYCLE},
-      {"KTRACE_GRP_SCHEDULER", KTRACE_GRP_SCHEDULER},
-      {"KTRACE_GRP_TASKS", KTRACE_GRP_TASKS},
-      {"KTRACE_GRP_IPC", KTRACE_GRP_IPC},
-      {"KTRACE_GRP_IRQ", KTRACE_GRP_IRQ},
-      {"KTRACE_GRP_PROBE", KTRACE_GRP_PROBE},
-      {"KTRACE_GRP_ARCH", KTRACE_GRP_ARCH},
-      {"KTRACE_GRP_SYSCALL", KTRACE_GRP_SYSCALL},
-      {"KTRACE_GRP_VM", KTRACE_GRP_VM},
-      {"UNKNOWN", KTRACE_GRP_ALL},
+      {"KTRACE_GRP_ALL", KTRACE_GRP_ALL},       {"KTRACE_GRP_META", KTRACE_GRP_META},
+      {"KTRACE_GRP_MEMORY", KTRACE_GRP_MEMORY}, {"KTRACE_GRP_SCHEDULER", KTRACE_GRP_SCHEDULER},
+      {"KTRACE_GRP_TASKS", KTRACE_GRP_TASKS},   {"KTRACE_GRP_IPC", KTRACE_GRP_IPC},
+      {"KTRACE_GRP_IRQ", KTRACE_GRP_IRQ},       {"KTRACE_GRP_PROBE", KTRACE_GRP_PROBE},
+      {"KTRACE_GRP_ARCH", KTRACE_GRP_ARCH},     {"KTRACE_GRP_SYSCALL", KTRACE_GRP_SYSCALL},
+      {"KTRACE_GRP_VM", KTRACE_GRP_VM},         {"UNKNOWN", KTRACE_GRP_ALL},
   };
 
   for (auto& element : corresponding_string) {

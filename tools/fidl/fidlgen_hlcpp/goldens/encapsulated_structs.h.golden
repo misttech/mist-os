@@ -36,7 +36,7 @@ class Int8Int32 final {
   static inline ::std::unique_ptr<Int8Int32> New() { return ::std::make_unique<Int8Int32>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Int8Int32* value, size_t _offset);
   zx_status_t Clone(Int8Int32* result) const;
 };
@@ -59,7 +59,7 @@ class Int16Int8 final {
   static inline ::std::unique_ptr<Int16Int8> New() { return ::std::make_unique<Int16Int8>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, Int16Int8* value, size_t _offset);
   zx_status_t Clone(Int16Int8* result) const;
 };
@@ -80,7 +80,7 @@ class ArrayInt16Int8 final {
   static inline ::std::unique_ptr<ArrayInt16Int8> New() { return ::std::make_unique<ArrayInt16Int8>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, ArrayInt16Int8* value, size_t _offset);
   zx_status_t Clone(ArrayInt16Int8* result) const;
 };
@@ -105,7 +105,7 @@ class StructPaddingTestStruct final {
   static inline ::std::unique_ptr<StructPaddingTestStruct> New() { return ::std::make_unique<StructPaddingTestStruct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, StructPaddingTestStruct* value, size_t _offset);
   zx_status_t Clone(StructPaddingTestStruct* result) const;
 };
@@ -130,7 +130,7 @@ class NonInlineStructTestStruct final {
   static inline ::std::unique_ptr<NonInlineStructTestStruct> New() { return ::std::make_unique<NonInlineStructTestStruct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, NonInlineStructTestStruct* value, size_t _offset);
   zx_status_t Clone(NonInlineStructTestStruct* result) const;
 };
@@ -141,10 +141,6 @@ inline zx_status_t Clone(const ::test::encapsulatedstructs::NonInlineStructTestS
 }
 
 using NonInlineStructTestStructPtr = ::std::unique_ptr<NonInlineStructTestStruct>;
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 class TopLevelStruct final {
  public:
@@ -157,7 +153,7 @@ class TopLevelStruct final {
   static inline ::std::unique_ptr<TopLevelStruct> New() { return ::std::make_unique<TopLevelStruct>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
-              cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt);
+              std::optional<::fidl::HandleInformation> maybe_handle_info = std::nullopt);
   static void Decode(::fidl::Decoder* _decoder, TopLevelStruct* value, size_t _offset);
   zx_status_t Clone(TopLevelStruct* result) const;
 };
@@ -317,10 +313,6 @@ struct Equality<::test::encapsulatedstructs::NonInlineStructTestStruct> {
     return true;
   }
 };
-
-#endif  // __Fuchsia__
-
-#ifdef __Fuchsia__
 
 template <>
 struct CodingTraits<::test::encapsulatedstructs::TopLevelStruct>

@@ -4,13 +4,28 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/cpp/library_headers.gni")
 import("//build/zircon/c_utils.gni")
-import("//build/zircon/migrated_targets.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/params.gni")
 
-zx_library("userabi") {
-  sources = []
+static_library("userabi") {
+  public_deps = [ ":headers" ]
+  if (is_kernel && !kernel_no_userabi) {
+    deps = [
+      ":userboot",
+      ":vdso",
+      "//zircon/kernel/lib/instrumentation",
+    ]
+  }
+}
+
+library_headers("headers") {
+  headers = [
+    "lib/userabi/userboot.h",
+    "lib/userabi/vdso-constants.h",
+    "lib/userabi/vdso.h",
+  ]
   public_deps = [
     # <lib/userabi/vdso.h> has #include <lib/fasttime/internal/abi.h>.
     "//zircon/kernel/lib/fasttime:headers",
@@ -24,15 +39,10 @@ zx_library("userabi") {
   ]
   if (is_kernel) {
     public_deps += [
-      # <lib/userabi/rodso.h> has #include <object/handle.h>.
+      # <lib/userabi/vdso.h> has #include <object/vm_object_dispatcher.h>.
       "//zircon/kernel/object",
     ]
     if (!kernel_no_userabi) {
-      deps = [
-        ":userboot",
-        ":vdso",
-        "//zircon/kernel/lib/instrumentation",
-      ]
       public_configs = [
         ":sysret-offsets",
         ":vdso-valid-sysret",
@@ -73,18 +83,13 @@ config("userabi.user.config") {
 # Parameters
 #
 #   name
-#     - Required: "USERBOOT" or "VDSO", used in generated macro names
+#     - Required: "VDSO", used in generated macro names
 #     - Type: string
 #
 #   deps
 #     - Required; Should reach the loadable_module() or library() target
 #     and no other linking targets; see link_output_rspfile().
 #     - Type: list(label)
-#
-#   writable
-#     - Optional: Writable segments allowed (not for userboot or vDSO!).
-#     - Type: bool
-#     - Default: false
 #
 template("rodso") {
   rspfile_target = "$target_name.rsp"
@@ -98,6 +103,10 @@ template("rodso") {
                              "visibility",
                            ])
     outputs = [ rspfile ]
+
+    metadata = {
+      distribution_entries_barrier = []
+    }
   }
 
   if (is_kernel) {
@@ -128,9 +137,6 @@ template("rodso") {
         rebase_path(depfile, root_build_dir),
         rebase_path(header, root_build_dir),
       ]
-      if (defined(invoker.writable) && invoker.writable) {
-        args += [ "--writable" ]
-      }
       args += [
         invoker.name,
         "@" + rebase_path(rspfile, root_build_dir),
@@ -140,7 +146,7 @@ template("rodso") {
         generated_sources = rebase_path(outputs, root_build_dir)
 
         # Prevent deps from propagating up to code that uses this action.
-        manifest_barrier = []
+        distribution_entries_barrier = []
       }
     }
   } else {
@@ -155,23 +161,12 @@ rodso("vdso") {
 }
 
 if (is_kernel) {
-  # Support for loading embedded ELF files, used for both vdso and userboot.
-  source_set("rodso") {
-    visibility = [ ":*" ]
-    sources = [ "rodso.cc" ]
-    deps = [
-      ":headers",
-      "//zircon/kernel/vm:headers",
-    ]
-  }
-
   # Initializing, supporting, and validating the vDSO itself.
   source_set("vdso") {
     visibility = [ ":*" ]
     sources = [ "vdso.cc" ]
     deps = [
       ":headers",
-      ":rodso",
       ":vdso-code.h",
       "//zircon/kernel/dev/timer/arm_generic:headers",
       "//zircon/kernel/lib/boot-options",
@@ -226,14 +221,14 @@ if (is_kernel) {
   source_set("userboot") {
     visibility = [ ":*" ]
     sources = [
+      "elf.cc",
+      "elf.h",
       "resource.cc",
       "userboot.cc",
     ]
     include_dirs = [ target_gen_dir ]
     deps = [
       ":headers",
-      ":rodso",
-      ":userboot-code.h",
       "//src/lib/elfldltl",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/console",
@@ -245,10 +240,12 @@ if (is_kernel) {
       "//zircon/system/ulib/zircon-internal",
     ]
   }
+}
 
-  rodso("userboot") {
-    visibility = [ ":*" ]
-    name = "USERBOOT"
-    deps = [ "userboot" ]
-  }
+group("boot_tests") {
+  testonly = true
+  deps = [
+    "trivial-test-userboot:boot_tests",
+    "userboot/tests:boot_tests",
+  ]
 }

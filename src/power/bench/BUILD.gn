@@ -38,7 +38,7 @@ if (is_fuchsia) {
       ":power-framework-benchmarks",
       "//src/power/broker:component",
       "//src/power/system-activity-governor:component",
-      "//src/power/topology-test-daemon:component",
+      "//src/power/testing/topology-test-daemon:component",
     ]
     testonly = true
     manifest = "meta/power-framework-microbenchmarks.cml"
@@ -90,7 +90,7 @@ fuchsia_test_package("package") {
   deps = [
     "//src/power/broker:component",
     "//src/power/system-activity-governor:component",
-    "//src/power/topology-test-daemon:component",
+    "//src/power/testing/topology-test-daemon:component",
   ]
   subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
 }

@@ -9,7 +9,7 @@ use std::io::Write;
 
 fn print_state(state: &State) {
     if termion::is_tty(&std::io::stdout()) {
-        print!("\r{}\x1b[K", state);
+        print!("\r{state}\x1b[K");
         if state.is_terminal() {
             println!();
         }

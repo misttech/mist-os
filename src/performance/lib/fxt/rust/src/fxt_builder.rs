@@ -1,11 +1,18 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use thiserror::Error;
 
 #[derive(Clone)]
 pub(crate) struct FxtBuilder<H> {
     header: H,
     buf: Vec<u8>,
+}
+
+#[derive(Error, Debug)]
+pub enum SerializeError {
+    #[error("Encountered Empty StringRefs when serializing argument's name")]
+    MissingArgName,
 }
 
 impl<H: crate::header::TraceHeader> FxtBuilder<H> {

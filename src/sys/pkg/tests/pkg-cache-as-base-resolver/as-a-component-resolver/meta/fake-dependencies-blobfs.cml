@@ -7,11 +7,4 @@
         runner: "elf",
         binary: "bin/base_resolver_fake_dependencies_bin",
     },
-    offer: [
-        {
-            protocol: "fuchsia.kernel.VmexResource",
-            from: "parent",
-            to: "#fs-collection",
-        },
-    ],
 }

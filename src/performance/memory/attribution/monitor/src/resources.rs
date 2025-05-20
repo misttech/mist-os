@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 use crate::attribution_client::AttributionState;
+use attribution_processing::{ResourcesVisitor, ZXName};
 use fuchsia_trace::duration;
+use index_table_builder::IndexTableBuilder;
 use std::collections::{HashMap, HashSet};
 use std::mem::MaybeUninit;
 use traces::CATEGORY_MEMORY_CAPTURE;
+use zerocopy::{FromBytes, IntoBytes};
 use {
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_memory_attribution_plugin as fplugin,
@@ -15,25 +18,55 @@ use {
 const ZX_INFO_CACHE_INITIAL_SIZE: usize = 64;
 const ZX_INFO_CACHE_GROWTH_FACTOR: usize = 2;
 
-/// A structure containing a set of kernel resources (jobs, processes, VMOs), indexed by KOIDs.
+/// Deduplicate resource names and reference them by index.
+#[derive(Default)]
+pub struct NameTableBuilder {
+    builder: IndexTableBuilder<ZXName>,
+}
+
+fn into_zx_name(name: &zx::Name) -> Result<&ZXName, zx::Status> {
+    ZXName::ref_from_bytes(name.as_bytes()).map_err(|_| zx::Status::INVALID_ARGS)
+}
+
+impl NameTableBuilder {
+    fn intern(&mut self, resource_name: &ZXName) -> Result<u64, zx::Status> {
+        Ok(self.builder.intern(resource_name).try_into().map_err(|_| fidl::Status::OUT_OF_RANGE)?)
+    }
+
+    pub fn build(self) -> Vec<ZXName> {
+        self.builder.build()
+    }
+}
+
+/// Set of jobs, processes, and VMOs, indexed by KOIDs.
 #[derive(Default)]
 pub struct KernelResources {
     /// Map of resource Koid to resource definition.
     pub resources: HashMap<zx::Koid, fplugin::Resource>,
+    pub resource_names: Vec<ZXName>,
+}
+
+#[derive(Default)]
+struct KernelResourcesBuilder {
+    resources: HashMap<zx::Koid, fplugin::Resource>,
     /// Map of resource name to unique identifier.
     ///
     /// Many different resources often share the same name. In order to minimize the space taken by
     /// resource definitions, we give each unique name an identifier, and refer to these
     /// identifiers in the resource definitions
-    pub resource_names: HashMap<String, u64>,
+    resource_names: NameTableBuilder,
 }
 
+impl KernelResourcesBuilder {
+    fn build(self) -> KernelResources {
+        KernelResources { resources: self.resources, resource_names: self.resource_names.build() }
+    }
+}
+
+/// Crawls the jobs, processes and vmos, calling back visitor method for each object.
 #[derive(Default)]
-struct KernelResourcesBuilder {
-    kernel_resources: KernelResources,
-    /// Value of the next resource identifier. It should be incremented each time a new name is
-    /// inserted in `resource_names``.
-    next_resource_name_index: u64,
+pub struct KernelResourcesExplorer {
+    cache: Cache,
 }
 
 struct Cache {
@@ -88,23 +121,50 @@ impl Cache {
 }
 
 /// Represents whether we should collect information about VMOs or memory maps of a process.
+#[derive(PartialEq, Debug)]
 struct CollectionRequest {
     collect_vmos: bool,
-    collect_maps: bool,
+    collect_maps: Option<CollectionRequestRange>,
+}
+
+/// Represents an address space range we need to collect information about.
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct CollectionRequestRange {
+    /// Start of the range
+    range_start: u64,
+    /// End of the range
+    range_end: u64,
+}
+
+impl CollectionRequestRange {
+    fn merge(a: &Self, b: &Self) -> Self {
+        Self {
+            range_start: a.range_start.min(b.range_start),
+            range_end: a.range_end.max(b.range_end),
+        }
+    }
 }
 
 impl CollectionRequest {
     fn collect_vmos() -> Self {
-        Self { collect_vmos: true, collect_maps: false }
+        Self { collect_vmos: true, collect_maps: None }
     }
 
-    fn collect_maps() -> Self {
-        Self { collect_vmos: false, collect_maps: true }
+    fn collect_maps(range_start: u64, range_end: u64) -> Self {
+        Self {
+            collect_vmos: false,
+            collect_maps: Some(CollectionRequestRange { range_start, range_end }),
+        }
     }
 
     fn merge(&mut self, other: &Self) {
         self.collect_vmos |= other.collect_vmos;
-        self.collect_maps |= other.collect_maps;
+        self.collect_maps = match (self.collect_maps, other.collect_maps) {
+            (None, None) => None,
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (Some(a), Some(b)) => Some(CollectionRequestRange::merge(&a, &b)),
+        };
     }
 }
 
@@ -208,10 +268,95 @@ impl Process for zx::Process {
 }
 
 impl KernelResources {
+    // Get all jobs, processes and vmos for the specified root.
     pub fn get_resources(
         root: &dyn Job,
         attribution_state: &AttributionState,
     ) -> Result<KernelResources, zx::Status> {
+        let mut kernel_resources_builder = KernelResourcesBuilder::default();
+        KernelResourcesExplorer::default().explore_root_job(
+            &mut kernel_resources_builder,
+            root,
+            attribution_state,
+        )?;
+        Ok(kernel_resources_builder.build())
+    }
+}
+
+impl ResourcesVisitor for KernelResourcesBuilder {
+    fn on_job(
+        &mut self,
+        job_koid: zx_types::zx_koid_t,
+        job_name: &ZXName,
+        job: fplugin::Job,
+    ) -> Result<(), zx::Status> {
+        let name_index = self.resource_names.intern(job_name)?;
+        self.resources.insert(
+            zx::Koid::from_raw(job_koid),
+            fplugin::Resource {
+                koid: Some(job_koid),
+                name_index: Some(name_index),
+                resource_type: Some(fplugin::ResourceType::Job(job)),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    fn on_vmo(
+        &mut self,
+        vmo_koid: zx_types::zx_koid_t,
+        vmo_name: &ZXName,
+        vmo: fplugin::Vmo,
+    ) -> Result<(), zx::Status> {
+        let vmo_koid = zx::Koid::from_raw(vmo_koid);
+        // No need to copy the VMO info if we have already seen it.
+        if self.resources.contains_key(&vmo_koid) {
+            return Ok(());
+        }
+        let name_index = self.resource_names.intern(vmo_name)?;
+        self.resources.insert(
+            vmo_koid,
+            fplugin::Resource {
+                koid: Some(vmo_koid.raw_koid()),
+                name_index: Some(name_index),
+                // TODO(https://fxbug.dev/393078902): also take into account the fractional
+                // part.
+                resource_type: Some(fplugin::ResourceType::Vmo(vmo)),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+
+    fn on_process(
+        &mut self,
+        process_koid: zx_types::zx_koid_t,
+        process_name: &ZXName,
+        process: fplugin::Process,
+    ) -> Result<(), zx::Status> {
+        let process_koid = zx::Koid::from_raw(process_koid);
+        let process_name_index = self.resource_names.intern(process_name)?;
+        self.resources.insert(
+            process_koid,
+            fplugin::Resource {
+                koid: Some(process_koid.raw_koid()),
+                name_index: Some(process_name_index),
+                resource_type: Some(fplugin::ResourceType::Process(process)),
+                ..Default::default()
+            },
+        );
+        Ok(())
+    }
+}
+
+impl KernelResourcesExplorer {
+    pub fn explore_root_job(
+        &mut self,
+        visitor: &mut impl ResourcesVisitor,
+        root: &dyn Job,
+        attribution_state: &AttributionState,
+    ) -> Result<(), zx::Status> {
         duration!(CATEGORY_MEMORY_CAPTURE, c"get_resources");
         // For each process for which we have attribution information, decide what information we
         // need to collect.
@@ -228,7 +373,10 @@ impl KernelResources {
                     }
                     fattribution::Resource::ProcessMapped(pm) => {
                         // Here, we assume that we would have learned about the VMOs elsewhere.
-                        (zx::Koid::from_raw(pm.process), CollectionRequest::collect_maps())
+                        (
+                            zx::Koid::from_raw(pm.process),
+                            CollectionRequest::collect_maps(pm.base, pm.base + pm.len),
+                        )
                     }
                     fattribution::Resource::__SourceBreaking { unknown_ordinal: _ } => todo!(),
                 };
@@ -238,27 +386,22 @@ impl KernelResources {
                     .or_insert(resource_collection);
                 hashmap
             });
-        let mut kr_builder = KernelResourcesBuilder::default();
-        let mut cache = Cache::default();
-        let root_job_koid = root.get_koid().unwrap();
-        kr_builder.explore_job(&mut cache, &root_job_koid, root, &process_collection_requests)?;
-        Ok(kr_builder.kernel_resources)
-    }
-}
 
-impl KernelResourcesBuilder {
+        self.explore_job(visitor, &root.get_koid()?, root, &process_collection_requests)?;
+        Ok(())
+    }
+
     /// Recursively gather memory information from a job.
     fn explore_job(
         &mut self,
-        cache: &mut Cache,
-        koid: &zx::Koid,
+        visitor: &mut impl ResourcesVisitor,
+        job_koid: &zx::Koid,
         job: &dyn Job,
         process_mapped: &HashMap<zx::Koid, CollectionRequest>,
     ) -> Result<(), zx::Status> {
         let job_name = job.get_name()?;
         let child_jobs = job.children()?;
         let processes = job.processes()?;
-
         for child_job_koid in &child_jobs {
             // Here and below: jobs and processes can disappear while we explore the job
             // and process hierarchy. Therefore, we don't stop the exploration if we don't
@@ -273,7 +416,7 @@ impl KernelResourcesBuilder {
                 }
                 Ok(child) => child,
             };
-            self.explore_job(cache, child_job_koid, child_job.as_ref(), process_mapped)?;
+            self.explore_job(visitor, child_job_koid, child_job.as_ref(), process_mapped)?;
         }
 
         for process_koid in &processes {
@@ -288,7 +431,7 @@ impl KernelResourcesBuilder {
                 Ok(child) => child,
             };
             match self.explore_process(
-                cache,
+                visitor,
                 process_koid,
                 child_process.as_ref(),
                 process_mapped.get(process_koid),
@@ -303,44 +446,23 @@ impl KernelResourcesBuilder {
                 Ok(_) => continue,
             };
         }
-
-        let name_index = self.ensure_resource_name(job_name);
-        self.kernel_resources.resources.insert(
-            koid.clone(),
-            fplugin::Resource {
-                koid: Some(koid.raw_koid()),
-                name_index: Some(name_index),
-                resource_type: Some(fplugin::ResourceType::Job(fplugin::Job {
-                    child_jobs: Some(child_jobs.iter().map(zx::Koid::raw_koid).collect()),
-                    processes: Some(processes.iter().map(zx::Koid::raw_koid).collect()),
-                    ..Default::default()
-                })),
+        visitor.on_job(
+            job_koid.raw_koid(),
+            into_zx_name(&job_name)?,
+            fplugin::Job {
+                child_jobs: Some(child_jobs.iter().map(zx::Koid::raw_koid).collect()),
+                processes: Some(processes.iter().map(zx::Koid::raw_koid).collect()),
                 ..Default::default()
             },
-        );
+        )?;
         Ok(())
-    }
-
-    /// Ensures the resource name is registered and returns its index.
-    fn ensure_resource_name(&mut self, resource_name: zx::Name) -> u64 {
-        match self.kernel_resources.resource_names.get(&resource_name.as_bstr().to_string()) {
-            Some(name_index) => *name_index,
-            None => {
-                let index = self.next_resource_name_index;
-                self.kernel_resources
-                    .resource_names
-                    .insert(resource_name.as_bstr().to_string(), index);
-                self.next_resource_name_index += 1;
-                index
-            }
-        }
     }
 
     /// Gather the memory information of a process.
     fn explore_process(
         &mut self,
-        cache: &mut Cache,
-        koid: &zx::Koid,
+        visitor: &mut impl ResourcesVisitor,
+        process_koid: &zx::Koid,
         process: &dyn Process,
         collection: Option<&CollectionRequest>,
     ) -> Result<(), zx::Status> {
@@ -350,62 +472,56 @@ impl KernelResourcesBuilder {
 
         let vmo_koids = if collection.is_none() || collection.is_some_and(|c| c.collect_vmos) {
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos");
-            let (mut info_vmos, available) = process.info_vmos(cache.vmos_cache(0))?;
+            let (mut vmo_infos, available) = process.info_vmos(self.cache.vmos_cache(0))?;
 
-            if info_vmos.len() < available {
+            if vmo_infos.len() < available {
                 duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:grow",
-                    "initial_length" => info_vmos.len(), "target_length" => available);
-                (info_vmos, _) = process.info_vmos(cache.vmos_cache(available))?;
+                    "initial_length" => vmo_infos.len(), "target_length" => available);
+                (vmo_infos, _) = process.info_vmos(self.cache.vmos_cache(available))?;
             }
 
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:insert");
-            let mut vmo_koids = HashSet::with_capacity(info_vmos.len());
-            for info_vmo in info_vmos {
-                if !vmo_koids.insert(info_vmo.koid.clone()) {
+            let mut vmo_koids = HashSet::with_capacity(vmo_infos.len());
+            for vmo_info in vmo_infos {
+                if !vmo_koids.insert(vmo_info.koid.clone()) {
                     // The VMO is already in the set, we can skip.
                     continue;
                 }
-                // No need to copy the VMO info if we have already seen it.
-                if self.kernel_resources.resources.contains_key(&info_vmo.koid) {
-                    continue;
-                }
-                let name_index = self.ensure_resource_name(info_vmo.name);
-                self.kernel_resources.resources.insert(
-                    info_vmo.koid.clone(),
-                    fplugin::Resource {
-                        koid: Some(info_vmo.koid.raw_koid()),
-                        name_index: Some(name_index),
-                        // TODO(https://fxbug.dev/393078902): also take into account the fractional
-                        // part.
-                        resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                            parent: match info_vmo.parent_koid.raw_koid() {
-                                0 => None,
-                                k => Some(k),
-                            },
-                            private_committed_bytes: Some(info_vmo.committed_private_bytes),
-                            private_populated_bytes: Some(info_vmo.populated_private_bytes),
-                            scaled_committed_bytes: Some(info_vmo.committed_scaled_bytes),
-                            scaled_populated_bytes: Some(info_vmo.populated_scaled_bytes),
-                            total_committed_bytes: Some(info_vmo.committed_bytes),
-                            total_populated_bytes: Some(info_vmo.populated_bytes),
-                            ..Default::default()
-                        })),
+
+                // TODO(https://fxbug.dev/393078902): also take into account the fractional
+                // part.
+                visitor.on_vmo(
+                    vmo_info.koid.raw_koid(),
+                    into_zx_name(&vmo_info.name)?,
+                    fplugin::Vmo {
+                        parent: match vmo_info.parent_koid.raw_koid() {
+                            0 => None,
+                            k => Some(k),
+                        },
+                        private_committed_bytes: Some(vmo_info.committed_private_bytes),
+                        private_populated_bytes: Some(vmo_info.populated_private_bytes),
+                        scaled_committed_bytes: Some(vmo_info.committed_scaled_bytes),
+                        scaled_populated_bytes: Some(vmo_info.populated_scaled_bytes),
+                        total_committed_bytes: Some(vmo_info.committed_bytes),
+                        total_populated_bytes: Some(vmo_info.populated_bytes),
                         ..Default::default()
                     },
-                );
+                )?;
             }
             Some(vmo_koids.iter().map(zx::Koid::raw_koid).collect())
         } else {
             None
         };
 
-        let process_maps = if collection.is_some_and(|c| c.collect_maps) {
+        let process_maps = if let Some(CollectionRequestRange { range_start, range_end }) =
+            collection.map(|c| c.collect_maps).flatten()
+        {
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps");
-            let (mut info_maps, available) = process.info_maps(cache.maps_cache(0))?;
+            let (mut info_maps, available) = process.info_maps(self.cache.maps_cache(0))?;
 
             if info_maps.len() < available {
                 duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:grow", "initial_length" => info_maps.len(), "target_length" => available);
-                (info_maps, _) = process.info_maps(cache.maps_cache(available))?;
+                (info_maps, _) = process.info_maps(self.cache.maps_cache(available))?;
             }
 
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:insert");
@@ -414,33 +530,29 @@ impl KernelResourcesBuilder {
             let mut mappings = Vec::with_capacity(info_maps.len());
             for info_map in info_maps {
                 if let zx::MapDetails::Mapping(details) = info_map.details() {
-                    mappings.push(fplugin::Mapping {
-                        vmo: Some(details.vmo_koid.raw_koid()),
-                        address_base: Some(info_map.base.try_into().unwrap()),
-                        size: Some(info_map.size.try_into().unwrap()),
-                        ..Default::default()
-                    });
+                    let address_base = info_map.base.try_into().unwrap();
+                    let address_end: u64 = (info_map.base + info_map.size).try_into().unwrap();
+                    if address_base < range_end && address_end >= range_start {
+                        mappings.push(fplugin::Mapping {
+                            vmo: Some(details.vmo_koid.raw_koid()),
+                            address_base: Some(address_base),
+                            size: Some(info_map.size.try_into().unwrap()),
+                            ..Default::default()
+                        });
+                    }
                 }
             }
+            // As we overestimated the capacity, we now need to shrink it.
+            mappings.shrink_to_fit();
             Some(mappings)
         } else {
             None
         };
-
-        let name_index = self.ensure_resource_name(process_name);
-        self.kernel_resources.resources.insert(
-            koid.clone(),
-            fplugin::Resource {
-                koid: Some(koid.raw_koid()),
-                name_index: Some(name_index),
-                resource_type: Some(fplugin::ResourceType::Process(fplugin::Process {
-                    vmos: vmo_koids,
-                    mappings: process_maps,
-                    ..Default::default()
-                })),
-                ..Default::default()
-            },
-        );
+        visitor.on_process(
+            process_koid.raw_koid(),
+            into_zx_name(&process_name)?,
+            fplugin::Process { vmos: vmo_koids, mappings: process_maps, ..Default::default() },
+        )?;
         Ok(())
     }
 }
@@ -694,7 +806,7 @@ pub mod tests {
         if let fplugin::ResourceType::Process(proc11) = kernel_resoures
             .resources
             .get(&zx::Koid::from_raw(11))
-            .expect("Unable to find proc11")
+            .unwrap_or_else(|| panic!("Unable to find proc11 in {:?}", kernel_resoures.resources))
             .resource_type
             .as_ref()
             .expect("No resource type")
@@ -716,5 +828,26 @@ pub mod tests {
         } else {
             unreachable!("Not a process");
         }
+    }
+
+    #[test]
+    fn test_collection_request_merges() {
+        let mut a1 = CollectionRequest::collect_maps(100, 200);
+        a1.merge(&CollectionRequest::collect_maps(300, 400));
+        assert_eq!(a1, CollectionRequest::collect_maps(100, 400));
+
+        let mut a2 = CollectionRequest::collect_maps(100, 200);
+        a2.merge(&CollectionRequest::collect_maps(50, 400));
+        assert_eq!(a2, CollectionRequest::collect_maps(50, 400));
+
+        let mut a3 = CollectionRequest::collect_maps(100, 200);
+        a3.merge(&CollectionRequest::collect_vmos());
+        assert_eq!(
+            a3,
+            CollectionRequest {
+                collect_vmos: true,
+                collect_maps: Some(CollectionRequestRange { range_start: 100, range_end: 200 })
+            }
+        );
     }
 }

@@ -15,7 +15,10 @@ declare_args() {
   #  * `balanced`: some optimizations, but prioritizing compilation speed over
   #                 runtime performance.
   #  * `release`: all the optimizations, used for product releases.
+  # LINT.IfChange
   compilation_mode = ""
+
+  # LINT.ThenChange(//build/bazel/BUILD.gn)
 
   # Overridden settings for the compilation mode.  This is a set of override
   # values for variables whose default values are set by the chosen compilation
@@ -25,6 +28,7 @@ declare_args() {
   #       * `debug`: "optimized for debugging", light enough to avoid confusion
   #       * `moderate`: moderate optimization level (clang's default -O2)
   #       * `size`:  optimized for space rather than purely for speed
+  #       * `size_thinlto`:  optimize for space and use Thin LTO
   #       * `size_lto`:  optimize for space and use LTO
   #       * `speed`: optimized purely for speed
   #       * `sanitizer`: optimized for sanitizers (ASan, etc.)
@@ -41,7 +45,7 @@ _default_compilation_settings = {
   }
 
   balanced = {
-    optimize = "size_lto"
+    optimize = "size_thinlto"
   }
 
   release = {
@@ -112,6 +116,13 @@ assert(compilation_mode != "",
 assert(
     defined(_default_compilation_settings[compilation_mode]),
     "The specified compilation mode (${compilation_mode}) is not a valid option. They are: 'debug', 'balanced', and 'release'")
+
+# Create booleans for each compilation mode, to allow binaries to fine-tune
+# configuration
+
+# is_debug = is_debug  # this compilation mode has already been set
+is_balanced = compilation_mode == "balanced"
+is_release = compilation_mode == "release"
 
 compilation_settings = {
   # Set the compilation settings to use based on the chosen compilation mode

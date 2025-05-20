@@ -57,7 +57,7 @@ TEST(SequenceChecker, SameSequenceId) {
   FakeSequenceIdAsync dispatcher;
   dispatcher.SetSequenceIdAnswer({.value = 1});
   async::sequence_checker checker{&dispatcher};
-  EXPECT_TRUE(cpp17::holds_alternative<cpp17::monostate>(checker.is_sequence_valid()));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(checker.is_sequence_valid()));
 }
 
 TEST(SequenceChecker, LockUnlock) {
@@ -74,8 +74,8 @@ TEST(SequenceChecker, DifferentSequenceId) {
   dispatcher.SetSequenceIdAnswer({.value = 1});
   async::sequence_checker checker{&dispatcher};
   dispatcher.SetSequenceIdAnswer({.value = 2});
-  EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_sequence_valid()));
-  EXPECT_SUBSTR(cpp17::get<std::string>(checker.is_sequence_valid()), "test sequence id mismatch");
+  EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_sequence_valid()));
+  EXPECT_SUBSTR(std::get<std::string>(checker.is_sequence_valid()), "test sequence id mismatch");
 }
 
 TEST(SequenceChecker, NoSequenceId) {
@@ -93,8 +93,8 @@ TEST(SequenceChecker, ConcatError) {
   dispatcher.SetSequenceIdAnswer({.value = 1});
   async::sequence_checker checker{&dispatcher, "|Foo| is thread unsafe."};
   dispatcher.SetSequenceIdAnswer(ZX_ERR_INVALID_ARGS, "Switch to another dispatcher.");
-  EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_sequence_valid()));
-  EXPECT_SUBSTR(cpp17::get<std::string>(checker.is_sequence_valid()),
+  EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_sequence_valid()));
+  EXPECT_SUBSTR(std::get<std::string>(checker.is_sequence_valid()),
                 "|Foo| is thread unsafe. Switch to another dispatcher.");
 }
 
@@ -102,7 +102,7 @@ TEST(SynchronizationChecker, SameSequenceId) {
   FakeSequenceIdAsync dispatcher;
   dispatcher.SetSequenceIdAnswer({.value = 1});
   async::synchronization_checker checker{&dispatcher};
-  EXPECT_TRUE(cpp17::holds_alternative<cpp17::monostate>(checker.is_synchronized()));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(checker.is_synchronized()));
 }
 
 TEST(SynchronizationChecker, LockUnlock) {
@@ -119,25 +119,25 @@ TEST(SynchronizationChecker, DifferentSequenceId) {
   dispatcher.SetSequenceIdAnswer({.value = 1});
   async::synchronization_checker checker{&dispatcher};
   dispatcher.SetSequenceIdAnswer({.value = 2});
-  EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_synchronized()));
-  EXPECT_SUBSTR(cpp17::get<std::string>(checker.is_synchronized()), "test sequence id mismatch");
+  EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_synchronized()));
+  EXPECT_SUBSTR(std::get<std::string>(checker.is_synchronized()), "test sequence id mismatch");
 }
 
 TEST(SynchronizationChecker, SameThreadId) {
   FakeSequenceIdAsync dispatcher;
   dispatcher.SetSequenceIdAnswer(ZX_ERR_NOT_SUPPORTED, "");
   async::synchronization_checker checker{&dispatcher};
-  EXPECT_TRUE(cpp17::holds_alternative<cpp17::monostate>(checker.is_synchronized()));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(checker.is_synchronized()));
 }
 
 TEST(SynchronizationChecker, DifferentThreadId) {
   FakeSequenceIdAsync dispatcher;
   dispatcher.SetSequenceIdAnswer(ZX_ERR_NOT_SUPPORTED, "");
   async::synchronization_checker checker{&dispatcher};
-  EXPECT_TRUE(cpp17::holds_alternative<cpp17::monostate>(checker.is_synchronized()));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(checker.is_synchronized()));
   std::thread t([&] {
-    EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_synchronized()));
-    EXPECT_SUBSTR(cpp17::get<std::string>(checker.is_synchronized()),
+    EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_synchronized()));
+    EXPECT_SUBSTR(std::get<std::string>(checker.is_synchronized()),
                   "Access from multiple threads detected");
   });
   t.join();
@@ -147,23 +147,23 @@ TEST(SynchronizationChecker, SequenceIdThenThreadId) {
   FakeSequenceIdAsync dispatcher;
   dispatcher.SetSequenceIdAnswer({.value = 1});
   async::synchronization_checker checker{&dispatcher};
-  EXPECT_TRUE(cpp17::holds_alternative<cpp17::monostate>(checker.is_synchronized()));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(checker.is_synchronized()));
   dispatcher.SetSequenceIdAnswer(ZX_ERR_INVALID_ARGS, "");
-  EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_synchronized()));
+  EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_synchronized()));
   ASSERT_DEATH([&] {
     dispatcher.SetSequenceIdAnswer(ZX_ERR_INVALID_ARGS, "");
     checker.lock();
     checker.unlock();
   });
   dispatcher.SetSequenceIdAnswer(ZX_ERR_WRONG_TYPE, "");
-  EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_synchronized()));
+  EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_synchronized()));
   ASSERT_DEATH([&] {
     dispatcher.SetSequenceIdAnswer(ZX_ERR_WRONG_TYPE, "");
     checker.lock();
     checker.unlock();
   });
   dispatcher.SetSequenceIdAnswer(ZX_ERR_NOT_SUPPORTED, "");
-  EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_synchronized()));
+  EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_synchronized()));
   ASSERT_DEATH([&] {
     dispatcher.SetSequenceIdAnswer(ZX_ERR_NOT_SUPPORTED, "");
     checker.lock();
@@ -176,8 +176,8 @@ TEST(SynchronizationChecker, SequenceConcatError) {
   dispatcher.SetSequenceIdAnswer({.value = 1});
   async::synchronization_checker checker{&dispatcher, "|Foo| is thread unsafe."};
   dispatcher.SetSequenceIdAnswer(ZX_ERR_INVALID_ARGS, "Switch to another dispatcher.");
-  EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_synchronized()));
-  EXPECT_SUBSTR(cpp17::get<std::string>(checker.is_synchronized()),
+  EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_synchronized()));
+  EXPECT_SUBSTR(std::get<std::string>(checker.is_synchronized()),
                 "|Foo| is thread unsafe. Switch to another dispatcher.");
 }
 
@@ -186,8 +186,8 @@ TEST(SynchronizationChecker, ThreadConcatError) {
   dispatcher.SetSequenceIdAnswer(ZX_ERR_NOT_SUPPORTED, "");
   async::synchronization_checker checker{&dispatcher, "|Foo| is thread unsafe."};
   std::thread([&] {
-    EXPECT_TRUE(cpp17::holds_alternative<std::string>(checker.is_synchronized()));
-    EXPECT_SUBSTR(cpp17::get<std::string>(checker.is_synchronized()),
+    EXPECT_TRUE(std::holds_alternative<std::string>(checker.is_synchronized()));
+    EXPECT_SUBSTR(std::get<std::string>(checker.is_synchronized()),
                   "|Foo| is thread unsafe. Access from multiple threads detected. "
                   "This is not allowed. Ensure the object is used from the same thread.");
   }).join();

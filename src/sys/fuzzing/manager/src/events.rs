@@ -9,84 +9,62 @@ use futures::{pin_mut, select, FutureExt, SinkExt};
 
 pub type LaunchResult = std::result::Result<(), test_manager::LaunchError>;
 
-pub async fn handle_run_events(
-    run_proxy: test_manager::RunControllerProxy,
-    mut artifact_sender: mpsc::UnboundedSender<test_manager::Artifact>,
-    kill_receiver: oneshot::Receiver<()>,
-) -> Result<()> {
-    let kill_fut = kill_receiver.fuse();
-    pin_mut!(kill_fut);
-    loop {
-        let events_fut = run_proxy.get_events().fuse();
-        pin_mut!(events_fut);
-        let events = select! {
-            result = kill_fut => {
-                if result.is_ok() {
-                    run_proxy.kill().context("fuchsia.test.manager.RunController/Kill")?;
-                }
-                break;
-            }
-            result = events_fut => result.context("fuchsia.test.manager.RunController/GetEvents")
-        }?;
-        if events.is_empty() {
-            break;
-        }
-        for event in events {
-            match event.payload {
-                Some(test_manager::RunEventPayload::Artifact(artifact)) => {
-                    artifact_sender.send(artifact).await.context("failed to send run artifact")?;
-                }
-                _ => {}
-            };
-        }
-    }
-    Ok(())
-}
-
 pub async fn handle_suite_events(
     suite_proxy: test_manager::SuiteControllerProxy,
     mut artifact_sender: mpsc::UnboundedSender<test_manager::Artifact>,
     start_sender: oneshot::Sender<LaunchResult>,
+    kill_receiver: oneshot::Receiver<()>,
 ) -> Result<()> {
     // Wrap |start_sender| in an option to enforce using it at most once.
     let mut start_sender = Some(start_sender);
+
+    let kill_fut = kill_receiver.fuse();
+    pin_mut!(kill_fut);
+
     loop {
-        let result = suite_proxy
-            .get_events()
-            .await
-            .context("fuchsia.test.manager.SuiteController/GetEvents")?;
-        let events = match result {
-            Ok(events) => events,
-            Err(e) => {
-                if let Some(start_sender) = start_sender.take() {
-                    start_sender
-                        .send(Err(e))
-                        .map_err(|_| anyhow!("failed to send launch error"))?;
+        let events_fut = suite_proxy.watch_events().fuse();
+        pin_mut!(events_fut);
+        let events = select! {
+            result = kill_fut => {
+                if result.is_ok() {
+                    suite_proxy.kill().context("fuchsia.test.manager.SuiteController/Kill")?;
                 }
                 break;
             }
+            result = events_fut => match result.context("fuchsia.test.manager.SuiteController/WatchEvents")? {
+                Ok(events) => events,
+                Err(e) => {
+                    if let Some(start_sender) = start_sender.take() {
+                        start_sender
+                            .send(Err(e))
+                            .map_err(|_| anyhow!("failed to send launch error"))?;
+                    }
+                    break;
+                }
+            }
         };
+
         if events.is_empty() {
             break;
         }
         for event in events {
-            match event.payload {
-                Some(test_manager::SuiteEventPayload::SuiteStarted(_)) => {
+            match event.details {
+                Some(test_manager::EventDetails::SuiteStarted(_)) => {
                     if let Some(start_sender) = start_sender.take() {
                         start_sender
                             .send(Ok(()))
                             .map_err(|_| anyhow!("failed to send launch result"))?;
                     }
                 }
-                Some(test_manager::SuiteEventPayload::SuiteArtifact(suite_artifact)) => {
+                Some(test_manager::EventDetails::SuiteArtifactGenerated(details)) => {
                     artifact_sender
-                        .send(suite_artifact.artifact)
+                        .send(details.artifact.expect("suite artifact details have artifact"))
                         .await
                         .context("failed to send suite artifact")?;
                 }
-                Some(test_manager::SuiteEventPayload::CaseArtifact(case_artifact)) => {
+                Some(test_manager::EventDetails::TestCaseArtifactGenerated(details)) => {
                     artifact_sender
-                        .send(case_artifact.artifact)
+                        .send(details.artifact.expect("test case artifact details have artifact"))
                         .await
                         .context("failed to send case artifact")?;
                 }

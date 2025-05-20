@@ -18,6 +18,7 @@
 
 #include "src/developer/forensics/crash_reports/filing_result.h"
 #include "src/developer/forensics/crash_reports/item_location.h"
+#include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/lib/fsl/vmo/strings.h"
@@ -45,15 +46,22 @@ inline void PrintTo(const fpromise::result_state& state, std::ostream* os) {
 }  // namespace fit
 
 namespace forensics {
+namespace pretty {
+
+inline std::string ToString(const ErrorOrString& error_or) {
+  if (error_or.HasValue()) {
+    return error_or.Value();
+  }
+
+  return ToString(error_or.Error());
+}
+
+}  // namespace pretty
 
 inline void PrintTo(const Error error, std::ostream* os) { *os << ToString(error); }
 
 inline void PrintTo(const ErrorOrString& error_or, std::ostream* os) {
-  if (error_or.HasValue()) {
-    *os << error_or.Value();
-  } else {
-    *os << ToString(error_or.Error());
-  }
+  *os << pretty::ToString(error_or);
 }
 
 namespace crash_reports {
@@ -107,6 +115,14 @@ inline void PrintTo(const FilingResult& result, std::ostream* os) {
       break;
   }
   *os << result_str;
+}
+
+inline void PrintTo(const Product& product, std::ostream* os) {
+  *os << "\nProduct {";
+  *os << "\n  name:    " << product.name;
+  *os << "\n  version: " << pretty::ToString(product.version);
+  *os << "\n  channel: " << pretty::ToString(product.channel);
+  *os << "\n}";
 }
 
 }  // namespace crash_reports

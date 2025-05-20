@@ -26,6 +26,7 @@
 //! ```
 
 #![warn(missing_docs)]
+#![warn(clippy::all)]
 #![deny(clippy::await_holding_lock)]
 #![deny(clippy::await_holding_refcell_ref)]
 

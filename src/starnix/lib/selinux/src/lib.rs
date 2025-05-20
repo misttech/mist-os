@@ -18,6 +18,9 @@ use policy::arrays::FsUseType;
 
 use std::num::NonZeroU32;
 
+/// Numeric class Ids are provided to the userspace AVC surfaces (e.g. "create", "access", etc).
+pub use policy::ClassId;
+
 /// The Security ID (SID) used internally to refer to a security context.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SecurityId(NonZeroU32);
@@ -31,14 +34,26 @@ impl SecurityId {
     }
 }
 
-/// A class that may appear in SELinux policy or an access vector cache query.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+/// Identifies a specific class by its policy-defined Id, or as a kernel object class enum Id.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum ObjectClass {
-    /// A well-known class used in the SELinux system, such as `process` or `file`.
-    System(KernelClass),
-    /// A custom class that only has meaning in policies that define class with the given string
-    /// name.
-    Custom(String),
+    /// Refers to a well-known SELinux kernel object class (e.g. "process", "file", "capability").
+    Kernel(KernelClass),
+    /// Refers to a policy-defined class by its policy-defined numeric Id. This is most commonly
+    /// used when handling queries from userspace, which refer to classes by-Id.
+    ClassId(ClassId),
+}
+
+impl From<ClassId> for ObjectClass {
+    fn from(id: ClassId) -> Self {
+        Self::ClassId(id)
+    }
+}
+
+impl<T: Into<KernelClass>> From<T> for ObjectClass {
+    fn from(class: T) -> Self {
+        Self::Kernel(class.into())
+    }
 }
 
 /// Declares an `enum` and implements an `all_variants()` API for it.
@@ -53,10 +68,10 @@ macro_rules! enumerable_enum {
         }
 
         impl $name {
-            pub fn all_variants() -> Vec<Self> {
-                let all_variants = vec![$($name::$variant),*];
-                $(let mut all_variants = all_variants; all_variants.extend($common_name::all_variants().into_iter().map(Self::Common));)?
-                all_variants
+            pub fn all_variants() -> impl Iterator<Item=Self> {
+                let iter = [$($name::$variant),*].iter().map(Clone::clone);
+                $(let iter = iter.chain($common_name::all_variants().map($name::Common));)?
+                iter
             }
         }
     }
@@ -208,18 +223,6 @@ impl KernelClass {
             Self::VSockSocket => "vsock_socket",
             // keep-sorted end
         }
-    }
-}
-
-impl From<KernelClass> for ObjectClass {
-    fn from(object_class: KernelClass) -> Self {
-        Self::System(object_class)
-    }
-}
-
-impl From<String> for ObjectClass {
-    fn from(name: String) -> Self {
-        Self::Custom(name)
     }
 }
 
@@ -449,10 +452,10 @@ macro_rules! permission_enum {
                 }
             }
 
-            pub fn all_variants() -> Vec<Self> {
-                let mut all_variants = vec![];
-                $(all_variants.extend($inner::all_variants().into_iter().map($name::from));)*
-                all_variants
+            pub fn all_variants() -> impl Iterator<Item=Self> {
+                let iter = [].iter().map(Clone::clone);
+                $(let iter = iter.chain($inner::all_variants().map($name::from));)*
+                iter
             }
         }
     }
@@ -766,6 +769,16 @@ common_permission_enum! {
         Bind("bind"),
         /// Permission to initiate a connection.
         Connect("connect"),
+        /// Permission to get socket options.
+        GetOpt("getopt"),
+        /// Permission to listen for connections.
+        Listen("listen"),
+        /// Permission to send datagrams to the socket.
+        SendTo("sendto"),
+        /// Permission to set socket options.
+        SetOpt("setopt"),
+        /// Permission to terminate connection.
+        Shutdown("shutdown"),
         // keep-sorted end
     }
 }
@@ -1032,6 +1045,10 @@ class_permission_enum! {
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     UnixStreamSocketPermission extends CommonSocketPermission {
+        // keep-sorted start
+        /// Permission to connect a streaming Unix-domain socket.
+        ConnectTo("connectto"),
+        // keep-sorted end
     }
 }
 
@@ -1237,6 +1254,8 @@ class_permission_enum! {
         // keep-sorted start
         /// Permission to dynamically transition a process to a different security domain.
         DynTransition("dyntransition"),
+        /// Permission to execute arbitrary code from the heap.
+        ExecHeap("execheap"),
         /// Permission to execute arbitrary code from memory.
         ExecMem("execmem"),
         /// Permission to fork the current running process.
@@ -1296,8 +1315,14 @@ class_permission_enum! {
         CheckContext("check_context"),
         /// Permission to compute access vectors via the "access" API.
         ComputeAv("compute_av"),
-        /// Permission to compute security contexts for newly created objects via "create".
+        /// Permission to compute security contexts based on `type_transition` rules via "create".
         ComputeCreate("compute_create"),
+        /// Permission to compute security contexts based on `type_member` rules via "member".
+        ComputeMember("compute_member"),
+        /// Permission to compute security contexts based on `type_change` rules via "relabel".
+        ComputeRelabel("compute_relabel"),
+        /// Permission to compute user decisions via "user".
+        ComputeUser("compute_user"),
         /// Permission to load a new binary policy into the kernel via the "load" API.
         LoadPolicy("load_policy"),
         /// Permission to commit booleans to control conditional elements of the policy.
@@ -1345,8 +1370,8 @@ macro_rules! initial_sid_enum {
         }
 
         impl $name {
-            pub fn all_variants() -> Vec<Self> {
-                vec![
+            pub fn all_variants() -> &'static [Self] {
+                &[
                     $($name::$variant),*
                 ]
             }
@@ -1470,13 +1495,14 @@ mod tests {
 
     #[test]
     fn object_class_permissions() {
-        assert_eq!(ObjectClass::Custom(String::from("my_class")), String::from("my_class").into());
+        let test_class_id = ClassId::new(NonZeroU32::new(20).unwrap());
+        assert_eq!(ObjectClass::ClassId(test_class_id), test_class_id.into());
         for variant in ProcessPermission::all_variants().into_iter() {
             assert_eq!(KernelClass::Process, variant.class());
             assert_eq!("process", variant.class().name());
             let permission: KernelPermission = variant.clone().into();
             assert_eq!(KernelPermission::Process(variant.clone()), permission);
-            assert_eq!(ObjectClass::System(KernelClass::Process), variant.class().into());
+            assert_eq!(ObjectClass::Kernel(KernelClass::Process), variant.class().into());
         }
     }
 
