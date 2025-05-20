@@ -26,6 +26,7 @@
 //! capability routing.  Refer to capability routing docs for those details.
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::RequestStream;
 use fidl::HandleBased;
@@ -77,17 +78,174 @@ fn is_deadline_changed(
     }
 }
 
+// Errors returnable from [TimerOps] calls.
+#[derive(Debug)]
+enum TimerOpsError {
+    // The driver reported an error.
+    Driver(ffhh::DriverError),
+    // FIDL-specific RPC error.
+    Fidl(fidl::Error),
+}
+
+trait SawResponseFut:
+    Send + std::future::Future<Output = Result<zx::EventPair, TimerOpsError>>
+{
+    // nop
+}
+
+// Abstracts away timer operations.
+#[async_trait]
+trait TimerOps {
+    // Stop the timer with the specified ID.
+    async fn stop(&self, id: u64);
+
+    // Examine the timer's properties, such as supported resolutions and tick
+    // counts.
+    async fn get_timer_properties(&self) -> TimerConfig;
+
+    // This method must return an actual future, to handle the borrow checker:
+    // making this async will assume that `self` remains borrowed, which will
+    // thwart attempts to move the return value of this call into a separate
+    // closure.
+    fn start_and_wait(
+        &self,
+        id: u64,
+        resolution: &ffhh::Resolution,
+        ticks: u64,
+        setup_event: zx::Event,
+    ) -> std::pin::Pin<Box<dyn SawResponseFut>>;
+}
+
+/// TimerOps backed by an actual hardware timer.
+struct HardwareTimerOps {
+    proxy: ffhh::DeviceProxy,
+}
+
+impl HardwareTimerOps {
+    fn new(proxy: ffhh::DeviceProxy) -> Box<Self> {
+        Box::new(Self { proxy })
+    }
+}
+
+#[async_trait]
+impl TimerOps for HardwareTimerOps {
+    async fn stop(&self, id: u64) {
+        let _ = self
+            .proxy
+            .stop(id)
+            .await
+            .map(|result| {
+                let _ = result.map_err(|e| warn!("stop_hrtimer: driver error: {:?}", e));
+            })
+            .map_err(|e| warn!("stop_hrtimer: could not stop prior timer: {}", e));
+    }
+
+    async fn get_timer_properties(&self) -> TimerConfig {
+        match self.proxy.get_properties().await {
+            Ok(p) => {
+                let timers_properties = &p.timers_properties.expect("timers_properties must exist");
+                debug!("get_timer_properties: got: {:?}", timers_properties);
+
+                // Pick the correct hrtimer to use for wakes.
+                let timer_index = if timers_properties.len() > MAIN_TIMER_ID {
+                    // Mostly vim3, where we have pre-existing timer allocations
+                    // that we don't need to change.
+                    MAIN_TIMER_ID
+                } else if timers_properties.len() > 0 {
+                    // Newer devices that don't need to allocate timer IDs, and/or
+                    // may not even have as many timers as vim3 does. But, at least
+                    // one timer is needed.
+                    0
+                } else {
+                    // Give up.
+                    return TimerConfig::new_empty();
+                };
+                let main_timer_properties = &timers_properties[timer_index];
+                debug!("alarms: main_timer_properties: {:?}", main_timer_properties);
+                // Not sure whether it is useful to have more ticks than this, so limit it.
+                let max_ticks: u64 = std::cmp::min(
+                    main_timer_properties.max_ticks.unwrap_or(*MAX_USEFUL_TICKS),
+                    *MAX_USEFUL_TICKS,
+                );
+                let resolutions = &main_timer_properties
+                    .supported_resolutions
+                    .as_ref()
+                    .expect("supported_resolutions is populated")
+                    .iter()
+                    .last() //  Limits the resolution to the coarsest available.
+                    .map(|r| match *r {
+                        ffhh::Resolution::Duration(d) => d,
+                        _ => {
+                            error!(
+                            "get_timer_properties: Unknown resolution type, returning millisecond."
+                        );
+                            MSEC_IN_NANOS
+                        }
+                    })
+                    .map(|d| zx::BootDuration::from_nanos(d))
+                    .into_iter() // Used with .last() above.
+                    .collect::<Vec<_>>();
+                let timer_id = main_timer_properties.id.expect("timer ID is always present");
+                TimerConfig::new_from_data(timer_id, resolutions, max_ticks)
+            }
+            Err(e) => {
+                error!("could not get timer properties: {:?}", e);
+                TimerConfig::new_empty()
+            }
+        }
+    }
+
+    fn start_and_wait(
+        &self,
+        id: u64,
+        resolution: &ffhh::Resolution,
+        ticks: u64,
+        setup_event: zx::Event,
+    ) -> std::pin::Pin<Box<dyn SawResponseFut>> {
+        let inner = self.proxy.start_and_wait(id, resolution, ticks, setup_event);
+        Box::pin(HwResponseFut { pinner: Box::pin(inner) })
+    }
+}
+
+// Untangles the borrow checker issues that otherwise result from making
+// TimerOps::start_and_wait an async function.
+struct HwResponseFut {
+    pinner: std::pin::Pin<
+        Box<
+            fidl::client::QueryResponseFut<
+                ffhh::DeviceStartAndWaitResult,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+        >,
+    >,
+}
+
+use std::task::Poll;
+impl SawResponseFut for HwResponseFut {}
+unsafe impl Send for HwResponseFut {}
+impl std::future::Future for HwResponseFut {
+    type Output = Result<zx::EventPair, TimerOpsError>;
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let inner_poll = self.pinner.as_mut().poll(cx);
+        match inner_poll {
+            Poll::Ready(result) => Poll::Ready(match result {
+                Ok(Ok(keep_alive)) => Ok(keep_alive),
+                Ok(Err(e)) => Err(TimerOpsError::Driver(e)),
+                Err(e) => Err(TimerOpsError::Fidl(e)),
+            }),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 /// Stops a currently running hardware timer.
-async fn stop_hrtimer(hrtimer: &ffhh::DeviceProxy, timer_config: &TimerConfig) {
+async fn stop_hrtimer(hrtimer: &Box<dyn TimerOps>, timer_config: &TimerConfig) {
     trace::duration!(c"alarms", c"hrtimer:stop", "id" => timer_config.id);
     debug!("stop_hrtimer: stopping hardware timer: {}", timer_config.id);
-    let _ = hrtimer
-        .stop(timer_config.id)
-        .await
-        .map(|result| {
-            let _ = result.map_err(|e| warn!("stop_hrtimer: driver error: {:?}", e));
-        })
-        .map_err(|e| warn!("stop_hrtimer: could not stop prior timer: {}", e));
+    hrtimer.stop(timer_config.id).await;
     debug!("stop_hrtimer: stopped  hardware timer: {}", timer_config.id);
 }
 
@@ -327,10 +485,11 @@ impl Loop {
     ///
     /// `device_proxy` is a connection to a low-level timer device.
     pub fn new(device_proxy: ffhh::DeviceProxy, inspect: finspect::Node) -> Self {
+        let hw_device_timer_ops = HardwareTimerOps::new(device_proxy);
         let (snd, rcv) = mpsc::channel(CHANNEL_SIZE);
         let snd_clone = snd.clone();
         let _task = fasync::Task::local(async move {
-            wake_timer_loop(snd_clone, rcv, device_proxy, inspect).await
+            wake_timer_loop(snd_clone, rcv, hw_device_timer_ops, inspect).await
         });
         Self { _task, snd_cloneable: snd }
     }
@@ -870,60 +1029,9 @@ impl TimerConfig {
     }
 }
 
-async fn get_timer_properties(hrtimer: &ffhh::DeviceProxy) -> TimerConfig {
+async fn get_timer_properties(hrtimer: &Box<dyn TimerOps>) -> TimerConfig {
     debug!("get_timer_properties: requesting timer properties.");
-    match hrtimer.get_properties().await {
-        Ok(p) => {
-            let timers_properties = &p.timers_properties.expect("timers_properties must exist");
-            debug!("get_timer_properties: got: {:?}", timers_properties);
-
-            // Pick the correct hrtimer to use for wakes.
-            let timer_index = if timers_properties.len() > MAIN_TIMER_ID {
-                // Mostly vim3, where we have pre-existing timer allocations
-                // that we don't need to change.
-                MAIN_TIMER_ID
-            } else if timers_properties.len() > 0 {
-                // Newer devices that don't need to allocate timer IDs, and/or
-                // may not even have as many timers as vim3 does. But, at least
-                // one timer is needed.
-                0
-            } else {
-                // Give up.
-                return TimerConfig::new_empty();
-            };
-            let main_timer_properties = &timers_properties[timer_index];
-            debug!("alarms: main_timer_properties: {:?}", main_timer_properties);
-            // Not sure whether it is useful to have more ticks than this, so limit it.
-            let max_ticks: u64 = std::cmp::min(
-                main_timer_properties.max_ticks.unwrap_or(*MAX_USEFUL_TICKS),
-                *MAX_USEFUL_TICKS,
-            );
-            let resolutions = &main_timer_properties
-                .supported_resolutions
-                .as_ref()
-                .expect("supported_resolutions is populated")
-                .iter()
-                .last() //  Limits the resolution to the coarsest available.
-                .map(|r| match *r {
-                    ffhh::Resolution::Duration(d) => d,
-                    _ => {
-                        error!(
-                            "get_timer_properties: Unknown resolution type, returning millisecond."
-                        );
-                        MSEC_IN_NANOS
-                    }
-                })
-                .map(|d| zx::BootDuration::from_nanos(d))
-                .into_iter() // Used with .last() above.
-                .collect::<Vec<_>>();
-            let timer_id = main_timer_properties.id.expect("timer ID is always present");
-            TimerConfig::new_from_data(timer_id, resolutions, max_ticks)
-        }
-        Err(e) => {
-            error!("could not get timer properties: {:?}", e);
-            TimerConfig::new_empty()
-        }
-    }
+    hrtimer.get_timer_properties().await
 }
 
 /// The state of a single hardware timer that we must bookkeep.
@@ -945,7 +1053,7 @@ struct TimerState {
 async fn wake_timer_loop(
     snd: mpsc::Sender<Cmd>,
     mut cmds: mpsc::Receiver<Cmd>,
-    timer_proxy: ffhh::DeviceProxy,
+    timer_proxy: Box<dyn TimerOps>,
     inspect: finspect::Node,
 ) {
     debug!("wake_timer_loop: started");
@@ -1255,7 +1363,7 @@ async fn wake_timer_loop(
 /// - `needs_cancel`: if set, we must first cancel a hrtimer before scheduling a new one.
 async fn schedule_hrtimer(
     now: fasync::BootInstant,
-    hrtimer: &ffhh::DeviceProxy,
+    hrtimer: &Box<dyn TimerOps>,
     deadline: fasync::BootInstant,
     mut command_send: mpsc::Sender<Cmd>,
     timer_config: &TimerConfig,
@@ -1300,7 +1408,7 @@ async fn schedule_hrtimer(
         let response = start_and_wait_fut.await;
         trace::instant!(c"alarms", c"hrtimer:response", trace::Scope::Process);
         match response {
-            Err(e) => {
+            Err(TimerOpsError::Fidl(e)) => {
                 trace::instant!(c"alarms", c"hrtimer:response:fidl_error", trace::Scope::Process);
                 debug!("hrtimer_task: hrtimer FIDL error: {:?}", e);
                 command_send
@@ -1308,7 +1416,7 @@ async fn schedule_hrtimer(
                     .unwrap();
                 // BAD: no way to keep alive.
             }
-            Ok(Err(e)) => {
+            Err(TimerOpsError::Driver(e)) => {
                 let driver_error_str = format!("{:?}", e);
                 trace::instant!(c"alarms", c"hrtimer:response:driver_error", trace::Scope::Process, "error" => &driver_error_str[..]);
                 debug!("schedule_hrtimer: hrtimer driver error: {:?}", e);
@@ -1317,7 +1425,7 @@ async fn schedule_hrtimer(
                     .unwrap();
                 // BAD: no way to keep alive.
             }
-            Ok(Ok(keep_alive)) => {
+            Ok(keep_alive) => {
                 trace::instant!(c"alarms", c"hrtimer:response:alarm", trace::Scope::Process);
                 debug!("hrtimer: got alarm response: {:?}", keep_alive);
                 // May trigger sooner than the deadline.
