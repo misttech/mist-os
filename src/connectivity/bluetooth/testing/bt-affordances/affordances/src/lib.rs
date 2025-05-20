@@ -136,31 +136,7 @@ impl WorkThread {
                     }
                 }
                 Request::SetDiscoverability(discoverable, sender) => {
-                    if !discoverable {
-                        if proxies.discoverability_session.take().is_none() {
-                            eprintln!("Asked to revoke nonexistent discoverability session.");
-                        }
-                        sender.send(Ok(())).unwrap();
-                        continue;
-                    }
-                    if proxies.discoverability_session.is_some() {
-                        continue;
-                    }
-                    let (token, discoverability_session_server) = fidl::endpoints::create_proxy();
-                    if let Err(err) = proxies
-                        .access_proxy
-                        .make_discoverable(discoverability_session_server)
-                        .await?
-                    {
-                        sender
-                            .send(Err(anyhow!(
-                                "fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {err:?}"
-                            )))
-                            .unwrap();
-                        continue;
-                    }
-                    proxies.discoverability_session = Some(token);
-                    sender.send(Ok(())).unwrap();
+                    sender.send(proxies.set_discoverability(discoverable).await).unwrap();
                 }
                 Request::Stop => break,
             }
@@ -239,7 +215,7 @@ struct Proxies {
     profile_proxy: ProfileProxy,
     host_watcher_stream: HangingGetStream<HostWatcherProxy, Vec<HostInfo>>,
     peer_watcher_stream: HangingGetStream<AccessProxy, (Vec<Peer>, Vec<PeerId>)>,
-    discoverability_session: Option<ProcedureTokenProxy>,
+    discoverability_session: Mutex<Option<ProcedureTokenProxy>>,
 }
 
 impl Proxies {
@@ -252,7 +228,7 @@ impl Proxies {
         );
         let peer_watcher_stream =
             HangingGetStream::new_with_fn_ptr(access_proxy.clone(), AccessProxy::watch_peers);
-        let discoverability_session: Option<ProcedureTokenProxy> = None;
+        let discoverability_session: Mutex<Option<ProcedureTokenProxy>> = Mutex::new(None);
 
         Ok(Proxies {
             access_proxy,
@@ -378,5 +354,26 @@ impl Proxies {
                 Err(anyhow!("fuchsia.bluetooth.bredr.Profile/Connect error: {fidl_err}"))
             }
         }
+    }
+
+    async fn set_discoverability(&mut self, discoverable: bool) -> Result<(), anyhow::Error> {
+        let mut discoverability_session = self.discoverability_session.lock();
+        if !discoverable {
+            if discoverability_session.take().is_none() {
+                eprintln!("Asked to revoke nonexistent discoverability session.");
+            }
+            return Ok(());
+        }
+        if discoverability_session.is_some() {
+            return Ok(());
+        }
+        let (token, discoverability_session_server) = fidl::endpoints::create_proxy();
+        if let Err(err) =
+            self.access_proxy.make_discoverable(discoverability_session_server).await?
+        {
+            return Err(anyhow!("fuchsia.bluetooth.sys.Access/MakeDiscoverable error: {err:?}"));
+        }
+        *discoverability_session = Some(token);
+        Ok(())
     }
 }
