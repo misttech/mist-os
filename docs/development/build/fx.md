@@ -309,32 +309,6 @@ if that target is defined as an `executable()` only.
 See the [build system overview][build-overview] for a more detailed discussion
 of build targets.
 
-### Generating a build archive {#generating-a-build-archive}
-
-In addition to executing a build, you can use the `fx build` command
-to generate a build archive file (that is, `.tar`, `.tgz`, or`.zip`). This build
-archive file comprises a specific blend of the build artifacts produced by `fx build`,
-making your build output portable for various purposes. For instance, you can provide
-this build archive file as input to the [`ffx target flash`][ffx-target-flash] command
-for flashing the build to a Fuchsia device.
-
-To generate a build archive file, run `fx build` with the following special target:
-
-```posix-terminal
-fx build build-archive.{{ "<var>" }}FORMAT{{ "</var>" }}
-```
-
-Replace `FORMAT` with `tar`, `tgz`, or `zip`, for example:
-
-```posix-terminal
-fx build build-archive.zip
-```
-
-Once the build is finished, this command creates the build archive file
-(`build-archive.zip` in the example above) in your Fuchsia build directory, which is
-`out/default` by default. (To view the exact location of your build directory,
-run `fx get-build-dir`.)
-
 ### Creating a product bundle ZIP file {#creating-a-product-bundle-zip-file}
 
 If you've already built a Fuchsia product (by running `fx build`), you can
