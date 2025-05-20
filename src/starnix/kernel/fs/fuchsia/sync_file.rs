@@ -84,7 +84,7 @@ struct FenceState {
 }
 
 impl SyncFile {
-    const SIGNALS: zx::Signals = zx::Signals::COUNTER_SIGNALED.union(zx::Signals::USER_0);
+    const SIGNALS: zx::Signals = zx::Signals::COUNTER_SIGNALED;
 
     pub fn new(name: [u8; 32], fence: SyncFence) -> SyncFile {
         SyncFile { name, fence }
