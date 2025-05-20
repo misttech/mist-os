@@ -560,6 +560,7 @@ func fuchsiaLogChecks() []FailureModeCheck {
 					// LINT.IfChange(seriallistener_timed_out_exception)
 					{startString: "seriallistener FATAL: timed out before success string", endString: "was read from serial"},
 					// LINT.ThenChange(/tools/testing/seriallistener/cmd/main.go:timed_out)
+					{startString: "seriallistener DEBUG: ReadUntilMatch(", endString: "bytes read before cancellation"},
 				},
 			},
 			&stringInLogCheck{
