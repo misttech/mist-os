@@ -13,8 +13,8 @@
         {
             name: "session-env",
 
-            // This excludes the boot-resolver and builtin-runner, which the session is not
-            // allowed access to.
+            // This excludes the boot-resolver and most builtin runners, which
+            // the session is not allowed access to.
             extends: "none",
             runners: [
                 {
@@ -25,12 +25,21 @@
                     runner: "elf",
                     from: "parent",
                 },
+                {
+                    runner: "builtin_dispatcher",
+                    from: "parent",
+                },
             ],
             resolvers: [
                 {
                     resolver: "base_resolver",
                     from: "parent",
                     scheme: "fuchsia-pkg",
+                },
+                {
+                    resolver: "fuchsia-builtin",
+                    from: "parent",
+                    scheme: "fuchsia-builtin",
                 },
             ],
 

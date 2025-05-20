@@ -423,6 +423,16 @@
             dependency: "weak",
             availability: "optional",
         },
+        {
+            runner: "builtin_dispatcher",
+            from: "parent",
+            to: "#core",
+        },
+        {
+            resolver: "fuchsia-builtin",
+            from: "parent",
+            to: "#core",
+        },
     ],
     expose: [
         {
