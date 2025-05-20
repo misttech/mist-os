@@ -10,11 +10,15 @@
 #include <atomic>
 #include <cstddef>
 
-#include "internal/atomic.h"
-#include "internal/linkage.h"
 #include "memory.h"
 #include "type_traits.h"
 #include "version.h"
+
+#if !(defined(__cpp_lib_atomic_ref) && __cpp_lib_atomic_ref >= 201806L && \
+      !defined(LIB_STDCOMPAT_USE_POLYFILLS))
+#include "internal/atomic.h"
+#include "internal/linkage.h"
+#endif
 
 namespace cpp20 {
 
