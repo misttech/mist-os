@@ -96,6 +96,7 @@ use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use std::vec::Vec;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder};
 
@@ -598,14 +599,12 @@ impl Releasable for TransactionState {
             if let Some(task) = get_task_for_thread_group(&self.key) {
                 let resource_accessor =
                     get_resource_accessor(task.deref(), &self.remote_resource_accessor);
-                for fd in &self.owned_fds {
-                    if let Err(error) = resource_accessor.close_fd(*fd) {
-                        log_warn!(
-                                "Error when dropping transaction state while closing fd for task {}: {:?}",
-                                task.id,
-                                error
-                            )
-                    }
+                if let Err(error) = resource_accessor.close_files(self.owned_fds) {
+                    log_warn!(
+                        "Error when dropping transaction state while closing fd for task {}: {:?}",
+                        task.id,
+                        error
+                    );
                 }
             }
         }
@@ -630,9 +629,7 @@ struct TransientTransactionState<'a> {
 impl<'a> Releasable for TransientTransactionState<'a> {
     type Context<'b: 'c, 'c> = ();
     fn release<'b: 'c, 'c>(self, _: Self::Context<'b, 'c>) {
-        for fd in &self.transient_fds {
-            let _: Result<(), Errno> = self.accessor.close_fd(*fd);
-        }
+        let _ = self.accessor.close_files(self.transient_fds);
         self.state.release(());
         self.drop_guard.disarm();
     }
@@ -3147,19 +3144,19 @@ impl std::fmt::Display for Handle {
 /// remote one.
 trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     // File related methods.
-    fn close_fd(&self, fd: FdNumber) -> Result<(), Errno>;
-    fn get_file_with_flags(
+    fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno>;
+    fn get_files_with_flags(
         &self,
         current_task: &CurrentTask,
-        fd: FdNumber,
-    ) -> Result<(FileHandle, FdFlags), Errno>;
-    fn add_file_with_flags(
+        fds: Vec<FdNumber>,
+    ) -> Result<Vec<(FileHandle, FdFlags)>, Errno>;
+    fn add_files_with_flags(
         &self,
         locked: &mut Locked<'_, ResourceAccessorAddFile>,
         current_task: &CurrentTask,
-        file: FileHandle,
-        flags: FdFlags,
-    ) -> Result<FdNumber, Errno>;
+        files: Vec<(FileHandle, FdFlags)>,
+        add_action: &mut dyn FnMut(FdNumber),
+    ) -> Result<Vec<FdNumber>, Errno>;
 
     // Convenience method to allow passing a MemoryAccessor as a parameter.
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor;
@@ -3308,71 +3305,90 @@ impl MemoryAccessor for RemoteResourceAccessor {
 }
 
 impl ResourceAccessor for RemoteResourceAccessor {
-    fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-        self.run_file_request(fbinder::FileRequest {
-            close_requests: Some(vec![fd.raw()]),
-            ..Default::default()
-        })
-        .map(|_| ())
+    fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno> {
+        profile_duration!("RemoteCloseFile");
+        for chunk in fds.chunks(fbinder::MAX_REQUEST_COUNT as usize) {
+            self.run_file_request(fbinder::FileRequest {
+                close_requests: Some(chunk.into_iter().map(|fd| fd.raw()).collect()),
+                ..Default::default()
+            })?;
+        }
+        Ok(())
     }
 
-    fn get_file_with_flags(
+    fn get_files_with_flags(
         &self,
         current_task: &CurrentTask,
-        fd: FdNumber,
-    ) -> Result<(FileHandle, FdFlags), Errno> {
+        fds: Vec<FdNumber>,
+    ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
         profile_duration!("RemoteGetFile");
-        let response = self.run_file_request(fbinder::FileRequest {
-            get_requests: Some(vec![fd.raw()]),
-            ..Default::default()
-        })?;
-        if let Some(mut files) = response.get_responses {
-            // Validate that the server returned a single response, as a single fd was sent.
-            if files.len() == 1 {
-                let file = files.pop().unwrap();
-                let Some(flags) = file.flags else {
+        let num_fds = fds.len();
+        let mut files = Vec::with_capacity(num_fds);
+
+        for chunk in fds.chunks(fbinder::MAX_REQUEST_COUNT as usize) {
+            let response = self.run_file_request(fbinder::FileRequest {
+                get_requests: Some(chunk.into_iter().map(|fd| fd.raw()).collect()),
+                ..Default::default()
+            })?;
+            for fbinder::FileHandle { file, flags, .. } in
+                response.get_responses.into_iter().flatten()
+            {
+                let Some(flags) = flags else {
                     log_warn!("Incorrect response to file request. Missing flags.");
                     return error!(ENOENT);
                 };
-                if let Some(handle) = file.file {
-                    return Ok((
-                        new_remote_file(current_task, handle, flags.into_fidl())?,
-                        FdFlags::empty(),
-                    ));
+                let file = if let Some(file) = file {
+                    new_remote_file(current_task, file, flags.into_fidl())?
                 } else {
-                    return Ok((new_null_file(current_task, flags.into_fidl()), FdFlags::empty()));
-                }
+                    new_null_file(current_task, flags.into_fidl())
+                };
+                files.push((file, FdFlags::empty()));
             }
         }
-        error!(ENOENT)
+
+        if files.len() != num_fds {
+            error!(ENOENT)
+        } else {
+            Ok(files)
+        }
     }
 
-    fn add_file_with_flags(
+    fn add_files_with_flags(
         &self,
         _locked: &mut Locked<'_, ResourceAccessorAddFile>,
         current_task: &CurrentTask,
-        file: FileHandle,
-        _flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
+        files: Vec<(FileHandle, FdFlags)>,
+        add_action: &mut dyn FnMut(FdNumber),
+    ) -> Result<Vec<FdNumber>, Errno> {
         profile_duration!("RemoteAddFile");
-        let flags: fbinder::FileFlags = file.flags().into_fidl();
-        let handle = file.to_handle(current_task)?;
-        let response = self.run_file_request(fbinder::FileRequest {
-            add_requests: Some(vec![fbinder::FileHandle {
-                file: handle,
-                flags: Some(flags),
-                ..fbinder::FileHandle::default()
-            }]),
-            ..Default::default()
-        })?;
-        if let Some(fds) = response.add_responses {
-            // Validate that the server returned a single response, as a single file was sent.
-            if fds.len() == 1 {
-                let fd = fds[0];
-                return Ok(FdNumber::from_raw(fd));
+        let num_files = files.len();
+        let mut fds = Vec::with_capacity(num_files);
+
+        for chunk in files.chunks(fbinder::MAX_REQUEST_COUNT as usize) {
+            let mut handles = Vec::with_capacity(chunk.len());
+            for (file, _) in chunk.into_iter() {
+                handles.push(fbinder::FileHandle {
+                    file: file.to_handle(current_task)?,
+                    flags: Some(file.flags().into_fidl()),
+                    ..fbinder::FileHandle::default()
+                });
+            }
+            let response = self.run_file_request(fbinder::FileRequest {
+                add_requests: Some(handles),
+                ..Default::default()
+            })?;
+            for fd in response.add_responses.into_iter().flatten().map(|fd| FdNumber::from_raw(fd))
+            {
+                add_action(fd);
+                fds.push(fd);
             }
         }
-        error!(ENOENT)
+
+        if fds.len() != num_files {
+            error!(ENOENT)
+        } else {
+            Ok(fds)
+        }
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -3382,28 +3398,43 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
 /// Implementation of `ResourceAccessor` for a local client represented as a `CurrentTask`.
 impl ResourceAccessor for CurrentTask {
-    fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-        log_trace!("Closing fd {:?}", fd);
-        self.files.close(fd)
+    fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno> {
+        for fd in fds {
+            log_trace!("Closing fd {:?}", fd);
+            self.files.close(fd)?;
+        }
+        Ok(())
     }
-    fn get_file_with_flags(
+
+    fn get_files_with_flags(
         &self,
         _current_task: &CurrentTask,
-        fd: FdNumber,
-    ) -> Result<(FileHandle, FdFlags), Errno> {
-        log_trace!("Getting file {:?} with flags", fd);
-        // TODO: Should we allow O_PATH here?
-        self.files.get_allowing_opath_with_flags(fd)
+        fds: Vec<FdNumber>,
+    ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
+        let mut files = Vec::with_capacity(fds.len());
+        for fd in fds {
+            log_trace!("Getting file {:?} with flags", fd);
+            // TODO: Should we allow O_PATH here?
+            files.push(self.files.get_allowing_opath_with_flags(fd)?);
+        }
+        Ok(files)
     }
-    fn add_file_with_flags(
+
+    fn add_files_with_flags(
         &self,
         _locked: &mut Locked<'_, ResourceAccessorAddFile>,
         _current_task: &CurrentTask,
-        file: FileHandle,
-        flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
-        log_trace!("Adding file {:?} with flags {:?}", file, flags);
-        self.add_file(file, flags)
+        files: Vec<(FileHandle, FdFlags)>,
+        add_action: &mut dyn FnMut(FdNumber),
+    ) -> Result<Vec<FdNumber>, Errno> {
+        let mut fds = Vec::with_capacity(files.len());
+        for (file, flags) in files {
+            log_trace!("Adding file {:?} with flags {:?}", file, flags);
+            let fd = self.add_file(file, flags)?;
+            add_action(fd);
+            fds.push(fd);
+        }
+        Ok(fds)
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -3413,28 +3444,43 @@ impl ResourceAccessor for CurrentTask {
 
 /// Implementation of `ResourceAccessor` for a local client represented as a `Task`.
 impl ResourceAccessor for Task {
-    fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-        log_trace!("Closing fd {:?}", fd);
-        self.files.close(fd)
+    fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno> {
+        for fd in fds {
+            log_trace!("Closing fd {:?}", fd);
+            self.files.close(fd)?;
+        }
+        Ok(())
     }
-    fn get_file_with_flags(
+
+    fn get_files_with_flags(
         &self,
         _current_task: &CurrentTask,
-        fd: FdNumber,
-    ) -> Result<(FileHandle, FdFlags), Errno> {
-        log_trace!("Getting file {:?} with flags", fd);
-        // TODO: Should we allow O_PATH here?
-        self.files.get_allowing_opath_with_flags(fd)
+        fds: Vec<FdNumber>,
+    ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
+        let mut files = Vec::with_capacity(fds.len());
+        for fd in fds {
+            log_trace!("Getting file {:?} with flags", fd);
+            // TODO: Should we allow O_PATH here?
+            files.push(self.files.get_allowing_opath_with_flags(fd)?);
+        }
+        Ok(files)
     }
-    fn add_file_with_flags(
+
+    fn add_files_with_flags(
         &self,
         _locked: &mut Locked<'_, ResourceAccessorAddFile>,
         _current_task: &CurrentTask,
-        file: FileHandle,
-        flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
-        log_trace!("Adding file {:?} with flags {:?}", file, flags);
-        self.add_file(file, flags)
+        files: Vec<(FileHandle, FdFlags)>,
+        add_action: &mut dyn FnMut(FdNumber),
+    ) -> Result<Vec<FdNumber>, Errno> {
+        let mut fds = Vec::with_capacity(files.len());
+        for (file, flags) in files {
+            log_trace!("Adding file {:?} with flags {:?}", file, flags);
+            let fd = self.add_file(file, flags)?;
+            add_action(fd);
+            fds.push(fd);
+        }
+        Ok(fds)
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -4484,6 +4530,28 @@ impl BinderDriver {
         Ok((allocations.into(), transient_transaction_state))
     }
 
+    /// Translates file descriptors from the sending process to the receiving process.
+    fn translate_files<'a, L>(
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        source_resource_accessor: &dyn ResourceAccessor,
+        target_resource_accessor: &'a dyn ResourceAccessor,
+        fds: Vec<FdNumber>,
+        add_action: &mut dyn FnMut(FdNumber),
+    ) -> Result<Vec<FdNumber>, Errno>
+    where
+        L: LockBefore<ResourceAccessorAddFile>,
+    {
+        let source_files = source_resource_accessor.get_files_with_flags(current_task, fds)?;
+        let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
+        target_resource_accessor.add_files_with_flags(
+            &mut locked,
+            current_task,
+            source_files,
+            add_action,
+        )
+    }
+
     /// Translates binder object handles/FDs from the sending process to the receiver process,
     /// patching the transaction data as needed.
     ///
@@ -4524,6 +4592,7 @@ impl BinderDriver {
         release_on_error!(transaction_state, (), {
             let mut sg_remaining_buffer = sg_buffer.user_buffer();
             let mut sg_buffer_offset = 0;
+            let mut files = Vec::with_capacity(offsets.len());
             for (offset_idx, object_offset) in offsets.iter().map(|o| *o as usize).enumerate() {
                 // Bounds-check the offset.
                 if object_offset >= transaction_data.len() {
@@ -4602,20 +4671,8 @@ impl BinderDriver {
                         })
                     }
                     SerializedBinderObject::File { fd, flags, cookie } => {
-                        let (file, fd_flags) =
-                            source_resource_accessor.get_file_with_flags(current_task, fd)?;
-                        let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
-                        let new_fd = target_resource_accessor.add_file_with_flags(
-                            &mut locked,
-                            current_task,
-                            file,
-                            fd_flags,
-                        )?;
-
-                        // Close this FD if the transaction fails.
-                        transaction_state.push_transient_fd(new_fd);
-
-                        SerializedBinderObject::File { fd: new_fd, flags, cookie }
+                        files.push(TransientFile { object_offset, fd, flags, cookie });
+                        continue;
                     }
                     SerializedBinderObject::Buffer {
                         buffer,
@@ -4718,22 +4775,16 @@ impl BinderDriver {
                         let fd_array = zerocopy::Ref::into_mut(layout);
 
                         // Dup each file descriptor and re-write the value of the new FD.
-                        for fd in fd_array {
-                            let (file, flags) = source_resource_accessor.get_file_with_flags(
-                                current_task,
-                                FdNumber::from_raw(*fd as i32),
-                            )?;
-                            let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
-                            let new_fd = target_resource_accessor.add_file_with_flags(
-                                &mut locked,
-                                current_task,
-                                file,
-                                flags,
-                            )?;
-
+                        let new_fds = Self::translate_files(
+                            locked,
+                            current_task,
+                            source_resource_accessor,
+                            target_resource_accessor,
+                            fd_array.iter().map(|fd| FdNumber::from_raw(*fd as i32)).collect(),
                             // Close this FD if the transaction ends either by success or failure.
-                            transaction_state.push_owned_fd(new_fd);
-
+                            &mut |fd| transaction_state.push_owned_fd(fd),
+                        )?;
+                        for (fd, new_fd) in std::iter::zip(fd_array, new_fds) {
                             *fd = new_fd.raw() as u32;
                         }
 
@@ -4742,6 +4793,22 @@ impl BinderDriver {
                 };
 
                 translated_object.write_to(&mut transaction_data[object_offset..])?;
+            }
+
+            let new_fds = Self::translate_files(
+                locked,
+                current_task,
+                source_resource_accessor,
+                target_resource_accessor,
+                files.iter().map(|TransientFile { fd, .. }| *fd).collect(),
+                // Close this FD if the transaction fails.
+                &mut |fd| transaction_state.push_transient_fd(fd),
+            )?;
+            for (TransientFile { object_offset, flags, cookie, .. }, new_fd) in
+                std::iter::zip(files, new_fds)
+            {
+                SerializedBinderObject::File { fd: new_fd, flags, cookie }
+                    .write_to(&mut transaction_data[object_offset..])?;
             }
 
             Ok(())
@@ -4870,6 +4937,16 @@ fn find_parent_buffer<'a>(
 
     // Return a slice that represents the parent buffer.
     Ok(&mut sg_buffer.as_mut_bytes()[buffer_payload_start..buffer_payload_end])
+}
+
+/// Represents a file descriptor during a binder transaction.
+struct TransientFile {
+    /// Offset of `BINDER_TYPE_FD` object within transaction data.
+    object_offset: usize,
+    /// A `BINDER_TYPE_FD` object. A file descriptor.
+    fd: FdNumber,
+    flags: BinderObjectFlags,
+    cookie: binder_uintptr_t,
 }
 
 /// Represents a serialized binder object embedded in transaction data.
@@ -5275,24 +5352,24 @@ pub mod tests {
     const VMO_LENGTH: usize = 4096;
 
     impl ResourceAccessor for AutoReleasableTask {
-        fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
-            self.deref().close_fd(fd)
+        fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno> {
+            self.deref().close_files(fds)
         }
-        fn get_file_with_flags(
+        fn get_files_with_flags(
             &self,
             current_task: &CurrentTask,
-            fd: FdNumber,
-        ) -> Result<(FileHandle, FdFlags), Errno> {
-            self.deref().get_file_with_flags(current_task, fd)
+            fds: Vec<FdNumber>,
+        ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
+            self.deref().get_files_with_flags(current_task, fds)
         }
-        fn add_file_with_flags(
+        fn add_files_with_flags(
             &self,
             locked: &mut Locked<'_, ResourceAccessorAddFile>,
             current_task: &CurrentTask,
-            file: FileHandle,
-            flags: FdFlags,
-        ) -> Result<FdNumber, Errno> {
-            self.deref().add_file_with_flags(locked, current_task, file, flags)
+            files: Vec<(FileHandle, FdFlags)>,
+            add_action: &mut dyn FnMut(FdNumber),
+        ) -> Result<Vec<FdNumber>, Errno> {
+            self.deref().add_files_with_flags(locked, current_task, files, add_action)
         }
         fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
             self.deref().as_memory_accessor()
@@ -9117,50 +9194,42 @@ pub mod tests {
             assert_eq!(vector[..small_size], other_vector[..small_size]);
 
             let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
-            let fd0 = remote_binder_task
-                .add_file_with_flags(
-                    &mut locked,
-                    &task,
-                    new_null_file(&task, OpenFlags::RDWR),
-                    FdFlags::empty(),
-                )
-                .expect("add_file_with_flags");
-            assert_eq!(fd0.raw(), 0);
-            let fd1 = remote_binder_task
-                .add_file_with_flags(
-                    &mut locked,
-                    &task,
-                    new_null_file(&task, OpenFlags::WRONLY),
-                    FdFlags::empty(),
-                )
-                .expect("add_file_with_flags");
-            assert_eq!(fd1.raw(), 1);
-            let fd2 = remote_binder_task
-                .add_file_with_flags(
-                    &mut locked,
-                    &task,
-                    new_null_file(&task, OpenFlags::RDONLY),
-                    FdFlags::empty(),
-                )
-                .expect("add_file_with_flags");
-            assert_eq!(fd2.raw(), 2);
 
-            assert_eq!(remote_binder_task.close_fd(fd1), Ok(()));
-            let (handle, flags) =
-                remote_binder_task.get_file_with_flags(&task, fd0).expect("get_file_with_flags");
+            let mut files = vec![
+                (new_null_file(&task, OpenFlags::RDONLY), FdFlags::empty()),
+                (new_null_file(&task, OpenFlags::WRONLY), FdFlags::empty()),
+            ];
+            // Add more files to force chunking of requests.
+            for _ in 0..fbinder::MAX_REQUEST_COUNT {
+                files.push((new_null_file(&task, OpenFlags::RDWR), FdFlags::empty()));
+            }
+            let fds = remote_binder_task
+                .add_files_with_flags(&mut locked, &task, files, &mut |_| {})
+                .expect("add_files_with_flags");
+            for (i, fd) in fds.iter().enumerate() {
+                assert_eq!(fd.raw(), i as i32);
+            }
+
+            assert_eq!(remote_binder_task.close_files(vec![fds[1]]), Ok(()));
+            let (handle, flags) = remote_binder_task
+                .get_files_with_flags(&task, vec![fds[0]])
+                .expect("get_files_with_flags")
+                .pop()
+                .expect("pop");
             assert_eq!(flags, FdFlags::empty());
-            assert_eq!(handle.flags(), OpenFlags::RDWR);
+            assert_eq!(handle.flags(), OpenFlags::RDONLY);
 
             assert_eq!(
                 remote_binder_task
-                    .get_file_with_flags(&task, FdNumber::from_raw(3))
+                    .get_files_with_flags(&task, vec![FdNumber::from_raw(1000)])
                     .expect_err("bad fd"),
                 errno!(EBADF)
             );
 
             std::mem::drop(remote_binder_task);
             let fds = process_accessor_thread.join().expect("join").expect("fds");
-            assert_eq!(fds.len(), 1);
+            // Close and get requests both remove file descriptors.
+            assert_eq!(fds.len(), fbinder::MAX_REQUEST_COUNT as usize);
         });
     }
 
