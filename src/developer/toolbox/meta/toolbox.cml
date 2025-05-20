@@ -5,6 +5,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.bluetooth.affordances.PeerController",
                 "fuchsia.bluetooth.pandora.GrpcServerController",
                 "fuchsia.bluetooth.pandora.RootcanalClientController",
                 "fuchsia.bluetooth.sys.Access",
