@@ -80,6 +80,8 @@ class ManagedPmmNode {
       zx::result<vm_page_t*> result =
           node_.AllocLoanedPage([cow = vmo_->DebugGetCowPages().get()](vm_page_t* page) {
             page->set_state(vm_page_state::OBJECT);
+            page->object.set_object(nullptr);
+            page->object.set_page_offset(0);
             Pmm::Node().GetPageQueues()->SetReclaim(page, cow, 0);
           });
       if (result.is_error()) {
