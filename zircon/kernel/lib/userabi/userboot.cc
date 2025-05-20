@@ -22,6 +22,7 @@
 #include <zircon/types.h>
 
 #include <ktl/bit.h>
+#include <ktl/source_location.h>
 #include <ktl/utility.h>
 #include <lk/init.h>
 #include <object/channel_dispatcher.h>
@@ -44,7 +45,31 @@
 
 #include <ktl/enforce.h>
 
+#define RETURN_IF_NOT_OK(expr, ...) \
+  do {                              \
+    zx_status_t eval_expr = (expr); \
+    if (eval_expr != ZX_OK) {       \
+      KernelOops(#expr, eval_expr); \
+      return __VA_ARGS__;           \
+    }                               \
+  } while (0)
+
+#define RETURN_IF_NOT(predicate, ...) \
+  do {                                \
+    if (!(predicate)) {               \
+      KernelOops(#predicate, false);  \
+      return __VA_ARGS__;             \
+    }                                 \
+  } while (0)
+
 namespace {
+
+template <typename T>
+void KernelOops(const char* expression, T actual,
+                ktl::source_location where = ktl::source_location::current()) {
+  KERNEL_OOPS("[%s:%u] Expectation failure (%s was %d).\n", where.file_name(), where.line(),
+              expression, actual);
+}
 
 class VmoBuffer {
  public:
@@ -114,13 +139,13 @@ class Userboot {
                                   Handle*& out_vmar) {
     // Map in the userboot image along with the vDSO.
     zx::result mapped = Map(root_vmar);
-    ZX_ASSERT_MSG(mapped.is_ok(), "failed to map userboot: %d", mapped.error_value());
+    RETURN_IF_NOT_OK(mapped.status_value(), mapped.status_value());
     out_vmar = mapped->userboot_vmar.release();
     dprintf(SPEW, "userboot: %-31s @  %#" PRIxPTR "\n", "entry point", mapped->userboot_entry);
 
     // Set up the stack.
     zx::result<uintptr_t> sp = MapStack(root_vmar, mapped->stack_size);
-    ZX_ASSERT_MSG(sp.is_ok(), "failed to map userboot stack: %d", sp.error_value());
+    RETURN_IF_NOT_OK(sp.status_value(), sp.status_value());
 
     // Start the process running.
     return process.Start(ktl::move(thread), mapped->userboot_entry, sp.value(),
@@ -148,8 +173,7 @@ class Userboot {
       return vdso.take_error();
     }
 
-    ZX_ASSERT_MSG(userboot->stack_size,
-                  "userboot image must be linked with explicit -Wl,-z,stack-size=...");
+    RETURN_IF_NOT(userboot->stack_size, zx::error(ZX_ERR_INVALID_ARGS));
     return zx::ok(Mapped{
         .userboot_vmar = ktl::move(userboot->vmar),
         .userboot_entry = userboot->entry,
@@ -161,35 +185,26 @@ class Userboot {
   // Map the stack anywhere, in its own VMAR and a one-page guard region below.
   static zx::result<uintptr_t> MapStack(VmAddressRegionDispatcher& root_vmar, size_t stack_size) {
     fbl::RefPtr<VmObjectPaged> stack_vmo;
-    zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT, 0u,
-                                               stack_size, &stack_vmo);
-    if (status != ZX_OK) {
-      dprintf(CRITICAL, "userboot: failed to create stack VMO of %zu bytes: %d\n", stack_size,
-              status);
-      return zx::error{status};
-    }
+    zx_status_t status;
+
+    RETURN_IF_NOT_OK(status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY | PMM_ALLOC_FLAG_CAN_WAIT,
+                                                    0u, stack_size, &stack_vmo),
+                     zx::error(status));
     stack_vmo->set_name(kStackVmoName, sizeof(kStackVmoName) - 1);
 
     const size_t vmar_size = stack_size + ZX_PAGE_SIZE;
     KernelHandle<VmAddressRegionDispatcher> vmar_handle;
     zx_rights_t vmar_rights;
-    status = root_vmar.Allocate(0, vmar_size,
-                                ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC,
-                                &vmar_handle, &vmar_rights);
-    if (status != ZX_OK) {
-      dprintf(CRITICAL, "userboot: failed allocate stack VMAR of %zu bytes: %d\n", vmar_size,
-              status);
-      return zx::error{status};
-    }
+    RETURN_IF_NOT_OK(
+        status = root_vmar.Allocate(
+            0, vmar_size, ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC,
+            &vmar_handle, &vmar_rights),
+        zx::error(status));
 
     zx::result<VmAddressRegion::MapResult> map_result =
         vmar_handle.dispatcher()->Map(ZX_PAGE_SIZE, stack_vmo, 0, stack_size,
                                       ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC);
-    if (map_result.is_error()) {
-      dprintf(CRITICAL, "userboot: failed to map stack of %zu bytes: %d\n", stack_size,
-              map_result.error_value());
-      return map_result.take_error();
-    }
+    RETURN_IF_NOT_OK(map_result.status_value(), map_result.take_error());
     const uintptr_t stack_base = map_result->base;
     const uintptr_t sp = elfldltl::AbiTraits<>::InitialStackPointer(stack_base, stack_size);
     dprintf(SPEW, "userboot: %-31s @ [%#" PRIxPTR ", %#" PRIxPTR ")\n", "stack mapped", stack_base,
@@ -200,13 +215,10 @@ class Userboot {
 
     zx_rights_t vmo_rights;
     KernelHandle<VmObjectDispatcher> vmo_handle;
-    status = VmObjectDispatcher::Create(ktl::move(stack_vmo), stack_size,
-                                        VmObjectDispatcher::InitialMutability::kMutable,
-                                        &vmo_handle, &vmo_rights);
-    if (status != ZX_OK) {
-      dprintf(CRITICAL, "userboot: failed to create stack VMO dispatcher: %d\n", status);
-      return zx::error{status};
-    }
+    RETURN_IF_NOT_OK(status = VmObjectDispatcher::Create(
+                         ktl::move(stack_vmo), stack_size,
+                         VmObjectDispatcher::InitialMutability::kMutable, &vmo_handle, &vmo_rights),
+                     zx::error(status));
 
     return zx::ok(sp);
   }
@@ -252,15 +264,10 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
   size_t size = crashlog.Recover(nullptr);
   fbl::RefPtr<VmObjectPaged> crashlog_vmo;
   size_t aligned_size;
-  zx_status_t status = VmObject::RoundSize(size, &aligned_size);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, aligned_size, &crashlog_vmo);
-
-  if (status != ZX_OK) {
-    return status;
-  }
+  zx_status_t status;
+  RETURN_IF_NOT_OK(status = VmObject::RoundSize(size, &aligned_size), status);
+  RETURN_IF_NOT_OK(
+      status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, aligned_size, &crashlog_vmo), status);
 
   if (size) {
     VmoBuffer vmo_buffer{crashlog_vmo};
@@ -288,12 +295,11 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
   return ZX_OK;
 }
 
-Userboot bootstrap_vmos(HandoffEnd handoff_end,
-                        ktl::span<Handle*, userboot::kHandleCount> handles) {
+void bootstrap_vmos(HandoffEnd handoff_end, ktl::span<Handle*, userboot::kHandleCount> handles,
+                    ktl::optional<Userboot>& out_userboot) {
   // The instrumentation VMOs need to be created prior to the rootfs as the information for these
   // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
-  zx_status_t status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
-  ASSERT(status == ZX_OK);
+  RETURN_IF_NOT_OK(InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]));
 
   for (size_t i = 0; i < PhysVmo::kMaxExtraHandoffPhysVmos; ++i) {
     handles[userboot::kFirstExtraPhysVmo + i] = handoff_end.extra_phys_vmos[i].release();
@@ -308,12 +314,12 @@ Userboot bootstrap_vmos(HandoffEnd handoff_end,
   handles[userboot::kTimeValues] =
       Handle::Make(ktl::move(time_values_handle), (vdso->vmo_rights() & (~ZX_RIGHT_EXECUTE)))
           .release();
-  ASSERT(handles[userboot::kTimeValues]);
+  RETURN_IF_NOT(handles[userboot::kTimeValues]);
   for (size_t i = 0; i < userboot::kNumVdsoVariants; ++i) {
-    ASSERT(vdso_kernel_handles[i].dispatcher());
+    RETURN_IF_NOT(vdso_kernel_handles[i].dispatcher());
     handles[userboot::kFirstVdso + i] =
         Handle::Make(ktl::move(vdso_kernel_handles[i]), vdso->vmo_rights()).release();
-    ASSERT(handles[userboot::kFirstVdso + i]);
+    RETURN_IF_NOT(handles[userboot::kFirstVdso + i]);
   }
   DEBUG_ASSERT(handles[userboot::kFirstVdso + 1]->dispatcher() == vdso->dispatcher());
   if (gBootOptions->always_use_next_vdso) {
@@ -323,11 +329,9 @@ Userboot bootstrap_vmos(HandoffEnd handoff_end,
   // Crashlog.
   fbl::RefPtr<VmObject> crashlog_vmo;
   size_t crashlog_size = 0;
-  status = crashlog_to_vmo(&crashlog_vmo, &crashlog_size);
-  ASSERT(status == ZX_OK);
-  status =
-      get_vmo_handle(crashlog_vmo, true, crashlog_size, nullptr, &handles[userboot::kCrashlog]);
-  ASSERT(status == ZX_OK);
+  RETURN_IF_NOT_OK(crashlog_to_vmo(&crashlog_vmo, &crashlog_size));
+  RETURN_IF_NOT_OK(
+      get_vmo_handle(crashlog_vmo, true, crashlog_size, nullptr, &handles[userboot::kCrashlog]));
 
   // Boot options.
   {
@@ -335,61 +339,58 @@ Userboot bootstrap_vmos(HandoffEnd handoff_end,
     FILE boot_options_file{&boot_options};
     gBootOptions->Show(/*defaults=*/false, &boot_options_file);
     boot_options.vmo()->set_name(kBootOptionsVmoname, sizeof(kBootOptionsVmoname) - 1);
-    status = get_vmo_handle(boot_options.vmo(), false, boot_options.content_size(), nullptr,
-                            &handles[userboot::kBootOptions]);
-    ZX_ASSERT(status == ZX_OK);
+    RETURN_IF_NOT_OK(get_vmo_handle(boot_options.vmo(), false, boot_options.content_size(), nullptr,
+                                    &handles[userboot::kBootOptions]));
   }
 
 #if ENABLE_ENTROPY_COLLECTOR_TEST
-  ASSERT(!crypto::entropy::entropy_was_lost);
-  status =
-      get_vmo_handle(crypto::entropy::entropy_vmo, true, crypto::entropy::entropy_vmo_content_size,
-                     nullptr, &handles[kEntropyTestData]);
-  ASSERT(status == ZX_OK);
+  RETURN_IF_NOT(!crypto::entropy::entropy_was_lost);
+  RETURN_IF_NOT_OK(get_vmo_handle(crypto::entropy::entropy_vmo, true,
+                                  crypto::entropy::entropy_vmo_content_size, nullptr,
+                                  &handles[kEntropyTestData]));
+
 #endif
 
   // kcounters names table.
   fbl::RefPtr<VmObjectPaged> kcountdesc_vmo;
-  status = VmObjectPaged::CreateFromWiredPages(CounterDesc().VmoData(), CounterDesc().VmoDataSize(),
-                                               true, &kcountdesc_vmo);
-  ASSERT(status == ZX_OK);
+  RETURN_IF_NOT_OK(VmObjectPaged::CreateFromWiredPages(
+      CounterDesc().VmoData(), CounterDesc().VmoDataSize(), true, &kcountdesc_vmo));
   kcountdesc_vmo->set_name(counters::DescriptorVmo::kVmoName,
                            sizeof(counters::DescriptorVmo::kVmoName) - 1);
-  status = get_vmo_handle(ktl::move(kcountdesc_vmo), true, CounterDesc().VmoContentSize(), nullptr,
-                          &handles[userboot::kCounterNames]);
-  ASSERT(status == ZX_OK);
+  RETURN_IF_NOT_OK(get_vmo_handle(ktl::move(kcountdesc_vmo), true, CounterDesc().VmoContentSize(),
+                                  nullptr, &handles[userboot::kCounterNames]));
 
   // kcounters live data.
   fbl::RefPtr<VmObjectPaged> kcounters_vmo;
-  status = VmObjectPaged::CreateFromWiredPages(CounterArena().VmoData(),
-                                               CounterArena().VmoDataSize(), false, &kcounters_vmo);
-  ASSERT(status == ZX_OK);
+  RETURN_IF_NOT_OK(VmObjectPaged::CreateFromWiredPages(
+      CounterArena().VmoData(), CounterArena().VmoDataSize(), false, &kcounters_vmo));
   kcounters_vmo_ref = kcounters_vmo;
   kcounters_vmo->set_name(counters::kArenaVmoName, sizeof(counters::kArenaVmoName) - 1);
-  status = get_vmo_handle(ktl::move(kcounters_vmo), true, CounterArena().VmoContentSize(), nullptr,
-                          &handles[userboot::kCounters]);
-  ASSERT(status == ZX_OK);
+  RETURN_IF_NOT_OK(get_vmo_handle(ktl::move(kcounters_vmo), true, CounterArena().VmoContentSize(),
+                                  nullptr, &handles[userboot::kCounters]));
 
-  return {ktl::move(handoff_end.userboot), ktl::move(handoff_end.vdso)};
+  out_userboot.emplace(ktl::move(handoff_end.userboot), ktl::move(handoff_end.vdso));
 }
 
 class BootstrapChannel {
  public:
-  explicit BootstrapChannel(ProcessDispatcher& process) {
+  static zx::result<> Create(ProcessDispatcher& process,
+                             ktl::optional<BootstrapChannel>& out_channel) {
     // Make the channel that will hold the message.
     KernelHandle<ChannelDispatcher> user_handle, kernel_handle;
     zx_rights_t channel_rights;
-    zx_status_t status = ChannelDispatcher::Create(&user_handle, &kernel_handle, &channel_rights);
-    ASSERT(status == ZX_OK);
-
-    // Save user-side handle for StartUserboot, kernel-side channel for Send.
-    user_handle_ = Handle::Make(ktl::move(user_handle), channel_rights);
-    send_ = kernel_handle.release();
+    zx_status_t res;
+    RETURN_IF_NOT_OK(res = ChannelDispatcher::Create(&user_handle, &kernel_handle, &channel_rights),
+                     zx::make_result(res));
+    out_channel.emplace();
+    out_channel->user_handle_ = Handle::Make(ktl::move(user_handle), channel_rights);
+    out_channel->send_ = kernel_handle.release();
+    return zx::ok();
   }
 
-  [[nodiscard]] zx_status_t Send(MessagePacketPtr msg) {
-    ZX_ASSERT(send_);
-    return ktl::exchange(send_, {})->Write(ZX_KOID_INVALID, ktl::move(msg));
+  zx::result<> Send(MessagePacketPtr msg) {
+    RETURN_IF_NOT(send_, zx::make_result(ZX_ERR_BAD_STATE));
+    return zx::make_result(ktl::exchange(send_, {})->Write(ZX_KOID_INVALID, ktl::move(msg)));
   }
 
   HandleOwner TakeUserHandle() { return ktl::move(user_handle_); }
@@ -399,18 +400,16 @@ class BootstrapChannel {
   fbl::RefPtr<ChannelDispatcher> send_;
 };
 
-fbl::RefPtr<ThreadDispatcher> MakeThread(fbl::RefPtr<ProcessDispatcher> process,
-                                         Handle*& out_handle) {
+void MakeThread(fbl::RefPtr<ProcessDispatcher> process,
+                fbl::RefPtr<ThreadDispatcher>& out_dispatcher, Handle*& out_handle) {
+  ASSERT(out_dispatcher == nullptr);
   KernelHandle<ThreadDispatcher> thread_handle;
   zx_rights_t thread_rights;
-  zx_status_t status =
-      ThreadDispatcher::Create(ktl::move(process), 0, "userboot", &thread_handle, &thread_rights);
-  ASSERT(status == ZX_OK);
-  status = thread_handle.dispatcher()->Initialize();
-  ASSERT(status == ZX_OK);
-  fbl::RefPtr<ThreadDispatcher> thread = thread_handle.dispatcher();
+  RETURN_IF_NOT_OK(
+      ThreadDispatcher::Create(ktl::move(process), 0, "userboot", &thread_handle, &thread_rights));
+  RETURN_IF_NOT_OK(thread_handle.dispatcher()->Initialize());
+  out_dispatcher = thread_handle.dispatcher();
   out_handle = Handle::Make(ktl::move(thread_handle), thread_rights).release();
-  return thread;
 }
 
 }  // namespace
@@ -444,49 +443,52 @@ void userboot_init(HandoffEnd handoff_end) {
   });
 
   // Create the user thread.
-  fbl::RefPtr<ThreadDispatcher> thread =
-      MakeThread(process_handle.dispatcher(), handles[userboot::kThreadSelf]);
-  ASSERT(thread);
+  fbl::RefPtr<ThreadDispatcher> thread;
+  MakeThread(process_handle.dispatcher(), thread, handles[userboot::kThreadSelf]);
+  RETURN_IF_NOT(thread);
 
   // Set up the bootstrap channel and install the other end in the process.
-  BootstrapChannel bootstrap_channel{*process_handle.dispatcher()};
+  ktl::optional<BootstrapChannel> bootstrap_channel;
+  RETURN_IF_NOT_OK(
+      BootstrapChannel::Create(*process_handle.dispatcher(), bootstrap_channel).status_value());
+  RETURN_IF_NOT(bootstrap_channel.has_value());
 
   // Pack up the miscellaneous VMOs and take the userboot VMO and details.
-  Userboot userboot = bootstrap_vmos(ktl::move(handoff_end), handles);
+  ktl::optional<Userboot> userboot;
+  bootstrap_vmos(ktl::move(handoff_end), handles, userboot);
+  RETURN_IF_NOT(userboot.has_value());
 
   // Start userboot running.  It may block waiting for the bootstrap message.
-  status =
-      userboot.Start(*process_handle.dispatcher(), *vmar_handle.dispatcher(), ktl::move(thread),
-                     bootstrap_channel.TakeUserHandle(), handles[userboot::kVmarLoaded]);
-  ASSERT(status == ZX_OK);
-  ASSERT(handles[userboot::kVmarLoaded]);
+  RETURN_IF_NOT_OK(userboot->Start(*process_handle.dispatcher(), *vmar_handle.dispatcher(),
+                                   ktl::move(thread), bootstrap_channel->TakeUserHandle(),
+                                   handles[userboot::kVmarLoaded]));
+  RETURN_IF_NOT(handles[userboot::kVmarLoaded]);
 
   // It needs its own process and root VMAR handles.
   HandleOwner proc_handle_owner = Handle::Make(ktl::move(process_handle), process_rights);
   HandleOwner vmar_handle_owner = Handle::Make(ktl::move(vmar_handle), vmar_rights);
-  ASSERT(proc_handle_owner);
-  ASSERT(vmar_handle_owner);
+  RETURN_IF_NOT(proc_handle_owner);
+  RETURN_IF_NOT(vmar_handle_owner);
   handles[userboot::kProcSelf] = proc_handle_owner.release();
   handles[userboot::kVmarRootSelf] = vmar_handle_owner.release();
   handles[userboot::kMmioResource] = get_resource_handle(ZX_RSRC_KIND_MMIO).release();
-  ASSERT(handles[userboot::kMmioResource]);
+  RETURN_IF_NOT(handles[userboot::kMmioResource]);
   handles[userboot::kIrqResource] = get_resource_handle(ZX_RSRC_KIND_IRQ).release();
-  ASSERT(handles[userboot::kIrqResource]);
+  RETURN_IF_NOT(handles[userboot::kIrqResource]);
 #if ARCH_X86
   handles[userboot::kIoportResource] = get_resource_handle(ZX_RSRC_KIND_IOPORT).release();
-  ASSERT(handles[userboot::kIoportResource]);
+  RETURN_IF_NOT(handles[userboot::kIoportResource]);
 #elif ARCH_ARM64
   handles[userboot::kSmcResource] = get_resource_handle(ZX_RSRC_KIND_SMC).release();
-  ASSERT(handles[userboot::kSmcResource]);
+  RETURN_IF_NOT(handles[userboot::kSmcResource]);
 #endif
   handles[userboot::kSystemResource] = get_resource_handle(ZX_RSRC_KIND_SYSTEM).release();
-  ASSERT(handles[userboot::kSystemResource]);
+  RETURN_IF_NOT(handles[userboot::kSystemResource]);
   handles[userboot::kRootJob] = get_job_handle().release();
-  ASSERT(handles[userboot::kRootJob]);
+  RETURN_IF_NOT(handles[userboot::kRootJob]);
 
   // Send the bootstrap message.
-  status = bootstrap_channel.Send(ktl::move(msg));
-  ASSERT_MSG(status == ZX_OK, "status=%d", status);
+  RETURN_IF_NOT_OK(bootstrap_channel->Send(ktl::move(msg)).status_value());
 
   kill_userboot.cancel();
 
