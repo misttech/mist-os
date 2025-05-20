@@ -36,16 +36,36 @@ class FakeFile : public fidl::testing::WireTestBase<fuchsia_io::File> {
   }
 
   // fuchsia_io::File methods
-  void GetAttr(GetAttrCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK, fuchsia_io::wire::NodeAttributes{
-                               .mode = 1,
-                               .id = 1,
-                               .content_size = 10,
-                               .storage_size = 20,
-                               .link_count = 0,
-                               .creation_time = 3,
-                               .modification_time = 5,
-                           });
+  void GetAttributes(fuchsia_io::wire::NodeGetAttributesRequest* request,
+                     GetAttributesCompleter::Sync& completer) override {
+    fidl::WireTableFrame<fuchsia_io::wire::ImmutableNodeAttributes> immutable_frame_;
+    fidl::WireTableFrame<fuchsia_io::wire::MutableNodeAttributes> mutable_frame_;
+    auto immutable_builder = fuchsia_io::wire::ImmutableNodeAttributes::ExternalBuilder(
+        fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::ImmutableNodeAttributes>>::
+            FromExternal(&immutable_frame_));
+
+    auto mutable_builder = fuchsia_io::wire::MutableNodeAttributes::ExternalBuilder(
+        fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::MutableNodeAttributes>>::
+            FromExternal(&mutable_frame_));
+    uint64_t expected_id = 1;
+    uint64_t expected_content_size = 10;
+    uint64_t expected_storage_size = 20;
+    uint64_t expected_link_count = 0;
+    uint64_t expected_creation_time = 3;
+    uint64_t expected_modification_time = 5;
+
+    mutable_builder.mode(1);
+    immutable_builder.id(fidl::ObjectView<uint64_t>::FromExternal(&expected_id));
+    immutable_builder.content_size(
+        fidl::ObjectView<uint64_t>::FromExternal(&expected_content_size));
+    immutable_builder.storage_size(
+        fidl::ObjectView<uint64_t>::FromExternal(&expected_storage_size));
+    immutable_builder.link_count(fidl::ObjectView<uint64_t>::FromExternal(&expected_link_count));
+    mutable_builder.creation_time(
+        fidl::ObjectView<uint64_t>::FromExternal(&expected_creation_time));
+    mutable_builder.modification_time(
+        fidl::ObjectView<uint64_t>::FromExternal(&expected_modification_time));
+    completer.ReplySuccess(mutable_builder.Build(), immutable_builder.Build());
   }
 
   void Close(CloseCompleter::Sync& completer) override { completer.ReplySuccess(); }
@@ -92,12 +112,13 @@ class FakeDirectory : public fidl::testing::WireTestBase<fuchsia_io::Directory> 
   }
 
   // fuchsia_io::Directory methods
-  void GetAttr(GetAttrCompleter::Sync& completer) override {
+  void GetAttributes(fuchsia_io::wire::NodeGetAttributesRequest* request,
+                     GetAttributesCompleter::Sync& completer) override {
     auto ret = expect_get_attr_.front();
     expect_get_attr_.pop();
-    completer.Reply(ZX_OK, ret);
+    completer.ReplySuccess(ret.mutable_attributes, ret.immutable_attributes);
   }
-  void ExpectGetAttr(fuchsia_io::wire::NodeAttributes attr) { expect_get_attr_.push(attr); }
+  void ExpectGetAttributes(fuchsia_io::wire::NodeAttributes2 attr) { expect_get_attr_.push(attr); }
 
   void Open(fuchsia_io::wire::DirectoryOpenRequest* request,
             OpenCompleter::Sync& completer) override {
@@ -130,7 +151,7 @@ class FakeDirectory : public fidl::testing::WireTestBase<fuchsia_io::Directory> 
   async_dispatcher_t* dispatcher_;
   std::unique_ptr<fidl::ServerBindingRef<fuchsia_io::Directory>> binding_ref_;
 
-  std::queue<fuchsia_io::wire::NodeAttributes> expect_get_attr_;
+  std::queue<fuchsia_io::wire::NodeAttributes2> expect_get_attr_;
   std::queue<std::vector<uint8_t>> expect_read_dirents_;
   uint32_t expect_rewind_ = 0;
 };
@@ -402,11 +423,29 @@ TEST_F(AdbFileSyncTest, HandleListTestWithDefault) {
 
 TEST_F(AdbFileSyncTest, HandleStatTest) {
   Build();
-  directory_.ExpectGetAttr(fuchsia_io::wire::NodeAttributes{
-      .mode = 5,
-      .storage_size = 15,
-      .modification_time = 1234,
+  fidl::WireTableFrame<fuchsia_io::wire::ImmutableNodeAttributes> immutable_frame_;
+  fidl::WireTableFrame<fuchsia_io::wire::MutableNodeAttributes> mutable_frame_;
+
+  auto immutable_builder = fuchsia_io::wire::ImmutableNodeAttributes::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::ImmutableNodeAttributes>>::
+          FromExternal(&immutable_frame_));
+
+  auto mutable_builder = fuchsia_io::wire::MutableNodeAttributes::ExternalBuilder(
+      fidl::ObjectView<fidl::WireTableFrame<fuchsia_io::wire::MutableNodeAttributes>>::FromExternal(
+          &mutable_frame_));
+  uint64_t expected_storage_size = 15;
+  uint64_t expected_modification_time = 1234;
+
+  mutable_builder.mode(5);
+  immutable_builder.storage_size(fidl::ObjectView<uint64_t>::FromExternal(&expected_storage_size));
+  mutable_builder.modification_time(
+      fidl::ObjectView<uint64_t>::FromExternal(&expected_modification_time));
+
+  directory_.ExpectGetAttributes(fuchsia_io::wire::NodeAttributes2{
+      .mutable_attributes = mutable_builder.Build(),
+      .immutable_attributes = immutable_builder.Build(),
   });
+
   std::string path = "./" + kComponent + "::/" + kTest;
   SyncRequest request{.id = ID_LSTAT_V1, .path_length = static_cast<uint32_t>(path.length())};
   size_t actual;

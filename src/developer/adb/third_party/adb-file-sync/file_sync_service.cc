@@ -135,26 +135,38 @@ static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path
     }
   }
 
-  fuchsia_io::wire::NodeAttributes attr;
-  if (path.empty()) {
-    auto result = component->GetAttr();
-    if (!result.ok()) {
-      FX_LOGS(ERROR) << "GetAttr failed: " << result.error();
-      return false;
-    }
-    attr = result.Unwrap()->attributes;
-  } else {
-    auto result = fidl::WireCall(client)->GetAttr();
-    if (!result.ok()) {
-      FX_LOGS(ERROR) << "GetAttr failed: " << result.error();
-      return false;
-    }
-    attr = result.Unwrap()->attributes;
+  fuchsia_io::wire::NodeAttributes2 attr;
+  fuchsia_io::NodeAttributesQuery query = fuchsia_io::NodeAttributesQuery::kMode |
+                                          fuchsia_io::NodeAttributesQuery::kStorageSize |
+                                          fuchsia_io::NodeAttributesQuery::kModificationTime;
+
+  auto component_node = fidl::UnownedClientEnd<fuchsia_io::Node>(component.client_end().handle());
+  auto result = path.empty() ? fidl::WireCall(component_node)->GetAttributes(query)
+                             : fidl::WireCall(client)->GetAttributes(query);
+
+  if (!result.ok()) {
+    FX_LOGS(ERROR) << "Transport error on GetAttributes: " << result.error();
+    return false;
+  }
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    FX_LOGS(ERROR) << "GetAttributes failed: " << response.error_value();
+    return false;
+  }
+  attr = *response.value();
+
+  if (attr.mutable_attributes.has_mode()) {
+    msg.stat_v1.mode = attr.mutable_attributes.mode();
   }
 
-  msg.stat_v1.mode = attr.mode;
-  msg.stat_v1.size = static_cast<uint32_t>(attr.storage_size);
-  msg.stat_v1.time = static_cast<uint32_t>(attr.modification_time);
+  if (attr.immutable_attributes.has_storage_size()) {
+    msg.stat_v1.size = static_cast<uint32_t>(attr.immutable_attributes.storage_size());
+  }
+
+  if (attr.mutable_attributes.has_modification_time()) {
+    msg.stat_v1.time = static_cast<uint32_t>(attr.mutable_attributes.modification_time());
+  }
+
   return WriteFdExactly(socket, &msg.stat_v1, sizeof(msg.stat_v1));
 }
 
@@ -174,34 +186,65 @@ static bool do_stat_v2(zx::socket& socket, uint32_t id, const std::vector<std::s
   }
 
   zx_status_t status;
-  fuchsia_io::wire::NodeAttributes attr;
-  if (path.empty()) {
-    auto result = component->GetAttr();
-    status = result.status();
-    if (result.ok()) {
-      attr = result->attributes;
+  fuchsia_io::wire::NodeAttributes2 attr;
+  auto component_node = fidl::UnownedClientEnd<fuchsia_io::Node>(component.client_end().handle());
+  auto result =
+      path.empty()
+          ? fidl::WireCall(component_node)->GetAttributes(fuchsia_io::NodeAttributesQuery::kMask)
+          : fidl::WireCall(client)->GetAttributes(fuchsia_io::NodeAttributesQuery::kMask);
+
+  status = result.status();
+  if (result.ok()) {
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      status = response.error_value();
     }
-  } else {
-    auto result = fidl::WireCall(client)->GetAttr();
-    status = result.status();
-    if (result.ok()) {
-      attr = result->attributes;
-    }
+    attr = *response.value();
   }
+
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "GetAttr failed: " << status;
+    FX_LOGS(ERROR) << "GetAttributes failed: " << status;
     msg.stat_v2.error = status;
   } else {
-    msg.stat_v2.dev = attr.id;
-    // msg.stat_v2.ino = st.st_ino;
-    msg.stat_v2.mode = attr.mode;
-    msg.stat_v2.nlink = static_cast<uint32_t>(attr.link_count);
-    // msg.stat_v2.uid = st.st_uid;
-    // msg.stat_v2.gid = st.st_gid;
-    msg.stat_v2.size = attr.storage_size;
-    // msg.stat_v2.atime = st.st_atime;
-    msg.stat_v2.mtime = attr.modification_time;
-    // msg.stat_v2.ctime = st.st_ctime;
+    if (attr.mutable_attributes.has_rdev()) {
+      msg.stat_v2.dev = attr.mutable_attributes.rdev();
+    }
+
+    if (attr.mutable_attributes.has_mode()) {
+      msg.stat_v2.mode = attr.mutable_attributes.mode();
+    }
+
+    if (attr.immutable_attributes.has_link_count()) {
+      msg.stat_v2.nlink = static_cast<uint32_t>(attr.immutable_attributes.link_count());
+    }
+
+    if (attr.immutable_attributes.has_storage_size()) {
+      msg.stat_v2.size = attr.immutable_attributes.storage_size();
+    }
+
+    if (attr.mutable_attributes.has_modification_time()) {
+      msg.stat_v2.mtime = attr.mutable_attributes.modification_time();
+    }
+
+    if (attr.mutable_attributes.has_uid()) {
+      msg.stat_v2.uid = attr.mutable_attributes.uid();
+    }
+
+    if (attr.mutable_attributes.has_gid()) {
+      msg.stat_v2.gid = attr.mutable_attributes.gid();
+    }
+
+    if (attr.immutable_attributes.has_id()) {
+      msg.stat_v2.ino = attr.immutable_attributes.id();
+    }
+
+    if (attr.mutable_attributes.has_access_time()) {
+      msg.stat_v2.atime = attr.mutable_attributes.access_time();
+    }
+
+    if (attr.immutable_attributes.has_change_time()) {
+      msg.stat_v2.ctime = attr.immutable_attributes.change_time();
+    }
   }
   return WriteFdExactly(socket, &msg.stat_v2, sizeof(msg.stat_v2));
 }
@@ -219,7 +262,7 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
     // Unterminated name of entry.
   } __PACKED;
 
-  syncmsg msg;
+  syncmsg msg = {};
   msg.dent.id = ID_DENT;
 
   auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
@@ -263,19 +306,39 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
 
       auto [file_client, file_server] = fidl::Endpoints<fuchsia_io::File>::Create();
       fidl::WireSyncClient<fuchsia_io::File> file(std::move(file_client));
+      fuchsia_io::NodeAttributesQuery query = fuchsia_io::NodeAttributesQuery::kMode |
+                                              fuchsia_io::NodeAttributesQuery::kStorageSize |
+                                              fuchsia_io::NodeAttributesQuery::kModificationTime;
       if (auto open = dir_ptr->Open(fidl::StringView::FromExternal(name), fuchsia_io::kPermReadable,
                                     {}, file_server.TakeChannel());
           !open.ok()) {
         FX_LOGS(ERROR) << "Failed to open file " << open.error();
         goto increment;
       }
-      if (auto attr = file->GetAttr(); !attr.ok()) {
-        FX_LOGS(ERROR) << "GetAttr failed " << result.error();
+
+      if (auto attr = file->GetAttributes(query); !attr.ok()) {
+        FX_LOGS(ERROR) << "Transport error on GetAttributes " << attr.error();
         goto increment;
       } else {
-        msg.dent.mode = attr->attributes.mode;
-        msg.dent.size = static_cast<uint32_t>(attr->attributes.storage_size);
-        msg.dent.time = static_cast<uint32_t>(attr->attributes.modification_time);
+        const fit::result response = attr.value();
+        if (response.is_error()) {
+          FX_LOGS(ERROR) << "GetAttributes failed " << response.error_value();
+          goto increment;
+        }
+        if (response.value()->mutable_attributes.has_mode()) {
+          msg.dent.mode = response.value()->mutable_attributes.mode();
+        }
+
+        if (response.value()->immutable_attributes.has_storage_size()) {
+          msg.dent.size =
+              static_cast<uint32_t>(response.value()->immutable_attributes.storage_size());
+        }
+
+        if (response.value()->mutable_attributes.has_modification_time()) {
+          msg.dent.time =
+              static_cast<uint32_t>(response.value()->mutable_attributes.modification_time());
+        }
+
         msg.dent.namelen = static_cast<uint32_t>(name.length());
       }
 
