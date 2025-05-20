@@ -429,7 +429,7 @@ pub mod tests {
         let (mut task_start_tx, mut task_start_rx) = mpsc::channel::<()>(0);
         let (mut task_done_tx, mut task_done_rx) = mpsc::channel::<()>(0);
         let a = component_a.clone();
-        let guard = component_a.execution_scope.active_guard();
+        let guard = component_a.execution_scope.try_active_guard().unwrap();
         let fut = async move {
             let _guard = guard;
             task_start_rx.next().await;

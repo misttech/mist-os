@@ -129,7 +129,9 @@ fn use_service(decl: cm_rust::UseServiceDecl, target: &Arc<ComponentInstance>) -
 
             // Hold a guard to prevent this task from being dropped during component
             // destruction.
-            let _guard = request.scope().active_guard();
+            let Some(_guard) = request.scope().try_active_guard() else {
+                return Err(zx::Status::PEER_CLOSED);
+            };
 
             let route_request = RouteRequest::UseService(self.decl.clone());
 
@@ -198,7 +200,9 @@ fn use_directory_or_storage(
             }
 
             // Hold a guard to prevent this task from being dropped during component destruction.
-            let _guard = request.scope().active_guard();
+            let Some(_guard) = request.scope().try_active_guard() else {
+                return Err(zx::Status::PEER_CLOSED);
+            };
 
             let target = match self.target.upgrade() {
                 Ok(component) => component,

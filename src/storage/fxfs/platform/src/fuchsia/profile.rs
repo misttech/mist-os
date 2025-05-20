@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use fuchsia_async as fasync;
 use fuchsia_hash::Hash;
 use futures::future::{self, join_all, BoxFuture, RemoteHandle};
-use futures::FutureExt;
+use futures::{select, FutureExt};
 use fxfs::errors::FxfsError;
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID};
@@ -26,7 +26,10 @@ use std::cmp::{Eq, PartialEq};
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::marker::PhantomData;
 use std::mem::size_of;
+use std::pin::pin;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use vfs::execution_scope::ActiveGuard;
 
 const FILE_OPEN_MARKER: u64 = u64::MAX;
 const REPLAY_THREADS: usize = 2;
@@ -34,6 +37,8 @@ const REPLAY_THREADS: usize = 2;
 // number of allocations in the serving threads.
 const MESSAGE_CHUNK_SIZE: usize = 64;
 const IO_SIZE: usize = 1 << 17; // 128KiB. Needs to be a power of 2 and >= block size.
+
+pub static RECORDED: AtomicU64 = AtomicU64::new(0);
 
 trait RecordedVolume: Send + Sync + Sized + Unpin {
     type IdType: std::fmt::Display + Ord + Send + Sized;
@@ -280,6 +285,7 @@ impl<T: Message> Recorder for RecorderImpl<T> {
                 Vec::with_capacity(MESSAGE_CHUNK_SIZE),
             ))?;
         }
+        RECORDED.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 
@@ -420,7 +426,7 @@ struct ReplayState<T> {
 }
 
 impl<T: RecordedVolume> ReplayState<T> {
-    fn new(handle: Box<dyn ReadObjectHandle>, volume: Arc<FxVolume>) -> Self {
+    fn new(handle: Box<dyn ReadObjectHandle>, volume: Arc<FxVolume>, guard: ActiveGuard) -> Self {
         let (sender, receiver) = async_channel::unbounded::<Request<T::NodeType>>();
 
         // Create async_channel. An async thread reads and populates the channel, then N threads
@@ -428,7 +434,11 @@ impl<T: RecordedVolume> ReplayState<T> {
         let mut replay_threads = Vec::with_capacity(REPLAY_THREADS);
         for _ in 0..REPLAY_THREADS {
             let receiver = receiver.clone();
+            // The replay threads can have references to files so we make sure they have a guard
+            // so that shutdown will wait till they have been joined.
+            let guard = guard.clone();
             replay_threads.push(fasync::unblock(move || {
+                let _guard = guard;
                 Self::page_in_thread(receiver);
             }));
         }
@@ -441,42 +451,42 @@ impl<T: RecordedVolume> ReplayState<T> {
         let scope = volume.scope().clone();
         let cache_task = scope
             .spawn({
-                let scope = scope.clone();
-                let replay_threads = replay_threads.clone();
+                // The replay threads hold active guards, so we must watch for cancellation.  When
+                // cancelled, we'll drop the sender which will cause the replay threads to drop
+                // their guards, which will allow shutdown to proceed.
                 async move {
-                    // When we're dropped, we must make sure all the pager threads have been joined
-                    // because they can have references to files, so we hold an active guard whilst
-                    // we wait for the replay threads to finish.
-                    scopeguard::defer!({
-                        scope.spawn({
-                            let scope = scope.clone();
-                            async move {
-                                let _guard = scope.active_guard();
-                                replay_threads.await;
-                            }
-                        });
-                    });
+                    let mut task = pin!(async {
+                        // Hold the items in cache until replay is stopped. Optional as None
+                        // indicates that the file could not be opened, and we want to cache that
+                        // failure.
+                        let mut local_cache: BTreeMap<T::IdType, Option<Arc<T::NodeType>>> =
+                            BTreeMap::new();
 
-                    // Hold the items in cache until replay is stopped. Optional as None indicates
-                    // that the file could not be opened, and we want to cache that failure.
-                    let mut local_cache: BTreeMap<T::IdType, Option<Arc<T::NodeType>>> =
-                        BTreeMap::new();
-                    let volume_id = volume.id();
-                    if let Err(e) =
-                        Self::read_and_queue(handle, volume, &sender, &mut local_cache).await
-                    {
-                        error!("Failed to read back profile: {:?}", e);
+                        let volume_id = volume.id();
+
+                        if let Err(error) =
+                            Self::read_and_queue(handle, volume, &sender, &mut local_cache).await
+                        {
+                            error!(error:?; "Failed to read back profile");
+                        }
+                        sender.close();
+
+                        info!(
+                            "Replay for volume {} opened {} of {} objects.",
+                            volume_id,
+                            local_cache.iter().filter(|(_, e)| e.is_some()).count(),
+                            local_cache.len()
+                        );
+
+                        // Keep the cache alive until dropped.
+                        let () = std::future::pending().await;
                     }
-                    sender.close();
+                    .fuse());
 
-                    info!(
-                        "Replay for volume {} opened {} of {} objects.",
-                        volume_id,
-                        local_cache.iter().filter(|(_, e)| e.is_some()).count(),
-                        local_cache.len()
-                    );
-                    // Keep the cache alive until dropped.
-                    let () = std::future::pending().await;
+                    select! {
+                        _ = task => {}
+                        _ = guard.on_cancel().fuse() => {}
+                    }
                 }
             })
             .into();
@@ -575,7 +585,12 @@ pub trait ProfileState: Send + Sync {
 
     /// Reads given handle to parse a profile and replay it by requesting pages via
     /// ZX_VMO_OP_COMMIT in blocking background threads. Stops any replay currently in progress.
-    fn replay_profile(&mut self, handle: Box<dyn ReadObjectHandle>, volume: Arc<FxVolume>);
+    fn replay_profile(
+        &mut self,
+        handle: Box<dyn ReadObjectHandle>,
+        volume: Arc<FxVolume>,
+        guard: ActiveGuard,
+    );
 
     /// Waits for replay to finish, but does not drop the cache.  The cache will be dropped when
     /// the ProfileState impl is dropped.  This is fine to call multiple times.
@@ -624,8 +639,13 @@ impl<T: RecordedVolume> ProfileState for ProfileStateImpl<T> {
         Box::new(RecorderImpl::new(sender))
     }
 
-    fn replay_profile(&mut self, handle: Box<dyn ReadObjectHandle>, volume: Arc<FxVolume>) {
-        self.replay = Some(ReplayState::new(handle, volume));
+    fn replay_profile(
+        &mut self,
+        handle: Box<dyn ReadObjectHandle>,
+        volume: Arc<FxVolume>,
+        guard: ActiveGuard,
+    ) {
+        self.replay = Some(ReplayState::new(handle, volume, guard));
     }
 
     async fn wait_for_replay_to_finish(&mut self) {
@@ -1148,7 +1168,11 @@ mod tests {
             }
 
             let volume = fixture.volume().volume();
-            state.replay_profile(Box::new(get_test_profile_handle(volume).await), volume.clone());
+            state.replay_profile(
+                Box::new(get_test_profile_handle(volume).await),
+                volume.clone(),
+                volume.scope().try_active_guard().unwrap(),
+            );
 
             // Await all data being played back by checking that things have paged in.
             for hash in &hashes {
@@ -1219,7 +1243,11 @@ mod tests {
             }
 
             let volume = fixture.volume().volume();
-            state.replay_profile(Box::new(get_test_profile_handle(volume).await), volume.clone());
+            state.replay_profile(
+                Box::new(get_test_profile_handle(volume).await),
+                volume.clone(),
+                volume.scope().try_active_guard().unwrap(),
+            );
 
             // Await all data being played back by checking that things have paged in.
             for id in &ids {
@@ -1299,7 +1327,11 @@ mod tests {
 
             // Replay the original recording.
             let volume = fixture.volume().volume();
-            state.replay_profile(Box::new(get_test_profile_handle(volume).await), volume.clone());
+            state.replay_profile(
+                Box::new(get_test_profile_handle(volume).await),
+                volume.clone(),
+                volume.scope().try_active_guard().unwrap(),
+            );
 
             // Await all data being played back by checking that things have paged in.
             {
@@ -1365,7 +1397,11 @@ mod tests {
             let delay2 = Event::new();
             replay_handle.push_delay(delay2.listen());
 
-            state.replay_profile(replay_handle, volume.clone());
+            state.replay_profile(
+                replay_handle,
+                volume.clone(),
+                volume.scope().try_active_guard().unwrap(),
+            );
 
             // Delay the first read long enough so that the stop can be triggered during it.
             fasync::Task::spawn(async move {

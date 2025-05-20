@@ -113,23 +113,6 @@ impl FxBlob {
         new_blob
     }
 
-    /// Marks the blob as being purged.  Returns true if there are no open references.
-    pub fn mark_to_be_purged(&self) -> bool {
-        let mut old = self.open_count.load(Ordering::Relaxed);
-        loop {
-            assert_eq!(old & PURGED, 0);
-            match self.open_count.compare_exchange_weak(
-                old,
-                old | PURGED,
-                Ordering::Relaxed,
-                Ordering::Relaxed,
-            ) {
-                Ok(_) => return old == 0,
-                Err(x) => old = x,
-            }
-        }
-    }
-
     pub fn root(&self) -> Hash {
         self.merkle_root
     }
@@ -206,6 +189,12 @@ impl FxNode for FxBlob {
 
     fn terminate(&self) {
         self.pager_packet_receiver_registration.stop_watching_for_zero_children();
+    }
+
+    fn mark_to_be_purged(&self) -> bool {
+        let old = self.open_count.fetch_or(PURGED, Ordering::Relaxed);
+        assert!(old & PURGED == 0);
+        old == 0
     }
 }
 

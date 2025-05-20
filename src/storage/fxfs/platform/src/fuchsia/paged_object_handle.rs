@@ -592,7 +592,15 @@ impl PagedObjectHandle {
         Ok(())
     }
 
-    async fn flush_locked<'a>(&self, truncate_guard: &TruncateGuard<'a>) -> Result<(), Error> {
+    // If `last_chance` is true, pages that are dirty beyond the end of the file are unreserved.
+    // This is only safe to do if the file is never going to be flushed again because we will have
+    // surrendered the reservation.  We do this so that `needs_flush` returns false upon successful
+    // completion, so that we don't log error messages saying dirty data was dropped.
+    async fn flush_locked<'a>(
+        &self,
+        truncate_guard: &TruncateGuard<'a>,
+        last_chance: bool,
+    ) -> Result<(), Error> {
         self.handle.owner().pager().page_in_barrier().await;
 
         let pending_shrink = self.inner.lock().pending_shrink;
@@ -685,13 +693,15 @@ impl PagedObjectHandle {
             .await?
         }
 
-        let mut inner = self.inner.lock();
-        inner.put_back(pages_not_flushed, &reservation);
+        if !last_chance {
+            let mut inner = self.inner.lock();
+            inner.put_back(pages_not_flushed, &reservation);
+        }
 
         Ok(())
     }
 
-    async fn flush_impl(&self) -> Result<(), Error> {
+    async fn flush_impl(&self, last_chance: bool) -> Result<(), Error> {
         if !self.needs_flush() {
             return Ok(());
         }
@@ -703,11 +713,11 @@ impl PagedObjectHandle {
         // prevent the file from shrinking while it's being flushed.
         let truncate_guard =
             fs.truncate_guard(store.store_object_id(), self.handle.object_id()).await;
-        self.flush_locked(&truncate_guard).await
+        self.flush_locked(&truncate_guard, last_chance).await
     }
 
-    pub async fn flush(&self) -> Result<(), Error> {
-        match self.flush_impl().await {
+    pub async fn flush(&self, last_chance: bool) -> Result<(), Error> {
+        match self.flush_impl(last_chance).await {
             Ok(()) => Ok(()),
             Err(error) => {
                 error!(error:?; "Failed to flush");
@@ -939,7 +949,7 @@ impl PagedObjectHandle {
         // the whole time to make sure the ordering of those operations is correct. Clearing most
         // of the pending write reservations that might overlap with allocated range is a nice side
         // effect, but it's not really required.
-        self.flush_locked(&truncate_guard)
+        self.flush_locked(&truncate_guard, false)
             .await
             .inspect_err(|error| error!(error:?; "Failed to flush in allocate"))?;
 
@@ -2403,7 +2413,7 @@ mod tests {
                     cloned_file.unblock(request1);
                 });
 
-                file.handle.flush().await.expect("flush failed");
+                file.handle.flush(false).await.expect("flush failed");
 
                 // We don't care what the original VMO read request returned, but reading now should
                 // return the new content, i.e. zeroes.  The original page-in request would/will

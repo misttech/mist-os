@@ -6,7 +6,6 @@ use crate::fuchsia::component::map_to_raw_status;
 use crate::fuchsia::directory::FxDirectory;
 use crate::fuchsia::dirent_cache::DirentCache;
 use crate::fuchsia::file::FxFile;
-use crate::fuchsia::fxblob::blob::FxBlob;
 use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
 use crate::fuchsia::node::{FxNode, GetResult, NodeCache};
 use crate::fuchsia::pager::Pager;
@@ -254,11 +253,13 @@ impl FxVolume {
         // Begin recording first to ensure that we capture any activity from the replay.
         self.pager.set_recorder(Some(state.record_new(self, name)));
         if let Some(handle) = replay_handle {
-            state.replay_profile(handle, self.clone());
-            info!(
-                "Replaying existing profile '{name}' for volume object {}",
-                self.store.store_object_id()
-            );
+            if let Some(guard) = self.scope().try_active_guard() {
+                state.replay_profile(handle, self.clone(), guard);
+                info!(
+                    "Replaying existing profile '{name}' for volume object {}",
+                    self.store.store_object_id()
+                );
+            }
         }
         *profile_state = Some(state);
         Ok(())
@@ -276,6 +277,12 @@ impl FxVolume {
     }
 
     pub async fn terminate(&self) {
+        let task = std::mem::replace(&mut *self.background_task.lock(), None);
+        if let Some((task, terminate)) = task {
+            let _ = terminate.send(());
+            task.await;
+        }
+
         // `NodeCache::terminate` will break any strong reference cycles contained within nodes
         // (pager registration). The only remaining nodes should be those with open FIDL
         // connections or vmo references in the process of handling the VMO_ZERO_CHILDREN signal.
@@ -292,12 +299,9 @@ impl FxVolume {
         // tasks that insert entries into the cache.
         self.dirent_cache.clear();
 
+        self.flush_all_files(true).await;
+
         self.store.filesystem().graveyard().flush().await;
-        let task = std::mem::replace(&mut *self.background_task.lock(), None);
-        if let Some((task, terminate)) = task {
-            let _ = terminate.send(());
-            task.await;
-        }
         if self.store.crypt().is_some() {
             if let Err(e) = self.store.lock().await {
                 // The store will be left in a safe state and there won't be data-loss unless
@@ -367,15 +371,8 @@ impl FxVolume {
     /// |object_id|, since before that point, new connections could be established.
     pub(super) async fn maybe_purge_file(&self, object_id: u64) -> Result<(), Error> {
         if let Some(node) = self.cache.get(object_id) {
-            if let Ok(file) = node.clone().into_any().downcast::<FxFile>() {
-                if !file.mark_to_be_purged() {
-                    return Ok(());
-                }
-            }
-            if let Ok(blob) = node.into_any().downcast::<FxBlob>() {
-                if !blob.mark_to_be_purged() {
-                    return Ok(());
-                }
+            if !node.mark_to_be_purged() {
+                return Ok(());
             }
         }
         // If this fails, the graveyard should clean it up on next mount.
@@ -473,7 +470,7 @@ impl FxVolume {
             }
 
             if should_flush {
-                self.flush_all_files().await;
+                self.flush_all_files(false).await;
                 self.dirent_cache.recycle_stale_files();
             }
             if should_purge_layer_files {
@@ -511,17 +508,22 @@ impl FxVolume {
     }
 
     #[trace]
-    pub async fn flush_all_files(&self) {
+    pub async fn flush_all_files(&self, last_chance: bool) {
         let mut flushed = 0;
         for file in self.cache.files() {
-            if let Some(node) = file.clone_as_opened_node() {
-                if let Err(e) = FxFile::flush(&node).await {
+            if let Some(node) = file.into_opened_node() {
+                if let Err(e) = FxFile::flush(&node, last_chance).await {
                     warn!(
                         store_id = self.store.store_object_id(),
-                        oid = file.object_id(),
+                        oid = node.object_id(),
                         error:? = e;
                         "Failed to flush",
                     )
+                }
+                if last_chance {
+                    let file = node.clone();
+                    std::mem::drop(node);
+                    file.force_clean();
                 }
             }
             flushed += 1;
@@ -531,7 +533,9 @@ impl FxVolume {
 
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        self.executor.spawn_detached(FutureWithGuard::new(self.scope.active_guard(), task));
+        if let Some(guard) = self.scope.try_active_guard() {
+            self.executor.spawn_detached(FutureWithGuard::new(guard, task));
+        }
     }
 
     /// Tries to unwrap this volume.  If it fails, it will poison the volume so that when it is
@@ -807,7 +811,7 @@ mod tests {
     use crate::fuchsia::fxblob::BlobDirectory;
     use crate::fuchsia::memory_pressure::{MemoryPressureLevel, MemoryPressureMonitor};
     use crate::fuchsia::pager::PagerBacked;
-    use crate::fuchsia::profile::new_profile_state;
+    use crate::fuchsia::profile::{new_profile_state, RECORDED};
     use crate::fuchsia::testing::{
         close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
         open_file_checked, write_at, TestFixture,
@@ -829,6 +833,7 @@ mod tests {
     use fxfs::object_store::volume::root_volume;
     use fxfs::object_store::{HandleOptions, ObjectDescriptor, ObjectStore, NO_OWNER};
     use fxfs_insecure_crypto::InsecureCrypt;
+    use std::sync::atomic::Ordering;
     use std::sync::{Arc, Weak};
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
@@ -2417,6 +2422,8 @@ mod tests {
                     .await
                     .expect("Recording");
 
+                let original_recorded = RECORDED.load(Ordering::Relaxed);
+
                 // Page in the zero offsets only to avoid readahead strangeness.
                 {
                     let mut writable = [0u8];
@@ -2427,7 +2434,7 @@ mod tests {
 
                 // The recording happens asynchronously, so we must wait.  This is crude, but it's
                 // only for testing and it's simple.
-                while volume.scope().active_count() > 0 {
+                while RECORDED.load(Ordering::Relaxed) == original_recorded {
                     fasync::Timer::new(std::time::Duration::from_millis(10)).await;
                 }
 
@@ -2471,6 +2478,8 @@ mod tests {
                 }
             }
 
+            let original_recorded = RECORDED.load(Ordering::Relaxed);
+
             // Record the new profile that will overwrite it.
             {
                 let mut writable = [0u8];
@@ -2481,7 +2490,7 @@ mod tests {
 
             // The recording happens asynchronously, so we must wait.  This is crude, but it's only
             // for testing and it's simple.
-            while volume.scope().active_count() > 0 {
+            while RECORDED.load(Ordering::Relaxed) == original_recorded {
                 fasync::Timer::new(std::time::Duration::from_millis(10)).await;
             }
 

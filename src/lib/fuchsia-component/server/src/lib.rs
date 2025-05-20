@@ -615,6 +615,8 @@ impl<ServiceObjTy: ServiceObjTrait> Stream for ServiceFs<ServiceObjTy> {
     type Item = ServiceObjTy::Output;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // NOTE: Normally, it isn't safe to poll a stream after it returns None, but we support this
+        // and StallabkeServiceFs depends on this.
         if let Some(channels) = self.channel_queue.take() {
             for chan in channels {
                 self.serve_connection_impl(chan);

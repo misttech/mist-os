@@ -306,15 +306,18 @@ impl<DirectoryType: MutableDirectory> RequestHandler
     type Request = Result<fio::DirectoryRequest, fidl::Error>;
 
     async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
-        let _guard = self.base.scope.active_guard();
-        match request {
-            Ok(request) => {
-                match MutableConnection::<DirectoryType>::handle_request(self, request).await {
-                    Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
-                    Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+        if let Some(_guard) = self.base.scope.try_active_guard() {
+            match request {
+                Ok(request) => {
+                    match MutableConnection::<DirectoryType>::handle_request(self, request).await {
+                        Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                        Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+                    }
                 }
+                Err(_) => ControlFlow::Break(()),
             }
-            Err(_) => ControlFlow::Break(()),
+        } else {
+            ControlFlow::Break(())
         }
     }
 }

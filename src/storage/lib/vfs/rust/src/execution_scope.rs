@@ -18,18 +18,19 @@
 
 use crate::token_registry::TokenRegistry;
 
-use fuchsia_async::{self as fasync, JoinHandle, Scope, SpawnableFuture};
-use fuchsia_sync::Mutex;
+use fuchsia_async::{JoinHandle, Scope, ScopeHandle, SpawnableFuture};
+use fuchsia_sync::{MappedMutexGuard, Mutex, MutexGuard};
 use futures::task::{self, Poll};
 use futures::Future;
-use pin_project::pin_project;
-use std::future::{pending, poll_fn};
-use std::pin::{pin, Pin};
-use std::sync::{Arc, OnceLock};
-use std::task::{ready, Context};
+use std::future::poll_fn;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::Context;
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_async::EHandle;
+
+pub use fuchsia_async::scope::ScopeActiveGuard as ActiveGuard;
 
 pub type SpawnError = task::SpawnError;
 
@@ -49,28 +50,8 @@ pub struct ExecutionScope {
 }
 
 struct Executor {
-    inner: Mutex<Inner>,
     token_registry: TokenRegistry,
-    scope: OnceLock<Scope>,
-}
-
-struct Inner {
-    /// Records the kind of shutdown that has been called on the executor.
-    shutdown_state: ShutdownState,
-
-    /// The number of active tasks preventing shutdown.
-    active_count: usize,
-
-    /// A fake active task that we use when there are no other tasks yet there's still an an active
-    /// count.
-    fake_active_task: Option<fasync::Task<()>>,
-}
-
-#[derive(Copy, Clone, PartialEq)]
-enum ShutdownState {
-    Active,
-    Shutdown,
-    ForceShutdown,
+    scope: Mutex<Option<Scope>>,
 }
 
 impl ExecutionScope {
@@ -87,11 +68,6 @@ impl ExecutionScope {
         ExecutionScopeParams::default()
     }
 
-    /// Returns the active count: the number of tasks that are active and will prevent shutdown.
-    pub fn active_count(&self) -> usize {
-        self.executor.inner.lock().active_count
-    }
-
     /// Sends a `task` to be executed in this execution scope.  This is very similar to
     /// [`futures::task::Spawn::spawn_obj()`] with a minor difference that `self` reference is not
     /// exclusive.
@@ -104,15 +80,12 @@ impl ExecutionScope {
     /// This way `ExecutionScope` can actually also implement [`futures::task::Spawn`] - it just was
     /// not necessary for now.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
-        self.executor.scope().spawn(FutureWithShutdown { executor: self.executor.clone(), task })
+        self.executor.scope().spawn(task)
     }
 
     /// Returns a task that can be spawned later.  The task can also be polled before spawning.
     pub fn new_task(self, task: impl Future<Output = ()> + Send + 'static) -> Task {
-        Task(
-            self.executor.clone(),
-            SpawnableFuture::new(FutureWithShutdown { executor: self.executor, task }),
-        )
+        Task(self.executor, SpawnableFuture::new(task))
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {
@@ -125,57 +98,27 @@ impl ExecutionScope {
 
     /// Forcibly shut down the executor without respecting the active guards.
     pub fn force_shutdown(&self) {
-        let mut inner = self.executor.inner.lock();
-        inner.shutdown_state = ShutdownState::ForceShutdown;
-        self.executor.scope().wake_all_with_active_guard();
+        let _ = self.executor.scope().clone().abort();
     }
 
     /// Restores the executor so that it is no longer in the shut-down state.  Any tasks
     /// that are still running will continue to run after calling this.
     pub fn resurrect(&self) {
-        self.executor.inner.lock().shutdown_state = ShutdownState::Active;
+        // After setting the scope to None, a new scope will be created the next time `spawn` is
+        // called.
+        *self.executor.scope.lock() = None;
     }
 
-    /// Wait for all tasks to complete.
+    /// Wait for all tasks to complete and for there to be no guards.
     pub async fn wait(&self) {
-        let mut on_no_tasks = pin!(self.executor.scope().on_no_tasks());
-        poll_fn(|cx| {
-            // Hold the lock whilst we poll the scope so that the active count can't change.
-            let mut inner = self.executor.inner.lock();
-            ready!(on_no_tasks.as_mut().poll(cx));
-            if inner.active_count == 0 {
-                Poll::Ready(())
-            } else {
-                // There are no tasks but there's an active count and we must only finish when there
-                // are no tasks *and* the active count is zero.  To address this, we spawn a fake
-                // task so that we can just use `on_no_tasks`, and then we'll cancel the task when
-                // the active count drops to zero.
-                let scope = self.executor.scope();
-                inner.fake_active_task = Some(scope.compute(pending::<()>()));
-                on_no_tasks.set(scope.on_no_tasks());
-                assert!(on_no_tasks.as_mut().poll(cx).is_pending());
-                Poll::Pending
-            }
-        })
-        .await;
+        let scope = self.executor.scope().clone();
+        scope.on_no_tasks_and_guards().await;
     }
 
     /// Prevents the executor from shutting down whilst the guard is held. Returns None if the
     /// executor is shutting down.
     pub fn try_active_guard(&self) -> Option<ActiveGuard> {
-        let mut inner = self.executor.inner.lock();
-        if inner.shutdown_state != ShutdownState::Active {
-            return None;
-        }
-        inner.active_count += 1;
-        Some(ActiveGuard(self.executor.clone()))
-    }
-
-    /// As above, but succeeds even if the executor is shutting down. This can be used in drop
-    /// implementations to spawn tasks that *must* run before the executor shuts down.
-    pub fn active_guard(&self) -> ActiveGuard {
-        self.executor.inner.lock().active_count += 1;
-        ActiveGuard(self.executor.clone())
+        self.executor.scope().active_guard()
     }
 }
 
@@ -211,45 +154,37 @@ impl ExecutionScopeParams {
         ExecutionScope {
             executor: Arc::new(Executor {
                 token_registry: TokenRegistry::new(),
-                inner: Mutex::new(Inner {
-                    shutdown_state: ShutdownState::Active,
-                    active_count: 0,
-                    fake_active_task: None,
-                }),
                 #[cfg(target_os = "fuchsia")]
-                scope: self
-                    .async_executor
-                    .map_or_else(|| OnceLock::new(), |e| e.global_scope().new_child().into()),
+                scope: self.async_executor.map_or_else(
+                    || Mutex::new(None),
+                    |e| Mutex::new(Some(e.global_scope().new_child())),
+                ),
                 #[cfg(not(target_os = "fuchsia"))]
-                scope: OnceLock::new(),
+                scope: Mutex::new(None),
             }),
         }
     }
 }
 
 impl Executor {
-    fn scope(&self) -> &Scope {
+    fn scope(&self) -> MappedMutexGuard<'_, Scope> {
         // We lazily initialize the executor rather than at construction time as there are currently
         // a few tests that create the ExecutionScope before the async executor has been initialized
         // (which means we cannot call EHandle::local()).
-        self.scope.get_or_init(|| {
-            #[cfg(target_os = "fuchsia")]
-            return Scope::global().new_child();
-            #[cfg(not(target_os = "fuchsia"))]
-            return Scope::new();
+        MutexGuard::map(self.scope.lock(), |s| {
+            s.get_or_insert_with(|| {
+                #[cfg(target_os = "fuchsia")]
+                return Scope::global().new_child();
+                #[cfg(not(target_os = "fuchsia"))]
+                return Scope::new();
+            })
         })
     }
 
     fn shutdown(&self) {
-        let wake_all = {
-            let mut inner = self.inner.lock();
-            inner.shutdown_state = ShutdownState::Shutdown;
-            inner.active_count == 0
-        };
-        if wake_all {
-            if let Some(scope) = self.scope.get() {
-                scope.wake_all_with_active_guard();
-            }
+        if let Some(scope) = &*self.scope.lock() {
+            scope.wake_all_with_active_guard();
+            let _ = ScopeHandle::clone(&*scope).cancel();
         }
     }
 }
@@ -257,26 +192,10 @@ impl Executor {
 impl Drop for Executor {
     fn drop(&mut self) {
         self.shutdown();
-    }
-}
-
-// ActiveGuard prevents the executor from shutting down until the guard is dropped.
-pub struct ActiveGuard(Arc<Executor>);
-
-impl Drop for ActiveGuard {
-    fn drop(&mut self) {
-        let wake_all = {
-            let mut inner = self.0.inner.lock();
-            inner.active_count -= 1;
-            if inner.active_count == 0 {
-                if let Some(task) = inner.fake_active_task.take() {
-                    let _ = task.abort();
-                }
-            }
-            inner.active_count == 0 && inner.shutdown_state == ShutdownState::Shutdown
-        };
-        if wake_all {
-            self.0.scope().wake_all_with_active_guard();
+        // We must detach the scope, because otherwise all the tasks will be aborted and the active
+        // guards will be ignored.
+        if let Some(scope) = self.scope.get_mut().take() {
+            scope.detach();
         }
     }
 }
@@ -294,33 +213,6 @@ pub async fn yield_to_executor() {
         }
     })
     .await;
-}
-
-/// A future that wraps another future and watches for the shutdown signal.
-#[pin_project]
-struct FutureWithShutdown<Task: Future<Output = ()> + Send + 'static> {
-    executor: Arc<Executor>,
-    #[pin]
-    task: Task,
-}
-
-impl<Task: Future<Output = ()> + Send + 'static> Future for FutureWithShutdown<Task> {
-    type Output = ();
-
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        let shutdown_state = this.executor.inner.lock().shutdown_state;
-        match this.task.poll(cx) {
-            Poll::Ready(()) => Poll::Ready(()),
-            Poll::Pending => match shutdown_state {
-                ShutdownState::Active => Poll::Pending,
-                ShutdownState::Shutdown if this.executor.inner.lock().active_count > 0 => {
-                    Poll::Pending
-                }
-                _ => Poll::Ready(()),
-            },
-        }
-    }
 }
 
 pub struct Task(Arc<Executor>, SpawnableFuture<'static, ()>);
@@ -344,14 +236,15 @@ impl Future for Task {
 mod tests {
     use super::{yield_to_executor, ExecutionScope};
 
-    use fuchsia_async::{Task, TestExecutor, Timer};
+    use fuchsia_async::{TestExecutor, Timer};
     use futures::channel::oneshot;
-    use futures::stream::FuturesUnordered;
-    use futures::task::Poll;
-    use futures::{Future, StreamExt};
+    use futures::Future;
     use std::pin::pin;
+    #[cfg(target_os = "fuchsia")]
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    #[cfg(target_os = "fuchsia")]
+    use std::task::Poll;
     use std::time::Duration;
 
     #[cfg(target_os = "fuchsia")]
@@ -474,61 +367,6 @@ mod tests {
         });
     }
 
-    #[fuchsia::test]
-    async fn test_active_guard() {
-        let scope = ExecutionScope::new();
-        let (guard_taken_tx, guard_taken_rx) = oneshot::channel();
-        let (shutdown_triggered_tx, shutdown_triggered_rx) = oneshot::channel();
-        let (drop_task_tx, drop_task_rx) = oneshot::channel();
-        let scope_clone = scope.clone();
-        let done = Arc::new(AtomicBool::new(false));
-        let done_clone = done.clone();
-        scope.spawn(async move {
-            {
-                struct OnDrop((ExecutionScope, Option<oneshot::Receiver<()>>));
-                impl Drop for OnDrop {
-                    fn drop(&mut self) {
-                        let guard = self.0 .0.active_guard();
-                        let rx = self.0 .1.take().unwrap();
-                        Task::spawn(async move {
-                            rx.await.unwrap();
-                            std::mem::drop(guard);
-                        })
-                        .detach();
-                    }
-                }
-                let _guard = scope_clone.try_active_guard().unwrap();
-                let _on_drop = OnDrop((scope_clone, Some(drop_task_rx)));
-                guard_taken_tx.send(()).unwrap();
-                shutdown_triggered_rx.await.unwrap();
-                // Stick a timer here and record whether we're done to make sure we get to run to
-                // completion.
-                Timer::new(std::time::Duration::from_millis(100)).await;
-                done_clone.store(true, Ordering::SeqCst);
-            }
-        });
-        guard_taken_rx.await.unwrap();
-        scope.shutdown();
-
-        // The task should keep running whilst it has an active guard. Introduce a timer here to
-        // make failing more likely if it's broken.
-        Timer::new(std::time::Duration::from_millis(100)).await;
-        let mut shutdown_wait = std::pin::pin!(scope.wait());
-        assert_eq!(futures::poll!(shutdown_wait.as_mut()), Poll::Pending);
-
-        shutdown_triggered_tx.send(()).unwrap();
-
-        // The drop task should now start running and the executor still shouldn't have finished.
-        Timer::new(std::time::Duration::from_millis(100)).await;
-        assert_eq!(futures::poll!(shutdown_wait.as_mut()), Poll::Pending);
-
-        drop_task_tx.send(()).unwrap();
-
-        shutdown_wait.await;
-
-        assert!(done.load(Ordering::SeqCst));
-    }
-
     #[cfg(target_os = "fuchsia")]
     #[fuchsia::test]
     async fn test_shutdown_waits_for_channels() {
@@ -570,7 +408,7 @@ mod tests {
             let _ref_count_clone = ref_count_clone;
 
             // Hold an active guard so that only a forced shutdown will work.
-            let _guard = scope_clone.active_guard();
+            let _guard = scope_clone.try_active_guard().unwrap();
 
             let _: () = std::future::pending().await;
         });
@@ -604,40 +442,6 @@ mod tests {
             yield_to_executor().await;
             assert_eq!(Arc::strong_count(&ref_count), 3);
         }
-    }
-
-    #[fuchsia::test]
-    async fn test_task_runs_once() {
-        let scope = ExecutionScope::new();
-
-        // Spawn a task.
-        scope.spawn(async {});
-
-        scope.shutdown();
-
-        let polled = Arc::new(AtomicBool::new(false));
-        let polled_clone = polled.clone();
-
-        let scope_clone = scope.clone();
-
-        // Use FuturesUnordered so that it uses its own waker.
-        let mut futures = FuturesUnordered::new();
-        futures.push(async move { scope_clone.wait().await });
-
-        // Poll it now to set up a waker.
-        assert_eq!(futures::poll!(futures.next()), Poll::Pending);
-
-        // Spawn another task.  When this task runs, wait still shouldn't be resolved because at
-        // this point the first task hasn't finished.
-        scope.spawn(async move {
-            assert_eq!(futures::poll!(futures.next()), Poll::Pending);
-            polled_clone.store(true, Ordering::Relaxed);
-        });
-
-        scope.wait().await;
-
-        // Make sure the second spawned task actually ran.
-        assert!(polled.load(Ordering::Relaxed));
     }
 
     mod mocks {

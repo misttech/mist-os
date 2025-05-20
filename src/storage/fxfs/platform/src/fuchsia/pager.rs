@@ -215,7 +215,9 @@ impl Pager {
 
     /// Spawns a short term task for the pager that includes a guard that will prevent termination.
     fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        self.executor.spawn_detached(FutureWithGuard::new(self.scope.active_guard(), task));
+        if let Some(guard) = self.scope.try_active_guard() {
+            self.executor.spawn_detached(FutureWithGuard::new(guard, task));
+        }
     }
 
     /// Set the current profile recorder, or set to None to not record.

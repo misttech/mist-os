@@ -668,7 +668,7 @@ impl VolumesDirectory {
                         for MountedVolume { volume, .. } in volumes.values() {
                             let vol = volume.volume().clone();
                             flushes.push(async move {
-                                vol.flush_all_files().await;
+                                vol.flush_all_files(false).await;
                             });
                         }
 
@@ -1204,9 +1204,10 @@ mod tests {
         volumes_directory.lock().await.unmount(store_id).await.expect("unmount failed");
 
         let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
+        let scope = ExecutionScope::new();
         // TODO(https://fxbug.dev/378924259): Migrate this to open3.
         volumes_directory.directory_node().clone().deprecated_open(
-            ExecutionScope::new(),
+            scope.clone(),
             fio::OpenFlags::empty(),
             Path::validate_and_split("encrypted").unwrap(),
             volume_server_end.into_channel().into(),
@@ -1320,9 +1321,10 @@ mod tests {
         volumes_directory.lock().await.unmount(store_id).await.expect("unmount failed");
 
         let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
+        let scope = ExecutionScope::new();
         // TODO(https://fxbug.dev/378924259): Migrate this to open3.
         volumes_directory.directory_node().clone().deprecated_open(
-            ExecutionScope::new(),
+            scope.clone(),
             fio::OpenFlags::empty(),
             Path::validate_and_split("encrypted").unwrap(),
             volume_server_end.into_channel().into(),
@@ -1502,9 +1504,10 @@ mod tests {
                 .expect("create unencrypted volume failed");
 
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
+            let scope = ExecutionScope::new();
             // TODO(https://fxbug.dev/378924259): Migrate this to open3.
             volumes_directory.directory_node().clone().deprecated_open(
-                ExecutionScope::new(),
+                scope.clone(),
                 fio::OpenFlags::empty(),
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
                 volume_server_end.into_channel().into(),
@@ -1565,6 +1568,7 @@ mod tests {
     }
 
     struct VolumeInfo {
+        _scope: ExecutionScope,
         volume_proxy: VolumeProxy,
         file_proxy: fio::FileProxy,
     }
@@ -1583,9 +1587,10 @@ mod tests {
                 .expect("serve_volume failed");
 
             let (volume_proxy, volume_server_end) = fidl::endpoints::create_proxy::<VolumeMarker>();
+            let scope = ExecutionScope::new();
             // TODO(https://fxbug.dev/378924259): Migrate this to Open3.
             volumes_directory.directory_node().clone().deprecated_open(
-                ExecutionScope::new(),
+                scope.clone(),
                 fio::OpenFlags::empty(),
                 Path::validate_and_split(name).unwrap(),
                 volume_server_end.into_channel().into(),
@@ -1612,7 +1617,7 @@ mod tests {
                 &Default::default(),
             )
             .await;
-            VolumeInfo { volume_proxy, file_proxy }
+            VolumeInfo { _scope: scope, volume_proxy, file_proxy }
         }
     }
 

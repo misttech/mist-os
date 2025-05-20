@@ -302,13 +302,16 @@ impl<N: Node> RequestHandler for Connection<N> {
 
     async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
         let this = self.get_mut();
-        let _guard = this.scope.active_guard();
-        match request {
-            Ok(request) => match this.handle_request(request).await {
-                Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
-                Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
-            },
-            Err(_) => ControlFlow::Break(()),
+        if let Some(_guard) = this.scope.try_active_guard() {
+            match request {
+                Ok(request) => match this.handle_request(request).await {
+                    Ok(ConnectionState::Alive) => ControlFlow::Continue(()),
+                    Ok(ConnectionState::Closed) | Err(_) => ControlFlow::Break(()),
+                },
+                Err(_) => ControlFlow::Break(()),
+            }
+        } else {
+            ControlFlow::Break(())
         }
     }
 }

@@ -606,6 +606,7 @@ fn generate_protocol_name_alias(protocol_name: &str, component_source: &str) -> 
 }
 
 struct ManagedRealm {
+    scope: vfs::execution_scope::ExecutionScope,
     server_end: ServerEnd<ManagedRealmMarker>,
     realm: RealmInstance,
     devfs: Arc<SimpleImmutableDir>,
@@ -696,7 +697,7 @@ fn realm_moniker(realm: &RealmInstance) -> String {
 
 impl ManagedRealm {
     async fn run_service(self) -> Result {
-        let Self { server_end, realm, devfs, capability_from_children } = self;
+        let Self { scope, server_end, realm, devfs, capability_from_children } = self;
         let mut stream = server_end.into_stream();
         while let Some(request) = stream.try_next().await.context("FIDL error")? {
             match request {
@@ -744,7 +745,7 @@ impl ManagedRealm {
                     vfs::directory::serve_on(
                         devfs.clone(),
                         fio::PERM_READABLE,
-                        vfs::ExecutionScope::new(),
+                        scope.clone(),
                         server_end,
                     );
                 }
@@ -1232,6 +1233,7 @@ async fn handle_sandbox(
                         {
                             Ok((realm, capability_from_children)) => tx
                                 .send(ManagedRealm {
+                                    scope: vfs::execution_scope::ExecutionScope::new(),
                                     server_end,
                                     realm,
                                     devfs,

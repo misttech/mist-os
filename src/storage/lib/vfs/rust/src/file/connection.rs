@@ -1064,7 +1064,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
     async fn handle_request(self: Pin<&mut Self>, request: Self::Request) -> ControlFlow<()> {
         let option_this = self.get_mut();
         let this = option_this.as_mut().unwrap();
-        let _guard = this.scope.active_guard();
+        let Some(_guard) = this.scope.try_active_guard() else { return ControlFlow::Break(()) };
         let state = match request {
             Ok(request) => {
                 this.handle_request(request)
@@ -1113,8 +1113,9 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
     async fn stream_closed(self: Pin<&mut Self>) {
         let this = self.get_mut().as_mut().unwrap();
         if this.should_sync_before_close() {
-            let _guard = this.scope.active_guard();
-            let _ = this.file.sync(SyncMode::PreClose).await;
+            if let Some(_guard) = this.scope.try_active_guard() {
+                let _ = this.file.sync(SyncMode::PreClose).await;
+            }
         }
     }
 }
