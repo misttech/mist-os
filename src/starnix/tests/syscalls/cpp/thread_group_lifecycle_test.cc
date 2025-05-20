@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -27,4 +28,28 @@ TEST(ThreadGroupLifeCycleTest, ErroneousClone) {
   if (fork_result == 0) {
     _Exit(0);
   }
+}
+
+TEST(ThreadGroupLifeCycleTest, EndMainThreadFirst) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    pthread_t tid;
+    pthread_attr_t attr = {};
+    pthread_create(
+        &tid, &attr,
+        [](void* args) -> void* {
+          auto tid = gettid();
+          auto pid = getpid();
+          EXPECT_NE(tid, pid);
+          usleep(100000);
+          // Test that the task for the leader is still alive even after the
+          // leader task called SYS_exit
+          std::string leader_proc = "/proc/" + std::to_string(pid) + "/task/" + std::to_string(pid);
+          fbl::unique_fd fd(open(leader_proc.c_str(), O_RDONLY));
+          EXPECT_TRUE(fd.is_valid());
+          _exit(testing::Test::HasFailure());
+        },
+        nullptr);
+    syscall(SYS_exit, 1);
+  });
 }
