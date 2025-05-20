@@ -47,6 +47,7 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap,
     wlan_policy_ap_using_fc,
 )
+from honeydew.affordances.hello_world import hello_world, hello_world_using_ffx
 from honeydew.affordances.location import location, location_using_fc
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
@@ -570,6 +571,18 @@ class FuchsiaDeviceImpl(
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
             reboot_affordance=self,
+        )
+
+    @properties.Affordance
+    def hello_world(self) -> hello_world.HelloWorld:
+        """Returns a HelloWorld affordance object.
+
+        Returns:
+            hello_world.HelloWorld object
+        """
+        return hello_world_using_ffx.HelloWorldUsingFfx(
+            device_name=self.device_name,
+            ffx=self.ffx,
         )
 
     # List all the public methods

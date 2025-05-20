@@ -15,6 +15,7 @@ from honeydew.affordances.connectivity.netstack import netstack
 from honeydew.affordances.connectivity.wlan.wlan import wlan
 from honeydew.affordances.connectivity.wlan.wlan_policy import wlan_policy
 from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
+from honeydew.affordances.hello_world import hello_world
 from honeydew.affordances.location import location
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller,
@@ -205,6 +206,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             Bluetooth LE object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def hello_world(self) -> hello_world.HelloWorld:
+        """Returns a HelloWorld affordance object.
+
+        Returns:
+            hello_world.HelloWorld object
         """
 
     @properties.Affordance

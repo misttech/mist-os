@@ -207,7 +207,12 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
-  public_deps = [ "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)" ]
+  public_deps = [
+    "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
+
+    # Note - Intentionally not adding this hello_world_test across all the test groups
+    "honeydew/honeydew/affordances/hello_world/tests/functional_tests:hello_world_test($host_toolchain)",
+  ]
 }
 
 group("workbench_vim3_staging_tests") {
