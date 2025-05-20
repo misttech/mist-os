@@ -11,6 +11,7 @@ fidl("fuchsia.bluetooth.sys") {
 
   sources = [
     "access.fidl",
+    "address_lookup.fidl",
     "bootstrap.fidl",
     "configuration.fidl",
     "host_watcher.fidl",
