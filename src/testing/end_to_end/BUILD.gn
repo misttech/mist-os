@@ -224,15 +224,16 @@ group("workbench_vim3_staging_tests") {
 # Note - `wlan_core_vim3_stable_tests` are not yet running in CQ
 group("wlan_core_vim3_stable_tests") {
   testonly = true
-  public_deps = [ "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:wlan_policy_ap_test_fc($host_toolchain)" ]
+  public_deps = [
+    "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:wlan_test_fc($host_toolchain)",
+    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:wlan_policy_test_fc($host_toolchain)",
+    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:wlan_policy_ap_test_fc($host_toolchain)",
+  ]
 }
 
 group("wlan_core_vim3_unstable_tests") {
   testonly = true
-  public_deps = [
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:wlan_test_fc($host_toolchain)",
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:wlan_policy_test_fc($host_toolchain)",
-  ]
+  public_deps = []
 }
 
 group("wlan_core_vim3_staging_tests") {
