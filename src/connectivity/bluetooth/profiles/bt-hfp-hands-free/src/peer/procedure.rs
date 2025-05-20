@@ -16,6 +16,9 @@ use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 pub mod test;
 
 // Individual procedures
+pub mod answer_incoming;
+use answer_incoming::AnswerIncomingProcedure;
+
 pub mod audio_connection_setup;
 
 pub mod codec_connection_setup;
@@ -75,6 +78,8 @@ macro_rules! impl_from_to_variant {
     };
 }
 
+/// Commands that a procedure might take as input which drive its state machine;
+/// these are inputs from this component or its FIDL clients.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandFromHf {
     StartSlci { hf_features: HfFeatures },
@@ -82,6 +87,7 @@ pub enum CommandFromHf {
     CallActionDialFromMemory { memory: String },
     CallActionRedialLast,
     StartAudioConnection,
+    AnswerIncoming,
     HangUpCall,
 }
 
@@ -94,6 +100,8 @@ pub enum ProcedureInput {
 impl_from_to_variant!(at_connection::Response, ProcedureInput, AtResponseFromAg);
 impl_from_to_variant!(CommandFromHf, ProcedureInput, CommandFromHf);
 
+/// Commands that a procedure might emit to specify that the HF, i.e., this
+/// component or its FIDL clients, should perform the specified action.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CommandToHf {
     SetInitialAgIndicatorValues { ordered_values: Vec<i64> },
@@ -136,6 +144,10 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
                 Some(Box::new(HangUpProcedure::new()))
             }
 
+            ProcedureInput::CommandFromHf(CommandFromHf::AnswerIncoming) => {
+                Some(Box::new(AnswerIncomingProcedure::new()))
+            }
+
             _ => None,
         }
     }
@@ -148,6 +160,7 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
             | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromNumber { .. })
             | ProcedureInput::CommandFromHf(CommandFromHf::CallActionDialFromMemory { .. })
             | ProcedureInput::CommandFromHf(CommandFromHf::CallActionRedialLast)
+            | ProcedureInput::CommandFromHf(CommandFromHf::AnswerIncoming)
             | ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall) => true,
             _ => false,
         }
