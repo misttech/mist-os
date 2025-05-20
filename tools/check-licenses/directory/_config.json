@@ -4,6 +4,25 @@
         "skips": [
             {
                 "notes": [
+                    "Test directories under repos in bazel_vendor.",
+                    "They don't have license files included."
+                ],
+                "paths": [
+                    "third_party/bazel_vendor/rules_go~/tests"
+                ]
+            },
+            {
+                "notes": [
+                    "This directory contains patches for repositories declared",
+                    "by go_rules_dependencies.",
+                    "It doesn't have license files included."
+                ],
+                "paths": [
+                    "third_party/bazel_vendor/rules_go~/third_party"
+                ]
+            },
+            {
+                "notes": [
                     "Contains config proto for rules_cc.",
                     "It uses Apache 2.0 in BUILD file and proto file header,",
                     "but does not have a LICENSE file in the directory."

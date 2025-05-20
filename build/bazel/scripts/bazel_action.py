@@ -65,6 +65,7 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "bazel_tools~cc_configure_extension~local_config_cc",
     "platforms",
     "platforms~host_platform~host_platform",
+    "rules_license",
     "rules_license~",
     "rules_python~",
     "rules_python~~internal_deps~rules_python_internal",

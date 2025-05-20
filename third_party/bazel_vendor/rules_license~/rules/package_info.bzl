@@ -34,7 +34,9 @@ def _package_info_impl(ctx):
         package_name = ctx.attr.package_name or ctx.build_file_path.rstrip("/BUILD"),
         package_url = ctx.attr.package_url,
         package_version = ctx.attr.package_version,
+        purl = ctx.attr.purl,
     )
+
     # Experimental alternate design, using a generic 'data' back to hold things
     generic_provider = ExperimentalMetadataInfo(
         type = "package_info_alt",
@@ -42,8 +44,9 @@ def _package_info_impl(ctx):
         data = {
             "package_name": ctx.attr.package_name or ctx.build_file_path.rstrip("/BUILD"),
             "package_url": ctx.attr.package_url,
-            "package_version": ctx.attr.package_version
-        }
+            "package_version": ctx.attr.package_version,
+            "purl": ctx.attr.purl,
+        },
     )
     return [provider, generic_provider]
 
@@ -53,18 +56,23 @@ _package_info = rule(
         "package_name": attr.string(
             doc = "A human readable name identifying this package." +
                   " This may be used to produce an index of OSS packages used by" +
-                  " an applicatation.",
+                  " an application.",
         ),
         "package_url": attr.string(
             doc = "The URL this instance of the package was download from." +
                   " This may be used to produce an index of OSS packages used by" +
-                  " an applicatation.",
+                  " an application.",
         ),
         "package_version": attr.string(
             doc = "A human readable version string identifying this package." +
                   " This may be used to produce an index of OSS packages used" +
-                  " by an applicatation.  It should be a value that" +
-                  " increases over time, rather than a commit hash."
+                  " by an application.  It should be a value that" +
+                  " increases over time, rather than a commit hash.",
+        ),
+        "purl": attr.string(
+            doc = "A pURL conforming to the spec outlined in" +
+                  " https://github.com/package-url/purl-spec. This may be used when" +
+                  " generating an SBOM.",
         ),
     },
 )
@@ -75,10 +83,14 @@ def package_info(
         package_name = None,
         package_url = None,
         package_version = None,
+        purl = None,
         **kwargs):
     """Wrapper for package_info rule.
 
     @wraps(_package_info)
+
+    The purl attribute should be a valid pURL, as defined in the
+    [pURL spec](https://github.com/package-url/purl-spec).
 
     Args:
       name: str target name.
@@ -86,9 +98,10 @@ def package_info(
                     may be used to produce an index of OSS packages used by
                     an application.
       package_url: str The canoncial URL this package distribution was retrieved from.
-                       Note that, because of local mirroring, that might not be the 
+                       Note that, because of local mirroring, that might not be the
                        physical URL it was retrieved from.
       package_version: str A human readable name identifying version of this package.
+      purl: str The canonical pURL by which this package is known.
       kwargs: other args. Most are ignored.
     """
     visibility = kwargs.get("visibility") or ["//visibility:public"]
@@ -97,6 +110,7 @@ def package_info(
         package_name = package_name,
         package_url = package_url,
         package_version = package_version,
+        purl = purl,
         applicable_licenses = [],
         visibility = visibility,
         tags = [],

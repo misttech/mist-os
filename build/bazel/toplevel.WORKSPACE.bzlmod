@@ -12,15 +12,6 @@ sync with toplevel.MODULE.bazel whenever possible!!
 workspace(name = "main")
 # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 
-# Note that this is a fake repository that only contains the minimum
-# amount of declarations required by Bazel to run. The Fuchsia platform
-# build does not support Java, and will likely never will, and using
-# this fake repository prevents unexpected downloads and dependencies.
-local_repository(
-    name = "rules_java",
-    path = "build/bazel/local_repositories/rules_java",
-)
-
 load(
     "//:third_party/pigweed/repositories.bzl",
     "setup_pigweed_repository_dependencies",
@@ -28,20 +19,9 @@ load(
 
 setup_pigweed_repository_dependencies()
 
-# NOTE this must appear before bazel_skylib_workspace() call.
-local_repository(
-    name = "rules_license",
-    path = "third_party/bazel_rules_license",
-)
-
 local_repository(
     name = "rules_cc",
     path = "third_party/bazel_rules_cc",
-)
-
-local_repository(
-    name = "io_bazel_rules_go",
-    path = "third_party/bazel_rules_go",
 )
 
 local_repository(

@@ -1,3 +1,0 @@
-"""Fake rules_java package for the Fuchsia platform build."""
-
-package(default_visibility = ["//visibility:public"])
