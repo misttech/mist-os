@@ -14,20 +14,18 @@ async fn unlink_file_with_sufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness
-        .dir_rights
-        .combinations_containing_deprecated(fio::Rights::READ_BYTES | fio::Rights::WRITE_BYTES)
-    {
+    for flags in harness.dir_rights.combinations_containing(fio::W_STAR_DIR) {
         let entries = vec![directory("src", vec![file("file.txt", contents.to_vec())])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
+        let src_dir = dir
+            .open_node::<fio::DirectoryMarker>("src", flags | fio::PERM_READABLE, None)
+            .await
+            .unwrap();
 
-        let file = deprecated_open_node::<fio::FileMarker>(
-            &src_dir,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-            "file.txt",
-        )
-        .await;
+        let file = src_dir
+            .open_node::<fio::FileMarker>("file.txt", fio::PERM_READABLE, None)
+            .await
+            .unwrap();
 
         src_dir
             .unlink("file.txt", &fio::UnlinkOptions::default())
@@ -36,7 +34,12 @@ async fn unlink_file_with_sufficient_rights() {
             .expect("unlink failed");
 
         // Check file is gone.
-        assert_file_not_found(&dir, "src/file.txt").await;
+        assert_eq!(
+            dir.open_node::<fio::FileMarker>("src/file.txt", fio::PERM_READABLE, None)
+                .await
+                .unwrap_err(),
+            zx::Status::NOT_FOUND
+        );
 
         // Ensure file connection remains usable.
         let read_result = file
@@ -58,10 +61,10 @@ async fn unlink_file_with_insufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness.dir_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
+    for flags in harness.dir_rights.combinations_without(fio::W_STAR_DIR) {
         let entries = vec![directory("src", vec![file("file.txt", contents.to_vec())])];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
+        let src_dir = dir.open_node::<fio::DirectoryMarker>("src", flags, None).await.unwrap();
 
         assert_eq!(
             src_dir
@@ -73,7 +76,10 @@ async fn unlink_file_with_insufficient_rights() {
         );
 
         // Check file still exists.
-        assert_eq!(read_file(&dir, "src/file.txt").await, contents);
+        let _ = dir
+            .open_node::<fio::NodeMarker>("src/file.txt", fio::Flags::PROTOCOL_NODE, None)
+            .await
+            .unwrap();
     }
 }
 
@@ -84,13 +90,9 @@ async fn unlink_directory_with_sufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.dir_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
-    {
+    for flags in harness.dir_rights.combinations_containing(fio::W_STAR_DIR) {
         let entries = vec![directory("src", vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        // Re-open dir with flags being tested.
-        let dir = deprecated_open_dir_with_flags(&dir, dir_flags, ".").await;
-
+        let dir = harness.get_directory(entries, flags);
         dir.unlink("src", &fio::UnlinkOptions::default())
             .await
             .expect("unlink fidl failed")
@@ -105,12 +107,9 @@ async fn unlink_directory_with_insufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.dir_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
+    for flags in harness.dir_rights.combinations_without(fio::W_STAR_DIR) {
         let entries = vec![directory("src", vec![])];
-        let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        // Re-open dir with flags being tested.
-        let dir = deprecated_open_dir_with_flags(&dir, dir_flags, ".").await;
-
+        let dir = harness.get_directory(entries, flags);
         assert_eq!(
             dir.unlink("src", &fio::UnlinkOptions::default())
                 .await

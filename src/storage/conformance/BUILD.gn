@@ -70,6 +70,7 @@ rustc_test("conformance_test") {
   sources = [
     "tests/attributes.rs",
     "tests/clone.rs",
+    "tests/deprecated.rs",
     "tests/describe.rs",
     "tests/directory.rs",
     "tests/directory/create.rs",

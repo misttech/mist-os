@@ -133,20 +133,6 @@ pub async fn deprecated_open_dir_with_flags(
     .await
 }
 
-/// Helper function to open a sub-directory as readable and writable. Only use this if testing
-/// something other than the open call directly.
-pub async fn deprecated_open_rw_dir(
-    parent_dir: &fio::DirectoryProxy,
-    path: &str,
-) -> fio::DirectoryProxy {
-    deprecated_open_dir_with_flags(
-        parent_dir,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        path,
-    )
-    .await
-}
-
 /// Helper function to call `get_token` on a directory. Only use this if testing something
 /// other than the `get_token` call directly.
 pub async fn get_token(dir: &fio::DirectoryProxy) -> fidl::Handle {
@@ -158,21 +144,9 @@ pub async fn get_token(dir: &fio::DirectoryProxy) -> fidl::Handle {
 /// Helper function to read a file and return its contents. Only use this if testing something other
 /// than the read call directly.
 pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Vec<u8> {
-    let file = deprecated_open_file_with_flags(dir, fio::OpenFlags::RIGHT_READABLE, path).await;
+    let file =
+        dir.open_node::<fio::FileMarker>(path, fio::Flags::PERM_READ_BYTES, None).await.unwrap();
     file.read(100).await.expect("read failed").map_err(zx::Status::from_raw).expect("read error")
-}
-
-/// Attempts to open the given file, and checks the status is `NOT_FOUND`.
-pub async fn assert_file_not_found(dir: &fio::DirectoryProxy, path: &str) {
-    let (file_proxy, file_server) = create_proxy::<fio::NodeMarker>();
-    dir.deprecated_open(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE,
-        fio::ModeType::empty(),
-        path,
-        file_server,
-    )
-    .expect("Cannot open file");
-    assert_eq!(get_open_status(&file_proxy).await, zx::Status::NOT_FOUND);
 }
 
 /// Returns the .name field from a given DirectoryEntry, otherwise panics.

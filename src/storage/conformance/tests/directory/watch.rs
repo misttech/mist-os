@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
 use futures::StreamExt;
@@ -51,23 +50,27 @@ async fn watch_dir_added_removed() {
         WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() },
     );
 
-    let _ = deprecated_open_dir_with_flags(
-        &dir,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-        "foo",
-    )
-    .await;
+    let _ = dir
+        .open_node::<fio::FileMarker>(
+            "foo",
+            fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE,
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(
         watcher.next().await.expect("watcher stream empty").expect("watch message error"),
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("foo") },
     );
 
-    let _ = deprecated_open_dir_with_flags(
-        &dir,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
-        "dir",
-    )
-    .await;
+    let _ = dir
+        .open_node::<fio::DirectoryMarker>(
+            "dir",
+            fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(
         watcher.next().await.expect("watcher stream empty").expect("watch message error"),
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("dir") },
@@ -102,28 +105,28 @@ async fn watch_dir_existing_file_create_does_not_generate_new_event() {
         WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() },
     );
 
-    let _ = deprecated_open_dir_with_flags(
-        &dir,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-        "foo",
-    )
-    .await;
+    let _ = dir
+        .open_node::<fio::FileMarker>(
+            "foo",
+            fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE,
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(
         watcher.next().await.expect("watcher stream empty").expect("watch message error"),
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("foo") },
     );
-    {
-        let (client, server) = create_proxy::<fio::NodeMarker>();
-        dir.deprecated_open(
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::DESCRIBE,
-            fio::ModeType::empty(),
+
+    // Ensure FLAG_MAYBE_CREATE doesn't trigger a new event as the file should already exist.
+    let _ = dir
+        .open_node::<fio::FileMarker>(
             "foo",
-            server,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            None,
         )
-        .expect("Cannot open file");
-        // Open should succeed - CREATE is fine if the file already exists.
-        assert_eq!(get_open_status(&client).await, zx::Status::OK);
-    }
+        .await
+        .unwrap();
     // Since we are testing that the previous open does _not_ generate an event, do something else
     // that will generate a different event and make sure that is the next event.
     dir.unlink("foo", &fio::UnlinkOptions::default())
@@ -155,12 +158,15 @@ async fn watch_dir_rename() {
         WatchMessage { event: WatchEvent::IDLE, filename: PathBuf::new() },
     );
 
-    let _ = deprecated_open_dir_with_flags(
-        &dir,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-        "foo",
-    )
-    .await;
+    let _ = dir
+        .open_node::<fio::FileMarker>(
+            "foo",
+            fio::PERM_WRITABLE | fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE,
+            None,
+        )
+        .await
+        .unwrap();
+
     assert_eq!(
         watcher.next().await.expect("watcher stream empty").expect("watch message error"),
         WatchMessage { event: WatchEvent::ADD_FILE, filename: PathBuf::from("foo") },
