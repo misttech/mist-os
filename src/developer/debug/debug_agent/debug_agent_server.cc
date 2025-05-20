@@ -5,6 +5,7 @@
 #include "src/developer/debug/debug_agent/debug_agent_server.h"
 
 #include <lib/fit/result.h>
+#include <lib/stdcompat/functional.h>
 
 #include "fidl/fuchsia.debugger/cpp/natural_types.h"
 #include "src/developer/debug/debug_agent/backtrace_utils.h"
