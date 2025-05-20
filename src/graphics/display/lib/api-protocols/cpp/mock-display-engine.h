@@ -32,7 +32,7 @@
 
 namespace display::testing {
 
-// Strict mock for the Banjo-generated DisplayEngineListener protocol.
+// Strict mock for DisplayEngineInterface implementations.
 //
 // This is a very rare case where strict mocking is warranted. The code under
 // test is an adapter that maps Banjo or FIDL calls 1:1 to C++ calls. So, the

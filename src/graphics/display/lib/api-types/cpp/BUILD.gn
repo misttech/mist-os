@@ -9,6 +9,7 @@ source_set("cpp") {
   sources = [
     "alpha-mode.cc",
     "alpha-mode.h",
+    "backlight-state.h",
     "buffer-collection-id.h",
     "buffer-id.h",
     "color.cc",
@@ -48,6 +49,7 @@ source_set("cpp") {
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
@@ -60,6 +62,7 @@ source_set("cpp") {
 
 test_sources = [
   "alpha-mode-test.cc",
+  "backlight-state-test.cc",
   "buffer-collection-id-test.cc",
   "buffer-id-test.cc",
   "color-test.cc",
