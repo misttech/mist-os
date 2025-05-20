@@ -146,7 +146,7 @@ _VALID_ATOM_TYPES = [
     "package",
     "sysroot",
     "version_history",
-    # LINT.ThenChange(//build/sdk/generate_prebuild_idk/generate_prebuild_idk.py, //build/sdk/manifest_schema.json, //build/sdk/meta/BUILD.gn:schema_in_idk)
+    # LINT.ThenChange(//build/sdk/generate_prebuild_idk/generate_prebuild_idk.py, //build/sdk/manifest_schema.json, //build/sdk/meta/BUILD.bazel:schema_in_idk, //build/sdk/meta/BUILD.gn:schema_in_idk)
 ]
 
 # Remove the types requiring area from the list of all types to get the types

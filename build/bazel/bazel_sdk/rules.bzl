@@ -19,12 +19,10 @@ def _find_root_directory(files, suffix):
 def _generate_merged_idk(ctx):
     output_dir = ctx.actions.declare_directory(ctx.label.name)
 
-    # TODO(https://fxbug.dev/413071161): Implement a solution that does not
-    # rely on dependency checking of directories, which is unsound.
-    if len(ctx.files._schema_directory) != 1:
-        fail("Unexpected number of elements in 'ctx.files._schema_directory'")
-    schema_dir_path = ctx.files._schema_directory[0].path
-    inputs = ctx.files._schema_directory
+    if len(ctx.files._schema_files) == 0:
+        fail("No schema files specified.")
+    inputs = ctx.files._schema_files
+    schema_dir_path = ctx.files._schema_files[0].dirname
 
     _relative_collection_build_manifest = "sdk/manifest/%s" % ctx.attr.collection_name
 
@@ -118,10 +116,10 @@ generate_merged_idk = rule(
             default = "@gn_targets//build/tools/json_validator:json_validator_valico",
             allow_single_file = True,
         ),
-        "_schema_directory": attr.label(
-            doc = "The source directory containing the IDK schema files",
-            default = "//:build/sdk/meta",
-            allow_files = True,
+        "_schema_files": attr.label(
+            doc = "The IDK schema files. They must all be in the same directory.",
+            default = "//build/sdk/meta:idk_schema_files",
+            # allow_files = True,
         ),
         "_idk_merge_script": attr.label(
             default = "//build/sdk/generate_idk:generate_idk_bazel",

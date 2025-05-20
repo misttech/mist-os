@@ -30,7 +30,7 @@ schemas = [
   "sysroot.json",
   "version_history.json",
 
-  # LINT.ThenChange(//build/sdk/sdk_common/__init__.py:idk_atom_types)
+  # LINT.ThenChange(BUILD.bazel:schema_in_idk, //build/sdk/sdk_common/__init__.py:idk_atom_types)
 ]
 
 sdk_documentation("meta") {

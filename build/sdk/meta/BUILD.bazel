@@ -1,0 +1,35 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This list should only contain schemas that are currently exported outside of
+# the Fuchsia source tree. Unless otherwise indicated, each file corresponds
+# to a supported IDK atom type.
+_idk_schema_files = [
+    # LINT.IfChange(schema_in_idk)
+    "bind_library.json",
+    "cc_prebuilt_library.json",
+    "cc_source_library.json",
+    "companion_host_tool.json",
+    "common.json",  # No associated atom type.
+    "dart_library.json",
+    "data.json",
+    "documentation.json",
+    "experimental_python_e2e_test.json",
+    "ffx_tool.json",
+    "fidl_library.json",
+    "host_tool.json",
+    "loadable_module.json",
+    "manifest.json",  # IDK manifest - no associated atom type.
+    "package.json",
+    "sysroot.json",
+    "version_history.json",
+
+    # LINT.ThenChange(BUILD.gn:schema_in_idk, //build/sdk/sdk_common/__init__.py:idk_atom_types)
+]
+
+filegroup(
+    name = "idk_schema_files",
+    srcs = _idk_schema_files,
+    visibility = ["//build/bazel/bazel_sdk:__subpackages__"],
+)
