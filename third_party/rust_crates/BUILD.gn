@@ -855,7 +855,7 @@ if (current_os == "fuchsia") {
 }
 
 group("rustc-hash") {
-  public_deps = [ ":rustc-hash-v2_1_1" ]
+  public_deps = [ ":rustc-hash-v1_0_1" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -13974,36 +13974,35 @@ icu_rust_library("rust_icu_ustring-v5_0_0") {
   applicable_licenses = [ ":rust_icu_ustring-v5_0_0.license" ]
 }
 
-license("rustc-hash-v2_1_1.license") {
+license("rustc-hash-v1_0_1.license") {
   public_package_name = "rustc_hash"
   license_files = [
-    "//third_party/rust_crates/vendor/rustc-hash-2.1.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/rustc-hash-2.1.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/rustc-hash-1.0.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/rustc-hash-1.0.1/LICENSE-MIT",
   ]
 }
 
-rust_library("rustc-hash-v2_1_1") {
+rust_library("rustc-hash-v1_0_1") {
   crate_name = "rustc_hash"
-  crate_root = "//third_party/rust_crates/vendor/rustc-hash-2.1.1/src/lib.rs"
-  output_name = "rustc_hash-ff84e699bf166b5"
+  crate_root = "//third_party/rust_crates/vendor/rustc-hash-1.0.1/src/lib.rs"
+  output_name = "rustc_hash-d18fd5c05c7b0ca4"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":byteorder-v1_5_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2021",
-    "-Cmetadata=ff84e699bf166b5",
-    "-Cextra-filename=-ff84e699bf166b5",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"std\"",
+    "--edition=2015",
+    "-Cmetadata=d18fd5c05c7b0ca4",
+    "-Cextra-filename=-d18fd5c05c7b0ca4",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":rustc-hash-v2_1_1.license" ]
+  applicable_licenses = [ ":rustc-hash-v1_0_1.license" ]
 }
 
 license("rustfix-v0_9_0.license") {

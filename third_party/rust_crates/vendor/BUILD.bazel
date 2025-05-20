@@ -2275,14 +2275,14 @@ alias(
 )
 
 alias(
-    name = "rustc-hash-2.1.1",
-    actual = "//third_party/rust_crates/vendor/rustc-hash-2.1.1:rustc_hash",
+    name = "rustc-hash-1.0.1",
+    actual = "//third_party/rust_crates/vendor/rustc-hash-1.0.1:rustc_hash",
     tags = ["manual"],
 )
 
 alias(
     name = "rustc-hash",
-    actual = "//third_party/rust_crates/vendor/rustc-hash-2.1.1:rustc_hash",
+    actual = "//third_party/rust_crates/vendor/rustc-hash-1.0.1:rustc_hash",
     tags = ["manual"],
 )
 
