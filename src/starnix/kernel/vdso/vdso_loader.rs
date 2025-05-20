@@ -59,6 +59,7 @@ impl MemoryMappedVvar {
     }
 
     pub fn update_utc_data_transform(&self, new_transform: &UtcClockTransform) {
+        assert!(new_transform.rate.reference_ticks != 0);
         let vvar_data = self.get_pointer_to_memory_mapped_vvar();
         let old_transform = UtcClockTransform {
             reference_offset: zx::BootInstant::from_nanos(
