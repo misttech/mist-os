@@ -30,7 +30,7 @@ def _get_fuchsia_source_relative_path(repo_ctx, path):
     """
     fuchsia_source_dir = repo_ctx.attr.fuchsia_source_dir
     if not fuchsia_source_dir:
-        return repo_ctx.path(Label("@//:" + path))
+        return repo_ctx.path("%s/%s" % (repo_ctx.workspace_root, path))
 
     if not fuchsia_source_dir.startswith("/"):
         fuchsia_source_dir = "%s/%s" % (repo_ctx.workspace_root, fuchsia_source_dir)

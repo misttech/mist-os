@@ -63,7 +63,7 @@ def _make_path_from_str(repo_ctx, path_str):
 # Does not do anything if path is empty or absolute.
 def _record_path_dependency(repo_ctx, path_str):
     if path_str and not path_str.startswith("/"):
-        repo_ctx.path(Label("@//:" + path_str))
+        repo_ctx.path("%s/%s" % (repo_ctx.workspace_root, path_str))
         log("### Recording %s as path dependency for repository %s ###" % (path_str, repo_ctx.name))
     else:
         log("### IGNORING %s AS PATH DEPENDENCY FOR REPOSITORY %s ####" % (path_str, repo_ctx.name))
