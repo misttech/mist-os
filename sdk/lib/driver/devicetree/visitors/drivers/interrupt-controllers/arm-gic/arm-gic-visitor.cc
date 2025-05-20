@@ -6,6 +6,7 @@
 
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/stdcompat/array.h>
 
 #include <cstddef>
 #include <cstdint>
