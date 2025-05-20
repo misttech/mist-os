@@ -16,6 +16,7 @@
 #include <object/resource_dispatcher.h>
 
 #include "tests.h"
+#include "zircon/syscalls/resource.h"
 
 #include <ktl/enforce.h>
 
@@ -165,12 +166,16 @@ static bool root_resource_filter() {
     size_t size;
     zx_rsrc_kind_t kind;
   };
-  ktl::array kTestVectors = {TestVector{0x0AFF000000003400, kRangeSize, ZX_RSRC_KIND_MMIO},
-                             TestVector{0x0AFF000000007abd, kRangeSize, ZX_RSRC_KIND_MMIO},
-                             TestVector{0x0AFF000000004000, kRangeSize, ZX_RSRC_KIND_MMIO},
-                             TestVector{0x0040, kRangeSize, ZX_RSRC_KIND_IOPORT},
-                             TestVector{0x01c0, kRangeSize, ZX_RSRC_KIND_IOPORT},
-                             TestVector{0x70ef, kRangeSize, ZX_RSRC_KIND_IOPORT}};
+  ktl::array kTestVectors = {
+      TestVector{0x0AFF000000003400, kRangeSize, ZX_RSRC_KIND_MMIO},
+      TestVector{0x0AFF000000007abd, kRangeSize, ZX_RSRC_KIND_MMIO},
+      TestVector{0x0AFF000000004000, kRangeSize, ZX_RSRC_KIND_MMIO},
+      TestVector{0x0040, kRangeSize, ZX_RSRC_KIND_IOPORT},
+      TestVector{0x01c0, kRangeSize, ZX_RSRC_KIND_IOPORT},
+      TestVector{0x70ef, kRangeSize, ZX_RSRC_KIND_IOPORT},
+      TestVector{0x80ef, kRangeSize, ZX_RSRC_KIND_SMC},
+      TestVector{0x90ef, kRangeSize, ZX_RSRC_KIND_SMC},
+  };
 
   for (uint32_t pass = 0; pass < 2; ++pass) {
     constexpr size_t kTestSize = 16;
@@ -183,12 +188,16 @@ static bool root_resource_filter() {
       EXPECT_TRUE(filter.IsRegionAllowed(v.base - kTestSize, kTestSize / 2, v.kind));
       EXPECT_TRUE(filter.IsRegionAllowed(v.base + kRangeSize, kTestSize / 2, v.kind));
 
-      // Now check ranges which overlap the start, overlap the end, and are
-      // entirely contained within the deny ranges.  These should succeed on the
-      // first pass, but fail on the second (after we have added the deny-ranges
-      // to the filter), or if the kind of range is IOPORT (currently the
-      // deny list does not yet apply to the IOPORT domain).
-      bool expected = (pass == 0) || (v.kind == ZX_RSRC_KIND_IOPORT);
+// Now check ranges which overlap the start, overlap the end, and are
+// entirely contained within the deny ranges.  These should succeed on the
+// first pass, but fail on the second (after we have added the deny-ranges
+// to the filter), or if the kind of range is SMC (currently the
+// deny list does not yet apply to the SMC domain).
+#ifdef __x86_64__
+      bool expected = (pass == 0) || (v.kind == ZX_RSRC_KIND_SMC);
+#else
+      bool expected = (pass == 0) || (v.kind != ZX_RSRC_KIND_MMIO);
+#endif
       EXPECT_EQ(expected, filter.IsRegionAllowed(v.base - (kTestSize / 2), kTestSize, v.kind));
       EXPECT_EQ(expected, filter.IsRegionAllowed(v.base + kTestSize, kTestSize, v.kind));
       EXPECT_EQ(expected,

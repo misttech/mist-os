@@ -10,6 +10,7 @@
 #include <lib/root_resource_filter_internal.h>
 #include <stdio.h>
 #include <trace.h>
+#include <zircon/syscalls/resource.h>
 
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
@@ -55,21 +56,31 @@ void RootResourceFilter::Finalize() {
   if (DPRINTF_ENABLED_FOR_LEVEL(SPEW)) {
     dprintf(SPEW, "Final MMIO Deny list is:\n");
     mmio_deny_.WalkAvailableRegions([](const ralloc_region_t* region) -> bool {
-      dprintf(SPEW, "Region [0x%lx, 0x%lx)\n", region->base, region->base + region->size);
+      dprintf(SPEW, "Region [%#lx, %#lx)\n", region->base, region->base + region->size);
       return true;  // Keep printing, don't stop now!
     });
+#ifdef __x86_64__
+    ioport_deny_.WalkAvailableRegions([](const ralloc_region_t* region) -> bool {
+      dprintf(SPEW, "IoPort [%#lx, %#lx)\n", region->base, region->base + region->size);
+      return true;  // Keep printing, don't stop now!
+    });
+#endif
   }
 }
 
 bool RootResourceFilter::IsRegionAllowed(uintptr_t base, size_t size, zx_rsrc_kind_t kind) const {
-  // Currently, we only need to track denied mmio regions. Someday, this may
-  // need to expand to other ranges as well (such as x64 IO ports)
-  if (kind != ZX_RSRC_KIND_MMIO) {
-    return true;
-  }
-
-  return !mmio_deny_.TestRegionIntersects({.base = base, .size = size},
-                                          RegionAllocator::TestRegionSet::Available);
+  switch (kind) {
+    case ZX_RSRC_KIND_MMIO:
+      return !mmio_deny_.TestRegionIntersects({.base = base, .size = size},
+                                              RegionAllocator::TestRegionSet::Available);
+#ifdef __x86_64__
+    case ZX_RSRC_KIND_IOPORT:
+      return !ioport_deny_.TestRegionIntersects({.base = base, .size = size},
+                                                RegionAllocator::TestRegionSet::Available);
+#endif
+    default:
+      return true;
+  };
 }
 
 void root_resource_filter_add_deny_region(uintptr_t base, size_t size, zx_rsrc_kind_t kind) {
@@ -77,7 +88,6 @@ void root_resource_filter_add_deny_region(uintptr_t base, size_t size, zx_rsrc_k
   // wants to limit other regions as well (perhaps the I/O port space for x64),
   // they need to come back here and add another RegionAllocator instance to
   // enforce the rules for the new zone.
-  ASSERT(kind == ZX_RSRC_KIND_MMIO);
   g_root_resource_filter.AddDenyRegion(base, size, kind);
 }
 

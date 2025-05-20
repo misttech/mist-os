@@ -4,8 +4,10 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/root_resource_filter.h>
 #include <lib/uart/uart.h>
 #include <lib/zbi-format/driver-config.h>
+#include <zircon/syscalls/resource.h>
 
 #include <cstdint>
 
@@ -15,12 +17,10 @@
 #include <platform/uart.h>
 #include <vm/physmap.h>
 
-#include "memory.h"
-
 volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
   volatile void* vaddr = paddr_to_physmap(paddr);
   physmap_preserve_gaps_for_mmio();
-  mark_mmio_region_to_reserve(reinterpret_cast<vaddr_t>(vaddr), size);
+  root_resource_filter_add_deny_region(paddr, size, ZX_RSRC_KIND_MMIO);
   return vaddr;
 }
 
@@ -28,7 +28,7 @@ PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>::Platf
     const zbi_dcfg_simple_pio_t& config, uint16_t io_slots)
     : Base(config, io_slots) {
   // Reserve pio.
-  mark_pio_region_to_reserve(config.base, io_slots);
+  root_resource_filter_add_deny_region(config.base, io_slots, ZX_RSRC_KIND_IOPORT);
 }
 
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) {
