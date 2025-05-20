@@ -196,7 +196,7 @@ regex = "1.7.3"
 regex-syntax = "0.8.3"
 ring = "0.17.8"
 rsa = { version = "0.9.7", default-features = false }
-rustc-hash = "1.0.1"
+rustc-hash = "2.1.1"
 rustls = { version = "0.21.12", features = ["dangerous_configuration"] }
 rustls-pemfile = "1.0.4"
 rustls-webpki = "0.101.6"
