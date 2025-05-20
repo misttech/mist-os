@@ -12,11 +12,8 @@ if (is_fuchsia) {
 }
 
 if (is_host) {
-  host_test_data("network-conformance-base-test-data") {
-    out_dir = get_label_info(":anything($target_toolchain)", "target_out_dir")
-    sources = [
-      "${out_dir}/network-conformance-base_gen/network-conformance-base.zbi",
-    ]
-    deps = [ ":network-conformance-base($target_toolchain)" ]
+  network_conformance_assembly_host_test_data(
+      "network-conformance-base-test-data") {
+    assembly_name = "network-conformance-base"
   }
 }

@@ -118,3 +118,20 @@ template("assemble_network_conformance_system") {
     board_config_label = ":${labels.board_config}"
   }
 }
+
+# Produces the necessary `host_test_data` for a given invocation of
+# `assemble_network_conformance_system` in order for the assembly .zbi to be used in a host test.
+#
+# Parameters
+#
+#   assembly_name
+#     The target_name passed to `assemble_network_conformance_system`.
+template("network_conformance_assembly_host_test_data") {
+  _assembly_name = invoker.assembly_name
+
+  host_test_data(target_name) {
+    out_dir = get_label_info(":anything($target_toolchain)", "target_out_dir")
+    sources = [ "${out_dir}/${_assembly_name}_gen/${_assembly_name}.zbi" ]
+    deps = [ ":${_assembly_name}($target_toolchain)" ]
+  }
+}
