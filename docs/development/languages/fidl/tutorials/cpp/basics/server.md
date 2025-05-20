@@ -83,7 +83,7 @@ You may build the server package via the following:
 1. Build the server package:
 
     ```posix-terminal
-    fx build examples/fidl/cpp/server
+    fx build //examples/fidl/cpp/server
     ```
 
 Note: This build configuration assumes your device target is the emulator.
