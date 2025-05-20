@@ -10,6 +10,7 @@
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.feedback.DataProvider",
+                "fuchsia.pkg.resolution.PackageResolver",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.process.explorer.ProcessExplorer",
                 "fuchsia.process.explorer.Query",

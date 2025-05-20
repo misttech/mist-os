@@ -273,6 +273,27 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         }
     };
 
+    let resolver_toolbox_cb = {
+        let package_resolver = package_resolver.clone();
+        let cobalt_sender = cobalt_sender.clone();
+        let eager_package_manager = Arc::clone(&eager_package_manager);
+        move |stream| {
+            fasync::Task::local(
+                resolver_service::run_resolver_toolbox_service(
+                    package_resolver.clone(),
+                    stream,
+                    fpkg::GcProtection::OpenPackageTracking,
+                    cobalt_sender.clone(),
+                    Arc::clone(&eager_package_manager),
+                )
+                .unwrap_or_else(|e| {
+                    error!("run_resolver_toolbox_service failed: {:#}", anyhow!(e))
+                }),
+            )
+            .detach()
+        }
+    };
+
     let repo_cb = move |stream| {
         let repo_manager = Arc::clone(&repo_manager);
 
@@ -318,6 +339,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
             format!("{}-ota", fpkg::PackageResolverMarker::PROTOCOL_NAME),
             make_resolver_cb(fpkg::GcProtection::Retained),
         )
+        .add_fidl_service(resolver_toolbox_cb)
         .add_fidl_service(repo_cb)
         .add_fidl_service(rewrite_cb)
         .add_fidl_service(cup_cb);

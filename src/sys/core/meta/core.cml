@@ -693,6 +693,7 @@
             protocol: [
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.RepositoryManager",
+                "fuchsia.pkg.resolution.PackageResolver",
                 "fuchsia.pkg.rewrite.Engine",
             ],
             from: "#pkg-resolver",

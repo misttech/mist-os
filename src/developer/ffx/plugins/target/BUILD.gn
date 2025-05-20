@@ -23,6 +23,7 @@ ffx_plugin("ffx_target") {
     "get-time:ffx_target_get_time",
     "list:ffx_list",
     "off:ffx_off",
+    "package:ffx_target_package",
     "reboot:ffx_reboot",
     "remove:ffx_target_remove",
     "repository:ffx_target_repository",

@@ -164,6 +164,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes",
   "//sdk/fidl/fuchsia.net.stackmigrationdeprecated:fuchsia.net.stackmigrationdeprecated",
   "//sdk/fidl/fuchsia.net:fuchsia.net",
+  "//sdk/fidl/fuchsia.pkg.resolution:fuchsia.pkg.resolution",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker",
   "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel",
   "//sdk/fidl/fuchsia.power.profile:fuchsia.power.profile",

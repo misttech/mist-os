@@ -63,6 +63,13 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.pkg.resolution.PackageResolver",
+            from: "#pkg-resolver",
+            to: "self/toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
     expose: [
         {

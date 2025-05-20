@@ -330,6 +330,15 @@
                 ],
             },
             {
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "fuchsia.pkg.resolution.PackageResolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/toolbox",
+                ],
+            },
+            {
                 source_moniker: "/core/lowpanservice",
                 source: "component",
                 source_name: "fuchsia.factory.lowpan.FactoryLookup",
