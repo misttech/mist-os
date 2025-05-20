@@ -19,9 +19,10 @@ def main() -> int:
     parser.add_argument(
         "--aib-list", type=argparse.FileType("r"), required=True
     )
+    parser.add_argument("--version", type=str)
+    parser.add_argument("--repo", type=str, required=True)
     parser.add_argument("--outdir", type=str, required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
-    parser.add_argument("--version", type=str)
     args = parser.parse_args()
 
     shutil.rmtree(args.outdir)
@@ -40,7 +41,15 @@ def main() -> int:
             shutil.copytree(src, dst)
 
     version = args.version if args.version else "unversioned"
-    config_data = {"release_version": version}
+    config_data = {
+        "release_version": version,
+        "release_info": {
+            "name": "fuchsia_platform_artifacts",
+            "repository": args.repo,
+            "version": version,
+        },
+    }
+
     config = os.path.join(args.outdir, "platform_artifacts.json")
     with open(config, "w") as f:
         json.dump(config_data, f, indent=2)

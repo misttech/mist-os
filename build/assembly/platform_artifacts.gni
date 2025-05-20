@@ -73,6 +73,8 @@ template("platform_artifacts") {
     args = [
       "--aib-list",
       rebase_path(files.aib_list, root_build_dir),
+      "--repo",
+      "fuchsia",
       "--outdir",
       rebase_path(files.platform_artifacts, root_build_dir),
       "--depfile",

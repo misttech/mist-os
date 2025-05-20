@@ -85,13 +85,11 @@ import("//build/compiled_action.gni")
 #
 #  version (optional)
 #    [string] String representing the release version for this board config.
-#    TODO(https://fxbug.dev/397489730): Either this field or "version_file"
-#    must be set.
+#    Either this field or "version_file" must be set.
 #
 #  version_file (optional)
 #    [string] Path to a file containing the release version for this config.
-#    TODO(https://fxbug.dev/397489730): Either this field or "version" must
-#    be set.
+#    Either this field or "version" must be set.
 #
 #  Outputs
 #    A directory structure and manifest
@@ -257,6 +255,8 @@ template("board_configuration") {
       "board",
       "--config",
       rebase_path(files.board_config_file_intermediate, root_build_dir),
+      "--repo",
+      "fuchsia",
       "--output",
       rebase_path(files.board_config_dir, root_build_dir),
       "--depfile",
@@ -275,6 +275,9 @@ template("board_configuration") {
       ]
     }
 
+    assert(
+        defined(invoker.version) || defined(invoker.version_file),
+        "board_configuration(\"target_name\") must define `version` or `version_file`")
     if (defined(invoker.version) && invoker.version != "") {
       args += [
         "--version",

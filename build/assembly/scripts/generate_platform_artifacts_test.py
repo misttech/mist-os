@@ -32,10 +32,19 @@ class VersionTest(unittest.TestCase):
                 depfile_path,
                 "--version",
                 "fake_version_123",
+                "--repo",
+                "fake_repository",
             ]
             generate_platform_artifacts.main()
 
-            expected = {"release_version": "fake_version_123"}
+            expected = {
+                "release_version": "fake_version_123",
+                "release_info": {
+                    "name": "fuchsia_platform_artifacts",
+                    "repository": "fake_repository",
+                    "version": "fake_version_123",
+                },
+            }
 
             result_path = os.path.join(
                 tmpdir, "outdir", "platform_artifacts.json"
@@ -60,6 +69,8 @@ class VersionTest(unittest.TestCase):
                 "",
                 "--aib-list",
                 aib_list_path,
+                "--repo",
+                "fake_repository",
                 "--outdir",
                 outdir_path,
                 "--depfile",
@@ -67,7 +78,14 @@ class VersionTest(unittest.TestCase):
             ]
             generate_platform_artifacts.main()
 
-            expected = {"release_version": "unversioned"}
+            expected = {
+                "release_version": "unversioned",
+                "release_info": {
+                    "name": "fuchsia_platform_artifacts",
+                    "repository": "fake_repository",
+                    "version": "unversioned",
+                },
+            }
 
             result_path = os.path.join(
                 tmpdir, "outdir", "platform_artifacts.json"
