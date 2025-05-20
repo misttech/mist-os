@@ -4,6 +4,7 @@
 
 import("//build/config/clang/clang.gni")
 import("//build/config/clang/crash_diagnostics.gni")
+import("//build/config/clang/stack_clash_protection.gni")
 import("//build/config/clang/stack_size_section.gni")
 import("//build/config/clang/time_trace.gni")
 import("//build/config/compiler.gni")
@@ -105,6 +106,25 @@ config("stack-size-section") {
   }
 }
 
+config("stack-clash-protection") {
+  # see https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html#index-fstack-clash-protection
+  #
+  # NOTE: PAGE_SIZE used in probing is a compile-time constant, controlled by
+  # -mstack-probe-size, and defaults to 4096. Advanced probing can be
+  # controlled with a function attribute, "probe-stack" to use a function to do
+  # the probing. Otherwise, the compiler will emit the probing instructions
+  # directly in the prologue. Rust code always emits these checks via
+  # __rust_probestack in all functions that require probing.
+  #
+  # stack-clash-protection is only enabled for Fuchsia and Linux targets on
+  # x64, arm64, and riscv64 architectures.
+  if (stack_clash_protection && (is_linux || is_fuchsia) &&
+      (current_cpu == "arm64" || current_cpu == "riscv64" ||
+       current_cpu == "x64")) {
+    cflags = [ "-fstack-clash-protection" ]
+  }
+}
+
 config("time-trace") {
   if (!is_gcc && time_trace) {
     cflags = [ "-ftime-trace" ]
@@ -123,6 +143,7 @@ config("compiler") {
     ":time-trace",
     ":toolchain_version_stamp",
     ":stack-size-section",
+    ":stack-clash-protection",
   ]
 
   if (is_gcc) {
