@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::memory_attribution::MemoryAttributionLifecycleEvent;
+use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
 use starnix_logging::track_stub;
 use starnix_types::ownership::{TempRef, WeakRef};

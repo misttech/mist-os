@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::device::terminal::{Terminal, TerminalController};
-use crate::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::syscalls::{read_siginfo, WaitingOptions};
@@ -12,6 +11,7 @@ use crate::signals::{
     SignalDetail, SignalInfo,
 };
 use crate::task::interval_timer::IntervalTimerHandle;
+use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     ptrace_detach, AtomicStopState, ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable,
     ProcessGroup, PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session,

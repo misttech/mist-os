@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
+use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
     PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,

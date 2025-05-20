@@ -11,6 +11,7 @@ mod iptables;
 mod kernel;
 mod kernel_stats;
 mod kernel_threads;
+mod memory_attribution;
 pub mod net;
 mod pid_table;
 mod process_group;
