@@ -13,7 +13,11 @@
 //!
 //! <http://www.unicode.org/reports/tr9/#BD2>
 
-use std::convert::{From, Into};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::slice;
 
 use super::char_data::BidiClass;
 
@@ -28,7 +32,8 @@ use super::char_data::BidiClass;
 ///
 /// <http://www.unicode.org/reports/tr9/#BD2>
 #[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[repr(transparent)]
 pub struct Level(u8);
 
 pub const LTR_LEVEL: Level = Level(0);
@@ -192,6 +197,19 @@ impl Level {
     pub fn vec(v: &[u8]) -> Vec<Level> {
         v.iter().map(|&x| x.into()).collect()
     }
+
+    /// Converts a byte slice to a slice of Levels
+    ///
+    /// Does _not_ check if each level is within bounds (`<=` [`MAX_IMPLICIT_DEPTH`]),
+    /// which is not a requirement for safety but is a requirement for correctness of the algorithm.
+    pub fn from_slice_unchecked(v: &[u8]) -> &[Level] {
+        debug_assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<Level>());
+        unsafe {
+            // Safety: The two arrays are the same size and layout-compatible since
+            // Level is `repr(transparent)` over `u8`
+            slice::from_raw_parts(v as *const [u8] as *const u8 as *const Level, v.len())
+        }
+    }
 }
 
 /// If levels has any RTL (odd) level
@@ -202,11 +220,11 @@ pub fn has_rtl(levels: &[Level]) -> bool {
     levels.iter().any(|&lvl| lvl.is_rtl())
 }
 
-impl Into<u8> for Level {
+impl From<Level> for u8 {
     /// Convert to the level number
     #[inline]
-    fn into(self) -> u8 {
-        self.number()
+    fn from(val: Level) -> Self {
+        val.number()
     }
 }
 
@@ -227,7 +245,7 @@ impl<'a> PartialEq<&'a str> for Level {
 }
 
 /// Used for matching levels in conformance tests
-impl<'a> PartialEq<String> for Level {
+impl PartialEq<String> for Level {
     #[inline]
     fn eq(&self, s: &String) -> bool {
         self == &s.as_str()
@@ -328,7 +346,8 @@ mod tests {
     #[test]
     fn test_into() {
         let level = Level::rtl();
-        assert_eq!(1u8, level.into());
+        let number: u8 = level.into();
+        assert_eq!(1u8, number);
     }
 
     #[test]
@@ -356,8 +375,8 @@ mod tests {
 
 #[cfg(all(feature = "serde", test))]
 mod serde_tests {
-    use serde_test::{Token, assert_tokens};
     use super::*;
+    use serde_test::{assert_tokens, Token};
 
     #[test]
     fn test_statics() {

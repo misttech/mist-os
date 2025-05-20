@@ -73,7 +73,7 @@ rust_library(
     version = "0.2.3",
     deps = [
         "//third_party/rust_crates/vendor/matches-0.1.9:matches",
-        "//third_party/rust_crates/vendor/unicode-bidi-0.3.4:unicode_bidi",
+        "//third_party/rust_crates/vendor/unicode-bidi-0.3.18:unicode_bidi",
         "//third_party/rust_crates/vendor/unicode-normalization-0.1.19:unicode_normalization",
     ],
 )

@@ -9,9 +9,6 @@
 
 //! This module holds deprecated assets only.
 
-// Doesn't worth updating API here
-#![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
-
 use super::*;
 
 /// Find the level runs within a line and return them in visual order.
@@ -24,7 +21,10 @@ use super::*;
 /// `line` is a range of bytes indices within `levels`.
 ///
 /// <http://www.unicode.org/reports/tr9/#Reordering_Resolved_Levels>
-#[deprecated(since = "0.3.0", note = "please use `BidiInfo::visual_runs()` instead.")]
+#[deprecated(
+    since = "0.3.0",
+    note = "please use `BidiInfo::visual_runs()` instead."
+)]
 pub fn visual_runs(line: Range<usize>, levels: &[Level]) -> Vec<LevelRun> {
     assert!(line.start <= levels.len());
     assert!(line.end <= levels.len());
@@ -44,8 +44,8 @@ pub fn visual_runs(line: Range<usize>, levels: &[Level]) -> Vec<LevelRun> {
             start = i;
             run_level = new_level;
 
-            min_level = min(run_level, min_level);
-            max_level = max(run_level, max_level);
+            min_level = cmp::min(run_level, min_level);
+            max_level = cmp::max(run_level, max_level);
         }
     }
     runs.push(start..line.end);
@@ -69,10 +69,8 @@ pub fn visual_runs(line: Range<usize>, levels: &[Level]) -> Vec<LevelRun> {
 
             // Found the start of a sequence. Now find the end.
             let mut seq_end = seq_start + 1;
-            while seq_end < run_count {
-                if levels[runs[seq_end].start] < max_level {
-                    break;
-                }
+
+            while seq_end < run_count && levels[runs[seq_end].start] >= max_level {
                 seq_end += 1;
             }
 
@@ -81,9 +79,10 @@ pub fn visual_runs(line: Range<usize>, levels: &[Level]) -> Vec<LevelRun> {
 
             seq_start = seq_end;
         }
-        max_level.lower(1).expect(
-            "Lowering embedding level below zero",
-        );
+
+        max_level
+            .lower(1)
+            .expect("Lowering embedding level below zero");
     }
 
     runs

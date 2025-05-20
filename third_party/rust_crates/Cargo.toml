@@ -1100,7 +1100,7 @@ env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-char-pr
 [gn.package.unic-ucd-block."0.9.0"]
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-ucd-block\\\"",  "CARGO_PKG_DESCRIPTION=\\\"\\\"", ]
 
-[gn.package.unicode-bidi."0.3.4"]
+[gn.package.unicode-bidi."0.3.18"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-normalization."0.1.19"]

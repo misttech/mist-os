@@ -7829,7 +7829,7 @@ rust_library("idna-v0_1_5") {
 
   deps = []
   deps += [ ":matches-v0_1_9" ]
-  deps += [ ":unicode-bidi-v0_3_4" ]
+  deps += [ ":unicode-bidi-v0_3_18" ]
   deps += [ ":unicode-normalization-v0_1_19" ]
 
   rustenv = []
@@ -7862,7 +7862,7 @@ rust_library("idna-v0_2_3") {
 
   deps = []
   deps += [ ":matches-v0_1_9" ]
-  deps += [ ":unicode-bidi-v0_3_4" ]
+  deps += [ ":unicode-bidi-v0_3_18" ]
   deps += [ ":unicode-normalization-v0_1_19" ]
 
   rustenv = []
@@ -7894,7 +7894,7 @@ rust_library("idna-v0_3_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":unicode-bidi-v0_3_4" ]
+  deps += [ ":unicode-bidi-v0_3_18" ]
   deps += [ ":unicode-normalization-v0_1_19" ]
 
   rustenv = []
@@ -18043,34 +18043,35 @@ rust_library("unicase-v2_8_1") {
   applicable_licenses = [ ":unicase-v2_8_1.license" ]
 }
 
-license("unicode-bidi-v0_3_4.license") {
+license("unicode-bidi-v0_3_18.license") {
   public_package_name = "unicode_bidi"
   license_files =
-      [ "//third_party/rust_crates/vendor/unicode-bidi-0.3.4/LICENSE-APACHE" ]
+      [ "//third_party/rust_crates/vendor/unicode-bidi-0.3.18/LICENSE-APACHE" ]
 }
 
-rust_library("unicode-bidi-v0_3_4") {
+rust_library("unicode-bidi-v0_3_18") {
   crate_name = "unicode_bidi"
-  crate_root = "//third_party/rust_crates/vendor/unicode-bidi-0.3.4/src/lib.rs"
-  output_name = "unicode_bidi-6196d3d9fc63e289"
+  crate_root = "//third_party/rust_crates/vendor/unicode-bidi-0.3.18/src/lib.rs"
+  output_name = "unicode_bidi-e12d17bb81d32560"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":matches-v0_1_9" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=6196d3d9fc63e289",
-    "-Cextra-filename=-6196d3d9fc63e289",
+    "--edition=2018",
+    "-Cmetadata=e12d17bb81d32560",
+    "-Cextra-filename=-e12d17bb81d32560",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"hardcoded-data\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":unicode-bidi-v0_3_4.license" ]
+  applicable_licenses = [ ":unicode-bidi-v0_3_18.license" ]
 }
 
 license("unicode-ident-v1_0_1.license") {
