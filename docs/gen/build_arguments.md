@@ -25,6 +25,16 @@ archives.
 
 From //build/images/args.gni:112
 
+### additional_bazel_sdk_labels
+
+Extra generate_fuchsia_bazel_sdk targets to be included in the
+`bazel_sdk_info` API module. This allows defining bazel SDKs outside of the
+main repository.
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:108
+
 ### additional_bootserver_arguments
 
 Additional bootserver args to add to pave.sh. New uses of this should be
@@ -43,7 +53,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:115
+From //BUILD.gn:120
 
 ### all_cpu_kernel_boot_tests
 
@@ -136,7 +146,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:107
+From //BUILD.gn:112
 
 ### assembly_generate_fvm_fastboot
 
@@ -167,7 +177,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:111
+From //BUILD.gn:116
 
 ### authorized_ssh_keys_label
 
@@ -359,7 +369,7 @@ in args.gn.
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/bazel_root_targets_list.gni:31
+From //build/bazel/bazel_root_targets_list.gni:26
 
 ### bazel_upload_build_events
 
@@ -698,7 +708,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:123
+From //BUILD.gn:128
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -706,7 +716,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:123
+From //BUILD.gn:128
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -714,7 +724,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:123
+From //BUILD.gn:128
 
 ### build_should_trace_actions
 
@@ -1069,7 +1079,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -1743,7 +1753,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -2206,14 +2216,7 @@ artifact. Schema is:
       to the `fx host-tool <ninja_name>` command.
 
 
-**Current value (from the default):**
-
-```none
-[{
-  bazel_label = "//build/tools/json_validator:json_validator_valico"
-  install_host_tool = true
-}]
-```
+**Current value (from the default):** `[]`
 
 From //build/bazel/bazel_root_targets_list.gni:22
 
@@ -4961,7 +4964,7 @@ Labels for product bundles to assemble in addition to the main product bundle.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:126
+From //BUILD.gn:131
 
 ### product_bundle_test_groups
 
