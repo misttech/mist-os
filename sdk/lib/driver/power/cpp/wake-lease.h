@@ -129,10 +129,15 @@ class TimeoutWakeLease {
   // this method is called.
   bool HandleInterrupt(zx::duration timeout);
 
-  // Acquire a wake lease and automatically drop it after the specified timeout. If a lease was
-  // still held from an earlier invocation, it will be extended until the new timeout.
-  // Note that a duration is taken because the deadline is computed once the lease is acquired,
-  // rather than at the point this method is called.
+  // Acquire a wake lease (if not already held) and automatically drop it after the specified
+  // timeout. If a lease was held from an earlier invocation, it will be extended until the new
+  // timeout. Note that a duration is taken because the deadline is computed once the lease is
+  // acquired, rather than at the point this method is called.
+  //
+  // This return value alone is not sufficient to understand if we currently hold a wake lease.
+  // Returns `false` if we previously held a lease or we failed to acquire one. Returns `true` if
+  // we did **not** already have a lease and we succeeded in acquiring one. To know whether we
+  // currently hold a wake lease after calling, call `GetWakeLeaseCopy` and examine the result.
   bool AcquireWakeLease(zx::duration timeout);
 
   // Provide a wake lease which will be dropped either:
