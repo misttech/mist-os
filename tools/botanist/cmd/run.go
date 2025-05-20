@@ -133,6 +133,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.DurationVar(&r.timeout, "timeout", 0, "duration allowed for the command to finish execution, a value of 0 (zero) will not impose a timeout.")
 	f.StringVar(&r.syslogDir, "syslog-dir", "", "the directory to write all system logs to.")
 	f.StringVar(&r.serialLogDir, "serial-log-dir", "", "the directory to write all serial logs to.")
+	// TODO(https://fxbug.dev/407117303): Remove `repo` and `blobs` flag after recipes no longer sets it.
 	f.StringVar(&r.repoURL, "repo", "", "URL at which to configure a package repository; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
 	f.StringVar(&r.blobURL, "blobs", "", "URL at which to serve a package repository's blobs; if the placeholder of \"localhost\" will be resolved and scoped as appropriate")
 	f.StringVar(&r.localRepo, "local-repo", "", "path to a local package repository; the repo and blobs flags are ignored when this is set")
@@ -296,19 +297,14 @@ func (r *RunCommand) setupPackageServer(ctx context.Context) (*botanist.PackageS
 		}
 	}
 
-	pkgSrv, err := botanist.NewPackageServer(ctx, r.localRepo, r.repoURL, r.blobURL, r.downloadManifest, port)
+	pkgSrv, err := botanist.NewPackageServer(ctx, r.localRepo, port)
 	if err != nil {
 		return pkgSrv, err
 	}
-	// TODO(rudymathu): Once gcsproxy and remote package serving are deprecated, remove
-	// the repoURL and blobURL from the command line flags.
-	r.repoURL = pkgSrv.RepoURL
-	r.blobURL = pkgSrv.BlobURL
-
 	return pkgSrv, nil
 }
 
-func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, baseTargets []targets.Base, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget, testsPath string) {
+func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, baseTargets []targets.Base, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget, pkgSrv *botanist.PackageServer, testsPath string) {
 	// Log any failures after running tests.
 	for _, t := range fuchsiaTargets {
 		t := t
@@ -370,8 +366,8 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 					}
 					return err
 				}
-				if r.repoURL != "" {
-					if err := t.AddPackageRepository(client, r.repoURL, r.blobURL); err != nil {
+				if pkgSrv != nil {
+					if err := t.AddPackageRepository(client, pkgSrv.RepoURL, pkgSrv.BlobURL); err != nil {
 						return err
 					}
 					logger.Debugf(ctx, "added package repo to target %s", t.Nodename())
@@ -395,7 +391,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 							syslogName = "syslog.txt"
 						}
 						syslogPath := filepath.Join(r.syslogDir, syslogName)
-						if err := t.CaptureSyslog(client, syslogPath, r.repoURL, r.blobURL); err != nil && ctx.Err() == nil {
+						if err := t.CaptureSyslog(client, syslogPath, pkgSrv); err != nil && ctx.Err() == nil {
 							logger.Errorf(ctx, "%s at %s: %s", constants.FailedToCaptureSyslogMsg, syslogPath, err)
 						}
 					}()
@@ -497,7 +493,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		return err
 	}
 
-	r.dispatchTests(ctx, cancel, eg, baseTargets, fuchsiaTargets, primaryTarget, testsPath)
+	r.dispatchTests(ctx, cancel, eg, baseTargets, fuchsiaTargets, primaryTarget, pkgSrv, testsPath)
 
 	if err := eg.Wait(); err != nil {
 		return err
@@ -725,8 +721,6 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		}()
 	}
 
-	r.blobURL = os.ExpandEnv(r.blobURL)
-	r.repoURL = os.ExpandEnv(r.repoURL)
 	if err := r.execute(ctx, args); err != nil {
 		logger.Errorf(ctx, "%s", err)
 		return subcommands.ExitFailure

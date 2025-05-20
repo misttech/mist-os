@@ -11,10 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
-
-	"cloud.google.com/go/storage"
 )
 
 // emptyPackageRepo is a helper that constructs an empty package repository
@@ -64,28 +61,6 @@ func TestPackageServer(t *testing.T) {
 			wantStatusCode: http.StatusOK,
 			wantContents:   "desired contents",
 		},
-		{
-			name:           "remote repository fetches work as expected",
-			endpoint:       "/repository/targets.json",
-			wantStatusCode: http.StatusOK,
-			wantContents:   "{\"targets\": []}",
-		},
-		{
-			name:           "remote blob fetches work as expected",
-			endpoint:       "/blobs/123456",
-			wantStatusCode: http.StatusOK,
-			wantContents:   "desired contents",
-		},
-		{
-			name:           "remote fetch of non-existent object returns not found",
-			endpoint:       "/blobs/123456",
-			wantStatusCode: http.StatusNotFound,
-		},
-		{
-			name:           "remote fetch of invalid path returns bad request",
-			endpoint:       "/invalid",
-			wantStatusCode: http.StatusBadRequest,
-		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -95,32 +70,18 @@ func TestPackageServer(t *testing.T) {
 			// Set up the local package repository.
 			localRepo := emptyPackageRepo(t)
 
-			// Override the GCS reader to effectively return a 404 unless the
-			// test case overrides it below.
-			getGCSReader = func(_ context.Context, _ *storage.Client, _, _ string) (io.ReadCloser, int, error) {
-				return nil, 0, storage.ErrObjectNotExist
-			}
-
-			// Add any contents to the repo (both locally and in the "remote")
-			// that the test case requires.
+			// Add any contents to the repo that the test case requires.
 			if tc.wantContents != "" {
-				if tc.local {
-					localPath := filepath.Join(localRepo, tc.endpoint)
-					if err := os.WriteFile(localPath, []byte(tc.wantContents), os.ModePerm); err != nil {
-						t.Fatalf("WriteFile(%s, %s) failed; got %s, want <nil> error", localPath, tc.wantContents, err)
-					}
-				} else {
-					getGCSReader = func(_ context.Context, _ *storage.Client, _, _ string) (io.ReadCloser, int, error) {
-						r := strings.NewReader(tc.wantContents)
-						return io.NopCloser(r), len(tc.wantContents), nil
-					}
+				localPath := filepath.Join(localRepo, tc.endpoint)
+				if err := os.WriteFile(localPath, []byte(tc.wantContents), os.ModePerm); err != nil {
+					t.Fatalf("WriteFile(%s, %s) failed; got %s, want <nil> error", localPath, tc.wantContents, err)
 				}
 			}
 
 			// Start the package server.
 			// We ignore the returned repoURL and blobURL to make testing
 			// invalid endpoints easier.
-			pkgSrv, err := NewPackageServer(ctx, localRepo, "", "", "", 8080)
+			pkgSrv, err := NewPackageServer(ctx, localRepo, 8080)
 			if err != nil {
 				t.Fatalf("NewPackageServer failed; got %s, want <nil> error", err)
 			}

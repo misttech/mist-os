@@ -74,7 +74,7 @@ type FuchsiaTarget interface {
 
 	// CaptureSyslog starts capturing the syslog to the given file.
 	// This is only valid when the target has SSH running.
-	CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error
+	CaptureSyslog(client *sshutil.Client, filename string, pkgSrv *botanist.PackageServer) error
 
 	// StopSyslog stops the syslog context that controls the process to capture the syslog
 	// that was started by CaptureSyslog().
@@ -433,7 +433,7 @@ func (t *genericFuchsiaTarget) AddPackageRepository(client *sshutil.Client, repo
 // and blobURL of the package repo as a matter of convenience - it makes
 // it easy to re-register the package repository on reboot. This function
 // blocks until the target is stopped.
-func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error {
+func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename string, pkgSrv *botanist.PackageServer) error {
 	var syslogger *syslog.Syslogger
 	// The SSH client is no longer needed if using `ffx log`, so close it so
 	// it doesn't keep sending keepalives.
@@ -488,7 +488,7 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 		// we don't know when test binaries restart the device. Eventually, we should
 		// build out a more resilient framework in which we register "restart handlers"
 		// that are triggered on reboot.
-		if repoURL != "" && blobURL != "" {
+		if pkgSrv != nil {
 			select {
 			case <-client.DisconnectionListener():
 				if err := client.Reconnect(syslogCtx); err != nil {
@@ -497,7 +497,7 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 			default:
 				// The client is still connected, so continue.
 			}
-			t.AddPackageRepository(client, repoURL, blobURL)
+			t.AddPackageRepository(client, pkgSrv.RepoURL, pkgSrv.BlobURL)
 			client.Close()
 		}
 	}
