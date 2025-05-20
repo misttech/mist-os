@@ -878,5 +878,10 @@ func infraToolLogChecks() []FailureModeCheck {
 			// LINT.ThenChange(//src/testing/end_to_end/mobly_base_tests/fuchsia_base_test/fuchsia_base_test.py)
 			Type: swarmingOutputType,
 		},
+		&stringInLogCheck{
+			String:             "Sending signal 9 to service 'zygote'",
+			Type:               syslogType,
+			SkipAllPassedTests: true,
+		},
 	}
 }
