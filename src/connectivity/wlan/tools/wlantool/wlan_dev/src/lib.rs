@@ -238,6 +238,52 @@ async fn do_phy(cmd: opts::PhyCmd, monitor_proxy: DeviceMonitor) -> Result<(), E
                 monitor_proxy.clear_country(&req).await.context("error clearing country")?;
             println!("response: {:?}", zx_status::Status::from_raw(response));
         }
+        opts::PhyCmd::PowerDown { phy_id } => {
+            let response = monitor_proxy.power_down(phy_id).await.context("error powering down")?;
+            match response {
+                Ok(_) => {
+                    println!("response: OK");
+                }
+                Err(status) => {
+                    println!("response: Failed {:?}", zx_status::Status::from_raw(status));
+                }
+            }
+        }
+        opts::PhyCmd::PowerUp { phy_id } => {
+            let response = monitor_proxy.power_up(phy_id).await.context("error powering up")?;
+            match response {
+                Ok(_) => {
+                    println!("response: OK");
+                }
+                Err(status) => {
+                    println!("response: Failed {:?}", zx_status::Status::from_raw(status));
+                }
+            }
+        }
+        opts::PhyCmd::Reset { phy_id } => {
+            let response = monitor_proxy.reset(phy_id).await.context("error resetting")?;
+            match response {
+                Ok(_) => {
+                    println!("response: OK");
+                }
+                Err(status) => {
+                    println!("response: Failed {:?}", zx_status::Status::from_raw(status));
+                }
+            }
+        }
+        opts::PhyCmd::GetPowerState { phy_id } => {
+            let result =
+                monitor_proxy.get_power_state(phy_id).await.context("error getting power state")?;
+            match result {
+                Ok(power_state) => match power_state {
+                    true => println!("Powered ON"),
+                    false => println!("Powered OFF"),
+                },
+                Err(status) => {
+                    println!("response: Failed {:?}", zx_status::Status::from_raw(status));
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -926,6 +972,88 @@ mod tests {
                 responder.send(zx_status::Status::OK.into_raw()).expect("failed to send response");
             }
         );
+    }
+
+    #[fuchsia::test]
+    fn test_power_down() {
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
+        let fut = do_phy(PhyCmd::PowerDown { phy_id: 45 }, monitor_svc_local);
+        let mut fut = pin!(fut);
+
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut monitor_svc_stream.next()),
+            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::PowerDown {
+                phy_id, responder,
+            }))) => {
+                assert_eq!(phy_id, 45);
+                responder.send(Err(zx_status::Status::OK.into_raw())).expect("failed to send response");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_power_up() {
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
+        let fut = do_phy(PhyCmd::PowerUp { phy_id: 45 }, monitor_svc_local);
+        let mut fut = pin!(fut);
+
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut monitor_svc_stream.next()),
+            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::PowerUp {
+                phy_id, responder,
+            }))) => {
+                assert_eq!(phy_id, 45);
+                responder.send(Err(zx_status::Status::OK.into_raw())).expect("failed to send response");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_reset() {
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
+        let fut = do_phy(PhyCmd::Reset { phy_id: 45 }, monitor_svc_local);
+        let mut fut = pin!(fut);
+
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut monitor_svc_stream.next()),
+            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::Reset {
+                phy_id, responder,
+            }))) => {
+                assert_eq!(phy_id, 45);
+                responder.send(Err(zx_status::Status::OK.into_raw())).expect("failed to send response");
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_get_power_state() {
+        let mut exec = fasync::TestExecutor::new();
+        let (monitor_svc_local, monitor_svc_remote) = create_proxy::<DeviceMonitorMarker>();
+        let mut monitor_svc_stream = monitor_svc_remote.into_stream();
+        let fut = do_phy(PhyCmd::GetPowerState { phy_id: 45 }, monitor_svc_local);
+        let mut fut = pin!(fut);
+
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut monitor_svc_stream.next()),
+            Poll::Ready(Some(Ok(wlan_service::DeviceMonitorRequest::GetPowerState {
+                phy_id, responder,
+            }))) => {
+                assert_eq!(phy_id, 45);
+                responder.send(Ok(true)).expect("failed to send response");
+            }
+        );
+
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
