@@ -58,7 +58,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         let inner = Rc::downgrade(&inner);
         if let Some(context) = ffx_config::global_env_context() {
             // Probably could avoid creating the entire inner object but that refactoring can wait
-            if is_usb_discovery_disabled(&context).await {
+            if is_usb_discovery_disabled(&context) {
                 return Ok(());
             }
         }

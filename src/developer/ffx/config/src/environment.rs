@@ -89,12 +89,12 @@ impl Environment {
         Ok(checked)
     }
 
-    pub async fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<()> {
         let path = self.context.env_file_path()?;
 
         Self::save_env_file(path, &self.files)?;
 
-        crate::cache::invalidate(&self.context.cache).await;
+        crate::cache::invalidate(&self.context.cache);
 
         Ok(())
     }
@@ -281,7 +281,7 @@ impl Environment {
 
     /// Checks the config files at the requested level to make sure they exist and are configured
     /// properly.
-    pub async fn populate_defaults(&mut self, level: &ConfigLevel) -> Result<()> {
+    pub fn populate_defaults(&mut self, level: &ConfigLevel) -> Result<()> {
         match level {
             ConfigLevel::User => {
                 log::debug!("Populating user defaults");
@@ -399,7 +399,7 @@ mod test {
         std::fs::remove_file(&tmp_path).expect("Temporary env file wasn't available to remove");
 
         // Save the environment, then read the saved file and make sure it's correct.
-        env_load.save().await.unwrap();
+        env_load.save().unwrap();
         test_env.env_file.flush().unwrap();
 
         let env_file = fs::read(&tmp_path).unwrap();
@@ -409,7 +409,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn build_config_autoconfigure() {
+    fn build_config_autoconfigure() {
         let temp = tempfile::tempdir().expect("temporary build directory");
         let temp_dir = std::fs::canonicalize(temp.path()).expect("canonical temp path");
         let build_dir_path = temp_dir.join("build");
@@ -427,7 +427,6 @@ mod test {
         let mut env = context.load().expect("Should be able to load the environment");
 
         env.populate_defaults(&ConfigLevel::Build)
-            .await
             .expect("Setting build level environment to automatic path should work");
         drop(env);
         let config = context
@@ -440,7 +439,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn build_config_manual_configure() {
+    fn build_config_manual_configure() {
         let temp = tempfile::tempdir().expect("temporary build directory");
         let temp_dir = std::fs::canonicalize(temp.path()).expect("canonical temp path");
         let build_dir_path = temp_dir.join("build");
@@ -460,10 +459,9 @@ mod test {
         let mut config_map = std::collections::HashMap::new();
         config_map.insert(build_dir_path.clone(), build_dir_config.clone());
         env.files.build = Some(config_map);
-        env.save().await.expect("Should be able to save the configured environment");
+        env.save().expect("Should be able to save the configured environment");
 
         env.populate_defaults(&ConfigLevel::Build)
-            .await
             .expect("Setting build level environment to automatic path should work");
         drop(env);
 

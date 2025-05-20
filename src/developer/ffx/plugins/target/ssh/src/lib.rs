@@ -37,9 +37,8 @@ impl FfxMain for SshTool {
             .user_message("Failed to get target ssh address")?;
 
         let addr = get_addr(&addr_info)?;
-        let mut ssh_cmd = make_ssh_command(self.cmd, addr)
-            .await
-            .bug_context("Building command to ssh to target")?;
+        let mut ssh_cmd =
+            make_ssh_command(self.cmd, addr).bug_context("Building command to ssh to target")?;
 
         log::debug!("About to ssh with command: {:#?}", ssh_cmd);
         let mut ssh = ssh_cmd.spawn().user_message("Failed to run ssh command to target")?;
@@ -100,17 +99,16 @@ fn get_addr(addr_info: &TargetIpAddrInfo) -> fho::Result<TargetIpAddr> {
     )
 }
 
-async fn make_ssh_command(cmd: SshCommand, addr: TargetIpAddr) -> Result<Command> {
+fn make_ssh_command(cmd: SshCommand, addr: TargetIpAddr) -> Result<Command> {
     let addr = netext::ScopedSocketAddr::from_socket_addr(addr.into())?;
     let ssh_cmd = if let Some(config_file) = cmd.sshconfig {
         build_ssh_command_with_config_file(
             &PathBuf::from(config_file),
             addr,
             cmd.command.iter().map(|s| s.as_str()).collect(),
-        )
-        .await?
+        )?
     } else {
-        build_ssh_command(addr, cmd.command.iter().map(|s| s.as_str()).collect()).await?
+        build_ssh_command(addr, cmd.command.iter().map(|s| s.as_str()).collect())?
     };
 
     Ok(ssh_cmd)
@@ -140,7 +138,7 @@ mod test {
         test_env.context.query("ssh.priv").level(Some(ConfigLevel::User)).set(json!(&keys)).await?;
         let addr = TargetIpAddr::from_str("127.0.0.1:34522")?;
         let cmd = SshCommand { sshconfig: None, command: vec![] };
-        let ssh_cmd = make_ssh_command(cmd, addr).await?;
+        let ssh_cmd = make_ssh_command(cmd, addr)?;
         assert_eq!(ssh_cmd.get_program(), "ssh");
 
         // assert that the keys are added,
@@ -177,7 +175,7 @@ mod test {
             sshconfig: Some("/foo/bar/baz.conf".to_string()),
             command: vec!["echo".to_string(), "'foo'".to_string()],
         };
-        let ssh_cmd = make_ssh_command(cmd, addr).await?;
+        let ssh_cmd = make_ssh_command(cmd, addr)?;
         assert_eq!(ssh_cmd.get_program(), "ssh");
         assert_eq!(
             ssh_cmd.get_args().map(|a| a.to_str().unwrap()).collect::<Vec<&str>>(),

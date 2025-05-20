@@ -75,7 +75,7 @@ pub async fn get_default_repository() -> Result<Option<String>> {
 
 /// Sets the default repository from the config.
 pub async fn set_default_repository(repo_name: &str) -> Result<()> {
-    ffx_config::invalidate_global_cache().await; // Necessary when the daemon does some writes and the CLI does others
+    ffx_config::invalidate_global_cache(); // Necessary when the daemon does some writes and the CLI does others
     ffx_config::query(CONFIG_KEY_DEFAULT_REPOSITORY)
         .level(Some(ConfigLevel::User))
         .set(repo_name.into())

@@ -188,7 +188,7 @@ impl<T: FfxTool> FhoTool<T> {
 
 #[async_trait::async_trait(?Send)]
 impl<M: FfxTool> ToolSuite for FhoSuite<M> {
-    async fn from_env(context: &EnvironmentContext) -> Result<Self> {
+    fn from_env(context: &EnvironmentContext) -> Result<Self> {
         let context = context.clone();
         Ok(Self { context: context, _p: Default::default() })
     }

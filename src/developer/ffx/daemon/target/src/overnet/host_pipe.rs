@@ -131,7 +131,6 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder {
                 &ctx,
                 args,
             )
-            .await
             .map_err(|e| PipeError::Error(e.to_string()))?,
         );
 
@@ -260,7 +259,6 @@ impl HostPipeChild {
                 &ctx,
                 args,
             )
-            .await
             .map_err(|e| PipeError::Error(e.to_string()))?,
         );
 
@@ -1007,7 +1005,6 @@ mod test {
                 &env.context,
                 vec![],
             )
-            .await
             .unwrap(),
         );
         // Kind of a hack, but there's no non-debug method that returns a string corresponding to the command.

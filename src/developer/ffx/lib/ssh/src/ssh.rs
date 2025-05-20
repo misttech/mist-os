@@ -81,29 +81,27 @@ impl From<&str> for SshError {
 }
 
 #[cfg(not(test))]
-pub async fn get_ssh_key_paths() -> Result<Vec<String>> {
+pub fn get_ssh_key_paths() -> Result<Vec<String>> {
     use anyhow::Context;
     ffx_config::query(SSH_PRIV)
         .get_file()
-        .await
         .context("getting path to an ssh private key from ssh.priv")
 }
 
-pub async fn get_ssh_key_paths_from_env(env: &EnvironmentContext) -> Result<Vec<String>> {
+pub fn get_ssh_key_paths_from_env(env: &EnvironmentContext) -> Result<Vec<String>> {
     env.query(SSH_PRIV)
         .get_file()
-        .await
         .context("getting path to an ssh private key from ssh.priv from env context")
 }
 
 #[cfg(test)]
 const TEST_SSH_KEY_PATH: &str = "ssh/ssh_key_in_test";
 #[cfg(test)]
-async fn get_ssh_key_paths() -> Result<Vec<String>> {
+fn get_ssh_key_paths() -> Result<Vec<String>> {
     Ok(vec![TEST_SSH_KEY_PATH.to_string()])
 }
 
-async fn apply_auth_sock(cmd: &mut Command) {
+fn apply_auth_sock(cmd: &mut Command) {
     const SSH_AUTH_SOCK: &str = "ssh.auth-sock";
     if let Ok(path) = ffx_config::get::<String, _>(SSH_AUTH_SOCK) {
         log::debug!("SSH_AUTH_SOCK retrieved via config: {}", path);
@@ -114,16 +112,16 @@ async fn apply_auth_sock(cmd: &mut Command) {
     }
 }
 
-async fn build_ssh_command_with_ssh_path(
+fn build_ssh_command_with_ssh_path(
     ssh_path: &str,
     addr: ScopedSocketAddr,
     command: Vec<&str>,
 ) -> Result<Command> {
     let mut config = SshConfig::new()?;
-    build_ssh_command_with_ssh_config(ssh_path, addr, &mut config, command).await
+    build_ssh_command_with_ssh_config(ssh_path, addr, &mut config, command)
 }
 
-pub async fn build_ssh_command_with_env(
+pub fn build_ssh_command_with_env(
     ssh_path: &str,
     addr: ScopedSocketAddr,
     env: &EnvironmentContext,
@@ -131,20 +129,19 @@ pub async fn build_ssh_command_with_env(
 ) -> Result<Command> {
     let mut ssh_config = SshConfig::new()?;
     build_ssh_command_with_ssh_config_and_env(ssh_path, addr, &mut ssh_config, command, Some(env))
-        .await
 }
 
-pub async fn build_ssh_command_with_ssh_config(
+pub fn build_ssh_command_with_ssh_config(
     ssh_path: &str,
     addr: ScopedSocketAddr,
     config: &mut SshConfig,
     command: Vec<&str>,
 ) -> Result<Command> {
-    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, config, command, None).await
+    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, config, command, None)
 }
 
 /// Builds the ssh command using the specified ssh configuration and path to the ssh command.
-async fn build_ssh_command_with_ssh_config_and_env(
+fn build_ssh_command_with_ssh_config_and_env(
     ssh_path: &str,
     addr: ScopedSocketAddr,
     config: &mut SshConfig,
@@ -155,11 +152,8 @@ async fn build_ssh_command_with_ssh_config_and_env(
         return Err(anyhow!("missing SSH command"));
     }
 
-    let keys = if let Some(env) = env {
-        get_ssh_key_paths_from_env(env).await?
-    } else {
-        get_ssh_key_paths().await?
-    };
+    let keys =
+        if let Some(env) = env { get_ssh_key_paths_from_env(env)? } else { get_ssh_key_paths()? };
 
     if let Some(env) = env {
         if let Some(keepalive_timeout) = env.query(KEEPALIVE_TIMEOUT_CONFIG).get::<Option<u64>>()? {
@@ -168,7 +162,7 @@ async fn build_ssh_command_with_ssh_config_and_env(
     }
 
     let mut c = Command::new(ssh_path);
-    apply_auth_sock(&mut c).await;
+    apply_auth_sock(&mut c);
     c.args(["-F", "none"]);
     c.args(config.to_args());
 
@@ -198,20 +192,20 @@ async fn build_ssh_command_with_ssh_config_and_env(
 }
 
 /// Build the ssh command using the default ssh command and configuration.
-pub async fn build_ssh_command(addr: ScopedSocketAddr, command: Vec<&str>) -> Result<Command> {
-    build_ssh_command_with_ssh_path("ssh", addr, command).await
+pub fn build_ssh_command(addr: ScopedSocketAddr, command: Vec<&str>) -> Result<Command> {
+    build_ssh_command_with_ssh_path("ssh", addr, command)
 }
 
 /// Build the ssh command using a provided sshconfig file.
-pub async fn build_ssh_command_with_config_file(
+pub fn build_ssh_command_with_config_file(
     config_file: &PathBuf,
     addr: ScopedSocketAddr,
     command: Vec<&str>,
 ) -> Result<Command> {
-    let keys = get_ssh_key_paths().await?;
+    let keys = get_ssh_key_paths()?;
 
     let mut c = Command::new("ssh");
-    apply_auth_sock(&mut c).await;
+    apply_auth_sock(&mut c);
     c.arg("-F").arg(config_file);
 
     for k in keys {
@@ -248,7 +242,6 @@ mod test {
 
         let result =
             build_ssh_command(ScopedSocketAddr::from_socket_addr(addr).unwrap(), vec!["ls"])
-                .await
                 .unwrap();
         let actual_args: Vec<_> = result.get_args().map(|a| a.to_string_lossy()).collect();
         let mut expected_args: Vec<String> = vec!["-F".into(), "none".into()];
@@ -267,7 +260,6 @@ mod test {
         // This presumes the host device running the test is linux and has a `lo` loopback device.
         let result =
             build_ssh_command(ScopedSocketAddr::from_socket_addr(addr).unwrap(), vec!["ls"])
-                .await
                 .unwrap();
         let actual_args: Vec<_> = result.get_args().map(|a| a.to_string_lossy()).collect();
         let mut expected_args: Vec<String> = vec!["-F".into(), "none".into()];
@@ -301,7 +293,7 @@ mod test {
             .expect("setting auth sock config");
 
         let mut cmd = Command::new("env");
-        apply_auth_sock(&mut cmd).await;
+        apply_auth_sock(&mut cmd);
         let lines =
             cmd.output().unwrap().stdout.lines().filter_map(|res| res.ok()).collect::<Vec<_>>();
 
@@ -328,7 +320,6 @@ mod test {
             &mut config,
             vec!["ls"],
         )
-        .await
         .unwrap();
         let actual_args: Vec<_> =
             result.get_args().map(|a| a.to_string_lossy().to_string()).collect();

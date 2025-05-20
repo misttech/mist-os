@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs, SubCommands};
-use async_utils::async_once;
 use errors::ffx_error;
 use ffx_command::{
     analytics_command, return_bug, return_user_error, send_enhanced_analytics, CliArgsInfo, Error,
@@ -29,15 +28,14 @@ struct FfxSubCommand {
 /// The suite of commands FFX supports.
 struct FfxSuite {
     context: EnvironmentContext,
-    external_commands: async_once::Once<Result<ExternalSubToolSuite>>,
+    external_commands: std::cell::OnceCell<Result<ExternalSubToolSuite>>,
 }
 
 impl FfxSuite {
-    async fn get_external_commands(&self) -> &ExternalSubToolSuite {
+    fn get_external_commands(&self) -> &ExternalSubToolSuite {
         // unwrap() is okay because ExternalSubToolSuite::from_env() has no failure path
         self.external_commands
-            .get_or_init(ExternalSubToolSuite::from_env(&self.context))
-            .await
+            .get_or_init(|| ExternalSubToolSuite::from_env(&self.context))
             .as_ref()
             .unwrap()
     }
@@ -45,10 +43,10 @@ impl FfxSuite {
 
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for FfxSuite {
-    async fn from_env(env: &EnvironmentContext) -> Result<Self> {
+    fn from_env(env: &EnvironmentContext) -> Result<Self> {
         let context = env.clone();
 
-        Ok(Self { context, external_commands: async_once::Once::new() })
+        Ok(Self { context, external_commands: std::cell::OnceCell::new() })
     }
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
@@ -91,7 +89,7 @@ impl ToolSuite for FfxSuite {
             let mut seen: HashSet<&str> = HashSet::new();
             let mut info: ffx_command::CliArgsInfo = ffx_command::Ffx::get_args_info().into();
             let internal_info: ffx_command::CliArgsInfo = SubCommand::get_args_info().into();
-            let external_info = self.get_external_commands().await.get_args_info().await?;
+            let external_info = self.get_external_commands().get_args_info().await?;
 
             // filter out duplicate commands
             for sub in &internal_info.commands {
@@ -113,7 +111,7 @@ impl ToolSuite for FfxSuite {
     async fn command_list(&self) -> Vec<FfxToolInfo> {
         let builtin_commands = SubCommand::COMMANDS.iter().copied().map(FfxToolInfo::from);
 
-        let tools = self.get_external_commands().await;
+        let tools = self.get_external_commands();
         builtin_commands.chain(tools.command_list().await.into_iter()).collect()
     }
 
@@ -132,7 +130,7 @@ impl ToolSuite for FfxSuite {
                 Some(cli_info) => cli_info,
                 None => {
                     // If info is none, then it is an external command (or an unknown command)
-                    let external_info = self.get_external_commands().await.get_args_info().await?;
+                    let external_info = self.get_external_commands().get_args_info().await?;
                     info = find_info_from_cmd(&args, &external_info);
                     match info {
                         Some(cli_info) => cli_info,
@@ -181,7 +179,7 @@ impl ToolSuite for FfxSuite {
                     .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))?;
                 Ok(Some(Box::new(FfxSubCommand { cmd, context, app })))
             }
-            _ => self.get_external_commands().await.try_from_args(ffx_cmd).await,
+            _ => self.get_external_commands().try_from_args(ffx_cmd).await,
         }
     }
 }
@@ -292,7 +290,7 @@ mod test {
     #[fuchsia::test]
     async fn test_try_runner_from_name() {
         let env = ffx_config::test_init().await.expect("test env");
-        let suite = FfxSuite::from_env(&env.context).await.expect("ffx suite");
+        let suite = FfxSuite::from_env(&env.context).expect("ffx suite");
 
         let cmd = FfxCommandLine::new(None, &["ffx", "target", "list"]).expect("ffx cmdline");
         let runner = suite.try_runner_from_name(&cmd).await.expect("runner from name");

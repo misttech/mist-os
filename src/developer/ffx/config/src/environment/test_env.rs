@@ -127,7 +127,7 @@ impl TestEnv {
             env.set_build(&build_file_path)?;
         }
         env.set_global(Some(&global_file_path));
-        env.save().await.context("saving env file")?;
+        env.save().context("saving env file")?;
 
         Ok(test_env)
     }

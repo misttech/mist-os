@@ -70,7 +70,7 @@ impl<'a> ConfigQuery<'a> {
         }
     }
 
-    async fn get_env(&self) -> Result<Environment> {
+    fn get_env(&self) -> Result<Environment> {
         match self.ctx {
             Some(ctx) => ctx.load(),
             None => crate::global_env().context("No configured global environment"),
@@ -195,7 +195,7 @@ impl<'a> ConfigQuery<'a> {
     }
 
     /// Get a value with normal processing, but verifying that it's a file that exists.
-    pub async fn get_file<T>(&self) -> Result<T, ConfigError>
+    pub fn get_file<T>(&self) -> Result<T, ConfigError>
     where
         T: TryConvert + ValueStrategy,
     {
@@ -262,9 +262,9 @@ impl<'a> ConfigQuery<'a> {
     pub async fn set(&self, value: Value) -> Result<()> {
         log::debug!("Setting config value");
         let (key, level) = self.validate_write_query()?;
-        let mut env = self.get_env().await?;
+        let mut env = self.get_env()?;
         log::debug!("Config set got environment");
-        env.populate_defaults(&level).await?;
+        env.populate_defaults(&level)?;
         log::debug!("Config set defaults populated");
         let config = env.config_from_cache()?;
         log::debug!("Config set got value from cache");
@@ -280,7 +280,7 @@ impl<'a> ConfigQuery<'a> {
     /// Remove the value at the queried location.
     pub async fn remove(&self) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
-        let env = self.get_env().await?;
+        let env = self.get_env()?;
         let config = env.config_from_cache()?;
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
         write_guard.remove(key, level)?;
@@ -291,8 +291,8 @@ impl<'a> ConfigQuery<'a> {
     /// if necessary.
     pub async fn add(&self, value: Value) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
-        let mut env = self.get_env().await?;
-        env.populate_defaults(&level).await?;
+        let mut env = self.get_env()?;
+        env.populate_defaults(&level)?;
         let config = env.config_from_cache()?;
         let mut write_guard = config.write().map_err(|_| anyhow!("config write guard"))?;
         if let Some(mut current) = write_guard.get_in_level(key, level) {

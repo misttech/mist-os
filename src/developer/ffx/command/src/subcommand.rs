@@ -148,9 +148,9 @@ impl ExternalSubToolSuite {
 
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for ExternalSubToolSuite {
-    async fn from_env(env: &EnvironmentContext) -> Result<Self> {
+    fn from_env(env: &EnvironmentContext) -> Result<Self> {
         let subtool_manifest: PathBuf =
-            env.query(FFX_SUBTOOL_MANIFEST_CONFIG).get_file().await.unwrap_or_default();
+            env.query(FFX_SUBTOOL_MANIFEST_CONFIG).get_file().unwrap_or_default();
 
         // If the subtool manifest is configured, it use it to load the information for
         // external subtools. Otherwise scan the directories. The manifest file is used when
@@ -163,7 +163,6 @@ impl ToolSuite for ExternalSubToolSuite {
                 .query(FFX_SUBTOOL_PATHS_CONFIG)
                 .select(SelectMode::All)
                 .get_file()
-                .await
                 .unwrap_or_else(|_| vec![]);
             log::info!("Initializing ExternalSubToolSuite from {subtool_config:?}");
             Ok(Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config)))

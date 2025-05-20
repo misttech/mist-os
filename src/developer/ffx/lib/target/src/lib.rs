@@ -218,8 +218,7 @@ pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
     // with client-side discovery. (Currently re-enabled, but I want to validate the flake before resolving
     // this bug -slgrady 8/7/24)
     // true
-    !ffx_config::is_usb_discovery_disabled(ctx).await
-        || !ffx_config::is_mdns_discovery_disabled(ctx).await
+    !ffx_config::is_usb_discovery_disabled(ctx) || !ffx_config::is_mdns_discovery_disabled(ctx)
 }
 
 #[derive(Debug, Error)]
@@ -281,7 +280,6 @@ async fn wait_for_device_inner(
     behavior: WaitFor,
 ) -> Result<(), ffx_command_error::Error> {
     let target_spec_clone = target_spec.clone();
-    let env = env.clone();
     let knock_fut = async {
         loop {
             futures_lite::future::yield_now().await;

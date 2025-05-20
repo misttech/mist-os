@@ -161,7 +161,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     };
     ffx_config::logging::init(&context, app.verbose, &log_dest)?;
 
-    let tools = T::from_env(&context).await?;
+    let tools = T::from_env(&context)?;
 
     if return_args_info {
         // This handles the top level ffx command information and prints the information

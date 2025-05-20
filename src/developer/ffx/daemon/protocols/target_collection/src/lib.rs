@@ -570,7 +570,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                         // For backwards compatibility.
                         // Immediately mark the target as used then run the host pipe.
                         let autoconnect = if let Some(ctx) = ffx_config::global_env_context() {
-                            !ffx_config::is_mdns_autoconnect_disabled(&ctx).await
+                            !ffx_config::is_mdns_autoconnect_disabled(&ctx)
                         } else {
                             true
                         };

@@ -48,8 +48,8 @@ pub async fn maybe_locally_resolve_target_spec(
         Ok(target_spec)
     } else {
         log::warn!("crate::is_discovery_enabled is false - using local target resolution. is_usb_discovery_disabled is {}, is_mdns_discovery_disabled is {}",
-        ffx_config::is_usb_discovery_disabled(env_context).await,
-        ffx_config::is_mdns_discovery_disabled(env_context).await);
+        ffx_config::is_usb_discovery_disabled(env_context),
+        ffx_config::is_mdns_discovery_disabled(env_context));
 
         locally_resolve_target_spec(target_spec, &QueryResolver::default(), env_context).await
     }

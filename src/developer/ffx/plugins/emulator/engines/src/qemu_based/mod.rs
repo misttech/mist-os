@@ -125,7 +125,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         let mut instance_root: PathBuf = env
             .query(config::EMU_INSTANCE_ROOT_DIR)
             .get_file()
-            .await
             .map_err(|e| bug!("Error reading config for instance root: {e}"))?;
         // This should really just be part of the conversion, but the structure of the config file
         // makes it awkward to do. The `file_check` function doesn't allow for returning an error,

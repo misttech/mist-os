@@ -211,9 +211,12 @@ async fn start_fdomain_ssh_command(
     let args = vec!["fdomain_runner"];
     // Use ssh from the environment.
     let ssh_path = "ssh";
-    let mut ssh = tokio::process::Command::from(
-        build_ssh_command_with_env(ssh_path, target, env_context, args).await?,
-    );
+    let mut ssh = tokio::process::Command::from(build_ssh_command_with_env(
+        ssh_path,
+        target,
+        env_context,
+        args,
+    )?);
     log::debug!("SshConnector starting start_fdomain_ssh invoking:  {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
     Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
@@ -240,9 +243,12 @@ async fn start_overnet_ssh_command(
     ];
     // Use ssh from the environment.
     let ssh_path = "ssh";
-    let mut ssh = tokio::process::Command::from(
-        build_ssh_command_with_env(ssh_path, target, env_context, args).await?,
-    );
+    let mut ssh = tokio::process::Command::from(build_ssh_command_with_env(
+        ssh_path,
+        target,
+        env_context,
+        args,
+    )?);
     log::debug!("SshConnector starting overnet invoking: {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
     Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
