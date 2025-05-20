@@ -115,9 +115,16 @@ if (toolchain_environment == "kernel.phys") {
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
+      "//zircon/kernel/phys:address-space",
       "//zircon/kernel/phys:allocation",
+      "//zircon/kernel/phys:allocation-init",
       "//zircon/kernel/phys:boot-options",
+      "//zircon/kernel/phys:boot-zbi",
+      "//zircon/kernel/phys:main",
+      "//zircon/kernel/phys:new",
       "//zircon/kernel/phys:stdio",
+      "//zircon/kernel/phys:symbolize",
+      "//zircon/kernel/phys:uart",
       "//zircon/kernel/phys:zbitl-allocation",
       "//zircon/kernel/phys:zbitl-allocation",
       "//zircon/kernel/phys/lib/boot-shim",
@@ -128,10 +135,6 @@ if (toolchain_environment == "kernel.phys") {
     deps = [
       "//zircon/kernel/arch/$current_cpu/phys:linuxboot",
       "//zircon/kernel/lib/arch",
-      "//zircon/kernel/phys:address-space",
-      "//zircon/kernel/phys:allocation-init",
-      "//zircon/kernel/phys:main",
-      "//zircon/kernel/phys:uart",
       "//zircon/system/ulib/uart",
     ]
   }
