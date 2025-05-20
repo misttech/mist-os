@@ -31,9 +31,9 @@ use netstack3_ip::device::{
     DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressData, IpAddressEntry,
     IpAddressFlags, IpAddressState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent,
     IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
-    IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4DadSentProbeData,
+    IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4DadSendData,
     Ipv4DeviceConfiguration, Ipv4DeviceTimerId, Ipv6AddrConfig, Ipv6AddrSlaacConfig,
-    Ipv6DadAddressContext, Ipv6DadSentProbeData, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
+    Ipv6DadAddressContext, Ipv6DadSendData, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
     Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
     Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
     SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfigAndState, SlaacContext,
@@ -868,7 +868,7 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        Ipv4DadSentProbeData { target_ip }: Ipv4DadSentProbeData,
+        data: Ipv4DadSendData,
     ) {
         // NB: Safe to `unwrap` here because DAD is disabled for IPv4 addresses
         // on devices that don't support ARP. See the implementation of
@@ -881,20 +881,17 @@ impl<
         //   A host probes to see if an address is already in use by broadcasting
         //   an ARP Request for the desired address.  The client MUST fill in the
         //  'sender hardware address' field of the ARP Request with the hardware
-        //   address of the interface through which it is sending the packet.  The
-        //   'sender IP address' field MUST be set to all zeroes; this is to avoid
-        //   polluting ARP caches in other hosts on the same link in the case
-        //   where the address turns out to be already in use by another host.
+        //   address of the interface through which it is sending the packet.
+        //   [...]
         //   The 'target hardware address' field is ignored and SHOULD be set to
-        //   all zeroes.  The 'target IP address' field MUST be set to the address
-        //   being probed.  An ARP Request constructed this way, with an all-zero
-        //   'sender IP address', is referred to as an 'ARP Probe'.
+        //   all zeroes.
         //
         // Setting the `target_link_addr` to `None` causes `send_arp_request` to
         // 1) broadcast the request, and 2) set the target hardware address to
         // all 0s.
-        let sender_ip = Ipv4::UNSPECIFIED_ADDRESS;
         let target_link_addr = None;
+
+        let (sender_ip, target_ip) = data.into_sender_and_target_addr();
 
         let Self { config: _, core_ctx } = self;
         netstack3_device::send_arp_request(
@@ -980,7 +977,7 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        Ipv6DadSentProbeData { dst_ip, message, nonce }: Ipv6DadSentProbeData,
+        Ipv6DadSendData { dst_ip, message, nonce }: Ipv6DadSendData,
     ) {
         // Do not include the source link-layer option when the NS
         // message as DAD messages are sent with the unspecified source

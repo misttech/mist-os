@@ -486,8 +486,6 @@ fn handle_packet<
     let target_addr = packet.target_protocol_address();
 
     let garp = sender_addr == target_addr;
-    // TODO(https://fxbug.dev/42077260): As specified in RFC 5227 section 2.5,
-    // respond to ARP requests for addresses in the "announcing" state.
     let targets_interface = match target_addr_state {
         IpAddressState::Assigned => true,
         IpAddressState::Tentative | IpAddressState::Unavailable => false,

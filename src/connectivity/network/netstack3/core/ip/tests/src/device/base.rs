@@ -38,7 +38,7 @@ use netstack3_ip::device::{
     Ipv6DeviceContext, Ipv6DeviceHandler, Ipv6DeviceTimerId, Ipv6NetworkLearnedParameters,
     Lifetime, PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
     StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
-    UpdateIpConfigurationError,
+    UpdateIpConfigurationError, IPV4_DAD_ANNOUNCE_NUM,
 };
 use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode, MldTimerId};
 use netstack3_ip::nud::{self, LinkResolutionResult};
@@ -806,13 +806,15 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
             let (dev, buf) = assert_matches!(&frames[..], [frame] => frame);
             let dev = assert_matches!(dev, DispatchedFrame::Ethernet(device_id) => device_id);
             assert_eq!(WeakDeviceId::Ethernet(dev.clone()), device_id.downgrade());
-            let ArpPacketInfo { target_protocol_address, .. } =
+            let ArpPacketInfo { target_protocol_address, sender_protocol_address, .. } =
                 packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
                     buf,
                     packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
                 )
                 .expect("should successfully parse ARP packet");
             assert_eq!(target_protocol_address, ipv4_addr_subnet.addr().get());
+            // Note: IPv4 ARP Probes have the sender protocol address set to all 0s.
+            assert_eq!(sender_protocol_address, Ipv4::UNSPECIFIED_ADDRESS);
         });
         ctx.bindings_ctx
             .timer_ctx()
@@ -822,7 +824,7 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
 
     // Trigger the DadTimer and verify the address became assigned.
     let (mut core_ctx, bindings_ctx) = ctx.contexts();
-    assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id));
+    assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(expected_timer_id.clone()));
     assert_eq!(
         ctx.bindings_ctx.take_events()[..],
         [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
@@ -831,6 +833,40 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
             state: IpAddressState::Assigned,
         })]
     );
+
+    // Finally, verify ARP announcements are sent.
+    for i in 0..IPV4_DAD_ANNOUNCE_NUM.get() {
+        ctx.bindings_ctx.with_fake_frame_ctx_mut(|ctx| {
+            let frames = ctx.take_frames();
+            let (dev, buf) = assert_matches!(&frames[..], [frame] => frame);
+            let dev = assert_matches!(dev, DispatchedFrame::Ethernet(device_id) => device_id);
+            assert_eq!(WeakDeviceId::Ethernet(dev.clone()), device_id.downgrade());
+            let ArpPacketInfo { target_protocol_address, sender_protocol_address, .. } =
+                packet_formats::testutil::parse_arp_packet_in_ethernet_frame(
+                    buf,
+                    packet_formats::ethernet::EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("should successfully parse ARP packet");
+            assert_eq!(target_protocol_address, ipv4_addr_subnet.addr().get());
+            // Note: IPv4 ARP Announcements have the sender protocol address set to
+            // the address being announced.
+            assert_eq!(sender_protocol_address, ipv4_addr_subnet.addr().get());
+        });
+        if i == IPV4_DAD_ANNOUNCE_NUM.get() - 1 {
+            // The last announcement shouldn't have scheduled a timer.
+            ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        } else {
+            // Otherwise, trigger the next timer to drive the next announcement.
+            let (mut core_ctx, bindings_ctx) = ctx.contexts();
+            assert_eq!(
+                bindings_ctx.trigger_next_timer(&mut core_ctx),
+                Some(expected_timer_id.clone())
+            );
+        }
+    }
+
+    // We shouldn't have sent any more events when exiting Announcing.
+    assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
     // Disable device and take all events to cleanup references.
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
