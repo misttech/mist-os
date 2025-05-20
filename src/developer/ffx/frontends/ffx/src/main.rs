@@ -279,7 +279,24 @@ async fn main() {
         Ok(cli) => cli.global.machine.is_some(),
         Err(_e) => true,
     };
+    show_mac_deprecation_warning(should_format);
     ffx_command::exit(result, should_format).await
+}
+
+fn show_mac_deprecation_warning(is_machine: bool) {
+    if let Some(msg) = get_mac_deprecation_warning(is_machine) {
+        println!("{}", msg);
+    }
+}
+
+fn get_mac_deprecation_warning(is_machine: bool) -> Option<&'static str> {
+    // Only return the deprecation warning if we  are running on macOS and the user
+    // did not pass --machine JSON.
+    if !is_machine && cfg!(target_os = "macos") {
+        Some("[WARNING] This tool is deprecated for macOS per go/fuchsia-on-mac and will no longer run on [2025/07/01]: b/418852451")
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -361,5 +378,23 @@ mod test {
         };
         let actual = find_info_from_cmd(&args, &some_info);
         assert!(actual.is_some());
+    }
+
+    #[fuchsia::test]
+    #[cfg(target_os = "macos")]
+    fn test_get_mac_deprecation_warning_macos() {
+        // Return Some if not --machine JSON
+        assert!(get_mac_deprecation_warning(false).is_some(),);
+
+        // Return None if --machine JSON
+        assert!(get_mac_deprecation_warning(true).is_none());
+    }
+
+    #[fuchsia::test]
+    #[cfg(target_os = "linux")]
+    fn test_get_mac_deprecation_warning_linux() {
+        // Should never show the warning on linux
+        assert!(get_mac_deprecation_warning(true).is_none());
+        assert!(get_mac_deprecation_warning(false).is_none());
     }
 }
