@@ -11,6 +11,7 @@
 #define FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
 #include <zircon/syscalls-next.h>
 #undef FUCHSIA_UNSUPPORTED_ALLOW_SYSCALLS_NEXT_ON_HOST
+#include <lib/stdcompat/utility.h>
 #include <zircon/types.h>
 
 #include <algorithm>
