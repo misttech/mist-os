@@ -345,9 +345,9 @@ class VmPageOrMarker {
  private:
   explicit VmPageOrMarker(uint32_t raw) : raw_(raw) {}
 
-  // The low 2 bits of raw_ are reserved to select the type, any other data has to fit into the
-  // remaining high bits. Note that there is no explicit Empty type, rather a PageType with a zero
-  // pointer is used to represent Empty.
+  // The low 3 bits of raw_ are reserved to represent the type, any other data has to fit into
+  // the remaining high bits. Note that there is no explicit Empty type, rather a PageType with a
+  // zero pointer is used to represent Empty.
   static constexpr uint32_t kTypeBits = 3;
   static constexpr uint32_t kPageType = 0b000;
   static constexpr uint32_t kZeroMarkerType = 0b001;
