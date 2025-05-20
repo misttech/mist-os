@@ -127,7 +127,7 @@ impl ExecutionScope {
     pub fn force_shutdown(&self) {
         let mut inner = self.executor.inner.lock();
         inner.shutdown_state = ShutdownState::ForceShutdown;
-        self.executor.scope().wake_all();
+        self.executor.scope().wake_all_with_active_guard();
     }
 
     /// Restores the executor so that it is no longer in the shut-down state.  Any tasks
@@ -248,7 +248,7 @@ impl Executor {
         };
         if wake_all {
             if let Some(scope) = self.scope.get() {
-                scope.wake_all();
+                scope.wake_all_with_active_guard();
             }
         }
     }
@@ -276,7 +276,7 @@ impl Drop for ActiveGuard {
             inner.active_count == 0 && inner.shutdown_state == ShutdownState::Shutdown
         };
         if wake_all {
-            self.0.scope().wake_all();
+            self.0.scope().wake_all_with_active_guard();
         }
     }
 }

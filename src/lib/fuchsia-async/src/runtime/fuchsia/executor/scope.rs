@@ -11,7 +11,7 @@ use fuchsia_sync::Mutex;
 use futures::Stream;
 use pin_project_lite::pin_project;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use state::{JoinResult, ScopeState, ScopeWaker, Status};
+use state::{JoinResult, ScopeState, ScopeWaker, Status, WakeVec};
 use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
@@ -544,9 +544,24 @@ impl ScopeHandle {
             .await;
     }
 
+    /// Wait for there to be no tasks and no guards. This is racy: as soon as this returns it is
+    /// possible for another task to have been spawned on this scope, or for there to be guards.
+    pub async fn on_no_tasks_and_guards(&self) {
+        self.inner
+            .state
+            .when(|state| {
+                if state.has_tasks() || state.guards() > 0 {
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            })
+            .await;
+    }
+
     /// Wake all the scope's tasks so their futures will be polled again.
-    pub fn wake_all(&self) {
-        self.lock().wake_all();
+    pub fn wake_all_with_active_guard(&self) {
+        self.lock().wake_all_with_active_guard();
     }
 
     /// Creates a new task associated with this scope.  This does not spawn it on the executor.
@@ -767,7 +782,7 @@ impl Drop for ScopeActiveGuard {
 
 impl Clone for ScopeActiveGuard {
     fn clone(&self) -> Self {
-        self.0.lock().acquire_cancel_guard();
+        self.0.lock().acquire_cancel_guard(1);
         Self(self.0.clone())
     }
 }
@@ -980,10 +995,14 @@ mod state {
             self.subscopes_with_tasks > 0
         }
 
-        pub fn wake_all(&self) {
+        pub fn wake_all_with_active_guard(&mut self) {
+            let mut count = 0;
             for task in &self.all_tasks {
-                task.wake();
+                if task.wake_with_active_guard() {
+                    count += 1;
+                }
             }
+            self.acquire_cancel_guard(count);
         }
 
         pub fn abort_tasks_and_mark_finished(&mut self) {
@@ -1059,30 +1078,41 @@ mod state {
         pub fn acquire_cancel_guard_if_not_finished(&mut self) -> bool {
             match self.status {
                 Status::Active | Status::PendingCancellation => {
-                    self.acquire_cancel_guard();
+                    self.acquire_cancel_guard(1);
                     true
                 }
                 Status::Finished => false,
             }
         }
 
-        pub fn acquire_cancel_guard(&mut self) {
+        pub fn acquire_cancel_guard(&mut self, count: u32) {
+            if count == 0 {
+                return;
+            }
             if self.guards == 0 {
                 if let Some(parent) = self.parent.as_ref() {
                     parent.acquire_cancel_guard();
                 }
             }
-            self.guards += 1;
+            self.guards += count;
         }
 
-        pub fn release_cancel_guard(&mut self) {
-            self.guards = self.guards.checked_sub(1).expect("released non-acquired guard");
-            if self.guards == 0 {
-                self.on_zero_guards();
+        pub fn release_cancel_guard(
+            this: &mut ConditionGuard<'_, Self>,
+            wake_vec: &mut WakeVec,
+            mut waker_count: usize,
+        ) {
+            this.guards = this.guards.checked_sub(1).expect("released non-acquired guard");
+            if this.guards == 0 {
+                waker_count += this.waker_count();
+                this.on_zero_guards(wake_vec, waker_count);
+                wake_vec.0.extend(this.drain_wakers())
+            } else {
+                wake_vec.0.reserve_exact(waker_count);
             }
         }
 
-        fn on_zero_guards(&mut self) {
+        fn on_zero_guards(&mut self, wake_vec: &mut WakeVec, waker_count: usize) {
             match self.status {
                 Status::Active => {}
                 Status::PendingCancellation => {
@@ -1093,13 +1123,13 @@ mod state {
                 Status::Finished => {}
             }
             if let Some(parent) = &self.parent {
-                parent.release_cancel_guard();
+                ScopeState::release_cancel_guard(&mut parent.lock(), wake_vec, waker_count);
             }
         }
     }
 
     #[derive(Default)]
-    struct WakeVec(Vec<Waker>);
+    pub struct WakeVec(Vec<Waker>);
 
     impl Drop for WakeVec {
         fn drop(&mut self) {
@@ -1192,9 +1222,10 @@ impl Drop for ScopeInner {
         let key = unsafe { &*(self as *const _ as *const PtrKey) };
         let state = self.state.lock();
         if let Some(parent) = &state.parent {
+            let mut wake_vec = WakeVec::default();
             let mut parent_state = parent.lock();
             if state.guards() != 0 {
-                parent_state.release_cancel_guard();
+                ScopeState::release_cancel_guard(&mut parent_state, &mut wake_vec, 0);
             }
             parent_state.remove_child(key);
         }
@@ -1342,11 +1373,12 @@ impl ScopeHandle {
     }
 
     fn acquire_cancel_guard(&self) {
-        self.lock().acquire_cancel_guard()
+        self.lock().acquire_cancel_guard(1)
     }
 
-    fn release_cancel_guard(&self) {
-        self.lock().release_cancel_guard()
+    pub(crate) fn release_cancel_guard(&self) {
+        let mut wake_vec = WakeVec::default();
+        ScopeState::release_cancel_guard(&mut self.lock(), &mut wake_vec, 0);
     }
 
     /// Cancels tasks in this scope and all child scopes.
@@ -1566,14 +1598,17 @@ impl<R: Send + 'static> Results for ResultsStream<R> {
 
 #[cfg(test)]
 mod tests {
+    // NOTE: Tests that work on both the fuchsia and portable runtimes should be placed in
+    // runtime/scope.rs.
+
     use super::*;
-    use crate::{EHandle, LocalExecutor, SendExecutor, SpawnableFuture, Task, TestExecutor, Timer};
-    use assert_matches::assert_matches;
+    use crate::{
+        yield_now, EHandle, LocalExecutor, SendExecutor, SpawnableFuture, Task, TestExecutor, Timer,
+    };
     use fuchsia_sync::{Condvar, Mutex};
     use futures::channel::mpsc;
-    use futures::future::join_all;
     use futures::{FutureExt, StreamExt};
-    use std::future::{pending, poll_fn};
+    use std::future::pending;
     use std::pin::{pin, Pin};
     use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use std::sync::Arc;
@@ -2135,57 +2170,58 @@ mod tests {
     }
 
     #[test]
-    fn on_no_tasks() {
-        let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
-        let _task1 = scope.spawn(std::future::ready(()));
-        let task2 = scope.spawn(pending::<()>());
+    fn wake_all_with_active_guard_on_send_executor() {
+        let mut executor = SendExecutor::new(2);
+        let scope = executor.root_scope().new_child();
 
-        let mut on_no_tasks = pin!(scope.on_no_tasks());
+        let (tx, mut rx) = mpsc::unbounded();
+        // Bottom 32 bits are the poll count. Top 32 bits are when to signal.
+        let state = Arc::new(AtomicU64::new(0));
 
-        assert!(executor.run_until_stalled(&mut on_no_tasks).is_pending());
-
-        drop(task2.abort());
-
-        let on_no_tasks2 = pin!(scope.on_no_tasks());
-        let on_no_tasks3 = pin!(scope.on_no_tasks());
-
-        assert_matches!(
-            executor.run_until_stalled(&mut join_all([on_no_tasks, on_no_tasks2, on_no_tasks3])),
-            Poll::Ready(_)
-        );
-    }
-
-    #[test]
-    fn wake_all() {
-        let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
-
-        let poll_count = Arc::new(AtomicU64::new(0));
-
-        struct PollCounter(Arc<AtomicU64>);
+        struct PollCounter(Arc<AtomicU64>, mpsc::UnboundedSender<()>);
 
         impl Future for PollCounter {
             type Output = ();
             fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
-                self.0.fetch_add(1, Ordering::Relaxed);
+                let old = self.0.fetch_add(1, Ordering::Relaxed);
+                if old >> 32 == (old + 1) & u32::MAX as u64 {
+                    let _ = self.1.unbounded_send(());
+                }
                 Poll::Pending
             }
         }
 
-        scope.spawn(PollCounter(poll_count.clone()));
-        scope.spawn(PollCounter(poll_count.clone()));
+        scope.spawn(PollCounter(state.clone(), tx.clone()));
+        scope.spawn(PollCounter(state.clone(), tx.clone()));
 
-        let _ = executor.run_until_stalled(&mut pending::<()>());
+        executor.run(async move {
+            let mut wait_for_poll_count = async |count| {
+                let old = state.fetch_or(count << 32, Ordering::Relaxed);
+                if old & u32::MAX as u64 != count {
+                    rx.next().await.unwrap();
+                }
+                state.fetch_and(u32::MAX as u64, Ordering::Relaxed);
+            };
 
-        let mut start_count = poll_count.load(Ordering::Relaxed);
+            // We must assume the executor will only poll the two tasks once each.
+            wait_for_poll_count(2).await;
 
-        for _ in 0..2 {
-            scope.wake_all();
-            let _ = executor.run_until_stalled(&mut pending::<()>());
-            assert_eq!(poll_count.load(Ordering::Relaxed), start_count + 2);
-            start_count += 2;
-        }
+            let mut start_count = 2;
+            for _ in 0..2 {
+                scope.wake_all_with_active_guard();
+
+                wait_for_poll_count(start_count + 2).await;
+                start_count += 2;
+            }
+
+            // Wake, then cancel the scope and verify the tasks still get polled.
+            scope.wake_all_with_active_guard();
+            let done = scope.cancel();
+
+            wait_for_poll_count(start_count + 2).await;
+
+            done.await;
+        });
     }
 
     #[test]
@@ -2209,20 +2245,6 @@ mod tests {
         }
     }
 
-    async fn yield_to_executor() {
-        let mut done = false;
-        poll_fn(|cx| {
-            if done {
-                Poll::Ready(())
-            } else {
-                done = true;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        })
-        .await;
-    }
-
     #[test]
     fn test_detach() {
         let mut e = LocalExecutor::new();
@@ -2233,7 +2255,7 @@ mod tests {
                 let counter = counter.clone();
                 Task::spawn(async move {
                     for _ in 0..5 {
-                        yield_to_executor().await;
+                        yield_now().await;
                         counter.fetch_add(1, Ordering::Relaxed);
                     }
                 })
@@ -2241,7 +2263,7 @@ mod tests {
             }
 
             while counter.load(Ordering::Relaxed) != 5 {
-                yield_to_executor().await;
+                yield_now().await;
             }
         });
 
@@ -2263,7 +2285,7 @@ mod tests {
             }
 
             while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
+                yield_now().await;
             }
 
             // Now try explicitly cancelling.
@@ -2277,7 +2299,7 @@ mod tests {
 
             assert_eq!(task.abort().await, None);
             while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
+                yield_now().await;
             }
 
             // Now cancel a task that has already finished.
@@ -2290,7 +2312,7 @@ mod tests {
 
             // Wait for it to finish.
             while Arc::strong_count(&ref_count) != 1 {
-                yield_to_executor().await;
+                yield_now().await;
             }
 
             assert_eq!(task.abort().await, Some(()));
@@ -2559,18 +2581,6 @@ mod tests {
             scope.join().await;
             cancel.await;
         })
-    }
-
-    #[test]
-    fn active_guard_holds_cancellation() {
-        let mut executor = TestExecutor::new();
-        let scope = executor.global_scope().new_child();
-        let guard = scope.active_guard().expect("acquire guard");
-        scope.spawn(futures::future::pending());
-        let mut join = pin!(scope.cancel());
-        assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
-        drop(guard);
-        assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
     }
 
     #[test]

@@ -116,6 +116,7 @@ rustc_library("fuchsia-async") {
     "src/lib.rs",
     "src/net/mod.rs",
     "src/runtime/mod.rs",
+    "src/runtime/scope.rs",
     "src/runtime/task_group.rs",
     "src/test_support.rs",
   ]
@@ -157,12 +158,12 @@ rustc_library("fuchsia-async") {
   edition = "2021"
   proc_macro_deps = [ "//src/lib/fuchsia-async-macro" ]
   test_deps = []
-  test_deps += [ "//third_party/rust_crates:futures-test" ]
+  test_deps += [
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures-test",
+  ]
   if (is_fuchsia) {
-    test_deps += [
-      "//third_party/rust_crates:assert_matches",
-      "//third_party/rust_crates:rand",
-    ]
+    test_deps += [ "//third_party/rust_crates:rand" ]
   } else {
     test_deps += []
   }

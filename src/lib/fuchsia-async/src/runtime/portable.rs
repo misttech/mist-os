@@ -9,6 +9,7 @@ pub mod task {
     use std::future::Future;
     use std::mem::ManuallyDrop;
     use std::pin::Pin;
+    pub use tokio::task::yield_now;
     use tokio::task::AbortHandle;
 
     use futures::FutureExt;

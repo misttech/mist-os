@@ -5,6 +5,7 @@
 use crate::scope::ScopeHandle;
 use crate::EHandle;
 use futures::prelude::*;
+use std::future::poll_fn;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::pin::Pin;
@@ -249,6 +250,21 @@ pub fn unblock<T: 'static + Send>(
         let _ = tx.send(f());
     });
     rx.map(|r| r.unwrap())
+}
+
+/// Yields execution back to the runtime.
+pub async fn yield_now() {
+    let mut done = false;
+    poll_fn(|cx| {
+        if done {
+            Poll::Ready(())
+        } else {
+            done = true;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await;
 }
 
 #[cfg(test)]

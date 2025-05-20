@@ -16,7 +16,7 @@ use self::portable as implementation;
 pub use implementation::executor::{
     LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, SpawnableFuture, TestExecutor,
 };
-pub use implementation::task::{unblock, JoinHandle, Task};
+pub use implementation::task::{unblock, yield_now, JoinHandle, Task};
 pub use implementation::timer::Timer;
 
 mod task_group;
@@ -32,12 +32,7 @@ pub use self::fuchsia::{
 /// Structured concurrency API for fuchsia-async.
 ///
 /// See the [`Scope`] documentation for details.
-pub mod scope {
-    pub use super::implementation::scope::{Scope, ScopeHandle};
-
-    #[cfg(target_os = "fuchsia")]
-    pub use super::implementation::scope::{Join, ScopeActiveGuard, ScopeStream, Spawnable};
-}
+pub mod scope;
 
 pub use scope::{Scope, ScopeHandle};
 
