@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::args::{Arg, RawArg, RawArgValue};
-use crate::fxt_builder::FxtBuilder;
+use crate::fxt_builder::{FxtBuilder, SerializeError};
 use crate::init::Ticks;
 use crate::session::ResolveCtx;
 use crate::string::{StringRef, STRING_REF_INLINE_BIT};
@@ -140,7 +140,7 @@ impl<'a> RawEventRecord<'a> {
         header
     }
 
-    pub fn serialize(&self) -> Result<Vec<u8>, String> {
+    pub fn serialize(&self) -> Result<Vec<u8>, SerializeError> {
         let mut event_record = FxtBuilder::new(self.make_header());
 
         event_record = event_record.atom(self.ticks.0.to_le_bytes());

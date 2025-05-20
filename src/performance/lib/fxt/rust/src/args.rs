@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::error::ParseWarning;
-use crate::fxt_builder::FxtBuilder;
+use crate::fxt_builder::{FxtBuilder, SerializeError};
 use crate::session::ResolveCtx;
 use crate::string::{StringRef, STRING_REF_INLINE_BIT};
 use crate::{trace_header, ParseError, ParseResult};
@@ -86,12 +86,12 @@ impl<'a> RawArg<'a> {
         }
     }
 
-    pub(crate) fn serialize(&self) -> Result<Vec<u8>, String> {
+    pub(crate) fn serialize(&self) -> Result<Vec<u8>, SerializeError> {
         let arg_name_ref = match self.name {
             StringRef::Index(id) => id.into(),
             StringRef::Inline(name) => name.len() as u16 | STRING_REF_INLINE_BIT,
             StringRef::Empty => {
-                return Err("Argument is missing a name.".to_string());
+                return Err(SerializeError::MissingArgName);
             }
         };
 
