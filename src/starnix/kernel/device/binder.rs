@@ -15,8 +15,8 @@ use crate::mm::{
 use crate::mutable_state::Guard;
 use crate::security;
 use crate::task::{
-    CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, WaitCanceler,
-    WaitQueue, Waiter,
+    CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, ThreadGroupKey,
+    WaitCanceler, WaitQueue, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use crate::vfs::{
@@ -141,7 +141,7 @@ impl DeviceOps for BinderDevice {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let identifier = self.create_local_process(current_task.get_pid());
+        let identifier = self.create_local_process(current_task.thread_group_key.clone());
         log_trace!("opened new BinderConnection id={}", identifier);
         Ok(Box::new(BinderConnection { identifier, device: self.clone() }))
     }
@@ -159,7 +159,7 @@ struct BinderConnection {
 impl BinderConnection {
     fn proc(&self, current_task: &CurrentTask) -> Result<OwnedRef<BinderProcess>, Errno> {
         let process = self.device.find_process(self.identifier)?;
-        if process.pid == current_task.get_pid() {
+        if process.key == current_task.thread_group_key.clone() {
             Ok(process)
         } else {
             process.release(current_task.kernel());
@@ -547,11 +547,10 @@ impl Releasable for ActiveTransaction {
 /// state is dropped, decrementing temporary strong references to binder objects.
 #[derive(Debug)]
 struct TransactionState {
-    kernel: Arc<Kernel>,
     /// The process whose handle table `handles` belong to.
     proc: WeakRef<BinderProcess>,
-    /// The pid of the target process.
-    pid: pid_t,
+    /// The target process.
+    key: ThreadGroupKey,
     /// The remote resource accessor of the target process. This is None when the receiving process
     /// is a local process.
     remote_resource_accessor: Option<Arc<RemoteResourceAccessor>>,
@@ -585,7 +584,7 @@ impl Releasable for TransactionState {
                     // Panicking would be wrong, in case the client issued an extra strong decrement.
                     log_warn!(
                         "Error when dropping transaction state for process {}: {:?}",
-                        proc.pid,
+                        proc.key.pid(),
                         error
                     );
                 }
@@ -596,20 +595,19 @@ impl Releasable for TransactionState {
 
         // Close the owned fd.
         if !self.owned_fds.is_empty() {
-            let weak_task = self.kernel.pids.read().get_task(self.pid);
-            if let Some(task) = weak_task.upgrade() {
+            if let Some(task) = get_task_for_thread_group(&self.key) {
                 let resource_accessor =
                     get_resource_accessor(task.deref(), &self.remote_resource_accessor);
                 for fd in &self.owned_fds {
                     if let Err(error) = resource_accessor.close_fd(*fd) {
                         log_warn!(
-                            "Error when dropping transaction state while closing fd for task {}: {:?}",
-                            self.pid,
-                            error
-                        );
+                                "Error when dropping transaction state while closing fd for task {}: {:?}",
+                                task.id,
+                                error
+                            )
                     }
                 }
-            };
+            }
         }
     }
 }
@@ -657,9 +655,8 @@ impl<'a> TransientTransactionState<'a> {
         TransientTransactionState {
             state: Some(
                 TransactionState {
-                    kernel: accessor.kernel().clone(),
                     proc: target_proc.weak_self.clone(),
-                    pid: target_proc.pid,
+                    key: target_proc.key.clone(),
                     remote_resource_accessor: target_proc.remote_resource_accessor.clone(),
                     guards: vec![],
                     handles: vec![],
@@ -728,7 +725,7 @@ struct BinderProcess {
     identifier: u64,
 
     /// The identifier of the process associated with this binder process.
-    pid: pid_t,
+    key: ThreadGroupKey,
 
     /// Resource accessor to access remote resource in case of a remote binder process. None in
     /// case of a local process.
@@ -760,14 +757,14 @@ impl BinderProcess {
     #[allow(clippy::let_and_return)]
     fn new(
         identifier: u64,
-        pid: pid_t,
+        key: ThreadGroupKey,
         remote_resource_accessor: Option<Arc<RemoteResourceAccessor>>,
     ) -> OwnedRef<Self> {
         log_trace!("new BinderProcess id={}", identifier);
         let result = OwnedRef::new_cyclic(|weak_self| Self {
             weak_self,
             identifier,
-            pid,
+            key,
             remote_resource_accessor,
             shared_memory: Default::default(),
             state: Default::default(),
@@ -1066,6 +1063,11 @@ impl BinderProcess {
         let size = memory.get_size();
         *shared_memory = Some(SharedMemory::map(&memory, mapped_address.into(), size as usize)?);
         Ok(())
+    }
+
+    /// Returns a task in the process
+    fn get_task(&self) -> Option<TempRef<'_, Task>> {
+        get_task_for_thread_group(&self.key)
     }
 }
 
@@ -3159,9 +3161,6 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
         flags: FdFlags,
     ) -> Result<FdNumber, Errno>;
 
-    // State related methods.
-    fn kernel(&self) -> &Arc<Kernel>;
-
     // Convenience method to allow passing a MemoryAccessor as a parameter.
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor;
 }
@@ -3183,7 +3182,6 @@ impl MemoryAccessorExt for dyn ResourceAccessor + '_ {}
 
 /// Implementation of `ResourceAccessor` for a remote client.
 struct RemoteResourceAccessor {
-    kernel: Arc<Kernel>,
     process: zx::Process,
     process_accessor: fbinder::ProcessAccessorSynchronousProxy,
 }
@@ -3377,10 +3375,6 @@ impl ResourceAccessor for RemoteResourceAccessor {
         error!(ENOENT)
     }
 
-    fn kernel(&self) -> &Arc<Kernel> {
-        &self.kernel
-    }
-
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
         self
     }
@@ -3412,10 +3406,6 @@ impl ResourceAccessor for CurrentTask {
         self.add_file(file, flags)
     }
 
-    fn kernel(&self) -> &Arc<Kernel> {
-        (self as &Task).kernel()
-    }
-
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
         self
     }
@@ -3445,10 +3435,6 @@ impl ResourceAccessor for Task {
     ) -> Result<FdNumber, Errno> {
         log_trace!("Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
-    }
-
-    fn kernel(&self) -> &Arc<Kernel> {
-        (self as &Task).kernel()
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -3511,47 +3497,51 @@ impl BinderDriver {
         self.procs
             .read()
             .iter()
-            .filter_map(|(_k, v)| if v.pid == pid { Some(OwnedRef::share(v)) } else { None })
+            .filter_map(|(_k, v)| if v.key.pid() == pid { Some(OwnedRef::share(v)) } else { None })
             .collect::<Vec<_>>()
     }
 
-    /// Creates and register the binder process state to represent a local process with `pid`.
-    fn create_local_process(&self, pid: pid_t) -> u64 {
-        self.create_process(pid, None)
+    /// Creates and register the binder process state to represent a local process with `key`.
+    fn create_local_process(&self, key: ThreadGroupKey) -> u64 {
+        self.create_process(key, None)
     }
 
-    /// Creates and register the binder process state to represent a remote process with `pid`.
-    fn create_remote_process(&self, pid: pid_t, resource_accessor: RemoteResourceAccessor) -> u64 {
-        self.create_process(pid, Some(Arc::new(resource_accessor)))
+    /// Creates and register the binder process state to represent a remote process with `key`.
+    fn create_remote_process(
+        &self,
+        key: ThreadGroupKey,
+        resource_accessor: RemoteResourceAccessor,
+    ) -> u64 {
+        self.create_process(key, Some(Arc::new(resource_accessor)))
     }
 
-    /// Creates and register the binder process state to represent a process with `pid`.
+    /// Creates and register the binder process state to represent a process with `key`.
     fn create_process(
         &self,
-        pid: pid_t,
+        key: ThreadGroupKey,
         resource_accessor: Option<Arc<RemoteResourceAccessor>>,
     ) -> u64 {
         let identifier = self.next_identifier.next();
-        let binder_process = BinderProcess::new(identifier, pid, resource_accessor);
+        let binder_process = BinderProcess::new(identifier, key, resource_accessor);
         assert!(
             self.procs.write().insert(identifier, binder_process).is_none(),
-            "process with same pid created"
+            "process with same identifier created"
         );
         identifier
     }
 
-    /// Creates the binder process and thread state to represent a process with `pid` and one main
+    /// Creates the binder process and thread state to represent a process with `key` and one main
     /// thread.
     #[cfg(test)]
     /// Return a `RemoteBinderConnection` that can be used to driver a remote connection to the
     /// binder device represented by this driver.
     fn create_process_and_thread(
         &self,
-        pid: pid_t,
+        key: ThreadGroupKey,
     ) -> (OwnedRef<BinderProcess>, OwnedRef<BinderThread>) {
-        let identifier = self.create_local_process(pid);
+        let identifier = self.create_local_process(key.clone());
         let binder_process = self.find_process(identifier).expect("find_process");
-        let binder_thread = binder_process.lock().find_or_register_thread(pid);
+        let binder_thread = binder_process.lock().find_or_register_thread(key.pid());
         (binder_process, binder_thread)
     }
 
@@ -3566,12 +3556,8 @@ impl BinderDriver {
         let process_accessor =
             fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
         let identifier = this.create_remote_process(
-            current_task.get_pid(),
-            RemoteResourceAccessor {
-                kernel: current_task.kernel().clone(),
-                process_accessor,
-                process,
-            },
+            current_task.thread_group_key.clone(),
+            RemoteResourceAccessor { process_accessor, process },
         );
         Arc::new(RemoteBinderConnection {
             binder_connection: BinderConnection { identifier, device: Arc::clone(this) },
@@ -4044,8 +4030,7 @@ impl BinderDriver {
                 if is_target_frozen && !oneway {
                     return Err(TransactionError::Frozen);
                 }
-                let weak_task = current_task.get_task(target_proc.pid);
-                let target_task = weak_task.upgrade().ok_or(TransactionError::Dead)?;
+                let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
                 let security_context: Option<FsString> =
                     if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
                         let mut security_context = FsString::from(
@@ -4072,7 +4057,7 @@ impl BinderDriver {
                 )?;
 
                 let transaction = TransactionData {
-                    peer_pid: binder_proc.pid,
+                    peer_pid: binder_proc.key.pid(),
                     peer_tid: binder_thread.tid,
                     peer_euid: current_task.creds().euid,
                     object: {
@@ -4136,7 +4121,7 @@ impl BinderDriver {
                         Some(TransactionRole::Receiver(rx, _)) => rx.upgrade(),
                         _ => None,
                     } {
-                        Some((proc, thread)) if proc.pid == target_proc.pid => Some(thread),
+                        Some((proc, thread)) if proc.key == target_proc.key => Some(thread),
                         _ => None,
                     };
 
@@ -4214,8 +4199,7 @@ impl BinderDriver {
         let (target_proc, target_thread, policy) =
             binder_thread.lock().pop_transaction_caller(current_task)?;
         if let Err(e) = release_after!(policy, current_task, || -> Result<(), TransactionError> {
-            let weak_task = current_task.get_task(target_proc.pid);
-            let target_task = weak_task.upgrade().ok_or(TransactionError::Dead)?;
+            let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
 
             // Copy the transaction data to the target process.
             let (buffers, transaction_state) = self.copy_transaction_buffers(
@@ -4242,7 +4226,7 @@ impl BinderDriver {
 
             // Schedule the transaction on the target process' command queue.
             target_thread.lock().enqueue_command(Command::Reply(TransactionData {
-                peer_pid: binder_proc.pid,
+                peer_pid: binder_proc.key.pid(),
                 peer_tid: binder_thread.tid,
                 peer_euid: current_task.creds().euid,
 
@@ -5257,6 +5241,14 @@ impl FsNodeOps for BinderFeaturesDir {
     }
 }
 
+/// Returns a task in the process keyed by `key`.
+fn get_task_for_thread_group(key: &ThreadGroupKey) -> Option<TempRef<'_, Task>> {
+    key.upgrade().and_then(|tg| {
+        let tg = tg.read();
+        tg.get_task(tg.leader()).or_else(|| tg.tasks().next()).map(TempRef::into_static)
+    })
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -5302,9 +5294,6 @@ pub mod tests {
         ) -> Result<FdNumber, Errno> {
             self.deref().add_file_with_flags(locked, current_task, file, flags)
         }
-        fn kernel(&self) -> &Arc<Kernel> {
-            &self.deref().kernel()
-        }
         fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
             self.deref().as_memory_accessor()
         }
@@ -5324,7 +5313,7 @@ pub mod tests {
             device: &BinderDevice,
         ) -> Self {
             let task = create_task(locked, current_task.kernel(), "task");
-            let (proc, thread) = device.create_process_and_thread(task.get_pid());
+            let (proc, thread) = device.create_process_and_thread(task.thread_group_key.clone());
 
             mmap_shared_memory(&device, &task, &proc);
             Self { device: Arc::downgrade(device), proc, thread, task }
@@ -6388,7 +6377,7 @@ pub mod tests {
                 transaction_data: binder_transaction_data {
                     code: 1,
                     flags: 0,
-                    sender_pid: sender.proc.pid,
+                    sender_pid: sender.proc.key.pid(),
                     sender_euid: 0,
                     target: binder_transaction_data__bindgen_ty_1 { handle: 0 },
                     cookie: 0,
@@ -7792,7 +7781,7 @@ pub mod tests {
             let binder_connection =
                 binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
             let binder_proc = binder_connection.proc(&current_task).unwrap();
-            let binder_thread = binder_proc.lock().find_or_register_thread(binder_proc.pid);
+            let binder_thread = binder_proc.lock().find_or_register_thread(binder_proc.key.pid());
 
             let thread = std::thread::spawn({
                 let task = current_task.weak_task();
@@ -9102,8 +9091,7 @@ pub mod tests {
             let process = fuchsia_runtime::process_self()
                 .duplicate(zx::Rights::SAME_RIGHTS)
                 .expect("process");
-            let remote_binder_task =
-                RemoteResourceAccessor { process_accessor, process, kernel: task.kernel().clone() };
+            let remote_binder_task = RemoteResourceAccessor { process_accessor, process };
             let mut vector = Vec::with_capacity(vector_size);
             for i in 0..vector_size {
                 vector.push((i & 255) as u8);
@@ -9267,7 +9255,11 @@ pub mod tests {
             let freeze_info_address = map_object_anywhere(
                 locked,
                 &current_task,
-                &binder_freeze_info { pid: receiver.proc.pid as u32, enable: 1, timeout_ms: 1000 },
+                &binder_freeze_info {
+                    pid: receiver.proc.key.pid() as u32,
+                    enable: 1,
+                    timeout_ms: 1000,
+                },
             );
             device
                 .ioctl(
@@ -9311,7 +9303,7 @@ pub mod tests {
                 locked,
                 &current_task,
                 &binder_frozen_status_info {
-                    pid: receiver.proc.pid as u32,
+                    pid: receiver.proc.key.pid() as u32,
                     sync_recv: 0,
                     async_recv: 0,
                 },

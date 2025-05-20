@@ -11,7 +11,8 @@ use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
     PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,
     PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue,
-    ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter, ZombieProcess,
+    ThreadGroup, ThreadGroupKey, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
+    ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
@@ -877,7 +878,7 @@ impl TaskStateCode {
 pub struct TaskPersistentInfoState {
     /// Immutable information about the task
     tid: pid_t,
-    pid: pid_t,
+    thread_group_key: ThreadGroupKey,
 
     /// The command of this task.
     command: CString,
@@ -892,12 +893,12 @@ pub struct TaskPersistentInfoState {
 impl TaskPersistentInfoState {
     fn new(
         tid: pid_t,
-        pid: pid_t,
+        thread_group_key: ThreadGroupKey,
         command: CString,
         creds: Credentials,
         exit_signal: Option<Signal>,
     ) -> TaskPersistentInfo {
-        Arc::new(Mutex::new(Self { tid, pid, command, creds, exit_signal }))
+        Arc::new(Mutex::new(Self { tid, thread_group_key, command, creds, exit_signal }))
     }
 
     pub fn tid(&self) -> pid_t {
@@ -905,7 +906,7 @@ impl TaskPersistentInfoState {
     }
 
     pub fn pid(&self) -> pid_t {
-        self.pid
+        self.thread_group_key.pid()
     }
 
     pub fn command(&self) -> &CString {
@@ -958,8 +959,8 @@ pub struct Task {
     /// of the `thread_group`.
     pub id: pid_t,
 
-    /// The process if of this task.
-    pub pid: pid_t,
+    /// The process key of this task.
+    pub thread_group_key: ThreadGroupKey,
 
     /// The kernel to which this thread group belongs.
     pub kernel: Arc<Kernel>,
@@ -1167,10 +1168,10 @@ impl Task {
         timerslack_ns: u64,
         security_state: security::TaskState,
     ) -> Self {
-        let pid = thread_group.leader;
+        let thread_group_key = ThreadGroupKey::from(&thread_group);
         let task = Task {
             id,
-            pid: thread_group.leader,
+            thread_group_key: thread_group_key.clone(),
             kernel: Arc::clone(&thread_group.kernel),
             thread_group: Some(thread_group),
             thread: RwLock::new(thread.map(Arc::new)),
@@ -1199,7 +1200,13 @@ impl Task {
                 ptrace: None,
                 captured_thread_state: None,
             }),
-            persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
+            persistent_info: TaskPersistentInfoState::new(
+                id,
+                thread_group_key,
+                command,
+                creds,
+                exit_signal,
+            ),
             seccomp_filter_state,
             trace_syscalls: AtomicBool::new(false),
             proc_pid_directory_cache: Mutex::new(None),
@@ -1338,7 +1345,7 @@ impl Task {
     }
 
     pub fn get_pid(&self) -> pid_t {
-        self.pid
+        self.thread_group_key.pid()
     }
 
     pub fn get_tid(&self) -> pid_t {
