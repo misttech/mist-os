@@ -17,7 +17,7 @@ fuchsia_board_input_bundle(
         "//src/devices/board/drivers/vim3-devicetree",
     ],
     power_manager_config = "//src/power/power-manager/node_config:base_node_config.json5",
-    release_version = build_info_version,
+    version = build_info_version,
 )
 
 fuchsia_board_input_bundle(
@@ -29,13 +29,13 @@ fuchsia_board_input_bundle(
         "//src/devices/usb/drivers/aml-usb-phy",
         "//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo",
     ],
-    release_version = build_info_version,
+    version = build_info_version,
 )
 
 fuchsia_board_input_bundle(
     name = "paver",
     bootfs_packages = ["//src/bringup/bin/paver:package-vim3"],
-    release_version = build_info_version,
+    version = build_info_version,
 )
 
 fuchsia_board_configuration(

@@ -131,3 +131,9 @@ common --enable_workspace=true
 # removed when the fuchsia.git and vendor/*.git repositories no
 # longer include rules from @fuchsia_sdk.
 common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
+
+# Set the release repository for assembly config artifacts to "fuchsia".
+# This is necessary so MOS knows where a given assembly artifact came from.
+common --@rules_fuchsia//fuchsia/flags:fuchsia_release_repository="fuchsia"
+
+
