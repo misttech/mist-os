@@ -4,11 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/boot-options/boot-options.h>
 #include <lib/boot-shim/devicetree-boot-shim.h>
-#include <lib/boot-shim/devicetree.h>
-#include <lib/boot-shim/pool-mem-config.h>
-#include <lib/boot-shim/uart.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbitl/view.h>
 #include <stdint.h>
@@ -35,16 +31,16 @@
 
 namespace {
 
+using Shim = Riscv64StandardBootShimItems::Shim<boot_shim::DevicetreeBootShim>;
+
 constexpr const char* kShimName = "linux-riscv64-boot-shim";
 
-struct BootHartIdGetter {
-  static uint64_t Get() {
-    ZX_DEBUG_ASSERT(gArchPhysInfo);
-    return gArchPhysInfo->boot_hart_id;
-  }
-};
-
 }  // namespace
+
+uint64_t BootHartIdGetter::Get() {
+  ZX_DEBUG_ASSERT(gArchPhysInfo);
+  return gArchPhysInfo->boot_hart_id;
+}
 
 void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   InitStdout();
@@ -62,12 +58,7 @@ void PhysMain(void* fdt, arch::EarlyTicks ticks) {
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
-  boot_shim::DevicetreeBootShim<
-      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::NvramItem,
-      boot_shim::DevicetreeSerialNumberItem, boot_shim::RiscvDevicetreePlicItem,
-      boot_shim::RiscvDevicetreeTimerItem,
-      boot_shim::RiscvDevicetreeCpuTopologyItem<BootHartIdGetter>, boot_shim::DevicetreeDtbItem>
-      shim(kShimName, gDevicetreeBoot.fdt);
+  Shim shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_allocator([](size_t size, size_t align, fbl::AllocChecker& ac) -> void* {
     return new (ktl::align_val_t{align}, gPhysNew<memalloc::Type::kPhysScratch>, ac) uint8_t[size];
   });

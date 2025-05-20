@@ -7,6 +7,11 @@
 #ifndef ZIRCON_KERNEL_PHYS_BOOT_SHIM_INCLUDE_PHYS_BOOT_SHIM_DEVICETREE_H_
 #define ZIRCON_KERNEL_PHYS_BOOT_SHIM_INCLUDE_PHYS_BOOT_SHIM_DEVICETREE_H_
 
+#include <lib/boot-options/boot-options.h>
+#include <lib/boot-shim/devicetree-boot-shim.h>
+#include <lib/boot-shim/devicetree.h>
+#include <lib/boot-shim/pool-mem-config.h>
+#include <lib/boot-shim/uart.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/memalloc/range.h>
 #include <lib/mmio-ptr/mmio-ptr.h>
@@ -15,6 +20,8 @@
 
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
+#include <phys/arch/arch-phys-info.h>
+#include <phys/main.h>
 
 // Bootstrapping data from the devicetree blob.
 struct DevicetreeBoot {
@@ -46,5 +53,32 @@ struct WatchdogMmioHelper {
 
 // Instance populated by InitMemory().
 extern DevicetreeBoot gDevicetreeBoot;
+
+using Arm64StandardBootShimItems =
+    boot_shim::StandardBootShimItems<boot_shim::UartItem<>,                               //
+                                     boot_shim::PoolMemConfigItem,                        //
+                                     boot_shim::NvramItem,                                //
+                                     boot_shim::DevicetreeSerialNumberItem,               //
+                                     boot_shim::ArmDevicetreePsciItem,                    //
+                                     boot_shim::ArmDevicetreeGicItem,                     //
+                                     boot_shim::DevicetreeDtbItem,                        //
+                                     boot_shim::GenericWatchdogItem<WatchdogMmioHelper>,  //
+                                     boot_shim::ArmDevicetreeCpuTopologyItem,             //
+                                     boot_shim::ArmDevicetreeTimerItem>;
+
+// Accessor obtaining the boot hart ID, RISCV only.
+struct BootHartIdGetter {
+  static uint64_t Get();
+};
+
+using Riscv64StandardBootShimItems = boot_shim::StandardBootShimItems<
+    boot_shim::UartItem<>,                                        //
+    boot_shim::PoolMemConfigItem,                                 //
+    boot_shim::NvramItem,                                         //
+    boot_shim::DevicetreeSerialNumberItem,                        //
+    boot_shim::RiscvDevicetreePlicItem,                           //
+    boot_shim::RiscvDevicetreeTimerItem,                          //
+    boot_shim::RiscvDevicetreeCpuTopologyItem<BootHartIdGetter>,  //
+    boot_shim::DevicetreeDtbItem>;
 
 #endif  // ZIRCON_KERNEL_PHYS_BOOT_SHIM_INCLUDE_PHYS_BOOT_SHIM_DEVICETREE_H_

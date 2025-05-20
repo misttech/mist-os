@@ -353,6 +353,64 @@ class BootShim : public BootShimBase {
   ItemsTuple items_;
 };
 
+// Helper struct used to generate a `BootShim` item with a set of `Items`.
+//
+// Use `Shim` helper alias to instiatiate `BootShim` templates.
+//
+// This helper struct provides internal helpers to allow adding or removing items
+// from this set.
+template <typename... Items>
+struct StandardBootShimItems {
+ private:
+  template <typename Item>
+  static constexpr bool kItemInPack = (std::is_same_v<Item, Items> || ...);
+
+ public:
+  using type = StandardBootShimItems;
+
+  // Instantiates the `ShimType` template with `Items` resulting in `ShimType<Items...>`.
+  template <template <typename...> typename ShimType>
+  using Shim = ShimType<Items...>;
+
+  // `Add` will generate a `struct` with a `type` member whose type is `StandardBootShim`
+  // instantiated with the the union of `Items` and `ExtraItems`.
+  //
+  // `ExtraItems` must not contain any item already present in `Items`, that is, they must
+  // not overlap.
+  template <typename... ExtraItems>
+    requires(sizeof...(ExtraItems) > 0 && (!kItemInPack<ExtraItems> && ...))
+  struct Add {
+    using type = StandardBootShimItems<Items..., ExtraItems...>;
+  };
+
+  // `Remove` will generate a `struct` with a `type` member whose type is `StandardBootShim`
+  // instantiated with the the difference of `Items` and `ExtraItems`, that is all the items in
+  // `Items` that are not preent in `RemoveItems`.
+  //
+  // Every item in `ExtraItems` must be present in `Items`, that is, `ExtraItems` is a subset of
+  // `Items`.
+  template <typename... RemoveItems>
+    requires(sizeof...(RemoveItems) > 0 && (kItemInPack<RemoveItems> && ...))
+  struct Remove {
+   private:
+    template <typename Item>
+    static constexpr bool kShouldFilterItem = (std::is_same_v<Item, RemoveItems> || ...);
+
+    template <typename... Args>
+    struct ShimType;
+
+    template <typename... Args>
+    struct ShimType<std::tuple<Args...>> {
+      using type = StandardBootShimItems<Args...>;
+    };
+
+   public:
+    using type = ShimType<decltype(std::tuple_cat(
+        std::declval<std::conditional_t<kShouldFilterItem<Items>, std::tuple<>,
+                                        std::tuple<Items>>>()...))>::type;
+  };
+};
+
 }  // namespace boot_shim
 
 #endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_BOOT_SHIM_H_
