@@ -16,7 +16,10 @@ rustc_library("binder_ndk_sys") {
   source_root = "third_party/binder_ndk_sys/lib.rs"
   sources = [ source_root ]
 
-  configs += [ "//src/lib/android:android_rust_config" ]
+  configs += [
+    "//build/config/rust:cap_lints_allow",
+    "//src/lib/android:android_rust_config",
+  ]
 
   deps = [ "//third_party/rust_crates:libc" ]
 
@@ -49,7 +52,10 @@ rustc_library("binder") {
     "//third_party/android/platform/frameworks/native/libs/binder/rust/src/system_only.rs",
   ]
 
-  configs += [ "//src/lib/android:android_rust_config" ]
+  configs += [
+    "//build/config/rust:cap_lints_allow",
+    "//src/lib/android:android_rust_config",
+  ]
 
   deps = [
     ":binder_ndk_sys",

@@ -351,7 +351,10 @@ template("rust_auxiliary") {
       # per-target, user-configurable, (opt-in?) basis. There are
       # rustdoc-specific lints that should be acted upon to improve doc quality
       # (https://doc.rust-lang.org/rustdoc/lints.html).
-      configs += [ "//build/config/rust:cap_lints_allow" ]
+      _allow_lint_cfg = [ "//build/config/rust:cap_lints_allow" ]
+      if (configs + _allow_lint_cfg - _allow_lint_cfg == configs) {
+        configs += _allow_lint_cfg
+      }
 
       if (!defined(quiet_rustdoc)) {
         quiet_rustdoc = false
