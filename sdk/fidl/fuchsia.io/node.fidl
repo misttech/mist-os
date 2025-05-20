@@ -239,7 +239,7 @@ type NodeAttributes2 = struct {
         6: id Id;
 
         /// Time of last change to the metadata in nanoseconds since the Unix epoch, UTC.
-        @available(added=HEAD)
+        @available(added=18)
         7: change_time uint64;
 
         /// Contains the verification options for verity-enabled files.

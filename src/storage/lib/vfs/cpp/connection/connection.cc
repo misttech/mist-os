@@ -174,7 +174,7 @@ zx::result<fio::wire::NodeAttributes2*> NodeAttributeBuilder::Build(
   if (query & fio::NodeAttributesQuery::kId && attributes->id) {
     immutable_builder.id(ExternalView(&*attributes->id));
   }
-#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(18)
   if (query & fio::NodeAttributesQuery::kChangeTime && attributes->change_time) {
     immutable_builder.change_time(ExternalView(&*attributes->change_time));
   }

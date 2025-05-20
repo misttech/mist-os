@@ -1364,6 +1364,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.io/ImmutableNodeAttributes.change_time",
+        "ordinal": "7",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.io/ImmutableNodeAttributes.content_size",
         "ordinal": "3",
         "type": "uint64"
