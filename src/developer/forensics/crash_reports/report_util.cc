@@ -197,7 +197,6 @@ void ExtractAnnotationsAndAttachments(fuchsia::feedback::CrashReport report,
     if (native_report.has_minidump()) {
       *minidump = std::move(*native_report.mutable_minidump());
     } else {
-      FX_LOGS(WARNING) << "no minidump to attach to crash report";
       // We don't want to overwrite the client-provided signature.
       if (!report.has_crash_signature()) {
         annotations->Set(kCrashSignatureKey, "fuchsia-no-minidump");
