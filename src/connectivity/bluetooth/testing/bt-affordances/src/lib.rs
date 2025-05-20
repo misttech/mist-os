@@ -54,7 +54,7 @@ pub unsafe extern "C" fn get_peer_id(address: *const core::ffi::c_char) -> u64 {
     match block_on(WORKER.get_peer_id(address)) {
         Ok(peer_id) => peer_id.value,
         Err(err) => {
-            eprintln!("connect_peer encountered error: {err}");
+            eprintln!("get_peer_id encountered error: {err}");
             0
         }
     }
