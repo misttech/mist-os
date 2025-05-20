@@ -72,7 +72,7 @@ impl WriteInspect for PeerId {
     }
 }
 
-/// A Bluetooth Host Adapter id. Uniquely identifiers a bluetooth Host on this system.
+/// A Bluetooth Host Adapter id. Uniquely identifies a bluetooth Host on this system.
 /// `HostId` can be converted to/from a FIDL Bluetooth HostId type.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct HostId(pub u64);

@@ -5,6 +5,7 @@
 #![cfg(test)]
 
 mod access;
+mod address_lookup;
 mod configuration;
 mod discovery;
 mod host_device;

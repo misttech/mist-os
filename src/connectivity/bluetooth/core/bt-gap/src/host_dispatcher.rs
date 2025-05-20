@@ -1167,6 +1167,10 @@ impl HostDispatcher {
 
         Ok(())
     }
+
+    pub fn get_peer_address(&self, peer_id: PeerId) -> Option<Address> {
+        self.state.read().peers.get(&peer_id).map(|p| p.address)
+    }
 }
 
 async fn init_host(path: &str, node: inspect::Node, proxy: HostProxy) -> Result<HostDevice, Error> {
