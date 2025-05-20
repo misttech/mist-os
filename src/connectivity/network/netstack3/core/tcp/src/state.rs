@@ -2358,6 +2358,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     buffer_sizes,
                                     ..
                                 }) => {
+                                    log::debug!("transition to state SynSent => Established");
                                     let Established {snd, rcv} = established;
                                     let (rcv_buffer, snd_buffer) =
                                         active_open.into_buffers(buffer_sizes);
@@ -2375,6 +2376,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             syn_ack,
                             mut syn_rcvd,
                         ) => {
+                            log::debug!("transition to state SynSent => SynRcvd");
                             replace_with(self, |this| {
                                 assert_matches!(this, State::SynSent(SynSent {
                                     active_open,
