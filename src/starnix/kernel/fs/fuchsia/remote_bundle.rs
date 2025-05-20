@@ -117,7 +117,7 @@ impl RemoteBundle {
             .get_node(node.node_id)
             .extended_attributes
             .get(&**name)
-            .ok_or_else(|| errno!(ENOENT))?[..];
+            .ok_or_else(|| errno!(ENODATA))?[..];
         Ok(FsString::from(value).into())
     }
 
