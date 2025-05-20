@@ -209,7 +209,9 @@ abi::Abi<> PopulateLdAbi() {
   uint32_t symbolizer_modid = 0;
   auto prev = gModuleStorage.begin();
   for (auto it = std::next(prev); it != gModuleStorage.end(); ++it) {
-    it->symbolizer_modid = symbolizer_modid++;
+    // The loop doesn't visit the first module (the application), which
+    // implicitly gets ID 0 (and nullptr in .prev) from default construction.
+    it->symbolizer_modid = ++symbolizer_modid;
     auto& prev_link_map = prev->link_map;
     auto& this_link_map = it->link_map;
     prev_link_map.next = &this_link_map;

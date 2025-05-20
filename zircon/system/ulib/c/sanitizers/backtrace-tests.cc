@@ -2,14 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ld/module.h>
+#include <lib/ld/testing/startup-ld-abi.h>
+#include <lib/symbolizer-markup/writer.h>
 #include <pthread.h>
 #include <threads.h>
 #include <unwind.h>
 #include <zircon/sanitizer.h>
+#include <zircon/syscalls.h>
 
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <string_view>
 #include <thread>
 
@@ -34,6 +39,34 @@ using namespace std::literals;
 
 using Backtrace = cpp20::span<uintptr_t>;
 using Getter = size_t(Backtrace);
+
+auto StringWriter(std::string& result) {
+  return symbolizer_markup::Writer{
+      [&result](std::string_view str) { result += str; },
+  };
+}
+
+std::string SymbolizerContext() {
+  std::string result;
+  auto writer = StringWriter(result);
+  writer.Reset();
+  for (const auto& module : ld::AbiLoadedModules(ld::testing::gStartupLdAbi)) {
+    ld::ModuleSymbolizerContext(writer, module, zx_system_get_page_size());
+  }
+  return result;
+}
+
+std::string Symbolize(Backtrace bt, std::string_view prefix) {
+  // The first time through we generate the context, but use it only that once.
+  static std::string context = SymbolizerContext();
+  std::string result = std::exchange(context, {});
+
+  auto writer = StringWriter(result);
+  for (unsigned int i = 0; i < bt.size(); ++i) {
+    writer.Prefix(prefix).ReturnAddressFrame(i, bt[i]).Newline();
+  }
+  return result;
+}
 
 size_t BacktraceByUnwind(Backtrace buffer) {
   // The unwinder works by making callbacks for each frame from innermost to
@@ -80,21 +113,21 @@ struct BacktraceMethod {
 };
 
 constexpr BacktraceMethod kByFramePointer = {
-    __libc_sanitizer::BacktraceByFramePointer,
-    "frame pointers",
-    true,
+    .getter = __libc_sanitizer::BacktraceByFramePointer,
+    .name = "frame pointers",
+    .enabled = true,
 };
 
 constexpr BacktraceMethod kByShadowCallStack = {
-    __libc_sanitizer::BacktraceByShadowCallStack,
-    "shadow call stack",
-    __has_feature(shadow_call_stack),
+    .getter = __libc_sanitizer::BacktraceByShadowCallStack,
+    .name = "shadow call stack",
+    .enabled = __has_feature(shadow_call_stack),
 };
 
 constexpr BacktraceMethod kByUnwind = {
-    BacktraceByUnwind,
-    "_Unwind_Backtrace",
-    true,
+    .getter = BacktraceByUnwind,
+    .name = "_Unwind_Backtrace",
+    .enabled = true,
 };
 
 constexpr size_t kFrameCount = 4;  // Foo -> Otter -> Outer -> Find
@@ -195,15 +228,8 @@ class Collector {
       message += context_;
       message += ", ";
       message += method_.name;
-      message += "):\n";
-      __sanitizer_log_write(message.data(), message.size());
-
-      unsigned int n = 0;
-      for (uintptr_t pc : backtrace()) {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "{{{bt:%u:%#zx}}}\n", n++, pc);
-        __sanitizer_log_write(buf, strlen(buf));
-      }
+      message += "): ";
+      fputs(Symbolize(backtrace(), message).c_str(), stdout);
     }
   }
 
@@ -318,8 +344,8 @@ void ExpectMatch(Collector& fp_collector, Collector& scs_collector, Collector& u
   Backtrace scs = scs_collector.backtrace();
   Backtrace unw = unw_collector.backtrace();
 
-  EXPECT_GT(fp.size(), kFrameCount);
-  EXPECT_GT(unw.size(), kFrameCount);
+  EXPECT_GT(fp.size(), kFrameCount) << Symbolize(fp, "Frame pointers: ");
+  EXPECT_GT(unw.size(), kFrameCount) << Symbolize(fp, "CFI: ");
 
   // If zxtest doesn't use frame pointers, the FP backtrace may be incomplete
   // but won't necessarily just be truncated.  Since libc always synthesizes
@@ -347,35 +373,49 @@ void ExpectMatch(Collector& fp_collector, Collector& scs_collector, Collector& u
   // cases, they're completely identical.  This assertion failure won't
   // generate any helpful explanation of the differences, but the two
   // backtraces will have appeared in the sanitizer log output for comparison.
-  EXPECT_EQ(fp_vs_unw.size(), unw_vs_fp.size());
+  EXPECT_EQ(fp_vs_unw.size(), unw_vs_fp.size())
+      << Symbolize(fp_vs_unw, "Frame pointers: ") << Symbolize(unw_vs_fp, "CFI: ");
   if (fp_vs_unw.size() == fp.size()) {
-    EXPECT_EQ(count_differences(unw_vs_fp, fp_vs_unw), expected_diffs);
+    EXPECT_EQ(count_differences(unw_vs_fp, fp_vs_unw), expected_diffs)
+        << Symbolize(fp_vs_unw, "Frame pointers: ") << Symbolize(unw_vs_fp, "CFI: ");
   } else {
-    EXPECT_LE(count_differences(unw_vs_fp, fp_vs_unw), expected_diffs);
+    EXPECT_LE(count_differences(unw_vs_fp, fp_vs_unw), expected_diffs)
+        << Symbolize(fp_vs_unw, "Frame pointers: ") << Symbolize(unw_vs_fp, "CFI: ");
   }
 
   // The differences shouldn't be in the outermost or innermost frames.
-  EXPECT_EQ(fp_vs_unw.front(), unw_vs_fp.front());
-  EXPECT_EQ(fp_vs_unw.back(), unw_vs_fp.back());
+  EXPECT_EQ(fp_vs_unw.front(), unw_vs_fp.front())
+      << Symbolize(fp_vs_unw, "Frame pointers: ") << Symbolize(unw_vs_fp, "CFI: ");
+  EXPECT_EQ(fp_vs_unw.back(), unw_vs_fp.back())
+      << Symbolize(fp_vs_unw, "Frame pointers: ") << Symbolize(unw_vs_fp, "CFI: ");
 
   if (kByShadowCallStack.enabled) {
-    EXPECT_GT(fp_vs_scs.size(), kFrameCount);
+    EXPECT_GT(fp_vs_scs.size(), kFrameCount) << Symbolize(fp_vs_scs, "ShadowCallStack: ");
 
-    EXPECT_EQ(fp_vs_scs.size(), scs_vs_fp.size());
-    if (fp_vs_unw.size() == fp.size()) {
-      EXPECT_EQ(count_differences(scs_vs_fp, fp_vs_scs), expected_diffs);
+    EXPECT_EQ(fp_vs_scs.size(), scs_vs_fp.size())
+        << Symbolize(fp_vs_scs, "Frame pointers: ") << Symbolize(scs_vs_fp, "ShadowCallStack: ");
+    if (fp_vs_scs.size() == fp.size()) {
+      EXPECT_EQ(count_differences(scs_vs_fp, fp_vs_scs), expected_diffs)
+          << Symbolize(fp_vs_scs, "Frame pointers: ") << Symbolize(scs_vs_fp, "ShadowCallStack: ");
     } else {
-      EXPECT_LE(count_differences(scs_vs_fp, fp_vs_scs), expected_diffs);
+      EXPECT_LE(count_differences(scs_vs_fp, fp_vs_scs), expected_diffs)
+          << Symbolize(fp_vs_scs, "Frame pointers: ") << Symbolize(scs_vs_fp, "ShadowCallStack: ");
     }
-    EXPECT_EQ(fp_vs_scs.front(), scs_vs_fp.front());
-    EXPECT_EQ(fp_vs_scs.back(), scs_vs_fp.back());
+    EXPECT_EQ(fp_vs_scs.front(), scs_vs_fp.front())
+        << Symbolize(fp_vs_scs, "Frame pointers: ") << Symbolize(scs_vs_fp, "ShadowCallStack: ");
+    EXPECT_EQ(fp_vs_scs.back(), scs_vs_fp.back())
+        << Symbolize(fp_vs_scs, "Frame pointers: ") << Symbolize(scs_vs_fp, "ShadowCallStack: ");
 
-    EXPECT_EQ(unw.size(), scs.size());
-    EXPECT_EQ(expected_diffs, count_differences(scs, unw));
-    EXPECT_EQ(unw.front(), scs.front());
-    EXPECT_EQ(unw.back(), scs.back());
+    EXPECT_EQ(unw.size(), scs.size())
+        << Symbolize(unw, "CFI: ") << Symbolize(scs, "ShadowCallStack: ");
+    EXPECT_EQ(expected_diffs, count_differences(scs, unw))
+        << Symbolize(unw, "CFI: ") << Symbolize(scs, "ShadowCallStack: ");
+    EXPECT_EQ(unw.front(), scs.front())
+        << Symbolize(unw, "CFI: ") << Symbolize(scs, "ShadowCallStack: ");
+    EXPECT_EQ(unw.back(), scs.back())
+        << Symbolize(unw, "CFI: ") << Symbolize(scs, "ShadowCallStack: ");
   } else {
-    EXPECT_TRUE(scs.empty());
+    EXPECT_TRUE(scs.empty()) << Symbolize(scs, "ShadowCallStack: ");
   }
 }
 

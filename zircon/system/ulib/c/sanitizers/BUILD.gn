@@ -86,6 +86,8 @@ libc_test("unittests") {
   configs = [ "//build/config:frame_pointers" ]
   deps = [
     ":backtrace.testonly",
+    "//sdk/lib/ld/testing:ld-abi-testing",
+    "//src/lib/symbolizer-markup",
     "//zircon/system/ulib/zxtest",
   ]
 
