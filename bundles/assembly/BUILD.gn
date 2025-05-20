@@ -3599,7 +3599,7 @@ assembly_input_bundle("netstack3_packages_gub") {
 # feature_set_levels: minimal
 # build-types: all
 #
-# To be used in conjunction with socket_proxy_packages or socket_proxy_packages_gub.
+# To be used in conjunction with socket_proxy_packages.
 #
 assembly_input_bundle("socket-proxy-enabled") {
   compiled_packages = [
@@ -3641,18 +3641,9 @@ assembly_input_bundle("socket-proxy-disabled") {
 
 # Netpol socket-proxy packages without unified binary.
 #
-# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
-# exclusive with socket_proxy_packages_gub.
+# This AIB provides packages for the socket-proxy-enabled configuration.
 assembly_input_bundle("socket_proxy_packages") {
   base_packages = [ "//src/connectivity/policy/socket-proxy:package" ]
-}
-
-# Netpol socket-proxy packages with unified binary.
-#
-# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
-# exclusive with socket_proxy_packages.
-assembly_input_bundle("socket_proxy_packages_gub") {
-  base_packages = [ "//src/connectivity/policy/socket-proxy:package_gub" ]
 }
 
 # Netstack-migration as the netstack for use by base networking.

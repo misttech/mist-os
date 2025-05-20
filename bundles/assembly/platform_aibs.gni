@@ -245,7 +245,6 @@ user_platform_aib_names =
       "socket-proxy-enabled",
       "socket-proxy-disabled",
       "socket_proxy_packages",
-      "socket_proxy_packages_gub",
 
       # Location
       "location_emergency",
