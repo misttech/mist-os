@@ -47,7 +47,7 @@ pub struct EntityReporter<E, T: Borrow<DynReporter>> {
 pub type RunReporter = EntityReporter<(), Box<DynReporter>>;
 /// A reporter for structured results scoped to a test suite. Note this may not outlive
 /// the `RunReporter` from which it is created.
-pub type SuiteReporter<'a> = EntityReporter<(), &'a DynReporter>;
+pub type SuiteReporter<'a> = EntityReporter<SuiteId, &'a DynReporter>;
 
 /// A reporter for structured results scoped to a single test case. Note this may not outlive
 /// the `SuiteReporter` from which it is created.
@@ -109,8 +109,8 @@ impl RunReporter {
     }
 
     /// Record a new suite under the test run.
-    pub fn new_suite(&self, url: &str) -> Result<SuiteReporter<'_>, Error> {
-        let entity = EntityId::Suite;
+    pub fn new_suite(&self, url: &str, suite_id: &SuiteId) -> Result<SuiteReporter<'_>, Error> {
+        let entity = EntityId::Suite(*suite_id);
         self.reporter.new_entity(&entity, url)?;
         Ok(SuiteReporter { reporter: self.reporter.borrow(), entity, _entity_type: PhantomData })
     }
@@ -119,7 +119,11 @@ impl RunReporter {
 impl<'a> SuiteReporter<'a> {
     /// Record a new suite under the suite.
     pub fn new_case(&self, name: &str, case_id: &CaseId) -> Result<CaseReporter<'_>, Error> {
-        let entity = EntityId::Case { case: *case_id };
+        let suite = match self.entity.clone() {
+            EntityId::Suite(suite) => suite,
+            _ => panic!("Suite reporter should contain a suite"),
+        };
+        let entity = EntityId::Case { suite, case: *case_id };
         self.reporter.new_entity(&entity, name)?;
         Ok(CaseReporter { reporter: self.reporter, entity, _entity_type: PhantomData })
     }
@@ -180,16 +184,16 @@ impl std::fmt::Display for ReportedOutcome {
     }
 }
 
-impl From<ftest_manager::TestCaseResult> for ReportedOutcome {
-    fn from(status: ftest_manager::TestCaseResult) -> Self {
+impl From<ftest_manager::CaseStatus> for ReportedOutcome {
+    fn from(status: ftest_manager::CaseStatus) -> Self {
         match status {
-            ftest_manager::TestCaseResult::Passed => Self::Passed,
-            ftest_manager::TestCaseResult::Failed => Self::Failed,
-            ftest_manager::TestCaseResult::TimedOut => Self::Timedout,
-            ftest_manager::TestCaseResult::Skipped => Self::Skipped,
+            ftest_manager::CaseStatus::Passed => Self::Passed,
+            ftest_manager::CaseStatus::Failed => Self::Failed,
+            ftest_manager::CaseStatus::TimedOut => Self::Timedout,
+            ftest_manager::CaseStatus::Skipped => Self::Skipped,
             // Test case 'Error' indicates the test failed to report a result, not internal error.
-            ftest_manager::TestCaseResult::Error => Self::DidNotFinish,
-            ftest_manager::TestCaseResultUnknown!() => {
+            ftest_manager::CaseStatus::Error => Self::DidNotFinish,
+            ftest_manager::CaseStatusUnknown!() => {
                 panic!("unrecognized case status");
             }
         }
@@ -231,13 +235,15 @@ impl Into<test_output_directory::ArtifactType> for DirectoryArtifactType {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct SuiteId(pub u32);
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct CaseId(pub u32);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum EntityId {
     TestRun,
-    Suite,
-    Case { case: CaseId },
+    Suite(SuiteId),
+    Case { suite: SuiteId, case: CaseId },
 }
 
 #[derive(Default)]

@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use run_test_suite_lib::{ConnectionError, SuiteRunnerConnector};
+use run_test_suite_lib::{ConnectionError, RunBuilderConnector};
 use {
     fidl_fuchsia_developer_remotecontrol as fremotecontrol,
     fidl_fuchsia_test_manager as ftest_manager,
 };
 
-/// Connector implementation that connects to SuiteRunner using the RemoteControl
+/// Connector implementation that connects to RunBuilder using the RemoteControl
 /// protocol.
 pub(crate) struct RunConnector {
     remote_control_proxy: fremotecontrol::RemoteControlProxy,
@@ -25,9 +25,9 @@ impl RunConnector {
 }
 
 #[async_trait::async_trait]
-impl SuiteRunnerConnector for RunConnector {
-    async fn connect(&self) -> Result<ftest_manager::SuiteRunnerProxy, ConnectionError> {
-        testing_lib::connect_to_suite_runner(&self.remote_control_proxy)
+impl RunBuilderConnector for RunConnector {
+    async fn connect(&self) -> Result<ftest_manager::RunBuilderProxy, ConnectionError> {
+        testing_lib::connect_to_run_builder(&self.remote_control_proxy)
             .await
             .map_err(ConnectionError)
     }

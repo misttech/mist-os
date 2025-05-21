@@ -156,8 +156,8 @@ impl Reporter for DirectoryReporter {
         let mut entries = self.entries.lock();
         let parent_id = match entity {
             EntityId::TestRun => panic!("Cannot create new test run"),
-            EntityId::Suite => EntityId::TestRun,
-            EntityId::Case { .. } => EntityId::Suite,
+            EntityId::Suite(_) => EntityId::TestRun,
+            EntityId::Case { suite, .. } => EntityId::Suite(*suite),
         };
         let parent = entries
             .get_mut(&parent_id)
@@ -238,7 +238,7 @@ impl Reporter for DirectoryReporter {
     fn entity_finished(&self, entity: &EntityId) -> Result<(), Error> {
         match entity {
             EntityId::TestRun => self.persist_summary()?,
-            EntityId::Suite => {
+            EntityId::Suite(_) => {
                 let num_saved_suites = self.suites_finished_counter.fetch_add(1, Ordering::Relaxed);
                 if num_saved_suites % SAVE_AFTER_SUITE_COUNT == 0 {
                     self.persist_summary()?;
@@ -359,11 +359,13 @@ fn into_serializable_outcome(outcome: ReportedOutcome) -> directory::Outcome {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::output::{CaseId, RunReporter};
+    use crate::output::{CaseId, RunReporter, SuiteId};
     use fixture::fixture;
+    use std::ops::Deref;
     use tempfile::tempdir;
     use test_output_directory::testing::{
-        assert_run_result, ExpectedDirectory, ExpectedSuite, ExpectedTestCase, ExpectedTestRun,
+        assert_run_result, assert_suite_result, ExpectedDirectory, ExpectedSuite, ExpectedTestCase,
+        ExpectedTestRun,
     };
 
     fn version_variants<F>(_name: &str, test_fn: F)
@@ -390,21 +392,27 @@ mod test {
         let run_reporter = RunReporter::new(
             DirectoryReporter::new(dir.path().to_path_buf(), version).expect("create run reporter"),
         );
-        let suite_reporter = run_reporter.new_suite("suite").expect("create suite reporter");
-        suite_reporter.started(Timestamp::Given(SUITE_TIMES.0)).expect("start suite");
-        for case_no in 0..3 {
-            let case_reporter = suite_reporter
-                .new_case(&format!("case-{:?}", case_no), &CaseId(case_no))
+        for suite_no in 0..3 {
+            let suite_reporter = run_reporter
+                .new_suite(&format!("suite-{:?}", suite_no), &SuiteId(suite_no))
                 .expect("create suite reporter");
-            case_reporter
-                .started(Timestamp::Given(CASE_TIMES[case_no as usize].0))
-                .expect("start case");
-            case_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
+            suite_reporter.started(Timestamp::Given(SUITE_TIMES.0)).expect("start suite");
+            for case_no in 0..3 {
+                let case_reporter = suite_reporter
+                    .new_case(&format!("case-{:?}-{:?}", suite_no, case_no), &CaseId(case_no))
+                    .expect("create suite reporter");
+                case_reporter
+                    .started(Timestamp::Given(CASE_TIMES[case_no as usize].0))
+                    .expect("start case");
+                case_reporter
+                    .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
+                    .expect("stop case");
+            }
+            suite_reporter
+                .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
+                .expect("set suite outcome");
+            suite_reporter.finished().expect("record suite");
         }
-        suite_reporter
-            .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
-            .expect("set suite outcome");
-        suite_reporter.finished().expect("record suite");
         run_reporter
             .stopped(&ReportedOutcome::Timedout, Timestamp::Unknown)
             .expect("set run outcome");
@@ -412,12 +420,25 @@ mod test {
 
         assert_run_result(
             dir.path(),
-            &ExpectedTestRun::new(directory::Outcome::Timedout).with_suite(
-                ExpectedSuite::new("suite", directory::Outcome::Failed)
-                    .with_case(ExpectedTestCase::new("case-0", directory::Outcome::Passed))
-                    .with_case(ExpectedTestCase::new("case-1", directory::Outcome::Passed))
-                    .with_case(ExpectedTestCase::new("case-2", directory::Outcome::Passed)),
-            ),
+            &ExpectedTestRun::new(directory::Outcome::Timedout)
+                .with_suite(
+                    ExpectedSuite::new("suite-0", directory::Outcome::Failed)
+                        .with_case(ExpectedTestCase::new("case-0-0", directory::Outcome::Passed))
+                        .with_case(ExpectedTestCase::new("case-0-1", directory::Outcome::Passed))
+                        .with_case(ExpectedTestCase::new("case-0-2", directory::Outcome::Passed)),
+                )
+                .with_suite(
+                    ExpectedSuite::new("suite-1", directory::Outcome::Failed)
+                        .with_case(ExpectedTestCase::new("case-1-0", directory::Outcome::Passed))
+                        .with_case(ExpectedTestCase::new("case-1-1", directory::Outcome::Passed))
+                        .with_case(ExpectedTestCase::new("case-1-2", directory::Outcome::Passed)),
+                )
+                .with_suite(
+                    ExpectedSuite::new("suite-2", directory::Outcome::Failed)
+                        .with_case(ExpectedTestCase::new("case-2-0", directory::Outcome::Passed))
+                        .with_case(ExpectedTestCase::new("case-2-1", directory::Outcome::Passed))
+                        .with_case(ExpectedTestCase::new("case-2-2", directory::Outcome::Passed)),
+                ),
         );
     }
 
@@ -428,7 +449,8 @@ mod test {
         let run_reporter = RunReporter::new(
             DirectoryReporter::new(dir.path().to_path_buf(), version).expect("create run reporter"),
         );
-        let suite_reporter = run_reporter.new_suite("suite").expect("create new suite");
+        let suite_reporter =
+            run_reporter.new_suite("suite-1", &SuiteId(0)).expect("create new suite");
         run_reporter.started(Timestamp::Unknown).expect("start run");
         for case_no in 0..3 {
             let case_reporter = suite_reporter
@@ -471,7 +493,7 @@ mod test {
                     "stdout from run\n",
                 )
                 .with_suite(
-                    ExpectedSuite::new("suite", directory::Outcome::Passed)
+                    ExpectedSuite::new("suite-1", directory::Outcome::Passed)
                         .with_case(
                             ExpectedTestCase::new("case-1-0", directory::Outcome::Passed)
                                 .with_artifact(
@@ -518,7 +540,8 @@ mod test {
             .new_directory_artifact(&DirectoryArtifactType::Custom, None)
             .expect("Create run directory artifact");
 
-        let suite_reporter = run_reporter.new_suite("suite").expect("create new suite");
+        let suite_reporter =
+            run_reporter.new_suite("suite-1", &SuiteId(0)).expect("create new suite");
         suite_reporter.started(Timestamp::Unknown).expect("start suite");
         let _suite_directory_artifact = suite_reporter
             .new_directory_artifact(&DirectoryArtifactType::Custom, Some("suite-moniker".into()))
@@ -554,7 +577,7 @@ mod test {
                     ExpectedDirectory::new(),
                 )
                 .with_suite(
-                    ExpectedSuite::new("suite", directory::Outcome::Passed)
+                    ExpectedSuite::new("suite-1", directory::Outcome::Passed)
                         .with_directory_artifact(
                             directory::ArtifactMetadata {
                                 artifact_type: directory::ArtifactType::Custom.into(),
@@ -593,7 +616,8 @@ mod test {
         writeln!(run_artifact_file, "run artifact content").expect("write to run artifact");
         drop(run_artifact_file); // force flushing
 
-        let suite_reporter = run_reporter.new_suite("suite").expect("create new suite");
+        let suite_reporter =
+            run_reporter.new_suite("suite-1", &SuiteId(0)).expect("create new suite");
         suite_reporter.started(Timestamp::Unknown).expect("start suite");
         let suite_directory_artifact = suite_reporter
             .new_directory_artifact(&DirectoryArtifactType::Custom, Some("suite-moniker".into()))
@@ -639,7 +663,7 @@ mod test {
                     ExpectedDirectory::new().with_file("run-artifact", "run artifact content\n"),
                 )
                 .with_suite(
-                    ExpectedSuite::new("suite", directory::Outcome::Passed)
+                    ExpectedSuite::new("suite-1", directory::Outcome::Passed)
                         .with_directory_artifact(
                             directory::ArtifactMetadata {
                                 artifact_type: directory::ArtifactType::Custom.into(),
@@ -688,6 +712,125 @@ mod test {
 
     #[fixture(version_variants)]
     #[fuchsia::test]
+    fn duplicate_suite_names_ok(version: SchemaVersion) {
+        let dir = tempdir().expect("create temp directory");
+        let run_reporter = RunReporter::new(
+            DirectoryReporter::new(dir.path().to_path_buf(), version).expect("create run reporter"),
+        );
+
+        let success_suite_reporter =
+            run_reporter.new_suite("suite", &SuiteId(0)).expect("create new suite");
+        success_suite_reporter
+            .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
+            .expect("report suite outcome");
+        success_suite_reporter
+            .new_artifact(&ArtifactType::Stdout)
+            .expect("create new artifact")
+            .write_all(b"stdout from passed suite\n")
+            .expect("write to artifact");
+        success_suite_reporter.finished().expect("record suite");
+
+        let failed_suite_reporter =
+            run_reporter.new_suite("suite", &SuiteId(1)).expect("create new suite");
+        failed_suite_reporter
+            .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
+            .expect("report suite outcome");
+        failed_suite_reporter.finished().expect("record suite");
+
+        run_reporter
+            .stopped(&ReportedOutcome::Failed, Timestamp::Unknown)
+            .expect("report run outcome");
+        run_reporter.finished().expect("record run");
+
+        let saved_run_result = directory::TestRunResult::from_dir(dir.path()).expect("parse dir");
+        assert_eq!(
+            saved_run_result.common.deref().outcome,
+            directory::MaybeUnknown::Known(directory::Outcome::Failed)
+        );
+
+        assert_eq!(saved_run_result.suites.len(), 2);
+        // names of the suites are identical, so we rely on the outcome to differentiate them.
+        let expected_success_suite = ExpectedSuite::new("suite", directory::Outcome::Passed)
+            .with_artifact(
+                directory::ArtifactType::Stdout,
+                STDOUT_FILE.into(),
+                "stdout from passed suite\n",
+            );
+        let expected_failed_suite = ExpectedSuite::new("suite", directory::Outcome::Failed);
+
+        let suite_results = saved_run_result.suites;
+
+        if suite_results[0].common.deref().outcome
+            == directory::MaybeUnknown::Known(directory::Outcome::Passed)
+        {
+            assert_suite_result(dir.path(), &suite_results[0], &expected_success_suite);
+            assert_suite_result(dir.path(), &suite_results[1], &expected_failed_suite);
+        } else {
+            assert_suite_result(dir.path(), &suite_results[0], &expected_failed_suite);
+            assert_suite_result(dir.path(), &suite_results[1], &expected_success_suite);
+        }
+    }
+
+    #[fixture(version_variants)]
+    #[fuchsia::test]
+    fn intermediate_results_persisted(version: SchemaVersion) {
+        // This test verifies that the results of the test run are persisted after every
+        // few suites complete. This ensures that at least some results will be saved even if
+        // ffx test crashes.
+        let dir = tempdir().expect("create temp directory");
+        let run_reporter = RunReporter::new(
+            DirectoryReporter::new(dir.path().to_path_buf(), version).expect("create run reporter"),
+        );
+
+        assert_run_result(dir.path(), &ExpectedTestRun::new(directory::Outcome::NotStarted));
+
+        run_reporter.started(Timestamp::Unknown).expect("start test run");
+
+        // Create one suite which isn't finished. It should be present in intermediate results too.
+        let incomplete_suite_reporter =
+            run_reporter.new_suite("incomplete", &SuiteId(99)).expect("create new suite");
+
+        for i in 0..SAVE_AFTER_SUITE_COUNT {
+            let suite_reporter = run_reporter
+                .new_suite(&format!("suite-{:?}", i), &SuiteId(i))
+                .expect("create new suite");
+            suite_reporter.started(Timestamp::Unknown).expect("start suite");
+            suite_reporter
+                .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
+                .expect("stop suite");
+            suite_reporter.finished().expect("finish suite");
+        }
+
+        let mut intermediate_run = ExpectedTestRun::new(directory::Outcome::Inconclusive)
+            .with_suite(ExpectedSuite::new("incomplete", directory::Outcome::NotStarted));
+        for i in 0..SAVE_AFTER_SUITE_COUNT {
+            intermediate_run = intermediate_run.with_suite(ExpectedSuite::new(
+                &format!("suite-{:?}", i),
+                directory::Outcome::Passed,
+            ));
+        }
+
+        assert_run_result(dir.path(), &intermediate_run);
+
+        incomplete_suite_reporter.finished().expect("finish suite");
+
+        run_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop test run");
+        run_reporter.finished().expect("finish test run");
+
+        let mut final_run = ExpectedTestRun::new(directory::Outcome::Passed)
+            .with_suite(ExpectedSuite::new("incomplete", directory::Outcome::NotStarted));
+        for i in 0..SAVE_AFTER_SUITE_COUNT {
+            final_run = final_run.with_suite(ExpectedSuite::new(
+                &format!("suite-{:?}", i),
+                directory::Outcome::Passed,
+            ));
+        }
+
+        assert_run_result(dir.path(), &final_run);
+    }
+
+    #[fixture(version_variants)]
+    #[fuchsia::test]
     fn early_finish_ok(version: SchemaVersion) {
         // This test verifies that a suite is saved if finished() is called before an outcome is
         // reported. This could happen if some error causes test execution to terminate early.
@@ -699,7 +842,8 @@ mod test {
         run_reporter.started(Timestamp::Unknown).expect("start test run");
 
         // Add a suite and case that start, but don't stop.
-        let suite_reporter = run_reporter.new_suite("suite").expect("create new suite");
+        let suite_reporter =
+            run_reporter.new_suite("suite", &SuiteId(0)).expect("create new suite");
         suite_reporter.started(Timestamp::Unknown).expect("start suite");
         let case_reporter = suite_reporter.new_case("case", &CaseId(0)).expect("create case");
         case_reporter.started(Timestamp::Unknown).expect("start case");
@@ -709,7 +853,7 @@ mod test {
 
         // Add a suite that doesn't start.
         let no_start_suite_reporter =
-            run_reporter.new_suite("no-start-suite").expect("create new suite");
+            run_reporter.new_suite("no-start-suite", &SuiteId(1)).expect("create new suite");
         no_start_suite_reporter.finished().expect("finish suite");
 
         run_reporter.finished().expect("finish test run");

@@ -123,7 +123,7 @@ impl DirectoryWrite for MultiplexedDirectoryWriter {
 mod test {
     use super::*;
     use crate::output::directory::{DirectoryReporter, SchemaVersion};
-    use crate::output::RunReporter;
+    use crate::output::{RunReporter, SuiteId};
     use tempfile::tempdir;
     use test_output_directory as directory;
     use test_output_directory::testing::{
@@ -160,7 +160,7 @@ mod test {
         writeln!(run_artifact, "run artifact contents").expect("write to run artifact");
         run_artifact.flush().expect("flush run artifact");
 
-        let suite_reporter = run_reporter.new_suite("suite").expect("create suite");
+        let suite_reporter = run_reporter.new_suite("suite", &SuiteId(0)).expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("start suite");
         suite_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("start suite");
         let suite_dir_artifact = suite_reporter

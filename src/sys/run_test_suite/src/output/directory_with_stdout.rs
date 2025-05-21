@@ -7,9 +7,10 @@ use crate::output::mux::{MultiplexedDirectoryWriter, MultiplexedWriter};
 use crate::output::shell::ShellReporter;
 use crate::output::{
     ArtifactType, DirectoryArtifactType, DynArtifact, DynDirectoryArtifact, EntityId, EntityInfo,
-    ReportedOutcome, Reporter, Timestamp,
+    ReportedOutcome, Reporter, SuiteId, Timestamp,
 };
 use fuchsia_sync::Mutex;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Error};
 use std::path::PathBuf;
@@ -20,16 +21,25 @@ use std::path::PathBuf;
 // In the future, we may want to make the type of stdout output configurable.
 pub struct DirectoryWithStdoutReporter {
     directory_reporter: DirectoryReporter,
-    /// Shell reporter for suite. |ShellReporter| is routed events for a suite, and produces
-    /// a report.
-    shell_reporter: Mutex<Option<ShellReporter<BufWriter<File>>>>,
+    /// Set of shell reporters, one per suite. Each |ShellReporter| is routed events for a single
+    /// suite, and produces a report as if there is a run containing a single suite.
+    shell_reporters: Mutex<HashMap<SuiteId, ShellReporter<BufWriter<File>>>>,
 }
 
 impl DirectoryWithStdoutReporter {
     pub fn new(root: PathBuf, version: SchemaVersion) -> Result<Self, Error> {
         Ok(Self {
             directory_reporter: DirectoryReporter::new(root, version)?,
-            shell_reporter: Mutex::<Option<ShellReporter<BufWriter<File>>>>::new(None),
+            shell_reporters: Mutex::new(HashMap::new()),
+        })
+    }
+
+    fn get_locked_shell_reporter(
+        &self,
+        suite: &SuiteId,
+    ) -> impl '_ + std::ops::Deref<Target = ShellReporter<BufWriter<File>>> {
+        fuchsia_sync::MutexGuard::map(self.shell_reporters.lock(), |reporters| {
+            reporters.get_mut(suite).unwrap()
         })
     }
 }
@@ -39,15 +49,15 @@ impl Reporter for DirectoryWithStdoutReporter {
         self.directory_reporter.new_entity(entity, name)?;
 
         match entity {
-            EntityId::Suite => {
+            EntityId::Suite(suite_id) => {
                 let human_readable_artifact = self.directory_reporter.add_report(entity)?;
                 let shell_reporter = ShellReporter::new(human_readable_artifact);
                 shell_reporter.new_entity(entity, name)?;
-                let _ = self.shell_reporter.lock().insert(shell_reporter);
+                self.shell_reporters.lock().insert(*suite_id, shell_reporter);
                 Ok(())
             }
-            EntityId::Case { .. } => {
-                self.shell_reporter.lock().as_ref().unwrap().new_entity(entity, name)
+            EntityId::Case { suite, .. } => {
+                self.shell_reporters.lock().get(suite).unwrap().new_entity(entity, name)
             }
             EntityId::TestRun => Ok(()),
         }
@@ -56,30 +66,29 @@ impl Reporter for DirectoryWithStdoutReporter {
     fn set_entity_info(&self, entity: &EntityId, info: &EntityInfo) {
         self.directory_reporter.set_entity_info(entity, info);
 
-        match entity {
-            EntityId::Suite | EntityId::Case { .. } => {
-                self.shell_reporter.lock().as_ref().unwrap().set_entity_info(entity, info);
-            }
-            _ => (),
+        let suite_id = match entity {
+            EntityId::Suite(suite) => Some(suite),
+            EntityId::Case { suite, .. } => Some(suite),
+            _ => None,
         };
+        if let Some(suite) = suite_id {
+            self.get_locked_shell_reporter(suite).set_entity_info(entity, info);
+        }
     }
 
     fn entity_started(&self, entity: &EntityId, timestamp: Timestamp) -> Result<(), Error> {
         self.directory_reporter.entity_started(entity, timestamp)?;
 
         match entity {
-            EntityId::Suite => {
-                let reporter_guard = self.shell_reporter.lock();
+            EntityId::Suite(suite) => {
+                let reporter = self.get_locked_shell_reporter(suite);
                 // Since we create one reporter per suite, we should start the run at the
                 // same time as the suite.
-                let _ = (*reporter_guard)
-                    .as_ref()
-                    .unwrap()
-                    .entity_started(&EntityId::TestRun, timestamp);
-                (*reporter_guard).as_ref().unwrap().entity_started(entity, timestamp)
+                reporter.entity_started(&EntityId::TestRun, timestamp)?;
+                reporter.entity_started(entity, timestamp)
             }
-            EntityId::Case { .. } => {
-                self.shell_reporter.lock().as_ref().unwrap().entity_started(entity, timestamp)
+            EntityId::Case { suite, .. } => {
+                self.get_locked_shell_reporter(suite).entity_started(entity, timestamp)
             }
             EntityId::TestRun => Ok(()),
         }
@@ -94,23 +103,16 @@ impl Reporter for DirectoryWithStdoutReporter {
         self.directory_reporter.entity_stopped(entity, outcome, timestamp)?;
 
         match entity {
-            EntityId::Suite => {
-                let reporter_guard = self.shell_reporter.lock();
+            EntityId::Suite(suite) => {
+                let reporter = self.get_locked_shell_reporter(suite);
                 // Since we create one reporter per suite, we should stop the run at the
                 // same time as the suite.
-                (*reporter_guard).as_ref().unwrap().entity_stopped(entity, outcome, timestamp)?;
-                (*reporter_guard).as_ref().unwrap().entity_stopped(
-                    &EntityId::TestRun,
-                    outcome,
-                    timestamp,
-                )
+                reporter.entity_stopped(entity, outcome, timestamp)?;
+                reporter.entity_stopped(&EntityId::TestRun, outcome, timestamp)
             }
-            EntityId::Case { .. } => self
-                .shell_reporter
-                .lock()
-                .as_ref()
-                .unwrap()
-                .entity_stopped(entity, outcome, timestamp),
+            EntityId::Case { suite, .. } => {
+                self.get_locked_shell_reporter(suite).entity_stopped(entity, outcome, timestamp)
+            }
             EntityId::TestRun => Ok(()),
         }
     }
@@ -119,15 +121,15 @@ impl Reporter for DirectoryWithStdoutReporter {
         self.directory_reporter.entity_finished(entity)?;
 
         match entity {
-            EntityId::Suite => {
-                let reporter_guard = self.shell_reporter.lock();
+            EntityId::Suite(suite) => {
+                let reporter = self.get_locked_shell_reporter(suite);
                 // Since we create one reporter per suite, we should finish the run at the
                 // same time as the suite.
-                (*reporter_guard).as_ref().unwrap().entity_finished(entity)?;
-                (*reporter_guard).as_ref().unwrap().entity_finished(&EntityId::TestRun)
+                reporter.entity_finished(entity)?;
+                reporter.entity_finished(&EntityId::TestRun)
             }
-            EntityId::Case { .. } => {
-                self.shell_reporter.lock().as_ref().unwrap().entity_finished(entity)
+            EntityId::Case { suite, .. } => {
+                self.get_locked_shell_reporter(suite).entity_finished(entity)
             }
             EntityId::TestRun => Ok(()),
         }
@@ -139,9 +141,9 @@ impl Reporter for DirectoryWithStdoutReporter {
         artifact_type: &ArtifactType,
     ) -> Result<Box<DynArtifact>, Error> {
         let shell_reporter_artifact = match entity {
-            EntityId::Suite | EntityId::Case { .. } => Some(
-                self.shell_reporter.lock().as_ref().unwrap().new_artifact(entity, artifact_type)?,
-            ),
+            EntityId::Suite(suite) | EntityId::Case { suite, .. } => {
+                Some(self.get_locked_shell_reporter(suite).new_artifact(entity, artifact_type)?)
+            }
             EntityId::TestRun => None,
         };
         let directory_reporter_artifact =
@@ -162,8 +164,8 @@ impl Reporter for DirectoryWithStdoutReporter {
     ) -> Result<Box<DynDirectoryArtifact>, Error> {
         let component_moniker_clone = component_moniker.clone();
         let shell_reporter_artifact = match entity {
-            EntityId::Suite | EntityId::Case { .. } => {
-                Some(self.shell_reporter.lock().as_ref().unwrap().new_directory_artifact(
+            EntityId::Suite(suite) | EntityId::Case { suite, .. } => {
+                Some(self.get_locked_shell_reporter(suite).new_directory_artifact(
                     entity,
                     artifact_type,
                     component_moniker_clone,
@@ -207,36 +209,45 @@ mod test {
             DirectoryWithStdoutReporter::new(dir.path().to_path_buf(), SchemaVersion::V1).unwrap(),
         );
 
-        let suite_reporter = run_reporter.new_suite(&format!("test-suite")).expect("create suite");
-        suite_reporter.started(Timestamp::Unknown).expect("start suite");
-        let case_reporter =
-            suite_reporter.new_case("test-case", &CaseId(0)).expect("create test case");
-        case_reporter.started(Timestamp::Unknown).expect("start case");
-        let mut case_stdout =
-            case_reporter.new_artifact(&ArtifactType::Stdout).expect("create stdout");
-        writeln!(case_stdout, "Stdout for test case").expect("write to stdout");
-        case_stdout.flush().expect("flush stdout");
-        case_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
-        case_reporter.finished().expect("finish case");
-        suite_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop suite");
-        suite_reporter.finished().expect("finish suite");
-
+        for suite_no in 0..3 {
+            let suite_reporter = run_reporter
+                .new_suite(&format!("test-suite-{}", suite_no), &SuiteId(suite_no))
+                .expect("create suite");
+            suite_reporter.started(Timestamp::Unknown).expect("start suite");
+            let case_reporter =
+                suite_reporter.new_case("test-case", &CaseId(0)).expect("create test case");
+            case_reporter.started(Timestamp::Unknown).expect("start case");
+            let mut case_stdout =
+                case_reporter.new_artifact(&ArtifactType::Stdout).expect("create stdout");
+            writeln!(case_stdout, "Stdout for test case").expect("write to stdout");
+            case_stdout.flush().expect("flush stdout");
+            case_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop case");
+            case_reporter.finished().expect("finish case");
+            suite_reporter
+                .stopped(&ReportedOutcome::Passed, Timestamp::Unknown)
+                .expect("stop suite");
+            suite_reporter.finished().expect("finish suite");
+        }
         run_reporter.stopped(&ReportedOutcome::Passed, Timestamp::Unknown).expect("stop run");
         run_reporter.finished().expect("finish run");
 
         let mut expected_test = ExpectedTestRun::new(directory::Outcome::Passed);
-
-        let expected_report = format!(
-            "Running test 'test-suite'\n\
+        for suite_no in 0..3 {
+            let expected_report = format!(
+                "Running test 'test-suite-{:?}'\n\
             [RUNNING]\ttest-case\n\
             [stdout - test-case]\n\
             Stdout for test case\n\
             [PASSED]\ttest-case\n\
             \n\
             1 out of 1 tests passed...\n\
-            test-suite completed with result: PASSED\n",
-        );
-        let suite = ExpectedSuite::new(format!("test-suite"), directory::Outcome::Passed)
+            test-suite-{:?} completed with result: PASSED\n",
+                suite_no, suite_no
+            );
+            let suite = ExpectedSuite::new(
+                format!("test-suite-{:?}", suite_no),
+                directory::Outcome::Passed,
+            )
             .with_artifact(directory::ArtifactType::Report, "report.txt".into(), &expected_report)
             .with_case(
                 ExpectedTestCase::new("test-case", directory::Outcome::Passed).with_artifact(
@@ -245,7 +256,8 @@ mod test {
                     "Stdout for test case\n",
                 ),
             );
-        expected_test = expected_test.with_suite(suite);
+            expected_test = expected_test.with_suite(suite);
+        }
 
         assert_run_result(dir.path(), &expected_test);
     }

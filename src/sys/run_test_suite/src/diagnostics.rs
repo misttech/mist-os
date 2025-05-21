@@ -6,7 +6,7 @@ use crate::trace::duration;
 use anyhow::Error;
 use diagnostics_data::{LogTextDisplayOptions, LogTextPresenter, LogsData, Severity};
 use fidl_fuchsia_diagnostics::LogInterestSelector;
-use fidl_fuchsia_test_manager::LogsIteratorType;
+use fidl_fuchsia_test_manager::LogsIteratorOption;
 use futures::{Stream, TryStreamExt};
 use selectors::SelectorExt;
 use std::io::Write;
@@ -112,13 +112,13 @@ where
 }
 
 #[cfg(target_os = "fuchsia")]
-pub fn get_logs_iterator_type() -> LogsIteratorType {
-    LogsIteratorType::Batch
+pub fn get_type() -> LogsIteratorOption {
+    LogsIteratorOption::BatchIterator
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-pub fn get_logs_iterator_type() -> LogsIteratorType {
-    LogsIteratorType::Socket
+pub fn get_type() -> LogsIteratorOption {
+    LogsIteratorOption::SocketBatchIterator
 }
 
 #[cfg(test)]

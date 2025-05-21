@@ -4,8 +4,11 @@
 
 use assert_matches::assert_matches;
 use diagnostics_data::Severity;
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_sys2 as fsys;
-use fidl_fuchsia_test_manager::{LaunchError, LogsIteratorType, SuiteRunnerMarker};
+use fidl_fuchsia_test_manager::{
+    LaunchError, LogsIteratorOption, RunBuilderMarker, RunBuilderProxy,
+};
 use fuchsia_component::client::connect_to_protocol;
 use regex::Regex;
 use run_test_suite_lib::{output, Outcome, RunTestSuiteError, TestParams};
@@ -101,6 +104,7 @@ fn new_run_params() -> run_test_suite_lib::RunParams {
         timeout_behavior: run_test_suite_lib::TimeoutBehavior::TerminateRemaining,
         timeout_grace_seconds: 0,
         stop_after_failures: None,
+        experimental_parallel_execution: None,
         accumulate_debug_data: false,
         log_protocol: None,
         min_severity_logs: vec![],
@@ -167,16 +171,39 @@ async fn run_test_once(
     test_params: TestParams,
 ) -> Result<Outcome, RunTestSuiteError> {
     let run_reporter = run_test_suite_lib::output::RunReporter::new(reporter);
-    Ok(run_test_suite_lib::run_test_and_get_outcome(
+    Ok(run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        test_params,
+        vec![test_params],
         new_run_params(),
         run_reporter,
         futures::future::pending(),
     )
     .await)
+}
+
+/// Connector with configurable chunk size that connects to test_manager
+/// over fidl.
+struct ChunkedRunConnector {
+    chunk_size: usize,
+}
+
+impl ChunkedRunConnector {
+    const fn new(chunk_size: usize) -> Self {
+        Self { chunk_size }
+    }
+}
+
+#[async_trait::async_trait]
+impl run_test_suite_lib::RunBuilderConnector for ChunkedRunConnector {
+    async fn connect(&self) -> Result<RunBuilderProxy, run_test_suite_lib::ConnectionError> {
+        Ok(connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"))
+    }
+
+    fn batch_size(&self) -> usize {
+        self.chunk_size
+    }
 }
 
 #[fixture::fixture(run_with_reporter)]
@@ -271,11 +298,11 @@ async fn launch_and_test_passing_v2_test(in_provided_realm: bool) {
         subcase,
         |reporter: TestMuxMuxReporter, output: TestOutputView, output_dir: tempfile::TempDir| async move {
             let reporter = output::RunReporter::new(reporter);
-            let outcome = run_test_suite_lib::run_test_and_get_outcome(
+            let outcome = run_test_suite_lib::run_tests_and_get_outcome(
                 run_test_suite_lib::SingleRunConnector::new(
-                    connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+                    connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
                 ),
-                test_params,
+                vec![test_params],
                 new_run_params(),
                 reporter,
                 futures::future::pending(),
@@ -329,11 +356,11 @@ async fn launch_and_test_echo_test_in_provided_realm(
     let test_url =
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_client.cm";
     let reporter = output::RunReporter::new(reporter);
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        new_test_params_with_realm(test_url, PROVIDED_ECHO_REALM).await,
+        vec![new_test_params_with_realm(test_url, PROVIDED_ECHO_REALM).await],
         new_run_params(),
         reporter,
         futures::future::pending(),
@@ -373,18 +400,71 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_client
 // early, which may cause the test to fail depending on the implementation.
 async fn experimental_parallel_execution_integ_test(
     reporter: TestMuxMuxReporter,
+    _output: TestOutputView,
+    _output_dir: tempfile::TempDir,
+) {
+    let reporter = output::RunReporter::new(reporter);
+    let mut run_params = new_run_params();
+    run_params.experimental_parallel_execution = Some(8);
+    let _outcome = run_test_suite_lib::run_tests_and_get_outcome(
+        run_test_suite_lib::SingleRunConnector::new(
+            connect_to_protocol::<RunBuilderMarker>()
+                    .expect("connecting to RunBuilderProxy")
+        ),
+        vec![new_test_params(
+            "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm",
+        )],
+        run_params,
+        reporter,
+        futures::future::pending(),
+    )
+    .await;
+
+    let data = ArchiveReader::inspect()
+        .add_selector("test_manager:root")
+        .snapshot()
+        .await
+        .expect("got inspect data");
+    assert_eq!(data[0].moniker.to_string(), "test_manager");
+
+    // Manually look through all of the children in DiagnosticsHierarchy to find one
+    // where parallel executor was used.
+    // inspect structure is roughly
+    // <root>
+    //   + run
+    //     + parallel_executor / serial_executor
+    // So we need to find a grandchild called "parallel_executor"
+    let root = data[0].payload.as_ref().unwrap();
+    let root_children = &root.children;
+
+    let grandchildren: Vec<_> = root_children
+        .iter()
+        .map(|child| child.children.iter())
+        .flatten()
+        .filter(|grandchild| grandchild.name == "parallel_executor")
+        .collect();
+
+    // This is a weak assertion since other tests might be changed to run in parallel too. If this
+    // happens we'll need to hope that this flakily fails, or run this in an isolated
+    // test_manager instance to prevent the issue.
+    assert_eq!(grandchildren.len(), 1, "expected to find one run executed in parallel");
+}
+
+#[fixture::fixture(run_with_reporter)]
+#[fuchsia::test]
+async fn launch_and_test_stderr_test(
+    reporter: TestMuxMuxReporter,
     output: TestOutputView,
     output_dir: tempfile::TempDir,
 ) {
     let reporter = output::RunReporter::new(reporter);
-    // run_params.experimental_parallel_execution = Some(8);
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        new_test_params(
+        vec![new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/test-with-stderr.cm",
-        ),
+        )],
         new_run_params(),
         reporter,
         futures::future::pending(),
@@ -463,7 +543,6 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/test-with-stderr
     );
 }
 
-/*
 #[test_case(usize::MAX, false ; "one_chunk")]
 #[test_case(5, false ; "two_chunk")]
 #[test_case(3, false ; "three_chunk")]
@@ -483,7 +562,7 @@ async fn launch_and_test_passing_v2_test_multiple_times(
         true => new_test_params_with_realm(test_url, PROVIDED_HERMETIC_REALM).await,
         false => new_test_params(test_url),
     };
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         ChunkedRunConnector::new(test_chunk_size),
         vec![test_params; 10],
         new_run_params(),
@@ -523,10 +602,10 @@ async fn launch_and_test_multiple_passing_tests(
     output_dir: tempfile::TempDir,
 ) {
     let reporter = output::RunReporter::new(reporter);
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>()
-                    .expect("connecting to SuiteRunnerProxy")
+            connect_to_protocol::<RunBuilderMarker>()
+                    .expect("connecting to RunBuilderProxy")
         ),
             vec![new_test_params(
                     "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/passing-test-example.cm",
@@ -566,7 +645,6 @@ async fn launch_and_test_multiple_passing_tests(
 
     directory::testing::assert_run_result(output_dir.path(), &expected_test_run);
 }
-*/
 
 #[fixture::fixture(run_with_reporter)]
 #[fuchsia::test]
@@ -745,21 +823,21 @@ async fn launch_and_test_huge_test(
     );
 }
 
-#[test_case(LogsIteratorType::Batch ; "batch")]
-#[test_case(LogsIteratorType::Socket ; "archive")]
+#[test_case(LogsIteratorOption::BatchIterator ; "batch")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
-async fn launch_and_test_logspam_test(iterator_type: LogsIteratorType) {
+async fn launch_and_test_logspam_test(iterator_option: LogsIteratorOption) {
     let (reporter, _output, output_dir) = create_shell_and_dir_reporter();
 
     let mut run_params = new_run_params();
-    run_params.log_protocol = Some(iterator_type);
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    run_params.log_protocol = Some(iterator_option);
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        new_test_params(
+        vec![new_test_params(
             "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logspam_test.cm",
-        ),
+        )],
         run_params,
         run_test_suite_lib::output::RunReporter::new(reporter),
         futures::future::pending(),
@@ -951,7 +1029,6 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/failing-test-exa
     );
 }
 
-/*
 #[test_case(usize::MAX ; "one_chunk")]
 #[test_case(5 ; "two_chunk")]
 #[test_case(3 ; "three_chunk")]
@@ -959,7 +1036,7 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/failing-test-exa
 async fn launch_and_test_failing_v2_test_multiple_times(test_chunk_size: usize) {
     let (reporter, _output, output_dir) = create_shell_and_dir_reporter();
     let reporter = output::RunReporter::new(reporter);
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         ChunkedRunConnector::new(test_chunk_size),
         vec![new_test_params(
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/failing-test-example.cm",
@@ -987,7 +1064,6 @@ async fn launch_and_test_failing_v2_test_multiple_times(test_chunk_size: usize) 
         directory::testing::assert_suite_result(output_dir.path(), &suite_result, &expected_suite);
     }
 }
-*/
 
 #[fixture::fixture(run_with_reporter)]
 #[fuchsia::test]
@@ -1107,7 +1183,6 @@ async fn test_timeout(reporter: TestMuxMuxReporter, output: TestOutputView, _: t
     assert!(std::str::from_utf8(output_lock.as_slice()).unwrap().contains(expected_output));
 }
 
-/*
 #[test_case(usize::MAX ; "one_chunk")]
 #[test_case(5 ; "two_chunk")]
 #[test_case(3 ; "three_chunk")]
@@ -1120,7 +1195,7 @@ async fn test_timeout_multiple_times(test_chunk_size: usize) {
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/long_running_test.cm",
     );
     test_params.timeout_seconds = TIMEOUT_SECONDS;
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         ChunkedRunConnector::new(test_chunk_size),
         vec![test_params; 10],
         new_run_params(),
@@ -1190,13 +1265,14 @@ async fn test_continue_on_timeout(test_chunk_size: usize) {
         test_params.push(short_test_params.clone());
     }
 
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         ChunkedRunConnector::new(test_chunk_size),
         test_params,
         run_test_suite_lib::RunParams {
             timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
             timeout_grace_seconds: 0,
             stop_after_failures: None,
+            experimental_parallel_execution: None,
             accumulate_debug_data: false,
             log_protocol: None,
             min_severity_logs: vec![],
@@ -1259,7 +1335,7 @@ async fn test_continue_on_timeout(test_chunk_size: usize) {
 async fn test_stop_after_n_failures(test_chunk_size: usize) {
     let (reporter, _output, output_dir) = create_shell_and_dir_reporter();
     let reporter = output::RunReporter::new(reporter);
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         ChunkedRunConnector::new(test_chunk_size),
         vec![new_test_params(
                 "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/failing-test-example.cm",
@@ -1268,6 +1344,7 @@ async fn test_stop_after_n_failures(test_chunk_size: usize) {
                     timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
                     timeout_grace_seconds: 0,
                     stop_after_failures: Some(5u32.try_into().unwrap()),
+                    experimental_parallel_execution: None,
                     accumulate_debug_data: false,
                     log_protocol: None,
                     min_severity_logs: vec![],
@@ -1319,7 +1396,6 @@ async fn test_stop_after_n_failures(test_chunk_size: usize) {
         );
     }
 }
-*/
 
 #[fixture::fixture(run_with_reporter)]
 #[fuchsia::test]
@@ -1346,14 +1422,14 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_realm.
     assert_eq!(outcome, Outcome::Passed);
 }
 
-#[test_case("batch", LogsIteratorType::Batch, false ; "batch")]
-#[test_case("archive", LogsIteratorType::Socket, false ; "archive")]
-#[test_case("batch_in_provided_realm", LogsIteratorType::Batch, true ; "batch_in_provided_realm")]
-#[test_case("archive_in_provided_realm", LogsIteratorType::Socket, true ; "archive_in_provided_realm")]
+#[test_case("batch", LogsIteratorOption::BatchIterator, false ; "batch")]
+#[test_case("archive", LogsIteratorOption::SocketBatchIterator, false ; "archive")]
+#[test_case("batch_in_provided_realm", LogsIteratorOption::BatchIterator, true ; "batch_in_provided_realm")]
+#[test_case("archive_in_provided_realm", LogsIteratorOption::SocketBatchIterator, true ; "archive_in_provided_realm")]
 #[fuchsia::test]
 async fn test_logging_component(
     subcase: &'static str,
-    iterator_option: LogsIteratorType,
+    iterator_option: LogsIteratorOption,
     in_provided_realm: bool,
 ) {
     let test_url =
@@ -1390,12 +1466,12 @@ async fn test_logging_component(
                 ],
                 ..new_run_params()
             };
-            let outcome = run_test_suite_lib::run_test_and_get_outcome(
+            let outcome = run_test_suite_lib::run_tests_and_get_outcome(
                 run_test_suite_lib::SingleRunConnector::new(
-                    connect_to_protocol::<SuiteRunnerMarker>()
-                            .expect("connecting to SuiteRunnerProxy")
+                    connect_to_protocol::<RunBuilderMarker>()
+                            .expect("connecting to RunBuilderProxy")
                 ),
-                test_params,
+                vec![test_params],
                 run_params,
                 run_test_suite_lib::output::RunReporter::new(reporter),
                 futures::future::pending(),
@@ -1427,12 +1503,12 @@ async fn test_logging_component(
     ).await;
 }
 
-#[test_case("batch", LogsIteratorType::Batch ; "batch")]
-#[test_case("archive", LogsIteratorType::Socket ; "archive")]
+#[test_case("batch", LogsIteratorOption::BatchIterator ; "batch")]
+#[test_case("archive", LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
 async fn test_logging_component_min_severity(
     subcase: &'static str,
-    iterator_option: LogsIteratorType,
+    iterator_option: LogsIteratorOption,
 ) {
     run_with_reporter(
         &format!("test_logging_component_{}", subcase),
@@ -1450,12 +1526,12 @@ async fn test_logging_component_min_severity(
         .unwrap()],
         ..new_run_params()
     };
-        let outcome = run_test_suite_lib::run_test_and_get_outcome(
+        let outcome = run_test_suite_lib::run_tests_and_get_outcome(
             run_test_suite_lib::SingleRunConnector::new(
-                connect_to_protocol::<SuiteRunnerMarker>()
-                        .expect("connecting to SuiteRunnerProxy")
+                connect_to_protocol::<RunBuilderMarker>()
+                        .expect("connecting to RunBuilderProxy")
             ),
-            test_params,
+            vec![test_params],
             run_params,
             run_test_suite_lib::output::RunReporter::new(reporter),
             futures::future::pending(),
@@ -1476,10 +1552,13 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/logging_test.cm 
     }).await;
 }
 
-#[test_case("batch", LogsIteratorType::Batch ; "batch")]
-#[test_case("archive", LogsIteratorType::Socket ; "archive")]
+#[test_case("batch", LogsIteratorOption::BatchIterator ; "batch")]
+#[test_case("archive", LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
-async fn test_per_component_min_severity(subcase: &'static str, iterator_option: LogsIteratorType) {
+async fn test_per_component_min_severity(
+    subcase: &'static str,
+    iterator_option: LogsIteratorOption,
+) {
     run_with_reporter(
         &format!("test_logging_component_{}", subcase),
         |reporter: TestMuxMuxReporter, output: TestOutputView, _output_dir: tempfile::TempDir| async move {
@@ -1496,12 +1575,12 @@ async fn test_per_component_min_severity(subcase: &'static str, iterator_option:
         .unwrap()],
         ..new_run_params()
     };
-        let outcome = run_test_suite_lib::run_test_and_get_outcome(
+        let outcome = run_test_suite_lib::run_tests_and_get_outcome(
             run_test_suite_lib::SingleRunConnector::new(
-                connect_to_protocol::<SuiteRunnerMarker>()
-                        .expect("connecting to SuiteRunnerProxy")
+                connect_to_protocol::<RunBuilderMarker>()
+                        .expect("connecting to RunBuilderProxy")
             ),
-            test_params,
+            vec![test_params],
             run_params,
             run_test_suite_lib::output::RunReporter::new(reporter),
             futures::future::pending(),
@@ -1567,11 +1646,11 @@ async fn test_stdout_and_log_filter_ansi(
         ..new_run_params()
     };
 
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        test_params,
+        vec![test_params],
         run_params,
         reporter,
         futures::future::pending(),
@@ -1593,28 +1672,28 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/stdout_ansi_test
     assert_eq!(outcome, Outcome::Passed);
 }
 
-#[test_case(LogsIteratorType::Batch ; "batch")]
-#[test_case(LogsIteratorType::Socket ; "archive")]
+#[test_case(LogsIteratorOption::BatchIterator ; "batch")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
-async fn test_logging_component_max_severity_info(iterator_option: LogsIteratorType) {
+async fn test_logging_component_max_severity_info(iterator_option: LogsIteratorOption) {
     test_max_severity(Severity::Info, iterator_option).await;
 }
 
-#[test_case(LogsIteratorType::Batch ; "batch")]
-#[test_case(LogsIteratorType::Socket ; "archive")]
+#[test_case(LogsIteratorOption::BatchIterator ; "batch")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
-async fn test_logging_component_max_severity_warn(iterator_option: LogsIteratorType) {
+async fn test_logging_component_max_severity_warn(iterator_option: LogsIteratorOption) {
     test_max_severity(Severity::Warn, iterator_option).await;
 }
 
-#[test_case(LogsIteratorType::Batch ; "batch")]
-#[test_case(LogsIteratorType::Socket ; "archive")]
+#[test_case(LogsIteratorOption::BatchIterator ; "batch")]
+#[test_case(LogsIteratorOption::SocketBatchIterator ; "archive")]
 #[fuchsia::test]
-async fn test_logging_component_max_severity_error(iterator_option: LogsIteratorType) {
+async fn test_logging_component_max_severity_error(iterator_option: LogsIteratorOption) {
     test_max_severity(Severity::Error, iterator_option).await;
 }
 
-async fn test_max_severity(max_severity: Severity, iterator_option: LogsIteratorType) {
+async fn test_max_severity(max_severity: Severity, iterator_option: LogsIteratorOption) {
     let mut test_params = new_test_params(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/error_logging_test.cm",
     );
@@ -1623,11 +1702,11 @@ async fn test_max_severity(max_severity: Severity, iterator_option: LogsIterator
     let (reporter, output) = create_shell_reporter();
     let mut run_params = new_run_params();
     run_params.log_protocol = Some(iterator_option);
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        test_params,
+        vec![test_params],
         run_params,
         run_test_suite_lib::output::RunReporter::new(reporter),
         futures::future::pending(),
@@ -1711,11 +1790,11 @@ async fn test_stdout_to_directory(
     );
     test_params.timeout_seconds = std::num::NonZeroU32::new(600);
 
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        test_params,
+        vec![test_params],
         new_run_params(),
         reporter,
         futures::future::pending(),
@@ -1774,11 +1853,11 @@ async fn test_syslog_to_directory(
     test_params.timeout_seconds = std::num::NonZeroU32::new(600);
     test_params.max_severity_logs = Some(Severity::Warn);
 
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        test_params,
+        vec![test_params],
         new_run_params(),
         reporter,
         futures::future::pending(),
@@ -1828,11 +1907,11 @@ async fn test_custom_artifacts_to_directory(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/custom_artifact_user.cm",
     );
 
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        test_params,
+        vec![test_params],
         new_run_params(),
         reporter,
         futures::future::pending(),
@@ -1881,11 +1960,11 @@ async fn test_terminate_signal(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/long_running_test.cm",
     );
 
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        test_params,
+        vec![test_params],
         new_run_params(),
         reporter,
         futures::future::ready(()),
@@ -1919,7 +1998,6 @@ async fn test_terminate_signal(
     // simultaneously, we'll need to support writing to multiple reporters at once as well.
 }
 
-/*
 #[fixture::fixture(run_with_reporter)]
 #[fuchsia::test]
 async fn test_terminate_signal_multiple_suites(
@@ -1932,9 +2010,9 @@ async fn test_terminate_signal_multiple_suites(
         "fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/long_running_test.cm",
     );
 
-    let outcome = run_test_suite_lib::run_test_and_get_outcome(
+    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
         vec![test_params; 10],
         new_run_params(),
@@ -1974,7 +2052,6 @@ async fn test_terminate_signal_multiple_suites(
         );
     });
 }
-*/
 
 async fn wait_until_contains(output: &TestOutputView, contents: &str) {
     loop {
@@ -2001,11 +2078,11 @@ async fn test_collect_stream_artifacts_from_hung_test(
     let cancel_event = async_utils::event::Event::new();
     let cancel_waiter = cancel_event.wait();
 
-    let run_fut = run_test_suite_lib::run_test_and_get_outcome(
+    let run_fut = run_test_suite_lib::run_tests_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(
-            connect_to_protocol::<SuiteRunnerMarker>().expect("connecting to SuiteRunnerProxy"),
+            connect_to_protocol::<RunBuilderMarker>().expect("connecting to RunBuilderProxy"),
         ),
-        new_test_params(SUITE_NAME),
+        vec![new_test_params(SUITE_NAME)],
         new_run_params(),
         reporter,
         cancel_waiter,
