@@ -181,7 +181,7 @@ TEST_F(NetStreamSocketsTest, PeerClosedPOLLOUT) {
       .fd = server().get(),
       .events = POLLOUT,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kPositiveCheckTimeout).count());
   EXPECT_GE(n, 0) << strerror(errno);
   EXPECT_EQ(n, 1);
   EXPECT_EQ(pfd.revents, POLLOUT | POLLERR | POLLHUP);
