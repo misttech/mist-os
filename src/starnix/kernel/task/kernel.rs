@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::bpf::attachments::EbpfAttachments;
-use crate::container_namespace::ContainerNamespace;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
@@ -11,6 +10,7 @@ use crate::fs::fuchsia::nmfs::NetworkManagerHandle;
 use crate::mm::{FutexTable, MappingSummary, MlockPinFlavor, MlockShadowProcess, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
+use crate::task::container_namespace::ContainerNamespace;
 use crate::task::limits::SystemLimits;
 use crate::task::memory_attribution::MemoryAttributionManager;
 use crate::task::net::NetstackDevices;

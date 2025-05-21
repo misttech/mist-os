@@ -21,6 +21,7 @@ rustc_library("starnix_types") {
     "src/math.rs",
     "src/ownership.rs",
     "src/stats.rs",
+    "src/thread_start_info.rs",
     "src/time.rs",
     "src/user_buffer.rs",
     "src/vfs.rs",

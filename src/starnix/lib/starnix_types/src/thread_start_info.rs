@@ -1,12 +1,22 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_uapi::user_address::ArchSpecific;
+use crate::arch::ArchWidth;
+use starnix_uapi::user_address::UserAddress;
 use zx::sys::zx_thread_state_general_regs_t;
 
-use crate::loader::ThreadStartInfo;
+#[cfg(target_arch = "aarch64")]
+use starnix_uapi::user_address::ArchSpecific;
 
+pub struct ThreadStartInfo {
+    pub entry: UserAddress,
+    pub stack: UserAddress,
+    pub environ: UserAddress,
+    pub arch_width: ArchWidth,
+}
+
+#[cfg(target_arch = "aarch64")]
 impl From<ThreadStartInfo> for zx_thread_state_general_regs_t {
     fn from(val: ThreadStartInfo) -> Self {
         if val.arch_width.is_arch32() {
@@ -36,6 +46,28 @@ impl From<ThreadStartInfo> for zx_thread_state_general_regs_t {
                 sp: val.stack.ptr() as u64,
                 ..Default::default()
             }
+        }
+    }
+}
+
+#[cfg(target_arch = "riscv64")]
+impl From<ThreadStartInfo> for zx_thread_state_general_regs_t {
+    fn from(val: ThreadStartInfo) -> Self {
+        zx_thread_state_general_regs_t {
+            pc: val.entry.ptr() as u64,
+            sp: val.stack.ptr() as u64,
+            ..Default::default()
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+impl From<ThreadStartInfo> for zx_thread_state_general_regs_t {
+    fn from(val: ThreadStartInfo) -> Self {
+        zx_thread_state_general_regs_t {
+            rip: val.entry.ptr() as u64,
+            rsp: val.stack.ptr() as u64,
+            ..Default::default()
         }
     }
 }

@@ -22,13 +22,13 @@ use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
 use starnix_container_structured_config::Config as ContainerStructuredConfig;
-use starnix_core::container_namespace::ContainerNamespace;
 use starnix_core::execution::{
     create_init_process, create_system_task, execute_task_with_prerun_result,
 };
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
+use starnix_core::task::container_namespace::ContainerNamespace;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{

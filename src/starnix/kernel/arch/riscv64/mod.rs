@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 pub mod execution;
-pub mod loader;
 pub mod registers;
 pub mod signal_handling;
 pub mod syscalls;

@@ -16,6 +16,7 @@ use starnix_logging::{log_error, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_types::arch::ArchWidth;
 use starnix_types::math::round_up_to_system_page_size;
+use starnix_types::thread_start_info::ThreadStartInfo;
 use starnix_types::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
@@ -325,13 +326,6 @@ fn load_elf(
     elf_load::map_elf_segments(vmo, &headers, &mapper, mm.base_addr.ptr(), vaddr_bias)
         .map_err(elf_load_error_to_errno)?;
     Ok(LoadedElf { arch_width, headers, file_base, vaddr_bias, length })
-}
-
-pub struct ThreadStartInfo {
-    pub entry: UserAddress,
-    pub stack: UserAddress,
-    pub environ: UserAddress,
-    pub arch_width: ArchWidth,
 }
 
 /// Holds a resolved ELF VMO and associated parameters necessary for an execve call.

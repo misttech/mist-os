@@ -5,10 +5,10 @@
 use crate::arch::registers::RegisterState;
 use crate::arch::task::{decode_page_fault_exception_report, get_signal_for_general_exception};
 use crate::execution::{create_zircon_process, TaskInfo};
-use crate::loader::{load_executable, resolve_executable, ResolvedElf};
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor};
 use crate::security;
 use crate::signals::{send_signal_first, send_standard_signal, RunState, SignalInfo};
+use crate::task::loader::{load_executable, resolve_executable, ResolvedElf};
 use crate::task::{
     ExitStatus, PtraceCoreState, PtraceEvent, PtraceEventData, PtraceOptions, RobustListHeadPtr,
     SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,

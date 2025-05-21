@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::container_namespace::ContainerNamespace;
 use crate::device::mem::new_null_file;
 use crate::execution::{
     create_init_child_process, create_init_process, create_system_task,
@@ -13,6 +12,7 @@ use crate::fs::tmpfs::TmpFs;
 use crate::mm::syscalls::{do_mmap, sys_mremap};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
+use crate::task::container_namespace::ContainerNamespace;
 use crate::task::{CurrentTask, Kernel, SchedulerManager, Task, TaskBuilder};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
