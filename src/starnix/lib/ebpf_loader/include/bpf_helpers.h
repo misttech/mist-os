@@ -8,6 +8,8 @@ static void *(*const bpf_map_lookup_elem)(void *map,
                                           const void *key) = (void *)BPF_FUNC_map_lookup_elem;
 static long (*const bpf_map_update_elem)(void *map, const void *key, const void *value,
                                          __u64 flags) = (void *)BPF_FUNC_map_update_elem;
+static long (*const bpf_map_delete_elem)(void *map,
+                                         const void *key) = (void *)BPF_FUNC_map_delete_elem;
 static __u64 (*bpf_get_socket_cookie)(struct __sk_buff *skb) = (void *)BPF_FUNC_get_socket_cookie;
 static __u64 (*bpf_get_sk_cookie)(struct bpf_sock *sk) = (void *)BPF_FUNC_get_socket_cookie;
 static __u32 (*bpf_get_socket_uid)(struct __sk_buff *skb) = (void *)BPF_FUNC_get_socket_uid;

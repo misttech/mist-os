@@ -52,7 +52,10 @@ group("tests") {
 
 group("benchmarks") {
   testonly = true
-  deps = [ "gvisor:benchmarks" ]
+  deps = [
+    "ebpf_bench:benchmarks",
+    "gvisor:benchmarks",
+  ]
 }
 
 # Tests that use starnix_test_runner should depend on one of these.

@@ -267,6 +267,7 @@ where
     ]
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LoadBytesBase {
     MacHeader,
     NetworkHeader,
