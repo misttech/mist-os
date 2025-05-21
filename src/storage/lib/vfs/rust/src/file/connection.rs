@@ -958,7 +958,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
 
     #[cfg(target_os = "fuchsia")]
     async fn handle_get_backing_memory(&mut self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        get_backing_memory_validate_flags(flags, self.options.to_io1())?;
+        get_backing_memory_validate_flags(flags, self.options)?;
         self.file.get_backing_memory(flags).await
     }
 
