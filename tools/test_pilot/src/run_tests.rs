@@ -61,7 +61,7 @@ async fn run_test_inner(
 
         // Populate the main summary based on test run results.
         main_summary.common.duration = start_time.elapsed().as_millis() as i64;
-        main_summary.common.outcome = String::from(outcome_from_exit_status(exit_status));
+        main_summary.common.outcome = outcome_from_exit_status(exit_status);
         if let Some(stdout) = stdout_writer.path_if_wrote() {
             main_summary.common.artifacts.insert(
                 outdir.make_relative(&stdout).expect("stdout file is in output directory"),
@@ -91,7 +91,7 @@ async fn run_test_inner(
         exit_status
     };
 
-    if main_summary.maybe_merge_file(&outdir.subdir_summary("target"))? {
+    if main_summary.maybe_merge_file(&outdir.test_summary())? {
         main_summary.write(&outdir.main_summary())?;
     }
 
@@ -431,7 +431,7 @@ mod tests {
                         "envs": {"PATH": "/usr/bin"},
                         "exit_status": 0,
                         "program_path": "echo",
-                        "stdout_artifact": "echo_stdout.txt"
+                        "stdout_artifact": "echo/stdout.txt"
                     }
                 },
                 "test": {
@@ -440,7 +440,7 @@ mod tests {
                     "envs": {"PATH": "/usr/bin"},
                     "exit_status": 0,
                     "program_path": "echo",
-                    "stdout_artifact": "host_binary_stdout.txt"
+                    "stdout_artifact": "test/stdout.txt"
                 }
             }),
             log
