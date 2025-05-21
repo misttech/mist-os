@@ -111,7 +111,7 @@ class TestFindBazelPaths(unittest.TestCase):
         self.fuchsia_dir = Path(self._td.name)
         config_dir = self.fuchsia_dir / "build" / "bazel" / "config"
         config_dir.mkdir(parents=True)
-        (config_dir / "main_workspace_top_dir").write_text("some/top/dir\n")
+        (config_dir / "bazel_top_dir").write_text("some/top/dir\n")
 
         self.build_dir = self.fuchsia_dir / "out" / "build_dir"
         self.launcher_path = self.build_dir / "some/top/dir/bazel"
@@ -160,7 +160,7 @@ class TestFindBazelWorkspacePath(unittest.TestCase):
             fuchsia_dir = Path(tmp_dir)
             config_dir = fuchsia_dir / "build" / "bazel" / "config"
             config_dir.mkdir(parents=True)
-            (config_dir / "main_workspace_top_dir").write_text("some/top/dir\n")
+            (config_dir / "bazel_top_dir").write_text("some/top/dir\n")
 
             build_dir = fuchsia_dir / "out" / "build_dir"
             launcher_path = build_dir / "some/top/dir/bazel"
@@ -189,29 +189,20 @@ class TestGetBazelRelativeTopDir(unittest.TestCase):
             config_dir = fuchsia_dir / "build" / "bazel" / "config"
             config_dir.mkdir(parents=True)
 
-            main_config = config_dir / "main_workspace_top_dir"
+            main_config = config_dir / "bazel_top_dir"
             main_config.write_text("gen/test/bazel_workspace\n")
 
-            alt_config = config_dir / "alt_workspace_top_dir"
-            alt_config.write_text(" alternative_workspace \n")
-
             topdir, input_files = workspace_utils.get_bazel_relative_topdir(
-                fuchsia_dir, "main"
+                fuchsia_dir
             )
             self.assertEqual(topdir, "gen/test/bazel_workspace")
             self.assertListEqual(list(input_files), [main_config])
 
             topdir, input_files = workspace_utils.get_bazel_relative_topdir(
-                str(fuchsia_dir), "main"
+                str(fuchsia_dir)
             )
             self.assertEqual(topdir, "gen/test/bazel_workspace")
             self.assertListEqual(list(input_files), [main_config])
-
-            topdir, input_files = workspace_utils.get_bazel_relative_topdir(
-                str(fuchsia_dir), "alt"
-            )
-            self.assertEqual(topdir, "alternative_workspace")
-            self.assertListEqual(list(input_files), [alt_config])
 
 
 class TestWorkspaceShouldExcludeFile(unittest.TestCase):

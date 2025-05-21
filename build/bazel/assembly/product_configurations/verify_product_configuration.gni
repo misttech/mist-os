@@ -69,7 +69,7 @@ template("verify_product_configuration") {
       "--product_config2",
       rebase_path(inputs[1], root_build_dir),
       "--root_dir2",
-      bazel_main_top_dir_rebased + "/workspace",
+      bazel_top_dir_rebased + "/workspace",
       "--depfile",
       rebase_path(depfile, root_build_dir),
       "--output",

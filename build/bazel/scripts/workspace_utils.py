@@ -85,14 +85,11 @@ def find_fx_build_dir(fuchsia_dir: Path) -> T.Optional[Path]:
     return None
 
 
-def get_bazel_relative_topdir(
-    fuchsia_dir: str | Path, workspace_name: str
-) -> tuple[str, set[Path]]:
-    """Return Bazel topdir for a given workspace, relative to Ninja output dir.
+def get_bazel_relative_topdir(fuchsia_dir: str | Path) -> tuple[str, set[Path]]:
+    """Return Bazel topdir, relative to Ninja output dir.
 
     Args:
         fuchsia_dir: Fuchsia source directory path.
-        workspace_name: Name of workspace.
     Returns:
         A (topdir, input_files) pair, where input_files is a set of Path
         values corresponding to the file(s) read by this function.
@@ -102,7 +99,7 @@ def get_bazel_relative_topdir(
         "build",
         "bazel",
         "config",
-        f"{workspace_name}_workspace_top_dir",
+        "bazel_top_dir",
     )
     assert os.path.exists(input_file), "Missing input file: " + input_file
     with open(input_file) as f:
@@ -122,7 +119,7 @@ def find_bazel_launcher_path(
         Path to bazel launcher script, or empty Path() value if the file
         does not exist.
     """
-    bazel_topdir, _ = get_bazel_relative_topdir(fuchsia_dir, "main")
+    bazel_topdir, _ = get_bazel_relative_topdir(fuchsia_dir)
     result = build_dir / bazel_topdir / "bazel"
     return result if result.exists() else None
 
@@ -139,7 +136,7 @@ def find_bazel_workspace_path(
     Returns:
         Path to bazel workspace, or None if the directory does not exists.
     """
-    bazel_topdir, _ = get_bazel_relative_topdir(fuchsia_dir, "main")
+    bazel_topdir, _ = get_bazel_relative_topdir(fuchsia_dir)
     result = build_dir / bazel_topdir / "workspace"
     return result if result.exists() else None
 
@@ -966,7 +963,7 @@ def generate_fuchsia_workspace(
 
     # Find the location of the Bazel top-dir relative to the Ninja
     # build directory.
-    bazel_top_dir, input_files = get_bazel_relative_topdir(fuchsia_dir, "main")
+    bazel_top_dir, input_files = get_bazel_relative_topdir(fuchsia_dir)
 
     # Generate the bazel launcher and Bazel workspace files.
     generated = GeneratedWorkspaceFiles()

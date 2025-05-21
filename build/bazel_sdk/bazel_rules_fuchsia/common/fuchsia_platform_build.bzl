@@ -54,7 +54,7 @@ def _get_ninja_output_dir(repo_ctx):
     # in it.
     config_path = _get_fuchsia_source_relative_path(
         repo_ctx,
-        "build/bazel/config/main_workspace_top_dir",
+        "build/bazel/config/bazel_top_dir",
     )
     top_dir = repo_ctx.read(config_path).strip()
     num_fragments = len(top_dir.split("/"))

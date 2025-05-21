@@ -10,7 +10,7 @@
 # or output_base/
 fx-bazel-top-dir () {
   # See //build/bazel/config/README.md
-  local INPUT_FILE="${FUCHSIA_DIR}/build/bazel/config/main_workspace_top_dir"
+  local INPUT_FILE="${FUCHSIA_DIR}/build/bazel/config/bazel_top_dir"
   local TOPDIR
   TOPDIR=$(<"${INPUT_FILE}")
   echo "${FUCHSIA_BUILD_DIR}/${TOPDIR}"
