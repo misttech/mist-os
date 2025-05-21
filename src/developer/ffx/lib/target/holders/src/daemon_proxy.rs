@@ -146,18 +146,6 @@ where
     Ok(fidl::endpoints::create_proxy::<P::Protocol>())
 }
 
-/// The different ways to check the daemon's version against the local process' information
-#[derive(Clone, Debug)]
-pub enum DaemonVersionCheck {
-    /// Compare the buildid, requires the daemon to have been spawned by the same executable.
-    _SameBuildId(String),
-    /// Compare details from VersionInfo other than buildid, requires the daemon to have been
-    /// spawned by the same overall build.
-    SameVersionInfo(ffx_build_version::VersionInfo),
-    /// Checks to see if the API level matches.
-    _CheckApiLevel(version_history::ApiLevel),
-}
-
 /// Lock-protected contents of [ProxyState]
 enum ProxyStateInner<T: Proxy + Clone> {
     Uninitialized,
@@ -211,7 +199,7 @@ impl<T: Proxy + Clone> ProxyState<T> {
 
 pub struct Injection {
     env_context: EnvironmentContext,
-    daemon_check: DaemonVersionCheck,
+    version_info: ffx_build_version::VersionInfo,
     target_spec: Option<String>,
     node: Arc<overnet_core::Router>,
     daemon_once: ProxyState<DaemonProxy>,
@@ -231,13 +219,13 @@ impl std::fmt::Debug for Injection {
 impl Injection {
     pub fn new(
         env_context: EnvironmentContext,
-        daemon_check: DaemonVersionCheck,
+        version_info: ffx_build_version::VersionInfo,
         node: Arc<overnet_core::Router>,
         target_spec: Option<String>,
     ) -> Self {
         Self {
             env_context,
-            daemon_check,
+            version_info,
             node,
             target_spec,
             daemon_once: Default::default(),
@@ -249,7 +237,7 @@ impl Injection {
     pub async fn initialize_overnet(
         env_context: EnvironmentContext,
         router_interval: Option<Duration>,
-        daemon_check: DaemonVersionCheck,
+        version_info: ffx_build_version::VersionInfo,
     ) -> ffx_command_error::Result<Injection> {
         log::debug!("Initializing Overnet");
         let node = overnet_core::Router::new(router_interval)
@@ -257,7 +245,7 @@ impl Injection {
         log::debug!("Getting target");
         let target_spec = ffx_target::get_target_specifier(&env_context).await?;
         log::debug!("Building Injection");
-        Ok(Injection::new(env_context, daemon_check, node, target_spec))
+        Ok(Injection::new(env_context, version_info, node, target_spec))
     }
 
     async fn init_remote_proxy(
@@ -315,7 +303,7 @@ impl Injection {
                         start_mode,
                         Arc::clone(&self.node),
                         self.env_context.clone(),
-                        self.daemon_check.clone(),
+                        self.version_info.clone(),
                         first_connection,
                     )
                 })
@@ -393,7 +381,7 @@ impl Injector for Injection {
                     DaemonStart::DoNotAutoStart,
                     Arc::clone(&self.node),
                     self.env_context.clone(),
-                    self.daemon_check.clone(),
+                    self.version_info.clone(),
                     first_connection,
                 )
             })
@@ -479,7 +467,7 @@ async fn init_daemon_proxy(
     autostart: DaemonStart,
     node: Arc<overnet_core::Router>,
     context: EnvironmentContext,
-    version_check: DaemonVersionCheck,
+    version_info: ffx_build_version::VersionInfo,
     first_connection: bool,
 ) -> anyhow::Result<DaemonProxy> {
     let ascendd_path = context.get_ascendd_path().await?;
@@ -510,35 +498,12 @@ async fn init_daemon_proxy(
         .context("Getting hash from daemon")?;
 
     // Check the version against the given comparison scheme.
-    log::debug!("Checking daemon version: {version_check:?}");
+    log::debug!("Checking daemon version: {version_info:?}");
     log::debug!("Daemon version info: {daemon_version_info:?}");
-    let matched_proxy = match (first_connection, version_check, daemon_version_info) {
-        (false, _, _) => true,
-        (_, DaemonVersionCheck::_SameBuildId(ours), VersionInfo { build_id: Some(daemon), .. })
-            if ours == daemon =>
-        {
-            true
-        }
-        (_, DaemonVersionCheck::SameVersionInfo(ours), daemon)
-            if ours.build_version == daemon.build_version
-                && ours.commit_hash == daemon.commit_hash
-                && ours.commit_timestamp == daemon.commit_timestamp =>
-        {
-            true
-        }
-        (
-            _,
-            DaemonVersionCheck::_CheckApiLevel(ours),
-            VersionInfo { api_level: Some(daemon), .. },
-        ) if {
-            #[allow(deprecated)]
-            ours.as_u64()
-        } == daemon =>
-        {
-            true
-        }
-        _ => false,
-    };
+    let matched_proxy = !first_connection
+        || (version_info.build_version == daemon_version_info.build_version
+            && version_info.commit_hash == daemon_version_info.commit_hash
+            && version_info.commit_timestamp == daemon_version_info.commit_timestamp);
 
     if matched_proxy {
         log::debug!("Found matching daemon version, using it.");
@@ -644,7 +609,7 @@ mod test {
             DaemonStart::AutoStart,
             overnet_core::Router::new(None).unwrap(),
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             true,
         )
         .await;
@@ -665,7 +630,7 @@ mod test {
             DaemonStart::AutoStart,
             overnet_core::Router::new(None).unwrap(),
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             true,
         )
         .await;
@@ -677,7 +642,7 @@ mod test {
     async fn test_daemon_custom<F, R>(
         local_node: Arc<overnet_core::Router>,
         sockpath: PathBuf,
-        build_id: &str,
+        commit_hash: &str,
         sleep_secs: u64,
         handler: F,
     ) -> Task<()>
@@ -685,11 +650,8 @@ mod test {
         F: Fn(DaemonRequest) -> R + 'static,
         F::Output: Future<Output = anyhow::Result<(), fidl::Error>>,
     {
-        let version_info = VersionInfo {
-            exec_path: Some(std::env::current_exe().unwrap().to_string_lossy().to_string()),
-            build_id: Some(build_id.to_owned()),
-            ..Default::default()
-        };
+        let version_info =
+            VersionInfo { commit_hash: Some(commit_hash.to_owned()), ..Default::default() };
         let daemon = overnet_core::Router::new(None).unwrap();
         let listener = UnixListener::bind(&sockpath).unwrap();
         let local_link_task = start_socket_link(Arc::clone(&local_node), sockpath.clone());
@@ -760,10 +722,10 @@ mod test {
     async fn test_daemon(
         local_node: Arc<overnet_core::Router>,
         sockpath: PathBuf,
-        build_id: &str,
+        commit_hash: &str,
         sleep_secs: u64,
     ) -> Task<()> {
-        test_daemon_custom(local_node, sockpath, build_id, sleep_secs, |request| async move {
+        test_daemon_custom(local_node, sockpath, commit_hash, sleep_secs, |request| async move {
             panic!("unimplemented stub for request: {:?}", request);
         })
         .await
@@ -784,13 +746,20 @@ mod test {
             DaemonStart::AutoStart,
             local_node,
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             true,
         )
         .await
         .unwrap();
         proxy.quit().await.unwrap();
         daemons_task.await;
+    }
+
+    fn test_version_info() -> ffx_build_version::VersionInfo {
+        ffx_build_version::VersionInfo {
+            commit_hash: Some("testcurrenthash".to_owned()),
+            ..Default::default()
+        }
     }
 
     #[fuchsia::test]
@@ -818,7 +787,7 @@ mod test {
             DaemonStart::AutoStart,
             local_node,
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             true,
         )
         .await
@@ -843,7 +812,7 @@ mod test {
             DaemonStart::AutoStart,
             local_node,
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             true,
         )
         .await
@@ -868,7 +837,7 @@ mod test {
             DaemonStart::AutoStart,
             local_node,
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             true,
         )
         .await;
@@ -963,7 +932,7 @@ mod test {
 
         let injection = Injection::new(
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             local_node,
             Some("".into()),
         );
@@ -1079,7 +1048,7 @@ mod test {
 
         let injection = Injection::new(
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             local_node,
             Some("".into()),
         );
@@ -1201,7 +1170,7 @@ mod test {
 
         let injection = Injection::new(
             test_env.context.clone(),
-            DaemonVersionCheck::_SameBuildId("testcurrenthash".to_owned()),
+            test_version_info(),
             local_node,
             Some("".into()),
         );
