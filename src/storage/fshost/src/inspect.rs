@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error};
-use fidl_fuchsia_io::{DirectoryProxy, NodeAttributes, PERM_READABLE};
+use fidl_fuchsia_io::{self as fio, DirectoryProxy, PERM_READABLE};
 use fuchsia_fs::directory::{open_directory, open_file, readdir, DirentKind};
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt};
@@ -92,11 +92,14 @@ fn record_tree_size(
                 DirentKind::File => {
                     let child = node.create_child(&dir_entry.name);
                     let file_proxy = open_file(&dir_proxy, &dir_entry.name, PERM_READABLE).await?;
-                    let attrs = file_proxy
-                        .get_attr()
-                        .await
-                        .map(|(status, attrs)| zx::Status::ok(status).map(|_| attrs))??;
-                    let size: TreeSize = attrs.into();
+                    let (_, immutable_attributes) = file_proxy
+                        .get_attributes(
+                            fio::NodeAttributesQuery::CONTENT_SIZE
+                                | fio::NodeAttributesQuery::STORAGE_SIZE,
+                        )
+                        .await?
+                        .map_err(zx::Status::from_raw)?;
+                    let size: TreeSize = immutable_attributes.into();
                     size.record(&child);
                     node.record(child);
                     total += size;
@@ -138,9 +141,12 @@ impl TreeSize {
     }
 }
 
-impl From<NodeAttributes> for TreeSize {
-    fn from(value: NodeAttributes) -> Self {
-        Self { content_size: value.content_size, storage_size: value.storage_size }
+impl From<fio::ImmutableNodeAttributes> for TreeSize {
+    fn from(value: fio::ImmutableNodeAttributes) -> Self {
+        Self {
+            content_size: value.content_size.unwrap_or_default(),
+            storage_size: value.storage_size.unwrap_or_default(),
+        }
     }
 }
 

@@ -1530,7 +1530,9 @@ mod tests {
                 .await
             };
 
-            node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            node_id = immutable_attributes.id.unwrap();
 
             project_proxy
                 .set_for_node(node_id, 0)
@@ -1775,7 +1777,10 @@ mod tests {
                 assert_eq!(nodes, 0);
             }
 
-            let node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            let node_id = immutable_attributes.id.unwrap();
+
             first_object_id = node_id;
             project_proxy
                 .set_for_node(node_id, PROJECT_ID)
@@ -1906,7 +1911,10 @@ mod tests {
             )
             .await;
 
-            let node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            let node_id = immutable_attributes.id.unwrap();
+
             project_proxy
                 .set_for_node(node_id, PROJECT_ID)
                 .await
@@ -2055,7 +2063,10 @@ mod tests {
                 .await
             };
             {
-                let node_id = dir_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) =
+                    dir_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+                let node_id = immutable_attributes.id.unwrap();
+
                 project_proxy
                     .set_for_node(node_id, PROJECT_ID)
                     .await
@@ -2074,7 +2085,13 @@ mod tests {
             )
             .await;
             {
-                let node_id = subdir_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) = subdir_proxy
+                    .get_attributes(fio::NodeAttributesQuery::ID)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let node_id = immutable_attributes.id.unwrap();
+
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
@@ -2093,7 +2110,10 @@ mod tests {
             )
             .await;
             {
-                let node_id = file_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) =
+                    file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+                let node_id = immutable_attributes.id.unwrap();
+
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
@@ -2116,7 +2136,12 @@ mod tests {
             )
             .await;
             {
-                let node_id = tmpfile_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) = tmpfile_proxy
+                    .get_attributes(fio::NodeAttributesQuery::ID)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let node_id: u64 = immutable_attributes.id.unwrap();
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
@@ -2214,7 +2239,9 @@ mod tests {
                 )
                 .await
             };
-            let node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            let node_id = immutable_attributes.id.unwrap();
             project_proxy
                 .set_for_node(node_id, NON_ZERO_PROJECT_ID)
                 .await

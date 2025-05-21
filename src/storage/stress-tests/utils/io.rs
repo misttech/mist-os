@@ -230,10 +230,10 @@ impl File {
 
     // Get the size of this file as it exists on disk
     pub async fn size_on_disk(&self) -> Result<u64, Status> {
-        match self.proxy.get_attr().await {
-            Ok((raw_status_code, attr)) => {
-                Status::ok(raw_status_code)?;
-                Ok(attr.storage_size)
+        match self.proxy.get_attributes(fio::NodeAttributesQuery::STORAGE_SIZE).await {
+            Ok(res) => {
+                let (_, immutable_attributes) = res.map_err(Status::from_raw)?;
+                Ok(immutable_attributes.storage_size.unwrap_or_default())
             }
             Err(e) => {
                 if e.is_closed() {
@@ -247,10 +247,10 @@ impl File {
 
     // Get the uncompressed size of this file (as it would exist in memory)
     pub async fn uncompressed_size(&self) -> Result<u64, Status> {
-        match self.proxy.get_attr().await {
-            Ok((raw_status_code, attr)) => {
-                Status::ok(raw_status_code)?;
-                Ok(attr.content_size)
+        match self.proxy.get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE).await {
+            Ok(res) => {
+                let (_, immutable_attributes) = res.map_err(Status::from_raw)?;
+                Ok(immutable_attributes.content_size.unwrap_or_default())
             }
             Err(e) => {
                 if e.is_closed() {

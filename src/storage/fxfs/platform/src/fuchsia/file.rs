@@ -848,11 +848,19 @@ mod tests {
         assert_eq!(buf.len(), expected_output.as_bytes().len());
         assert!(buf.iter().eq(expected_output.as_bytes().iter()));
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(attrs.content_size, expected_output.as_bytes().len() as u64);
-        // We haven't synced yet, but the pending writes should have blocks reserved still.
-        assert_eq!(attrs.storage_size, fixture.fs().block_size() as u64);
+        let (_, immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("get_attributes failed");
+
+        assert_eq!(
+            immutable_attributes.content_size.unwrap(),
+            expected_output.as_bytes().len() as u64
+        );
+        assert_eq!(immutable_attributes.storage_size.unwrap(), fixture.fs().block_size() as u64);
 
         let () = file
             .sync()
@@ -861,10 +869,19 @@ mod tests {
             .map_err(Status::from_raw)
             .expect("sync failed");
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(attrs.content_size, expected_output.as_bytes().len() as u64);
-        assert_eq!(attrs.storage_size, fixture.fs().block_size() as u64);
+        let (_, immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("get_attributes failed");
+
+        assert_eq!(
+            immutable_attributes.content_size.unwrap(),
+            expected_output.as_bytes().len() as u64
+        );
+        assert_eq!(immutable_attributes.storage_size.unwrap(), fixture.fs().block_size() as u64);
 
         close_file_checked(file).await;
         fixture.close().await;
@@ -1038,10 +1055,16 @@ mod tests {
                 assert_eq!(buf, vec![0xaa as u8; 8192]);
             }
 
-            let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-            Status::ok(status).expect("get_attr failed");
-            assert_eq!(attrs.content_size, 8192u64);
-            assert_eq!(attrs.storage_size, 8192u64);
+            let (_, immutable_attributes) = file
+                .get_attributes(
+                    fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+                )
+                .await
+                .expect("FIDL call failed")
+                .expect("get_attributes failed");
+
+            assert_eq!(immutable_attributes.content_size.unwrap(), 8192u64);
+            assert_eq!(immutable_attributes.storage_size.unwrap(), 8192u64);
 
             close_file_checked(file).await;
             device = fixture.close().await;
@@ -1094,10 +1117,19 @@ mod tests {
         assert_eq!(buf.len(), expected_output.as_bytes().len());
         assert_eq!(&buf[..], expected_output.as_bytes());
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(attrs.content_size, expected_output.as_bytes().len() as u64);
-        assert_eq!(attrs.storage_size, fixture.fs().block_size() as u64);
+        let (_, immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("get_attributes failed");
+
+        assert_eq!(
+            immutable_attributes.content_size.unwrap(),
+            expected_output.as_bytes().len() as u64
+        );
+        assert_eq!(immutable_attributes.storage_size.unwrap(), fixture.fs().block_size() as u64);
 
         close_file_checked(file).await;
         fixture.close().await;

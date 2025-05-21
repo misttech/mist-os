@@ -3287,63 +3287,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_deprecated_set_attrs() {
-        let fixture = TestFixture::new().await;
-        let root = fixture.root();
-
-        let dir = open_dir_checked(
-            &root,
-            "foo",
-            fio::Flags::FLAG_MAYBE_CREATE
-                | fio::PERM_READABLE
-                | fio::PERM_WRITABLE
-                | fio::Flags::PROTOCOL_DIRECTORY,
-            Default::default(),
-        )
-        .await;
-
-        let (status, initial_attrs) = dir.get_attr().await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("get_attr failed");
-
-        let crtime = initial_attrs.creation_time ^ 1u64;
-        let mtime = initial_attrs.modification_time ^ 1u64;
-
-        let mut attrs = initial_attrs.clone();
-        attrs.creation_time = crtime;
-        attrs.modification_time = mtime;
-        let status = dir
-            .deprecated_set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
-            .await
-            .expect("FIDL call failed");
-        zx::Status::ok(status).expect("set_attr failed");
-
-        let mut expected_attrs = initial_attrs.clone();
-        expected_attrs.creation_time = crtime; // Only crtime is updated so far.
-        let (status, attrs) = dir.get_attr().await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("get_attr failed");
-        assert_eq!(expected_attrs, attrs);
-
-        let mut attrs = initial_attrs.clone();
-        attrs.creation_time = 0u64; // This should be ignored since we don't set the flag.
-        attrs.modification_time = mtime;
-        let status = dir
-            .deprecated_set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
-            .await
-            .expect("FIDL call failed");
-        zx::Status::ok(status).expect("set_attr failed");
-
-        let mut expected_attrs = initial_attrs.clone();
-        expected_attrs.creation_time = crtime;
-        expected_attrs.modification_time = mtime;
-        let (status, attrs) = dir.get_attr().await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("get_attr failed");
-        assert_eq!(expected_attrs, attrs);
-
-        close_dir_checked(dir).await;
-        fixture.close().await;
-    }
-
-    #[fuchsia::test]
     async fn test_link_symlink_into_encrypted_directory() {
         let fixture = TestFixture::new().await;
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
@@ -3740,8 +3683,11 @@ mod tests {
                 .expect("FIDL call failed")
                 .expect("rename failed");
 
-            let (status, _) = proxy.get_attr().await.expect("FIDL call failed");
-            assert_eq!(zx::Status::from_raw(status), zx::Status::NOT_FOUND);
+            let result = proxy
+                .get_attributes(fio::NodeAttributesQuery::empty())
+                .await
+                .expect("FIDL call failed");
+            assert_eq!(result.err(), Some(zx::Status::NOT_FOUND.into_raw()));
             assert_matches!(
                 proxy.describe().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })

@@ -270,22 +270,26 @@ async fn get_entries(dir: &fio::DirectoryProxy) -> Result<Vec<DirectoryEntry>, E
             server_end.into_channel(),
         )
         .with_context(|| format!("failed to open file {}", ent.name))?;
-        let (status, attrs) = file_proxy.get_attr().await.with_context(|| {
-            format!("failed to get attributes of file {}: (fidl failure)", ent.name)
-        })?;
-        if zx::Status::from_raw(status) != zx::Status::OK {
-            bail!("failed to get attributes of file {}", ent.name);
-        }
-        let data = file_proxy
-            .read(attrs.content_size)
-            .await
-            .with_context(|| {
-                format!("failed to read contents of file {}: (fidl failure)", ent.name)
-            })?
-            .map_err(zx::Status::from_raw)
-            .with_context(|| format!("failed to read contents of file {}", ent.name))?;
 
-        entries.push(DirectoryEntry { name: ent.name.as_bytes().to_vec(), data });
+        let result =
+            file_proxy.get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE).await.with_context(
+                || format!("failed to get attributes of file {}: (fidl failure)", ent.name),
+            )?;
+        match result {
+            Err(_) => bail!("failed to get attributes of file {}", ent.name),
+            Ok((_, immutable_attributes)) => {
+                let data = file_proxy
+                    .read(immutable_attributes.content_size.unwrap_or_default())
+                    .await
+                    .with_context(|| {
+                        format!("failed to read contents of file {}: (fidl failure)", ent.name)
+                    })?
+                    .map_err(zx::Status::from_raw)
+                    .with_context(|| format!("failed to read contents of file {}", ent.name))?;
+
+                entries.push(DirectoryEntry { name: ent.name.as_bytes().to_vec(), data });
+            }
+        }
     }
 
     entries.sort_by(|a, b| a.name.cmp(&b.name));

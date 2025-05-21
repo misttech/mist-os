@@ -342,7 +342,10 @@ impl TestFixture {
         self.dir("data", fio::PERM_READABLE)
             .open(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
-        file.get_attr().await.expect("get_attr failed - data was probably deleted!");
+        file.get_attributes(fio::NodeAttributesQuery::empty())
+            .await
+            .expect("Fidl transport error on get_attributes()")
+            .expect("get_attr failed - data was probably deleted!");
 
         let data = self.dir("data", fio::PERM_READABLE);
         fuchsia_fs::directory::open_file(&data, ".testdata", fio::PERM_READABLE).await.unwrap();
@@ -366,11 +369,14 @@ impl TestFixture {
     /// Checks for the absence of the .testdata marker file, indicating the data filesystem was
     /// reformatted.
     pub async fn check_test_data_file_absent(&self) {
-        let (file, server) = create_proxy::<fio::NodeMarker>();
-        self.dir("data", fio::PERM_READABLE)
-            .open(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
-            .expect("open failed");
-        file.get_attr().await.expect_err(".testdata should be absent");
+        let err = fuchsia_fs::directory::open_file(
+            &self.dir("data", fio::PERM_READABLE),
+            ".testdata",
+            fio::PERM_READABLE,
+        )
+        .await
+        .expect_err("open_file failed");
+        assert!(err.is_not_found_error());
     }
 
     async fn add_ramdisk(&mut self, vmo: zx::Vmo, type_guid: Option<[u8; 16]>) {
