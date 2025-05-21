@@ -8,7 +8,7 @@ import("../libc.gni")
 # This is only included in the new implementation.
 libc_source_set("threads") {
   sources = []
-  libc_deps = [ ":thread-allocator" ]
+  libc_deps = [ ":thread-storage" ]
 }
 
 # This doesn't need to be libc_source_set() because it's just a header.
@@ -17,28 +17,28 @@ source_set("shadow-call-stack") {
   sources = []
 }
 
-libc_source_set("thread-allocator") {
-  public = [ "thread-allocator.h" ]
+libc_source_set("thread-storage") {
+  public = [ "thread-storage.h" ]
   libc_public_deps = [ "../zircon:vmar" ]
   public_deps = [
     ":shadow-call-stack",
     "//src/lib/elfldltl:headers",
     "//zircon/system/ulib/zx",
   ]
-  sources = [ "thread-allocator.cc" ]
+  sources = [ "thread-storage.cc" ]
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
 }
 
 group("unittests") {
   testonly = true
-  deps = [ ":thread-allocator-tests" ]
+  deps = [ ":thread-storage-tests" ]
 }
 
-libc_test("thread-allocator-tests") {
-  sources = [ "thread-allocator-tests.cc" ]
+libc_test("thread-storage-tests") {
+  sources = [ "thread-storage-tests.cc" ]
   include_dirs = [ "//sdk/lib/ld/test/modules" ]
   deps = [
-    ":thread-allocator.testonly",
+    ":thread-storage.testonly",
     "../test:safe-zero-construction",
     "//sdk/lib/fit",
     "//sdk/lib/ld:headers",

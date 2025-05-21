@@ -19,7 +19,7 @@
 #include <zxtest/zxtest.h>
 
 #include "../test/safe-zero-construction.h"
-#include "thread-allocator.h"
+#include "thread-storage.h"
 #include "threads_impl.h"
 #include "tls-dep.h"
 
@@ -29,7 +29,7 @@ namespace {
 using TlsLayout = elfldltl::TlsLayout<>;
 using TlsTraits = elfldltl::TlsTraits<>;
 
-using InitializeTlsFn = void(std::span<std::byte> thread_block, ptrdiff_t tp_offset);
+using InitializeTlsFn = void(std::span<std::byte> thread_block, size_t tp_offset);
 
 class LibcThreadTests : public ::zxtest::Test {
  public:
@@ -37,7 +37,7 @@ class LibcThreadTests : public ::zxtest::Test {
   // end of the test, just in case.
   static inline const PageRoundedSize kTestVmarSize{1 << 30};
 
-  // Tests can set these so ThreadAllocator::Allocate will use them.
+  // Tests can set these so ThreadStorage::Allocate will use them.
   // They're reset for each test.
   static inline TlsLayout gTlsLayout;
   static inline fit::function<InitializeTlsFn> gInitializeTls;
@@ -75,7 +75,7 @@ class LibcThreadTests : public ::zxtest::Test {
   PageRoundedSize test_vmar_size_;
 };
 
-constexpr std::string_view kThreadName = "thread-allocator-test";
+constexpr std::string_view kThreadName = "thread-storage-test";
 
 const PageRoundedSize kOnePage{1};
 const PageRoundedSize kManyPages = kOnePage * 256;
@@ -190,20 +190,20 @@ void CheckStack(std::string_view stack_name, PageRoundedSize stack_size, PageRou
   ASSERT_DEATH(DeathByWrite(far_in_guard), "%s", std::string(stack_name).c_str());
 }
 
-void CheckAllocator(PageRoundedSize stack_size, PageRoundedSize guard_size,
-                    const ThreadAllocator& allocator) {
-  CheckThread(allocator.thread());
+void CheckStorage(PageRoundedSize stack_size, PageRoundedSize guard_size,
+                  const ThreadStorage& storage, Thread* thread) {
+  CheckThread(thread);
 
   // The abi.unsafe_sp slot should already be filled in.
   CheckStack("unsafe stack", stack_size, guard_size,
-             reinterpret_cast<uint64_t*>(allocator.thread()->abi.unsafe_sp));
+             reinterpret_cast<uint64_t*>(thread->abi.unsafe_sp));
 
-  CheckStack("machine stack", stack_size, guard_size, allocator.machine_sp());
+  CheckStack("machine stack", stack_size, guard_size, storage.machine_sp());
 
   if constexpr (kShadowCallStackAbi) {
-    CheckStack<true>("shadow call stack", stack_size, guard_size, allocator.shadow_call_sp());
+    CheckStack<true>("shadow call stack", stack_size, guard_size, storage.shadow_call_sp());
   } else {
-    EXPECT_EQ(allocator.shadow_call_sp(), nullptr);
+    EXPECT_EQ(storage.shadow_call_sp(), nullptr);
   }
 }
 
@@ -259,79 +259,83 @@ void CheckVmoName(zx::unowned_vmar vmar, std::string_view expected_name, zx_vadd
   EXPECT_STREQ(std::string{expected_name}, std::string{vmo_name});
 }
 
-TEST_F(LibcThreadTests, ThreadAllocator) {
-  ThreadAllocator allocator;
+TEST_F(LibcThreadTests, ThreadStorage) {
+  ThreadStorage storage;
 
   // Empty when constructed.
-  EXPECT_EQ(allocator.thread(), nullptr);
-  EXPECT_EQ(allocator.machine_sp(), nullptr);
-  EXPECT_EQ(allocator.shadow_call_sp(), nullptr);
+  EXPECT_EQ(storage.stack_size().get(), 0u);
+  EXPECT_EQ(storage.guard_size().get(), 0u);
+  EXPECT_EQ(storage.machine_sp(), nullptr);
+  EXPECT_EQ(storage.unsafe_sp(), nullptr);
+  EXPECT_EQ(storage.shadow_call_sp(), nullptr);
 
   // Allocate the most basic layout: one-page stacks, one-page guards.
-  auto result = allocator.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
+  auto result = storage.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
   ASSERT_TRUE(result.is_ok()) << result.status_string();
 
-  CheckVmoName(TestVmar(), kThreadName, reinterpret_cast<uintptr_t>(allocator.thread()));
+  CheckVmoName(TestVmar(), kThreadName, reinterpret_cast<uintptr_t>(*result));
 
-  CheckAllocator(kOnePage, kOnePage, allocator);
+  CheckStorage(kOnePage, kOnePage, storage, *result);
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorDefaultName) {
-  ThreadAllocator allocator;
+TEST_F(LibcThreadTests, ThreadStorageDefaultName) {
+  ThreadStorage storage;
 
   // Empty when constructed.
-  EXPECT_EQ(allocator.thread(), nullptr);
-  EXPECT_EQ(allocator.machine_sp(), nullptr);
-  EXPECT_EQ(allocator.shadow_call_sp(), nullptr);
+  EXPECT_EQ(storage.stack_size().get(), 0u);
+  EXPECT_EQ(storage.guard_size().get(), 0u);
+  EXPECT_EQ(storage.machine_sp(), nullptr);
+  EXPECT_EQ(storage.unsafe_sp(), nullptr);
+  EXPECT_EQ(storage.shadow_call_sp(), nullptr);
 
   // Use an empty thread name so the non-empty default is used instead.
-  auto result = allocator.Allocate(TestVmar(), "", kOnePage, kOnePage);
+  auto result = storage.Allocate(TestVmar(), "", kOnePage, kOnePage);
   ASSERT_TRUE(result.is_ok()) << result.status_string();
 
-  CheckVmoName(TestVmar(), "thread-stacks+TLS", reinterpret_cast<uintptr_t>(allocator.thread()));
+  CheckVmoName(TestVmar(), "thread-stacks+TLS", reinterpret_cast<uintptr_t>(*result));
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorTooBig) {
-  ThreadAllocator allocator;
+TEST_F(LibcThreadTests, ThreadStorageTooBig) {
+  ThreadStorage storage;
 
   // Use a stack size so big that they can't all be mapped in.
   const PageRoundedSize stack{kTestVmarSize / 2};
-  auto result = allocator.Allocate(TestVmar(), kThreadName, stack, kOnePage);
+  auto result = storage.Allocate(TestVmar(), kThreadName, stack, kOnePage);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value(), ZX_ERR_NO_RESOURCES);
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorBigStack) {
-  ThreadAllocator allocator;
+TEST_F(LibcThreadTests, ThreadStorageBigStack) {
+  ThreadStorage storage;
 
-  auto result = allocator.Allocate(TestVmar(), kThreadName, kManyPages, kOnePage);
+  auto result = storage.Allocate(TestVmar(), kThreadName, kManyPages, kOnePage);
   ASSERT_TRUE(result.is_ok()) << result.status_string();
-  CheckAllocator(kManyPages, kOnePage, allocator);
+  CheckStorage(kManyPages, kOnePage, storage, *result);
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorBigGuard) {
-  ThreadAllocator allocator;
+TEST_F(LibcThreadTests, ThreadStorageBigGuard) {
+  ThreadStorage storage;
 
-  auto result = allocator.Allocate(TestVmar(), kThreadName, kOnePage, kManyPages);
+  auto result = storage.Allocate(TestVmar(), kThreadName, kOnePage, kManyPages);
   ASSERT_TRUE(result.is_ok()) << result.status_string();
-  CheckAllocator(kOnePage, kManyPages, allocator);
+  CheckStorage(kOnePage, kManyPages, storage, *result);
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorNoGuard) {
+TEST_F(LibcThreadTests, ThreadStorageNoGuard) {
   constexpr PageRoundedSize kNoGuard{};
 
-  ThreadAllocator allocator;
+  ThreadStorage storage;
 
   // Use a tiny test VMAR that only has space for the requested sizes.  If all
   // the blocks fit, then there can't be any guard pages.  Each stack is one
   // page with no guards.  The thread block always gets two one-page guards, so
   // the minimal one is three pages.
   const PageRoundedSize vmar_size = (kOnePage * kStackCount) + (kOnePage * 3);
-  auto result = allocator.Allocate(TestVmar(vmar_size), kThreadName, kOnePage, kNoGuard);
+  auto result = storage.Allocate(TestVmar(vmar_size), kThreadName, kOnePage, kNoGuard);
   ASSERT_TRUE(result.is_ok()) << result.status_string();
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorTls) {
+TEST_F(LibcThreadTests, ThreadStorageTls) {
   // Use a trivial TLS layout as if one TLS module has one uint32_t variable.
   constexpr size_t kTlsStart = TlsTraits::kTlsLocalExecOffset;
   static constexpr TlsLayout kTrivialLayout{
@@ -347,7 +351,7 @@ TEST_F(LibcThreadTests, ThreadAllocatorTls) {
   // This both initializes that "variable" and checks that it all started
   // zero-initialized so InitializeTls doesn't need to zero the tbss space.
   constexpr uint32_t kInitValue = 123467890;
-  gInitializeTls = [](std::span<std::byte> thread_block, ptrdiff_t tp_offset) {
+  gInitializeTls = [](std::span<std::byte> thread_block, size_t tp_offset) {
     ASSERT_LT(tp_offset + kTlsBias, thread_block.size_bytes())
         << " tp_offset " << tp_offset << " + bias " << kTlsBias;
     std::span segment = thread_block.subspan(tp_offset + kTlsBias, sizeof(uint32_t));
@@ -360,12 +364,12 @@ TEST_F(LibcThreadTests, ThreadAllocatorTls) {
     *Launder(ptr) = kInitValue;
   };
 
-  ThreadAllocator allocator;
-  auto result = allocator.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
+  ThreadStorage storage;
+  auto result = storage.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
   ASSERT_TRUE(result.is_ok()) << result.status_string();
-  CheckAllocator(kOnePage, kOnePage, allocator);
+  CheckStorage(kOnePage, kOnePage, storage, *result);
 
-  void* tp = pthread_to_tp(allocator.thread());
+  void* tp = pthread_to_tp(*result);
   uint32_t* ptr = ld::TpRelative<uint32_t>(kTlsBias, tp);
   EXPECT_EQ(*Launder(ptr), kInitValue) << "\n    TLS initial data from $tp " << tp << " + bias "
                                        << kTlsBias << " = " << static_cast<void*>(ptr);
@@ -374,7 +378,7 @@ TEST_F(LibcThreadTests, ThreadAllocatorTls) {
                                            << kTlsBias << " = " << static_cast<void*>(ptr);
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorTlsAlignment) {
+TEST_F(LibcThreadTests, ThreadStorageTlsAlignment) {
   // Use a layout with the largest supported alignment requirement: one page.
   const TlsLayout kBigAlignmentLayout{17, kOnePage.get()};
   const auto aligned_big = [kBigAlignmentLayout](size_t size) -> size_t {
@@ -386,7 +390,7 @@ TEST_F(LibcThreadTests, ThreadAllocatorTlsAlignment) {
   gInitializeTls = [tls_bias =  // Compute the $tp bias for the first module.
                     static_cast<ptrdiff_t>(aligned_big(TlsTraits::kTlsLocalExecOffset)) -
                     static_cast<ptrdiff_t>(TlsTraits::kTlsNegative ? kAlignedSize : 0)](
-                       std::span<std::byte> thread_block, ptrdiff_t tp_offset) {
+                       std::span<std::byte> thread_block, size_t tp_offset) {
     uintptr_t tp = reinterpret_cast<uintptr_t>(thread_block.data() + tp_offset);
     EXPECT_EQ(0u, (tp + tls_bias) % kOnePage.get())
         << std::hex << std::showbase << "\n    $tp " << tp << " from ["
@@ -396,13 +400,13 @@ TEST_F(LibcThreadTests, ThreadAllocatorTlsAlignment) {
         << kOnePage.get();
   };
 
-  ThreadAllocator allocator;
-  auto result = allocator.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
+  ThreadStorage storage;
+  auto result = storage.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
   ASSERT_TRUE(result.is_ok()) << result.status_string();
-  CheckAllocator(kOnePage, kOnePage, allocator);
+  CheckStorage(kOnePage, kOnePage, storage, *result);
 }
 
-TEST_F(LibcThreadTests, ThreadAllocatorTlsReal) {
+TEST_F(LibcThreadTests, ThreadStorageTlsReal) {
   // Use some real TLS data from the executable and an Initial Exec module to
   // ensure things match what the real compiled TLS accesses resolved to and
   // the other tests aren't just matching bugs with the implementation.
@@ -411,7 +415,7 @@ TEST_F(LibcThreadTests, ThreadAllocatorTlsReal) {
   const ptrdiff_t kIeOffset = ld::TpRelativeToOffset(&tls_dep_data);
 
   gTlsLayout = ld::testing::gStartupLdAbi.static_tls_layout;
-  gInitializeTls = [](std::span<std::byte> thread_block, ptrdiff_t tp_offset) {
+  gInitializeTls = [](std::span<std::byte> thread_block, size_t tp_offset) {
     ld::TlsInitialExecDataInit(ld::testing::gStartupLdAbi, thread_block, tp_offset, true);
   };
 
@@ -426,12 +430,12 @@ TEST_F(LibcThreadTests, ThreadAllocatorTlsReal) {
 
     ASSERT_GE(gTlsLayout.size_bytes(), std::abs(kIeOffset) + sizeof(uint32_t));
 
-    ThreadAllocator allocator;
-    auto result = allocator.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
+    ThreadStorage storage;
+    auto result = storage.Allocate(TestVmar(), kThreadName, kOnePage, kOnePage);
     ASSERT_TRUE(result.is_ok()) << result.status_string();
-    CheckAllocator(kOnePage, kOnePage, allocator);
+    CheckStorage(kOnePage, kOnePage, storage, *result);
 
-    void* tp = pthread_to_tp(allocator.thread());
+    void* tp = pthread_to_tp(*result);
     EXPECT_EQ(*Launder(ld::TpRelative<uint64_t>(kLeOffset, tp)), 0x12346789abcdef);
     EXPECT_EQ(*Launder(ld::TpRelative<int>(kIeOffset, tp)), kTlsDepDataValue);
     EXPECT_EQ(*Launder(ld::TpRelative<char>(kIeOffset + sizeof(uint32_t), tp)), '\0');
@@ -448,14 +452,14 @@ TEST_F(LibcThreadTests, ThreadAllocatorTlsReal) {
 
 // This is defined in the non-test code to get the real layout from the dynamic
 // linking state and such.  In test code, it's set to a synthetic layout.
-TlsLayout ThreadAllocator::GetTlsLayout() {
+TlsLayout ThreadStorage::GetTlsLayout() {
   // Tests just set this variable beforehand.
   return LibcThreadTests::gTlsLayout;
 }
 
 // This is defined in the non-test code to fill the real layout with all the
 // actual PT_TLS segments.  In test code, it's a callback set by the test.
-void ThreadAllocator::InitializeTls(std::span<std::byte> thread_block, ptrdiff_t tp_offset) {
+void ThreadStorage::InitializeTls(std::span<std::byte> thread_block, size_t tp_offset) {
   if (LibcThreadTests::gInitializeTls) {
     LibcThreadTests::gInitializeTls(thread_block, tp_offset);
   }

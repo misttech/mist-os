@@ -5,6 +5,7 @@
 #ifndef ZIRCON_SYSTEM_ULIB_C_THREADS_SHADOW_CALL_STACK_H_
 #define ZIRCON_SYSTEM_ULIB_C_THREADS_SHADOW_CALL_STACK_H_
 
+#include <concepts>
 #include <type_traits>
 
 #include "src/__support/macros/config.h"
@@ -25,6 +26,16 @@ struct NoShadowCallStack {};
 
 template <typename T>
 using IfShadowCallStack = std::conditional_t<kShadowCallStackAbi, T, NoShadowCallStack>;
+
+constexpr void OnShadowCallStack(NoShadowCallStack, auto&& f) {}
+constexpr void OnShadowCallStack(auto&& stack, auto&& f) {
+  std::forward<decltype(f)>(f)(std::forward<decltype(stack)>(stack));
+}
+
+constexpr auto ShadowCallStackOr(NoShadowCallStack, auto value) { return value; }
+constexpr auto ShadowCallStackOr(auto stack, std::convertible_to<decltype(stack)> auto value) {
+  return stack;
+}
 
 }  // namespace LIBC_NAMESPACE_DECL
 
