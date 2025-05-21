@@ -577,7 +577,7 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
                     // fall back to the full (non-sparse) Fxfs image if we didn't find a sparse one.
                     if args.use_fxfs && args.fxfs.is_none() {
                         args.fxfs = system_a.iter().find_map(|i| match i {
-                            Image::Fxfs { path, .. } => Some(path.clone()),
+                            Image::Fxfs(path) => Some(path.clone()),
                             _ => None,
                         });
                     }

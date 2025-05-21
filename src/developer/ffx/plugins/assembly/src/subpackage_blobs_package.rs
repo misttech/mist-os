@@ -33,7 +33,7 @@ pub fn construct_subpackage_blobs_package(
         if let Some(contents) = image.get_blobfs_contents() {
             let PackagesMetadata { base, cache } = &contents.packages;
 
-            for package in base.0.iter().chain(cache.0.iter()) {
+            for package in base.metadata.iter().chain(cache.metadata.iter()) {
                 let manifest = PackageManifest::try_load_from(&package.manifest)?;
                 subpackage_blobs_pkg_builder.add_subpackages_from_package(manifest)?;
             }

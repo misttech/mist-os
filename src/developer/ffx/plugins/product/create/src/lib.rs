@@ -334,7 +334,7 @@ fn load_assembled_system(
         let mut packages = Vec::new();
         let mut extract_packages = |packages_metadata| -> Result<()> {
             let PackagesMetadata { base, cache } = packages_metadata;
-            let all_packages = [base.0, cache.0].concat();
+            let all_packages = [base.metadata, cache.metadata].concat();
             for package in all_packages {
                 let manifest = PackageManifest::try_load_from(&package.manifest)
                     .with_context(|| format!("reading package manifest: {}", package.manifest))?;
@@ -348,9 +348,9 @@ fn load_assembled_system(
         for image in system.images.into_iter() {
             match image {
                 Image::BasePackage(..) => {}
-                Image::Fxfs { path, contents } => {
+                Image::FxfsSparse { path, contents } => {
                     extract_packages(contents.packages)?;
-                    images.push(Image::Fxfs { path, contents: BlobfsContents::default() });
+                    images.push(Image::FxfsSparse { path, contents: BlobfsContents::default() });
                 }
                 Image::BlobFS { path, contents } => {
                     extract_packages(contents.packages)?;
@@ -378,9 +378,7 @@ fn load_assembled_system(
                     has_dtbo = true;
                 }
 
-                // We don't need to extract packages from `FxfsSparse`, since it exists only if
-                // `Fxfs` also exists (and always contains the same set of packages).
-                Image::FxfsSparse { .. }
+                Image::Fxfs(_)
                 | Image::FVM(_)
                 | Image::FVMSparse(_)
                 | Image::FVMFastboot(_)

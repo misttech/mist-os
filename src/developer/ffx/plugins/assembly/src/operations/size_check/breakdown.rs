@@ -229,7 +229,9 @@ impl Ord for PackageReference {
 impl SizeBreakdown {
     pub fn from_contents(contents: &BlobfsContents) -> Self {
         let mut blobs = BTreeMap::new();
-        for package in contents.packages.base.0.iter().chain(contents.packages.cache.0.iter()) {
+        for package in
+            contents.packages.base.metadata.iter().chain(contents.packages.cache.metadata.iter())
+        {
             for blob in &package.blobs {
                 let entry = blobs.entry(blob.merkle.clone()).or_insert_with(|| BlobBreakdown {
                     size: blob.used_space_in_blobfs,

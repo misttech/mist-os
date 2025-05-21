@@ -181,8 +181,8 @@ mod tests {
 
             // Ensure the blobs match expectations.
             let blobs = blobs.relativize(dir).unwrap();
-            assert!(!blobs.packages.base.0.is_empty());
-            assert!(blobs.packages.cache.0.is_empty());
+            assert!(!blobs.packages.base.metadata.is_empty());
+            assert!(blobs.packages.cache.metadata.is_empty());
         }
     }
 }

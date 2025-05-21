@@ -113,7 +113,7 @@ def main() -> int:
 
             # Collect the package manifests from the blobfs/Fxblob image.
             if (image["type"] == "blk" and image["name"] == "blob") or (
-                image["type"] == "fxfs-blk" and image["name"] == "storage-full"
+                image["type"] == "blk" and image["name"] == "fxfs.fastboot"
             ):
                 packages = []
                 packages.extend(image["contents"]["packages"].get("base", []))

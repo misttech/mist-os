@@ -149,7 +149,7 @@ impl PbGetImagePathTool {
                 (Image::ZBI { path, .. }, Some(ImageType::Zbi))
                 | (Image::VBMeta(path), Some(ImageType::VBMeta))
                 | (Image::FVM(path), Some(ImageType::Fvm))
-                | (Image::Fxfs { path, .. }, Some(ImageType::Fxfs))
+                | (Image::Fxfs(path), Some(ImageType::Fxfs))
                 | (Image::FxfsSparse { path, .. }, Some(ImageType::FxfsFastboot))
                 | (Image::QemuKernel(path), Some(ImageType::QemuKernel))
                 | (Image::Dtbo(path), Some(ImageType::Dtbo)) => Some(self.compute_path(path)),

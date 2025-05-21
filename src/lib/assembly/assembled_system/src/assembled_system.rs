@@ -92,12 +92,7 @@ pub enum Image {
     FVMFastboot(Utf8PathBuf),
 
     /// Fxfs.
-    Fxfs {
-        /// Path to the Fxfs image.
-        path: Utf8PathBuf,
-        /// Blob contents metadata.
-        contents: BlobfsContents,
-    },
+    Fxfs(Utf8PathBuf),
 
     /// Fxfs in the Android Sparse format.
     FxfsSparse {
@@ -123,7 +118,7 @@ impl Image {
             Image::FVM(s) => s.as_path(),
             Image::FVMSparse(s) => s.as_path(),
             Image::FVMFastboot(s) => s.as_path(),
-            Image::Fxfs { path, .. } => path.as_path(),
+            Image::Fxfs(s) => s.as_path(),
             Image::FxfsSparse { path, .. } => path.as_path(),
             Image::QemuKernel(s) => s.as_path(),
         }
@@ -141,7 +136,7 @@ impl Image {
             Image::FVM(s) => *s = source,
             Image::FVMSparse(s) => *s = source,
             Image::FVMFastboot(s) => *s = source,
-            Image::Fxfs { path, .. } => *path = source,
+            Image::Fxfs(s) => *s = source,
             Image::FxfsSparse { path, .. } => *path = source,
             Image::QemuKernel(s) => *s = source,
         }
@@ -151,7 +146,6 @@ impl Image {
     pub fn get_blobfs_contents(&self) -> Option<&BlobfsContents> {
         match self {
             Image::BlobFS { contents, .. } => Some(contents),
-            Image::Fxfs { contents, .. } => Some(contents),
             Image::FxfsSparse { contents, .. } => Some(contents),
             Image::BasePackage(_)
             | Image::ZBI { .. }
@@ -160,6 +154,7 @@ impl Image {
             | Image::FVM(_)
             | Image::FVMSparse(_)
             | Image::FVMFastboot(_)
+            | Image::Fxfs(_)
             | Image::QemuKernel(_) => None,
         }
     }
@@ -200,10 +195,9 @@ impl AssembledSystem {
                     path: path_relative_from(path, &base_path)?,
                     contents: contents.relativize(&base_path)?,
                 }),
-                Image::Fxfs { path, contents } => images.push(Image::Fxfs {
-                    path: path_relative_from(path, &base_path)?,
-                    contents: contents.relativize(&base_path)?,
-                }),
+                Image::Fxfs(path) => {
+                    images.push(Image::Fxfs(path_relative_from(path, &base_path)?))
+                }
                 Image::FxfsSparse { path, contents } => images.push(Image::FxfsSparse {
                     path: path_relative_from(path, &base_path)?,
                     contents: contents.relativize(&base_path)?,
@@ -245,10 +239,7 @@ impl AssembledSystem {
                     path: manifest_dir.as_ref().join(path),
                     contents: contents.derelativize(&manifest_dir)?,
                 }),
-                Image::Fxfs { path, contents } => images.push(Image::Fxfs {
-                    path: manifest_dir.as_ref().join(path),
-                    contents: contents.derelativize(&manifest_dir)?,
-                }),
+                Image::Fxfs(path) => images.push(Image::Fxfs(manifest_dir.as_ref().join(path))),
                 Image::FxfsSparse { path, contents } => images.push(Image::FxfsSparse {
                     path: manifest_dir.as_ref().join(path),
                     contents: contents.derelativize(&manifest_dir)?,
@@ -390,12 +381,12 @@ impl Serialize for Image {
                 signed: None,
                 contents: None,
             },
-            Image::Fxfs { path, contents } => ImageSerializeHelper {
+            Image::Fxfs(path) => ImageSerializeHelper {
                 partition_type: "fxfs-blk",
                 name: "storage-full",
                 path,
                 signed: None,
-                contents: Some(ImageContentsSerializeHelper::Blobfs(contents)),
+                contents: None,
             },
             Image::FxfsSparse { path, contents } => ImageSerializeHelper {
                 partition_type: "blk",
@@ -500,17 +491,17 @@ impl BlobfsContents {
         Self::add_package_blobs(None, package_manifest, &mut package_blobs, merkle_size_map)
             .with_context(|| format!("adding package: {manifest}"))?;
         package_blobs.sort();
-        package_set.0.push(PackageMetadata { name, manifest, blobs: package_blobs });
+        package_set.metadata.push(PackageMetadata { name, manifest, blobs: package_blobs });
         Ok(())
     }
 
     /// Relativize all manifest locations in the BlobFsContents to the output file's location
     pub fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
         // Modify in-place so we can add fields to the struct without updating this code
-        for package in self.packages.base.0.iter_mut() {
+        for package in self.packages.base.metadata.iter_mut() {
             package.manifest = path_relative_from(&package.manifest, &base_path)?
         }
-        for package in self.packages.cache.0.iter_mut() {
+        for package in self.packages.cache.metadata.iter_mut() {
             package.manifest = path_relative_from(&package.manifest, &base_path)?
         }
         Ok(self)
@@ -519,10 +510,10 @@ impl BlobfsContents {
     /// Join all manifest paths in the BlobFsContents to the location of the file it is serialized in
     fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
         // Modify in-place so we can add fields without updating this code
-        for package in self.packages.base.0.iter_mut() {
+        for package in self.packages.base.metadata.iter_mut() {
             package.manifest = manifest_dir.as_ref().join(&package.manifest)
         }
-        for package in self.packages.cache.0.iter_mut() {
+        for package in self.packages.cache.metadata.iter_mut() {
             package.manifest = manifest_dir.as_ref().join(&package.manifest)
         }
         Ok(self)
@@ -541,7 +532,10 @@ pub struct PackagesMetadata {
 /// Metadata for a certain package set (e.g. base or cache).
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(transparent)]
-pub struct PackageSetMetadata(pub Vec<PackageMetadata>);
+pub struct PackageSetMetadata {
+    /// Inner set of metadata.
+    pub metadata: Vec<PackageMetadata>,
+}
 
 /// Metadata on a single package included in a given image.
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -608,14 +602,7 @@ impl<'de> Deserialize<'de> for Image {
                 }
             }
             ("blk", "storage-full", None) => Ok(Image::FVM(helper.path)),
-            ("fxfs-blk", "storage-full", None) => {
-                if let Some(contents) = helper.contents {
-                    let ImageContentsDeserializeHelper::Blobfs(contents) = contents;
-                    Ok(Image::Fxfs { path: helper.path, contents })
-                } else {
-                    Err(de::Error::missing_field("contents"))
-                }
-            }
+            ("fxfs-blk", "storage-full", None) => Ok(Image::Fxfs(helper.path)),
             ("blk", "fxfs.fastboot", None) => {
                 if let Some(contents) = helper.contents {
                     let ImageContentsDeserializeHelper::Blobfs(contents) = contents;
@@ -689,7 +676,7 @@ mod tests {
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
                 Image::Dtbo("dtbo".into()),
-                Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
+                Image::Fxfs("fxfs.blk".into()),
                 Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
             ],
@@ -731,7 +718,7 @@ mod tests {
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
                 Image::Dtbo("dtbo".into()),
-                Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
+                Image::Fxfs("fxfs.blk".into()),
                 Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
             ],
@@ -778,7 +765,7 @@ mod tests {
                 Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("path/to/fuchsia.vbmeta".into()),
                 Image::Dtbo("path/to/dtbo".into()),
-                Image::Fxfs { path: "path/to/fxfs.blk".into(), contents: Default::default() },
+                Image::Fxfs("path/to/fxfs.blk".into()),
                 Image::FxfsSparse {
                     path: "path/to/fxfs.sparse.blk".into(),
                     contents: Default::default(),
@@ -870,10 +857,7 @@ mod tests {
                 }
                 Image::VBMeta(path) => ("path/to/fuchsia.vbmeta", path),
                 Image::Dtbo(path) => ("path/to/dtbo", path),
-                Image::Fxfs { path, contents } => {
-                    assert_eq!(contents, &BlobfsContents::default());
-                    ("path/to/fxfs.blk", path)
-                }
+                Image::Fxfs(path) => ("path/to/fxfs.blk", path),
                 Image::FxfsSparse { path, contents } => {
                     assert_eq!(contents, &BlobfsContents::default());
                     ("path/to/fxfs.sparse.blk", path)
@@ -1018,9 +1002,9 @@ mod tests {
         )?;
         contents
             .add_cache_package(root.join("package_manifest_temp_file.json"), &merkle_size_map)?;
-        let actual_package_blobs_base = &(contents.packages.base.0[0].blobs);
-        let actual_package_blobs_super_base = &(contents.packages.base.0[1].blobs);
-        let actual_package_blobs_cache = &(contents.packages.cache.0[0].blobs);
+        let actual_package_blobs_base = &(contents.packages.base.metadata[0].blobs);
+        let actual_package_blobs_super_base = &(contents.packages.base.metadata[1].blobs);
+        let actual_package_blobs_cache = &(contents.packages.cache.metadata[0].blobs);
 
         let package_blob1 = PackageBlob {
             merkle: "7ddff816740d5803358dd4478d8437585e8d5c984b4361817d891807a16ff581".to_string(),
@@ -1233,13 +1217,6 @@ mod tests {
                     "type": "fxfs-blk",
                     "name": "storage-full",
                     "path": "path/to/fxfs.blk",
-                    "contents": {
-                        "packages": {
-                            "base": [],
-                            "cache": [],
-                        },
-                        "maximum_contents_size": None::<u64>
-                    },
                 },
                 {
                     "type": "blk",

@@ -194,11 +194,10 @@ mod tests {
         pb.system_a = Some(vec![
             Image::ZBI { path: expected_zbi.clone(), signed: false },
             Image::QemuKernel(expected_kernel.clone()),
-            Image::Fxfs {
-                path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+            Image::Fxfs(
+                Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
                     .expect("couldn't convert fxfs to utf8"),
-                contents: BlobfsContents::default(),
-            },
+            ),
             Image::FxfsSparse {
                 path: expected_disk_image_path.clone(),
                 contents: BlobfsContents::default(),
@@ -275,11 +274,10 @@ mod tests {
             system_a: Some(vec![
                 Image::ZBI { path: expected_zbi.clone(), signed: false },
                 Image::QemuKernel(expected_kernel.clone()),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+                Image::Fxfs(
+                    Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
                         .expect("couldn't convert fxfs to utf8"),
-                    contents: BlobfsContents::default(),
-                },
+                ),
                 Image::FxfsSparse {
                     path: expected_disk_image_path.clone(),
                     contents: BlobfsContents::default(),

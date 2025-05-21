@@ -170,7 +170,7 @@ pub(crate) trait Canonicalizer {
         if let Some(system) = system {
             for image in system.iter_mut() {
                 let image_types = match image {
-                    Image::ZBI { path: _, signed: _ } | Image::Fxfs { path: _, contents: _ } => {
+                    Image::ZBI { path: _, signed: _ } | Image::Fxfs(_) => {
                         vec![Type::Emu, Type::Flash]
                     }
                     Image::QemuKernel(_) | Image::FVM(_) => vec![Type::Emu],

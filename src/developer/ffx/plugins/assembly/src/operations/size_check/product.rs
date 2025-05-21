@@ -165,9 +165,6 @@ fn extract_blob_contents(assembled_system: &AssembledSystem) -> Option<&BlobfsCo
             Image::BlobFS { contents, .. } => {
                 return Some(contents);
             }
-            Image::Fxfs { contents, .. } => {
-                return Some(contents);
-            }
             Image::FxfsSparse { contents, .. } => {
                 return Some(contents);
             }
@@ -204,12 +201,14 @@ mod tests {
     fn extract_blob_contents_test() -> Result<()> {
         let blobfs_contents = BlobfsContents {
             packages: PackagesMetadata {
-                base: PackageSetMetadata(vec![PackageMetadata {
-                    name: "hello".to_string(),
-                    manifest: "path".into(),
-                    blobs: Default::default(),
-                }]),
-                cache: PackageSetMetadata(vec![]),
+                base: PackageSetMetadata {
+                    metadata: vec![PackageMetadata {
+                        name: "hello".to_string(),
+                        manifest: "path".into(),
+                        blobs: Default::default(),
+                    }],
+                },
+                cache: PackageSetMetadata { metadata: vec![] },
             },
             maximum_contents_size: Some(1234),
         };

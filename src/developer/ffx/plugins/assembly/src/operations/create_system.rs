@@ -102,10 +102,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         if let Some(base_package) = &base_package {
             let ConstructedFxfs { image_path, sparse_image_path, contents } =
                 construct_fxfs(&gendir, &image_assembly_config, base_package, fxfs_config).await?;
-            assembled_system.images.push(assembled_system::Image::Fxfs {
-                path: image_path,
-                contents: contents.clone(),
-            });
+            assembled_system.images.push(assembled_system::Image::Fxfs(image_path));
             assembled_system
                 .images
                 .push(assembled_system::Image::FxfsSparse { path: sparse_image_path, contents });
@@ -118,7 +115,7 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let disk_image_for_zbi: Option<Utf8PathBuf> = match &mode {
         FilesystemImageMode::Ramdisk => assembled_system.images.iter().find_map(|i| match i {
             assembled_system::Image::FVM(path) => Some(path.clone()),
-            assembled_system::Image::Fxfs { path, .. } => Some(path.clone()),
+            assembled_system::Image::Fxfs(path) => Some(path.clone()),
             _ => None,
         }),
         _ => None,

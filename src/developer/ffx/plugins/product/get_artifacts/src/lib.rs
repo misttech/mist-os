@@ -170,7 +170,7 @@ impl PbGetArtifactsTool {
                         }
                         Image::BasePackage(_)
                         | Image::BlobFS { .. }
-                        | Image::Fxfs { path: _, contents: _ }
+                        | Image::Fxfs(_)
                         | Image::FVM(_)
                         | Image::FVMSparse(_)
                         | Image::QemuKernel(_) => continue,
@@ -207,7 +207,7 @@ impl PbGetArtifactsTool {
                         Image::BasePackage(_)
                         | Image::Dtbo(_)
                         | Image::BlobFS { .. }
-                        | Image::Fxfs { path: _, contents: _ }
+                        | Image::Fxfs(_)
                         | Image::FVMSparse(_)
                         | Image::FVMFastboot(_) => continue,
                     }
@@ -325,10 +325,7 @@ mod tests {
                 Image::FVMFastboot(Utf8PathBuf::from(
                     "/tmp/product_bundle/system_a/fvm_fastboot.blk",
                 )),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
                     contents: Default::default(),
@@ -432,10 +429,7 @@ mod tests {
                     "/tmp/product_bundle/system_a/fvm_fastboot.blk",
                 )),
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
                     contents: Default::default(),
@@ -581,10 +575,7 @@ mod tests {
                 Image::QemuKernel(
                     Utf8PathBuf::from_path_buf(qemu_path.clone()).expect("utf8 path"),
                 ),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from_path_buf(fxfs_sparse_path.clone()).expect("utf8 path"),
                     contents: Default::default(),
@@ -697,10 +688,7 @@ mod tests {
                 Image::QemuKernel(
                     Utf8PathBuf::from_path_buf(qemu_path.clone()).expect("utf8 path"),
                 ),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from_path_buf(fxfs_sparse_path.clone()).expect("utf8 path"),
                     contents: Default::default(),
