@@ -853,15 +853,15 @@ static bool pq_move_queues() {
 
   pq.MoveToReclaimDontNeed(&test_page);
   EXPECT_FALSE(pq.DebugPageIsReclaim(&test_page));
-  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&test_page));
-  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim_dont_need = 1}));
+  EXPECT_TRUE(pq.DebugPageIsReclaimIsolate(&test_page));
+  EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim_isolate = 1}));
 
   // Verify that the DontNeed page is first in line for eviction.
   auto backlink = pq.PeekReclaim(PageQueues::kNumReclaim - 1);
   EXPECT_TRUE(backlink != ktl::nullopt && backlink->page == &test_page);
 
   pq.MoveToWired(&test_page);
-  EXPECT_FALSE(pq.DebugPageIsReclaimDontNeed(&test_page));
+  EXPECT_FALSE(pq.DebugPageIsReclaimIsolate(&test_page));
   EXPECT_FALSE(pq.DebugPageIsReclaim(&test_page));
   EXPECT_TRUE(pq.DebugPageIsWired(&test_page));
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.wired = 1}));
@@ -1097,18 +1097,18 @@ static bool pq_toggle_dont_need_queue() {
   // Move the pages to the DontNeed queue.
   pq.MoveToReclaimDontNeed(&page1);
   pq.MoveToReclaimDontNeed(&page2);
-  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page1));
-  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
+  EXPECT_TRUE(pq.DebugPageIsReclaimIsolate(&page1));
+  EXPECT_TRUE(pq.DebugPageIsReclaimIsolate(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
-              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 2}));
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_isolate = 2}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
 
   // Rotate the queues. This should also process the DontNeed queue.
   pq.RotateReclaimQueues();
-  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page1));
-  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
+  EXPECT_TRUE(pq.DebugPageIsReclaimIsolate(&page1));
+  EXPECT_TRUE(pq.DebugPageIsReclaimIsolate(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
-              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 2}));
+              ((PageQueues::Counts){.reclaim = {0, 0, 0, 0, 0, 0, 0, 0}, .reclaim_isolate = 2}));
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
 
   // Simulate access for one of the pages. Then rotate the queues again. This should move the
@@ -1117,9 +1117,9 @@ static bool pq_toggle_dont_need_queue() {
   pq.RotateReclaimQueues();
   EXPECT_TRUE(pq.DebugPageIsReclaim(&page1, &queue));
   EXPECT_EQ(queue, 1u);
-  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
+  EXPECT_TRUE(pq.DebugPageIsReclaimIsolate(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
-              ((PageQueues::Counts){.reclaim = {0, 1, 0, 0, 0, 0, 0, 0}, .reclaim_dont_need = 1}));
+              ((PageQueues::Counts){.reclaim = {0, 1, 0, 0, 0, 0, 0, 0}, .reclaim_isolate = 1}));
   // Two active queues by default, so page1 is still considered active.
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 1, 1}));
 
@@ -1127,9 +1127,9 @@ static bool pq_toggle_dont_need_queue() {
   pq.RotateReclaimQueues();
   EXPECT_TRUE(pq.DebugPageIsReclaim(&page1, &queue));
   EXPECT_EQ(queue, 2u);
-  EXPECT_TRUE(pq.DebugPageIsReclaimDontNeed(&page2));
+  EXPECT_TRUE(pq.DebugPageIsReclaimIsolate(&page2));
   EXPECT_TRUE(pq.QueueCounts() ==
-              ((PageQueues::Counts){.reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .reclaim_dont_need = 1}));
+              ((PageQueues::Counts){.reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .reclaim_isolate = 1}));
   // page1 has now moved on past the two active queues, so it now counts as inactive.
   EXPECT_TRUE(pq.GetActiveInactiveCounts() == ((PageQueues::ActiveInactiveCounts){false, 0, 2}));
 

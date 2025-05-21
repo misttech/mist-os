@@ -152,7 +152,7 @@ class PageQueues {
     //    the lock held.
     auto queue_ref = page->object.get_page_queue_ref();
     const uint8_t queue = queue_ref.load(ktl::memory_order_relaxed);
-    if (queue < PageQueueReclaimDontNeed) {
+    if (queue < PageQueueReclaimIsolate) {
       return;
     }
     // With the early check complete, continue with the non-inlined longer body.
@@ -183,7 +183,7 @@ class PageQueues {
   //   1. A new queue, representing the current epoch, needs to be allocated to put pages that get
   //      accessed from here into. This just involves incrementing the MRU generation.
   //   2. As there is a limited number of page queues 'allocating' one might involve cleaning up an
-  //      old queue. See the description of ProcessDontNeedAndLruQueues for how this process works.
+  //      old queue. See the description of ProcessIsolateAndLruQueues for how this process works.
   void RotateReclaimQueues(AgeReason reason = AgeReason::Manual);
 
   // Used to represent and return page backlink information acquired whilst holding the page queue
@@ -231,7 +231,7 @@ class PageQueues {
   // Helper struct to group queue length counts returned by QueueCounts.
   struct Counts {
     ktl::array<size_t, kNumReclaim> reclaim = {0};
-    size_t reclaim_dont_need = 0;
+    size_t reclaim_isolate = 0;
     size_t pager_backed_dirty = 0;
     size_t anonymous = 0;
     size_t wired = 0;
@@ -240,7 +240,7 @@ class PageQueues {
     size_t high_priority = 0;
 
     bool operator==(const Counts& other) const {
-      return reclaim == other.reclaim && reclaim_dont_need == other.reclaim_dont_need &&
+      return reclaim == other.reclaim && reclaim_isolate == other.reclaim_isolate &&
              pager_backed_dirty == other.pager_backed_dirty && anonymous == other.anonymous &&
              wired == other.wired && anonymous_zero_fork == other.anonymous_zero_fork &&
              failed_reclaim == other.failed_reclaim && high_priority == other.high_priority;
@@ -297,7 +297,7 @@ class PageQueues {
   // This takes an optional output parameter that, if the function returns true, will contain the
   // index of the queue that the page was in.
   bool DebugPageIsReclaim(const vm_page_t* page, size_t* queue = nullptr) const;
-  bool DebugPageIsReclaimDontNeed(const vm_page_t* page) const;
+  bool DebugPageIsReclaimIsolate(const vm_page_t* page) const;
   bool DebugPageIsPagerBackedDirty(const vm_page_t* page) const;
   bool DebugPageIsAnonymous(const vm_page_t* page) const;
   bool DebugPageIsAnonymousZeroFork(const vm_page_t* page) const;
@@ -376,7 +376,7 @@ class PageQueues {
     PageQueueAnonymousZeroFork,
     PageQueuePagerBackedDirty,
     PageQueueFailedReclaim,
-    PageQueueReclaimDontNeed,
+    PageQueueReclaimIsolate,
     PageQueueReclaimBase,
     PageQueueReclaimLast = PageQueueReclaimBase + kNumReclaim - 1,
     PageQueueNumQueues,
@@ -522,19 +522,19 @@ class PageQueues {
   // returns false then it is guaranteed that both |queue_is_active| and |queue_is_inactive| would
   // return false.
   static constexpr bool queue_is_reclaim(PageQueue page_queue) {
-    // We check against the the DontNeed queue and not the base queue so that accessing a page can
-    // move it from the DontNeed list into the LRU queues. To keep this case efficient we require
-    // that the DontNeed queue be directly before the LRU queues.
-    static_assert(PageQueueReclaimDontNeed + 1 == PageQueueReclaimBase);
+    // We check against the the Isolate queue and not the base queue so that accessing a page can
+    // move it from the Isolate list into the LRU queues. To keep this case efficient we require
+    // that the Isoalte queue be directly before the LRU queues.
+    static_assert(PageQueueReclaimIsolate + 1 == PageQueueReclaimBase);
 
     // Ensure that the Dirty queue comes before the smallest queue that would return true for this
     // function. This function is used for computing active/inactive sets for the purpose of
     // eviction, and dirty pages cannot be evicted. The Dirty queue also needs to come before the
-    // DontNeed queue so that MarkAccessed does not try to move the page to the MRU queue on
+    // Isolate queue so that MarkAccessed does not try to move the page to the MRU queue on
     // access.
-    static_assert(PageQueuePagerBackedDirty < PageQueueReclaimDontNeed);
+    static_assert(PageQueuePagerBackedDirty < PageQueueReclaimIsolate);
 
-    return page_queue >= PageQueueReclaimDontNeed;
+    return page_queue >= PageQueueReclaimIsolate;
   }
 
   // Calculates the age of a queue against a given mru, with 0 meaning page_queue==mru
@@ -562,9 +562,9 @@ class PageQueues {
   // This is valid to call on any page queue, not just reclaimable ones, and as such this returning
   // false does not imply the queue is active.
   static constexpr bool queue_is_inactive(PageQueue page_queue, PageQueue mru) {
-    // The DontNeed queue does not have an age, and so we cannot call queue_age on it, but it should
+    // The Isolate queue does not have an age, and so we cannot call queue_age on it, but it should
     // definitely be considered part of the inactive set.
-    if (page_queue == PageQueueReclaimDontNeed) {
+    if (page_queue == PageQueueReclaimIsolate) {
       return true;
     }
     if (page_queue < PageQueueReclaimBase) {
@@ -581,8 +581,8 @@ class PageQueues {
     return gen_to_queue(lru_gen_.load(ktl::memory_order_relaxed));
   }
 
-  // This processes the DontNeed queue and the LRU queue.
-  // For the DontNeed queue the pages are either process to termination (if peek is false), or if
+  // This processes the Isolate queue and the LRU queue.
+  // For the Isolate queue the pages are either process to termination (if peek is false), or if
   // peek is true we will either return a page from it or make it empty. For the LRU queue, the aim
   // is to make the lru_gen_ be the passed in target_gen. It achieves this by walking all the pages
   // in the queue and either
@@ -596,10 +596,9 @@ class PageQueues {
   // is false, this always returns a nullopt and guarantees that it moved lru_gen_ to at least
   // target_gen. If |peek| is true, then the first time it hits a page in case (2), it returns it
   // instead of decreasing its age.
-  ktl::optional<PageQueues::VmoBacklink> ProcessDontNeedAndLruQueues(uint64_t target_gen,
-                                                                     bool peek);
+  ktl::optional<PageQueues::VmoBacklink> ProcessIsolateAndLruQueues(uint64_t target_gen, bool peek);
 
-  // Helper used by ProcessDontNeedAndLruQueues. |target_gen| is the minimum value lru_gen_ should
+  // Helper used by ProcessIsolateAndLruQueues. |target_gen| is the minimum value lru_gen_ should
   // advance to. If |peek| is true, the first page that  encountered in the respective queue, whose
   // age does not require to be fixed up, is returned.
   // The passed in LruIsolate object is used to process reclamation work outside of the lock and can
@@ -612,10 +611,10 @@ class PageQueues {
                                                                uint64_t target_gen, bool peek)
       TA_EXCL(lock_);
 
-  // Helper used by ProcessDontNeedAndLruQueues. Processes the DontNeed list and processes items
+  // Helper used by ProcessIsolateAndLruQueues. Processes the Isolate list and processes items
   // into their correct list, and either processes all elements (if peek is false), or returns the
-  // first DontNeed item if peek is true.
-  ktl::optional<VmoBacklink> ProcessDontNeedList(bool peek) TA_EXCL(lock_);
+  // first Isolate item if peek is true.
+  ktl::optional<VmoBacklink> ProcessIsolateList(bool peek) TA_EXCL(lock_);
 
   // Helpers for adding and removing to the queues. All of the public Set/Move/Remove operations
   // are convenience wrappers around these.
@@ -685,10 +684,10 @@ class PageQueues {
   template <typename F>
   bool DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue, F validator) const;
 
-  void AdvanceDontNeedCursorIf(vm_page_t* page) TA_REQ(lock_) {
-    if (page == dont_need_cursor_) {
-      dont_need_cursor_ = list_next_type(&page_queues_[PageQueueReclaimDontNeed], &page->queue_node,
-                                         vm_page_t, queue_node);
+  void AdvanceIsolateCursorIf(vm_page_t* page) TA_REQ(lock_) {
+    if (page == isolate_cursor_) {
+      isolate_cursor_ = list_next_type(&page_queues_[PageQueueReclaimIsolate], &page->queue_node,
+                                       vm_page_t, queue_node);
     }
   }
 
@@ -755,7 +754,7 @@ class PageQueues {
   //
   // New reclaimable pages are always placed into the queue associated with the MRU generation. If
   // they get accessed the vm_page_t::page_queue gets updated along with the counts. At some point
-  // the LRU queue will get processed (see |ProcessDontNeedAndLruQueues|) and this will cause pages
+  // the LRU queue will get processed (see |ProcessIsolateAndLruQueues|) and this will cause pages
   // to get relocated to their correct list.
   //
   // Consider the following example:
@@ -865,19 +864,19 @@ class PageQueues {
   // Current active ratio multiplier.
   uint64_t active_ratio_multiplier_ TA_GUARDED(lock_);
 
-  // In order to process all the items in the DontNeed list, whilst still being able to periodically
+  // In order to process all the items in the Isolate list, whilst still being able to periodically
   // drop the lock to avoid a long running operation, we use a cursor to record the current page
-  // being examined. Any operation that removes a page from the DontNeed list must check if its
+  // being examined. Any operation that removes a page from the Isolate list must check if its
   // removing this page, and advance it to the next page in the list if it is. This is automated by
   // calling AdvanceDontNeedCursorIf.
-  vm_page_t* dont_need_cursor_ TA_GUARDED(lock_) = nullptr;
+  vm_page_t* isolate_cursor_ TA_GUARDED(lock_) = nullptr;
 
   // There is only a single cursor and this lock acts as a resource control for it. This process
   // needs to be done on LRU rotation / when peeking pages for reclamation, which need to be
   // synchronized anyway so having this additional lock does not impact parallelism.
-  // The actual object member |dont_need_cursor_| is not guarded by this lock, since it needs to be
+  // The actual object member |isolate_cursor| is not guarded by this lock, since it needs to be
   // read, and potentially updated, specifically by other threads who do not own the logical cursor.
-  DECLARE_MUTEX(PageQueues) dont_need_cursor_lock_;
+  DECLARE_MUTEX(PageQueues) isolate_cursor_lock_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PAGE_QUEUES_H_
