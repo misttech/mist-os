@@ -81,12 +81,16 @@ zx_status_t Client::Transaction(block_fifo_request_t* requests, size_t count) {
     block_completion->status = ZX_ERR_IO;
   }
 
-  for (size_t i = 0; i < count; i++) {
-    requests[i].group = group;
-    requests[i].command.flags |= BLOCK_IO_FLAG_GROUP_ITEM;
-  }
+  // Avoid using 0 to mitigate accidents where the wrong reqid is used.
+  requests[count - 1].reqid = group + 1;
 
-  requests[count - 1].command.flags |= BLOCK_IO_FLAG_GROUP_LAST;
+  if (count > 1) {
+    for (size_t i = 0; i < count; i++) {
+      requests[i].group = group;
+      requests[i].command.flags |= BLOCK_IO_FLAG_GROUP_ITEM;
+    }
+    requests[count - 1].command.flags |= BLOCK_IO_FLAG_GROUP_LAST;
+  }
 
   if (zx_status_t status = DoWrite(requests, count); status != ZX_OK) {
     {
@@ -129,9 +133,14 @@ zx_status_t Client::Transaction(block_fifo_request_t* requests, size_t count) {
 
         // Record all the responses.
         for (size_t i = 0; i < count; ++i) {
-          assert(groups_[response[i].group].in_use);
-          groups_[response[i].group].status = response[i].status;
-          groups_[response[i].group].done = true;
+          uint32_t reqid = response[i].reqid;
+          if (reqid < 1 || reqid > MAX_TXN_GROUP_COUNT || !groups_[reqid - 1].in_use) {
+            ZX_DEBUG_ASSERT(false);
+            continue;
+          }
+          --reqid;
+          groups_[reqid].status = response[i].status;
+          groups_[reqid].done = true;
         }
         condition_.notify_all();  // Signal all threads that might be waiting for responses.
       } else {

@@ -263,48 +263,70 @@ TEST(RemoteBlockDeviceTest, LargeThreadCountSuceeds) {
   fbl::ConditionVariable condition;
   int done = 0;
   for (auto& thread : threads) {
-    thread = std::thread(
-        [device = device.value().get(), &mutex, &done, &condition, vmoid = vmoid.get()]() {
-          block_fifo_request_t request = {};
-          request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
-          request.vmoid = vmoid;
-          request.length = 1;
-          ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
-          fbl::AutoLock lock(&mutex);
-          ++done;
-          condition.Signal();
-        });
+    thread = std::thread([device = device.value().get(), &mutex, &done, &condition,
+                          vmoid = vmoid.get()]() {
+      block_fifo_request_t requests[] = {{
+                                             .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
+                                             .vmoid = vmoid,
+                                             .length = 1,
+                                         },
+                                         {
+                                             .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
+                                             .vmoid = vmoid,
+                                             .length = 1,
+                                         }};
+      ASSERT_EQ(device->FifoTransaction(requests, std::size(requests)), ZX_OK);
+      fbl::AutoLock lock(&mutex);
+      ++done;
+      condition.Signal();
+    });
   }
   vmoid.TakeId();  // We don't need the vmoid any more.
-  block_fifo_request_t requests[kThreadCount + BLOCK_FIFO_MAX_DEPTH];
+  block_fifo_request_t requests[kThreadCount * 2 + BLOCK_FIFO_MAX_DEPTH];
   size_t request_count = 0;
-  do {
-    if (request_count < kThreadCount) {
+  // Maps from group to (request-id, count).
+  std::unordered_map<groupid_t, std::pair<uint32_t, int>> groups;
+  bool finished = false;
+  while (!finished) {
+    if (request_count < kThreadCount * 2) {
       // Read some more requests.
       size_t count = 0;
       ASSERT_EQ(mock_device.ReadFifoRequests(&requests[request_count], &count), ZX_OK);
       ASSERT_GT(count, 0u);
+
+      // Check that all the outstanding requests we have use different group IDs.
+      for (size_t i = request_count; i < request_count + count; ++i) {
+        auto& group = groups[requests[i].group];
+        ASSERT_LT(group.second, 2) << "request #=" << i;
+        ++group.second;
+        if (requests[i].command.flags & BLOCK_IO_FLAG_GROUP_LAST) {
+          group.first = requests[i].reqid;
+        }
+      }
+
       request_count += count;
     }
-    // Check that all the outstanding requests we have use different group IDs.
-    std::unordered_set<groupid_t> groups;
-    for (size_t i = done; i < request_count; ++i) {
-      ASSERT_TRUE(groups.insert(requests[i].group).second);
-    }
     // Finish one request.
-    block_fifo_response_t response;
-    response.status = ZX_OK;
-    response.reqid = requests[done].reqid;
-    response.group = requests[done].group;
-    response.count = 1;
-    int last_done = done;
-    EXPECT_EQ(mock_device.WriteFifoResponse(response), ZX_OK);
-    // Wait for it to be done.
-    fbl::AutoLock lock(&mutex);
-    while (done != last_done + 1) {
-      condition.Wait(&mutex);
+    for (const auto& [group_id, group] : groups) {
+      if (group.second == 2) {
+        block_fifo_response_t response;
+        response.status = ZX_OK;
+        response.reqid = group.first;
+        response.group = group_id;
+        response.count = 1;
+        int last_done = done;
+        EXPECT_EQ(mock_device.WriteFifoResponse(response), ZX_OK);
+        groups.erase(group_id);
+        // Wait for it to be done.
+        fbl::AutoLock lock(&mutex);
+        while (done != last_done + 1) {
+          condition.Wait(&mutex);
+        }
+        finished = done == kThreadCount;
+        break;
+      }
     }
-  } while (done < kThreadCount);
+  }
   for (auto& thread : threads) {
     thread.join();
   }
