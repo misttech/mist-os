@@ -60,17 +60,13 @@ pub struct RunParams {
     /// If set, stop executing tests after this number of normal test failures occur.
     pub stop_after_failures: Option<std::num::NonZeroU32>,
 
-    /// If set, execute this number of test suites in parallel.
-    /// Server will use default value if this is zero.
-    pub experimental_parallel_execution: Option<u16>,
-
     /// Whether or not to merge debug data from previous runs with new debug data collected
     /// for this test run.
     pub accumulate_debug_data: bool,
 
     /// If set, set the protocol used to retrieve logs. If not set, an appropriate default
     /// will be chosen by the implementation.
-    pub log_protocol: Option<ftest_manager::LogsIteratorOption>,
+    pub log_protocol: Option<ftest_manager::LogsIteratorType>,
 
     /// If set, specifies the minimum log severity to report. As it is an
     /// option for output, it will likely soon be moved to a reporter.

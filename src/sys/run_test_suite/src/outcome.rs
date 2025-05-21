@@ -73,7 +73,7 @@ pub enum RunTestSuiteError {
     Io(#[from] std::io::Error),
     #[error("unexpected event: {0:?}")]
     UnexpectedEvent(#[from] UnexpectedEventError),
-    #[error("Error connecting to RunBuilder protocol: {0:?}")]
+    #[error("Error connecting to SuiteRunner protocol: {0:?}")]
     Connection(#[from] ConnectionError),
 }
 
@@ -83,42 +83,42 @@ pub enum RunTestSuiteError {
 #[derive(Error, Debug)]
 pub enum UnexpectedEventError {
     #[error(
-        "received a 'started' event for case with id {identifier:?} but no 'case_found' event"
+        "received a 'started' event for case with id {test_case_id:?} but no 'case_found' event"
     )]
-    CaseStartedButNotFound { identifier: u32 },
+    CaseStartedButNotFound { test_case_id: u32 },
     #[error(
-        "invalid case event to '{next_state:?}' received while in state '{last_state:?}' for case {test_case_name:?} with id {identifier:?}"
+        "invalid case event to '{next_state:?}' received while in state '{last_state:?}' for case {test_case_name:?} with id {test_case_id:?}"
     )]
     InvalidCaseEvent {
         last_state: Lifecycle,
         next_state: Lifecycle,
         test_case_name: String,
-        identifier: u32,
+        test_case_id: u32,
     },
     #[error(
-        "received an 'artifact' event for case with id {identifier:?} but no 'case_found' event"
+        "received an 'artifact' event for case with id {test_case_id:?} but no 'case_found' event"
     )]
-    CaseArtifactButNotFound { identifier: u32 },
+    CaseArtifactButNotFound { test_case_id: u32 },
     #[error(
-        "received an 'artifact' event for case with id {identifier:?} but the case is already finished"
+        "received an 'artifact' event for case with id {test_case_id:?} but the case is already finished"
     )]
-    CaseArtifactButFinished { identifier: u32 },
+    CaseArtifactButFinished { test_case_id: u32 },
     #[error(
-        "received a '{next_state:?}' event for case with id {identifier:?} but no 'case_found' event"
+        "received a '{next_state:?}' event for case with id {test_case_id:?} but no 'case_found' event"
     )]
-    CaseEventButNotFound { next_state: Lifecycle, identifier: u32 },
-    #[error("received a 'stopped' event for case with id {identifier:?} but no 'started' event")]
-    UnrecognizedCaseStatus { status: ftest_manager::CaseStatus, identifier: u32 },
+    CaseEventButNotFound { next_state: Lifecycle, test_case_id: u32 },
+    #[error("received a 'stopped' event for case with id {test_case_id:?} but no 'started' event")]
+    UnrecognizedTestCaseResult { result: ftest_manager::TestCaseResult, test_case_id: u32 },
     #[error("server closed channel without reporting finish for cases: {cases:?}")]
     CasesDidNotFinish { cases: Vec<String> },
-    #[error("invalid suite event to '{next_state:?}' received while in state '{last_state:?}'")]
-    InvalidSuiteEvent { last_state: Lifecycle, next_state: Lifecycle },
-    #[error("received an unhandled suite status: {status:?}")]
-    UnrecognizedSuiteStatus { status: ftest_manager::SuiteStatus },
+    #[error("invalid event to '{next_state:?}' received while in state '{last_state:?}'")]
+    InvalidEvent { last_state: Lifecycle, next_state: Lifecycle },
+    #[error("received an unhandled suite result: {result:?}")]
+    UnrecognizedSuiteResult { result: ftest_manager::SuiteResult },
     #[error("server closed channel without reporting a result for the suite")]
     SuiteDidNotReportStop,
-    #[error("received an InternalError suite status")]
-    InternalErrorSuiteStatus,
+    #[error("received an InternalError suite result")]
+    InternalErrorSuiteResult,
     #[error("missing required field {field} in {containing_struct}")]
     MissingRequiredField { containing_struct: &'static str, field: &'static str },
 }

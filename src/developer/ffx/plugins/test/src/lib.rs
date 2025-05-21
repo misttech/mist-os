@@ -15,7 +15,7 @@ use ffx_test_args::{
     EarlyBootProfileCommand, ListCommand, RunCommand, TestCommand, TestSubCommand,
 };
 use ffx_writer::{ToolIO, VerifiedMachineWriter};
-use fho::{return_user_error, FfxContext, FfxMain, FfxTool};
+use fho::{return_bug, return_user_error, FfxContext, FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use futures::FutureExt;
 use itertools::Itertools;
@@ -40,12 +40,12 @@ pub static SETUP_FAILED_CODE: LazyLock<i32> =
 /// Error code returned if tests time out.
 pub static TIMED_OUT_CODE: LazyLock<i32> = LazyLock::new(|| -fidl::Status::TIMED_OUT.into_raw());
 
-/// Max number of test suites to run using a single RunBuilder connection.
+/// Max number of test suites to run using a single SuiteRunner connection.
 /// Since we need to make n SuiteController channels when running tests on a
-/// single RunBuilder channel, this max limits the number of channels that need
+/// single SuiteRunner channel, this max limits the number of channels that need
 /// to be opened before any tests are run, allowing tests to start running faster.
 /// It also limits the maximum resources that overnet needs to handle at once.
-/// This isn't set to 1 as (1 RunBuilder connection) = (1 set of debug data). Since
+/// This isn't set to 1 as (1 SuiteRunner connection) = (1 set of debug data). Since
 /// pulling debug data off device is expensive we also want to limit the number of
 /// times this occurs.
 const SUITE_BATCH_SIZE: usize = 100;
@@ -111,7 +111,9 @@ impl FfxMain for TestTool {
                 }
                 Ok(())
             }
-            TestSubCommand::List(list) => get_tests(&remote_control, writer, list).await,
+            TestSubCommand::List(list) => {
+                get_tests(&remote_control, writer, list).await.map_err(|e| fho::Error::User(e))
+            }
             TestSubCommand::EarlyBootProfile(cmd) => {
                 early_boot_profile(remote_control.deref().clone(), writer, cmd).await
             }
@@ -145,13 +147,13 @@ pub enum TestToolMessage {
 }
 
 struct Experiment {
+    #[allow(dead_code)]
     name: &'static str,
     enabled: bool,
 }
 
 struct Experiments {
     json_input: Experiment,
-    parallel_execution: Experiment,
 }
 
 impl Experiments {
@@ -166,11 +168,7 @@ impl Experiments {
     }
 
     async fn from_env() -> Self {
-        Self {
-            json_input: Self::get_experiment("test.experimental_json_input").await,
-            parallel_execution: Self::get_experiment("test.enable_experimental_parallel_execution")
-                .await,
-        }
+        Self { json_input: Self::get_experiment("test.experimental_json_input").await }
     }
 }
 
@@ -255,19 +253,6 @@ async fn run_test<W: 'static + Write + Send + Sync>(
             Some(None) => return_user_error!("--stop-after-failures should be greater than zero."),
             Some(Some(stop_after)) => Some(stop_after),
         },
-        experimental_parallel_execution: match (
-            cmd.experimental_parallel_execution,
-            experiments.parallel_execution.enabled,
-        ) {
-            (None, _) => None,
-            (Some(max_parallel_suites), true) => Some(max_parallel_suites),
-            (_, false) => return_user_error!(
-              "Parallel test suite execution is experimental and is subject to breaking changes. \
-              To enable parallel test suite execution, run: \n \
-              'ffx config set {} true'",
-              experiments.parallel_execution.name
-            ),
-        },
         accumulate_debug_data: false, // ffx never accumulates.
         log_protocol: None,
         min_severity_logs: min_log_severity,
@@ -291,10 +276,19 @@ async fn run_test<W: 'static + Write + Send + Sync>(
         }
     });
 
+    let test_definitions = test_definitions.collect::<Vec<_>>();
+    if test_definitions.len() != 1 {
+        return_bug!(
+            "Expected only a single test run per invocation, got {}",
+            test_definitions.len()
+        );
+    }
+    let test_definition = test_definitions.into_iter().next().unwrap();
+
     let start_time = std::time::Instant::now();
-    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
+    let outcome = run_test_suite_lib::run_test_and_get_outcome(
         RunConnector::new(remote_control, SUITE_BATCH_SIZE),
-        test_definitions,
+        test_definition,
         run_params,
         reporter,
         cancel_receiver.map(|_| ()),
@@ -449,8 +443,8 @@ async fn get_tests(
     remote_control: &fremotecontrol::RemoteControlProxy,
     mut writer: VerifiedMachineWriter<TestToolMessage>,
     cmd: ListCommand,
-) -> fho::Result<()> {
-    let query_proxy = testing_lib::connect_to_query(&remote_control)
+) -> Result<()> {
+    let test_case_enumerator_proxy = testing_lib::connect_to_test_case_enumerator(&remote_control)
         .await
         .map_err(|e| ffx_error_with_code!(*SETUP_FAILED_CODE, "{:?}", e))?;
     let (iterator_proxy, iterator) = create_proxy();
@@ -479,21 +473,32 @@ async fn get_tests(
         );
     }
 
-    let fut_response = match provided_realm {
-        Some(realm) => {
-            let offers = realm.offers();
-            query_proxy.enumerate_in_realm(
+    let fut_response =
+        match provided_realm {
+            Some(realm) => {
+                let offers = realm.offers();
+                test_case_enumerator_proxy.enumerate(
+                    &cmd.test_url,
+                    ftest_manager::EnumerateTestCasesOptions {
+                        realm_options: Some(ftest_manager::RealmOptions {
+                            realm: Some(realm.get_realm_client().map_err(|e| {
+                                ffx_error!("Cannot connect to realm client: {}", e)
+                            })?),
+                            offers: Some(offers),
+                            test_collection: Some(realm.collection().to_string()),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    iterator,
+                )
+            }
+            None => test_case_enumerator_proxy.enumerate(
                 &cmd.test_url,
-                realm
-                    .get_realm_client()
-                    .map_err(|e| ffx_error!("Cannot connect to realm client: {}", e))?,
-                offers.as_slice(),
-                realm.collection(),
+                ftest_manager::EnumerateTestCasesOptions { ..Default::default() },
                 iterator,
-            )
-        }
-        None => query_proxy.enumerate(&cmd.test_url, iterator),
-    };
+            ),
+        };
 
     fut_response
         .await

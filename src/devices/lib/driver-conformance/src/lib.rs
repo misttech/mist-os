@@ -13,6 +13,7 @@ use errors::ffx_bail;
 use fuchsia_driver_dev::{
     get_devices_by_driver, get_driver_by_device, get_driver_by_filter, Device,
 };
+use futures::channel::oneshot::Sender;
 use futures::FutureExt;
 use parser::{FilterTests, ValidateAgainstMetadata};
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
@@ -21,6 +22,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::stdout;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use {fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_test_manager as ftm};
 
 impl From<parser::TestInfo> for run_test_suite_lib::TestParams {
@@ -65,19 +67,22 @@ fn get_name(cmd: &TestCommand) -> String {
 /// Calls on the `ffx test` library to run the given set of tests.
 async fn run_tests(
     tests: HashSet<parser::TestInfo>,
-    builder_proxy: ftm::RunBuilderProxy,
+    suite_runner_proxy: ftm::SuiteRunnerProxy,
     output_dir: &Path,
-) -> Result<run_test_suite_lib::Outcome> {
-    let writer = Box::new(stdout());
-    let (cancel_sender, cancel_receiver) = futures::channel::oneshot::channel::<()>();
+) -> Result<Vec<run_test_suite_lib::Outcome>> {
+    let senders: Arc<Mutex<Option<Vec<Sender<()>>>>> = Arc::new(Mutex::new(Some(vec![])));
 
     let mut signals = Signals::new(&[SIGINT, SIGTERM]).unwrap();
     // signals.forever() is blocking, so we need to spawn a thread rather than use async.
+    let clone_senders = senders.clone();
     std::thread::spawn(move || {
         if let Some(signal) = signals.forever().next() {
             match signal {
                 SIGINT | SIGTERM => {
-                    let _ = cancel_sender.send(());
+                    for sender in clone_senders.lock().unwrap().take().unwrap().drain(..) {
+                        let _ = sender.send(());
+                    }
+                    return;
                 }
                 _ => unreachable!(),
             }
@@ -85,26 +90,44 @@ async fn run_tests(
     });
 
     let test_params = process_test_list(tests)?;
-    let reporter_options =
-        Some(run_test_suite_lib::DirectoryReporterOptions { root_path: output_dir.to_path_buf() });
 
-    Ok(run_test_suite_lib::run_tests_and_get_outcome(
-        run_test_suite_lib::SingleRunConnector::new(builder_proxy),
-        test_params,
-        run_test_suite_lib::RunParams {
-            timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
-            timeout_grace_seconds: 0,
-            stop_after_failures: None,
-            experimental_parallel_execution: None,
-            accumulate_debug_data: false,
-            log_protocol: None,
-            min_severity_logs: vec![],
-            show_full_moniker: false,
-        },
-        run_test_suite_lib::create_reporter(false, reporter_options, writer)?,
-        cancel_receiver.map(|_| ()),
-    )
-    .await)
+    let mut ret = vec![];
+
+    for test_param in test_params.into_iter() {
+        println!("Running test: {}", test_param.test_url);
+
+        let (cancel_sender, cancel_receiver) = futures::channel::oneshot::channel();
+        match senders.lock().unwrap().as_mut() {
+            Some(v) => v.push(cancel_sender),
+            None => break, // break out if we already handled cancellation
+        }
+
+        let writer = Box::new(stdout());
+        let reporter_options = Some(run_test_suite_lib::DirectoryReporterOptions {
+            root_path: output_dir.to_path_buf(),
+        });
+
+        ret.push(
+            run_test_suite_lib::run_test_and_get_outcome(
+                run_test_suite_lib::SingleRunConnector::new(suite_runner_proxy.clone()),
+                test_param,
+                run_test_suite_lib::RunParams {
+                    timeout_behavior: run_test_suite_lib::TimeoutBehavior::Continue,
+                    timeout_grace_seconds: 0,
+                    stop_after_failures: None,
+                    accumulate_debug_data: false,
+                    log_protocol: None,
+                    min_severity_logs: vec![],
+                    show_full_moniker: false,
+                },
+                run_test_suite_lib::create_reporter(false, reporter_options, writer)?,
+                cancel_receiver.map(|_| ()),
+            )
+            .await,
+        );
+    }
+
+    Ok(ret)
 }
 
 fn validate_license_dir(path: &Option<PathBuf>) -> Result<()> {
@@ -346,7 +369,7 @@ pub async fn conformance(
                 // the report generated via `run_test_suite_lib::create_reporter()`.
                 let _ = run_tests(
                     tests,
-                    driver_connector.get_run_builder_proxy().await?,
+                    driver_connector.get_suite_runner_proxy().await?,
                     temp_output_path,
                 )
                 .await;

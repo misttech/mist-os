@@ -263,14 +263,14 @@ impl driver_connector::DriverConnector for DriverConnector {
         .context("Failed to get tool runner component")
     }
 
-    async fn get_run_builder_proxy(&self) -> Result<ftm::RunBuilderProxy> {
-        self.get_component_with_capability::<ftm::RunBuilderMarker>(
+    async fn get_suite_runner_proxy(&self) -> Result<ftm::SuiteRunnerProxy> {
+        self.get_component_with_capability::<ftm::SuiteRunnerMarker>(
             "/core/test_manager",
-            DiscoverableCapabilityOptions::<ftm::RunBuilderMarker>::default(),
+            DiscoverableCapabilityOptions::<ftm::SuiteRunnerMarker>::default(),
             false,
         )
         .await
-        .context("Failed to get RunBuilder component")
+        .context("Failed to get SuiteRunner component")
     }
 }
 
