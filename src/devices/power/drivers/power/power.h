@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_POWER_DRIVERS_POWER_POWER_H_
 #define SRC_DEVICES_POWER_DRIVERS_POWER_POWER_H_
 
-#include <fidl/fuchsia.hardware.power/cpp/wire.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
@@ -58,7 +58,7 @@ class PowerDomain : public PowerDomainType {
 
   static zx_status_t Create(void* ctx, zx_device_t* parent,
                             const ddk::PowerImplProtocolClient& power_impl,
-                            fuchsia_hardware_power::wire::Domain domain_info);
+                            const fuchsia_hardware_power::Domain& domain_info);
   void DdkRelease();
 
   zx_status_t RegisterPowerDomain(uint64_t fragment_device_id, uint32_t min_needed_voltage_uV,

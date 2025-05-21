@@ -8,6 +8,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <zircon/errors.h>
 
 #include <memory>
@@ -52,20 +53,37 @@ class TestPowerDriver : public fdf::DriverBase, public ddk::PowerImplProtocol<Te
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
   compat::BanjoServer banjo_server_{ZX_PROTOCOL_POWER_IMPL, this, &power_impl_protocol_ops_};
+  fdf_metadata::MetadataServer<fuchsia_hardware_power::DomainMetadata> metadata_server_;
 };
 
 zx::result<> TestPowerDriver::Start() {
   compat::DeviceServer::BanjoConfig banjo_config{.default_proto_id = ZX_PROTOCOL_POWER_IMPL};
   banjo_config.callbacks[ZX_PROTOCOL_POWER_IMPL] = banjo_server_.callback();
-  zx::result<> result = compat_server_.Initialize(
-      incoming(), outgoing(), node_name(), kChildNodeName,
-      compat::ForwardMetadata::Some({DEVICE_METADATA_POWER_DOMAINS}), std::move(banjo_config));
+  zx::result<> result =
+      compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
+                                compat::ForwardMetadata::None(), std::move(banjo_config));
   if (result.is_error()) {
     fdf::error("Failed to initialize compat server: {}", result);
     return result.take_error();
   }
 
+  zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Device>();
+  if (pdev.is_error()) {
+    fdf::error("Failed to connect to platform device: {}", pdev);
+    return pdev.take_error();
+  }
+  if (zx::result result = metadata_server_.SetMetadataFromPDevIfExists(pdev.value());
+      result.is_error()) {
+    fdf::error("Failed to set metadata: {}", result);
+    return result.take_error();
+  }
+  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    fdf::error("Failed to serve metadata: {}", result);
+    return result.take_error();
+  }
+
   std::vector offers = compat_server_.CreateOffers2();
+  offers.push_back(metadata_server_.MakeOffer());
   zx::result child =
       AddChild(kChildNodeName, std::vector<fuchsia_driver_framework::NodeProperty2>{}, offers);
   if (child.is_error()) {

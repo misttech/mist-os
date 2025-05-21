@@ -50,9 +50,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: fuchsia_hardware_thermal_ThermalDeviceInfo
 #define DEVICE_METADATA_THERMAL_CONFIG 0x54485243  // THRC
 
-// type: FIDL fuchsia.hardware.power/DomainMetadata
-#define DEVICE_METADATA_POWER_DOMAINS 0x52574F50  // POWR
-
 // type: FIDL fuchsia.hardware.pwm/PwmChannelsMetadata
 #define DEVICE_METADATA_PWM_CHANNELS 0x004D5750  // PWM\0
 

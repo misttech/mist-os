@@ -18,6 +18,7 @@
 #include <memory>
 
 #include <bind/fuchsia/power/cpp/bind.h>
+#include <ddktl/metadata_server.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
@@ -353,8 +354,13 @@ zx_status_t PowerDomain::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end
 
 zx_status_t PowerDomain::Create(void* ctx, zx_device_t* parent,
                                 const ddk::PowerImplProtocolClient& power_impl,
-                                fuchsia_hardware_power::wire::Domain domain_info) {
-  auto index = domain_info.id();
+                                const fuchsia_hardware_power::Domain& domain_info) {
+  const auto& id = domain_info.id();
+  if (!id.has_value()) {
+    zxlogf(ERROR, "Domain info metadata missing id field");
+    return ZX_ERR_INVALID_ARGS;
+  }
+  auto index = id.value();
   char name[20];
   snprintf(name, sizeof(name), "power-%u", index);
 
@@ -417,11 +423,10 @@ zx_status_t PowerDomain::Create(void* ctx, zx_device_t* parent,
 }
 
 zx_status_t Power::Create(void* ctx, zx_device_t* parent) {
-  auto power_domains = ddk::GetEncodedMetadata<fuchsia_hardware_power::wire::DomainMetadata>(
-      parent, DEVICE_METADATA_POWER_DOMAINS);
-  if (!power_domains.is_ok()) {
+  zx::result power_domains = ddk::GetMetadata<fuchsia_hardware_power::DomainMetadata>(parent);
+  if (power_domains.is_error()) {
     zxlogf(ERROR, "Failed to get metadata: %s", power_domains.status_string());
-    return power_domains.error_value();
+    return power_domains.status_value();
   }
 
   std::unique_ptr<Power> root = std::make_unique<Power>(parent);
@@ -439,10 +444,15 @@ zx_status_t Power::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  for (const auto& domain : power_domains->domains()) {
+  const auto& domains = power_domains->domains();
+  if (!domains.has_value()) {
+    zxlogf(ERROR, "Power domains metadata missing domains field");
+    return ZX_ERR_INTERNAL;
+  }
+  for (const auto& domain : domains.value()) {
     status = PowerDomain::Create(ctx, root->zxdev(), power_impl, domain);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to add power domain - %d: %s", domain.id(),
+      zxlogf(ERROR, "Failed to add power domain - %d: %s", domain.id().value(),
              zx_status_get_string(status));
       return status;
     }
