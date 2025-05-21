@@ -24,7 +24,6 @@ async fn symbolize_fn_ptr() {
     assert!(invalid_location_one.is_err());
     symbolizer.reset();
     symbolize_and_validate_result(&outputs, &mut symbolizer);
-    emu.stop().await;
 }
 
 fn symbolize_and_validate_result(outputs: &SymbolizationTestOutputs, symbolizer: &mut Symbolizer) {

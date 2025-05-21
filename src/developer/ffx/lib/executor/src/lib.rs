@@ -47,6 +47,13 @@ pub enum ExecutionError {
     IoError(std::io::Error),
 }
 
+fn run_ffx_command(mut cmd: Command) -> Result<CommandOutput, ExecutionError> {
+    let out = cmd.output().map_err(ExecutionError::IoError)?;
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    Ok(CommandOutput { status: out.status, stdout, stderr })
+}
+
 /// Represents an object that is capable of creating an ffx command. Used primarily for integration
 /// testing.
 pub trait FfxExecutor {
@@ -57,17 +64,17 @@ pub trait FfxExecutor {
         args: &'a [&'a str],
     ) -> LocalBoxFuture<'a, Result<CommandOutput, ExecutionError>> {
         Box::pin(async move {
-            let mut cmd =
-                self.make_ffx_cmd(args).map_err(ExecutionError::CommandConstructionError)?;
+            let cmd = self.make_ffx_cmd(args).map_err(ExecutionError::CommandConstructionError)?;
             log::info!("Executing ffx command: {args:?}");
-            fuchsia_async::unblock(move || {
-                let out = cmd.output().map_err(ExecutionError::IoError)?;
-                let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-                Ok::<_, ExecutionError>(CommandOutput { status: out.status, stdout, stderr })
-            })
-            .await
+            fuchsia_async::unblock(move || run_ffx_command(cmd)).await
         })
+    }
+
+    /// Like [`FfxExecutor::exec_ffx`], but runs synchronously.
+    fn exec_ffx_sync(&self, args: &[&str]) -> Result<CommandOutput, ExecutionError> {
+        let cmd = self.make_ffx_cmd(args).map_err(ExecutionError::CommandConstructionError)?;
+        log::info!("Executing ffx command: {args:?}");
+        run_ffx_command(cmd)
     }
 }
 

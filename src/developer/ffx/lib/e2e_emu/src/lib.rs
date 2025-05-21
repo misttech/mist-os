@@ -223,6 +223,23 @@ impl IsolatedEmulator {
         Ok(())
     }
 
+    /// Like [`IsolatedEmulator::ffx`], but runs synchronously, blocking the
+    /// current thread until the ffx command exits.
+    pub fn ffx_sync(&self, args: &[&str]) -> anyhow::Result<()> {
+        let output = self
+            .ffx_isolate
+            .exec_ffx_sync(&self.make_args(args))
+            .context("ffx() running ffx synchronously")?;
+        if !output.stdout.is_empty() {
+            info!("stdout:\n{}", output.stdout);
+        }
+        if !output.stderr.is_empty() {
+            info!("stderr:\n{}", output.stderr);
+        }
+        ensure!(output.status.success(), "ffx must complete successfully");
+        Ok(())
+    }
+
     /// Run an ffx command, returning stdout and logging stderr as an INFO message.
     pub async fn ffx_output(&self, args: &[&str]) -> anyhow::Result<String> {
         let output = self
@@ -352,20 +369,15 @@ impl IsolatedEmulator {
         Ok(parsed)
     }
 
-    pub async fn stop(&self) {
-        match self.ffx(&["repository", "server", "stop", &self.package_server_name]).await {
-            Ok(_) => (),
-            Err(e) => {
-                log::error!("Error stopping repo server {}: {e}.", self.package_server_name)
-            }
-        };
-
-        match self.ffx(&["emu", "stop", &self.emu_name]).await {
-            Ok(()) => return,
-            Err(e) => {
-                log::error!("Error stopping {}: {e}.", self.emu_name);
-            }
-        }
+    pub fn stop_sync(&self) {
+        self.ffx_sync(&["repository", "server", "stop", &self.package_server_name]).unwrap_or_else(
+            |e| {
+                log::warn!("failed to stop repository server: {e:?}");
+            },
+        );
+        self.ffx_sync(&["emu", "stop", &self.emu_name]).unwrap_or_else(|e| {
+            log::warn!("failed to stop emulator: {e:?}");
+        });
     }
 }
 
@@ -379,6 +391,8 @@ impl Drop for IsolatedEmulator {
                 child.kill().ok();
             }
         }
+
+        self.stop_sync();
 
         info!(
             "Tearing down isolated emulator instance. Logs are in {}.",
@@ -423,7 +437,6 @@ mod tests {
         info!("Checking that we can read RCS' logs.");
         let remote_control_logs = emu.logs_for_moniker("/core/remote-control").await.unwrap();
         assert_eq!(remote_control_logs.is_empty(), false);
-        emu.stop().await;
     }
 
     #[fuchsia::test]
@@ -439,7 +452,6 @@ mod tests {
                 .await
                 .unwrap();
         emu.ssh(&["pkgctl", "resolve", &test_package_url]).await.unwrap();
-        emu.stop().await;
     }
 
     /// This ensures the above test is actually resolving the package from the package server by
@@ -451,6 +463,5 @@ mod tests {
             .expect("TEST_PACKAGE_NAME env var must be set -- run this test with 'fx test'");
         let test_package_url = format!("fuchsia-pkg://fuchsia.com/{test_package_name}");
         emu.ssh(&["pkgctl", "resolve", &test_package_url]).await.unwrap_err();
-        emu.stop().await;
     }
 }

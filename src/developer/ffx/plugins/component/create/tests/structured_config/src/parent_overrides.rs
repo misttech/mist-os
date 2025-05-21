@@ -37,5 +37,4 @@ async fn override_echo_greeting_and_observe_in_logs() {
         info!("expected log message not found, retrying...");
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
-    emu.stop().await;
 }

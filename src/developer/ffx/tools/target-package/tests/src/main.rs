@@ -51,7 +51,6 @@ async fn cat_file_from_package_and_subpackages_using_full_resolver() {
         .await
         .unwrap();
     assert_eq!(output, include_str!("../testdata/subsubpackage_file.txt"));
-    emu.stop().await;
 }
 
 #[fuchsia::test]
@@ -72,6 +71,4 @@ async fn cat_file_from_package_using_base_resolver() {
         .await
         .unwrap();
     assert_eq!(output, r#"{"name":"system_image","version":"0"}"#);
-
-    emu.stop().await;
 }

@@ -225,6 +225,4 @@ async fn test_ffx_profile_heapdump() {
         assert!(distrib.get(&2).is_some());
         assert!(distrib.get(&1).is_some());
     }
-
-    emu.stop().await;
 }
