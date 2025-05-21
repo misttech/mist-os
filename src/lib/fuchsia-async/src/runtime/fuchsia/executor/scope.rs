@@ -306,13 +306,12 @@ pin_project! {
     }
 }
 
-impl<S> Join<S> {
-    fn new(scope: S) -> Self {
-        Self { scope, waker_entry: WakerEntry::new() }
-    }
-}
-
 impl<S: Borrow<ScopeHandle>> Join<S> {
+    fn new(scope: S) -> Self {
+        let waker_entry = scope.borrow().inner.state.waker_entry();
+        Self { scope, waker_entry }
+    }
+
     /// Aborts the scope. The future will resolve when all tasks have finished
     /// polling.
     ///
