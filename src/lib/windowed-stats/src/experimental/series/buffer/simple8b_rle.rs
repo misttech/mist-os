@@ -4,6 +4,7 @@
 
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::collections::VecDeque;
+use std::num::NonZeroUsize;
 use std::{io, iter};
 
 use crate::experimental::series::buffer::{encoding, zigzag_simple8b_rle};
@@ -275,6 +276,19 @@ impl Simple8bRleRingBuffer {
         evicted_blocks
     }
 
+    /// Push |count| counts of the new value onto the Simple8bRleRingBuffer. Return
+    /// the blocks that are evicted.
+    ///
+    /// Internally, this will push the value `k` times, where `0 <= k <= count`, until
+    /// it detects that RLE blocks can be created and pushed, in which case it will create
+    /// and push RLE blocks until the `count` has been exhausted.
+    pub fn push_multiple(&mut self, value: u64, count: NonZeroUsize) -> Vec<Simple8bRleBlock> {
+        self.num_samples += count.get();
+        let mut evicted_blocks = vec![];
+        self.push_back_multiple(value, count, &mut evicted_blocks);
+        evicted_blocks
+    }
+
     fn push_back(&mut self, value: u64, evicted_blocks: &mut Vec<Simple8bRleBlock>) {
         let current_block = match self.back() {
             Some(block) => block,
@@ -399,6 +413,58 @@ impl Simple8bRleRingBuffer {
         self.push_value_onto_new_block(value, evicted_blocks);
     }
 
+    fn push_back_multiple(
+        &mut self,
+        value: u64,
+        count: NonZeroUsize,
+        evicted_blocks: &mut Vec<Simple8bRleBlock>,
+    ) {
+        let current_block = match self.back() {
+            Some(block) => block,
+            _ => {
+                self.push_rles(value, count, evicted_blocks);
+                return;
+            }
+        };
+
+        // Base case: the current block is an RLE block with the same value.
+        if current_block.selector == RLE_SELECTOR {
+            let current_value = current_block.data & RLE_DATA_BITMASK;
+            if value == current_value {
+                // Increment as much of the count as we can on the current RLE block
+                let len = std::cmp::min(
+                    RLE_LEN_MAX as u32,
+                    (count.get() as u32).saturating_add(self.current_block_num_values),
+                );
+                let additional = len - self.current_block_num_values;
+                self.current_block_num_values = len;
+                let block = rle_block_from_value(value, len);
+                self.replace_back(block);
+
+                // If the value still needs to be pushed more, push them as new RLE blocks
+                // Note that `count.get() - additional >= 0` because the most we increment
+                // the count of the current block by is `count.get()`
+                let remaining_count = NonZeroUsize::new(count.get() - additional as usize);
+                if let Some(remaining_count) = remaining_count {
+                    self.push_rles(value, remaining_count, evicted_blocks);
+                }
+                return;
+            }
+        }
+
+        // For all other cases, insert the value once and then recurse if more need to be pushed.
+        // The recursion will terminate one of two ways:
+        // 1. `count` is small and `push_back` is called repeatedly until it reaches 0.
+        // 2. `push_back` called several times until the existing block has been finalized,
+        //    and a new RLE block is created with the current value and a count 1, then the
+        //    next call on `push_back_multiple` will reach the base case.
+        self.push_back(value, evicted_blocks);
+        let remaining_count = NonZeroUsize::new(count.get() - 1);
+        if let Some(remaining_count) = remaining_count {
+            self.push_back_multiple(value, remaining_count, evicted_blocks);
+        }
+    }
+
     fn front(&self) -> Option<Simple8bRleBlock> {
         self.selectors
             .front()
@@ -426,7 +492,10 @@ impl Simple8bRleRingBuffer {
             Simple8bRleBlock { selector: U64_SELECTOR, data: value }
         };
         self.push_block(new_block);
+        self.maybe_evict_oldest_blocks(evicted_blocks);
+    }
 
+    fn maybe_evict_oldest_blocks(&mut self, evicted_blocks: &mut Vec<Simple8bRleBlock>) {
         // Evict the oldest blocks if we still have at least `min_samples` by doing so
         // and if there are more than one block.
         while self.value_blocks.len() > 1 {
@@ -455,6 +524,23 @@ impl Simple8bRleRingBuffer {
         self.selectors.pop_back();
         self.value_blocks.pop_back();
         self.push_block(block);
+    }
+
+    fn push_rles(
+        &mut self,
+        value: u64,
+        count: NonZeroUsize,
+        evicted_blocks: &mut Vec<Simple8bRleBlock>,
+    ) {
+        let mut count = count.get() as u64;
+        while count > 0 {
+            let len = std::cmp::min(count, RLE_LEN_MAX) as u32;
+            let block = rle_block_from_value(value, len);
+            self.push_block(block);
+            self.current_block_num_values = len;
+            count -= len as u64;
+        }
+        self.maybe_evict_oldest_blocks(evicted_blocks);
     }
 }
 
@@ -1073,6 +1159,181 @@ mod tests {
             1, 0, 0, 0, 0, 0, // first block: value
             62, 0, // first block: length
             0xf0, 0, 0, 0, 0, 0, 0, 0, // second block
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_push_multiple_on_empty_ring_buffer() {
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+
+        ring_buffer.push_multiple(1, NonZeroUsize::new(10).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            1, 0, // length
+            0, 0,    // selector head index
+            10,   // last block's # of values
+            0x0f, // RLE selector
+            1, 0, 0, 0, 0, 0, // first block: value
+            10, 0, // first block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_push_multiple_with_len_exceeding_rle_max() {
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+
+        ring_buffer.push_multiple(1, NonZeroUsize::new(RLE_LEN_MAX as usize + 4).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            2, 0, // length
+            0, 0,    // selector head index
+            4,    // last block's # of values
+            0xff, // first block: RLE selector, second block: RLE selector
+            1, 0, 0, 0, 0, 0, // first block: value
+            0xff, 0xff, // first block: length
+            1, 0, 0, 0, 0, 0, // second block: value
+            4, 0, // second block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    // This test adopts the `test_chain_reencode_new_value_goes_with_excess_value` test
+    // but modifies the last step to `push_multiple`
+    #[test]
+    fn test_push_multiple_that_reencodes_an_existing_simple8b_block() {
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+
+        // Push 63 one-bit values
+        ring_buffer.push(0);
+        for _i in 0..31 {
+            ring_buffer.push(1);
+            ring_buffer.push(0);
+        }
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            1, 0, // length
+            0, 0,    // selector head index
+            63,   // last block's # of values
+            0x00, // 1-bit selector
+            0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x2a, // first block
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+
+        ring_buffer.push_multiple(3, NonZeroUsize::new(50).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        // The 63 one-bit values + the first of the new two-bit values are then split into:
+        // - 32 two-bit values
+        // - 32 two-bit values
+        // Then the remaining 49 two-bit values are put in the next RLE block
+        let expected_bytes = &[
+            3, 0, // length
+            0, 0,    // selector head index
+            49,   // last block's # of values
+            0x11, // first block: 2-bit selector, second block: 2-bit selector
+            0x0f, // third block: RLE selector
+            0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, // first block
+            0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0xc4, // second block
+            3, 0, 0, 0, 0, 0, // third block: value
+            49, 0, // third block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_push_multiple_that_reencodes_an_existing_rle_block() {
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+        for _i in 0..8 {
+            ring_buffer.push(0);
+        }
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            1, 0, // length
+            0, 0,    // selector head index
+            8,    // last block's # of values
+            0x0f, // RLE selector
+            0, 0, 0, 0, 0, 0, // first block: value
+            8, 0, // first block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+
+        ring_buffer.push_multiple(1, NonZeroUsize::new(80).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        // 56 values 1's get included into the first block. The remaining 24 values 1's get
+        // encoded into a new RLE block
+        let expected_bytes = &[
+            2, 0, // length
+            0, 0,    // selector head index
+            24,   // last block's # of values
+            0xf0, // first block: 1-bit selector, second block: RLE selector
+            0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // first block
+            1, 0, 0, 0, 0, 0, // second block: value
+            24, 0, // second block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_push_multiple_eviction() {
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+        ring_buffer.push(u64::MAX);
+        for _i in 0..40 {
+            ring_buffer.push(1);
+        }
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            2, 0, // length
+            0, 0,    // selector head index
+            40,   // last block's # of values
+            0xfe, // first block: 64-bit selector, second block: RLE selector
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // first block
+            1, 0, 0, 0, 0, 0, // second block: value
+            40, 0, // second block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+
+        let evicted = ring_buffer.push_multiple(
+            u32::MAX as u64,
+            NonZeroUsize::new(RLE_LEN_MAX as usize + RLE_LEN_MAX as usize + MIN_SAMPLES).unwrap(),
+        );
+        // Evicted values are:
+        // - A block with `u64::MAX`
+        // - A block with 40 1's
+        // - Two blocks, each with RLE_LEN_MAX (i.e. `2^16 - 1`) count of `u32::MAX`
+        assert_eq!(
+            &evicted,
+            &[
+                Simple8bRleBlock { selector: 0xe, data: u64::MAX },
+                Simple8bRleBlock { selector: 0xf, data: 0x0028000000000001 },
+                Simple8bRleBlock { selector: 0xf, data: 0xffff0000ffffffff },
+                Simple8bRleBlock { selector: 0xf, data: 0xffff0000ffffffff },
+            ]
+        );
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            1, 0, // length
+            0, 0,    // selector head index
+            120,  // last block's # of values (MIN_SAMPLES)
+            0x0f, // first block: RLE selector
+            0xff, 0xff, 0xff, 0xff, 0, 0, // first block: value
+            120, 0, // first block: length (MIN_SAMPLES)
         ];
         assert_eq!(&buffer[..], expected_bytes);
     }
