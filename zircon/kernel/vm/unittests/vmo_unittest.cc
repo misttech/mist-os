@@ -1703,6 +1703,8 @@ static bool vmo_eviction_hints_test() {
 
   // Hint that second page is always needed.
   ASSERT_OK(vmo->HintRange(PAGE_SIZE, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
+  // If the page was loaned, it will be replaced with a non-loaned page now.
+  pages[1] = vmo->DebugGetPage(PAGE_SIZE);
 
   ASSERT_EQ(reclaim_page(vmo, pages[1], PAGE_SIZE, VmCowPages::EvictionAction::Require, nullptr),
             1u);
