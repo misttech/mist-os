@@ -18,7 +18,7 @@ pub use vfs_macros::attribute_query;
 const FS_RIGHTS: fio::OpenFlags = fio::OPEN_RIGHTS;
 
 /// Returns true if the rights flags in `flags` do not exceed those in `parent_flags`.
-pub fn stricter_or_same_rights(parent_flags: fio::OpenFlags, flags: fio::OpenFlags) -> bool {
+pub(crate) fn stricter_or_same_rights(parent_flags: fio::OpenFlags, flags: fio::OpenFlags) -> bool {
     let parent_rights = parent_flags & FS_RIGHTS;
     let rights = flags & FS_RIGHTS;
     return !rights.intersects(!parent_rights);
@@ -26,7 +26,7 @@ pub fn stricter_or_same_rights(parent_flags: fio::OpenFlags, flags: fio::OpenFla
 
 /// Common logic for rights processing during cloning a node, shared by both file and directory
 /// implementations.
-pub fn inherit_rights_for_clone(
+pub(crate) fn inherit_rights_for_clone(
     parent_flags: fio::OpenFlags,
     mut flags: fio::OpenFlags,
 ) -> Result<fio::OpenFlags, Status> {
@@ -404,39 +404,4 @@ pub fn mutable_node_attributes_to_query(
         query |= fio::NodeAttributesQuery::RDEV;
     }
     query
-}
-
-#[cfg(test)]
-mod tests {
-    use super::inherit_rights_for_clone;
-
-    use fidl_fuchsia_io as fio;
-
-    // TODO This should be converted into a function as soon as backtrace support is in place.
-    // The only reason this is a macro is to generate error messages that point to the test
-    // function source location in their top stack frame.
-    macro_rules! irfc_ok {
-        ($parent_flags:expr, $flags:expr, $expected_new_flags:expr $(,)*) => {{
-            let res = inherit_rights_for_clone($parent_flags, $flags);
-            match res {
-                Ok(new_flags) => assert_eq!(
-                    $expected_new_flags, new_flags,
-                    "`inherit_rights_for_clone` returned unexpected set of flags.\n\
-                     Expected: {:X}\n\
-                     Actual: {:X}",
-                    $expected_new_flags, new_flags
-                ),
-                Err(status) => panic!("`inherit_rights_for_clone` failed.  Status: {status}"),
-            }
-        }};
-    }
-
-    #[test]
-    fn node_reference_is_inherited() {
-        irfc_ok!(
-            fio::OpenFlags::NODE_REFERENCE,
-            fio::OpenFlags::empty(),
-            fio::OpenFlags::NODE_REFERENCE
-        );
-    }
 }

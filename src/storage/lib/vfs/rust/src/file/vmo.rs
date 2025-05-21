@@ -64,7 +64,7 @@ impl VmoFile {
     /// * `vmo` - Vmo backing this file object.
     /// * `readable` - Must be `true`, VmoFile needs to be readable.
     /// * `writable` - Must be `false`, VmoFile no longer supports writing.
-    /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
+    /// * `executable` - If true, allow connections with Flags::PERM_EXECUTE.
     pub fn new(vmo: zx::Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
         // TODO(https://fxbug.dev/294078001) Remove the readable and writable arguments.
         assert!(readable, "VmoFile must be readable");
@@ -79,7 +79,7 @@ impl VmoFile {
     /// * `vmo` - Vmo backing this file object.
     /// * `readable` - Must be `true`, VmoFile needs to be readable.
     /// * `writable` - Must be `false`, VmoFile no longer supports writing.
-    /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
+    /// * `executable` - If true, allow connections with Flags::PERM_EXECUTE.
     /// * `inode` - Inode value to report when getting the VmoFile's attributes.
     pub fn new_with_inode(
         vmo: zx::Vmo,

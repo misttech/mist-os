@@ -429,13 +429,12 @@ mod tests {
         DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest, RequestFlags, SubNode,
     };
     use crate::directory::entry::GetEntryInfo;
-    use crate::directory::entry_container::Directory;
     use crate::execution_scope::ExecutionScope;
     use crate::file::read_only;
     use crate::path::Path;
-    use crate::{assert_read, pseudo_directory, ObjectRequest, ToObjectRequest};
+    use crate::{assert_read, pseudo_directory, ObjectRequest};
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
+    use fidl::endpoints::create_proxy;
     use fidl_fuchsia_io as fio;
     use futures::StreamExt;
     use std::sync::Arc;
@@ -457,20 +456,17 @@ mod tests {
             Path::validate_and_split("a/b").unwrap(),
             fio::DirentType::Directory,
         ));
-        let scope = ExecutionScope::new();
-        let (client, server) = create_endpoints();
 
         let root2 = pseudo_directory!(
             "e" => sub_node
         );
 
-        root2.deprecated_open(
-            scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
+        let file_proxy = crate::serve_file(
+            root2,
             Path::validate_and_split("e/c/d").unwrap(),
-            server,
+            fio::PERM_READABLE,
         );
-        assert_read!(ClientEnd::<fio::FileMarker>::from(client.into_channel()).into_proxy(), "foo");
+        assert_read!(file_proxy, "foo");
     }
 
     #[fuchsia::test]
@@ -511,37 +507,6 @@ mod tests {
         }
 
         let scope = ExecutionScope::new();
-        let (proxy, server) = create_proxy::<fio::NodeMarker>();
-        let flags = fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE;
-        let mut object_request = flags.to_object_request(server);
-
-        let flags_copy = flags;
-        Arc::new(MockNode {
-            callback: move |request| {
-                assert_matches!(
-                    request,
-                    OpenRequest {
-                        request_flags: RequestFlags::Open1(f),
-                        path,
-                        ..
-                    } if f == flags_copy && path.as_ref() == "a/b/c"
-                );
-                Status::BAD_STATE
-            },
-        })
-        .open_entry(OpenRequest::new(
-            scope.clone(),
-            flags,
-            "a/b/c".try_into().unwrap(),
-            &mut object_request,
-        ))
-        .unwrap();
-
-        assert_matches!(
-            proxy.take_event_stream().next().await,
-            Some(Err(fidl::Error::ClientChannelClosed { status, .. }))
-                if status == Status::BAD_STATE
-        );
 
         let (proxy, server) = create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FILE_APPEND;
