@@ -4,18 +4,20 @@
 
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::sandbox_util::LaunchTaskOnReceive;
+use ::routing::component_instance::ComponentInstanceInterface;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::future::BoxFuture;
 use routing::capability_source::{CapabilitySource, FrameworkSource, InternalCapability};
-use routing::component_instance::ComponentInstanceInterface;
 use sandbox::Dict;
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_internal as finternal,
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component_runtime as fruntime, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_sys2 as fsys,
 };
 
 pub mod binder;
+pub mod capability_factory;
 pub mod capability_store;
 pub mod component_sandbox_retriever;
 pub mod config_override;
@@ -45,6 +47,11 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstance>) -> Dict {
         component,
         &framework_dictionary,
         component_sandbox_retriever::serve,
+    );
+    add_protocol::<fruntime::CapabilityFactoryMarker>(
+        component,
+        &framework_dictionary,
+        capability_factory::serve,
     );
     framework_dictionary
 }

@@ -188,6 +188,7 @@ fidl_library://fidl/fuchsia.component
 fidl_library://fidl/fuchsia.component.decl
 fidl_library://fidl/fuchsia.component.resolution
 fidl_library://fidl/fuchsia.component.runner
+fidl_library://fidl/fuchsia.component.runtime
 fidl_library://fidl/fuchsia.component.sandbox
 fidl_library://fidl/fuchsia.component.test
 fidl_library://fidl/fuchsia.data

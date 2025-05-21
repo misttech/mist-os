@@ -46,6 +46,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl",
   "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution",
   "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner",
+  "//sdk/fidl/fuchsia.component.runtime:fuchsia.component.runtime",
   "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox",
   "//sdk/fidl/fuchsia.component.test:fuchsia.component.test",
   "//sdk/fidl/fuchsia.component:fuchsia.component",

@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use moniker::Moniker;
 use std::fmt::{self, Debug, Display};
 use std::sync::Arc;
 use thiserror::Error;
-use {fidl_fuchsia_component_sandbox as fsandbox, zx_status as zx};
+use {
+    fidl_fuchsia_component_runtime as fruntime, fidl_fuchsia_component_sandbox as fsandbox,
+    zx_status as zx,
+};
 
 /// The error type returned by bedrock operations.
 #[derive(Debug, Error, Clone)]
@@ -24,6 +28,34 @@ pub enum RouterError {
 
     #[error("unknown")]
     Unknown,
+
+    #[error("route continues outside of component manager at component {moniker}")]
+    RemotedAt { moniker: Moniker },
+}
+
+impl From<fruntime::RouterError> for RouterError {
+    fn from(router_error: fruntime::RouterError) -> Self {
+        match router_error {
+            fruntime::RouterError::NotFound => Self::NotFound(Arc::new(ExternalNotFoundError {})),
+            fruntime::RouterError::InvalidArgs => RouterError::InvalidArgs,
+            fruntime::RouterError::NotSupported => RouterError::InvalidArgs,
+            fruntime::RouterError::Internal => RouterError::Internal,
+            _ => RouterError::Unknown,
+        }
+    }
+}
+
+impl From<RouterError> for fruntime::RouterError {
+    fn from(router_error: RouterError) -> Self {
+        match router_error {
+            RouterError::NotFound(_) => fruntime::RouterError::NotFound,
+            RouterError::InvalidArgs => fruntime::RouterError::InvalidArgs,
+            RouterError::NotSupported => fruntime::RouterError::InvalidArgs,
+            RouterError::RemotedAt { .. } => fruntime::RouterError::NotSupported,
+            RouterError::Internal => fruntime::RouterError::Internal,
+            RouterError::Unknown => fruntime::RouterError::Unknown,
+        }
+    }
 }
 
 impl From<fsandbox::RouterError> for RouterError {
@@ -44,6 +76,7 @@ impl From<RouterError> for fsandbox::RouterError {
             RouterError::NotFound(_) => Self::NotFound,
             RouterError::InvalidArgs => Self::InvalidArgs,
             RouterError::NotSupported => Self::NotSupported,
+            RouterError::RemotedAt { .. } => Self::NotSupported,
             RouterError::Internal => Self::Internal,
             RouterError::Unknown => Self::unknown(),
         }
@@ -80,6 +113,7 @@ impl Explain for RouterError {
         match self {
             Self::NotFound(err) => err.as_zx_status(),
             Self::InvalidArgs => zx::Status::INVALID_ARGS,
+            Self::RemotedAt { .. } => zx::Status::NOT_SUPPORTED,
             Self::NotSupported => zx::Status::NOT_SUPPORTED,
             Self::Internal => zx::Status::INTERNAL,
             Self::Unknown => zx::Status::INTERNAL,
