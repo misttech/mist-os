@@ -1053,7 +1053,16 @@ if (current_toolchain == default_toolchain) {
         # Do not add to this list. See  the comment in
         # `//src/developer/ffx:ffx_bin`.
 
+        "//src/developer/ffx/lib/e2e_emu:isolated_emulator_data",
         "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
+        "//src/developer/ffx/lib/profiler/tests:ffx_profiler_lib_e2e_test_emulator_data",
+        "//src/developer/ffx/lib/symbolize/tests:ffx_symbolize_lib_e2e_test_emulator_data",
+        "//src/developer/ffx/plugins/component/create/tests/structured_config:verify_ffx_component_create_parent_overrides_emulator_data",
+        "//src/developer/ffx/plugins/component/run/tests/structured_config:verify_ffx_component_run_parent_overrides_emulator_data",
+        "//src/developer/ffx/plugins/profile/heapdump:verify_ffx_profile_heapdump_emulator_data",
+        "//src/developer/ffx/plugins/target/ssh:ffx_target_ssh_e2e_tests_emulator_data",
+        "//src/developer/ffx/tools/power/system-activity/application-activity:ffx_power_system_activity_application_activity_e2e_tests_emulator_data",
+        "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_emulator_data",
         "//vendor/*",
       ]
 
