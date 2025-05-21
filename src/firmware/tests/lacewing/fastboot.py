@@ -90,6 +90,12 @@ class FastbootTest(fuchsia_base_test.FuchsiaBaseTest):
         """Puts the device into fastboot mode before each test."""
         super().setup_test()
         self.device.fastboot.boot_to_fastboot_mode()
+        # `fastboot devices` sometimes lists a device before it's fully
+        # connected, so rarely our first command we send might report
+        # `< waiting for [serial]>` while fastboot finishes connecting. Issue
+        # an initial command here to ensure the device is ready so we don't have
+        # to worry about this case when parsing output (b/419262916).
+        self.device.fastboot.run(["getvar", "serialno"])
 
     def teardown_test(self) -> None:
         """Puts the device back into Fuchsia mode after each test."""
