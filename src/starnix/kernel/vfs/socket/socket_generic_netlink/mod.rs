@@ -16,7 +16,7 @@ use netlink_packet_core::{
 use netlink_packet_generic::constants::GENL_ID_CTRL;
 use netlink_packet_generic::ctrl::nlas::{GenlCtrlAttrs, McastGrpAttrs};
 use netlink_packet_generic::ctrl::{GenlCtrl, GenlCtrlCmd};
-use netlink_packet_generic::GenlMessage;
+use netlink_packet_generic::{GenlHeader, GenlMessage};
 use netlink_packet_utils::Emitable;
 use starnix_logging::track_stub;
 use starnix_sync::Mutex;
@@ -36,6 +36,7 @@ mod taskstats;
 pub use messages::GenericMessage;
 
 const MIN_FAMILY_ID: u16 = GENL_ID_CTRL + 1;
+const NLCTRL_FAMILY: &str = "nlctrl";
 
 #[async_trait]
 trait GenericNetlinkFamily<S>: Send + Sync {
@@ -169,68 +170,43 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                 log_info!(tag = NETLINK_LOG_TAG; "Netlink GetFamily request: {:?}", family_names);
 
                 for family in &family_names {
-                    if let Some(id) = self.family_ids.get(family) {
+                    if family == NLCTRL_FAMILY {
+                        self.send_get_family_response(
+                            netlink_header,
+                            genl_header,
+                            NLCTRL_FAMILY,
+                            GENL_ID_CTRL,
+                            None,
+                            sender,
+                        );
+                    } else if let Some(id) = self.family_ids.get(family).copied() {
                         log_info!(
                             tag = NETLINK_LOG_TAG;
                             "Serving requested netlink family {}",
                             family
                         );
-                        let resp_ctrl = GenlCtrl {
-                            cmd: GenlCtrlCmd::NewFamily,
-                            nlas: vec![
-                                GenlCtrlAttrs::FamilyId(*id),
-                                GenlCtrlAttrs::FamilyName(family.to_string()),
-                                GenlCtrlAttrs::McastGroups(
-                                    self.get_family(*id)
-                                        .expect("Known family ID should always exist")
-                                        .multicast_groups()
-                                        .into_iter()
-                                        .map(|name| {
-                                            vec![
-                                                McastGrpAttrs::Name(name.clone()),
-                                                McastGrpAttrs::Id(
-                                                    self.get_multicast_group_id(
-                                                        family.to_string(),
-                                                        name,
-                                                    )
-                                                    .0,
-                                                ),
-                                            ]
-                                        })
-                                        .collect(),
-                                ),
-                            ],
-                        };
-                        // Flags need to be cleared as we are sending a response back
-                        // to the client, not requesting that the client send us
-                        // data or ACKs.
-                        let orig_flags = netlink_header.flags;
-                        netlink_header.flags = 0;
-                        let mut genl_message = GenlMessage::from_parts(genl_header, resp_ctrl);
-                        genl_message.finalize();
-                        let mut message = NetlinkMessage::new(
+                        let mcast_groups = self
+                            .get_family(id)
+                            .expect("Known family ID should always exist")
+                            .multicast_groups()
+                            .into_iter()
+                            .map(|name| {
+                                vec![
+                                    McastGrpAttrs::Name(name.clone()),
+                                    McastGrpAttrs::Id(
+                                        self.get_multicast_group_id(family.to_string(), name).0,
+                                    ),
+                                ]
+                            })
+                            .collect();
+                        self.send_get_family_response(
                             netlink_header,
-                            NetlinkPayload::InnerMessage(GenericMessage::Ctrl(genl_message)),
+                            genl_header,
+                            family,
+                            id,
+                            Some(mcast_groups),
+                            sender,
                         );
-                        message.finalize();
-                        sender.send(message, None);
-                        // Conversion is safe because 4 < 65535.
-                        if orig_flags & NLM_F_ACK as u16 != 0 {
-                            // ACK requested, send ACK
-                            let mut buffer = [0; NETLINK_HEADER_LEN];
-                            // Conversion is safe because 256 < 65535
-                            netlink_header.flags = NLM_F_CAPPED as u16;
-                            netlink_header.emit(&mut buffer[..NETLINK_HEADER_LEN]);
-                            let mut ack = ErrorMessage::default();
-                            // Netlink uses an error payload with no error code to indicate a
-                            // successful ack.
-                            ack.code = None;
-                            ack.header = buffer.to_vec();
-                            let mut netlink_message =
-                                NetlinkMessage::new(netlink_header, NetlinkPayload::Error(ack));
-                            netlink_message.finalize();
-                            sender.send(netlink_message, None);
-                        }
                     } else {
                         log_warn!(
                             tag = NETLINK_LOG_TAG;
@@ -279,6 +255,51 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
             GenlCtrlCmd::GetPolicy => {
                 track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlGetPolicy")
             }
+        }
+    }
+
+    fn send_get_family_response(
+        &mut self,
+        mut netlink_header: NetlinkHeader,
+        genl_header: GenlHeader,
+        family: &str,
+        id: u16,
+        mcast_groups: Option<Vec<Vec<McastGrpAttrs>>>,
+        sender: &mut S,
+    ) {
+        let mut nlas =
+            vec![GenlCtrlAttrs::FamilyId(id), GenlCtrlAttrs::FamilyName(family.to_string())];
+        mcast_groups.map(|mg| nlas.push(GenlCtrlAttrs::McastGroups(mg)));
+        let resp_ctrl = GenlCtrl { cmd: GenlCtrlCmd::NewFamily, nlas };
+        // Flags need to be cleared as we are sending a response back
+        // to the client, not requesting that the client send us
+        // data or ACKs.
+        let orig_flags = netlink_header.flags;
+        netlink_header.flags = 0;
+        let mut genl_message = GenlMessage::from_parts(genl_header, resp_ctrl);
+        genl_message.finalize();
+        let mut message = NetlinkMessage::new(
+            netlink_header,
+            NetlinkPayload::InnerMessage(GenericMessage::Ctrl(genl_message)),
+        );
+        message.finalize();
+        sender.send(message, None);
+        // Conversion is safe because 4 < 65535.
+        if orig_flags & NLM_F_ACK as u16 != 0 {
+            // ACK requested, send ACK
+            let mut buffer = [0; NETLINK_HEADER_LEN];
+            // Conversion is safe because 256 < 65535
+            netlink_header.flags = NLM_F_CAPPED as u16;
+            netlink_header.emit(&mut buffer[..NETLINK_HEADER_LEN]);
+            let mut ack = ErrorMessage::default();
+            // Netlink uses an error payload with no error code to indicate a
+            // successful ack.
+            ack.code = None;
+            ack.header = buffer.to_vec();
+            let mut netlink_message =
+                NetlinkMessage::new(netlink_header, NetlinkPayload::Error(ack));
+            netlink_message.finalize();
+            sender.send(netlink_message, None);
         }
     }
 }

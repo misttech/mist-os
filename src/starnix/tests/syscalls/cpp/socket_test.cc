@@ -446,6 +446,55 @@ TEST(NetlinkSocket, FamilyMissing) {
   ASSERT_FALSE(memcmp(&input.err.msg, orig_nlmsghdr, sizeof(nlmsghdr)));
 }
 
+TEST(NetlinkSocket, NlctrlFamily) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+  }
+
+  int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
+  ASSERT_GT(fd, 0);
+  constexpr char kNlctrl[] = "nlctrl";
+  test_helper::NetlinkEncoder encoder(GENL_ID_CTRL, NLM_F_REQUEST);
+  encoder.BeginGenetlinkHeader(CTRL_CMD_GETFAMILY);
+  encoder.BeginNla(CTRL_ATTR_FAMILY_NAME);
+  encoder.Write(kNlctrl);
+  encoder.EndNla();
+  iovec iov = {};
+  encoder.Finalize(iov);
+  struct msghdr header = {};
+  header.msg_iov = &iov;
+  header.msg_iovlen = 1;
+
+  ASSERT_EQ(sendmsg(fd, &header, 0), static_cast<ssize_t>(iov.iov_len));
+
+  iov.iov_len = 0;
+  ssize_t received = recvmsg(fd, &header, MSG_PEEK | MSG_TRUNC);
+  ASSERT_GT(static_cast<size_t>(received), sizeof(nlmsghdr));
+  struct {
+    nlmsghdr hdr;
+    genlmsghdr genl;
+    // Family ID
+    nlattr id_attr;
+    __u16 id;
+    char padding;
+    // Family name
+    nlattr name_attr;
+    char name[sizeof(kNlctrl)];
+    char padding_0;
+  } input;
+  iov.iov_len = sizeof(input);
+  iov.iov_base = &input;
+  received = recvmsg(fd, &header, 0);
+
+  ASSERT_EQ(static_cast<size_t>(received), sizeof(input));
+  ASSERT_EQ(input.id_attr.nla_type, CTRL_ATTR_FAMILY_ID);
+  ASSERT_EQ(input.id, GENL_ID_CTRL);
+  ASSERT_EQ(input.genl.cmd, CTRL_CMD_NEWFAMILY);
+  ASSERT_EQ(input.name_attr.nla_type, CTRL_ATTR_FAMILY_NAME);
+  ASSERT_FALSE(memcmp(input.name, "nlctrl", sizeof(input.name)));
+}
+
 TEST(UnixSocket, SendZeroFds) {
   int fds[2];
   ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
