@@ -11,6 +11,7 @@ TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
 
 using dl::testing::RunFunction;
 using dl::testing::TestModule;
+using dl::testing::TestShlib;
 using dl::testing::TestSym;
 
 // Test that the module data structure uses its own copy of the module's name,
@@ -190,6 +191,44 @@ TYPED_TEST(DlTests, UniqueModules) {
 
   ASSERT_TRUE(this->DlClose(open_ret17.value()).is_ok());
   ASSERT_TRUE(this->DlClose(open_ret23.value()).is_ok());
+}
+
+// Test that the same module can be located by either its DT_SONAME or filename.
+// dlopen libfoo-filename (with DT_SONAME libbar-soname)
+// dlopen libar-soname and expect the same module handle for libfoo-filename.
+// dlopen soname-filename-mismatch which has a dependency on libbar-soname and
+// expect to reuse libfoo-filename module.
+TYPED_TEST(DlTests, SonameFilenameMismatch) {
+  const std::string kFilename = TestShlib("libfoo-filename");
+  const std::string kSoname = TestShlib("libbar-soname");
+  const std::string kParentFile = TestModule("soname-filename-mismatch");
+
+  this->Needed({kFilename});
+
+  // Open the module by its filename.
+  auto open_filename = this->DlOpen(kFilename.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_filename.is_ok()) << open_filename.error_value();
+  ASSERT_TRUE(open_filename.value());
+
+  // Open the module by its DT_SONAME, expecting it to already be loaded and is
+  // pointing to the same module as `open_filename`.
+  auto open_soname = this->DlOpen(kSoname.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_soname.is_ok()) << open_soname.error_value();
+  ASSERT_TRUE(open_soname.value());
+
+  EXPECT_EQ(open_filename.value(), open_soname.value());
+
+  // Expect only the parent-file to be fetched from the filesystem; its dep
+  // should already be loaded.
+  this->ExpectRootModule(kParentFile);
+
+  auto open_parent = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
+  ASSERT_TRUE(open_parent.value());
+
+  ASSERT_TRUE(this->DlClose(open_parent.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_filename.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_soname.value()).is_ok());
 }
 
 }  // namespace

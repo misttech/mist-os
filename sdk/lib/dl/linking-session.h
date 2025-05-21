@@ -164,7 +164,7 @@ class LinkingSession {
   // Create module data structures for `soname` and enqueue the modules onto
   // this LinkingSession's bookkeeping lists.
   const RuntimeModule* EnqueueModule(Diagnostics& diag, Soname soname) {
-    if (auto it = std::ranges::find(loaded_modules_, soname, &RuntimeModule::name);
+    if (auto it = std::ranges::find_if(loaded_modules_, soname.equal_to());
         it != loaded_modules_.end()) {
       // Return a reference to the module if it was already loaded at startup or
       // by a LinkingSession from a previous dlopen() call.
