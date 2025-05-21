@@ -115,6 +115,7 @@ protocol ClientSideBatonManagement {
     });
 
     /// Same as [Cancel], but waits until `alarm_id` is canceled.
+    @deprecated // please do not use unless you're Starnix. Use Cancel instead.
     CancelSync(struct {
         alarm_id AlarmId;
     }) -> () error WakeError;
