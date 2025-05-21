@@ -1068,11 +1068,15 @@ mod tests {
                     server_end.into_channel().into(),
                 )
                 .unwrap();
-            // Check that open as a node reference passed by calling `get_attr()` on the proxy.
-            // The returned attributes should indicate the meta is a directory.
-            let (status, attr) = proxy.get_attr().await.expect("get_attr failed");
-            assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
-            assert_eq!(attr.mode & fio::MODE_TYPE_MASK, fio::MODE_TYPE_DIRECTORY);
+            // Check that open as a node reference passed by calling `get_attributes()` on the
+            // proxy. The returned attributes should indicate the meta is a directory.
+            let (_, immutable_attributes) =
+                proxy.get_attributes(fio::NodeAttributesQuery::PROTOCOLS).await.unwrap().unwrap();
+
+            assert_eq!(
+                immutable_attributes.protocols.unwrap_or_default(),
+                fio::NodeProtocolKinds::DIRECTORY
+            );
         }
     }
 

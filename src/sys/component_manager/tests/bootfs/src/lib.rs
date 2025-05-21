@@ -4,16 +4,14 @@
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_io as fio;
-use fuchsia_fs::{directory, file, node};
+use fuchsia_fs::{directory, file};
 use futures::StreamExt;
-use libc::{S_IRUSR, S_IXUSR};
 
 // Since this is a system test, we're actually going to verify real system critical files. That
 // means that these tests take a dependency on these files existing in the system, which may
 // not forever be true. If any of the files listed here are removed, it's fine to update the set
 // of checked files.
 const SAMPLE_UTF8_READONLY_FILE: &str = "/boot/config/build_info/minimum_utc_stamp";
-const SAMPLE_REQUIRED_DIRECTORY: &str = "/boot/lib";
 const KERNEL_VDSO_DIRECTORY: &str = "/boot/kernel/vdso";
 const BOOTFS_READONLY_FILES: &[&str] = &["/boot/config/component_manager"];
 const BOOTFS_DATA_DIRECTORY: &str = "/boot/data";
@@ -22,23 +20,18 @@ const BOOTFS_EXECUTABLE_NON_LIB_FILES: &[&str] = &["/boot/bin/component_manager"
 
 #[fuchsia::test]
 async fn basic_filenode_test() -> Result<(), Error> {
-    // Open the known good file as a node, and check its attributes.
-    let node = node::open_in_namespace(SAMPLE_UTF8_READONLY_FILE, fio::PERM_READABLE)
-        .context("failed to open as a readable node")?;
-
-    // This node should be a readonly file, the inode should not be unknown,
-    // and creation and modification times should be 0 since system UTC
-    // isn't available or reliable in early boot.
-    assert_eq!(node.get_attr().await?.1.mode, fio::MODE_TYPE_FILE | S_IRUSR);
-    assert_ne!(node.get_attr().await?.1.id, fio::INO_UNKNOWN);
-    assert_eq!(node.get_attr().await?.1.creation_time, 0);
-    assert_eq!(node.get_attr().await?.1.modification_time, 0);
-
-    node::close(node).await?;
-
-    // Reopen the known good file as a file to make use of the helper functions.
     let file = file::open_in_namespace(SAMPLE_UTF8_READONLY_FILE, fio::PERM_READABLE)
         .context("failed to open as a readable file")?;
+
+    // We only support the attributes the rust VFS VmoFile type does.
+    let query = fio::NodeAttributesQuery::CONTENT_SIZE
+        | fio::NodeAttributesQuery::ID
+        | fio::NodeAttributesQuery::STORAGE_SIZE;
+    let (_, immutable_attributes) = file.get_attributes(query).await.unwrap().unwrap();
+
+    assert_ne!(immutable_attributes.id.unwrap(), fio::INO_UNKNOWN);
+    assert!(immutable_attributes.content_size.unwrap() > 0);
+    assert!(immutable_attributes.storage_size.unwrap() > 0);
 
     // Check for data corruption. This file should contain a single utf-8 string which can
     // be converted into a non-zero unsigned integer.
@@ -51,28 +44,6 @@ async fn basic_filenode_test() -> Result<(), Error> {
     assert_ne!(parsed_time, 0);
 
     file::close(file).await?;
-
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn basic_directory_test() -> Result<(), Error> {
-    // Open the known good file as a node, and check its attributes.
-    let node = node::open_in_namespace(
-        SAMPLE_REQUIRED_DIRECTORY,
-        fio::PERM_READABLE | fio::PERM_EXECUTABLE,
-    )
-    .context("failed to open as a readable and executable node")?;
-
-    // This node should be an immutable directory, the inode should not be unknown,
-    // and creation and modification times should be 0 since system UTC isn't
-    // available or reliable in early boot.
-    assert_ne!(node.get_attr().await?.1.id, fio::INO_UNKNOWN);
-    assert_eq!(node.get_attr().await?.1.creation_time, 0);
-    assert_eq!(node.get_attr().await?.1.modification_time, 0);
-    assert_eq!(node.get_attr().await?.1.mode, fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IXUSR);
-
-    node::close(node).await?;
 
     Ok(())
 }

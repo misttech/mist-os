@@ -433,16 +433,14 @@ impl Directory for RemoteDirectory {
                 ))
             }
         };
-
-        match file.get_attr().await {
-            Ok((raw_status_code, attr)) => {
-                Status::ok(raw_status_code)?;
-                Ok(attr.storage_size)
-            }
-            Err(e) => {
-                Err(format_err!("Unexpected FIDL error during file attribute retrieval: {}", e))
-            }
-        }
+        let (_, immutable_attributes) = file
+            .get_attributes(fio::NodeAttributesQuery::STORAGE_SIZE)
+            .await
+            .map_err(|e| {
+                format_err!("Unexpected FIDL error during file attribute retrieval: {}", e)
+            })?
+            .unwrap();
+        Ok(immutable_attributes.storage_size.unwrap_or_default())
     }
 
     async fn entry_names(&self) -> Result<Vec<String>> {
