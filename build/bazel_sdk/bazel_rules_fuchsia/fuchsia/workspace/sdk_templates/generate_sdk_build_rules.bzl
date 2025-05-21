@@ -1812,10 +1812,22 @@ def _generate_sdk_build_rules(
     )
 
     for dir in dir_to_meta.keys():
+        meta = dir_to_meta[dir]
+        metas = list(meta.values())
+        if dir == "tools":
+            if "aemu_internal" not in [val.get("name") for val in metas]:
+                metas.append({
+                    "files": [],
+                    "name": "aemu_internal",
+                    "root": "tools",
+                    "type": "companion_host_tool",
+                    "_meta_path": "tools/x64/aemu_internal-meta.json",
+                    "_meta_sdk_root": metas[0]["_meta_sdk_root"],
+                })
         _process_dir(
             runtime,
             dir,
-            dir_to_meta[dir].values(),
+            metas,
             process_context,
             parent_sdk_contents,
         )
