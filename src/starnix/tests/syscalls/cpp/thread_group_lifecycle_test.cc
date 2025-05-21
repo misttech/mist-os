@@ -42,11 +42,25 @@ TEST(ThreadGroupLifeCycleTest, EndMainThreadFirst) {
           auto pid = getpid();
           EXPECT_NE(tid, pid);
           usleep(100000);
+          EXPECT_EQ(tid, gettid());
           // Test that the task for the leader is still alive even after the
           // leader task called SYS_exit
-          std::string leader_proc = "/proc/" + std::to_string(pid) + "/task/" + std::to_string(pid);
-          fbl::unique_fd fd(open(leader_proc.c_str(), O_RDONLY));
-          EXPECT_TRUE(fd.is_valid());
+          {
+            std::string leader_proc =
+                "/proc/" + std::to_string(pid) + "/task/" + std::to_string(pid);
+            fbl::unique_fd fd(open(leader_proc.c_str(), O_RDONLY));
+            EXPECT_TRUE(fd.is_valid());
+          }
+
+          // Test that the task for the current thread is still alive even after the
+          // leader task called SYS_exit
+          {
+            std::string leader_proc =
+                "/proc/" + std::to_string(pid) + "/task/" + std::to_string(tid);
+            fbl::unique_fd fd(open(leader_proc.c_str(), O_RDONLY));
+            EXPECT_TRUE(fd.is_valid());
+          }
+
           _exit(testing::Test::HasFailure());
         },
         nullptr);

@@ -96,9 +96,6 @@
 
                 // TODO(https://fxbug.dev/333132302)
                 "Madvise.MadvRemoveZeroesMemory",
-
-                // TODO(https://fxbug.dev/418965139)
-                "ThreadGroupLifeCycleTest.EndMainThreadFirst",
             ],
         },
         {
@@ -117,6 +114,9 @@
                 // TODO(https://fxbug.dev/394934526)
                 "PtraceTest.PtraceAttachesToParentThread",
                 "PtraceTest.ExitKillFromThread",
+
+                // TODO(https://fxbug.dev/418965139)
+                "ThreadGroupLifeCycleTest.EndMainThreadFirst",
             ],
         },
     ],
