@@ -234,7 +234,7 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
   auto image = images_.find(image_id);
   if (image.IsValid()) {
     if (CleanUpImage(*image)) {
-      ApplyConfig();
+      ApplyConfigImpl();
     }
     return;
   }
@@ -770,11 +770,17 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig3");
 
   if (!request->has_stamp()) {
-    fdf::error("ApplyConfig3: stamp is required; none was provided");
+    fdf::error("ApplyConfig3 called without a config stamp");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   const display::ConfigStamp new_config_stamp(request->stamp().value);
+
+  if (layers_.is_empty()) {
+    FDF_LOG(ERROR, "ApplyConfig3 called before SetDisplayLayers");
+    TearDown(ZX_ERR_BAD_STATE);
+    return;
+  }
 
   if (!draft_display_config_was_validated_) {
     // TODO(https://fxbug.dev/397427767): TearDown(ZX_ERR_BAD_STATE) instead of
@@ -782,7 +788,7 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
     draft_display_config_was_validated_ = CheckConfig(nullptr, nullptr);
 
     if (!draft_display_config_was_validated_) {
-      fdf::info("ApplyConfig() called with invalid configuration; dropping the request");
+      fdf::info("ApplyConfig3 called with invalid configuration; dropping the request");
       return;
     }
   }
@@ -790,8 +796,9 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
   // Now that we can guarantee that the configuration will be applied, it is
   // safe to update the config stamp.
   if (new_config_stamp <= latest_config_stamp_) {
-    fdf::error("Config stamp must be monotonically increasing. Previous stamp: {} New stamp: {}",
-               latest_config_stamp_.value(), new_config_stamp.value());
+    fdf::error(
+        "ApplyConfig3 config stamp not monotonically increasing; new stamp: {}, previous stamp: {}",
+        new_config_stamp.value(), latest_config_stamp_.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -865,7 +872,7 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
     }
   }
 
-  ApplyConfig();
+  ApplyConfigImpl();
 
   // No reply defined.
 }
@@ -1243,19 +1250,15 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
 void Client::ReapplyConfig() {
   if (latest_config_stamp_ != display::kInvalidConfigStamp) {
-    ApplyConfig();
+    ApplyConfigImpl();
   }
 }
 
-void Client::ApplyConfig() {
+void Client::ApplyConfigImpl() {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
   TRACE_DURATION("gfx", "Display::Client::ApplyConfig internal");
 
-  if (layers_.is_empty()) {
-    FDF_LOG(ERROR, "ApplyConfig() called before SetDisplayLayers()");
-    TearDown(ZX_ERR_BAD_STATE);
-    return;
-  }
+  ZX_DEBUG_ASSERT_MSG(!layers_.is_empty(), "Empty layers during ApplyConfigImpl");
 
   bool config_missing_image = false;
 
@@ -1558,7 +1561,7 @@ void Client::OnFenceFired(FenceReference* fence) {
     new_image_ready |= layer.MarkFenceReady(fence);
   }
   if (new_image_ready) {
-    ApplyConfig();
+    ApplyConfigImpl();
   }
 }
 

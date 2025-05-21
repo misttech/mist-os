@@ -150,7 +150,11 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                            display::ConfigStamp config_stamp,
                            display::VsyncAckCookie vsync_ack_cookie);
 
-  void ApplyConfig();
+  // Applies a previously applied configuration.
+  //
+  // Called when a client regains ownership of the displays.
+  //
+  // This method is a no-op if the client has not applied any configuration.
   void ReapplyConfig();
 
   void OnFenceFired(FenceReference* fence);
@@ -227,6 +231,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                        SetDisplayPowerCompleter::Sync& _completer) override;
 
  private:
+  void ApplyConfigImpl();
+
   // Cleans up states of all current Images.
   // Returns true if any current layer has been modified.
   bool CleanUpAllImages();
@@ -369,8 +375,10 @@ class ClientProxy {
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
                          std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
-  void ReapplyConfig();
   zx_status_t OnCaptureComplete();
+
+  // See `Client::ReapplyConfig()`.
+  void ReapplyConfig();
 
   void SetVsyncEventDelivery(bool vsync_delivery_enabled) {
     fbl::AutoLock lock(&mtx_);
