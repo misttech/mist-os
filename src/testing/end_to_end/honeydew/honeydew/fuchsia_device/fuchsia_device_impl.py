@@ -1047,17 +1047,19 @@ class FuchsiaDeviceImpl(
 
         # Get file size for verification later.
         try:
-            attr_resp: f_io.NodeGetAttrResponse = asyncio.run(
-                file_proxy.get_attr()
-            )
-            if attr_resp.s != fcp.ZxStatus.ZX_OK:
-                raise fc_errors.FuchsiaControllerError(
-                    f"get_attr() returned status: {attr_resp.s}"
+            attr_resp: f_io.NodeAttributes2 = asyncio.run(
+                file_proxy.get_attributes(
+                    query=f_io.NodeAttributesQuery.CONTENT_SIZE
                 )
-        except fcp.ZxStatus as status:
+            ).unwrap()
+        except (AssertionError, fcp.ZxStatus) as e:
             raise fc_errors.FuchsiaControllerError(
-                "get_attr() failed"
-            ) from status
+                "get_attributes() failed"
+            ) from e
+        if attr_resp.immutable_attributes.content_size is None:
+            raise fc_errors.FuchsiaControllerError(
+                "get_attributes() returned empty content size"
+            )
 
         # Read until channel is empty.
         ret: bytearray = bytearray()
@@ -1073,7 +1075,7 @@ class FuchsiaDeviceImpl(
             raise fc_errors.FuchsiaControllerError("read() failed") from e
 
         # Verify transfer.
-        expected_size: int = attr_resp.attributes.content_size
+        expected_size: int = attr_resp.immutable_attributes.content_size
         if len(ret) != expected_size:
             raise fc_errors.FuchsiaControllerError(
                 f"Expected {expected_size} bytes, but read {len(ret)} bytes"

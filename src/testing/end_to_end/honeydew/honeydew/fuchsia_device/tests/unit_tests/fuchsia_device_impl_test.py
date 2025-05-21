@@ -187,20 +187,28 @@ def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
     )
 
 
-def _file_attr_resp(status: ZxStatus, size: int) -> f_io.NodeGetAttrResponse:
-    return f_io.NodeGetAttrResponse(
-        s=status.raw(),
-        attributes=f_io.NodeAttributes(
-            content_size=size,
-            # The args below are arbitrary.
-            mode=0,
-            id_=0,
-            storage_size=0,
-            link_count=0,
-            creation_time=0,
-            modification_time=0,
-        ),
-    )
+def _file_attr_resp(
+    status: ZxStatus, size: int
+) -> f_io.NodeGetAttributesResult:
+    if status.raw() != ZxStatus.ZX_OK:
+        return f_io.NodeGetAttributesResult(err=status.raw())
+    else:
+        return f_io.NodeGetAttributesResult(
+            response=f_io.NodeAttributes2(
+                # The args below (besides content_size) are arbitrary.
+                mutable_attributes=f_io.MutableNodeAttributes(
+                    mode=0,
+                    creation_time=0,
+                    modification_time=0,
+                ),
+                immutable_attributes=f_io.ImmutableNodeAttributes(
+                    content_size=size,
+                    id_=0,
+                    storage_size=0,
+                    link_count=0,
+                ),
+            ),
+        )
 
 
 class FuchsiaDeviceImplTests(unittest.TestCase):
@@ -1637,7 +1645,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
@@ -1728,7 +1736,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
         side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
@@ -1748,14 +1756,14 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         "create_context",
         autospec=True,
     )
-    def test_send_snapshot_command_get_attr_error(
+    def test_send_snapshot_command_get_attributes_error(
         self,
         unused_mock_fc_create_context: mock.Mock,
         unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
-        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attributes
         FIDL call raises an exception.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         # pylint: disable=protected-access
@@ -1771,7 +1779,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS), 0),
     )
@@ -1790,14 +1798,14 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         "create_context",
         autospec=True,
     )
-    def test_send_snapshot_command_get_attr_status_not_ok(
+    def test_send_snapshot_command_get_attributes_status_not_ok(
         self,
         unused_mock_fc_create_context: mock.Mock,
         unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
-        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attributes
         FIDL call returns a non-OK status code.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         # pylint: disable=protected-access
@@ -1813,7 +1821,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
@@ -1861,7 +1869,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         # File reports size of 15 bytes.
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
