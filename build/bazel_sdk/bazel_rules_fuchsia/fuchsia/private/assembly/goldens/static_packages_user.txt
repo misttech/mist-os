@@ -36,6 +36,7 @@ build-info-service
 ?factory_reset
 ?factory_store_providers
 ?fan-controller
+?feedback-config
 ?font-server
 ?fonts
 forensics

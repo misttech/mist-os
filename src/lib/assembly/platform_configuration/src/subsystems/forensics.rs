@@ -8,7 +8,7 @@ use assembly_config_schema::developer_overrides::{
     DeveloperOnlyOptions, FeedbackBuildTypeConfig, ForensicsOptions,
 };
 use assembly_config_schema::platform_config::forensics_config::ForensicsConfig;
-use assembly_constants::FileEntry;
+use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
 
 pub(crate) struct ForensicsSubsystem;
 impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
@@ -62,9 +62,18 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
             }
         }
 
-        // Cobalt may be added to anything utility and higher.
+        // Cobalt and Feedback may be added to anything utility and higher.
         if matches!(context.feature_set_level, FeatureSetLevel::Standard | FeatureSetLevel::Utility)
         {
+            let config_dir = builder
+                .add_domain_config(PackageSetDestination::Blob(PackageDestination::FeedbackConfig))
+                .directory("feedback-config");
+
+            config_dir.entry_from_contents(
+                "snapshot_exclusion.json",
+                &serde_json::to_string_pretty(&config.feedback.snapshot_exclusion)?,
+            )?;
+
             match context.build_type {
                 BuildType::User => builder.platform_bundle("cobalt_user_config"),
                 BuildType::UserDebug => builder.platform_bundle("cobalt_userdebug_config"),

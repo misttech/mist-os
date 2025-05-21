@@ -35,6 +35,19 @@ pub struct FeedbackConfig {
     /// Whether to include the last few kernel logs in the last reboot info.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_kernel_logs_in_last_reboot_info: bool,
+
+    /// Configuration options for excluding items from snapshots.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub snapshot_exclusion: SnapshotExclusionConfig,
+}
+
+/// Configuration options for excluding items from snapshots.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct SnapshotExclusionConfig {
+    /// A list of annotations that should not be collected.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub excluded_annotations: Vec<String>,
 }
 
 /// Configuration options for the cobalt configuration area.

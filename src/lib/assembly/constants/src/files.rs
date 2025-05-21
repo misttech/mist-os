@@ -127,6 +127,8 @@ pub enum PackageDestination {
     ShellCommands,
     /// The network provisioning configuration.
     NetcfgConfig,
+    /// The feedback configuration.
+    FeedbackConfig,
     /// The configuration for the system-recovery package.
     SystemRecoveryConfig,
     /// Variant specifically for making tests easier.
@@ -157,6 +159,7 @@ impl std::fmt::Display for PackageDestination {
                 Self::ConfigData => "config-data",
                 Self::ShellCommands => "pkg-shell-commands",
                 Self::NetcfgConfig => "netcfg-config",
+                Self::FeedbackConfig => "feedback-config",
                 Self::SystemRecoveryConfig => "system-recovery-config",
                 Self::ForTest => "for-test",
             }

@@ -38,6 +38,7 @@ build-info-service
 ?factory_store_providers
 ?fake-battery
 ?fan-controller
+?feedback-config
 ?font-server
 ?fonts
 forensics
