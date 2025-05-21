@@ -39,6 +39,15 @@ std::unique_ptr<CachedAsyncAnnotationProvider> MakeDeviceIdProvider(
                                                   AnnotationProviders::AnnotationProviderBackoff());
 }
 
+std::set<std::string> RemoveExcludedAnnotations(const std::set<std::string>& default_annotations,
+                                                const std::set<std::string>& excluded_annotations) {
+  std::set<std::string> difference;
+  std::set_difference(default_annotations.begin(), default_annotations.end(),
+                      excluded_annotations.begin(), excluded_annotations.end(),
+                      std::inserter(difference, difference.begin()));
+  return difference;
+}
+
 }  // namespace
 
 MainService::MainService(
@@ -55,13 +64,15 @@ MainService::MainService(
       cobalt_(cobalt),
       redactor_(RedactorFromConfig(inspect_root, options.build_type_config)),
       inspect_node_manager_(inspect_root),
-      annotations_(dispatcher_, services_,
-                   // TODO(https://fxbug.dev/413747327): subtract product exclusion list from
-                   // default list.
-                   options.feedback_data_options.config.default_annotations,
-                   // TODO(https://fxbug.dev/413747327): pass actual exclusion list.
-                   /*product_exclude_list=*/{}, startup_annotations,
-                   MakeDeviceIdProvider(options.local_device_id_path, dispatcher_, services_)),
+      annotations_(
+          dispatcher_, services_,
+          /*allowlist=*/
+          RemoveExcludedAnnotations(
+              options.feedback_data_options.snapshot_config.default_annotations,
+              options.feedback_data_options.snapshot_exclusion_config.excluded_annotations),
+          options.feedback_data_options.snapshot_exclusion_config.excluded_annotations,
+          startup_annotations,
+          MakeDeviceIdProvider(options.local_device_id_path, dispatcher_, services_)),
       network_watcher_(dispatcher, *services),
       feedback_data_(dispatcher_, services_, clock_, inspect_root_, cobalt_, redactor_.get(),
                      annotations_.GetAnnotationManager(), std::move(dlog),

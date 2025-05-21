@@ -30,12 +30,12 @@ FeedbackData::FeedbackData(async_dispatcher_t* dispatcher,
       inspect_node_manager_(inspect_root),
       inspect_data_budget_(options.limit_inspect_data, &inspect_node_manager_, cobalt_),
       attachment_providers_(dispatcher, services, options.delete_previous_boot_logs_time, clock,
-                            redactor, &inspect_data_budget_, options.config.attachment_allowlist,
-                            std::move(dlog)),
+                            redactor, &inspect_data_budget_,
+                            options.snapshot_config.attachment_allowlist, std::move(dlog)),
       data_provider_(dispatcher_, services_, clock_, redactor, options.is_first_instance,
-                     options.config.default_annotations, options.config.attachment_allowlist,
-                     cobalt_, annotation_manager, attachment_providers_.GetAttachmentManager(),
-                     &inspect_data_budget_) {
+                     options.snapshot_config.default_annotations,
+                     options.snapshot_config.attachment_allowlist, cobalt_, annotation_manager,
+                     attachment_providers_.GetAttachmentManager(), &inspect_data_budget_) {
   if (options.run_log_persistence) {
     SpawnSystemLogRecorder();
   }

@@ -50,6 +50,10 @@ struct SnapshotConfig {
   std::set<std::string> attachment_allowlist;
 };
 
+struct SnapshotExclusionConfig {
+  std::set<std::string> excluded_annotations;
+};
+
 std::optional<ProductConfig> GetProductConfig(
     const std::string& default_path = kDefaultProductConfigPath,
     const std::string& override_path = kOverrideProductConfigPath);
@@ -60,6 +64,9 @@ std::optional<BuildTypeConfig> GetBuildTypeConfig(
 
 std::optional<SnapshotConfig> GetSnapshotConfig(
     const std::string& path = kDefaultSnapshotConfigPath);
+
+std::optional<SnapshotExclusionConfig> GetSnapshotExclusionConfig(
+    const std::string& path = kDefaultSnapshotExclusionConfigPath);
 
 // Exposes the static configuration based on build type and product.
 void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type_config,

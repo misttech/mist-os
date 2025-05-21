@@ -241,6 +241,36 @@ std::optional<SnapshotConfig> ParseSnapshotConfig(const rapidjson::Document& jso
   return config;
 }
 
+// This config may be defined outside of fuchsia.git, so to allow for easier migrations these
+// properties shouldn't be required.
+constexpr char kSnapshotExclusionConfigSchema[] = R"({
+  "type": "object",
+  "properties": {
+    "excluded_annotations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+})";
+
+std::optional<SnapshotExclusionConfig> ParseSnapshotExclusionConfig(
+    const rapidjson::Document& json) {
+  if (!json.HasMember("excluded_annotations")) {
+    return SnapshotExclusionConfig();
+  }
+
+  SnapshotExclusionConfig config;
+  for (const auto& k : json["excluded_annotations"].GetArray()) {
+    config.excluded_annotations.insert(k.GetString());
+  }
+
+  return config;
+}
+
 }  // namespace
 
 std::optional<ProductConfig> GetProductConfig(const std::string& default_path,
@@ -258,6 +288,12 @@ std::optional<BuildTypeConfig> GetBuildTypeConfig(const std::string& default_pat
 std::optional<SnapshotConfig> GetSnapshotConfig(const std::string& default_path) {
   return GetConfig<SnapshotConfig>(kSnapshotConfigSchema, ParseSnapshotConfig, "snapshot",
                                    default_path, std::nullopt);
+}
+
+std::optional<SnapshotExclusionConfig> GetSnapshotExclusionConfig(const std::string& path) {
+  return GetConfig<SnapshotExclusionConfig>(kSnapshotExclusionConfigSchema,
+                                            ParseSnapshotExclusionConfig, "snapshot exclusion",
+                                            path, std::nullopt);
 }
 
 void ExposeConfig(inspect::Node& inspect_root, const BuildTypeConfig& build_type_config,

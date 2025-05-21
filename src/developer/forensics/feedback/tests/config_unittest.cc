@@ -75,6 +75,13 @@ class SnapshotConfigTest : public ConfigTest {
   }
 };
 
+class SnapshotExclusionConfigTest : public ConfigTest {
+ protected:
+  std::optional<SnapshotExclusionConfig> ParseConfig(const std::string& config) {
+    return GetSnapshotExclusionConfig(WriteConfig(config));
+  }
+};
+
 using InspectConfigTest = UnitTestFixture;
 
 TEST_F(ProductConfigTest, MissingPersistedLogsNumFiles) {
@@ -820,6 +827,64 @@ TEST_F(SnapshotConfigTest, AttachmentAllowlistNonEmpty) {
 
   ASSERT_TRUE(config.has_value());
   EXPECT_THAT(config->attachment_allowlist, ElementsAreArray({"a", "b"}));
+}
+
+TEST_F(SnapshotExclusionConfigTest, MissingExcludedAnnotations) {
+  const std::optional<SnapshotExclusionConfig> config = ParseConfig(R"({})");
+
+  ASSERT_TRUE(config.has_value());
+  EXPECT_THAT(config->excluded_annotations, IsEmpty());
+}
+
+TEST_F(SnapshotExclusionConfigTest, SpuriousField) {
+  const std::optional<SnapshotExclusionConfig> config = ParseConfig(R"({
+    "excluded_annotations": [],
+    "spurious": ""
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotExclusionConfigTest, ExcludedAnnotationsNotArray) {
+  const std::optional<SnapshotExclusionConfig> config = ParseConfig(R"({
+    "excluded_annotations": ""
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotExclusionConfigTest, ExcludedAnnotationsNotArrayOfStrings) {
+  const std::optional<SnapshotExclusionConfig> config = ParseConfig(R"({
+    "excluded_annotations": [1]
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotExclusionConfigTest, ExcludedAnnotationsDuplicateItems) {
+  const std::optional<SnapshotExclusionConfig> config = ParseConfig(R"({
+    "excluded_annotations": ["a", "a"]
+})");
+
+  EXPECT_FALSE(config.has_value());
+}
+
+TEST_F(SnapshotExclusionConfigTest, ExcludedAnnotationsEmpty) {
+  const std::optional<SnapshotExclusionConfig> config = ParseConfig(R"({
+    "excluded_annotations": []
+})");
+
+  ASSERT_TRUE(config.has_value());
+  EXPECT_THAT(config->excluded_annotations, IsEmpty());
+}
+
+TEST_F(SnapshotExclusionConfigTest, ExcludedAnnotationsNonEmpty) {
+  const std::optional<SnapshotExclusionConfig> config = ParseConfig(R"({
+    "excluded_annotations": ["a", "b"]
+})");
+
+  ASSERT_TRUE(config.has_value());
+  EXPECT_THAT(config->excluded_annotations, ElementsAreArray({"a", "b"}));
 }
 
 TEST_F(ProductConfigTest, MissingConfigs) {
