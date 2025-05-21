@@ -16,6 +16,7 @@ rustc_library("lib") {
     "//src/developer/ffx/daemon/*",
     "//src/developer/ffx/lib/doctor_utils:*",
     "//src/developer/ffx/lib/isolate/*",
+    "//src/developer/ffx/lib/target/holders:*",
     "//src/developer/ffx/plugins/daemon/*",
     "//src/developer/ffx/plugins/doctor:*",
     "//src/developer/ffx/tests/connection:*",
@@ -59,7 +60,6 @@ group("tests") {
     "core:tests",
     "events:tests",
     "protocols:tests",
-    "proxy:tests",
     "server:tests",
   ]
 

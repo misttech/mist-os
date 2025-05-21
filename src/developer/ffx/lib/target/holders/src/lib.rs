@@ -5,9 +5,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_command_error::Result;
 use ffx_config::EnvironmentContext;
-use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_target::fho::FhoConnectionBehavior;
 use fho::{FhoEnvironment, TryFromEnv as _};
 use fidl::encoding::DefaultFuchsiaResourceDialect;
@@ -23,7 +23,7 @@ mod target_info;
 mod target_proxy;
 mod with_moniker;
 
-pub use daemon_proxy::{daemon_protocol, DaemonProxyHolder};
+pub use crate::daemon_proxy::{daemon_protocol, DaemonProxyHolder};
 pub use fake_injector::FakeInjector;
 use from_toolbox::WithToolbox;
 pub use from_toolbox::{toolbox, toolbox_or};
