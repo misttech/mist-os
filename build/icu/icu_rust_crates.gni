@@ -75,12 +75,31 @@ template("icu_rust_library") {
                                "testonly",
                                "target_name",  # Workaround for
                                                # https://fxbug.dev/42083609.
+                               "source_root",
+                               "edition",
+                               "disable_clippy",
+                               "enforce_source_listing",
                              ])
       forward_variables_from(invoker,
                              [
                                "visibility",
                                "testonly",
                              ])
+      if (defined(invoker.source_root)) {
+        crate_root = invoker.source_root
+      }
+
+      if (!defined(rustflags)) {
+        rustflags = []
+      }
+      if (defined(invoker.edition)) {
+        rustflags += [ "--edition=${invoker.edition}" ]
+      }
+      not_needed(invoker,
+                 [
+                   "disable_clippy",
+                   "enforce_source_listing",
+                 ])
 
       # For some reason using `.icu...` in the output names causes a compile
       # error which disappears if the same compilation is run multiple times.
@@ -125,6 +144,10 @@ template("icu_rust_library") {
                            [
                              "visibility",
                              "testonly",
+                             "source_root",
+                             "edition",
+                             "disable_clippy",
+                             "enforce_source_listing",
                            ])
     forward_variables_from(invoker,
                            [
@@ -135,5 +158,21 @@ template("icu_rust_library") {
 
     # See the comment on `output_dir` above.
     output_dir = "${target_out_dir}/icu_rust_crates_unflavored_outdir"
+
+    if (defined(invoker.source_root)) {
+      crate_root = invoker.source_root
+    }
+
+    if (!defined(rustflags)) {
+      rustflags = []
+    }
+    if (defined(invoker.edition)) {
+      rustflags += [ "--edition=${invoker.edition}" ]
+    }
+    not_needed(invoker,
+               [
+                 "disable_clippy",
+                 "enforce_source_listing",
+               ])
   }
 }

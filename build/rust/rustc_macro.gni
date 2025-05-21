@@ -139,11 +139,14 @@ template("rustc_macro") {
 
   # The actual host-target build of the proc macro crate.
   if (in_host_compiler_toolchain) {
-    package_name = target_name
-    if (defined(invoker.output_name)) {
+    if (defined(invoker.crate_name)) {
+      package_name = invoker.crate_name
+    } else if (defined(invoker.output_name)) {
       package_name = invoker.output_name
     } else if (defined(invoker.name)) {
       package_name = invoker.name
+    } else {
+      package_name = target_name
     }
     crate_name = string_replace(package_name, "-", "_")
 
@@ -171,13 +174,19 @@ template("rustc_macro") {
                                [
                                  "data_deps",
                                  "output_dir",
+                                 "output_name",
+                                 "rustflags",
                                ])
-        output_name = crate_name
+        if (!defined(output_name)) {
+          output_name = crate_name
+        }
       }
       original_target_name = _original_target_name
 
       forward_variables_from(invoker,
                              [
+                               "aliased_deps",
+                               "applicable_licenses",
                                "disable_clippy",
                                "disable_rustdoc",
                                "zip_rustdoc_to",

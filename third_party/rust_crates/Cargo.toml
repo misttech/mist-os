@@ -601,11 +601,10 @@ rustflags = [ "--cfg=fn_like_proc_macro" ]
 # re-reviewed before it can be used outside of tests.
 [gn.package.generator."0.7.5"]
 visibility = [
-  ":loom-v0_7_1",
-  ":loom-v0_7_1.clippy",
+  ":loom-v0_7_1.actual",
   ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.aux.deps",
-  ":loom-v0_7_1.aux.transdeps",
+  ":loom-v0_7_1.aux.deps.deps",
+  ":loom-v0_7_1.aux.deps.transdeps",
 ]
 testonly = true
 deps = [
@@ -876,14 +875,22 @@ rustflags = []
 # Thank you!
 visibility = [
   ":ring",
-  ":rustls-v0_21_12",
-  ":rustls-webpki-v0_101_7",
-  ":sct-v0_7_1",
-  ":tuf-v0_3_0-beta13",
-  ":tuf-v0_3_0-beta13.aux.deps",
-  ":tuf-v0_3_0-beta13.aux.transdeps",
-  ":tuf-v0_3_0-beta13.clippy",
+  ":rustls-v0_21_12.actual",
+  ":rustls-v0_21_12.rustdoc",
+  ":rustls-v0_21_12.aux.deps.deps",
+  ":rustls-v0_21_12.aux.deps.transdeps",
+  ":rustls-webpki-v0_101_7.actual",
+  ":rustls-webpki-v0_101_7.rustdoc",
+  ":rustls-webpki-v0_101_7.aux.deps.deps",
+  ":rustls-webpki-v0_101_7.aux.deps.transdeps",
+  ":sct-v0_7_1.actual",
+  ":sct-v0_7_1.rustdoc",
+  ":sct-v0_7_1.aux.deps.deps",
+  ":sct-v0_7_1.aux.deps.transdeps",
+  ":tuf-v0_3_0-beta13.actual",
   ":tuf-v0_3_0-beta13.rustdoc",
+  ":tuf-v0_3_0-beta13.aux.deps.deps",
+  ":tuf-v0_3_0-beta13.aux.deps.transdeps",
 ]
 deps = [ "//third_party/rust_crates/compat/ring-0.17.8:ring-core" ]
 env_vars = [ "RING_CORE_PREFIX=ring_core_0_17_8_" ]
@@ -938,12 +945,10 @@ rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
 [gn.package.scoped-tls."1.0.1"]
 deps = [ "//build/validate:non_production_tag" ]
 visibility = [
-  ":loom-v0_7_1",
-  ":loom-v0_7_1",
-  ":loom-v0_7_1.clippy",
+  ":loom-v0_7_1.actual",
   ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.aux.deps",
-  ":loom-v0_7_1.aux.transdeps",
+  ":loom-v0_7_1.aux.deps.deps",
+  ":loom-v0_7_1.aux.deps.transdeps",
 ]
 testonly = true
 

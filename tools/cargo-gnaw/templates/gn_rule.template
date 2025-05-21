@@ -1,7 +1,10 @@
 {gn_rule}("{target_name}") {{
   crate_name = "{crate_name}"
-  crate_root = "{root_path}"
+  source_root = "{root_path}"
   output_name = "{output_name}"
+  edition = "{edition}"
+  disable_clippy = true
+  enforce_source_listing = false
   {cfgs}
   {dependencies}
   {rustenv}

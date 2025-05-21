@@ -30,6 +30,9 @@ group("disable_strict_sources_check_allowlist") {
   # hygiene and the ease of rolling such third party repos without breaking
   # changes, we lean toward the latter.
   visibility += [ "//third_party/boringssl/rust:*" ]
+
+  # Third-party crates don't list sources explicitly.
+  visibility += [ "//third_party/rust_crates:*" ]
 }
 
 # NOTE: This target is used by "fx set --cargo-toml-gen ..." which

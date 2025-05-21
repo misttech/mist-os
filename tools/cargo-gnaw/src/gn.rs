@@ -340,7 +340,9 @@ pub fn write_rule<W: io::Write>(
                     }
                     dependencies.push_str("]\n");
                     if pkg.0.name.replace("-", "_") != pkg.1 {
-                        aliased_deps.push(format!("{} = \":{}\" ", pkg.1, pkg.0.gn_name()));
+                        // aliased_deps need to point to `rust_library` targets, which is the
+                        // `.actual` target in `rustc_library`.
+                        aliased_deps.push(format!("{} = \":{}.actual\" ", pkg.1, pkg.0.gn_name()));
                     }
                 }
             }
@@ -360,7 +362,9 @@ pub fn write_rule<W: io::Write>(
                     dependencies.push_str("]\n");
 
                     if pkg.0.name.replace("-", "_") != pkg.1 {
-                        aliased_deps.push(format!("{} = \":{}\" ", pkg.1, pkg.0.gn_name()));
+                        // aliased_deps need to point to `rust_library` targets, which is the
+                        // `.actual` target in `rustc_library`.
+                        aliased_deps.push(format!("{} = \":{}.actual\" ", pkg.1, pkg.0.gn_name()));
                     }
                 }
                 dependencies.push_str("}\n");
@@ -388,7 +392,6 @@ pub fn write_rule<W: io::Write>(
 
     // Associate unique metadata with this crate
     rustflags.add_cfg("--cap-lints=allow");
-    rustflags.add_cfg(format!("--edition={}", target.edition));
     rustflags.add_cfg(format!("-Cmetadata={}", target.metadata_hash()));
     rustflags.add_cfg(format!("-Cextra-filename=-{}", target.metadata_hash()));
     if is_test {
@@ -650,6 +653,7 @@ uses_fuchsia_license = true
         target_name = target_name,
         crate_name = gn_crate_name,
         output_name = output_name,
+        edition = target.edition,
         root_path = root_relative_path,
         aliased_deps = aliased_deps_str,
         dependencies = dependencies,
@@ -768,16 +772,19 @@ mod tests {
         let output = String::from_utf8(output).unwrap();
         assert_eq!(
             output,
-            r#"rust_library("test_package-v0_1_0") {
+            r#"rustc_library("test_package-v0_1_0") {
   crate_name = "test_target"
-  crate_root = "//simple_target"
+  source_root = "//simple_target"
   output_name = "test_target-c5bf97c44457465a"
+  edition = "2018"
+  disable_clippy = true
+  enforce_source_listing = false
   
   deps = []
 
   rustenv = []
 
-  rustflags = ["--cap-lints=allow","--edition=2018","-Cmetadata=c5bf97c44457465a","-Cextra-filename=-c5bf97c44457465a"]
+  rustflags = ["--cap-lints=allow","-Cmetadata=c5bf97c44457465a","-Cextra-filename=-c5bf97c44457465a"]
 
   
   visibility = [":*"]
@@ -834,14 +841,17 @@ mod tests {
             output,
             r#"executable("test_package-test_target-v0_1_0") {
   crate_name = "test_target"
-  crate_root = "//binary_target"
+  source_root = "//binary_target"
   output_name = "rainbow_binary"
+  edition = "2018"
+  disable_clippy = true
+  enforce_source_listing = false
   
   deps = []
 
   rustenv = []
 
-  rustflags = ["--cap-lints=allow","--edition=2018","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
+  rustflags = ["--cap-lints=allow","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
 
   
   visibility = [":*"]
@@ -897,14 +907,17 @@ mod tests {
             output,
             r#"renamed_rule("test_package-test_target-v0_1_0") {
   crate_name = "test_target"
-  crate_root = "//renamed_target"
+  source_root = "//renamed_target"
   output_name = "rainbow_binary"
+  edition = "2018"
+  disable_clippy = true
+  enforce_source_listing = false
   
   deps = []
 
   rustenv = []
 
-  rustflags = ["--cap-lints=allow","--edition=2018","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
+  rustflags = ["--cap-lints=allow","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
 
   
   visibility = [":*"]

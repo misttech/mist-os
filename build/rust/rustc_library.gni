@@ -258,6 +258,7 @@ template("rustc_library") {
       forward_variables_from(invoker,
                              [
                                "data_deps",
+                               "output_name",
                                "output_dir",
                              ])
 
@@ -289,6 +290,7 @@ template("rustc_library") {
 
     forward_variables_from(invoker,
                            [
+                             "aliased_deps",
                              "applicable_licenses",
                              "assert_no_deps",
                              "check_cfgs",
@@ -307,6 +309,7 @@ template("rustc_library") {
                              "rustdoc_args",
                              "rustdoc_out_dir",
                              "rustenv",
+                             "rustflags",
                              "sources",
                              "testonly",
                              "visibility",

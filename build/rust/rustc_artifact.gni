@@ -195,7 +195,6 @@ template("rustc_artifact") {
                                  "define_rustdoc_test_override",
                                  "disable_clippy",
                                  "disable_rustdoc",
-                                 "enable_clippy_first_party",
                                  "include_rustdoc_first_party",
                                  "original_target_name",
                                  "quiet_clippy",
@@ -259,7 +258,11 @@ template("rustc_artifact") {
         }
       }
     } else {
-      not_needed(invoker, [ "original_target_name" ])
+      not_needed(invoker,
+                 [
+                   "original_target_name",
+                   "disable_clippy",
+                 ])
     }
 
     # Every first party Rust target is actually a group of both target_name.actual
@@ -291,6 +294,7 @@ template("rustc_artifact") {
                                "all_dependent_configs",
                                "applicable_licenses",
                                "assert_no_deps",
+                               "aliased_deps",
                                "data_deps",
                                "deps",
                                "emit_tool_path",

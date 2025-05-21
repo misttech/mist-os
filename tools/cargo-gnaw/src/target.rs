@@ -161,9 +161,9 @@ impl<'a> GnTarget<'a> {
 
     pub fn gn_target_type(&self) -> String {
         match self.target_type {
-            GnRustType::Library | GnRustType::Rlib => String::from("rust_library"),
+            GnRustType::Library | GnRustType::Rlib => String::from("rustc_library"),
             GnRustType::Binary => String::from("executable"),
-            GnRustType::ProcMacro => String::from("rust_proc_macro"),
+            GnRustType::ProcMacro => String::from("rustc_macro"),
             ty => panic!("Don't know how to represent this type \"{:?}\" in GN", ty),
         }
     }
