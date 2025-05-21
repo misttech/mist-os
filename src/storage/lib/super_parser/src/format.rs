@@ -6,7 +6,7 @@ use anyhow::{anyhow, ensure, Error};
 use bitflags::bitflags;
 use sha2::Digest;
 use static_assertions::const_assert;
-use zerocopy::{FromBytes, Immutable, IntoBytes};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub const PARTITION_RESERVED_BYTES: u32 = 4096;
 pub const METADATA_GEOMETRY_MAGIC: u32 = 0x616c4467;
@@ -24,10 +24,15 @@ pub const METADATA_VERSION_FOR_EXPANDED_HEADER_MIN: u16 = 2;
 /// `PARTITION_ATTRIBUTE_MASK_V0`.
 pub const METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN: u16 = 1;
 
+// `PARTITION_RESERVED_BYTES + 2 * METADATA_GEOMETRY_RESERVED_SIZE` is used frequently to calculate
+// offsets.
+pub const RESERVED_AND_GEOMETRIES_SIZE: u64 =
+    PARTITION_RESERVED_BYTES as u64 + 2 * METADATA_GEOMETRY_RESERVED_SIZE as u64;
+
 /// `MetadataGeometry` provides information on the location of logical partitions. This struct is
 /// stored at block 0 of the first 4096 bytes of the partition.
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct MetadataGeometry {
     /// Magic number. Should be `METADATA_GEOMETRY_MAGIC`.
     pub magic: u32,
@@ -66,25 +71,56 @@ impl MetadataGeometry {
         //     | Metadata                          |
         //     |                                   |
         //     |  * contains `metadata_slot_count` |
-        //     |  * copies of the metadata         |
+        //     |    copies of the metadata         |
         //     |                                   |
         //     +-----------------------------------+
         //     | Backup Metadata                   |
         //     | ...                               |
         //     +-----------------------------------+
         //
-        let total_metadata_size = (self.metadata_max_size as u64)
+        let metadata_size = (self.metadata_max_size as u64)
             .checked_mul(self.metadata_slot_count as u64)
-            .ok_or_else(|| anyhow!("arithmetic overflow"))?;
-        let geometry_and_metadata_size = total_metadata_size
-            .checked_add(METADATA_GEOMETRY_RESERVED_SIZE as u64)
-            .ok_or_else(|| anyhow!("arithmetic overflow"))?;
-        let total_geometry_and_metadata_size = geometry_and_metadata_size
-            .checked_mul(2)
-            .ok_or_else(|| anyhow!("arithmetic overflow"))?;
-        total_geometry_and_metadata_size
-            .checked_add(PARTITION_RESERVED_BYTES as u64)
-            .ok_or_else(|| anyhow!("arithmetic overflow"))
+            .ok_or_else(|| anyhow!("calculate metadata size: arithmetic overflow"))?;
+        let primary_and_backup_metadata_size = metadata_size.checked_mul(2).ok_or_else(|| {
+            anyhow!("calculate primary and backup metadata size: arithmetic overflow")
+        })?;
+        RESERVED_AND_GEOMETRIES_SIZE
+            .checked_add(primary_and_backup_metadata_size as u64)
+            .ok_or_else(|| anyhow!("calculate total metadata size: arithmetic overflow"))
+    }
+
+    // As it currently is with the values set for const `PARTITION_RESERVED_BYTES` and
+    // `METADATA_GEOMETRY_RESERVED_SIZE`, calculating the primary metadata offset would not cause
+    // an arithmetic overflow. However, use checked arithmetic operation anyway in case it changes
+    // in the future.
+    pub fn get_primary_metadata_offset(&self, slot_number: u32) -> Result<u64, Error> {
+        let slot_offset =
+            (self.metadata_max_size as u64).checked_mul(slot_number as u64).ok_or_else(|| {
+                anyhow!("calculate primary metadata slot offset: arithmetic overflow")
+            })?;
+        RESERVED_AND_GEOMETRIES_SIZE
+            .checked_add(slot_offset)
+            .ok_or_else(|| anyhow!("calculate primary metadata offset: arithmetic overflow"))
+    }
+
+    // As it currently is with the values set for const `PARTITION_RESERVED_BYTES` and
+    // `METADATA_GEOMETRY_RESERVED_SIZE`, calculating the backup metadata offset would not cause
+    // an arithmetic overflow. However, use checked arithmetic operation anyway in case it changes
+    // in the future.
+    pub fn get_backup_metadata_offset(&self, slot_number: u32) -> Result<u64, Error> {
+        let metadata_size = (self.metadata_max_size as u64)
+            .checked_mul(self.metadata_slot_count as u64)
+            .ok_or_else(|| anyhow!("calculate backup metadata size: arithmetic overflow"))?;
+        let backup_metadata_offset =
+            RESERVED_AND_GEOMETRIES_SIZE.checked_add(metadata_size).ok_or_else(|| {
+                anyhow!("calculate backup metadata start offset: arithmetic overflow")
+            })?;
+        let slot_offset = (self.metadata_max_size as u64)
+            .checked_mul(slot_number as u64)
+            .ok_or_else(|| anyhow!("calculate backup metadata slot offset: arithmetic overflow"))?;
+        backup_metadata_offset
+            .checked_add(slot_offset)
+            .ok_or_else(|| anyhow!("calculate backup metadata offset: arithmetic overflow"))
     }
 
     pub fn validate(&self) -> Result<(), Error> {
@@ -112,7 +148,7 @@ impl MetadataGeometry {
 
 /// Header of the metadata format. See `MetadataHeaderV1` for the older compatible version.
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct MetadataHeader {
     /// Magic number. Should be `METADATA_HEADER_MAGIC`.
     pub magic: u32,
@@ -189,16 +225,16 @@ impl MetadataHeader {
 
         self.partitions
             .validate(self.tables_size)
-            .map_err(|_| anyhow!("partitions tables failed table bounds check."))?;
+            .map_err(|e| anyhow!("partitions tables failed table bounds check: {e}"))?;
         self.extents
             .validate(self.tables_size)
-            .map_err(|_| anyhow!("extents tables failed table bounds check."))?;
+            .map_err(|e| anyhow!("extents tables failed table bounds check: {e}"))?;
         self.groups
             .validate(self.tables_size)
-            .map_err(|_| anyhow!("groups tables failed table bounds check."))?;
+            .map_err(|e| anyhow!("groups tables failed table bounds check: {e}"))?;
         self.block_devices
             .validate(self.tables_size)
-            .map_err(|_| anyhow!("block_devices tables failed table bounds check."))?;
+            .map_err(|e| anyhow!("block_devices tables failed table bounds check: {e}"))?;
 
         ensure!(
             self.partitions.entry_size == std::mem::size_of::<MetadataPartition>() as u32,
@@ -238,7 +274,7 @@ impl MetadataTableDescriptor {
     pub fn get_table_size(&self) -> Result<u32, Error> {
         self.num_entries
             .checked_mul(self.entry_size)
-            .ok_or_else(|| anyhow!("num_entries * entry_size overflowed."))
+            .ok_or_else(|| anyhow!("calculate table size: arithmetic overflow"))
     }
 
     fn validate(&self, total_tables_size: u32) -> Result<(), Error> {
@@ -286,7 +322,7 @@ pub const PARTITION_ATTRIBUTE_MASK: PartitionAttributes =
     PARTITION_ATTRIBUTE_MASK_V0.union(PARTITION_ATTRIBUTE_MASK_V1);
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct MetadataPartition {
     /// Name of this partition in ASCII characters. Unused characters in the buffer are set to zero.
     pub name: [u8; 36],
@@ -323,7 +359,7 @@ pub const TARGET_TYPE_LINEAR: u32 = 0;
 pub const TARGET_TYPE_ZERO: u32 = 1;
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct MetadataExtent {
     /// Length of the extent, in 512-byte sectors.
     pub num_sectors: u64,
@@ -372,7 +408,7 @@ bitflags! {
 }
 
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct MetadataPartitionGroup {
     /// Name of this group in ASCII characters. Unused characters in the buffer are set to zero.
     pub name: [u8; 36],
@@ -388,7 +424,7 @@ impl ValidateTable for MetadataPartitionGroup {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Immutable, FromBytes, IntoBytes)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Immutable, FromBytes, IntoBytes, KnownLayout)]
 pub struct BlockDeviceFlags(u32);
 bitflags! {
     impl BlockDeviceFlags: u32 {
@@ -403,7 +439,7 @@ bitflags! {
 /// Defines an entry in the `block_device` table. There must be at least one device and the first
 /// device must represent the partition holding the super metadata.
 #[repr(C, packed)]
-#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, IntoBytes, Immutable, KnownLayout)]
 pub struct MetadataBlockDevice {
     /// First usable sector for allocating logical partitions. This is the first sector after the
     /// metadata region (consists of the the geometry blocks, and space consumed by the metadata
@@ -434,7 +470,7 @@ pub struct MetadataBlockDevice {
 
 impl ValidateTable for MetadataBlockDevice {
     fn validate(&self, _header: &MetadataHeader) -> Result<(), Error> {
-        ensure!(self.get_first_logical_sector_in_bytes().is_ok(), "Invalid first_logical_sector.");
+        ensure!(self.get_first_logical_sector_in_bytes().is_ok(), "Invalid first logical sector.");
         Ok(())
     }
 }
@@ -444,7 +480,7 @@ impl MetadataBlockDevice {
     pub fn get_first_logical_sector_in_bytes(&self) -> Result<u64, Error> {
         self.first_logical_sector
             .checked_mul(SECTOR_SIZE.into())
-            .ok_or_else(|| anyhow!("arithmetic overflow"))
+            .ok_or_else(|| anyhow!("calculate first logical sector bytes: arithmetic overflow"))
     }
 }
 
@@ -516,6 +552,36 @@ mod tests {
         let checksum = geometry.compute_checksum();
         geometry.checksum = checksum;
         geometry.validate().expect_err("metadata geometry passed validation unexpectedly");
+    }
+
+    #[fuchsia::test]
+    async fn test_get_metadata_offset() {
+        let mut geometry = VALID_METADATA_GEOMETRY_BEFORE_COMPUTING_CHECKSUM;
+        geometry.checksum = geometry.compute_checksum();
+        geometry.validate().expect("metadata geometry failed validation");
+
+        let primary_offset_slot_a =
+            geometry.get_primary_metadata_offset(0).expect("failed to get primary metadata offset");
+        assert_eq!(primary_offset_slot_a, RESERVED_AND_GEOMETRIES_SIZE);
+        let primary_offset_slot_b =
+            geometry.get_primary_metadata_offset(1).expect("failed to get primary metadata offset");
+        assert_eq!(
+            primary_offset_slot_b,
+            RESERVED_AND_GEOMETRIES_SIZE + geometry.metadata_max_size as u64
+        );
+
+        let backup_offset_slot_a =
+            geometry.get_backup_metadata_offset(0).expect("failed to get backup metadata offset");
+        assert_eq!(
+            backup_offset_slot_a,
+            RESERVED_AND_GEOMETRIES_SIZE + 2 * geometry.metadata_max_size as u64
+        );
+        let backup_offset_slot_b =
+            geometry.get_backup_metadata_offset(1).expect("failed to get backup metadata offset");
+        assert_eq!(
+            backup_offset_slot_b,
+            RESERVED_AND_GEOMETRIES_SIZE + 3 * geometry.metadata_max_size as u64
+        );
     }
 
     const VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM: MetadataHeader = MetadataHeader {
@@ -633,8 +699,9 @@ mod tests {
         {
             let mut invalid_header = valid_header.clone();
             invalid_header.block_devices.num_entries = u32::MAX;
+            invalid_header.header_checksum = invalid_header.compute_checksum();
             invalid_header.validate().expect_err(
-                "metadata header with invalid entry offset passed validation unexpectedly",
+                "metadata header with invalid num_entries passed validation unexpectedly",
             );
         }
     }
