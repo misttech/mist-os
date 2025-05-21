@@ -261,7 +261,7 @@ impl<R> Verdict<R> {
     fn into_behavior(self) -> ControlFlow<Verdict<()>, R> {
         match self {
             Self::Accept(result) => ControlFlow::Continue(result),
-            Self::Drop => ControlFlow::Break(Verdict::Drop.into()),
+            Self::Drop => ControlFlow::Break(Verdict::Drop),
         }
     }
 }
@@ -401,7 +401,7 @@ impl<I: FilterIpExt> NatHook<I> for LocalEgressHook {
     {
         match result {
             RoutineResult::Accept | RoutineResult::Return => ControlFlow::Continue(()),
-            RoutineResult::Drop => ControlFlow::Break(Verdict::Drop.into()),
+            RoutineResult::Drop => ControlFlow::Break(Verdict::Drop),
             result @ RoutineResult::TransparentLocalDelivery { .. } => {
                 unreachable!(
                     "transparent local delivery is only valid in INGRESS hook; got {result:?}"
@@ -470,7 +470,7 @@ impl<I: FilterIpExt> NatHook<I> for LocalIngressHook {
     {
         match result {
             RoutineResult::Accept | RoutineResult::Return => ControlFlow::Continue(()),
-            RoutineResult::Drop => ControlFlow::Break(Verdict::Drop.into()),
+            RoutineResult::Drop => ControlFlow::Break(Verdict::Drop),
             result @ RoutineResult::Masquerade { .. } => {
                 unreachable!("Masquerade not supported in LOCAL_INGRESS; got {result:?}")
             }
@@ -531,7 +531,7 @@ impl<I: FilterIpExt> NatHook<I> for EgressHook {
     {
         match result {
             RoutineResult::Accept | RoutineResult::Return => ControlFlow::Continue(()),
-            RoutineResult::Drop => ControlFlow::Break(Verdict::Drop.into()),
+            RoutineResult::Drop => ControlFlow::Break(Verdict::Drop),
             RoutineResult::Masquerade { src_port } => {
                 ControlFlow::Break(configure_masquerade_nat::<_, _, _, _>(
                     core_ctx,
@@ -1374,7 +1374,7 @@ mod tests {
     }
 
     fn tuple_with_port(which: ReplyTuplePort, port: u16) -> Tuple<Ipv4> {
-        packet_with_port(which, port).conntrack_packet().unwrap().tuple().clone()
+        packet_with_port(which, port).conntrack_packet().unwrap().tuple()
     }
 
     #[test]
@@ -1479,7 +1479,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            Verdict::Drop.into()
+            Verdict::Drop
         );
     }
 
@@ -1518,7 +1518,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            Verdict::Drop.into()
+            Verdict::Drop
         );
     }
 
@@ -1701,7 +1701,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
             ),
-            Verdict::Drop.into()
+            Verdict::Drop
         );
     }
 
@@ -1769,7 +1769,7 @@ mod tests {
             &mut packet,
             <LocalEgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         let verdict = perform_nat::<EgressHook, _, _, _, _>(
             &mut core_ctx,
@@ -1789,7 +1789,7 @@ mod tests {
             &mut packet,
             <EgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         assert_eq!(conn.external_data().destination.get(), Some(&ShouldNat::No));
         assert_eq!(conn.external_data().source.get(), Some(&ShouldNat::No));
@@ -1819,7 +1819,7 @@ mod tests {
             &mut packet,
             <LocalEgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
         assert_eq!(conn.external_data().destination.get(), None);
         assert_eq!(conn.external_data().source.get(), None);
 
@@ -1835,7 +1835,7 @@ mod tests {
             &mut packet,
             <EgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
         assert_eq!(conn.external_data().destination.get(), None);
         assert_eq!(conn.external_data().source.get(), None);
 
@@ -1878,7 +1878,7 @@ mod tests {
             &mut reply,
             <IngressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
         assert_eq!(conn.external_data().destination.get(), Some(&ShouldNat::No));
         assert_eq!(conn.external_data().source.get(), Some(&ShouldNat::No));
     }
@@ -2042,7 +2042,7 @@ mod tests {
             &mut packet,
             Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         // The packet's source address should be rewritten, and SNAT should be
         // configured for the packet; the reply tuple's destination should be rewritten
@@ -2386,7 +2386,7 @@ mod tests {
             true, /* ensure_port_in_range */
             ConflictStrategy::RewritePort,
         );
-        assert_eq!(result, Verdict::Drop.into());
+        assert_eq!(result, Verdict::Drop);
     }
 
     #[test_case(ReplyTuplePort::Source)]
@@ -2647,7 +2647,7 @@ mod tests {
             &mut error_packet,
             <EgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         let error_packet_expected = IE::make_serializer(
             // We expect this address to be rewritten since `redirect_addr`
@@ -2802,7 +2802,7 @@ mod tests {
             &mut reply_packet,
             <EgressHook as NatHookExt<I>>::interfaces(&ethernet_interface()),
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         let reply_packet_expected = []
             .into_serializer()
@@ -2957,7 +2957,7 @@ mod tests {
             &mut packet,
             Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         // The packet's source address should be rewritten, and SNAT should be
         // configured for the packet; the reply tuple's destination should be rewritten
@@ -3099,7 +3099,7 @@ mod tests {
             &mut packet,
             Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         // The packet's source address should be rewritten, and SNAT should be
         // configured for the packet; the reply tuple's destination should be rewritten
@@ -3208,7 +3208,7 @@ mod tests {
             &mut error_packet,
             Interfaces { ingress: None, egress: Some(&ethernet_interface()) },
         );
-        assert_eq!(verdict, Verdict::Accept(()).into());
+        assert_eq!(verdict, Verdict::Accept(()));
 
         let error_packet_expected = IE::make_serializer(
             // We expect this address to be rewritten since `redirect_addr`

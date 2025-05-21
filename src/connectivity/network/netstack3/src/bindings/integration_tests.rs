@@ -819,7 +819,7 @@ async fn test_list_del_routes() {
         AddableMetric::ExplicitMetric(RawMetric(0)),
     )
     .into();
-    let sub10_gateway = SpecifiedAddr::new(net_ip_v4!("10.0.0.1")).unwrap().into();
+    let sub10_gateway = SpecifiedAddr::new(net_ip_v4!("10.0.0.1")).unwrap();
     let route3: AddableEntryEither<_> = AddableEntry::with_gateway(
         sub10,
         device.downgrade(),
@@ -832,7 +832,7 @@ async fn test_list_del_routes() {
         test_stack
             .ctx()
             .bindings_ctx()
-            .apply_route_change_either(match route.into() {
+            .apply_route_change_either(match route {
                 netstack3_core::routes::AddableEntryEither::V4(entry) => {
                     routes::ChangeEither::V4(routes::Change::RouteOp(
                         routes::RouteOp::Add(entry),

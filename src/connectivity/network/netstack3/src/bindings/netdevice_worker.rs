@@ -561,8 +561,7 @@ impl DeviceHandler {
                             netdevice: dynamic_netdevice_info_builder(max_frame_size.as_mtu()),
                             neighbor_event_sink: neighbor_event_sink.clone(),
                         }),
-                    }
-                    .into();
+                    };
                     let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
                         devices::DeviceIdAndName { id: binding_id, name: name.clone() },
                         EthernetCreationProperties { mac, max_frame_size },
@@ -579,8 +578,7 @@ impl DeviceHandler {
                         dynamic_info: CoreRwLock::new(dynamic_netdevice_info_builder(
                             max_frame_size,
                         )),
-                    }
-                    .into();
+                    };
                     let core_pure_ip_id = ctx.api().device::<PureIpDevice>().add_device(
                         devices::DeviceIdAndName { id: binding_id, name: name.clone() },
                         PureIpDeviceCreationProperties { mtu: max_frame_size },

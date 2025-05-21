@@ -5,7 +5,13 @@
 //! Packet filtering framework.
 
 #![no_std]
-#![warn(missing_docs, clippy::precedence)]
+#![warn(
+    missing_docs,
+    unreachable_patterns,
+    clippy::useless_conversion,
+    clippy::redundant_clone,
+    clippy::precedence
+)]
 
 extern crate fakealloc as alloc;
 

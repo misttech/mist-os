@@ -474,7 +474,7 @@ mod testutil {
 
         /// Creates an [`fnet::SocketAddress`] with the given `addr` and `port`.
         fn create(addr: Self::AddrType, port: u16) -> fnet::SocketAddress {
-            Self::new(SpecifiedAddr::new(addr).map(|a| ZonedAddr::Unzoned(a).into()), port)
+            Self::new(SpecifiedAddr::new(addr).map(|a| ZonedAddr::Unzoned(a)), port)
                 .into_sock_addr()
         }
 

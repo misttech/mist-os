@@ -476,7 +476,7 @@ where
 
     fn try_into_fidl(self) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
         let (addr, port) = self;
-        Ok(SockAddr::new(addr.map(|a| ZonedAddr::Unzoned(a).into()), port.get()))
+        Ok(SockAddr::new(addr.map(|a| ZonedAddr::Unzoned(a)), port.get()))
     }
 }
 
@@ -693,17 +693,17 @@ where
                         // For conformance with Linux, allow callers to provide
                         // a scope ID for addresses that don't allow zones.
                         debug!("ignoring zone ({zone:?}) provided for address ({specified})");
-                        ZonedAddr::Unzoned(specified).into()
+                        ZonedAddr::Unzoned(specified)
                     }
                     Some(addr_and_zone) => addr_and_zone
                         .try_map_zone(|zone| {
                             TryFromFidlWithContext::try_from_fidl_with_ctx(ctx, zone)
                                 .map_err(SocketAddressError::Device)
                         })
-                        .map(|a| ZonedAddr::Zoned(a).into())?,
+                        .map(|a| ZonedAddr::Zoned(a))?,
                 }
             }
-            None => ZonedAddr::Unzoned(specified).into(),
+            None => ZonedAddr::Unzoned(specified),
         };
         Ok((Some(zoned), port))
     }
@@ -731,8 +731,7 @@ where
                             TryIntoFidlWithContext::try_into_fidl_with_ctx(zone, ctx)
                         })?
                         .into(),
-                }
-                .into())
+                })
             })
             .transpose()?;
         Ok(SockAddr::new(addr, port))
@@ -1588,11 +1587,10 @@ mod tests {
     {
         let ctx = FakeConversionContext::new().await;
         let zoned = zoned.map(|z| match z {
-            ZonedAddr::Unzoned(z) => ZonedAddr::Unzoned(z).into(),
+            ZonedAddr::Unzoned(z) => ZonedAddr::Unzoned(z),
             ZonedAddr::Zoned(z) => ZonedAddr::Zoned(z.map_zone(|ReplaceWithCoreId| {
                 ctx.get_core_id(FakeConversionContext::BINDING_ID1).unwrap()
-            }))
-            .into(),
+            })),
         });
 
         let result: (Option<ZonedAddr<_, _>>, _) =

@@ -74,7 +74,7 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
                 let port = v4_addr.port();
                 let address = v4_addr.addr().to_ipv6_mapped();
                 fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress::new(
-                    Some(ZonedAddr::Unzoned(address).into()),
+                    Some(ZonedAddr::Unzoned(address)),
                     port,
                 ))
             }

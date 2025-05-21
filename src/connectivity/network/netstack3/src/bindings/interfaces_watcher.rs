@@ -1233,8 +1233,7 @@ mod tests {
                         assignment_state: finterfaces::AddressAssignmentState::Assigned,
                         valid_until: finterfaces_ext::NoInterest,
                         preferred_lifetime_info: finterfaces_ext::NoInterest,
-                    }
-                    .into()],
+                    }],
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: false,
                 }

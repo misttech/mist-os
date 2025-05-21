@@ -330,7 +330,7 @@ mod tests {
     };
 
     #[test_case(InterfaceMatcher::Id(wlan_interface().id))]
-    #[test_case(InterfaceMatcher::Name(DeviceNameMatcher(wlan_interface().name.clone())))]
+    #[test_case(InterfaceMatcher::Name(DeviceNameMatcher(wlan_interface().name)))]
     #[test_case(InterfaceMatcher::DeviceClass(wlan_interface().class))]
     fn match_on_interface_properties(matcher: InterfaceMatcher<FakeDeviceClass>) {
         let matcher = PacketMatcher {
@@ -359,7 +359,7 @@ mod tests {
     }
 
     #[test_case(InterfaceMatcher::Id(wlan_interface().id))]
-    #[test_case(InterfaceMatcher::Name(DeviceNameMatcher(wlan_interface().name.clone())))]
+    #[test_case(InterfaceMatcher::Name(DeviceNameMatcher(wlan_interface().name)))]
     #[test_case(InterfaceMatcher::DeviceClass(wlan_interface().class))]
     fn interface_matcher_specified_but_not_available_in_hook_does_not_match(
         matcher: InterfaceMatcher<FakeDeviceClass>,

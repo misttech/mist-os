@@ -1332,7 +1332,7 @@ mod tests {
             TransportProtocol::Udp,
             TransportPacketData::Generic { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
         );
-        let original_tuple = packet.tuple().clone();
+        let original_tuple = packet.tuple();
         let reply_tuple = original_tuple.clone().invert();
 
         let mut connection =
@@ -1362,7 +1362,7 @@ mod tests {
             TransportProtocol::Udp,
             TransportPacketData::Generic { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
         );
-        let original_tuple = packet.tuple().clone();
+        let original_tuple = packet.tuple();
         let reply_tuple = original_tuple.clone().invert();
 
         let mut connection =
@@ -1391,7 +1391,7 @@ mod tests {
             TransportProtocol::Udp,
             TransportPacketData::Generic { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
         );
-        let original_tuple = packet.tuple().clone();
+        let original_tuple = packet.tuple();
         let reply_tuple = original_tuple.clone().invert();
 
         let mut other_tuple = original_tuple.clone();
@@ -1553,8 +1553,8 @@ mod tests {
             TransportPacketData::Generic { src_port: I::DST_PORT, dst_port: I::SRC_PORT },
         );
 
-        let original_tuple = packet.tuple().clone();
-        let reply_tuple = reply_packet.tuple().clone();
+        let original_tuple = packet.tuple();
+        let reply_tuple = reply_packet.tuple();
 
         let (conn, dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, packet.clone())
@@ -1648,7 +1648,7 @@ mod tests {
             &original_packet,
         )
         .unwrap();
-        conn2.inner.original_tuple = nated_original_packet.tuple().clone();
+        conn2.inner.original_tuple = nated_original_packet.tuple();
         let conn2 = Connection::Exclusive(conn2);
 
         // Fake NAT that ends up allocating the same original tuple as an
@@ -1658,7 +1658,7 @@ mod tests {
             &original_packet,
         )
         .unwrap();
-        conn3.inner.reply_tuple = nated_original_packet.tuple().clone().invert();
+        conn3.inner.reply_tuple = nated_original_packet.tuple().invert();
         let conn3 = Connection::Exclusive(conn3);
 
         assert_matches!(table.finalize_connection(&mut bindings_ctx, conn1), Ok((true, Some(_))));
@@ -1767,10 +1767,10 @@ mod tests {
             TransportPacketData::Generic { src_port: I::DST_PORT, dst_port: I::SRC_PORT + 1 },
         );
 
-        let first_tuple = first_packet.tuple().clone();
+        let first_tuple = first_packet.tuple();
         let first_tuple_reply = first_tuple.clone().invert();
-        let second_tuple = second_packet.tuple().clone();
-        let second_tuple_reply = second_packet_reply.tuple().clone();
+        let second_tuple = second_packet.tuple();
+        let second_tuple_reply = second_packet_reply.tuple();
 
         // T=0: Packets for two connections come in.
         let (conn, _dir) = core_ctx
@@ -1995,7 +1995,7 @@ mod tests {
         let evicted_tuple = {
             let (packet, _) = make_test_udp_packets(0);
             let packet = packet.conntrack_packet().unwrap();
-            packet.tuple().clone()
+            packet.tuple()
         };
         fill_table(&mut bindings_ctx, &table, 0..=0, EstablishmentLifecycle::Established);
         bindings_ctx.sleep(Duration::from_secs(1));
@@ -2041,7 +2041,7 @@ mod tests {
         let evicted_tuple = {
             let (packet, _) = make_test_udp_packets(0);
             let packet = packet.conntrack_packet().unwrap();
-            packet.tuple().clone()
+            packet.tuple()
         };
         // Add one connection that expires a second sooner than the others.
         fill_table(&mut bindings_ctx, &table, 0..=0, EstablishmentLifecycle::SeenOriginal);
@@ -2233,7 +2233,7 @@ mod tests {
             TransportPacketData::Generic { src_port: I::SRC_PORT, dst_port: I::SRC_PORT },
         );
 
-        let tuple = packet.tuple().clone();
+        let tuple = packet.tuple();
         let reply_tuple = tuple.clone().invert();
 
         assert_eq!(tuple, reply_tuple);
@@ -2304,7 +2304,7 @@ mod tests {
             },
         );
 
-        let tuple = original_packet.tuple().clone();
+        let tuple = original_packet.tuple();
         let reply_tuple = tuple.clone().invert();
 
         let (conn, _dir) = table
@@ -2351,7 +2351,7 @@ mod tests {
             TransportPacketData::Generic { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
         );
 
-        let tuple = packet.tuple().clone();
+        let tuple = packet.tuple();
         let reply_tuple = tuple.clone().invert();
 
         let (conn, _dir) = table
