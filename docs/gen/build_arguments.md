@@ -971,7 +971,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1133,7 +1133,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1153,7 +1153,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1769,7 +1769,7 @@ This should never be set as a build argument.
 }
   x86_64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -2248,7 +2248,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:28
+From //build/config/BUILD.gn:29
 
 ### developer_test_labels
 
@@ -5811,6 +5811,16 @@ Platform portability header for spinel.
 **Current value (from the default):** `"\"spinel_platform.h\""`
 
 From //third_party/openthread/src/lib/spinel/BUILD.gn:32
+
+### stack_clash_protection
+
+Whether to compile with stack-clash-protection enabled
+https://clang.llvm.org/docs/ClangCommandLineReference.html#cmdoption-clang-fstack-clash-protection
+https://blog.llvm.org/posts/2021-01-05-stack-clash-protection/
+
+**Current value (from the default):** `true`
+
+From //build/config/clang/stack_clash_protection.gni:9
 
 ### stack_size_section
 
