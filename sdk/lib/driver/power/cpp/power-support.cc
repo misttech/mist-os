@@ -539,7 +539,8 @@ fit::result<Error> AddElement(
     std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
     std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control,
     std::optional<fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>>
-        element_control_client) {
+        element_control_client,
+    std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner) {
   // Get the power levels we should have
   std::vector<fuchsia_power_broker::PowerLevel> levels = PowerLevelsFromConfig(config);
   if (levels.size() == 0) {
@@ -593,8 +594,9 @@ fit::result<Error> AddElement(
     }
   }
 
+  // Level control is deprecated. Only use if element_runner not supplied.
   std::optional<fuchsia_power_broker::LevelControlChannels> lvl_ctrl;
-  if (level_control.has_value()) {
+  if (!element_runner.has_value() && level_control.has_value()) {
     lvl_ctrl = {std::move(level_control->first), std::move(level_control->second)};
   } else {
     level_control = std::nullopt;
@@ -606,6 +608,7 @@ fit::result<Error> AddElement(
       .valid_levels = std::move(levels),
       .dependencies = std::move(level_deps),
       .level_control_channels = std::move(lvl_ctrl),
+      .element_runner = std::move(element_runner),
   }};
   if (lessor.has_value()) {
     schema.lessor_channel() = std::move(lessor.value());
@@ -661,7 +664,8 @@ fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& p
                     description.assertive_token.borrow(), description.opportunistic_token.borrow(),
                     std::move(description.level_control_servers),
                     std::move(description.lessor_server),
-                    std::move(description.element_control_server), element_control_client);
+                    std::move(description.element_control_server), element_control_client,
+                    std::move(description.element_runner));
 }
 
 void LeaseHelper::AcquireLease(

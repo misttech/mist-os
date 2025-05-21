@@ -30,7 +30,7 @@ void check_channels_peered(zx_handle_t c1, zx_handle_t c2) {
   ASSERT_EQ(basic1.koid, basic2.related_koid);
 }
 
-TEST_F(ElementBuilderTests, ElementBuilderFilledOut) {
+TEST_F(ElementBuilderTests, ElementBuilderLevelControlFilledOut) {
   fdf_power::PowerElementConfiguration config;
   fdf_power::TokenMap tokens;
 
@@ -61,6 +61,7 @@ TEST_F(ElementBuilderTests, ElementBuilderFilledOut) {
   ASSERT_TRUE(desc.element_control_server.is_valid());
   ASSERT_TRUE(desc.level_control_servers.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers.second.is_valid());
+  ASSERT_EQ(desc.element_runner, std::nullopt);
 
   ASSERT_TRUE(desc.assertive_token.is_valid());
   ASSERT_TRUE(desc.opportunistic_token.is_valid());
@@ -77,6 +78,51 @@ TEST_F(ElementBuilderTests, ElementBuilderFilledOut) {
   check_channels_peered(lessor.client.handle()->get(), desc.lessor_server.handle()->get());
   check_channels_peered(element_control.client.handle()->get(),
                         desc.element_control_server.handle()->get());
+}
+
+TEST_F(ElementBuilderTests, ElementBuilderElementRunnerFilledOut) {
+  fdf_power::PowerElementConfiguration config;
+  fdf_power::TokenMap tokens;
+
+  zx_handle_t active, passive;
+  zx_event_create(0, &active);
+  zx_event_create(0, &passive);
+  zx::event active_event(active);
+  zx::event passive_event(passive);
+  fidl::Endpoints<fuchsia_power_broker::Lessor> lessor =
+      fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>().value();
+  fidl::Endpoints<fuchsia_power_broker::ElementRunner> element_runner =
+      fidl::CreateEndpoints<fuchsia_power_broker::ElementRunner>().value();
+
+  fdf_power::ElementDesc desc = fdf_power::ElementDescBuilder(config, std::move(tokens))
+                                    .SetAssertiveToken(active_event.borrow())
+                                    .SetOpportunisticToken(passive_event.borrow())
+                                    .SetLessor(std::move(lessor.server))
+                                    .SetElementControl(std::move(element_control.server))
+                                    .SetElementRunner(std::move(element_runner.client))
+                                    .Build();
+
+  ASSERT_TRUE(desc.lessor_server.is_valid());
+  ASSERT_TRUE(desc.element_control_server.is_valid());
+  ASSERT_FALSE(desc.level_control_servers.first.is_valid());
+  ASSERT_FALSE(desc.level_control_servers.second.is_valid());
+  ASSERT_TRUE(desc.element_runner->is_valid());
+
+  ASSERT_TRUE(desc.assertive_token.is_valid());
+  ASSERT_TRUE(desc.opportunistic_token.is_valid());
+
+  ASSERT_EQ(desc.current_level_client, std::nullopt);
+  ASSERT_EQ(desc.required_level_client, std::nullopt);
+  ASSERT_EQ(desc.lessor_client, std::nullopt);
+  ASSERT_EQ(desc.element_control_client, std::nullopt);
+
+  check_channels_peered(lessor.client.handle()->get(), desc.lessor_server.handle()->get());
+  check_channels_peered(element_control.client.handle()->get(),
+                        desc.element_control_server.handle()->get());
+  check_channels_peered(element_runner.server.handle()->get(),
+                        desc.element_runner->handle()->get());
 }
 
 TEST_F(ElementBuilderTests, ElementBuilderMissingCurrentLevel) {
