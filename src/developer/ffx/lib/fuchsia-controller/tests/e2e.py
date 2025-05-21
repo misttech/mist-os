@@ -4,7 +4,6 @@
 import asyncio
 import os
 import os.path
-import platform
 import sys
 import typing
 import unittest
@@ -15,24 +14,6 @@ from fidl_codec import encode_fidl_message, method_ordinal
 from fuchsia_controller_py import Channel, Context, IsolateDir, Socket, ZxStatus
 
 from fidl import DomainError
-
-SDK_ROOT = "./sdk/exported/core"
-# For Linux this handles the gamut of options.
-# This map is derived from //build/rbe/fuchsia.py
-PLATFORM_TYPE = {
-    "x86_64": "x64",
-    "arm64": "arm64",
-}
-
-
-def _locate_ffx_binary(sdk_manifest: str) -> str:
-    """Locates the ffx binary from a given SDK root."""
-    return os.path.join(
-        SDK_ROOT,
-        "tools",
-        PLATFORM_TYPE[platform.machine()],
-        "ffx",
-    )
 
 
 class TestSocketServer(fc_test.TestingServer):
@@ -80,12 +61,9 @@ class TestSocketServer(fc_test.TestingServer):
         return DomainError("not implemented")
 
 
-FFX_PATH = _locate_ffx_binary(SDK_ROOT)
-
-
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
     def _get_default_config(self) -> typing.Dict[str, str]:
-        return {"sdk.root": SDK_ROOT}
+        return {}
 
     def _get_isolate_dir(self) -> IsolateDir:
         isolation_path = None
