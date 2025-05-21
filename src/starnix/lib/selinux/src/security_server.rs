@@ -371,7 +371,7 @@ impl SecurityServer {
                 sid: fs_sid,
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: use_type,
-                    computed_def_sid: mount_sids
+                    default_sid: mount_sids
                         .def_context
                         .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
                 },
@@ -392,7 +392,7 @@ impl SecurityServer {
                     .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled)),
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: FsUseType::Xattr,
-                    computed_def_sid: mount_sids
+                    default_sid: mount_sids
                         .def_context
                         .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
                 },

@@ -132,7 +132,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
         FileSystemLabelingScheme::Mountpoint { sid } => sid,
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
-        FileSystemLabelingScheme::FsUse { fs_use_type, computed_def_sid: def_sid, .. } => {
+        FileSystemLabelingScheme::FsUse { fs_use_type, default_sid, .. } => {
             match (fs_use_type, locked_or_no_xattr) {
                 (FsUseType::Xattr, Some(locked)) => {
                     // Determine the SID from the "security.selinux" attribute.
@@ -190,7 +190,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                                 fs_use_type
                             );
                         };
-                        def_sid
+                        default_sid
                     })
                 }
                 (FsUseType::Xattr, None) => {

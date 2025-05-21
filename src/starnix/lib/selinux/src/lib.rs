@@ -1445,10 +1445,9 @@ pub enum FileSystemLabelingScheme {
     /// This filesystem was mounted with "context=".
     Mountpoint { sid: SecurityId },
     /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
-    /// policy. `root_sid` identifies the context for the root of the filesystem and
-    /// `computed_def_sid`  identifies the context to use for unlabeled files in the filesystem
-    /// (the "default context").
-    FsUse { fs_use_type: FsUseType, computed_def_sid: SecurityId },
+    /// policy. If the `fs_use_type` is "fs_use_xattr" then the `default_sid` specifies the SID
+    /// with which to label `FsNode`s of files that do not have the "security.selinux" xattr.
+    FsUse { fs_use_type: FsUseType, default_sid: SecurityId },
     /// This filesystem has one or more "genfscon" statements associated with it in the policy.
     GenFsCon,
 }
