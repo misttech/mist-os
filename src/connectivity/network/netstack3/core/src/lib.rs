@@ -11,7 +11,13 @@
 // In case we roll the toolchain and something we're using as a feature has been
 // stabilized.
 #![allow(stable_features)]
-#![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
+#![warn(
+    missing_docs,
+    unreachable_patterns,
+    clippy::useless_conversion,
+    clippy::redundant_clone,
+    clippy::precedence
+)]
 
 // TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove
 // this module.

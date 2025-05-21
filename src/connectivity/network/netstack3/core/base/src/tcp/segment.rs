@@ -1316,14 +1316,14 @@ mod test {
         control: None,
         data_len: 10,
         rcv_nxt: 1,
-        rcv_wnd: 1 << 30 - 1,
+        rcv_wnd: WindowSize::MAX.into(),
     } => Some((SeqNum::new(1), None, 0..10)))]
     #[test_case(OverlapTestArgs{
         seg_seq: 10,
         control: None,
         data_len: 10,
         rcv_nxt: 1,
-        rcv_wnd: 1 << 30 - 1,
+        rcv_wnd: WindowSize::MAX.into(),
     } => Some((SeqNum::new(10), None, 0..10)))]
     #[test_case(OverlapTestArgs{
         seg_seq: 1,

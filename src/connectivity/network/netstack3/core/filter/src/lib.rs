@@ -5,7 +5,7 @@
 //! Packet filtering framework.
 
 #![no_std]
-#![warn(missing_docs)]
+#![warn(missing_docs, clippy::precedence)]
 
 extern crate fakealloc as alloc;
 
