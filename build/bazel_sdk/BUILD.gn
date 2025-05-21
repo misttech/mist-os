@@ -10,6 +10,7 @@ group("tests") {
   ]
 }
 
+# Test comment
 group("tests-no-e2e") {
   testonly = true
   deps = [ "//build/bazel/bazel_sdk:tests" ]
