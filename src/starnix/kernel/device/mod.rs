@@ -3,12 +3,10 @@
 // found in the LICENSE file.
 
 mod registry;
-mod remote_binder;
 
 pub use registry::*;
 
 pub mod android;
-pub mod binder;
 pub mod kobject;
 pub mod kobject_store;
 pub mod mem;

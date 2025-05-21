@@ -297,7 +297,7 @@ where
     Ok(builder.into())
 }
 
-fn create_task<F, L>(
+pub fn create_task<F, L>(
     locked: &mut Locked<'_, L>,
     kernel: &Arc<Kernel>,
     initial_name: CString,

@@ -4,7 +4,6 @@
 
 use crate::bpf::attachments::EbpfAttachments;
 use crate::container_namespace::ContainerNamespace;
-use crate::device::binder::BinderDevice;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
@@ -54,7 +53,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -184,9 +183,6 @@ pub struct Kernel {
 
     /// The registry of block devices backed by a remote fuchsia.io file.
     pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
-
-    /// The binder driver registered for this container, indexed by their device type.
-    pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
 
     /// The iptables used for filtering network packets.
     pub iptables: OrderedRwLock<IpTables, KernelIpTables>,
@@ -386,7 +382,6 @@ impl Kernel {
             device_registry: Default::default(),
             container_namespace,
             remote_block_device_registry: Default::default(),
-            binders: Default::default(),
             iptables,
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),

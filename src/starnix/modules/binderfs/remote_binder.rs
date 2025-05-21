@@ -2,17 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::binder::{BinderDriver, RemoteBinderConnection};
-use crate::device::DeviceOps;
-use crate::mm::memory::MemoryObject;
-use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
-use crate::power::mark_proxy_message_handled;
-use crate::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
-    NamespaceNode,
-};
+use crate::{BinderDevice, BinderDriver, RemoteBinderConnection};
 use anyhow::{Context, Error};
 use derivative::Derivative;
 use fidl::endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd};
@@ -21,6 +11,16 @@ use futures::channel::oneshot;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::task::Poll;
 use futures::{pin_mut, select, Future, Stream, StreamExt, TryStreamExt};
+use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
+use starnix_core::power::mark_proxy_message_handled;
+use starnix_core::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+    NamespaceNode,
+};
 use starnix_lifecycle::DropWaiter;
 use starnix_logging::{
     log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,
@@ -652,7 +652,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     payload, ..
                 } => {
                     if let Some(watcher) = payload.watcher {
-                        crate::power::create_watcher_for_wake_events(watcher);
+                        starnix_core::power::create_watcher_for_wake_events(watcher);
                     }
                 }
                 unknown => log_warn!("Unknown ContainerPowerController request: {:#?}", unknown),
@@ -968,17 +968,19 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<Arc<RemoteBinderConnection>, Errno> {
         let node = current_task.lookup_path_from_root(locked, path.as_ref())?;
         let device_type = node.entry.node.info().rdev;
-        let connection = BinderDriver::open_remote(
-            current_task
-                .kernel()
-                .binders
-                .read()
-                .get(&device_type)
-                .ok_or_else(|| errno!(ENOTSUP))?,
-            current_task,
-            process_accessor,
-            process,
-        );
+        let device: Arc<dyn DeviceOps> = current_task
+            .kernel()
+            .device_registry
+            .get_device(device_type, DeviceMode::Char)
+            .or_else(|_| error!(ENOTSUP))?;
+        let device_ref: &BinderDevice = device
+            .as_ref()
+            .as_any()
+            .downcast_ref::<BinderDevice>()
+            .ok_or_else(|| errno!(ENOTSUP))?;
+
+        let connection =
+            BinderDriver::open_remote(device_ref, current_task, process_accessor, process);
         Ok(connection)
     }
 
@@ -1000,7 +1002,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
         let (power_controller_server_end, power_controller_client_end) = zx::Channel::create();
         let (power_controller_server_end, power_controller_event) =
-            crate::power::create_proxy_for_wake_events_counter_zero(
+            starnix_core::power::create_proxy_for_wake_events_counter_zero(
                 power_controller_server_end,
                 format!("hal: {}", service_name),
             );
@@ -1153,18 +1155,18 @@ async fn select_first<O>(f1: impl Future<Output = O>, f2: impl Future<Output = O
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::device::binder::tests::run_process_accessor;
-    use crate::device::binder::BinderFs;
-    use crate::execution::create_init_child_process;
-    use crate::mm::MemoryAccessor;
-    use crate::testing::*;
-    use crate::vfs::{FileSystemOptions, WhatToMount};
+    use crate::tests::run_process_accessor;
+    use crate::BinderFs;
     use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
     use fidl::HandleBased;
     use rand::distributions::{Alphanumeric, DistString};
-    use starnix_types::arch::ArchWidth;
+    use starnix_core::mm::MemoryAccessor;
+    use starnix_core::testing::*;
+    use starnix_core::vfs::{FileSystemOptions, WhatToMount};
+    use starnix_types::PAGE_SIZE;
     use starnix_uapi::file_mode::mode;
     use starnix_uapi::mount_flags::MountFlags;
+    use starnix_uapi::restricted_aspace::RESTRICTED_ASPACE_RANGE;
     use std::collections::BTreeMap;
     use std::ffi::CString;
     use std::sync::LazyLock;
@@ -1185,161 +1187,204 @@ mod tests {
             REMOTE_CONTROLLER_CLIENT.lock().remove(service_name).ok_or_else(|| errno!(ENOENT))
         }
     }
+    use starnix_core::execution::{create_task, TaskInfo};
+    use starnix_core::security;
+    use starnix_core::signals::SignalActions;
 
     /// Setup and run a test against the remote binder. The closure that is passed to this function
     /// will be called with a binder proxy that can be used to access the remote binder.
     async fn run_remote_binder_test<F, Fut>(f: F)
     where
         Fut: Future<Output = fbinder::BinderProxy>,
-        F: FnOnce(fbinder::BinderProxy, fbinder::LutexControllerProxy) -> Fut,
+        F: FnOnce(fbinder::BinderProxy, fbinder::LutexControllerProxy) -> Fut
+            + Sync
+            + Send
+            + 'static,
     {
-        let service_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-        let (remote_controller_client, remote_controller_server) =
-            create_endpoints::<fbinder::RemoteControllerMarker>();
-        REMOTE_CONTROLLER_CLIENT.lock().insert(service_name.clone(), remote_controller_client);
-        // Simulate the remote binder user process.
-        let (kernel, _init_task) = create_kernel_and_task();
-        let starnix_thread = kernel.kthreads.spawner().spawn_and_get_result({
-            let kernel = Arc::clone(&kernel);
-            move |locked, current_task| {
-                current_task
-                    .fs()
-                    .root()
-                    .create_node(
-                        locked,
-                        &current_task,
-                        "dev".into(),
-                        mode!(IFDIR, 0o755),
-                        DeviceType::NONE,
-                    )
-                    .expect("mkdir dev");
-                let dev = current_task
-                    .lookup_path_from_root(locked, "/dev".into())
-                    .expect("lookup_path_from_root");
-                dev.mount(
-                    WhatToMount::Fs(
-                        BinderFs::new_fs(locked, &current_task, FileSystemOptions::default())
-                            .expect("new_fs"),
-                    ),
-                    MountFlags::empty(),
-                )
-                .expect("mount");
+        spawn_kernel_and_run(|_, init_task| {
+            let mut executor = fasync::LocalExecutor::new();
+            executor.run_singlethreaded(async move {
+                let service_name = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+                let (remote_controller_client, remote_controller_server) =
+                    create_endpoints::<fbinder::RemoteControllerMarker>();
+                REMOTE_CONTROLLER_CLIENT
+                    .lock()
+                    .insert(service_name.clone(), remote_controller_client);
+                let fs = init_task.fs().clone();
+                let kernel = init_task.kernel().clone();
+                let memory_manager = init_task.mm().cloned();
 
-                let task: AutoReleasableTask = create_init_child_process(
-                    locked,
-                    &kernel,
-                    &CString::new("remote_binder".to_string()).expect("CString"),
-                    None,
-                )
-                .expect("Task")
-                .into();
-                task.mm()
-                    .ok_or_else(|| errno!(EINVAL))?
-                    .initialize_mmap_layout_for_test(ArchWidth::Arch64);
+                // Simulate the remote binder user process.
+                let starnix_thread = std::thread::Builder::new()
+                    .name("user-thread".to_string())
+                    .spawn(move || {
+                        let mut locked = unsafe { Unlocked::new() };
+                        let builder = create_task(
+                            &mut locked,
+                            &kernel,
+                            CString::new("kthreadd").unwrap(),
+                            fs,
+                            |locked, pid, process_group| {
+                                let process = fuchsia_runtime::process_self()
+                                    .duplicate(zx::Rights::SAME_RIGHTS)
+                                    .expect("process");
+                                let thread_group = ThreadGroup::new(
+                                    locked,
+                                    kernel.clone(),
+                                    process,
+                                    None,
+                                    pid,
+                                    process_group,
+                                    SignalActions::default(),
+                                );
+                                Ok(TaskInfo { thread: None, thread_group, memory_manager }.into())
+                            },
+                            security::task_alloc_for_kernel(),
+                        )
+                        .expect("failed");
+                        let current_task: CurrentTask = builder.into();
 
-                let remote_binder_handle =
-                    RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);
+                        current_task
+                            .fs()
+                            .root()
+                            .create_node(
+                                &mut locked,
+                                &current_task,
+                                "dev".into(),
+                                mode!(IFDIR, 0o755),
+                                DeviceType::NONE,
+                            )
+                            .expect("mkdir dev");
+                        let dev = current_task
+                            .lookup_path_from_root(&mut locked, "/dev".into())
+                            .expect("lookup_path_from_root");
+                        dev.mount(
+                            WhatToMount::Fs(
+                                BinderFs::new_fs(
+                                    &mut locked,
+                                    &current_task,
+                                    FileSystemOptions::default(),
+                                )
+                                .expect("new_fs"),
+                            ),
+                            MountFlags::empty(),
+                        )
+                        .expect("mount");
 
-                let service_name_string =
-                    CString::new(service_name.as_bytes()).expect("CString::new");
-                let service_name_bytes = service_name_string.as_bytes_with_nul();
-                let service_name_address = map_memory(
-                    locked,
-                    &task,
-                    UserAddress::default(),
-                    service_name_bytes.len() as u64,
-                );
-                task.write_memory(service_name_address, service_name_bytes).expect("write_memory");
+                        let remote_binder_handle =
+                            RemoteBinderHandle::<TestRemoteControllerConnector>::new(&current_task);
 
-                let start_command_address = map_memory(
-                    locked,
-                    &task,
-                    UserAddress::default(),
-                    std::mem::size_of::<u64>() as u64,
-                );
-                task.write_object(start_command_address.into(), &service_name_address.ptr())
-                    .expect("write_object");
+                        let service_name_string =
+                            CString::new(service_name.as_bytes()).expect("CString::new");
+                        let service_name_bytes = service_name_string.as_bytes_with_nul();
+                        let base_address = UserAddress::from(RESTRICTED_ASPACE_RANGE.start as u64);
+                        let service_name_address = map_memory(
+                            &mut locked,
+                            &current_task,
+                            (base_address + *PAGE_SIZE).expect("failed to compute address"),
+                            service_name_bytes.len() as u64,
+                        );
+                        current_task
+                            .write_memory(service_name_address, service_name_bytes)
+                            .expect("write_memory");
 
-                let wait_command_address = map_memory(
-                    locked,
-                    &task,
-                    UserAddress::default(),
-                    std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,
-                );
+                        let start_command_address = map_memory(
+                            &mut locked,
+                            &current_task,
+                            (base_address + (*PAGE_SIZE * 2)).expect("failed to compute address"),
+                            std::mem::size_of::<u64>() as u64,
+                        );
+                        current_task
+                            .write_object(start_command_address.into(), &service_name_address.ptr())
+                            .expect("write_object");
 
-                let start_result = remote_binder_handle.ioctl(
-                    locked,
-                    &task,
-                    uapi::REMOTE_BINDER_START,
-                    start_command_address.into(),
-                );
-                if must_interrupt(&start_result).is_none() {
-                    panic!("Unexpected result for start ioctl: {start_result:?}");
-                }
-                loop {
-                    let result = remote_binder_handle.ioctl(
-                        locked,
-                        &task,
-                        uapi::REMOTE_BINDER_WAIT,
-                        wait_command_address.into(),
+                        let wait_command_address = map_memory(
+                            &mut locked,
+                            &current_task,
+                            UserAddress::default(),
+                            std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,
+                        );
+
+                        let start_result = remote_binder_handle.ioctl(
+                            &mut locked,
+                            &current_task,
+                            uapi::REMOTE_BINDER_START,
+                            start_command_address.into(),
+                        );
+                        if must_interrupt(&start_result).is_none() {
+                            panic!("Unexpected result for start ioctl: {start_result:?}");
+                        }
+                        loop {
+                            let result = remote_binder_handle.ioctl(
+                                &mut locked,
+                                &current_task,
+                                uapi::REMOTE_BINDER_WAIT,
+                                wait_command_address.into(),
+                            );
+                            if must_interrupt(&result).is_none() {
+                                current_task.release(&mut locked);
+                                break result;
+                            }
+                        }
+                    })
+                    .expect("Failed to create thread");
+
+                // Wait for the Start request
+                let mut remote_controller_stream =
+                    fbinder::RemoteControllerRequestStream::from_channel(
+                        fasync::Channel::from_channel(remote_controller_server.into_channel()),
                     );
-                    if must_interrupt(&result).is_none() {
-                        break result;
-                    }
-                }
-            }
+                let (dev_binder_client_end, lutex_controller_client_end) =
+                    match remote_controller_stream.try_next().await {
+                        Ok(Some(fbinder::RemoteControllerRequest::Start { payload, .. })) => (
+                            payload.dev_binder.expect("dev_binder"),
+                            payload.lutex_controller.expect("lutex_controller"),
+                        ),
+                        x => panic!("Expected a start request, got: {x:?}"),
+                    };
+
+                let lutex_controller = lutex_controller_client_end.into_proxy();
+
+                let (process_accessor_client_end, process_accessor_server_end) =
+                    create_endpoints::<fbinder::ProcessAccessorMarker>();
+                let process_accessor_task =
+                    fasync::Task::local(run_process_accessor(process_accessor_server_end));
+
+                let (binder, binder_server_end) = create_proxy::<fbinder::BinderMarker>();
+
+                let process = fuchsia_runtime::process_self()
+                    .duplicate(zx::Rights::SAME_RIGHTS)
+                    .expect("process");
+                let dev_binder =
+                    fbinder::DevBinderSynchronousProxy::new(dev_binder_client_end.into_channel());
+                dev_binder
+                    .open(fbinder::DevBinderOpenRequest {
+                        path: Some(b"/dev/binder".to_vec()),
+                        process_accessor: Some(process_accessor_client_end),
+                        process: Some(process),
+                        binder: Some(binder_server_end),
+                        ..Default::default()
+                    })
+                    .expect("open");
+
+                // Do the test.
+                let binder = f(binder, lutex_controller).await;
+
+                // Notify of the close binder
+                dev_binder
+                    .close(fbinder::DevBinderCloseRequest {
+                        binder: Some(
+                            binder.into_channel().expect("into_channel").into_zx_channel().into(),
+                        ),
+                        ..Default::default()
+                    })
+                    .expect("close");
+
+                std::mem::drop(dev_binder);
+                starnix_thread.join().expect("thread join").expect("thread result");
+                process_accessor_task.await.expect("process accessor wait");
+            });
         });
-
-        // Wait for the Start request
-        let mut remote_controller_stream = fbinder::RemoteControllerRequestStream::from_channel(
-            fasync::Channel::from_channel(remote_controller_server.into_channel()),
-        );
-        let (dev_binder_client_end, lutex_controller_client_end) =
-            match remote_controller_stream.try_next().await {
-                Ok(Some(fbinder::RemoteControllerRequest::Start { payload, .. })) => (
-                    payload.dev_binder.expect("dev_binder"),
-                    payload.lutex_controller.expect("lutex_controller"),
-                ),
-                x => panic!("Expected a start request, got: {x:?}"),
-            };
-
-        let lutex_controller = lutex_controller_client_end.into_proxy();
-
-        let (process_accessor_client_end, process_accessor_server_end) =
-            create_endpoints::<fbinder::ProcessAccessorMarker>();
-        let process_accessor_task =
-            fasync::Task::local(run_process_accessor(process_accessor_server_end));
-
-        let (binder, binder_server_end) = create_proxy::<fbinder::BinderMarker>();
-
-        let process =
-            fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process");
-        let dev_binder =
-            fbinder::DevBinderSynchronousProxy::new(dev_binder_client_end.into_channel());
-        dev_binder
-            .open(fbinder::DevBinderOpenRequest {
-                path: Some(b"/dev/binder".to_vec()),
-                process_accessor: Some(process_accessor_client_end),
-                process: Some(process),
-                binder: Some(binder_server_end),
-                ..Default::default()
-            })
-            .expect("open");
-
-        // Do the test.
-        let binder = f(binder, lutex_controller).await;
-
-        // Notify of the close binder
-        dev_binder
-            .close(fbinder::DevBinderCloseRequest {
-                binder: Some(binder.into_channel().expect("into_channel").into_zx_channel().into()),
-                ..Default::default()
-            })
-            .expect("close");
-
-        std::mem::drop(dev_binder);
-        starnix_thread.await.expect("thread join").expect("thread result");
-        process_accessor_task.await.expect("process accessor wait");
     }
 
     #[::fuchsia::test]
@@ -1433,7 +1478,7 @@ mod tests {
 
             binder
         })
-        .await
+        .await;
     }
 
     async fn wait_for_message(counter: &zx::Counter) {

@@ -9,6 +9,7 @@ use crate::fs::sysfs::DeviceDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
 use starnix_logging::{log_error, log_warn};
+use starnix_uapi::as_any::AsAny;
 use starnix_uapi::device_type::{
     DeviceType, DYN_MAJOR_RANGE, MISC_DYNANIC_MINOR_RANGE, MISC_MAJOR,
 };
@@ -53,7 +54,7 @@ impl DeviceMode {
     }
 }
 
-pub trait DeviceOps: DynClone + Send + Sync + 'static {
+pub trait DeviceOps: DynClone + Send + Sync + AsAny + 'static {
     /// Instantiate a FileOps for this device.
     ///
     /// This function is called when userspace opens a file with a `DeviceType`
@@ -615,6 +616,14 @@ impl DeviceRegistry {
         let dev_ops = self.devices(mode).get(device_type)?;
         let mut locked = locked.cast_locked::<DeviceOpen>();
         dev_ops.open(&mut locked, current_task, device_type, node, flags)
+    }
+
+    pub fn get_device(
+        &self,
+        device_type: DeviceType,
+        mode: DeviceMode,
+    ) -> Result<Arc<dyn DeviceOps>, Errno> {
+        self.devices(mode).get(device_type)
     }
 }
 

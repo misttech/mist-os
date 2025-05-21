@@ -7,6 +7,7 @@ import("//build/rust/rustc_library.gni")
 group("tests") {
   testonly = true
   deps = [
+    "binderfs:tests",
     "cgroupfs:tests",
     "ext4:tests",
     "input:tests",
@@ -30,6 +31,7 @@ rustc_library("modules") {
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_uapi",
+    "//src/starnix/modules/binderfs",
     "//src/starnix/modules/cgroupfs",
     "//src/starnix/modules/device_mapper",
     "//src/starnix/modules/ext4",

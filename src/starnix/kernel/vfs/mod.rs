@@ -74,7 +74,6 @@ pub use vec_directory::*;
 pub use wd_number::*;
 pub use xattr::*;
 
-use crate::device::binder::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_sync::{FileOpsCore, Locked};
@@ -100,6 +99,7 @@ use std::sync::Arc;
 //             .push(Box::new(Some(to_release)));
 //     });
 // }
+#[macro_export]
 macro_rules! register {
     ($arg:expr) => {
         RELEASERS.with(|cell| {
@@ -129,6 +129,7 @@ macro_rules! register {
 //         }
 //     }
 // }
+#[macro_export]
 macro_rules! impl_ctr_for_option {
     ($arg:ty) => {
         impl CurrentTaskAndLockedReleasable for Option<$arg> {
@@ -159,31 +160,22 @@ impl ReleaserAction<FsNode> for FsNodeReleaserAction {
 pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
 impl_ctr_for_option!(ReleaseGuard<FsNode>);
 
-pub enum BinderDriverReleaserAction {}
-impl ReleaserAction<BinderDriver> for BinderDriverReleaserAction {
-    fn release(driver: ReleaseGuard<BinderDriver>) {
-        register!(driver);
-    }
-}
-pub type BinderDriverReleaser = ObjectReleaser<BinderDriver, BinderDriverReleaserAction>;
-impl_ctr_for_option!(ReleaseGuard<BinderDriver>);
-
 pub type CurrentTaskAndLocked<'a, 'b> = (&'b mut Locked<'a, FileOpsCore>, &'b CurrentTask);
 
 /// An object-safe/dyn-compatible trait to wrap `Releasable` types.
-trait CurrentTaskAndLockedReleasable {
+pub trait CurrentTaskAndLockedReleasable {
     fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>);
 }
 
 thread_local! {
     /// Container of all `FileObject` that are not used anymore, but have not been closed yet.
-    static RELEASERS: RefCell<Option<LocalReleasers>> = RefCell::new(Some(LocalReleasers::default()));
+    pub static RELEASERS: RefCell<Option<LocalReleasers>> = RefCell::new(Some(LocalReleasers::default()));
 }
 
 #[derive(Default)]
-struct LocalReleasers {
+pub struct LocalReleasers {
     /// The list of entities to be deferred released.
-    releasables: Vec<Box<dyn CurrentTaskAndLockedReleasable>>,
+    pub releasables: Vec<Box<dyn CurrentTaskAndLockedReleasable>>,
 }
 
 impl LocalReleasers {
