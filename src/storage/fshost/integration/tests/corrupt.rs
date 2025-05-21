@@ -46,9 +46,6 @@ async fn data_reformatted_when_corrupt() {
 
 // Verify that WipeStorage can handle a completely corrupted FVM.
 #[fuchsia::test]
-// TODO(https://fxbug.dev/394970436): this test is flaky on devfs. Once we are fully on storage
-// host we can remove this todo and the not(storage-host) section of this ignore, because the flaky
-// configuration will no longer exist.
 // TODO(https://fxbug.dev/388533231): this test doesn't work on storage-host+minfs
 #[cfg_attr(all(feature = "storage-host", feature = "minfs"), ignore)]
 async fn wipe_storage_handles_corrupt_fvm() {

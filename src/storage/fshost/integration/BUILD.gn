@@ -337,7 +337,12 @@ template("fshost_integration_test_package") {
   }
 
   _test_packages = []
-  if (invoker.enable_corrupt_tests) {
+
+  # TODO(https://fxbug.dev/394970436): this test is flaky on devfs. Once we are fully on storage
+  # host we can remove this todo and the storage-host requirement, because the flaky configuration
+  # will no longer exist.
+  if (invoker.enable_corrupt_tests && defined(fshost_options.storage_host) &&
+      fshost_options.storage_host) {
     _corrupt_component_target = "${target_name}_corrupt"
     fshost_integration_test_component(_corrupt_component_target) {
       fshost_target = _fshost_target
