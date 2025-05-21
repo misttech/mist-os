@@ -91,19 +91,18 @@ macro_rules! firehose_trace_instant {
 #[macro_export]
 macro_rules! trace_duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        let _args = if $crate::regular_tracing_enabled() {
-            Some([$($crate::__fuchsia_trace::ArgValue::of($key, $val)),*])
-        } else {
+        let mut args;
+        let _scope = if !$crate::regular_tracing_enabled() {
             None
-        };
-        let _scope = if $crate::regular_tracing_enabled() {
-            Some($crate::__fuchsia_trace::duration(
-                $category,
-                $name,
-                _args.as_ref().unwrap()
-            ))
         } else {
-            None
+            static CACHE: $crate::__fuchsia_trace::trace_site_t = $crate::__fuchsia_trace::trace_site_t::new(0);
+            if let Some(_context) =
+                    $crate::__fuchsia_trace::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                args = [$($crate::__fuchsia_trace::ArgValue::of($key, $val)),*];
+                Some($crate::__fuchsia_trace::duration($category, $name, &args))
+            } else {
+                None
+            }
         };
     }
 }
