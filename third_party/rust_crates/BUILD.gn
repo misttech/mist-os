@@ -14147,19 +14147,19 @@ rustc_macro("remain-v0_2_14") {
   applicable_licenses = [ ":remain-v0_2_14.license" ]
 }
 
-license("remove_dir_all-v0_5_1.license") {
+license("remove_dir_all-v0_5_3.license") {
   public_package_name = "remove_dir_all"
   license_files = [
-    "//third_party/rust_crates/vendor/remove_dir_all-0.5.1/LICENCE-APACHE",
-    "//third_party/rust_crates/vendor/remove_dir_all-0.5.1/LICENCE-MIT",
+    "//third_party/rust_crates/vendor/remove_dir_all-0.5.3/LICENCE-APACHE",
+    "//third_party/rust_crates/vendor/remove_dir_all-0.5.3/LICENCE-MIT",
   ]
 }
 
-rustc_library("remove_dir_all-v0_5_1") {
+rustc_library("remove_dir_all-v0_5_3") {
   crate_name = "remove_dir_all"
   source_root =
-      "//third_party/rust_crates/vendor/remove_dir_all-0.5.1/src/lib.rs"
-  output_name = "remove_dir_all-202715e376d8ea96"
+      "//third_party/rust_crates/vendor/remove_dir_all-0.5.3/src/lib.rs"
+  output_name = "remove_dir_all-9dc9d5dadcb217ad"
   edition = "2015"
   disable_clippy = true
   enforce_source_listing = false
@@ -14174,13 +14174,13 @@ rustc_library("remove_dir_all-v0_5_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=202715e376d8ea96",
-    "-Cextra-filename=-202715e376d8ea96",
+    "-Cmetadata=9dc9d5dadcb217ad",
+    "-Cextra-filename=-9dc9d5dadcb217ad",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":remove_dir_all-v0_5_1.license" ]
+  applicable_licenses = [ ":remove_dir_all-v0_5_3.license" ]
 }
 
 license("rfc6979-v0_3_1.license") {
@@ -17258,7 +17258,7 @@ rustc_library("tempfile-v3_2_0") {
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":rand-v0_8_4" ]
-  deps += [ ":remove_dir_all-v0_5_1" ]
+  deps += [ ":remove_dir_all-v0_5_3" ]
   if (false) {
     deps += [ ":redox_syscall-v0_2_13" ]
   }
@@ -19100,7 +19100,7 @@ rustc_library("unicode-bidi-v0_3_18") {
   source_root =
       "//third_party/rust_crates/vendor/unicode-bidi-0.3.18/src/lib.rs"
   output_name = "unicode_bidi-e12d17bb81d32560"
-  edition = "2015"
+  edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]

@@ -21,8 +21,8 @@ package(
 package_info(
     name = "package_info",
     package_name = "remove_dir_all",
-    package_url = "https://github.com/Aaronepower/remove_dir_all.git",
-    package_version = "0.5.1",
+    package_url = "https://github.com/XAMPPRocky/remove_dir_all.git",
+    package_version = "0.5.3",
 )
 
 license(
@@ -69,5 +69,5 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.5.1",
+    version = "0.5.3",
 )
