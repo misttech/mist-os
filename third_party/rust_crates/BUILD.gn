@@ -794,64 +794,64 @@ group("rsa") {
   public_deps = [ ":rsa-v0_9_7" ]
 }
 
-import("//build/icu/icu_rust_crates.gni")
+import("//build/icu/icu_rustc_library.gni")
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_common") {
+  group("rust_icu_common") {
     public_deps = [ ":rust_icu_common-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_sys") {
+  group("rust_icu_sys") {
     public_deps = [ ":rust_icu_sys-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_ucal") {
+  group("rust_icu_ucal") {
     public_deps = [ ":rust_icu_ucal-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_uchar") {
+  group("rust_icu_uchar") {
     public_deps = [ ":rust_icu_uchar-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_udat") {
+  group("rust_icu_udat") {
     public_deps = [ ":rust_icu_udat-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_udata") {
+  group("rust_icu_udata") {
     public_deps = [ ":rust_icu_udata-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_uenum") {
+  group("rust_icu_uenum") {
     public_deps = [ ":rust_icu_uenum-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_uloc") {
+  group("rust_icu_uloc") {
     public_deps = [ ":rust_icu_uloc-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_unorm2") {
+  group("rust_icu_unorm2") {
     public_deps = [ ":rust_icu_unorm2-v5_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  icu_group("rust_icu_ustring") {
+  group("rust_icu_ustring") {
     public_deps = [ ":rust_icu_ustring-v5_0_0" ]
   }
 }
@@ -14371,7 +14371,7 @@ license("rust_icu_common-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_common-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_common-v5_0_0") {
+icu_rustc_library("rust_icu_common-v5_0_0") {
   crate_name = "rust_icu_common"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_common-5.0.0/src/lib.rs"
@@ -14398,7 +14398,10 @@ icu_rust_library("rust_icu_common-v5_0_0") {
     "--cfg=feature=\"renaming\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/lib/icu_data/rust/icu_data:*" ]
+  visibility += [ "//src/lib/intl/lookup/rust:*" ]
 
   applicable_licenses = [ ":rust_icu_common-v5_0_0.license" ]
 }
@@ -14409,7 +14412,7 @@ license("rust_icu_sys-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_sys-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_sys-v5_0_0") {
+icu_rustc_library("rust_icu_sys-v5_0_0") {
   crate_name = "rust_icu_sys"
   source_root = "//third_party/rust_crates/vendor/rust_icu_sys-5.0.0/src/lib.rs"
   output_name = "rust_icu_sys-fa9764e6a56c2ea1"
@@ -14434,7 +14437,10 @@ icu_rust_library("rust_icu_sys-v5_0_0") {
     "--cfg=feature=\"renaming\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/lib/intl/lookup/rust:*" ]
+  visibility += [ "//src/ui/lib/input_pipeline:*" ]
 
   applicable_licenses = [ ":rust_icu_sys-v5_0_0.license" ]
 }
@@ -14445,7 +14451,7 @@ license("rust_icu_ucal-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_ucal-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_ucal-v5_0_0") {
+icu_rustc_library("rust_icu_ucal-v5_0_0") {
   crate_name = "rust_icu_ucal"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_ucal-5.0.0/src/lib.rs"
@@ -14475,7 +14481,10 @@ icu_rust_library("rust_icu_ucal-v5_0_0") {
     "--cfg=feature=\"renaming\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/lib/icu_data/rust/icu_data:*" ]
+  visibility += [ "//src/lib/intl/lookup/rust:*" ]
 
   applicable_licenses = [ ":rust_icu_ucal-v5_0_0.license" ]
 }
@@ -14486,7 +14495,7 @@ license("rust_icu_uchar-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_uchar-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_uchar-v5_0_0") {
+icu_rustc_library("rust_icu_uchar-v5_0_0") {
   crate_name = "rust_icu_uchar"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_uchar-5.0.0/src/lib.rs"
@@ -14525,7 +14534,7 @@ license("rust_icu_udat-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_udat-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_udat-v5_0_0") {
+icu_rustc_library("rust_icu_udat-v5_0_0") {
   crate_name = "rust_icu_udat"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_udat-5.0.0/src/lib.rs"
@@ -14567,7 +14576,7 @@ license("rust_icu_udata-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_udata-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_udata-v5_0_0") {
+icu_rustc_library("rust_icu_udata-v5_0_0") {
   crate_name = "rust_icu_udata"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_udata-5.0.0/src/lib.rs"
@@ -14594,7 +14603,10 @@ icu_rust_library("rust_icu_udata-v5_0_0") {
     "--cfg=feature=\"renaming\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/lib/icu_data/rust/icu_data:*" ]
+  visibility += [ "//src/lib/intl/lookup/rust:*" ]
 
   applicable_licenses = [ ":rust_icu_udata-v5_0_0.license" ]
 }
@@ -14605,7 +14617,7 @@ license("rust_icu_uenum-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_uenum-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_uenum-v5_0_0") {
+icu_rustc_library("rust_icu_uenum-v5_0_0") {
   crate_name = "rust_icu_uenum"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_uenum-5.0.0/src/lib.rs"
@@ -14632,7 +14644,9 @@ icu_rust_library("rust_icu_uenum-v5_0_0") {
     "--cfg=feature=\"renaming\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/settings/service:*" ]
 
   applicable_licenses = [ ":rust_icu_uenum-v5_0_0.license" ]
 }
@@ -14643,7 +14657,7 @@ license("rust_icu_uloc-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_uloc-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_uloc-v5_0_0") {
+icu_rustc_library("rust_icu_uloc-v5_0_0") {
   crate_name = "rust_icu_uloc"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_uloc-5.0.0/src/lib.rs"
@@ -14674,7 +14688,10 @@ icu_rust_library("rust_icu_uloc-v5_0_0") {
     "--cfg=feature=\"renaming\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/lib/intl/lookup/rust:*" ]
+  visibility += [ "//src/settings/service:*" ]
 
   applicable_licenses = [ ":rust_icu_uloc-v5_0_0.license" ]
 }
@@ -14685,7 +14702,7 @@ license("rust_icu_unorm2-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_unorm2-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_unorm2-v5_0_0") {
+icu_rustc_library("rust_icu_unorm2-v5_0_0") {
   crate_name = "rust_icu_unorm2"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_unorm2-5.0.0/src/lib.rs"
@@ -14717,7 +14734,9 @@ icu_rust_library("rust_icu_unorm2-v5_0_0") {
     "--cfg=feature=\"renaming\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//src/ui/lib/input_pipeline:*" ]
 
   applicable_licenses = [ ":rust_icu_unorm2-v5_0_0.license" ]
 }
@@ -14728,7 +14747,7 @@ license("rust_icu_ustring-v5_0_0.license") {
       [ "//third_party/rust_crates/vendor/rust_icu_ustring-5.0.0/LICENSE" ]
 }
 
-icu_rust_library("rust_icu_ustring-v5_0_0") {
+icu_rustc_library("rust_icu_ustring-v5_0_0") {
   crate_name = "rust_icu_ustring"
   source_root =
       "//third_party/rust_crates/vendor/rust_icu_ustring-5.0.0/src/lib.rs"

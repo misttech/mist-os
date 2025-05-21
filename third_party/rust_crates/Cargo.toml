@@ -899,34 +899,67 @@ env_vars = [ "RING_CORE_PREFIX=ring_core_0_17_8_" ]
 # Refer to //build/icu/README.md for the details of the approach.
 [gn.package.rust_icu_common."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
+visibility = [
+  ":*",
+  "//src/lib/icu_data/rust/icu_data:*",
+  "//src/lib/intl/lookup/rust:*",
+]
 [gn.package.rust_icu_sys."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
+visibility = [
+  ":*",
+  "//src/lib/intl/lookup/rust:*",
+  "//src/ui/lib/input_pipeline:*",
+]
 [gn.package.rust_icu_ucal."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
+visibility = [
+  ":*",
+  "//src/lib/icu_data/rust/icu_data:*",
+  "//src/lib/intl/lookup/rust:*",
+]
 [gn.package.rust_icu_uchar."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
 [gn.package.rust_icu_udat."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
 [gn.package.rust_icu_udata."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
+visibility = [
+  ":*",
+  "//src/lib/icu_data/rust/icu_data:*",
+  "//src/lib/intl/lookup/rust:*",
+]
 [gn.package.rust_icu_uenum."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
+visibility = [
+  ":*",
+  "//src/settings/service:*",
+]
 [gn.package.rust_icu_uloc."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
+visibility = [
+  ":*",
+  "//src/lib/intl/lookup/rust:*",
+  "//src/settings/service:*",
+]
 [gn.package.rust_icu_unorm2."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
+visibility = [
+  ":*",
+  "//src/ui/lib/input_pipeline:*",
+]
 [gn.package.rust_icu_ustring."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
-target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+target_renaming = { import = "//build/icu/icu_rustc_library.gni", rule_name = "icu_rustc_library" }
 
 [gn.package.rustls."0.21.12"]
 rustflags = []
