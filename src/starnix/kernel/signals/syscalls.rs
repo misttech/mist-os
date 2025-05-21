@@ -11,10 +11,11 @@ use crate::signals::{
     SI_HEADER_SIZE,
 };
 use crate::task::{
-    CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
+    CurrentTask, PidTable, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
     ThreadGroupLifecycleWaitValue, WaitResult, WaitableChildResult, Waiter,
 };
 use crate::vfs::{FdFlags, FdNumber};
+use starnix_sync::RwLockReadGuard;
 use starnix_uapi::uapi;
 use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 
@@ -470,8 +471,11 @@ pub fn sys_kill(
     Ok(())
 }
 
-fn verify_tgid_for_task(task: &Task, tgid: pid_t) -> Result<(), Errno> {
-    let pids = task.thread_group().kernel.pids.read();
+fn verify_tgid_for_task(
+    task: &Task,
+    tgid: pid_t,
+    pids: &RwLockReadGuard<'_, PidTable>,
+) -> Result<(), Errno> {
     let thread_group = match pids.get_process(tgid) {
         Some(ProcessEntryRef::Process(proc)) => proc,
         Some(ProcessEntryRef::Zombie(_)) => return error!(EINVAL),
@@ -510,9 +514,12 @@ pub fn sys_tgkill(
     if tgid <= 0 || tid <= 0 {
         return error!(EINVAL);
     }
-    let weak_target = current_task.get_task(tid);
+    let pids = current_task.kernel().pids.read();
+
+    let weak_target = pids.get_task(tid);
     let thread = Task::from_weak(&weak_target)?;
-    verify_tgid_for_task(&thread, tgid)?;
+    verify_tgid_for_task(&thread, tgid, &pids)?;
+
     send_unchecked_signal(current_task, &thread, unchecked_signal, SI_TKILL)
 }
 
@@ -563,10 +570,13 @@ pub fn sys_rt_tgsigqueueinfo(
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
-    let thread_weak = current_task.get_task(tid);
-    let thread = Task::from_weak(&thread_weak)?;
-    verify_tgid_for_task(&thread, tgid)?;
-    send_unchecked_signal_info(current_task, &thread, unchecked_signal, siginfo_ref)
+    let pids = current_task.kernel().pids.read();
+
+    let thread_weak = pids.get_task(tid);
+    let task = Task::from_weak(&thread_weak)?;
+
+    verify_tgid_for_task(&task, tgid, &pids)?;
+    send_unchecked_signal_info(current_task, &task, unchecked_signal, siginfo_ref)
 }
 
 pub fn sys_pidfd_send_signal(
