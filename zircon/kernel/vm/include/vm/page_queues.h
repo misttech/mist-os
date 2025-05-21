@@ -183,7 +183,7 @@ class PageQueues {
   //   1. A new queue, representing the current epoch, needs to be allocated to put pages that get
   //      accessed from here into. This just involves incrementing the MRU generation.
   //   2. As there is a limited number of page queues 'allocating' one might involve cleaning up an
-  //      old queue. See the description of ProcessIsolateAndLruQueues for how this process works.
+  //      old queue. See the description of ProcessLruQueue for how this process works.
   void RotateReclaimQueues(AgeReason reason = AgeReason::Manual);
 
   // Used to represent and return page backlink information acquired whilst holding the page queue
@@ -203,14 +203,13 @@ class PageQueues {
   // (see VmoBacklink for more details).
   ktl::optional<VmoBacklink> PopAnonymousZeroFork();
 
-  // Looks at the reclaimable queues and returns backlink information of the first page found. The
-  // queues themselves are walked from the current LRU queue up to the queue that is at most
-  // |lowest_queue| epochs from the most recent. |lowest_queue| therefore represents the youngest
-  // age that would be accepted. If no page was found a nullopt is returned, otherwise if
-  // it has_value the vmo field may be null to indicate that the vmo is running its destructor (see
-  // VmoBacklink for more details). If a page is returned its location in the reclaim queue is
-  // not modified.
-  ktl::optional<VmoBacklink> PeekReclaim(size_t lowest_queue);
+  // Looks at the isolate queues and returns backlink information of the first page found. If the
+  // isolate queue is empty then LRU queues up to |lowest_queue| epochs from the most recent will be
+  // processed to attempt to fill the isolate list. If no page was found a nullopt is returned,
+  // otherwise if it has_value the vmo field may be null to indicate that the vmo is running its
+  // destructor (see VmoBacklink for more details). If a page is returned its location in the
+  // reclaim queue is not modified.
+  ktl::optional<VmoBacklink> PeekIsolate(size_t lowest_queue);
 
   // Can be called while the |page| is known to be in the loaned state. This method checks if it is
   // in the page queues, and if so returns a reference to the cow pages that owns it.
@@ -328,7 +327,7 @@ class PageQueues {
   void SetActiveRatioMultiplier(uint32_t multiplier);
 
   // Describes any action to take when processing the LRU queue. This is applied to pages that would
-  // otherwise have to be moved from the old LRU queue into the next queue when making space.
+  // otherwise have to be moved from the old LRU queue into the isolate queue.
   enum class LruAction {
     None,
     EvictOnly,
@@ -581,39 +580,18 @@ class PageQueues {
     return gen_to_queue(lru_gen_.load(ktl::memory_order_relaxed));
   }
 
-  // This processes the Isolate queue and the LRU queue.
-  // For the Isolate queue the pages are either process to termination (if peek is false), or if
-  // peek is true we will either return a page from it or make it empty. For the LRU queue, the aim
-  // is to make the lru_gen_ be the passed in target_gen. It achieves this by walking all the pages
-  // in the queue and either
+  // This processes the LRU queue with the goal of increasing the lru_gen_ to the target_gen. It
+  // achieves this by walking all the pages in the queue and doing one of the following:
   //   1. For pages that have a newest accessed time and are in the wrong queue, are moved into the
   //      correct queue.
-  //   2. For pages that are in the correct queue, they are either returned (if |peek| is true), or
-  //      moved to the next queue, which causes their age to be effectively decreased.
-  // In the second case for LRU, pages get moved into the next queue so that the LRU queue can
-  // become empty, allowing the gen to be incremented to eventually reach the |target_gen|. The
-  // mechanism of freeing up the LRU queue is necessary to make room for new MRU queues. When |peek|
-  // is false, this always returns a nullopt and guarantees that it moved lru_gen_ to at least
-  // target_gen. If |peek| is true, then the first time it hits a page in case (2), it returns it
-  // instead of decreasing its age.
-  ktl::optional<PageQueues::VmoBacklink> ProcessIsolateAndLruQueues(uint64_t target_gen, bool peek);
+  //   2. For pages that are in the correct queue, and |isolate| is true, they are moved to the
+  //      Isolate queue.
+  //   3. For pages that are in the correct queue, and |isolate| is false, they are moved to
+  //      the queue of |target_gen|.
+  void ProcessLruQueue(uint64_t target_gen, bool isolate);
 
-  // Helper used by ProcessIsolateAndLruQueues. |target_gen| is the minimum value lru_gen_ should
-  // advance to. If |peek| is true, the first page that  encountered in the respective queue, whose
-  // age does not require to be fixed up, is returned.
-  // The passed in LruIsolate object is used to process reclamation work outside of the lock and can
-  // be reused across multiple calls. The |Items| parameter therefore controls how much work will be
-  // done within the lock acquisition before returning.
-  template <size_t Items>
-  class LruIsolate;
-  template <size_t Items>
-  ktl::optional<PageQueues::VmoBacklink> ProcessLruQueueHelper(LruIsolate<Items>& deferred_list,
-                                                               uint64_t target_gen, bool peek)
-      TA_EXCL(lock_);
-
-  // Helper used by ProcessIsolateAndLruQueues. Processes the Isolate list and processes items
-  // into their correct list, and either processes all elements (if peek is false), or returns the
-  // first Isolate item if peek is true.
+  // Processes the Isolate list with the goal to move any pages into the correct list, if their
+  // queue is no longer the Isolate list, or return the first Isolate page if |peek| is true.
   ktl::optional<VmoBacklink> ProcessIsolateList(bool peek) TA_EXCL(lock_);
 
   // Helpers for adding and removing to the queues. All of the public Set/Move/Remove operations

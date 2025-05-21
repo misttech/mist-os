@@ -857,7 +857,7 @@ static bool pq_move_queues() {
   EXPECT_TRUE(pq.QueueCounts() == ((PageQueues::Counts){.reclaim_isolate = 1}));
 
   // Verify that the DontNeed page is first in line for eviction.
-  auto backlink = pq.PeekReclaim(PageQueues::kNumReclaim - 1);
+  auto backlink = pq.PeekIsolate(PageQueues::kNumReclaim - 1);
   EXPECT_TRUE(backlink != ktl::nullopt && backlink->page == &test_page);
 
   pq.MoveToWired(&test_page);
