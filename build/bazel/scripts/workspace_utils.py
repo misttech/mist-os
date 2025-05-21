@@ -524,8 +524,6 @@ class RootBazelFilesVariantsGenerator(object):
             self._root_files_symlink, "bazel_root_files.fuchsia"
         )
 
-        self._fuchsia_sdk_cutoff_prefix = "### FUCHSIA_SDK_CUTOFF"
-
     def filter_no_sdk_content(
         self, content: str, input_path: str | Path
     ) -> str:
@@ -709,18 +707,13 @@ def record_fuchsia_workspace(
 
     # Generate workspace/module files.
     if enable_bzlmod:
-        generated.record_file_content(
-            "workspace/WORKSPACE.bazel",
-            "# Empty on purpose, see MODULE.bazel\n",
-        )
-
-        generated.record_symlink(
-            "workspace/WORKSPACE.bzlmod",
+        variants_generator.add_file(
+            "WORKSPACE.bzlmod",
             fuchsia_dir / "build" / "bazel" / "toplevel.WORKSPACE.bzlmod",
         )
 
-        generated.record_symlink(
-            "workspace/MODULE.bazel",
+        variants_generator.add_file(
+            "MODULE.bazel",
             fuchsia_dir / "build" / "bazel" / "toplevel.MODULE.bazel",
         )
     else:
