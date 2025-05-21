@@ -9,7 +9,7 @@ use futures::{FutureExt, TryStreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use std::convert::Infallible;
 use std::net::{Ipv4Addr, SocketAddr};
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, tracing};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[async_trait]
 pub trait ServerController: Sized + Sync + Send {
@@ -80,7 +80,9 @@ fn stream_file(file: &'static str) -> hyper::body::Body {
     let (mut writer, body) = hyper::Body::channel();
     fuchsia_async::Task::spawn(async move {
         let f = file::open_in_namespace(file, fio::PERM_READABLE).expect("cannot open");
-        let content_size = f.get_attr().await.unwrap().1.content_size;
+        let (_, immutable_attributes) =
+            f.get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE).await.unwrap().unwrap();
+        let content_size = immutable_attributes.content_size;
         log::info!("file content_size: {:?}", content_size);
         loop {
             let bytes = f.read(fio::MAX_BUF).await.unwrap().unwrap();
