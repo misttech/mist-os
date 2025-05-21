@@ -103,6 +103,7 @@ fuchsia_test_package("starnix_kgsl_tests") {
     log_settings = {
       max_severity = "ERROR"
     }
+    environments = [ sorrel_env ]
   }
 }
 
@@ -144,6 +145,7 @@ fuchsia_test_package("starnix_magma_tests") {
       atlas_env,
       nuc7_env,
       nuc11_env,
+      sorrel_env,
       vim3_env,
     ]
   }

@@ -18,7 +18,11 @@ rustc_library("kgsl") {
   ]
 
   deps = [
+    "//sdk/rust/zx",
+    "//src/lib/fdio/rust:fdio",
     "//src/starnix/kernel:starnix_core",
+    "//src/starnix/kernel:starnix_logging",
+    "//src/starnix/lib/magma",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_syscalls",
     "//src/starnix/lib/starnix_uapi",
