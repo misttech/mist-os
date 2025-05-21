@@ -236,5 +236,8 @@
             // The source of this protocol may not be available on all products.
             availability: "optional",
         },
+        {
+            service: "fuchsia.hardware.power.suspend.SuspendService",
+        },
     ],
 }
