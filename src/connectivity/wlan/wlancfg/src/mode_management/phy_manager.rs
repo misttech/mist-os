@@ -35,6 +35,8 @@ pub enum PhyManagerError {
     PhyQueryFailure,
     #[error("failed to set country for new PHY")]
     PhySetCountryFailure,
+    #[error("unable to reset PHY")]
+    PhyResetFailure,
     #[error("unable to query iface information")]
     IfaceQueryFailure,
     #[error("unable to create iface")]
@@ -819,10 +821,15 @@ impl PhyManagerApi for PhyManager {
                     );
                 }
                 RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id }) => {
-                    warn!(
-                        "PHY reset has been requested for PHY {} but is not currently possible.",
-                        phy_id
-                    );
+                    for recorded_phy_id in self.phys.keys() {
+                        if phy_id == *recorded_phy_id {
+                            if let Err(e) = reset_phy(&self.device_monitor, phy_id).await {
+                                warn!("Resetting PHY {} failed: {:?}", phy_id, e);
+                            }
+
+                            return;
+                        }
+                    }
                 }
                 RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { iface_id }) => {
                     if let Err(e) = disconnect(&self.device_monitor, iface_id).await {
@@ -869,6 +876,21 @@ async fn destroy_iface(
     }
 
     destroy_iface_response
+}
+
+async fn reset_phy(
+    proxy: &fidl_service::DeviceMonitorProxy,
+    phy_id: u16,
+) -> Result<(), PhyManagerError> {
+    let result = proxy.reset(phy_id).await.map_err(|e| {
+        warn!("Request to reset PHY {} failed: {:?}", phy_id, e);
+        PhyManagerError::InternalError
+    })?;
+
+    result.map_err(|e| {
+        warn!("Failed to reset PHY {}: {:?}", phy_id, e);
+        PhyManagerError::PhyResetFailure
+    })
 }
 
 async fn set_phy_country_code(
@@ -4060,6 +4082,74 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_reset_request_fails() {
+        let mut exec = TestExecutor::new();
+        let test_values = test_setup();
+
+        // Drop the DeviceMonitor request stream so that the request fails.
+        drop(test_values.monitor_stream);
+
+        // Make the reset request and observe that it fails.
+        let fut = reset_phy(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(
+            exec.run_until_stalled(&mut fut),
+            Poll::Ready(Err(PhyManagerError::InternalError))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_reset_fails() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the reset request.
+        let fut = reset_phy(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Send back a failure.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(
+                fidl_service::DeviceMonitorRequest::Reset { phy_id: 0, responder }
+            ))) => {
+                responder.send(Err(ZX_ERR_NOT_FOUND)).expect("sending fake reset response");
+            }
+        );
+
+        // Ensure that the failure is returned to the caller.
+        assert_variant!(
+            exec.run_until_stalled(&mut fut),
+            Poll::Ready(Err(PhyManagerError::PhyResetFailure))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_reset_succeeds() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the reset request.
+        let fut = reset_phy(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Send back a success.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(
+                fidl_service::DeviceMonitorRequest::Reset { phy_id: 0, responder }
+            ))) => {
+                responder.send(Ok(())).expect("sending fake reset response");
+            }
+        );
+
+        // Ensure that the success is returned to the caller.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+    }
+
+    #[fuchsia::test]
     fn test_disconnect_request_fails() {
         let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
@@ -4480,15 +4570,25 @@ mod tests {
 
         let fut = phy_manager.perform_recovery(summary);
         let mut fut = pin!(fut);
-
-        // The future should complete immediately.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the Reset request was made and respond with a success.
         assert_variant!(
             exec.run_until_stalled(&mut test_values.monitor_stream.next()),
-            Poll::Pending,
+            Poll::Ready(Some(Ok(
+                fidl_service::DeviceMonitorRequest::Reset {
+                    phy_id: 0,
+                    responder,
+                }
+            ))) => {
+                responder
+                    .send(Ok(()))
+                    .expect("failed to send reset response.");
+            }
         );
+
+        // The future should complete now.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]
