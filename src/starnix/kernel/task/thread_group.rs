@@ -21,7 +21,7 @@ use crate::task::{
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
-use starnix_logging::{log_debug, log_error, track_stub};
+use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock, Unlocked};
 use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef, WeakRefKey};
 use starnix_types::stats::TaskTimeStats;
@@ -624,6 +624,14 @@ impl ThreadGroup {
     pub fn add(&self, task: &TempRef<'_, Task>) -> Result<(), Errno> {
         let mut state = self.write();
         if state.terminating {
+            if state.tasks_count() == 0 {
+                log_warn!(
+                    "Task {} with leader {} terminating while adding its first task, \
+                not sending creation notification",
+                    task.id,
+                    self.leader
+                );
+            }
             return error!(EINVAL);
         }
         state.tasks.insert(task.id, task.into());
