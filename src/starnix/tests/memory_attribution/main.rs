@@ -145,8 +145,6 @@ async fn mmap_anonymous() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/406364292): Test disabled due to a flake.
-#[ignore]
 async fn leader_killed() {
     const PROGRAM_URL: &str =
         "thread_group_leader_killed_package#meta/thread_group_leader_killed.cm";
