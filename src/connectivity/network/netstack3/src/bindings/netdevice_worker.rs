@@ -27,6 +27,7 @@ use netstack3_core::ip::{
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::trace::trace_duration;
+use thiserror::Error;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fuchsia_async as fasync,
@@ -77,7 +78,7 @@ pub(crate) struct NetdeviceWorker {
     watch_rx_leases: bool,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum Error {
     #[error("client error: {0}")]
     Client(#[from] netdevice_client::Error),

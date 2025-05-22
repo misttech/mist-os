@@ -8,6 +8,7 @@ use alloc::collections::{HashMap, HashSet};
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::convert::Infallible as Never;
+use core::error::Error;
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::marker::PhantomData;
@@ -1471,7 +1472,7 @@ pub trait DatagramSocketSpec: Sized + 'static {
     /// The potential error for serializing a packet. For example, in UDP, this
     /// should be infallible but for ICMP, there will be an error if the input
     /// is not an echo request.
-    type SerializeError;
+    type SerializeError: Error;
 
     /// Constructs a packet serializer with `addr` and `body`.
     fn make_packet<I: IpExt, B: BufferMut>(
@@ -3328,13 +3329,15 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec>
 }
 
 /// A connected socket was expected.
-#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq, Error)]
 #[generic_over_ip()]
+#[error("expected connected socket")]
 pub struct ExpectedConnError;
 
 /// An unbound socket was expected.
-#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, Eq, GenericOverIp, PartialEq, Error)]
 #[generic_over_ip()]
+#[error("expected unbound socket")]
 pub struct ExpectedUnboundError;
 
 /// Converts a connected socket to an unbound socket.
@@ -3472,24 +3475,30 @@ fn disconnect_to_listener<
 }
 
 /// Error encountered when sending a datagram on a socket.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, GenericOverIp, Error)]
 #[generic_over_ip()]
-pub enum SendError<SE> {
+pub enum SendError<SE: Error> {
     /// The socket is not connected,
+    #[error("socket not connected")]
     NotConnected,
     /// The socket is not writeable.
+    #[error("socket not writeable")]
     NotWriteable,
     /// There was a problem sending the IP packet.
-    IpSock(IpSockSendError),
+    #[error("error sending IP packet: {0}")]
+    IpSock(#[from] IpSockSendError),
     /// There was a problem when serializing the packet.
-    SerializeError(SE),
+    #[error("error serializing packet: {0:?}")]
+    SerializeError(#[source] SE),
     /// There is no space available on the send buffer.
+    #[error("send buffer full")]
     SendBufferFull,
     /// Invalid message length.
+    #[error("invalid message length")]
     InvalidLength,
 }
 
-impl<SE> From<SendBufferError> for SendError<SE> {
+impl<SE: Error> From<SendBufferError> for SendError<SE> {
     fn from(err: SendBufferError) -> Self {
         match err {
             SendBufferError::SendBufferFull => Self::SendBufferFull,
@@ -3499,30 +3508,41 @@ impl<SE> From<SendBufferError> for SendError<SE> {
 }
 
 /// An error encountered while sending a datagram packet to an alternate address.
-#[derive(Debug)]
-pub enum SendToError<SE> {
+#[derive(Debug, Error)]
+pub enum SendToError<SE: Error> {
     /// The socket is not writeable.
+    #[error("socket not writeable")]
     NotWriteable,
     /// There was a problem with the remote address relating to its zone.
-    Zone(ZonedAddressError),
+    #[error("problem with zone of remote address: {0}")]
+    Zone(#[from] ZonedAddressError),
     /// An error was encountered while trying to create a temporary IP socket
     /// to use for the send operation.
-    CreateAndSend(IpSockCreateAndSendError),
+    #[error("error creating temporary IP socket for send: {0}")]
+    CreateAndSend(#[from] IpSockCreateAndSendError),
     /// The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
     /// socket is not dual-stack enabled.
+    #[error("remote address is mapped, but socket is not dual-stack enabled")]
     RemoteUnexpectedlyMapped,
     /// The remote address is non-mapped (i.e not an ipv4-mapped-ipv6 address),
     /// but the socket is dual stack enabled and bound to a mapped address.
+    #[error(
+        "remote address is non-mapped, but socket is \
+         dual-stack enabled and bound to mapped address"
+    )]
     RemoteUnexpectedlyNonMapped,
     /// The provided buffer is not valid.
-    SerializeError(SE),
+    #[error("serialize buffer invalid")]
+    SerializeError(#[source] SE),
     /// There is no space available on the send buffer.
+    #[error("send buffer full")]
     SendBufferFull,
     /// Invalid message length.
+    #[error("invalid message length")]
     InvalidLength,
 }
 
-impl<SE> From<SendBufferError> for SendToError<SE> {
+impl<SE: Error> From<SendBufferError> for SendToError<SE> {
     fn from(err: SendBufferError) -> Self {
         match err {
             SendBufferError::SendBufferFull => Self::SendBufferFull,
@@ -3822,22 +3842,32 @@ fn set_bound_device_listener_both_stacks<
 
 /// Error resulting from attempting to change multicast membership settings for
 /// a socket.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
 pub enum SetMulticastMembershipError {
     /// The provided address does not match the provided device.
+    #[error("provided address does not match the provided device")]
     AddressNotAvailable,
     /// The device does not exist.
+    #[error("device does not exist")]
     DeviceDoesNotExist,
     /// The provided address does not match any address on the host.
+    #[error("provided address does not match any address on the host")]
     NoDeviceWithAddress,
-    /// No device or address was specified and there is no device with a route
-    /// to the multicast address.
+    /// No device or address was specified and there is no device with a route to the multicast
+    /// address.
+    #[error(
+        "no device or address was specified and \
+         there is no device with a route to the multicast address"
+    )]
     NoDeviceAvailable,
     /// Tried to join a group again.
+    #[error("tried to join a group again")]
     GroupAlreadyJoined,
     /// Tried to leave an unjoined group.
+    #[error("tried to leave an unjoined group")]
     GroupNotJoined,
     /// The socket is bound to a device that doesn't match the one specified.
+    #[error("socket is bound to a device that doesn't match the one specified")]
     WrongDevice,
 }
 

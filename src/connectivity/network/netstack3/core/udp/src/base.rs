@@ -470,9 +470,11 @@ pub struct DualStackSocketState<D: WeakDeviceIdentifier> {
 }
 
 /// Serialization errors for Udp Packets.
+#[derive(Debug, Error)]
 pub enum UdpSerializeError {
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
+    #[error("sending packets with a remote port of 0 is not allowed")]
     RemotePortUnset,
 }
 
@@ -1640,14 +1642,14 @@ pub enum SendToError {
     /// An error was encountered while trying to create a temporary IP socket
     /// to use for the send operation.
     #[error("could not create a temporary connection socket: {0}")]
-    CreateSock(IpSockCreationError),
+    CreateSock(#[from] IpSockCreationError),
     /// An error was encountered while trying to send via the temporary IP
     /// socket.
     #[error("could not send via temporary socket: {0}")]
-    Send(IpSockSendError),
+    Send(#[from] IpSockSendError),
     /// There was a problem with the remote address relating to its zone.
     #[error("zone error: {0}")]
-    Zone(ZonedAddressError),
+    Zone(#[from] ZonedAddressError),
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
     #[error("the remote port was unset")]
@@ -1810,7 +1812,7 @@ where
             .with_other_stack_ip_options_mut_if_unbound(id, |other_stack| {
                 I::map_ip(
                     (enabled, WrapOtherStackIpOptionsMut(other_stack)),
-                    |(_enabled, _v4)| Err(SetDualStackEnabledError::NotCapable),
+                    |(_enabled, _v4)| Err(NotDualStackCapableError.into()),
                     |(enabled, WrapOtherStackIpOptionsMut(other_stack))| {
                         let DualStackSocketState { dual_stack_enabled, .. } = other_stack;
                         *dual_stack_enabled = enabled;
@@ -1822,7 +1824,7 @@ where
                 // NB: Match Linux and prefer to return `NotCapable` errors over
                 // `SocketIsBound` errors, for IPv4 sockets.
                 match I::VERSION {
-                    IpVersion::V4 => SetDualStackEnabledError::NotCapable,
+                    IpVersion::V4 => NotDualStackCapableError.into(),
                     IpVersion::V6 => SetDualStackEnabledError::SocketIsBound,
                 }
             })?
@@ -2480,19 +2482,24 @@ where
 }
 
 /// Error when sending a packet on a socket.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp, Error)]
 #[generic_over_ip()]
 pub enum SendError {
     /// The socket is not writeable.
+    #[error("socket not writable")]
     NotWriteable,
     /// The packet couldn't be sent.
-    IpSock(IpSockSendError),
+    #[error("packet couldn't be sent: {0}")]
+    IpSock(#[from] IpSockSendError),
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
+    #[error("remote port unset")]
     RemotePortUnset,
     /// The socket's send buffer is full.
+    #[error("send buffer is full")]
     SendBufferFull,
     /// Invalid message length.
+    #[error("invalid message length")]
     InvalidLength,
 }
 
@@ -7224,7 +7231,7 @@ mod tests {
         for enabled in [true, false] {
             assert_eq!(
                 api.set_dual_stack_enabled(&socket, enabled),
-                Err(SetDualStackEnabledError::NotCapable)
+                Err(NotDualStackCapableError.into())
             );
             assert_eq!(api.get_dual_stack_enabled(&socket), Err(NotDualStackCapableError));
         }

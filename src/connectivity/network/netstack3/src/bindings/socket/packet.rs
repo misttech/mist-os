@@ -32,13 +32,14 @@ use zx::{self as zx, HandleBased as _};
 
 use crate::bindings::bpf::{SocketFilterProgram, SocketFilterResult};
 use crate::bindings::devices::BindingId;
+use crate::bindings::errno::ErrnoError;
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
 use crate::bindings::socket::{IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 use crate::bindings::util::{
-    DeviceNotFoundError, IntoCore as _, IntoFidl as _, RemoveResourceResultExt as _,
-    ResultExt as _, ScopeExt as _, TryFromFidl, TryIntoCoreWithContext as _,
-    TryIntoFidlWithContext,
+    DeviceNotFoundError, ErrnoResultExt as _, IntoCore as _, IntoFidl as _,
+    RemoveResourceResultExt as _, ResultExt as _, ScopeExt as _, TryFromFidl,
+    TryIntoCoreWithContext as _, TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
@@ -272,13 +273,18 @@ impl<'a> RequestHandler<'a> {
         self,
         protocol: Option<Box<fppacket::ProtocolAssociation>>,
         interface: fppacket::BoundInterfaceId,
-    ) -> Result<(), fposix::Errno> {
+    ) -> Result<(), ErrnoError> {
         let protocol = protocol
             .map(|protocol| {
                 Ok(match *protocol {
                     fppacket::ProtocolAssociation::All(fppacket::Empty) => Protocol::All,
                     fppacket::ProtocolAssociation::Specified(p) => {
-                        Protocol::Specific(NonZeroU16::new(p).ok_or(fposix::Errno::Einval)?)
+                        Protocol::Specific(NonZeroU16::new(p).ok_or_else(|| {
+                            ErrnoError::new(
+                                fposix::Errno::Einval,
+                                "invalid protocol 0 while binding packet socket",
+                            )
+                        })?)
                     }
                 })
             })
@@ -287,8 +293,12 @@ impl<'a> RequestHandler<'a> {
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
-                let id = BindingId::new(id).ok_or_else(|| DeviceNotFoundError.into_errno())?;
-                Some(id.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?)
+                let id =
+                    BindingId::new(id).ok_or_else(|| DeviceNotFoundError.into_errno_error())?;
+                Some(
+                    id.try_into_core_with_ctx(ctx.bindings_ctx())
+                        .map_err(IntoErrno::into_errno_error)?,
+                )
             }
         };
         let device_selector = match device.as_ref() {
@@ -309,7 +319,7 @@ impl<'a> RequestHandler<'a> {
         self,
     ) -> Result<
         (fppacket::Kind, Option<fppacket::ProtocolAssociation>, fppacket::BoundInterface),
-        fposix::Errno,
+        ErrnoError,
     > {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
 
@@ -319,7 +329,8 @@ impl<'a> RequestHandler<'a> {
         let interface = match device {
             TargetDevice::AnyDevice => fppacket::BoundInterface::All(fppacket::Empty),
             TargetDevice::SpecificDevice(d) => fppacket::BoundInterface::Specified(
-                d.try_into_fidl_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?,
+                d.try_into_fidl_with_ctx(ctx.bindings_ctx())
+                    .map_err(IntoErrno::into_errno_error)?,
             ),
         };
 
@@ -331,12 +342,12 @@ impl<'a> RequestHandler<'a> {
         Ok((kind, protocol, interface))
     }
 
-    fn receive(self) -> Result<Message, fposix::Errno> {
+    fn receive(self) -> Result<Message, ErrnoError> {
         let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
 
         let SocketState { queue, .. } = id.socket_state();
         let mut queue = queue.lock();
-        queue.pop().ok_or(fposix::EWOULDBLOCK)
+        queue.pop().ok_or_else(|| ErrnoError::new(fposix::EWOULDBLOCK, "receive queue empty"))
     }
 
     fn set_receive_buffer(self, size: u64) {
@@ -359,18 +370,26 @@ impl<'a> RequestHandler<'a> {
         self,
         packet_info: Option<Box<fppacket::PacketInfo>>,
         data: Vec<u8>,
-    ) -> Result<(), fposix::Errno> {
+    ) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
         let SocketState { kind, .. } = *id.socket_state();
 
         let data = Buf::new(data, ..);
         // NB: Packet sockets require the packet_info be provided to specify
         // the destination of the data.
-        let packet_info = *packet_info.ok_or(fposix::Errno::Einval)?;
+        let packet_info = *packet_info.ok_or_else(|| {
+            ErrnoError::new(
+                fposix::Errno::Einval,
+                "packet_info should be provided for send_msg on packet sockets",
+            )
+        })?;
         let device = match BindingId::new(packet_info.interface_id) {
-            None => Err(fposix::Errno::Enxio),
+            None => Err(ErrnoError::new(
+                fposix::Errno::Enxio,
+                "packet_info should have nonzero interface ID",
+            )),
             Some(id) => {
-                id.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)
+                id.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno_error)
             }
         }?;
 
@@ -416,7 +435,7 @@ impl<'a> RequestHandler<'a> {
                 Ok(())
             }
         };
-        result.map_err(|e| e.into_errno())
+        result.map_err(|e| e.into_errno_error())
     }
 
     fn handle_request(
@@ -521,10 +540,10 @@ impl<'a> RequestHandler<'a> {
                 responder.send(self.describe()).unwrap_or_log("failed to respond");
             }
             fppacket::SocketRequest::Bind { protocol, bound_interface_id, responder } => responder
-                .send(self.bind(protocol, bound_interface_id).log_error("packet::Bind"))
+                .send(self.bind(protocol, bound_interface_id).log_errno_error("packet::Bind"))
                 .unwrap_or_log("failed to respond"),
             fppacket::SocketRequest::GetInfo { responder } => responder
-                .send(match self.get_info().log_error("packet::GetInfo") {
+                .send(match self.get_info().log_errno_error("packet::GetInfo") {
                     Ok((kind, ref protocol, ref iface)) => Ok((kind, protocol.as_ref(), iface)),
                     Err(e) => Err(e),
                 })
@@ -541,7 +560,7 @@ impl<'a> RequestHandler<'a> {
                     .send(
                         match self
                             .receive()
-                            .log_error("packet::RecvMsg")
+                            .log_errno_error("packet::RecvMsg")
                             .map(|r| params.apply_to(r))
                         {
                             Ok((ref packet_info, ref data, ref control, truncated)) => {
@@ -563,15 +582,15 @@ impl<'a> RequestHandler<'a> {
                 .contains(&control)
                 {
                     warn!("unsupported control data: {:?}", control);
-                    Err(fposix::Errno::Eopnotsupp)
+                    Err(ErrnoError::new(fposix::Errno::Eopnotsupp, "unsupported control data"))
                 } else if flags != fpsocket::SendMsgFlags::empty() {
                     warn!("unsupported control flags: {:?}", flags);
-                    Err(fposix::Errno::Eopnotsupp)
+                    Err(ErrnoError::new(fposix::Errno::Eopnotsupp, "unsupported control flags"))
                 } else {
                     self.send_msg(packet_info, data)
                 };
                 responder
-                    .send(result.log_error("packet::SendMsg"))
+                    .send(result.log_errno_error("packet::SendMsg"))
                     .unwrap_or_log("failed to respond");
             }
             fppacket::SocketRequest::SetMark { domain: _, mark: _, responder } => {
@@ -632,23 +651,27 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties> for WeakDeviceId<Bind
 }
 
 impl TryFromFidl<fppacket::PacketInfo> for EthernetHeaderParams {
-    type Error = fposix::Errno;
+    type Error = ErrnoError;
 
     fn try_from_fidl(packet_info: fppacket::PacketInfo) -> Result<Self, Self::Error> {
         let fppacket::PacketInfo { protocol, interface_id: _, addr } = packet_info;
-        let protocol = NonZeroU16::new(protocol).ok_or(fposix::Errno::Einval)?;
+        let protocol = NonZeroU16::new(protocol).ok_or_else(|| {
+            ErrnoError::new(fposix::Errno::Einval, "invalid protocol 0 in packet info")
+        })?;
         let dest_addr = match addr {
             fppacket::HardwareAddress::Eui48(mac) => Some(mac.into_core()),
             fppacket::HardwareAddress::None(fppacket::Empty) => None,
             fppacket::HardwareAddress::__SourceBreaking { .. } => None,
         }
-        .ok_or(fposix::Errno::Einval)?;
+        .ok_or_else(|| {
+            ErrnoError::new(fposix::Errno::Einval, "invalid destination hardware address")
+        })?;
         Ok(EthernetHeaderParams { dest_addr, protocol: protocol.get().into() })
     }
 }
 
 impl TryFromFidl<fppacket::PacketInfo> for PureIpHeaderParams {
-    type Error = fposix::Errno;
+    type Error = ErrnoError;
 
     fn try_from_fidl(packet_info: fppacket::PacketInfo) -> Result<Self, Self::Error> {
         let fppacket::PacketInfo { protocol, interface_id: _, addr } = packet_info;
@@ -656,13 +679,21 @@ impl TryFromFidl<fppacket::PacketInfo> for PureIpHeaderParams {
             fppacket::HardwareAddress::None(fppacket::Empty) => {}
             fppacket::HardwareAddress::Eui48(_)
             | fppacket::HardwareAddress::__SourceBreaking { .. } => {
-                return Err(fposix::Errno::Einval)
+                return Err(ErrnoError::new(
+                    fposix::Errno::Einval,
+                    "pure-IP header should not have hardware address",
+                ))
             }
         }
         let ip_version = match protocol.into() {
             EtherType::Ipv4 => IpVersion::V4,
             EtherType::Ipv6 => IpVersion::V6,
-            EtherType::Arp | EtherType::Other(_) => return Err(fposix::Errno::Einval),
+            EtherType::Arp | EtherType::Other(_) => {
+                return Err(ErrnoError::new(
+                    fposix::Errno::Einval,
+                    "pure-IP header should have IPv4 or IPv6 ethertype",
+                ))
+            }
         };
         Ok(PureIpHeaderParams { ip_version })
     }
@@ -719,7 +750,7 @@ impl RecvMsgParams {
 }
 
 impl IntoErrno for SendFrameErrorReason {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             SendFrameErrorReason::Alloc | SendFrameErrorReason::QueueFull => fposix::Errno::Enobufs,
             SendFrameErrorReason::SizeConstraintsViolation => fposix::Errno::Einval,
@@ -766,7 +797,15 @@ mod tests {
         packet_info: fppacket::PacketInfo,
         expected_params: Result<EthernetHeaderParams, fposix::Errno>,
     ) {
-        assert_eq!(EthernetHeaderParams::try_from_fidl(packet_info), expected_params);
+        assert_eq!(
+            EthernetHeaderParams::try_from_fidl(packet_info).map_err(|e| {
+                // Normally we wouldn't just discard the source, but we only have Eq for errnos
+                // themselves.
+                let (errno, _source) = e.into_errno_and_source();
+                errno
+            }),
+            expected_params
+        );
     }
 
     const IPV4_PROTO: u16 = 0x0800;
@@ -795,6 +834,14 @@ mod tests {
         packet_info: fppacket::PacketInfo,
         expected_params: Result<PureIpHeaderParams, fposix::Errno>,
     ) {
-        assert_eq!(PureIpHeaderParams::try_from_fidl(packet_info), expected_params);
+        assert_eq!(
+            PureIpHeaderParams::try_from_fidl(packet_info).map_err(|e| {
+                // Normally we wouldn't just discard the source, but we only have Eq for errnos
+                // themselves.
+                let (errno, _source) = e.into_errno_and_source();
+                errno
+            }),
+            expected_params
+        );
     }
 }

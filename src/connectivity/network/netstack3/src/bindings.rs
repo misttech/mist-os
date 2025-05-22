@@ -21,6 +21,8 @@ mod bpf;
 mod counters;
 mod debug_fidl_worker;
 mod devices;
+mod errno;
+mod error;
 mod filter;
 mod health_check_worker;
 mod inspect;

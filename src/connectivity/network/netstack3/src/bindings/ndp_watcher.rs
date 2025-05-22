@@ -12,6 +12,7 @@ use futures::channel::mpsc;
 use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use log::{debug, error, info, warn};
 use packet_formats::icmp::ndp::options::option_types as ndp_option_types;
+use thiserror::Error;
 
 use crate::bindings::devices::BindingId;
 use crate::bindings::util::{ErrorLogExt, ResultExt as _};
@@ -21,7 +22,7 @@ use {fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_ndp_ext as fnet_ndp_ext}
 
 /// Possible errors when serving
 /// `fuchsia.net.ndp/RouterAdvertisementOptionWatcherProvider`.
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum Error {
     #[error("worker is closed")]
     WorkerClosed(#[from] WorkerClosedError),
@@ -364,7 +365,7 @@ struct RouterAdvertisement {
     interface_id: BindingId,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 #[error("connection to NDP options worker closed")]
 pub(crate) struct WorkerClosedError;
 
@@ -389,7 +390,7 @@ impl WorkerWatcherSink {
 
 /// Errors observed while trying to send a Router Advertisement from the
 /// netstack to the worker.
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum RouterAdvertisementSinkError {
     /// The worker is closed.
     #[error(transparent)]

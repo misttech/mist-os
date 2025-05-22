@@ -36,12 +36,13 @@ use {
 
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
 use crate::bindings::socket::{
-    IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
+    ErrnoError, IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_CONNECTED,
     ZXSIO_SIGNAL_INCOMING,
 };
 use crate::bindings::util::{
-    AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, IntoFidlWithContext as _,
-    ResultExt as _, ScopeExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
+    AllowBindingIdFromWeak, ConversionContext, ErrnoResultExt as _, IntoCore, IntoFidl,
+    IntoFidlWithContext as _, ResultExt as _, ScopeExt as _, TryIntoCoreWithContext,
+    TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
@@ -334,7 +335,7 @@ pub(super) fn spawn_worker(
 }
 
 impl IntoErrno for AcceptError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             AcceptError::WouldBlock => fposix::Errno::Eagain,
             AcceptError::NotSupported => fposix::Errno::Einval,
@@ -343,11 +344,11 @@ impl IntoErrno for AcceptError {
 }
 
 impl IntoErrno for ConnectError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             ConnectError::NoRoute => fposix::Errno::Enetunreach,
             ConnectError::NoPort | ConnectError::ConnectionExists => fposix::Errno::Eaddrnotavail,
-            ConnectError::Zone(z) => z.into_errno(),
+            ConnectError::Zone(z) => z.to_errno(),
             ConnectError::Listener => fposix::Errno::Einval,
             ConnectError::Pending => fposix::Errno::Ealready,
             ConnectError::Completed => fposix::Errno::Eisconn,
@@ -357,22 +358,22 @@ impl IntoErrno for ConnectError {
 }
 
 impl IntoErrno for BindError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             Self::AlreadyBound => fposix::Errno::Einval,
-            Self::LocalAddressError(err) => err.into_errno(),
+            Self::LocalAddressError(err) => err.to_errno(),
         }
     }
 }
 
 impl IntoErrno for NoConnection {
-    fn into_errno(self) -> fidl_fuchsia_posix::Errno {
+    fn to_errno(&self) -> fidl_fuchsia_posix::Errno {
         fposix::Errno::Enotconn
     }
 }
 
 impl IntoErrno for ListenError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             ListenError::ListenerExists => fposix::Errno::Eaddrinuse,
             ListenError::NotSupported => fposix::Errno::Einval,
@@ -381,7 +382,7 @@ impl IntoErrno for ListenError {
 }
 
 impl IntoErrno for SetReuseAddrError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             SetReuseAddrError::AddrInUse => fposix::Errno::Eaddrinuse,
             SetReuseAddrError::NotSupported => fposix::Errno::Eopnotsupp,
@@ -391,7 +392,7 @@ impl IntoErrno for SetReuseAddrError {
 
 // Mapping guided by: https://cs.opensource.google/gvisor/gvisor/+/master:test/packetimpact/tests/tcp_network_unreachable_test.go
 impl IntoErrno for ConnectionError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             ConnectionError::ConnectionRefused => fposix::Errno::Econnrefused,
             ConnectionError::ConnectionReset => fposix::Errno::Econnreset,
@@ -410,7 +411,7 @@ impl IntoErrno for ConnectionError {
 }
 
 impl IntoErrno for OriginalDestinationError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             Self::NotConnected
             | Self::NotFound
@@ -451,33 +452,37 @@ struct RequestHandler<'a, I: IpExt> {
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
-    fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
+    fn bind(self, addr: fnet::SocketAddress) -> Result<(), ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
         let (addr, port) =
-            addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
-        ctx.api().tcp().bind(id, addr, NonZeroU16::new(port)).map_err(IntoErrno::into_errno)?;
+            addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno_error)?;
+        ctx.api()
+            .tcp()
+            .bind(id, addr, NonZeroU16::new(port))
+            .map_err(IntoErrno::into_errno_error)?;
         Ok(())
     }
 
-    fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
+    fn connect(self, addr: fnet::SocketAddress) -> Result<(), ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control }, ctx } = self;
 
         let addr = I::SocketAddress::from_sock_addr(addr)?;
         let (ip, remote_port) =
-            addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
-        let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
-        ctx.api().tcp().connect(id, ip, port).map_err(IntoErrno::into_errno)?;
+            addr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno_error)?;
+        let port = NonZeroU16::new(remote_port)
+            .ok_or_else(|| ErrnoError::new(fposix::Errno::Einval, "remote port must not be 0"))?;
+        ctx.api().tcp().connect(id, ip, port).map_err(IntoErrno::into_errno_error)?;
         if let Some(task_data) = self.data.task_data.take() {
             let control = spawn_tasks::<I>(ctx.clone(), id.clone(), task_data);
             assert_matches::assert_matches!(task_control.replace(control), None);
-            Err(fposix::Errno::Einprogress)
+            Err(ErrnoError::new(fposix::Errno::Einprogress, "stream socket tasks starting up"))
         } else {
             Ok(())
         }
     }
 
-    fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
+    fn listen(self, backlog: i16) -> Result<(), ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         // The POSIX specification for `listen` [1] says
         //
@@ -501,11 +506,11 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             NonZeroUsize::min(MAXIMUM_BACKLOG_SIZE, NonZeroUsize::max(b, MINIMUM_BACKLOG_SIZE))
         });
 
-        ctx.api().tcp().listen(id, backlog).map_err(IntoErrno::into_errno)?;
+        ctx.api().tcp().listen(id, backlog).map_err(IntoErrno::into_errno_error)?;
         Ok(())
     }
 
-    fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
+    fn get_sock_name(self) -> Result<fnet::SocketAddress, ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let fidl = match ctx.api().tcp().get_info(id) {
             SocketInfo::Unbound(UnboundInfo { device: _ }) => {
@@ -518,18 +523,21 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 local_addr.try_into_fidl_with_ctx(ctx.bindings_ctx())
             }
         }
-        .map_err(IntoErrno::into_errno)?;
+        .map_err(IntoErrno::into_errno_error)?;
         Ok(fidl.into_sock_addr())
     }
 
-    fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
+    fn get_peer_name(self) -> Result<fnet::SocketAddress, ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         match ctx.api().tcp().get_info(id) {
-            SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
+            SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(ErrnoError::new(
+                fposix::Errno::Enotconn,
+                "cannot get_peer_name for non-connected socket",
+            )),
             SocketInfo::Connection(info) => Ok({
                 info.remote_addr
                     .try_into_fidl_with_ctx(ctx.bindings_ctx())
-                    .map_err(IntoErrno::into_errno)?
+                    .map_err(IntoErrno::into_errno_error)?
                     .into_sock_addr()
             }),
         }
@@ -540,11 +548,12 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         want_addr: bool,
     ) -> Result<
         (Option<fnet::SocketAddress>, ClientEnd<fposix_socket::StreamSocketMarker>),
-        fposix::Errno,
+        ErrnoError,
     > {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
 
-        let (accepted, addr, peer) = ctx.api().tcp().accept(id).map_err(IntoErrno::into_errno)?;
+        let (accepted, addr, peer) =
+            ctx.api().tcp().accept(id).map_err(IntoErrno::into_errno_error)?;
         let addr = addr
             .map_zone(AllowBindingIdFromWeak)
             .into_fidl_with_ctx(ctx.bindings_ctx())
@@ -557,20 +566,25 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         Ok((want_addr.then_some(addr), client))
     }
 
-    fn get_error(self) -> Result<(), fposix::Errno> {
+    fn get_error(self) -> Result<(), ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         match ctx.api().tcp().get_socket_error(id) {
-            Some(err) => Err(err.into_errno()),
+            Some(err) => Err(err.into_errno_error()),
             None => Ok(()),
         }
     }
 
-    async fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
+    async fn shutdown(self, mode: fposix_socket::ShutdownMode) -> Result<(), ErrnoError> {
         let Self { data: BindingData { id, peer, task_data: _, task_control }, ctx } = self;
         let shutdown_recv = mode.contains(fposix_socket::ShutdownMode::READ);
         let shutdown_send = mode.contains(fposix_socket::ShutdownMode::WRITE);
         let shutdown_type = ShutdownType::from_send_receive(shutdown_send, shutdown_recv)
-            .ok_or(fposix::Errno::Einval)?;
+            .ok_or_else(|| {
+                ErrnoError::new(
+                    fposix::Errno::Einval,
+                    "shutdown must shut down at least one of {read, write}",
+                )
+            })?;
 
         // If shutdown send is requested and we have spawned tasks, then we must
         // call shutdown send. This is valid because the only error possible
@@ -585,7 +599,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             .api()
             .tcp()
             .shutdown(id, shutdown_type)
-            .map_err(|e @ NoConnection| e.into_errno())?;
+            .map_err(|e @ NoConnection| e.into_errno_error())?;
         if is_conn {
             let peer_disposition = shutdown_send.then_some(zx::SocketWriteDisposition::Disabled);
             let my_disposition = shutdown_recv.then_some(zx::SocketWriteDisposition::Disabled);
@@ -595,26 +609,35 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         Ok(())
     }
 
-    fn set_bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
+    fn set_bind_to_device(self, device: Option<&str>) -> Result<(), ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
         let device = device
             .map(|name| {
-                ctx.bindings_ctx().devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev)
+                ctx.bindings_ctx().devices.get_device_by_name(name).ok_or_else(|| {
+                    ErrnoError::new(fposix::Errno::Enodev, "no such device for set_bind_to_device")
+                })
             })
             .transpose()?;
 
-        ctx.api().tcp().set_device(id, device).map_err(IntoErrno::into_errno)
+        ctx.api().tcp().set_device(id, device).map_err(IntoErrno::into_errno_error)
     }
 
-    fn bind_to_device_index(self, device: u64) -> Result<(), fposix::Errno> {
+    fn bind_to_device_index(self, device: u64) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { id, peer: _, task_data: _, task_control: _ } } = self;
 
         // If `device` is 0, then this will clear the bound device.
         let device: Option<DeviceId<_>> = NonZeroU64::new(device)
-            .map(|index| ctx.bindings_ctx().devices.get_core_id(index).ok_or(fposix::Errno::Enodev))
+            .map(|index| {
+                ctx.bindings_ctx().devices.get_core_id(index).ok_or_else(|| {
+                    ErrnoError::new(
+                        fposix::Errno::Enodev,
+                        "no such device for bind_to_device_index",
+                    )
+                })
+            })
             .transpose()?;
 
-        ctx.api().tcp().set_device(id, device).map_err(IntoErrno::into_errno)
+        ctx.api().tcp().set_device(id, device).map_err(IntoErrno::into_errno_error)
     }
 
     fn set_send_buffer_size(self, new_size: u64) {
@@ -657,9 +680,9 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             .unwrap_or(u64::MAX)
     }
 
-    fn set_reuse_address(self, value: bool) -> Result<(), fposix::Errno> {
+    fn set_reuse_address(self, value: bool) -> Result<(), ErrnoError> {
         let Self { data: BindingData { id, peer: _, task_data: _, task_control: _ }, ctx } = self;
-        ctx.api().tcp().set_reuseaddr(id, value).map_err(IntoErrno::into_errno)
+        ctx.api().tcp().set_reuseaddr(id, value).map_err(IntoErrno::into_errno_error)
     }
 
     fn reuse_address(self) -> bool {
@@ -670,13 +693,13 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
     fn get_original_destination(
         self,
         ip_version: IpVersion,
-    ) -> Result<fnet::SocketAddress, fposix::Errno> {
+    ) -> Result<fnet::SocketAddress, ErrnoError> {
         let result = self
             .ctx
             .api()
             .tcp()
             .get_original_destination(&self.data.id)
-            .map_err(IntoErrno::into_errno);
+            .map_err(IntoErrno::into_errno_error);
 
         fn sockaddr<I: IpSockAddrExt>(
             addr: SpecifiedAddr<I::Addr>,
@@ -687,7 +710,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        struct In<I: Ip>(Result<(SpecifiedAddr<I::Addr>, NonZeroU16), fposix::Errno>);
+        struct In<I: Ip>(Result<(SpecifiedAddr<I::Addr>, NonZeroU16), ErrnoError>);
 
         I::map_ip_in(
             In(result),
@@ -696,13 +719,21 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     let (addr, port) = result?;
                     Ok(sockaddr::<Ipv4>(addr, port))
                 }
-                IpVersion::V6 => Err(fposix::Errno::Eopnotsupp),
+                IpVersion::V6 => Err(ErrnoError::new(
+                    fposix::Errno::Eopnotsupp,
+                    "can't get V6 original destination on V4 socket",
+                )),
             },
             |In(result)| {
                 let (addr, port) = result?;
                 match ip_version {
                     IpVersion::V4 => {
-                        let addr = addr.to_ipv4_mapped().ok_or(fposix::Errno::Enoent)?;
+                        let addr = addr.to_ipv4_mapped().ok_or_else(|| {
+                            ErrnoError::new(
+                                fposix::Errno::Enoent,
+                                "can't get V4 original destination on non-mapped V6 socket",
+                            )
+                        })?;
                         // TCP connections always have a specified destination address, but this
                         // invariant is not upheld in the type system here because we are retrieving
                         // the destination from the connection tracking table.
@@ -712,13 +743,22 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                                 (port {port})",
                                 self.data.id
                             );
-                            fposix::Errno::Enoent
+                            ErrnoError::new(
+                                fposix::Errno::Enoent,
+                                "original destination had unspecified addr",
+                            )
                         })?;
 
                         Ok(sockaddr::<Ipv4>(addr, port))
                     }
                     IpVersion::V6 => {
-                        let addr = NonMappedAddr::new(addr).ok_or(fposix::Errno::Enoent)?;
+                        let addr = NonMappedAddr::new(addr).ok_or_else(|| {
+                            ErrnoError::new(
+                                fposix::Errno::Enoent,
+                                "can't get V6 original destination if \
+                                 original destination is an IPv4-mapped address",
+                            )
+                        })?;
                         Ok(sockaddr::<Ipv6>(*addr, port))
                     }
                 }
@@ -743,12 +783,16 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             self;
         match request {
             fposix_socket::StreamSocketRequest::Bind { addr, responder } => {
-                responder.send(self.bind(addr)).unwrap_or_log("failed to respond");
+                responder
+                    .send(self.bind(addr).log_errno_error("bind"))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
                 // Connect always spawns on the socket scope.
                 let response = self.connect(addr);
-                responder.send(response).unwrap_or_log("failed to respond");
+                responder
+                    .send(response.log_errno_error("connect"))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
@@ -766,12 +810,14 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Listen { backlog, responder } => {
-                responder.send(self.listen(backlog)).unwrap_or_log("failed to respond");
+                responder
+                    .send(self.listen(backlog).log_errno_error("listen"))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Accept { want_addr, responder } => {
                 // Accept receives the provider scope because it creates a new
                 // socket worker for the newly created socket.
-                let response = self.accept(want_addr);
+                let response = self.accept(want_addr).log_errno_error("stream::Accept");
                 responder
                     .send(match response {
                         Ok((ref addr, client)) => Ok((addr.as_ref(), client)),
@@ -794,12 +840,16 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             fposix_socket::StreamSocketRequest::SetBindToDevice { value, responder } => {
                 let identifier = (!value.is_empty()).then_some(value.as_str());
                 responder
-                    .send(self.set_bind_to_device(identifier))
+                    .send(
+                        self.set_bind_to_device(identifier)
+                            .log_errno_error("stream::SetBindToDevice"),
+                    )
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetBindToInterfaceIndex { value, responder } => {
-                let result =
-                    self.bind_to_device_index(value).log_error("tcp::SetBindToInterfaceIndex");
+                let result = self
+                    .bind_to_device_index(value)
+                    .log_errno_error("tcp::SetBindToInterfaceIndex");
                 responder.send(result).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Query { responder } => {
@@ -808,13 +858,17 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetReuseAddress { value, responder } => {
-                responder.send(self.set_reuse_address(value)).unwrap_or_log("failed to respond");
+                responder
+                    .send(self.set_reuse_address(value).log_errno_error("stream::SetReuseAddress"))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetReuseAddress { responder } => {
                 responder.send(Ok(self.reuse_address())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetError { responder } => {
-                responder.send(self.get_error()).unwrap_or_log("failed to respond");
+                responder
+                    .send(self.get_error().log_errno_error("stream::GetError"))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetBroadcast { value: _, responder } => {
                 respond_not_supported!("stream::SetBroadcast", responder);
@@ -891,7 +945,12 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             }
             fposix_socket::StreamSocketRequest::GetOriginalDestination { responder } => {
                 responder
-                    .send(self.get_original_destination(IpVersion::V4).as_ref().map_err(|e| *e))
+                    .send(
+                        self.get_original_destination(IpVersion::V4)
+                            .log_errno_error("stream::GetOriginalDestination (V4)")
+                            .as_ref()
+                            .map_err(|e| *e),
+                    )
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Disconnect { responder } => {
@@ -899,16 +958,28 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             }
             fposix_socket::StreamSocketRequest::GetSockName { responder } => {
                 responder
-                    .send(self.get_sock_name().as_ref().map_err(|e| *e))
+                    .send(
+                        self.get_sock_name()
+                            .log_errno_error("stream::GetSockName")
+                            .as_ref()
+                            .map_err(|e| *e),
+                    )
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetPeerName { responder } => {
                 responder
-                    .send(self.get_peer_name().as_ref().map_err(|e| *e))
+                    .send(
+                        self.get_peer_name()
+                            .log_errno_error("stream::GetPeerName")
+                            .as_ref()
+                            .map_err(|e| *e),
+                    )
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::Shutdown { mode, responder } => {
-                responder.send(self.shutdown(mode).await).unwrap_or_log("failed to respond");
+                responder
+                    .send(self.shutdown(mode).await.log_errno_error("stream::Shutdown"))
+                    .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
                 debug!("stream::SetIpTypeOfService is not supported, returning Ok(())");
@@ -1040,7 +1111,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                         ctx.api()
                             .tcp()
                             .set_dual_stack_enabled(id, !value)
-                            .map_err(IntoErrno::into_errno),
+                            .map_err(IntoErrno::into_errno_error)
+                            .log_errno_error("stream::SetIpv6Only"),
                     )
                     .unwrap_or_log("failed to respond");
             }
@@ -1052,7 +1124,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                             .tcp()
                             .dual_stack_enabled(id)
                             .map(|enabled| !enabled)
-                            .map_err(IntoErrno::into_errno),
+                            .map_err(IntoErrno::into_errno_error)
+                            .log_errno_error("stream::GetIpv6Only"),
                     )
                     .unwrap_or_log("failed to respond");
             }

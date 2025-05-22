@@ -9,6 +9,7 @@
 //! [RFC 8981]: https://datatracker.ietf.org/doc/html/rfc8981
 
 use alloc::vec::Vec;
+use core::fmt::Debug;
 use core::marker::PhantomData;
 use core::num::NonZeroU16;
 use core::ops::ControlFlow;
@@ -1264,7 +1265,7 @@ enum SlaacType {
     Temporary,
 }
 
-impl core::fmt::Debug for SlaacType {
+impl Debug for SlaacType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             SlaacType::Stable => f.write_str("stable"),

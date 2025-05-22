@@ -24,6 +24,7 @@ use netstack3_filter::{FilterIpExt, RawIpBody};
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::icmp;
 use packet_formats::ip::{DscpAndEcn, IpPacket};
+use thiserror::Error;
 use zerocopy::SplitByteSlice;
 
 use crate::internal::raw::counters::RawIpSocketCounters;
@@ -413,29 +414,35 @@ where
 }
 
 /// Errors that may occur when calling [`RawIpSocketApi::send_to`].
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum RawIpSocketSendToError {
     /// The socket's protocol is `RawIpSocketProtocol::Raw`, which disallows
     /// `send_to` (the remote IP should be specified in the included header, not
     /// as a separate address argument).
+    #[error("send_to is disallowed for raw IP socket with protocol = raw")]
     ProtocolRaw,
     /// The provided remote_ip was an IPv4-mapped-IPv6 address. Dual stack
     /// operations are not supported on raw IP sockets.
+    #[error("dual-stack operations are not supported on raw IP sockets")]
     MappedRemoteIp,
     /// The provided packet body was invalid, and could not be sent. Typically
     /// originates when the stack is asked to inspect the packet body, e.g. to
     /// compute and populate the checksum value.
+    #[error("provided packet body was invalid (e.g. bad checksum)")]
     InvalidBody,
     /// There was an error when resolving the remote_ip's zone.
-    Zone(ZonedAddressError),
+    #[error("resolving remote IP's zone: {0}")]
+    Zone(#[from] ZonedAddressError),
     /// The IP layer failed to send the packet.
-    Ip(IpSockCreateAndSendError),
+    #[error("failed to send packet: {0}")]
+    Ip(#[from] IpSockCreateAndSendError),
 }
 
 /// Errors that may occur getting/setting the ICMP filter for a raw IP socket.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum RawIpSocketIcmpFilterError {
     /// The socket's protocol does not allow ICMP filters.
+    #[error("socket's protocol does not allow ICMP filters")]
     ProtocolNotIcmp,
 }
 

@@ -25,6 +25,7 @@ use netstack3_core::device::{
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::trace::trace_duration;
 use netstack3_core::types::WorkQueueReport;
+use thiserror::Error;
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
@@ -91,7 +92,7 @@ impl<C> DevicesInner<C> {
     }
 }
 
-impl<C: HasDeviceName + Clone + std::fmt::Debug + PartialEq> DevicesInner<C> {
+impl<C: HasDeviceName + Clone + Debug + PartialEq> DevicesInner<C> {
     fn iter_device_names(&self) -> impl Iterator<Item = &String> + '_ {
         self.id_map.values().map(|entry| match entry {
             IdMapEntry::ReservedName(s) => s,
@@ -140,7 +141,7 @@ pub(crate) struct NameNotAvailableError;
 
 impl<C> Devices<C>
 where
-    C: Clone + std::fmt::Debug + PartialEq,
+    C: Clone + Debug + PartialEq,
 {
     /// Adds a new device with the id corresponding to the given [`BindingIdAllocation`].
     ///
@@ -195,7 +196,7 @@ impl HasDeviceName for DeviceId<BindingsCtx> {
     }
 }
 
-impl<C: HasDeviceName + Clone + std::fmt::Debug + PartialEq> Devices<C> {
+impl<C: HasDeviceName + Clone + Debug + PartialEq> Devices<C> {
     /// Reserves the given name and allocates a new [`BindingId`].
     /// If the name is already taken, returns an error.
     ///
@@ -347,7 +348,7 @@ pub(crate) async fn rx_task(
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum TxTaskError {
     #[error("netdevice error: {0}")]
     Netdevice(#[from] netdevice_client::Error),

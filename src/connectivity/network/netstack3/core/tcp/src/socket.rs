@@ -4144,7 +4144,7 @@ where
         self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let TcpSocketState { socket_state, ip_options } = socket_state;
             match core_ctx {
-                MaybeDualStack::NotDualStack(_) => Err(SetDualStackEnabledError::NotCapable),
+                MaybeDualStack::NotDualStack(_) => Err(NotDualStackCapableError.into()),
                 MaybeDualStack::DualStack((core_ctx, _converter)) => match socket_state {
                     TcpSocketStateInner::Unbound(_) => {
                         Ok(core_ctx.set_dual_stack_enabled(ip_options, value))
@@ -5021,49 +5021,59 @@ fn get_buffer_size<
 }
 
 /// Error returned when failing to set the bound device for a socket.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, GenericOverIp, Error)]
 #[generic_over_ip()]
 pub enum SetDeviceError {
     /// The socket would conflict with another socket.
+    #[error("cannot set bound device due to conflict with another socket")]
     Conflict,
     /// The socket would become unroutable.
+    #[error("cannot set bound device as socket would become unroutable")]
     Unroutable,
     /// The socket has an address with a different zone.
+    #[error("cannot set bound device as socket's address has a different zone")]
     ZoneChange,
 }
 
 /// Possible errors for accept operation.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, GenericOverIp, Error)]
 #[generic_over_ip()]
 pub enum AcceptError {
     /// There is no established socket currently.
+    #[error("would block: no currently-established socket")]
     WouldBlock,
     /// Cannot accept on this socket.
+    #[error("this socket does not support accept")]
     NotSupported,
 }
 
 /// Errors for the listen operation.
-#[derive(Debug, GenericOverIp, PartialEq)]
+#[derive(Debug, GenericOverIp, PartialEq, Error)]
 #[generic_over_ip()]
 pub enum ListenError {
     /// There would be a conflict with another listening socket.
+    #[error("conflict with another listening socket")]
     ListenerExists,
     /// Cannot listen on such socket.
+    #[error("listening not supported")]
     NotSupported,
 }
 
 /// Possible error for calling `shutdown` on a not-yet connected socket.
-#[derive(Debug, GenericOverIp, Eq, PartialEq)]
+#[derive(Debug, GenericOverIp, Eq, PartialEq, Error)]
 #[generic_over_ip()]
+#[error("no connection")]
 pub struct NoConnection;
 
 /// Error returned when attempting to set the ReuseAddress option.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, GenericOverIp, Error)]
 #[generic_over_ip()]
 pub enum SetReuseAddrError {
     /// Cannot share the address because it is already used.
+    #[error("cannot share in-use address")]
     AddrInUse,
     /// Cannot set ReuseAddr on a connected socket.
+    #[error("cannot set ReuseAddr on a connected socket")]
     NotSupported,
 }
 
@@ -5111,19 +5121,23 @@ pub enum BindError {
 }
 
 /// Possible errors when retrieving the original destination of a socket.
-#[derive(GenericOverIp)]
+#[derive(GenericOverIp, Debug, Error)]
 #[generic_over_ip()]
 pub enum OriginalDestinationError {
     /// Cannot retrieve original destination for an unconnected socket.
+    #[error("cannot retrieve original destination for unconnected socket")]
     NotConnected,
     /// The socket's original destination could not be found in the connection
     /// tracking table.
+    #[error("socket's original destination could not be found in connection tracking table")]
     NotFound,
     /// The socket's original destination had an unspecified address, which is
     /// invalid for TCP.
+    #[error("socket's original destination address should be specified for TCP")]
     UnspecifiedDestinationAddr,
     /// The socket's original destination had an unspecified port, which is
     /// invalid for TCP.
+    #[error("socket's original destination port should be specified for TCP")]
     UnspecifiedDestinationPort,
 }
 
@@ -8920,7 +8934,7 @@ mod tests {
             assert_eq!(api.dual_stack_enabled(&socket), Err(NotDualStackCapableError));
             assert_eq!(
                 api.set_dual_stack_enabled(&socket, true),
-                Err(SetDualStackEnabledError::NotCapable)
+                Err(NotDualStackCapableError.into())
             );
         });
     }

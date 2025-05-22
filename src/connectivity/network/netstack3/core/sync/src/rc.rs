@@ -13,6 +13,7 @@
 //!   * Allow waiting for all strongly-held references to be dropped after
 //!     marking the data.
 
+use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 use core::ops::Deref;
 use core::panic::Location;
@@ -27,6 +28,7 @@ mod caller {
     //! Callers are only tracked in debug builds. All operations and types
     //! are no-ops and empty unless the `rc-debug-names` feature is enabled.
 
+    use core::fmt::Debug;
     use core::panic::Location;
 
     /// Records reference-counted names of instances.
@@ -45,7 +47,7 @@ mod caller {
         pub(super) callers: std::sync::Mutex<std::collections::HashMap<Location<'static>, usize>>,
     }
 
-    impl core::fmt::Debug for Callers {
+    impl Debug for Callers {
         #[cfg(not(feature = "rc-debug-names"))]
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             write!(f, "(Not Tracked)")
@@ -120,6 +122,7 @@ mod caller {
 }
 
 mod debug_id {
+    use core::fmt::Debug;
     use core::sync::atomic::{AtomicU64, Ordering};
     use netstack3_trace::TraceResourceId;
 
@@ -134,7 +137,7 @@ mod debug_id {
     #[derive(Clone)]
     pub(super) struct DebugToken(u64);
 
-    impl core::fmt::Debug for DebugToken {
+    impl Debug for DebugToken {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
             let DebugToken(inner) = self;
             write!(f, "{}", inner)
@@ -173,7 +176,7 @@ mod debug_id {
         WithoutToken { ptr: *const T },
     }
 
-    impl<T> core::fmt::Debug for DebugId<T> {
+    impl<T> Debug for DebugId<T> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
             match self {
                 DebugId::WithToken { ptr, token } => write!(f, "{:?}:{:?}", token, ptr),
@@ -402,9 +405,9 @@ impl<T> Primary<T> {
         alloc::sync::Arc::ptr_eq(this, other)
     }
 
-    /// Returns [`core::fmt::Debug`] implementation that is stable and unique
+    /// Returns [`Debug`] implementation that is stable and unique
     /// for the data held behind this [`Primary`].
-    pub fn debug_id(&self) -> impl core::fmt::Debug + '_ {
+    pub fn debug_id(&self) -> impl Debug + '_ {
         let Self { inner } = self;
         debug_id::DebugId::WithToken {
             ptr: alloc::sync::Arc::as_ptr(inner),
@@ -549,9 +552,9 @@ impl<T> Strong<T> {
         Weak(alloc::sync::Arc::downgrade(inner))
     }
 
-    /// Returns [`core::fmt::Debug`] implementation that is stable and unique
+    /// Returns [`Debug`] implementation that is stable and unique
     /// for the data held behind this [`Strong`].
-    pub fn debug_id(&self) -> impl core::fmt::Debug + '_ {
+    pub fn debug_id(&self) -> impl Debug + '_ {
         let Self { inner, caller: _ } = self;
         debug_id::DebugId::WithToken {
             ptr: alloc::sync::Arc::as_ptr(inner),
@@ -648,9 +651,9 @@ impl<T> Weak<T> {
         this.ptr_eq(other)
     }
 
-    /// Returns [`core::fmt::Debug`] implementation that is stable and unique
+    /// Returns [`Debug`] implementation that is stable and unique
     /// for the data held behind this [`Weak`].
-    pub fn debug_id(&self) -> impl core::fmt::Debug + '_ {
+    pub fn debug_id(&self) -> impl Debug + '_ {
         match self.upgrade() {
             Some(strong) => {
                 let Strong { inner, caller: _ } = &strong;
@@ -726,7 +729,7 @@ fn debug_refs(
 #[derive(Clone)]
 pub struct DebugReferences<T>(alloc::sync::Weak<Inner<T>>);
 
-impl<T> core::fmt::Debug for DebugReferences<T> {
+impl<T> Debug for DebugReferences<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(inner) = self;
         let inner = inner.upgrade();
@@ -749,7 +752,7 @@ impl<T: Send + Sync + 'static> DebugReferences<T> {
 #[derive(Clone)]
 pub struct DynDebugReferences(alloc::sync::Weak<dyn ExposeRefs>);
 
-impl core::fmt::Debug for DynDebugReferences {
+impl Debug for DynDebugReferences {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(inner) = self;
         let inner = inner.upgrade();

@@ -62,6 +62,7 @@ use netstack3_core::ip::{
     SetIpAddressPropertiesError, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
     UpdateIpConfigurationError,
 };
+use thiserror::Error;
 use zx::{self as zx, HandleBased, Rights};
 
 use {
@@ -250,7 +251,7 @@ async fn run_blackhole_interface(
     std::mem::drop(guard);
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 enum DeviceControlError {
     #[error("worker error: {0}")]
     Worker(#[from] netdevice_worker::Error),
@@ -1909,7 +1910,7 @@ async fn address_state_provider_main_loop(
     )
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum AddressStateProviderError {
     #[error(
         "received a `WatchAddressAssignmentState` request while a previous request is pending"

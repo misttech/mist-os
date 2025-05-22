@@ -32,6 +32,7 @@ use log::{debug, error, info, warn};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6, Subnet};
 use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
+use thiserror::Error;
 use zx::AsHandleRef as _;
 use {fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin};
 
@@ -150,7 +151,7 @@ impl<I: Ip> From<Change<I>> for ChangeEither {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub(crate) enum ChangeError {
     #[error("route's device no longer exists")]
     DeviceRemoved,

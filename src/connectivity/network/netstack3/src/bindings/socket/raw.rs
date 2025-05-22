@@ -29,10 +29,11 @@ use {
 };
 
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
-use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
+use crate::bindings::socket::{ErrnoError, IntoErrno, IpSockAddrExt, SockAddr};
 use crate::bindings::util::{
-    AllowBindingIdFromWeak, IntoCore, IntoFidl, IntoFidlWithContext as _, RemoveResourceResultExt,
-    ResultExt as _, ScopeExt as _, TryFromFidl, TryFromFidlWithContext,
+    AllowBindingIdFromWeak, DeviceNotFoundError, ErrnoResultExt as _, IntoCore, IntoFidl,
+    IntoFidlWithContext as _, RemoveResourceResultExt, ResultExt as _, ScopeExt as _, TryFromFidl,
+    TryFromFidlWithContext, WrongIpVersionError,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
@@ -285,7 +286,10 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 respond_not_supported!("raw::GetAcceptConn", responder)
             }
             fpraw::SocketRequest::SetBindToDevice { value, responder } => responder
-                .send(handle_set_device::<I>(ctx, data, value).log_error("raw::SetBindToDevice"))
+                .send(
+                    handle_set_device::<I>(ctx, data, value)
+                        .log_errno_error("raw::SetBindToDevice"),
+                )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetBindToDevice { responder } => {
                 let name = handle_get_device(ctx, data);
@@ -330,13 +334,15 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::SetIpTtl { value, responder } => responder
                 .send(
                     handle_set_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V4, value)
-                        .log_error("raw::SetIpTtl"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::SetIpTtl"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIpTtl { responder } => responder
                 .send(
                     handle_get_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V4)
-                        .log_error("raw::GetIpTtl"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::GetIpTtl"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpPacketInfo { value: _, responder } => {
@@ -366,25 +372,29 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::SetIpMulticastTtl { value, responder } => responder
                 .send(
                     handle_set_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V4, value)
-                        .log_error("raw::SetIpMulticastTtl"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::SetIpMulticastTtl"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIpMulticastTtl { responder } => responder
                 .send(
                     handle_get_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V4)
-                        .log_error("raw::GetIpMulticastTtl"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::GetIpMulticastTtl"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpMulticastLoopback { value, responder } => responder
                 .send(
                     handle_set_multicast_loop(ctx, data, value, IpVersion::V4)
-                        .log_error("raw::SetIpMulticastLoopback"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::SetIpMulticastLoopback"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIpMulticastLoopback { responder } => responder
                 .send(
                     handle_get_multicast_loop(ctx, data, IpVersion::V4)
-                        .log_error("raw::GetIpMulticastLoopback"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::GetIpMulticastLoopback"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::AddIpMembership { membership: _, responder } => {
@@ -421,13 +431,15 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::SetIpv6UnicastHops { value, responder } => responder
                 .send(
                     handle_set_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V6, value)
-                        .log_error("raw::SetIpv6UnicastHops"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::SetIpv6UnicastHops"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIpv6UnicastHops { responder } => responder
                 .send(
                     handle_get_hop_limit(ctx, data, HopLimitType::Unicast, IpVersion::V6)
-                        .log_error("raw::GetIpv6UnicastHops"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::GetIpv6UnicastHops"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
@@ -439,25 +451,29 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::SetIpv6MulticastHops { value, responder } => responder
                 .send(
                     handle_set_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V6, value)
-                        .log_error("raw::SetIpv6MulticastHops"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::SetIpv6MulticastHops"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIpv6MulticastHops { responder } => responder
                 .send(
                     handle_get_hop_limit(ctx, data, HopLimitType::Multicast, IpVersion::V6)
-                        .log_error("raw::GetIpv6MulticastHops"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::GetIpv6MulticastHops"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6MulticastLoopback { value, responder } => responder
                 .send(
                     handle_set_multicast_loop(ctx, data, value, IpVersion::V6)
-                        .log_error("raw::SetIpv6MulticastLoopback"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::SetIpv6MulticastLoopback"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => responder
                 .send(
                     handle_get_multicast_loop(ctx, data, IpVersion::V6)
-                        .log_error("raw::GetIpv6MulticastLoopback"),
+                        .map_err(IntoErrno::into_errno_error)
+                        .log_errno_error("raw::GetIpv6MulticastLoopback"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetIpv6Only { value: _, responder } => {
@@ -495,7 +511,7 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 responder,
             } => {
                 let result = handle_recvmsg(ctx, data, want_addr, data_len, want_control, flags)
-                    .log_error("raw::RecvMsg");
+                    .log_errno_error("raw::RecvMsg");
                 responder
                     .send(result.as_ref().map(RecvMsgResponse::borrowed).map_err(|e| *e))
                     .unwrap_or_log("failed to respond")
@@ -504,7 +520,7 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 responder
                     .send(
                         handle_sendmsg(ctx, data, addr, msg, control, flags)
-                            .log_error("raw::SendMsg"),
+                            .log_errno_error("raw::SendMsg"),
                     )
                     .unwrap_or_log("failed to respond")
             }
@@ -518,11 +534,16 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                 respond_not_supported!("raw::GetIpHeaderIncluded", responder)
             }
             fpraw::SocketRequest::SetIcmpv6Filter { filter, responder } => responder
-                .send(handle_set_icmpv6_filter(ctx, data, filter).log_error("raw::SetIcmpv6Filter"))
+                .send(
+                    handle_set_icmpv6_filter(ctx, data, filter)
+                        .log_errno_error("raw::SetIcmpv6Filter"),
+                )
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::GetIcmpv6Filter { responder } => {
-                let result = handle_get_icmpv6_filter(ctx, data).log_error("raw::GetIcmpv6Filter");
-                responder.send(result.as_ref().map_err(|e| *e)).unwrap_or_log("failed to respond");
+                let result = handle_get_icmpv6_filter(ctx, data);
+                responder
+                    .send(result.log_errno_error("raw::GetIcmpv6Filter").as_ref().map_err(|e| *e))
+                    .unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::SetIpv6Checksum { config: _, responder } => {
                 respond_not_supported!("raw::SetIpv6Checksum", responder)
@@ -554,14 +575,14 @@ pub(crate) async fn serve(
             fpraw::ProviderRequest::Socket { responder, domain, proto } => responder
                 .send(
                     handle_create_socket(ctx.clone(), domain, proto, Default::default())
-                        .log_error("raw::create"),
+                        .log_errno_error("raw::create"),
                 )
                 .unwrap_or_log("failed to respond"),
             fpraw::ProviderRequest::SocketWithOptions { responder, domain, proto, opts } => {
                 responder
                     .send(
                         handle_create_socket(ctx.clone(), domain, proto, opts)
-                            .log_error("raw::create"),
+                            .log_errno_error("raw::create"),
                     )
                     .unwrap_or_log("failed to respond")
             }
@@ -576,7 +597,7 @@ fn handle_create_socket(
     domain: fposix_socket::Domain,
     protocol: fpraw::ProtocolAssociation,
     creation_opts: fposix_socket::SocketCreationOptions,
-) -> Result<fidl::endpoints::ClientEnd<fpraw::SocketMarker>, fposix::Errno> {
+) -> Result<fidl::endpoints::ClientEnd<fpraw::SocketMarker>, ErrnoError> {
     let (client, request_stream) = fidl::endpoints::create_request_stream();
     match domain {
         fposix_socket::Domain::Ipv4 => {
@@ -634,13 +655,16 @@ fn handle_recvmsg<I: IpExt + IpSockAddrExt>(
     max_len: u32,
     want_control: bool,
     flags: fposix_socket::RecvMsgFlags,
-) -> Result<RecvMsgResponse, fposix::Errno> {
+) -> Result<RecvMsgResponse, ErrnoError> {
     // TODO(https://fxbug.dev/42175797): Support control data & flags.
     let _want_control = want_control;
     let _flags = flags;
 
-    let ReceivedIpPacket { mut data, src_addr, device } =
-        socket.id.external_state().dequeue_rx_packet().ok_or(fposix::Errno::Eagain)?;
+    let ReceivedIpPacket { mut data, src_addr, device } = socket
+        .id
+        .external_state()
+        .dequeue_rx_packet()
+        .ok_or_else(|| ErrnoError::new(fposix::Errno::Eagain, "no packet in rx queue"))?;
     let data_len: usize = max_len.try_into().unwrap_or(usize::MAX);
     let truncated_bytes: u32 = data.len().saturating_sub(data_len).try_into().unwrap_or(u32::MAX);
     data.truncate(data_len);
@@ -673,7 +697,7 @@ fn handle_sendmsg<I: IpExt + IpSockAddrExt>(
     data: Vec<u8>,
     control: fposix_socket::NetworkSocketSendControlData,
     flags: fposix_socket::SendMsgFlags,
-) -> Result<(), fposix::Errno> {
+) -> Result<(), ErrnoError> {
     // TODO(https://fxbug.dev/42175797): Support control data & flags.
     let _control = control;
     let _flags = flags;
@@ -683,13 +707,16 @@ fn handle_sendmsg<I: IpExt + IpSockAddrExt>(
             // Match Linux and return `Einval` when asked to send to an IPv4
             // addr on an IPv6 socket. This errno is unique to raw IP sockets.
             let addr = match (I::VERSION, *addr) {
-                (IpVersion::V6, fnet::SocketAddress::Ipv4(_)) => Err(fposix::Errno::Einval),
+                (IpVersion::V6, fnet::SocketAddress::Ipv4(_)) => Err(ErrnoError::new(
+                    fposix::Errno::Einval,
+                    "cannot send to IPv4 on raw IPv6 socket",
+                )),
                 (_, _) => I::SocketAddress::from_sock_addr(*addr),
             }?;
             // NB: raw IP sockets ignore the port.
             let (remote_addr, _port) =
                 TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), addr)
-                    .map_err(IntoErrno::into_errno)?;
+                    .map_err(IntoErrno::into_errno_error)?;
             Ok(remote_addr)
         })
         .transpose()?;
@@ -699,13 +726,16 @@ fn handle_sendmsg<I: IpExt + IpSockAddrExt>(
             .api()
             .raw_ip_socket()
             .send_to(&socket.id, remote_addr, body)
-            .map_err(IntoErrno::into_errno),
+            .map_err(IntoErrno::into_errno_error),
         None => {
             // TODO(https://fxbug.dev/342577389): Support sending on connected
             // sockets.
             // TODO(https://fxbug.dev/339692009): Support sending when the
             // remote_ip is provided via IP_HDRINCL.
-            Err(fposix::Errno::Edestaddrreq)
+            Err(ErrnoError::new(
+                fposix::Errno::Edestaddrreq,
+                "cannot sendmsg on raw socket without specified destination",
+            ))
         }
     }
 }
@@ -716,7 +746,7 @@ fn handle_set_device<I: IpExt>(
     ctx: &mut Ctx,
     socket: &SocketWorkerState<I>,
     device_name: String,
-) -> Result<(), fposix::Errno> {
+) -> Result<(), ErrnoError> {
     let device = if device_name.is_empty() {
         None
     } else {
@@ -724,7 +754,7 @@ fn handle_set_device<I: IpExt>(
             ctx.bindings_ctx()
                 .devices
                 .get_device_by_name(device_name.as_str())
-                .ok_or(fposix::Errno::Enodev)?,
+                .ok_or_else(|| DeviceNotFoundError.into_errno_error())?,
         )
     };
     let _old_dev: Option<WeakDeviceId> =
@@ -744,16 +774,21 @@ fn handle_set_icmpv6_filter<I: IpExt>(
     ctx: &mut Ctx,
     socket: &SocketWorkerState<I>,
     filter: fpraw::Icmpv6Filter,
-) -> Result<(), fposix::Errno> {
+) -> Result<(), ErrnoError> {
     I::map_ip_in(
         (IpInvariant(filter), &socket.id),
-        |_| Err(fposix::Errno::Enoprotoopt),
+        |_| {
+            Err(ErrnoError::new(
+                fposix::Errno::Enoprotoopt,
+                "can't set icmpv6 filter for raw IPv4 socket",
+            ))
+        },
         |(IpInvariant(filter), id)| {
             let _old_filter = ctx
                 .api()
                 .raw_ip_socket()
                 .set_icmp_filter(id, Some(filter.into_core()))
-                .map_err(IntoErrno::into_errno)?;
+                .map_err(IntoErrno::into_errno_error)?;
             Ok(())
         },
     )
@@ -763,12 +798,17 @@ fn handle_set_icmpv6_filter<I: IpExt>(
 fn handle_get_icmpv6_filter<I: IpExt>(
     ctx: &mut Ctx,
     socket: &SocketWorkerState<I>,
-) -> Result<fpraw::Icmpv6Filter, fposix::Errno> {
+) -> Result<fpraw::Icmpv6Filter, ErrnoError> {
     I::map_ip_in(
         (IpInvariant(ctx), &socket.id),
-        |_| Err(fposix::Errno::Enoprotoopt),
+        |_| {
+            Err(ErrnoError::new(
+                fposix::Errno::Enoprotoopt,
+                "can't get icmpv6 filter for raw IPv4 socket",
+            ))
+        },
         |(IpInvariant(ctx), id)| match ctx.api().raw_ip_socket().get_icmp_filter(id) {
-            Err(e) => Err(e.into_errno()),
+            Err(e) => Err(e.into_errno_error()),
             Ok(filter) => Ok(filter.into_fidl()),
         },
     )
@@ -783,9 +823,9 @@ fn handle_set_multicast_loop<I: IpExt>(
     socket: &SocketWorkerState<I>,
     value: bool,
     ip_version: IpVersion,
-) -> Result<(), fposix::Errno> {
+) -> Result<(), WrongIpVersionError> {
     if I::VERSION != ip_version {
-        return Err(fposix::Errno::Enoprotoopt);
+        return Err(WrongIpVersionError);
     }
     let _old_value: bool = ctx.api().raw_ip_socket().set_multicast_loop(&socket.id, value);
     Ok(())
@@ -799,9 +839,9 @@ fn handle_get_multicast_loop<I: IpExt>(
     ctx: &mut Ctx,
     socket: &SocketWorkerState<I>,
     ip_version: IpVersion,
-) -> Result<bool, fposix::Errno> {
+) -> Result<bool, WrongIpVersionError> {
     if I::VERSION != ip_version {
-        return Err(fposix::Errno::Enoprotoopt);
+        return Err(WrongIpVersionError);
     }
 
     Ok(ctx.api().raw_ip_socket().get_multicast_loop(&socket.id))
@@ -825,9 +865,9 @@ fn handle_set_hop_limit<I: IpExt>(
     hop_limit_type: HopLimitType,
     ip_version: IpVersion,
     value: fposix_socket::OptionalUint8,
-) -> Result<(), fposix::Errno> {
+) -> Result<(), WrongIpVersionError> {
     if I::VERSION != ip_version {
-        return Err(fposix::Errno::Enoprotoopt);
+        return Err(WrongIpVersionError);
     }
     let value: Option<u8> = value.into_core();
     let _old_value = match hop_limit_type {
@@ -854,9 +894,9 @@ fn handle_get_hop_limit<I: IpExt>(
     socket: &SocketWorkerState<I>,
     hop_limit_type: HopLimitType,
     ip_version: IpVersion,
-) -> Result<u8, fposix::Errno> {
+) -> Result<u8, WrongIpVersionError> {
     if I::VERSION != ip_version {
-        return Err(fposix::Errno::Enoprotoopt);
+        return Err(WrongIpVersionError);
     }
     match hop_limit_type {
         HopLimitType::Unicast => {
@@ -869,7 +909,7 @@ fn handle_get_hop_limit<I: IpExt>(
 }
 
 impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I> {
-    type Error = fposix::Errno;
+    type Error = ErrnoError;
 
     fn try_from_fidl(proto: fpraw::ProtocolAssociation) -> Result<Self, Self::Error> {
         match proto {
@@ -877,7 +917,9 @@ impl<I: IpExt> TryFromFidl<fpraw::ProtocolAssociation> for RawIpSocketProtocol<I
             fpraw::ProtocolAssociation::Associated(val) => {
                 let protocol = RawIpSocketProtocol::<I>::new(I::Proto::from(val));
                 match &protocol {
-                    RawIpSocketProtocol::Raw => Err(fposix::Errno::Einval),
+                    RawIpSocketProtocol::Raw => Err(ErrnoError::new(fposix::Errno::Einval,
+                    "raw socket associated with a protocol should not specify `raw` as the protocol"
+                    )),
                     RawIpSocketProtocol::Proto(_) => Ok(protocol),
                 }
             }
@@ -938,7 +980,7 @@ impl IntoFidl<fpraw::Icmpv6Filter> for Option<RawIpSocketIcmpFilter<Ipv6>> {
 }
 
 impl IntoErrno for RawIpSocketSendToError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             RawIpSocketSendToError::ProtocolRaw => fposix::Errno::Einval,
             RawIpSocketSendToError::MappedRemoteIp => fposix::Errno::Enetunreach,
@@ -954,17 +996,17 @@ impl IntoErrno for RawIpSocketSendToError {
                     fposix::Errno::Eacces
                 }
                 IpSockCreateAndSendError::Send(IpSockSendError::Unroutable(inner)) => {
-                    inner.into_errno()
+                    inner.to_errno()
                 }
-                IpSockCreateAndSendError::Create(inner) => inner.into_errno(),
+                IpSockCreateAndSendError::Create(inner) => inner.to_errno(),
             },
-            RawIpSocketSendToError::Zone(inner) => inner.into_errno(),
+            RawIpSocketSendToError::Zone(inner) => inner.to_errno(),
         }
     }
 }
 
 impl IntoErrno for RawIpSocketIcmpFilterError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             RawIpSocketIcmpFilterError::ProtocolNotIcmp => fposix::Errno::Eopnotsupp,
         }
@@ -994,7 +1036,13 @@ mod tests {
         fidl: fpraw::ProtocolAssociation,
         expected_result: Result<RawIpSocketProtocol<I>, fposix::Errno>,
     ) {
-        assert_eq!(RawIpSocketProtocol::<I>::try_from_fidl(fidl), expected_result);
+        assert_eq!(
+            RawIpSocketProtocol::<I>::try_from_fidl(fidl).map_err(|e| {
+                let (errno, _source) = e.into_errno_and_source();
+                errno
+            }),
+            expected_result
+        );
     }
 
     #[ip_test(I)]

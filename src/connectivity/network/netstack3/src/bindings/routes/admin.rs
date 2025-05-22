@@ -17,6 +17,7 @@ use log::{debug, error, warn};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_core::device::DeviceId;
 use netstack3_core::routes::AddableEntry;
+use thiserror::Error;
 use zx::{self as zx, AsHandleRef, HandleBased as _};
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
@@ -522,7 +523,7 @@ impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum ModifyTableError {
     #[error("backing route table is removed")]
     TableRemoved,

@@ -113,6 +113,8 @@ common_sources = [
   "src/bindings/counters.rs",
   "src/bindings/debug_fidl_worker.rs",
   "src/bindings/devices.rs",
+  "src/bindings/errno.rs",
+  "src/bindings/error.rs",
   "src/bindings/filter.rs",
   "src/bindings/filter/controller.rs",
   "src/bindings/filter/conversion.rs",

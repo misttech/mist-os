@@ -33,6 +33,7 @@ use netstack3_core::socket::{
 };
 use netstack3_core::sync::RemoveResourceResult;
 use packet_formats::utils::NonZeroDuration;
+use thiserror::Error;
 use {
     fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
@@ -502,9 +503,23 @@ impl TryFromFidl<fposix_socket::OptionalUint32> for Option<u32> {
     }
 }
 
+#[derive(Debug, Error)]
+#[error("wrong IP version")]
+pub(crate) struct WrongIpVersionError;
+
+impl IntoErrno for WrongIpVersionError {
+    fn to_errno(&self) -> fposix::Errno {
+        let WrongIpVersionError = self;
+        fposix::Errno::Enoprotoopt
+    }
+}
+
+#[derive(Debug, Error)]
 pub(crate) enum MulticastMembershipConversionError {
+    #[error("address is not multicast")]
     AddrNotMulticast,
-    WrongIpVersion,
+    #[error(transparent)]
+    WrongIpVersion(#[from] WrongIpVersionError),
 }
 
 impl<I: Ip> GenericOverIp<I> for MulticastMembershipConversionError {
@@ -512,10 +527,10 @@ impl<I: Ip> GenericOverIp<I> for MulticastMembershipConversionError {
 }
 
 impl IntoErrno for MulticastMembershipConversionError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             Self::AddrNotMulticast => fposix::Errno::Einval,
-            Self::WrongIpVersion => fposix::Errno::Enoprotoopt,
+            Self::WrongIpVersion(e) => e.to_errno(),
         }
     }
 }
@@ -542,7 +557,7 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::IpMulticastMembership>
                     });
                 Ok((mcast_addr, selector))
             },
-            |_fidl| Err(Self::Error::WrongIpVersion),
+            |_fidl| Err(Self::Error::WrongIpVersion(WrongIpVersionError)),
         )
     }
 }
@@ -555,7 +570,7 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::Ipv6MulticastMembership>
     fn try_from_fidl(fidl: fposix_socket::Ipv6MulticastMembership) -> Result<Self, Self::Error> {
         <A::Version as Ip>::map_ip_out(
             fidl,
-            |_fidl| Err(Self::Error::WrongIpVersion),
+            |_fidl| Err(Self::Error::WrongIpVersion(WrongIpVersionError)),
             |fidl| {
                 let fposix_socket::Ipv6MulticastMembership { iface, mcast_addr } = fidl;
                 let mcast_addr = MulticastAddr::new(mcast_addr.into_core())
@@ -652,18 +667,20 @@ impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
+#[error("device not found")]
 pub(crate) struct DeviceNotFoundError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub(crate) enum SocketAddressError {
+    #[error(transparent)]
     Device(DeviceNotFoundError),
 }
 
 impl IntoErrno for SocketAddressError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
-            SocketAddressError::Device(d) => d.into_errno(),
+            SocketAddressError::Device(d) => d.to_errno(),
         }
     }
 }
@@ -862,7 +879,7 @@ impl TryIntoFidlWithContext<BindingId> for AllowBindingIdFromWeak {
 }
 
 impl IntoErrno for DeviceNotFoundError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         fposix::Errno::Enodev
     }
 }

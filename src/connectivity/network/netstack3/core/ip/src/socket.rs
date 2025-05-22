@@ -206,7 +206,7 @@ pub enum IpSockSendError {
     #[error("illegal loopback address")]
     IllegalLoopbackAddress,
     /// Broadcast send is not allowed.
-    #[error("Broadcast send is not enabled for the socket")]
+    #[error("broadcast send is not enabled for the socket")]
     BroadcastNotAllowed,
 }
 
