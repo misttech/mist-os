@@ -652,7 +652,11 @@ def _generate_companion_host_tool_build_rules(
     ctx = runtime.ctx
 
     # the metadata file itself is needed by the emulator
-    files_str = [str(meta["_meta_path"])]
+    files_str = []
+
+    # allow adding an empty host tool for aemu_internal
+    if not meta.get("_no_meta"):
+        files_str.append(str(meta["_meta_path"]))
 
     if "files" in meta:
         files_str.extend(meta["files"])
@@ -1817,12 +1821,12 @@ def _generate_sdk_build_rules(
         if dir == "tools":
             if "aemu_internal" not in [val.get("name") for val in metas]:
                 metas.append({
-                    "files": [],
                     "name": "aemu_internal",
                     "root": "tools",
                     "type": "companion_host_tool",
                     "_meta_path": "tools/x64/aemu_internal-meta.json",
                     "_meta_sdk_root": metas[0]["_meta_sdk_root"],
+                    "_no_meta": True,
                 })
         _process_dir(
             runtime,
