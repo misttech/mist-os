@@ -396,7 +396,7 @@ pub fn init(
         destinations.push(LogDestination::Stdout);
     }
 
-    let logging_method = ctx.get(LOG_LOGGER).unwrap_or_else(|_| "tracing".to_string());
+    let logging_method = ctx.get(LOG_LOGGER).unwrap_or_else(|_| "ffxlog".to_string());
 
     match logging_method.as_str() {
         "ffxlog" => {
