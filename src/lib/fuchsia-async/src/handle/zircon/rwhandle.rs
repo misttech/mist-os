@@ -4,6 +4,7 @@
 
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use crate::OnSignalsRef;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 use std::task::{ready, Context, Poll, Waker};
 use zx::{self as zx, AsHandleRef};
@@ -100,7 +101,10 @@ pub trait WritableHandle {
     fn need_writable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>>;
 }
 
-struct RWPacketReceiver(Mutex<Inner>);
+struct RWPacketReceiver<S: RWHandleSpec> {
+    inner: Mutex<Inner>,
+    _marker: PhantomData<S>,
+}
 
 struct Inner {
     signals: zx::Signals,
@@ -108,7 +112,7 @@ struct Inner {
     write_task: Option<Waker>,
 }
 
-impl PacketReceiver for RWPacketReceiver {
+impl<S: RWHandleSpec> PacketReceiver for RWPacketReceiver<S> {
     fn receive_packet(&self, packet: zx::Packet) {
         let new = if let zx::PacketContents::SignalOne(p) = packet.contents() {
             // Only consider the signals that were part of the trigger. This
@@ -127,15 +131,16 @@ impl PacketReceiver for RWPacketReceiver {
         let mut read_task = None;
         let mut write_task = None;
         {
-            let mut inner = self.0.lock().unwrap();
+            let mut inner = self.inner.lock().unwrap();
             let old = inner.signals;
             inner.signals |= new;
 
-            let became_readable = new.contains(OBJECT_READABLE) && !old.contains(OBJECT_READABLE);
-            let became_writable = new.contains(OBJECT_WRITABLE) && !old.contains(OBJECT_WRITABLE);
+            let became_readable =
+                new.intersection(S::READABLE_SIGNALS) != old.intersection(S::READABLE_SIGNALS);
+            let became_writable =
+                new.intersection(S::WRITABLE_SIGNALS) != old.intersection(S::WRITABLE_SIGNALS);
             let became_closed =
                 new.contains(OBJECT_PEER_CLOSED) && !old.contains(OBJECT_PEER_CLOSED);
-
             if became_readable || became_closed {
                 read_task = inner.read_task.take();
             }
@@ -156,12 +161,12 @@ impl PacketReceiver for RWPacketReceiver {
 }
 
 /// A `Handle` that receives notifications when it is readable/writable.
-pub struct RWHandle<T> {
+pub struct RWHandle<T, S: RWHandleSpec = DefaultRWHandleSpec> {
     handle: T,
-    receiver: ReceiverRegistration<RWPacketReceiver>,
+    receiver: ReceiverRegistration<RWPacketReceiver<S>>,
 }
 
-impl<T> RWHandle<T>
+impl<T> RWHandle<T, DefaultRWHandleSpec>
 where
     T: AsHandleRef,
 {
@@ -172,20 +177,52 @@ where
     ///
     /// If called outside the context of an active async executor.
     pub fn new(handle: T) -> Self {
-        let ehandle = EHandle::local();
+        Self::new_with_spec(handle)
+    }
+}
 
-        let initial_signals = OBJECT_READABLE | OBJECT_WRITABLE;
-        let receiver = ehandle.register_receiver(Arc::new(RWPacketReceiver(Mutex::new(Inner {
-            // Optimistically assume that the handle is readable and writable.
-            // Reads and writes will be attempted before queueing a packet.
-            // This makes handles slightly faster to read/write the first time
-            // they're accessed after being created, provided they start off as
-            // readable or writable. In return, there will be an extra wasted
-            // syscall per read/write if the handle is not readable or writable.
-            signals: initial_signals,
-            read_task: None,
-            write_task: None,
-        }))));
+impl<T, S> RWHandle<T, S>
+where
+    T: AsHandleRef,
+    S: RWHandleSpec,
+{
+    /// Creates a new `RWHandle` with a non-default spec and an object which
+    /// will receive notifications when the underlying handle becomes readable,
+    /// writable, or closes.
+    ///
+    /// # Panics
+    ///
+    /// If called outside the context of an active async executor.
+    ///
+    /// If `S::READABLE_SIGNALS` or `S::WRITABLE_SIGNALS` contain
+    /// [`zx::Signals::OBJECT_PEER_CLOSED`] or have a non-empty intersection.
+    pub fn new_with_spec(handle: T) -> Self {
+        let ehandle = EHandle::local();
+        let internal_signals = OBJECT_PEER_CLOSED;
+        assert!(
+            !S::READABLE_SIGNALS.contains(internal_signals),
+            "readable signals may not contain ({internal_signals:?})"
+        );
+        assert!(
+            !S::WRITABLE_SIGNALS.contains(internal_signals),
+            "writable signals may not contain ({internal_signals:?})"
+        );
+        assert!(!S::WRITABLE_SIGNALS.intersects(S::READABLE_SIGNALS), "signals may not intersect");
+        let initial_signals = S::WRITABLE_SIGNALS | S::READABLE_SIGNALS;
+        let receiver = ehandle.register_receiver(Arc::new(RWPacketReceiver {
+            inner: Mutex::new(Inner {
+                // Optimistically assume that the handle is readable and writable.
+                // Reads and writes will be attempted before queueing a packet.
+                // This makes handles slightly faster to read/write the first time
+                // they're accessed after being created, provided they start off as
+                // readable or writable. In return, there will be an extra wasted
+                // syscall per read/write if the handle is not readable or writable.
+                signals: initial_signals,
+                read_task: None,
+                write_task: None,
+            }),
+            _marker: PhantomData,
+        }));
 
         RWHandle { handle, receiver }
     }
@@ -207,7 +244,7 @@ where
 
     /// Returns true if the object received the `OBJECT_PEER_CLOSED` signal.
     pub fn is_closed(&self) -> bool {
-        let signals = self.receiver().0.lock().unwrap().signals;
+        let signals = self.receiver().inner.lock().unwrap().signals;
         if signals.contains(OBJECT_PEER_CLOSED) {
             return true;
         }
@@ -242,14 +279,14 @@ where
         OnSignalsRef::new(self.handle.as_handle_ref(), OBJECT_PEER_CLOSED)
     }
 
-    fn receiver(&self) -> &RWPacketReceiver {
+    fn receiver(&self) -> &RWPacketReceiver<S> {
         self.receiver.receiver()
     }
 
     fn need_signal(&self, cx: &mut Context<'_>, signal: Signal) -> Poll<Result<(), zx::Status>> {
-        let mut inner = self.receiver.0.lock().unwrap();
+        let mut inner = self.receiver.inner.lock().unwrap();
         let old = inner.signals;
-        if old.contains(zx::Signals::OBJECT_PEER_CLOSED) {
+        if old.contains(OBJECT_PEER_CLOSED) {
             // We don't want to return an error here because even though the peer has closed, the
             // object could still have queued messages that can be read.
             Poll::Ready(Ok(()))
@@ -258,48 +295,65 @@ where
             let signal = match signal {
                 Signal::Read => {
                     inner.read_task = Some(waker);
-                    zx::Signals::OBJECT_READABLE
+                    S::READABLE_SIGNALS
                 }
                 Signal::Write => {
                     inner.write_task = Some(waker);
-                    zx::Signals::OBJECT_WRITABLE
+                    S::WRITABLE_SIGNALS
                 }
             };
-            if old.contains(signal) {
+            if old.intersects(signal) {
                 inner.signals &= !signal;
                 std::mem::drop(inner);
                 self.handle.wait_async_handle(
                     self.receiver.port(),
                     self.receiver.key(),
-                    signal | zx::Signals::OBJECT_PEER_CLOSED,
+                    signal | OBJECT_PEER_CLOSED,
                     zx::WaitAsyncOpts::empty(),
                 )?;
             }
             Poll::Pending
         }
     }
+
+    fn poll_signal(
+        &self,
+        cx: &mut Context<'_>,
+        signal: Signal,
+    ) -> Poll<Result<zx::Signals, zx::Status>> {
+        let mask = match signal {
+            Signal::Read => S::READABLE_SIGNALS,
+            Signal::Write => S::WRITABLE_SIGNALS,
+        } | OBJECT_PEER_CLOSED;
+
+        loop {
+            let signals = self.receiver().inner.lock().unwrap().signals;
+            let asserted = signals.intersection(mask);
+            if !asserted.is_empty() {
+                return Poll::Ready(Ok(asserted));
+            }
+            ready!(self.need_signal(cx, signal)?);
+        }
+    }
 }
 
+#[derive(Copy, Clone)]
 enum Signal {
     Read,
     Write,
 }
 
-impl<T> ReadableHandle for RWHandle<T>
+impl<T, S> ReadableHandle for RWHandle<T, S>
 where
     T: AsHandleRef,
+    S: RWHandleSpec,
 {
     fn poll_readable(&self, cx: &mut Context<'_>) -> Poll<Result<ReadableState, zx::Status>> {
-        loop {
-            let signals = self.receiver().0.lock().unwrap().signals;
-            match (signals.contains(OBJECT_READABLE), signals.contains(OBJECT_PEER_CLOSED)) {
-                (true, false) => return Poll::Ready(Ok(ReadableState::Readable)),
-                (_, true) => return Poll::Ready(Ok(ReadableState::MaybeReadableAndClosed)),
-                (false, false) => {
-                    ready!(self.need_signal(cx, Signal::Read)?)
-                }
-            }
+        let signals = ready!(self.poll_signal(cx, Signal::Read)?);
+        if signals.contains(OBJECT_PEER_CLOSED) {
+            return Poll::Ready(Ok(ReadableState::MaybeReadableAndClosed));
         }
+        Poll::Ready(Ok(ReadableState::Readable))
     }
 
     fn need_readable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>> {
@@ -307,26 +361,50 @@ where
     }
 }
 
-impl<T> WritableHandle for RWHandle<T>
+impl<T, S> WritableHandle for RWHandle<T, S>
 where
     T: AsHandleRef,
+    S: RWHandleSpec,
 {
     fn poll_writable(&self, cx: &mut Context<'_>) -> Poll<Result<WritableState, zx::Status>> {
-        loop {
-            let signals = self.receiver().0.lock().unwrap().signals;
-            match (signals.contains(OBJECT_WRITABLE), signals.contains(OBJECT_PEER_CLOSED)) {
-                (_, true) => return Poll::Ready(Ok(WritableState::Closed)),
-                (true, _) => return Poll::Ready(Ok(WritableState::Writable)),
-                (false, false) => {
-                    ready!(self.need_signal(cx, Signal::Write)?)
-                }
-            }
+        let signals = ready!(self.poll_signal(cx, Signal::Write)?);
+        if signals.contains(OBJECT_PEER_CLOSED) {
+            return Poll::Ready(Ok(WritableState::Closed));
         }
+        Poll::Ready(Ok(WritableState::Writable))
     }
 
     fn need_writable(&self, cx: &mut Context<'_>) -> Poll<Result<(), zx::Status>> {
         self.need_signal(cx, Signal::Write)
     }
+}
+
+/// A trait specifying the behavior of [`RWHandle`].
+///
+/// The default behavior, listening for [`zx::Signals::OBJECT_READABLE`] and
+/// [`zx::Signals::OBJECT_WRITABLE`] is provided by [`DefaultRWHandleSpec`].
+pub trait RWHandleSpec: Send + Sync + 'static {
+    /// Signals asserted when the handle is readable.
+    ///
+    /// [`RWHandle`] installs wait for these signals and if any of them are
+    /// asserted, the handle is considered readable.
+    const READABLE_SIGNALS: zx::Signals;
+    /// Signals asserted when the handle is writable.
+    ///
+    /// [`RWHandle`] installs wait for these signals and if any of them are
+    /// asserted, the handle is considered writable.
+    const WRITABLE_SIGNALS: zx::Signals;
+}
+
+/// The default behavior for [`RWHandle`].
+///
+/// Considers the handle readable when [`zx::Signals::OBJECT_READABLE`] is set,
+/// and writable when [`zx::Signals::OBJECT_WRITABLE`] is set.
+pub struct DefaultRWHandleSpec;
+
+impl RWHandleSpec for DefaultRWHandleSpec {
+    const READABLE_SIGNALS: zx::Signals = OBJECT_READABLE;
+    const WRITABLE_SIGNALS: zx::Signals = OBJECT_WRITABLE;
 }
 
 #[cfg(test)]

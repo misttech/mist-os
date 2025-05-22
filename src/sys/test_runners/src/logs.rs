@@ -371,10 +371,9 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn buffer_and_drain_return_error_if_stream_polls_err() -> Result<(), Error> {
-        let (tx, rx) = zx::Socket::create_stream();
-        // A closed socket should yield an error when stream is polled.
-        let () = rx.half_close()?;
-        let () = tx.half_close()?;
+        let (_tx, rx) = zx::Socket::create_stream();
+        // If we don't have read rights the socket returns an error when polled.
+        let rx = rx.duplicate_handle(zx::Rights::BASIC).expect("duplicate");
         let stream = LoggerStream::new(rx).context("Failed to create LoggerStream")?;
         let (mut logger, _rx) = create_datagram_logger()?;
 

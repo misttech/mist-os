@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use super::on_signals::OnSignalsRef;
-use super::rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState};
+use super::rwhandle::{
+    RWHandle, RWHandleSpec, ReadableHandle, ReadableState, WritableHandle, WritableState,
+};
 use futures::future::poll_fn;
 use futures::io::{self, AsyncRead, AsyncWrite};
 use futures::ready;
@@ -15,7 +17,7 @@ use std::task::Poll;
 use zx::{self as zx, AsHandleRef};
 
 /// An I/O object representing a `Socket`.
-pub struct Socket(RWHandle<zx::Socket>);
+pub struct Socket(RWHandle<zx::Socket, SocketRWHandleSpec>);
 
 impl AsRef<zx::Socket> for Socket {
     fn as_ref(&self) -> &zx::Socket {
@@ -36,7 +38,7 @@ impl Socket {
     ///
     /// If called outside the context of an active async executor.
     pub fn from_socket(socket: zx::Socket) -> Self {
-        Socket(RWHandle::new(socket))
+        Socket(RWHandle::new_with_spec(socket))
     }
 
     /// Consumes `self` and returns the underlying `zx::Socket`.
@@ -70,6 +72,10 @@ impl Socket {
             let res = self.0.get_ref().read(buf);
             match res {
                 Err(zx::Status::SHOULD_WAIT) => ready!(self.need_readable(cx)?),
+                Err(zx::Status::BAD_STATE) => {
+                    // BAD_STATE indicates our peer is closed for writes.
+                    return Poll::Ready(Ok(0));
+                }
                 Err(zx::Status::PEER_CLOSED) => return Poll::Ready(Ok(0)),
                 _ => return Poll::Ready(res),
             }
@@ -89,6 +95,10 @@ impl Socket {
             let res = self.0.get_ref().write(buf);
             match res {
                 Err(zx::Status::SHOULD_WAIT) => ready!(self.need_writable(cx)?),
+                Err(zx::Status::BAD_STATE) => {
+                    // BAD_STATE indicates we're closed for writes.
+                    return Poll::Ready(Err(zx::Status::BAD_STATE));
+                }
                 _ => return Poll::Ready(res),
             }
         }
@@ -115,7 +125,7 @@ impl Socket {
                     return if bytes == avail {
                         Poll::Ready(Ok(bytes))
                     } else {
-                        Poll::Ready(Err(zx::Status::BAD_STATE))
+                        Poll::Ready(Err(zx::Status::IO_DATA_LOSS))
                     }
                 }
             }
@@ -259,6 +269,14 @@ impl Stream for DatagramStream<&Socket> {
     }
 }
 
+struct SocketRWHandleSpec;
+impl RWHandleSpec for SocketRWHandleSpec {
+    const READABLE_SIGNALS: zx::Signals =
+        zx::Signals::SOCKET_READABLE.union(zx::Signals::SOCKET_PEER_WRITE_DISABLED);
+    const WRITABLE_SIGNALS: zx::Signals =
+        zx::Signals::SOCKET_WRITABLE.union(zx::Signals::SOCKET_WRITE_DISABLED);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,6 +288,7 @@ mod tests {
     use futures::task::noop_waker_ref;
     use futures::FutureExt;
     use std::pin::pin;
+    use zx::SocketWriteDisposition;
 
     #[test]
     fn can_read_write() {
@@ -451,5 +470,60 @@ mod tests {
 
         // After reading from s1, its peer is now able to write and should have a write signal.
         assert!(executor.run_until_stalled(&mut tx_fut).is_ready());
+    }
+
+    #[test]
+    fn half_closed_for_writes() {
+        let mut executor = TestExecutor::new();
+
+        let (s1, s2) = zx::Socket::create_stream();
+
+        // Completely fill the transmit buffer. This socket is no longer writable.
+        let socket_info = s2.info().expect("failed to get socket info");
+        let bytes = vec![0u8; socket_info.tx_buf_max];
+        assert_eq!(socket_info.tx_buf_max, s2.write(&bytes).expect("failed to write to socket"));
+
+        let async_s2 = Socket::from_socket(s2);
+        let mut tx_fut = poll_fn(|cx| async_s2.poll_write_ref(cx, &bytes[..]));
+        assert_eq!(executor.run_until_stalled(&mut tx_fut), Poll::Pending);
+
+        s1.set_disposition(None, Some(SocketWriteDisposition::Disabled)).expect("set disposition");
+        assert_eq!(
+            executor.run_until_stalled(&mut tx_fut),
+            Poll::Ready(Err::<usize, _>(zx::Status::BAD_STATE))
+        );
+
+        // Drain the socket so we can reopen it.
+        let mut readbuf = vec![0u8; bytes.len()];
+        assert_eq!(s1.read(&mut readbuf[..]), Ok(readbuf.len()));
+        s1.set_disposition(None, Some(SocketWriteDisposition::Enabled)).expect("set disposition");
+
+        assert_eq!(executor.run_until_stalled(&mut tx_fut), Poll::Ready(Ok(bytes.len())));
+    }
+
+    #[test]
+    fn half_closed_for_reads() {
+        let mut executor = TestExecutor::new();
+
+        let (s1, s2) = zx::Socket::create_stream();
+        let async_s2 = Socket::from_socket(s2);
+        let mut bytes = [0u8; 10];
+        let mut tx_fut = poll_fn(|cx| async_s2.poll_read_ref(cx, &mut bytes[..]));
+        assert_eq!(executor.run_until_stalled(&mut tx_fut), Poll::Pending);
+
+        // Write a message and then half close.
+        let msg = b"hello";
+        assert_eq!(s1.write(msg), Ok(msg.len()));
+        s1.set_disposition(Some(SocketWriteDisposition::Disabled), None).expect("set disposition");
+        assert_eq!(executor.run_until_stalled(&mut tx_fut), Poll::Ready(Ok(msg.len())));
+        assert_eq!(executor.run_until_stalled(&mut tx_fut), Poll::Ready(Ok(0)));
+
+        // Reopen.
+        s1.set_disposition(Some(SocketWriteDisposition::Enabled), None).expect("set disposition");
+        assert_eq!(executor.run_until_stalled(&mut tx_fut), Poll::Pending);
+
+        // Close once more, without any bytes this time.
+        s1.set_disposition(Some(SocketWriteDisposition::Disabled), None).expect("set disposition");
+        assert_eq!(executor.run_until_stalled(&mut tx_fut), Poll::Ready(Ok(0)));
     }
 }
