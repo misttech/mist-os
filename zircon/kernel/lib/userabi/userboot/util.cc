@@ -169,5 +169,9 @@ void fail(const zx::debuglog& log, const char* fmt, ...) {
   va_start(ap, fmt);
   vprintl(log, fmt, ap);
   va_end(ap);
-  zx_process_exit(-1);
+
+  // Crash here instead of just doing zx_process_exit, so the kernel will
+  // report the exception details.  That may be helpful in identifying the
+  // failing code path in case the error messages are lost somehow.
+  __builtin_trap();
 }
