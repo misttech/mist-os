@@ -503,7 +503,7 @@ impl SeccompState {
                     let cookie = result.filter.as_ref().unwrap().cookie.next();
                     let msg = seccomp_notif {
                         id: cookie,
-                        pid: current_task.id as u32,
+                        pid: current_task.tid as u32,
                         flags: 0,
                         data: make_seccomp_data(
                             current_task,

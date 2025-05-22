@@ -46,7 +46,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::{errno, pid_t, rlimit};
+use starnix_uapi::{errno, rlimit, tid_t};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -617,7 +617,7 @@ async fn create_container(
     .source_context("create system task")?;
     // The system task gives pid 2. This value is less critical than giving
     // pid 1 to init, but this value matches what is supposed to happen.
-    debug_assert_eq!(system_task.id, 2);
+    debug_assert_eq!(system_task.tid, 2);
 
     kernel.kthreads.init(system_task).source_context("initializing kthreads")?;
     let system_task = kernel.kthreads.system_task();
@@ -922,7 +922,7 @@ fn create_remote_block_device_from_spec<'a>(
 async fn wait_for_init_file(
     startup_file_path: &str,
     current_task: &CurrentTask,
-    init_pid: pid_t,
+    init_tid: tid_t,
 ) -> Result<(), Error> {
     // TODO(https://fxbug.dev/42178400): Use inotify machinery to wait for the file.
     loop {
@@ -940,7 +940,7 @@ async fn wait_for_init_file(
             Err(error) => return Err(anyhow::Error::from(error)),
         }
 
-        if current_task.get_task(init_pid).upgrade().is_none() {
+        if current_task.get_task(init_tid).upgrade().is_none() {
             return Err(anyhow!("Init task terminated before startup_file_path was ready"));
         }
     }
@@ -1029,7 +1029,7 @@ mod test {
             .expect("Failed to create file");
 
         fasync::Task::local(async move {
-            wait_for_init_file(path, &current_task, current_task.get_pid())
+            wait_for_init_file(path, &current_task, current_task.get_tid())
                 .await
                 .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
@@ -1049,10 +1049,10 @@ mod test {
             current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
-        let test_init_pid = current_task.get_pid();
+        let test_init_tid = current_task.get_tid();
         fasync::Task::local(async move {
             sender.send(()).await.expect("failed to send message");
-            wait_for_init_file(path, &init_task, test_init_pid)
+            wait_for_init_file(path, &init_task, test_init_tid)
                 .await
                 .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
@@ -1088,10 +1088,10 @@ mod test {
             current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
         const STARTUP_FILE_PATH: &str = "/path";
 
-        let test_init_pid = init_task.get_pid();
+        let test_init_tid = init_task.get_tid();
         fasync::Task::local(async move {
             sender.send(()).await.expect("failed to send message");
-            wait_for_init_file(STARTUP_FILE_PATH, &current_task, test_init_pid)
+            wait_for_init_file(STARTUP_FILE_PATH, &current_task, test_init_tid)
                 .await
                 .expect_err("Did not detect init exit");
             sender.send(()).await.expect("failed to send message");

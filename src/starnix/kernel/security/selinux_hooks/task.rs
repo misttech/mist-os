@@ -1085,7 +1085,7 @@ mod tests {
             |mut locked, current_task, security_server| {
                 // In this testing context, `current_task` is the initial task.
                 // Set its rlimits to some known values.
-                assert_eq!(current_task.id, 1);
+                assert_eq!(current_task.tid, 1);
                 {
                     let mut initial_limits = current_task.thread_group().limits.lock();
                     (Resource::ALL).iter().for_each(|resource| {

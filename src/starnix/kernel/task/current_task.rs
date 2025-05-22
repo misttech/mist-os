@@ -71,8 +71,8 @@ pub struct TaskBuilder {
 }
 
 impl TaskBuilder {
-    pub fn new(task: Task) -> Self {
-        Self { task: OwnedRef::new(task), thread_state: Default::default() }
+    pub fn new(task: OwnedRef<Task>) -> Self {
+        Self { task, thread_state: Default::default() }
     }
 
     #[inline(always)]
@@ -967,7 +967,7 @@ impl CurrentTask {
             return Err(err);
         }
 
-        self.ptrace_event(locked, PtraceOptions::TRACEEXEC, self.task.id as u64);
+        self.ptrace_event(locked, PtraceOptions::TRACEEXEC, self.task.tid as u64);
         self.signal_vfork();
 
         Ok(())
@@ -1132,19 +1132,19 @@ impl CurrentTask {
             // strict mode.
             let tasks = state.tasks().collect::<Vec<_>>();
             for task in &tasks {
-                if task.id == self.id {
+                if task.tid == self.tid {
                     continue;
                 }
                 let other_task_state = task.read();
 
                 // Target threads cannot be in SECCOMP_MODE_STRICT
                 if task.seccomp_filter_state.get() == SeccompStateValue::Strict {
-                    return Self::seccomp_tsync_error(task.id, flags);
+                    return Self::seccomp_tsync_error(task.tid, flags);
                 }
 
                 // Target threads' filters must be a subsequence of this thread's
                 if !other_task_state.seccomp_filters.can_sync_to(&filters) {
-                    return Self::seccomp_tsync_error(task.id, flags);
+                    return Self::seccomp_tsync_error(task.tid, flags);
                 }
             }
 
@@ -1257,7 +1257,7 @@ impl CurrentTask {
                 return;
             };
 
-            if (futex & FUTEX_TID_MASK) as i32 == self.id {
+            if (futex & FUTEX_TID_MASK) as i32 == self.tid {
                 let owner_died = FUTEX_OWNER_DIED | futex;
                 if mm.atomic_store_u32_relaxed(futex_addr, owner_died).is_err() {
                     return;
@@ -1621,7 +1621,7 @@ impl CurrentTask {
             }
 
             if clone_parent_settid {
-                self.write_object(user_parent_tid, &child.id)?;
+                self.write_object(user_parent_tid, &child.tid)?;
             }
 
             if clone_child_cleartid {
@@ -1629,7 +1629,7 @@ impl CurrentTask {
             }
 
             if clone_child_settid {
-                child.write_object(user_child_tid, &child.id)?;
+                child.write_object(user_child_tid, &child.tid)?;
             }
 
             // TODO(https://fxbug.dev/42066087): We do not support running different processes with

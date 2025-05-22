@@ -28,7 +28,7 @@ use starnix_uapi::signals::{SigSet, SIGCHLD};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::EpollEvent;
 use starnix_uapi::{
-    __kernel_time_t, clone_args, errno, error, gid_t, itimerval, pid_t, pollfd, uapi, uid_t,
+    __kernel_time_t, clone_args, errno, error, gid_t, itimerval, pid_t, pollfd, tid_t, uapi, uid_t,
     ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, CLONE_VFORK, CLONE_VM, CSIGNAL,
     ITIMER_REAL,
 };
@@ -113,10 +113,10 @@ pub fn sys_clone(
     current_task: &mut CurrentTask,
     flags: u64,
     user_stack: UserAddress,
-    user_parent_tid: UserRef<pid_t>,
-    user_child_tid: UserRef<pid_t>,
+    user_parent_tid: UserRef<tid_t>,
+    user_child_tid: UserRef<tid_t>,
     user_tls: UserAddress,
-) -> Result<pid_t, Errno> {
+) -> Result<tid_t, Errno> {
     // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
     // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
     do_clone(
@@ -137,7 +137,7 @@ pub fn sys_clone(
 pub fn sys_fork(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
-) -> Result<pid_t, Errno> {
+) -> Result<tid_t, Errno> {
     do_clone(
         locked,
         current_task,
@@ -467,7 +467,7 @@ pub fn sys_signalfd(
 pub fn sys_vfork(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
-) -> Result<pid_t, Errno> {
+) -> Result<tid_t, Errno> {
     do_clone(
         locked,
         current_task,
