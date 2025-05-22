@@ -33,6 +33,7 @@ int DoPidFdOpen(pid_t pid) { return static_cast<int>(syscall(SYS_pidfd_open, pid
 int DoProcessMRelease(int pidfd, int flags = 0) {
   return static_cast<int>(syscall(SYS_process_mrelease, pidfd, flags));
 }
+
 int GetProcessRSSMemorySize(pid_t pid) {
   auto path = std::format("/proc/{}/status", pid);
   std::ifstream file(path);
@@ -56,6 +57,13 @@ int GetProcessRSSMemorySize(pid_t pid) {
   }
 
   return testing::AssertionFailure() << "Did not find rss value";
+}
+
+std::string GetMapsString(pid_t pid) {
+  auto path = std::format("/proc/{}/maps", pid);
+  std::string res;
+  files::ReadFileToString(path, &res);
+  return res;
 }
 
 }  // namespace
@@ -174,11 +182,12 @@ TEST_F(ProcessMemoryReleaseTest, SuccessfulRelease) {
   ASSERT_EQ(status >> 8, (SIGTRAP | (PTRACE_EVENT_EXIT << 8)))
       << "Child not stopped with PTRACE_EVENT_EXIT";
 
-  // Call process_mrelease on the pidfd. This is the syscall under test.
-  // Flags are 0 for the basic release operation.
+  // Verify the RSS size decreases 1MB and `maps` info has no change after memory is released.
   auto msize = GetProcessRSSMemorySize(child_pid);
+  auto maps_str = GetMapsString(child_pid);
   EXPECT_THAT(DoProcessMRelease(child_pidfd), SyscallSucceeds());
-  ASSERT_GT(msize, GetProcessRSSMemorySize(child_pid) + 1024);
+  EXPECT_GT(msize, GetProcessRSSMemorySize(child_pid) + 1024);
+  EXPECT_EQ(maps_str, GetMapsString(child_pid));
 
   // Wait for the child process to terminate and check its status.
   ASSERT_THAT(ptrace(PTRACE_CONT, child_pid, 0, 0), SyscallSucceeds());
