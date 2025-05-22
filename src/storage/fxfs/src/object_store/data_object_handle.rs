@@ -782,7 +782,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.multi_write(
             transaction,
             self.attribute_id(),
-            &[aligned.clone()],
+            std::slice::from_ref(&aligned),
             transfer_buf.as_mut(),
         )
         .await?;
