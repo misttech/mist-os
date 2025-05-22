@@ -2076,7 +2076,7 @@ closed protocol Object {
     /// } zx_info_bti_t;
     /// ```
     ///
-    /// ### Topic ZX_INFO_IOB
+    /// ### ZX_INFO_IOB
     ///
     /// *handle* type: `IOBuffer`
     ///
@@ -2095,7 +2095,7 @@ closed protocol Object {
     /// } zx_info_iob_t;
     /// ```
     ///
-    /// ### Topic ZX_INFO_IOB_REGIONS
+    /// ### ZX_INFO_IOB_REGIONS
     ///
     /// Returns information about each region of an IOB as an array of `zx_iob_region_info_t`
     ///
