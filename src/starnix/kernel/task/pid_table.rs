@@ -6,7 +6,7 @@ use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
 use starnix_logging::track_stub;
 use starnix_types::ownership::{TempRef, WeakRef};
-use starnix_uapi::{pid_t, tid_t};
+use starnix_uapi::pid_t;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 
@@ -98,18 +98,18 @@ impl PidTable {
         self.last_pid
     }
 
-    pub fn get_task(&self, tid: tid_t) -> WeakRef<Task> {
-        self.get_entry(tid).and_then(|entry| entry.task.clone()).unwrap_or_else(WeakRef::new)
+    pub fn get_task(&self, pid: pid_t) -> WeakRef<Task> {
+        self.get_entry(pid).and_then(|entry| entry.task.clone()).unwrap_or_else(WeakRef::new)
     }
 
     pub fn add_task(&mut self, task: &TempRef<'_, Task>) {
-        let entry = self.get_entry_mut(task.tid);
+        let entry = self.get_entry_mut(task.id);
         assert!(entry.task.is_none());
-        self.get_entry_mut(task.tid).task = Some(WeakRef::from(task));
+        self.get_entry_mut(task.id).task = Some(WeakRef::from(task));
     }
 
-    pub fn remove_task(&mut self, tid: tid_t) {
-        self.remove_item(tid, |entry| {
+    pub fn remove_task(&mut self, pid: pid_t) {
+        self.remove_item(pid, |entry| {
             let removed = entry.task.take();
             assert!(removed.is_some())
         });
@@ -151,7 +151,7 @@ impl PidTable {
     pub fn add_thread_group(&mut self, thread_group: &ThreadGroup) {
         let entry = self.get_entry_mut(thread_group.leader);
         assert!(entry.process.is_none());
-        entry.process = ProcessEntry::ThreadGroup(thread_group.weak_self.clone());
+        entry.process = ProcessEntry::ThreadGroup(thread_group.weak_thread_group.clone());
 
         // Notify thread group changes.
         if let Some(notifier) = &self.thread_group_notifier {

@@ -21,7 +21,7 @@ use starnix_uapi::{
     error, perf_event_attr, perf_event_read_format_PERF_FORMAT_GROUP,
     perf_event_read_format_PERF_FORMAT_ID, perf_event_read_format_PERF_FORMAT_LOST,
     perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED,
-    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING, tid_t, uapi,
+    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING, pid_t, uapi,
 };
 use zx::sys::zx_system_get_page_size;
 
@@ -73,7 +73,7 @@ struct PerfEventFileState {
 }
 
 struct PerfEventFile {
-    _tid: tid_t,
+    _pid: pid_t,
     _cpu: i32,
     perf_event_file: RwLock<PerfEventFileState>,
 }
@@ -306,20 +306,20 @@ pub fn sys_perf_event_open(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     attr: UserRef<perf_event_attr>,
-    tid: tid_t,
+    pid: pid_t,
     cpu: i32,
     group_fd: FdNumber,
     _flags: u64,
 ) -> Result<SyscallResult, Errno> {
-    if tid == -1 && cpu == -1 {
+    if pid == -1 && cpu == -1 {
         return error!(EINVAL);
     }
     if group_fd != FdNumber::from_raw(-1) {
         track_stub!(TODO("https://fxbug.dev/409619971"), "[perf_event_open] implement group_fd");
         return error!(ENOSYS);
     }
-    if tid > 0 {
-        track_stub!(TODO("https://fxbug.dev/409621963"), "[perf_event_open] implement tid > 0");
+    if pid > 0 {
+        track_stub!(TODO("https://fxbug.dev/409621963"), "[perf_event_open] implement pid > 0");
         return error!(ENOSYS);
     }
 
@@ -367,7 +367,7 @@ pub fn sys_perf_event_open(
     }
 
     let file = Box::new(PerfEventFile {
-        _tid: tid,
+        _pid: pid,
         _cpu: cpu,
         perf_event_file: RwLock::new(perf_event_file),
     });

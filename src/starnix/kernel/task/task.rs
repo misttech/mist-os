@@ -30,7 +30,7 @@ use starnix_uapi::signals::{sigaltstack_contains_pointer, SigSet, Signal};
 use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, tid_t, uapi, ucred,
+    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred,
     CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
@@ -374,7 +374,7 @@ impl From<uapi::arch32::robust_list_head> for RobustListHead {
 
 pub struct TaskMutableState {
     // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
-    pub clear_child_tid: UserRef<tid_t>,
+    pub clear_child_tid: UserRef<pid_t>,
 
     /// Signal handler related state. This is grouped together for when atomicity is needed during
     /// signal sending and delivery.
@@ -877,7 +877,7 @@ impl TaskStateCode {
 #[derive(Clone, Debug)]
 pub struct TaskPersistentInfoState {
     /// Immutable information about the task
-    tid: tid_t,
+    tid: pid_t,
     thread_group_key: ThreadGroupKey,
 
     /// The command of this task.
@@ -892,7 +892,7 @@ pub struct TaskPersistentInfoState {
 
 impl TaskPersistentInfoState {
     fn new(
-        tid: tid_t,
+        tid: pid_t,
         thread_group_key: ThreadGroupKey,
         command: CString,
         creds: Credentials,
@@ -901,7 +901,7 @@ impl TaskPersistentInfoState {
         Arc::new(Mutex::new(Self { tid, thread_group_key, command, creds, exit_signal }))
     }
 
-    pub fn tid(&self) -> tid_t {
+    pub fn tid(&self) -> pid_t {
         self.tid
     }
 
@@ -952,16 +952,12 @@ pub type TaskPersistentInfo = Arc<Mutex<TaskPersistentInfoState>>;
 /// See also `CurrentTask`, which represents the task corresponding to the thread that is currently
 /// executing.
 pub struct Task {
-    /// Weak reference to the `OwnedRef` of this `Task`. This allows to retrieve the
-    /// `TempRef` from a raw `Task`.
-    pub weak_self: WeakRef<Self>,
-
     /// A unique identifier for this task.
     ///
     /// This value can be read in userspace using `gettid(2)`. In general, this value
     /// is different from the value return by `getpid(2)`, which returns the `id` of the leader
     /// of the `thread_group`.
-    pub tid: tid_t,
+    pub id: pid_t,
 
     /// The process key of this task.
     pub thread_group_key: ThreadGroupKey,
@@ -1071,7 +1067,7 @@ impl Task {
 
     /// When the task exits, if there is a notification that needs to propagate
     /// to a ptracer, make sure it will propagate.
-    pub fn set_ptrace_zombie(&self, pids: &mut crate::task::PidTable) {
+    pub fn set_ptrace_zombie(&self, pids: &crate::task::PidTable) {
         let pgid = self.thread_group().read().process_group.leader;
         let mut state = self.write();
         state.set_stopped(StopState::ForceAwake, None, None, None);
@@ -1079,10 +1075,10 @@ impl Task {
             // Add a zombie that the ptracer will notice.
             ptrace.last_signal_waitable = true;
             let tracer_pid = ptrace.get_pid();
-            let tracer_tg = pids.get_thread_group(tracer_pid).map(TempRef::into_static);
-            if let Some(tracer_tg) = tracer_tg {
+            let weak_init = pids.get_task(tracer_pid);
+            if let Some(tracer_task) = weak_init.upgrade() {
                 drop(state);
-                let mut tracer_state = tracer_tg.write();
+                let mut tracer_state = tracer_task.thread_group().write();
 
                 let exit_status = self.exit_status().unwrap_or_else(|| {
                     starnix_logging::log_error!("Exiting without an exit code.");
@@ -1094,7 +1090,7 @@ impl Task {
                 };
                 let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
                 let zombie = ZombieProcess {
-                    pid: self.get_pid(),
+                    pid: self.id,
                     pgid,
                     uid,
                     exit_info: exit_info,
@@ -1103,7 +1099,7 @@ impl Task {
                     is_canonical: false,
                 };
 
-                tracer_state.zombie_ptracees.add(pids, self.tid, zombie);
+                tracer_state.zombie_ptracees.add(zombie);
             };
         }
     }
@@ -1115,9 +1111,9 @@ impl Task {
         if let Some(ptracer_pid) = ptracer_pid {
             let _ = state.set_ptrace(None);
             if let Some(ProcessEntryRef::Process(tg)) = pids.get_process(ptracer_pid) {
-                let tid = self.get_tid();
+                let pid = self.get_pid();
                 drop(state);
-                tg.ptracees.lock().remove(&tid);
+                tg.ptracees.lock().remove(&pid);
             }
         }
     }
@@ -1147,7 +1143,7 @@ impl Task {
     /// passed as parameters.
     #[allow(clippy::let_and_return)]
     pub fn new(
-        tid: tid_t,
+        id: pid_t,
         command: CString,
         thread_group: OwnedRef<ThreadGroup>,
         thread: Option<zx::Thread>,
@@ -1171,62 +1167,59 @@ impl Task {
         robust_list_head: RobustListHeadPtr,
         timerslack_ns: u64,
         security_state: security::TaskState,
-    ) -> OwnedRef<Self> {
+    ) -> Self {
         let thread_group_key = ThreadGroupKey::from(&thread_group);
-        OwnedRef::new_cyclic(|weak_self| {
-            let task = Task {
-                weak_self,
-                tid,
-                thread_group_key: thread_group_key.clone(),
-                kernel: Arc::clone(&thread_group.kernel),
-                thread_group: Some(thread_group),
-                thread: RwLock::new(thread.map(Arc::new)),
-                files,
-                mm,
-                fs: Some(RwLock::new(fs)),
-                abstract_socket_namespace,
-                abstract_vsock_namespace,
-                vfork_event,
-                stop_state: AtomicStopState::new(StopState::Awake),
-                flags: AtomicTaskFlags::new(TaskFlags::empty()),
-                mutable_state: RwLock::new(TaskMutableState {
-                    clear_child_tid: UserRef::default(),
-                    signals: SignalState::with_mask(signal_mask),
-                    kernel_signals,
-                    exit_status: None,
-                    scheduler_policy,
-                    uts_ns,
-                    no_new_privs,
-                    oom_score_adj: Default::default(),
-                    seccomp_filters,
-                    robust_list_head,
-                    timerslack_ns,
-                    // The default timerslack is set to the current timerslack of the creating thread.
-                    default_timerslack_ns: timerslack_ns,
-                    ptrace: None,
-                    captured_thread_state: None,
-                }),
-                persistent_info: TaskPersistentInfoState::new(
-                    tid,
-                    thread_group_key,
-                    command,
-                    creds,
-                    exit_signal,
-                ),
-                seccomp_filter_state,
-                trace_syscalls: AtomicBool::new(false),
-                proc_pid_directory_cache: Mutex::new(None),
-                security_state,
-            };
+        let task = Task {
+            id,
+            thread_group_key: thread_group_key.clone(),
+            kernel: Arc::clone(&thread_group.kernel),
+            thread_group: Some(thread_group),
+            thread: RwLock::new(thread.map(Arc::new)),
+            files,
+            mm,
+            fs: Some(RwLock::new(fs)),
+            abstract_socket_namespace,
+            abstract_vsock_namespace,
+            vfork_event,
+            stop_state: AtomicStopState::new(StopState::Awake),
+            flags: AtomicTaskFlags::new(TaskFlags::empty()),
+            mutable_state: RwLock::new(TaskMutableState {
+                clear_child_tid: UserRef::default(),
+                signals: SignalState::with_mask(signal_mask),
+                kernel_signals,
+                exit_status: None,
+                scheduler_policy,
+                uts_ns,
+                no_new_privs,
+                oom_score_adj: Default::default(),
+                seccomp_filters,
+                robust_list_head,
+                timerslack_ns,
+                // The default timerslack is set to the current timerslack of the creating thread.
+                default_timerslack_ns: timerslack_ns,
+                ptrace: None,
+                captured_thread_state: None,
+            }),
+            persistent_info: TaskPersistentInfoState::new(
+                id,
+                thread_group_key,
+                command,
+                creds,
+                exit_signal,
+            ),
+            seccomp_filter_state,
+            trace_syscalls: AtomicBool::new(false),
+            proc_pid_directory_cache: Mutex::new(None),
+            security_state,
+        };
 
-            #[cfg(any(test, debug_assertions))]
-            {
-                // Note that `Kernel::pids` is already locked by the caller of `Task::new()`.
-                let _l1 = task.read();
-                let _l2 = task.persistent_info.lock();
-            }
-            task
-        })
+        #[cfg(any(test, debug_assertions))]
+        {
+            // Note that `Kernel::pids` is already locked by the caller of `Task::new()`.
+            let _l1 = task.read();
+            let _l2 = task.persistent_info.lock();
+        }
+        task
     }
 
     state_accessor!(Task, mutable_state);
@@ -1334,7 +1327,7 @@ impl Task {
         let mut state = self.write();
         let user_tid = state.clear_child_tid;
         if !user_tid.is_null() {
-            let zero: tid_t = 0;
+            let zero: pid_t = 0;
             self.write_object(user_tid, &zero)?;
             self.kernel().shared_futexes.wake(
                 self,
@@ -1347,16 +1340,16 @@ impl Task {
         Ok(())
     }
 
-    pub fn get_task(&self, tid: tid_t) -> WeakRef<Task> {
-        self.kernel().pids.read().get_task(tid)
+    pub fn get_task(&self, pid: pid_t) -> WeakRef<Task> {
+        self.kernel().pids.read().get_task(pid)
     }
 
     pub fn get_pid(&self) -> pid_t {
         self.thread_group_key.pid()
     }
 
-    pub fn get_tid(&self) -> tid_t {
-        self.tid
+    pub fn get_tid(&self) -> pid_t {
+        self.id
     }
 
     pub fn is_leader(&self) -> bool {
@@ -1442,11 +1435,11 @@ impl Task {
                 0,
             );
             if let Some(notifier) = &self.thread_group().read().notifier {
-                let _ = notifier.send(MemoryAttributionLifecycleEvent::name_change(self.tid));
+                let _ = notifier.send(MemoryAttributionLifecycleEvent::name_change(self.id));
             }
         }
 
-        set_current_task_info(&name, self.thread_group().leader, self.tid);
+        set_current_task_info(&name, self.thread_group().leader, self.id);
 
         // Truncate to 16 bytes, including null byte.
         let bytes = name.to_bytes();
@@ -1611,7 +1604,7 @@ impl fmt::Debug for Task {
             f,
             "{}:{}[{}]",
             self.thread_group().leader,
-            self.tid,
+            self.id,
             self.persistent_info.lock().command.to_string_lossy()
         )
     }

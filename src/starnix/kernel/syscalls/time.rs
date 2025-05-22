@@ -22,10 +22,10 @@ use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::{MultiArchUserRef, UserRef};
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, tid_t, timespec, timezone, tms, uapi,
-    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
-    CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
-    CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
+    errno, error, from_status_like_fdio, pid_t, timespec, timezone, tms, uapi, CLOCK_BOOTTIME,
+    CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW,
+    CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE,
+    CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
 };
 use zx::{
     Task, {self as zx},
@@ -94,11 +94,11 @@ fn get_clock_gettime(current_task: &CurrentTask, which_clock: i32) -> Result<tim
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 profile_duration!("GetThreadCpuTime");
-                get_thread_cpu_time(current_task, current_task.tid)?
+                get_thread_cpu_time(current_task, current_task.id)?
             }
             CLOCK_PROCESS_CPUTIME_ID => {
                 profile_duration!("GetProcessCpuTime");
-                get_process_cpu_time(current_task, current_task.get_pid())?
+                get_process_cpu_time(current_task, current_task.id)?
             }
             _ => return error!(EINVAL),
         }
@@ -372,21 +372,26 @@ pub fn sys_nanosleep(
 /// Returns the cpu time for the task with the given `pid`.
 ///
 /// Returns EINVAL if no such task can be found.
-fn get_thread_cpu_time(current_task: &CurrentTask, tid: tid_t) -> Result<i64, Errno> {
-    let weak_task = current_task.get_task(tid);
+fn get_thread_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Errno> {
+    let weak_task = current_task.get_task(pid);
     let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
     Ok(task.thread_runtime_info()?.cpu_time)
 }
 
 /// Returns the cpu time for the process associated with the given `pid`. `pid`
 /// can be the `pid` for any task in the thread_group (so the caller can get the
-/// process cpu time for any `task` by simply using `task.get_pid()`).
+/// process cpu time for any `task` by simply using `task.pid`).
 ///
 /// Returns EINVAL if no such process can be found.
 fn get_process_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Errno> {
-    let pids = current_task.kernel().pids.read();
-    let tg = pids.get_thread_group(pid).ok_or_else(|| errno!(EINVAL))?;
-    Ok(tg.process.get_runtime_info().map_err(|status| from_status_like_fdio!(status))?.cpu_time)
+    let weak_task = current_task.get_task(pid);
+    let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
+    Ok(task
+        .thread_group()
+        .process
+        .get_runtime_info()
+        .map_err(|status| from_status_like_fdio!(status))?
+        .cpu_time)
 }
 
 /// Returns the type of cpu clock that `clock` encodes.

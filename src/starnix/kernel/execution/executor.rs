@@ -194,7 +194,7 @@ fn run_task(
     set_current_task_info(
         &current_task.task.command(),
         current_task.task.thread_group().leader,
-        current_task.tid,
+        current_task.id,
     );
 
     firehose_trace_duration!(CATEGORY_STARNIX, NAME_RUN_TASK);

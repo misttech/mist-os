@@ -92,7 +92,7 @@ impl ProcessGroup {
     {
         self.write(locked)
             .thread_groups
-            .insert(thread_group.leader, thread_group.weak_self.clone());
+            .insert(thread_group.leader, thread_group.weak_thread_group.clone());
     }
 
     /// Removes the thread group from the process group. Returns whether the process group is empty.

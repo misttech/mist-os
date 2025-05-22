@@ -26,7 +26,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
-    errno, error, robust_list_head, tid_t, uapi, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME,
+    errno, error, pid_t, robust_list_head, uapi, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME,
     FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_CMP_REQUEUE_PI, FUTEX_LOCK_PI, FUTEX_LOCK_PI2,
     FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_TRYLOCK_PI, FUTEX_UNLOCK_PI, FUTEX_WAIT,
     FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI, FUTEX_WAKE, FUTEX_WAKE_BITSET, FUTEX_WAKE_OP,
@@ -299,7 +299,7 @@ pub fn sys_brk(
 pub fn sys_process_vm_readv(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    tid: tid_t,
+    pid: pid_t,
     local_iov_addr: IOVecPtr,
     local_iov_count: UserValue<i32>,
     remote_iov_addr: IOVecPtr,
@@ -319,7 +319,7 @@ pub fn sys_process_vm_readv(
         return Ok(0);
     }
 
-    let weak_remote_task = current_task.get_task(tid);
+    let weak_remote_task = current_task.get_task(pid);
     let remote_task = Task::from_weak(&weak_remote_task)?;
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
@@ -327,8 +327,8 @@ pub fn sys_process_vm_readv(
     let local_iov = current_task.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = current_task.read_iovec(remote_iov_addr, remote_iov_count)?;
     log_trace!(
-        "process_vm_readv(tid={}, local_iov={:?}, remote_iov={:?})",
-        tid,
+        "process_vm_readv(pid={}, local_iov={:?}, remote_iov={:?})",
+        pid,
         local_iov,
         remote_iov
     );
@@ -350,7 +350,7 @@ pub fn sys_process_vm_readv(
 pub fn sys_process_vm_writev(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    tid: tid_t,
+    pid: pid_t,
     local_iov_addr: IOVecPtr,
     local_iov_count: UserValue<i32>,
     remote_iov_addr: IOVecPtr,
@@ -370,7 +370,7 @@ pub fn sys_process_vm_writev(
         return Ok(0);
     }
 
-    let weak_remote_task = current_task.get_task(tid);
+    let weak_remote_task = current_task.get_task(pid);
     let remote_task = Task::from_weak(&weak_remote_task)?;
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
@@ -378,8 +378,8 @@ pub fn sys_process_vm_writev(
     let local_iov = current_task.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = current_task.read_iovec(remote_iov_addr, remote_iov_count)?;
     log_trace!(
-        "sys_process_vm_writev(tid={}, local_iov={:?}, remote_iov={:?})",
-        tid,
+        "sys_process_vm_writev(pid={}, local_iov={:?}, remote_iov={:?})",
+        pid,
         local_iov,
         remote_iov
     );
@@ -652,20 +652,20 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
 pub fn sys_get_robust_list(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    tid: tid_t,
+    pid: pid_t,
     user_head_ptr: UserRef<UserAddress>,
     user_len_ptr: UserRef<usize>,
 ) -> Result<(), Errno> {
-    if tid < 0 {
+    if pid < 0 {
         return error!(EINVAL);
     }
     if user_head_ptr.is_null() || user_len_ptr.is_null() {
         return error!(EFAULT);
     }
-    if tid != 0 {
+    if pid != 0 {
         security::check_task_capable(current_task, CAP_SYS_PTRACE)?;
     }
-    let task = if tid == 0 { current_task.weak_task() } else { current_task.get_task(tid) };
+    let task = if pid == 0 { current_task.weak_task() } else { current_task.get_task(pid) };
     let task = Task::from_weak(&task)?;
     current_task.write_object(user_head_ptr, &task.read().robust_list_head.addr())?;
     current_task.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;

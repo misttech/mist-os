@@ -17,8 +17,6 @@ use linux_uapi as uapi;
 pub use uapi::*;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-pub type tid_t = pid_t;
-
 pub use uapi::__SIGRTMIN as SIGRTMIN;
 
 pub const SIG_DFL: uaddr = uaddr { addr: 0 };

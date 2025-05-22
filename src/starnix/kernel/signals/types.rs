@@ -11,9 +11,9 @@ use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS
 use starnix_uapi::union::struct_with_union_into_bytes;
 use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef, UserAddress};
 use starnix_uapi::{
-    c_int, c_uint, errno, error, pid_t, sigaction_t, sigaltstack, sigevent, sigval_t, tid_t, uaddr,
-    uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN,
-    SI_KERNEL, SI_MAX_SIZE,
+    c_int, c_uint, errno, error, pid_t, sigaction_t, sigaltstack, sigevent, sigval_t, uaddr, uapi,
+    uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
+    SI_MAX_SIZE,
 };
 use static_assertions::const_assert;
 use std::cmp::Ordering;
@@ -662,7 +662,7 @@ pub enum SignalEventNotify {
     /// a new thread.
     Thread { function: UserAddress, attribute: UserAddress },
     /// Similar to `SignalNotify::Signal`, but the signal is targeted at the thread ID.
-    ThreadId(tid_t),
+    ThreadId(pid_t),
 }
 
 impl From<SignalEventNotify> for i32 {

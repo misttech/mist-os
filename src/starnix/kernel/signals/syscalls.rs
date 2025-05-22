@@ -16,13 +16,13 @@ use crate::task::{
 };
 use crate::vfs::{FdFlags, FdNumber};
 use starnix_sync::RwLockReadGuard;
+use starnix_uapi::uapi;
 use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
-use starnix_uapi::{tid_t, uapi};
 
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
-use starnix_types::ownership::{OwnedRef, TempRef};
+use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_types::time::{duration_from_timespec, timeval_from_duration};
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT};
 use starnix_uapi::open_flags::OpenFlags;
@@ -491,7 +491,7 @@ fn verify_tgid_for_task(
 pub fn sys_tkill(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    tid: tid_t,
+    tid: pid_t,
     unchecked_signal: UncheckedSignal,
 ) -> Result<(), Errno> {
     // Linux returns EINVAL when the tgid or tid <= 0.
@@ -507,7 +507,7 @@ pub fn sys_tgkill(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     tgid: pid_t,
-    tid: tid_t,
+    tid: pid_t,
     unchecked_signal: UncheckedSignal,
 ) -> Result<(), Errno> {
     // Linux returns EINVAL when the tgid or tid <= 0.
@@ -566,7 +566,7 @@ pub fn sys_rt_tgsigqueueinfo(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     tgid: pid_t,
-    tid: tid_t,
+    tid: pid_t,
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
@@ -656,6 +656,9 @@ pub struct WaitingOptions {
     pub wait_for_all: bool,
     /// Wait for children who deliver no signal or a signal other than SIGCHLD, ignored if wait_for_all is true
     pub wait_for_clone: bool,
+    /// If present, and the target is ptraced by the waiter, wait for processes
+    /// to do anything.
+    pub waiter: Option<pid_t>,
 }
 
 impl WaitingOptions {
@@ -669,6 +672,7 @@ impl WaitingOptions {
             keep_waitable_state: options & WNOWAIT > 0,
             wait_for_all: options & __WALL > 0,
             wait_for_clone: options & __WCLONE > 0,
+            waiter: None,
         }
     }
 
@@ -686,12 +690,14 @@ impl WaitingOptions {
     }
 
     /// Build a `WaitingOptions` from the waiting flags of wait4.
-    pub fn new_for_wait4(options: u32) -> Result<Self, Errno> {
+    pub fn new_for_wait4(options: u32, waiter_pid: pid_t) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WUNTRACED | WCONTINUED) != 0 {
             track_stub!(TODO("https://fxbug.dev/322874017"), "wait4 options", options);
             return error!(EINVAL);
         }
-        Ok(Self::new(options | WEXITED))
+        let mut result = Self::new(options | WEXITED);
+        result.waiter = Some(waiter_pid);
+        Ok(result)
     }
 }
 
@@ -733,19 +739,19 @@ fn wait_on_pid(
                 current_task.thread_group().get_ptracees_and(
                     selector,
                     &pids,
-                    &mut |task: &Task, task_state: &TaskMutableState| {
+                    &mut |task: WeakRef<Task>, task_state: &TaskMutableState| {
                         if let Some(ptrace) = &task_state.ptrace {
                             has_any_tracee = true;
                             ptrace.tracer_waiters().wait_async(&waiter);
-                            if ptrace.is_waitable(task.load_stopped(), options) {
-                                has_waitable_tracee = true;
+                            if let Some(task_ref) = task.upgrade() {
+                                if ptrace.is_waitable(task_ref.load_stopped(), options) {
+                                    has_waitable_tracee = true;
+                                }
                             }
                         }
                     },
                 );
-                if has_waitable_tracee
-                    || thread_group.zombie_ptracees.has_zombie_matching(&selector)
-                {
+                if has_waitable_tracee || thread_group.zombie_ptracees.has_match(&selector, &pids) {
                     continue;
                 }
                 match thread_group.get_waitable_child(selector, options, &mut pids) {
@@ -845,7 +851,7 @@ pub fn sys_wait4(
     options: u32,
     user_rusage: RUsagePtr,
 ) -> Result<pid_t, Errno> {
-    let waiting_options = WaitingOptions::new_for_wait4(options)?;
+    let waiting_options = WaitingOptions::new_for_wait4(options, current_task.get_pid())?;
 
     let selector = if raw_selector == 0 {
         ProcessSelector::Pgid(current_task.thread_group().read().process_group.leader)
@@ -1550,7 +1556,7 @@ mod tests {
     async fn test_kill_same_task() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        assert_eq!(sys_kill(&mut locked, &current_task, current_task.tid, SIGINT.into()), Ok(()));
+        assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGINT.into()), Ok(()));
     }
 
     /// A task should be able to signal its own thread group.
@@ -1575,7 +1581,7 @@ mod tests {
         task1.thread_group().setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
-        assert_eq!(sys_kill(&mut locked, &task1, -task1.tid, SIGINT.into()), Ok(()));
+        assert_eq!(sys_kill(&mut locked, &task1, -task1.id, SIGINT.into()), Ok(()));
         assert_eq!(task1.read().queued_signal_count(SIGINT), 1);
         assert_eq!(task2.read().queued_signal_count(SIGINT), 1);
         assert_eq!(init_task.read().queued_signal_count(SIGINT), 0);
@@ -1613,7 +1619,7 @@ mod tests {
         task2.set_creds(Credentials::with_ids(2, 2));
 
         assert!(task1.can_signal(&task2, SIGINT.into()).is_err());
-        assert_eq!(sys_kill(&mut locked, &task2, task1.tid, SIGINT.into()), error!(EPERM));
+        assert_eq!(sys_kill(&mut locked, &task2, task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
 
@@ -1628,7 +1634,7 @@ mod tests {
         task2.set_creds(Credentials::with_ids(2, 2));
 
         assert!(task2.can_signal(&task1, SIGINT.into()).is_err());
-        assert_eq!(sys_kill(&mut locked, &task2, -task1.tid, SIGINT.into()), error!(EPERM));
+        assert_eq!(sys_kill(&mut locked, &task2, -task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
 
@@ -1638,7 +1644,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         assert_eq!(
-            sys_kill(&mut locked, &current_task, current_task.tid, UncheckedSignal::from(75)),
+            sys_kill(&mut locked, &current_task, current_task.id, UncheckedSignal::from(75)),
             error!(EINVAL)
         );
     }
@@ -1667,11 +1673,11 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(sys_kill(&mut locked, &current_task, current_task.tid, SIGIO.into()), Ok(()));
+        assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGIO.into()), Ok(()));
         assert_eq!(current_task.read().queued_signal_count(SIGIO), 1);
 
         // A second signal should not increment the number of pending signals.
-        assert_eq!(sys_kill(&mut locked, &current_task, current_task.tid, SIGIO.into()), Ok(()));
+        assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGIO.into()), Ok(()));
         assert_eq!(current_task.read().queued_signal_count(SIGIO), 1);
     }
 
@@ -1699,11 +1705,11 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(sys_kill(&mut locked, &current_task, current_task.tid, SIGRTMIN.into()), Ok(()));
+        assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
         assert_eq!(current_task.read().queued_signal_count(starnix_uapi::signals::SIGRTMIN), 1);
 
         // A second signal should increment the number of pending signals.
-        assert_eq!(sys_kill(&mut locked, &current_task, current_task.tid, SIGRTMIN.into()), Ok(()));
+        assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
         assert_eq!(current_task.read().queued_signal_count(starnix_uapi::signals::SIGRTMIN), 2);
     }
 
@@ -1725,7 +1731,7 @@ mod tests {
 
             // Signal the suspended task with a signal that is not blocked (only SIGHUP in this test).
             let _ =
-                sys_kill(locked, current_task, init_task_temp.tid, UncheckedSignal::from(SIGHUP));
+                sys_kill(locked, current_task, init_task_temp.id, UncheckedSignal::from(SIGHUP));
 
             // Wait for the sigsuspend to complete.
             rx.recv().expect("receive");
@@ -1835,7 +1841,7 @@ mod tests {
                 &mut locked,
                 &current_task,
                 &ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(0).expect("WaitingOptions")
+                &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             error!(ECHILD)
         );
@@ -1846,7 +1852,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let expected_result = WaitResult {
-            pid: child.tid,
+            pid: child.id,
             uid: 0,
             exit_info: ProcessExitInfo { status: ExitStatus::Exit(1), exit_signal: Some(SIGCHLD) },
             time_stats: Default::default(),
@@ -1859,7 +1865,7 @@ mod tests {
                 &mut locked,
                 &current_task,
                 &ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(0).expect("WaitingOptions")
+                &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
             ),
             Ok(Some(expected_result))
         );
@@ -1879,7 +1885,7 @@ mod tests {
                 &mut locked,
                 &task,
                 &ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(WNOHANG).expect("WaitingOptions")
+                &WaitingOptions::new_for_wait4(WNOHANG, 0).expect("WaitingOptions")
             ),
             Ok(None)
         );
@@ -1896,7 +1902,7 @@ mod tests {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
                 child.thread_group().exit(&mut locked, ExitStatus::Exit(0), None);
-                child.tid
+                child.id
             }
         });
 
@@ -1905,7 +1911,7 @@ mod tests {
             &mut locked,
             &task,
             &ProcessSelector::Any,
-            &WaitingOptions::new_for_wait4(0).expect("WaitingOptions"),
+            &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
         )
         .expect("wait_on_pid")
         .unwrap();
@@ -1936,7 +1942,7 @@ mod tests {
             &mut locked,
             &task,
             &ProcessSelector::Any,
-            &WaitingOptions::new_for_wait4(0).expect("WaitingOptions"),
+            &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
         )
         .expect_err("wait_on_pid");
         assert_eq!(errno, ERESTARTSYS);
@@ -2001,12 +2007,12 @@ mod tests {
     async fn test_wait4_by_pgid() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let child1_pid = child1.tid;
+        let child1_pid = child1.id;
         child1.thread_group().exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         child2.thread_group().setsid(&mut locked).expect("setsid");
-        let child2_pid = child2.tid;
+        let child2_pid = child2.id;
         child2.thread_group().exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
@@ -2038,12 +2044,12 @@ mod tests {
     async fn test_waitid_by_pgid() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let child1_pid = child1.tid;
+        let child1_pid = child1.id;
         child1.thread_group().exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         child2.thread_group().setsid(&mut locked).expect("setsid");
-        let child2_pid = child2.tid;
+        let child2_pid = child2.id;
         child2.thread_group().exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
