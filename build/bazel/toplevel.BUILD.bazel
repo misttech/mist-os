@@ -106,7 +106,6 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-### FUCHSIA_SDK_CUTOFF
 load(
     "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_devicetree_toolchain_info",

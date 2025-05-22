@@ -120,10 +120,6 @@ build --@rules_rust//rust/settings:clippy_flag=-Wclippy::all
 common --enable_bzlmod=true
 common --enable_workspace=true
 
-### FUCHSIA_SDK_CUTOFF
-# The line above and anything that follows will be removed from
-# the .bazelrc file used by the --config=no_sdk.
-
 # Pass local developer overrides for assembly to Bazel
 # For now, this needs to set the label_flag() in both @rules_fuchsia
 # and @fuchsia_sdk to ensure that all fuchsia_product() definitions

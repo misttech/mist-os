@@ -18,7 +18,7 @@ fi
 
 # shellcheck source=/dev/null
 source "${FUCHSIA_DIR}/tools/devshell/lib/bazel_utils.sh" || exit $?
-fx-update-bazel-workspace "fuchsia"
+fx-update-bazel-workspace
 
 "${PREBUILT_PYTHON3}" "${FUCHSIA_DIR}"/build/bazel/scripts/update_bazel_vendor_dir.py \
     --workspace="$(fx-get-bazel-workspace)" \

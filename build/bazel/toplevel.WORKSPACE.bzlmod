@@ -242,12 +242,6 @@ compact_python_runtime_repository(
 
 register_toolchains("@prebuilt_python//:py_toolchain")
 
-### FUCHSIA_SDK_CUTOFF ====================================================================
-# Everything after the line above is omitted from WORKSPACE.no_sdk.bazel, which is used
-# as a symlink destination for WORKSPACE.bazel when running `fx bazel-no-sdk`. This
-# prevents any repository related to GN artifacts (@gn_targets) or the Fuchsia IDK/SDK
-# (e.g. @fuchsia_sdk but also @fuchsia_clang) from being visible.
-
 # fuchsia_build_generated/gn_target_dir is a symlink to the content
 # of the @gn_targets repository. At `fx gen` time, it will point to
 # an empty repository, but bazel_action.py will update it just before
