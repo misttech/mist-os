@@ -660,19 +660,24 @@ impl<SM: SessionManager> SessionHelper<SM> {
                             .checked_mul(self.block_size as u64)
                             .ok_or(zx::Status::OUT_OF_RANGE)?,
                     },
-                    BlockOpcode::Write => Operation::Write {
-                        device_block_offset: request.dev_offset,
-                        block_count: request.length,
-                        options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
-                            WriteOptions::FORCE_ACCESS
-                        } else {
-                            WriteOptions::empty()
-                        },
-                        vmo_offset: request
-                            .vmo_offset
-                            .checked_mul(self.block_size as u64)
-                            .ok_or(zx::Status::OUT_OF_RANGE)?,
-                    },
+                    BlockOpcode::Write => {
+                        let mut options = WriteOptions::empty();
+                        if flags.contains(BlockIoFlag::FORCE_ACCESS) {
+                            options |= WriteOptions::FORCE_ACCESS;
+                        }
+                        if flags.contains(BlockIoFlag::PRE_BARRIER) {
+                            options |= WriteOptions::PRE_BARRIER;
+                        }
+                        Operation::Write {
+                            device_block_offset: request.dev_offset,
+                            block_count: request.length,
+                            options: options,
+                            vmo_offset: request
+                                .vmo_offset
+                                .checked_mul(self.block_size as u64)
+                                .ok_or(zx::Status::OUT_OF_RANGE)?,
+                        }
+                    }
                     BlockOpcode::Flush => Operation::Flush,
                     BlockOpcode::Trim => Operation::Trim {
                         device_block_offset: request.dev_offset,
@@ -972,12 +977,16 @@ impl Operation {
                         block_count: _,
                         vmo_offset,
                         options,
-                    } => Operation::Write {
-                        device_block_offset: *device_block_offset + max,
-                        block_count: rem,
-                        vmo_offset: *vmo_offset + max * block_size as u64,
-                        options: *options,
-                    },
+                    } => {
+                        // Only send the barrier flag once per write request.
+                        let options = *options & !WriteOptions::PRE_BARRIER;
+                        Operation::Write {
+                            device_block_offset: *device_block_offset + max,
+                            block_count: rem,
+                            vmo_offset: *vmo_offset + max * block_size as u64,
+                            options,
+                        }
+                    }
                     Operation::Trim { device_block_offset, block_count: _ } => Operation::Trim {
                         device_block_offset: *device_block_offset,
                         block_count: rem,

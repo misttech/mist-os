@@ -338,6 +338,18 @@ impl<I: Interface + ?Sized> Session<I> {
                                 .map(|(_, response)| response),
                         );
                     }
+                    // TODO(https://fxbug.dev/419117983): Add barrier support
+                    Ok(DecodedRequest {
+                        operation: Operation::Write { options, .. },
+                        request_id,
+                        ..
+                    }) if options.contains(WriteOptions::PRE_BARRIER) => {
+                        responses.extend(
+                            active_requests
+                                .complete_and_take_response(request_id, zx::Status::NOT_SUPPORTED)
+                                .map(|(_, response)| response),
+                        );
+                    }
                     Ok(request) => {
                         if map_future.is_terminated() {
                             map_future.set(self.map_request(request).fuse());

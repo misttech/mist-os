@@ -155,6 +155,14 @@ type BlockCommand = struct {
         /// it should not complete until the data is written to the non-volatile
         /// medium (write), and that reads should bypass any on-device caches.
         FORCE_ACCESS = 0x00000004;
+
+        /// Allows for delayed in-order flushing of cached data. Ensures that no request executed
+        /// before the barrier will be re-ordered to execute after the barrier. Barriers do not
+        /// guarantee ordering of in-flight requests (i.e. if a request is made prior to a barrier
+        /// but is not completed before the barrier, the request could be reordered to execute
+        /// after the barrier). The barrier will be applied before the request it was sent with.
+        /// Note that between two barriers, the device is free to execute requests in any order.
+        PRE_BARRIER = 0x00000008;
     };
 };
 

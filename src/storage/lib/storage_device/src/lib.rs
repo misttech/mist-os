@@ -68,6 +68,9 @@ pub trait Device: Send + Sync {
     /// Flush the device.
     async fn flush(&self) -> Result<(), Error>;
 
+    /// Attach a barrier to the next write made to the device.
+    fn barrier(&self);
+
     /// Reopens the device, making it usable again. (Only implemented for testing devices.)
     fn reopen(&self, _read_only: bool) {
         unreachable!();

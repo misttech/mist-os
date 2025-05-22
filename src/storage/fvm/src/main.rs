@@ -1491,6 +1491,10 @@ impl Interface for PartitionInterface {
             "write {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
             self.partition_index
         );
+        // Punting barrier support on the FVM.
+        if options.contains(WriteOptions::PRE_BARRIER) {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
         let device = &self.fvm.device;
         if let Some(key) = &self.key {
             let device_block_offset = device_block_offset

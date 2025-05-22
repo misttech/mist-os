@@ -19,10 +19,17 @@ pub enum Op {
     Flush,
 }
 
+#[derive(Debug, Default, Clone)]
+struct Inner {
+    data: Vec<u8>,
+    blocks_written_since_last_barrier: Vec<usize>,
+    attach_barrier: bool,
+}
+
 /// A Device backed by a memory buffer.
 pub struct FakeDevice {
     allocator: BufferAllocator,
-    data: Mutex<(/* data: */ Vec<u8>, /* blocks_written_since_last_flush: */ Vec<usize>)>,
+    inner: Mutex<Inner>,
     closed: AtomicBool,
     operation_closure: Box<dyn Fn(Op) -> Result<(), Error> + Send + Sync>,
     read_only: AtomicBool,
@@ -37,10 +44,11 @@ impl FakeDevice {
             BufferAllocator::new(block_size as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Self {
             allocator,
-            data: Mutex::new((
-                vec![0 as u8; block_count as usize * block_size as usize],
-                Vec::new(),
-            )),
+            inner: Mutex::new(Inner {
+                data: vec![0 as u8; block_count as usize * block_size as usize],
+                blocks_written_since_last_barrier: Vec::new(),
+                attach_barrier: false,
+            }),
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
@@ -69,7 +77,11 @@ impl FakeDevice {
         reader.read_to_end(&mut data)?;
         Ok(Self {
             allocator,
-            data: Mutex::new((data, Vec::new())),
+            inner: Mutex::new(Inner {
+                data: data,
+                blocks_written_since_last_barrier: Vec::new(),
+                attach_barrier: false,
+            }),
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_| Ok(())),
             read_only: AtomicBool::new(false),
@@ -90,7 +102,7 @@ impl Device for FakeDevice {
     }
 
     fn block_count(&self) -> u64 {
-        self.data.lock().0.len() as u64 / self.block_size() as u64
+        self.inner.lock().data.len() as u64 / self.block_size() as u64
     }
 
     async fn read(&self, offset: u64, mut buffer: MutableBufferRef<'_>) -> Result<(), Error> {
@@ -98,16 +110,16 @@ impl Device for FakeDevice {
         (self.operation_closure)(Op::Read)?;
         let offset = offset as usize;
         assert_eq!(offset % self.allocator.block_size(), 0);
-        let data = self.data.lock();
+        let inner = self.inner.lock();
         let size = buffer.len();
         assert!(
-            offset + size <= data.0.len(),
+            offset + size <= inner.data.len(),
             "offset: {} len: {} data.len: {}",
             offset,
             size,
-            data.0.len()
+            inner.data.len()
         );
-        buffer.as_mut_slice().copy_from_slice(&data.0[offset..offset + size]);
+        buffer.as_mut_slice().copy_from_slice(&inner.data[offset..offset + size]);
         Ok(())
     }
 
@@ -119,22 +131,29 @@ impl Device for FakeDevice {
     ) -> Result<(), Error> {
         ensure!(!self.closed.load(Ordering::Relaxed));
         ensure!(!self.read_only.load(Ordering::Relaxed));
+        let mut inner = self.inner.lock();
+
+        if inner.attach_barrier {
+            inner.blocks_written_since_last_barrier.clear();
+            inner.attach_barrier = false;
+        }
+
         (self.operation_closure)(Op::Write)?;
         let offset = offset as usize;
         assert_eq!(offset % self.allocator.block_size(), 0);
-        let mut data = self.data.lock();
+
         let size = buffer.len();
         assert!(
-            offset + size <= data.0.len(),
+            offset + size <= inner.data.len(),
             "offset: {} len: {} data.len: {}",
             offset,
             size,
-            data.0.len()
+            inner.data.len()
         );
-        data.0[offset..offset + size].copy_from_slice(buffer.as_slice());
+        inner.data[offset..offset + size].copy_from_slice(buffer.as_slice());
         let first_block = offset / self.allocator.block_size();
         for block in first_block..first_block + size / self.allocator.block_size() {
-            data.1.push(block)
+            inner.blocks_written_since_last_barrier.push(block)
         }
         Ok(())
     }
@@ -145,8 +164,8 @@ impl Device for FakeDevice {
         assert_eq!(range.start % self.block_size() as u64, 0);
         assert_eq!(range.end % self.block_size() as u64, 0);
         // Blast over the range to simulate it being used for something else.
-        let mut data = self.data.lock();
-        data.0[range.start as usize..range.end as usize].fill(0xab);
+        let mut inner = self.inner.lock();
+        inner.data[range.start as usize..range.end as usize].fill(0xab);
         Ok(())
     }
 
@@ -156,8 +175,12 @@ impl Device for FakeDevice {
     }
 
     async fn flush(&self) -> Result<(), Error> {
-        self.data.lock().1.clear();
+        self.inner.lock().blocks_written_since_last_barrier.clear();
         (self.operation_closure)(Op::Flush)
+    }
+
+    fn barrier(&self) {
+        self.inner.lock().attach_barrier = true;
     }
 
     fn reopen(&self, read_only: bool) {
@@ -178,7 +201,7 @@ impl Device for FakeDevice {
             BufferAllocator::new(self.block_size() as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Ok(DeviceHolder::new(Self {
             allocator,
-            data: Mutex::new(self.data.lock().clone()),
+            inner: Mutex::new(self.inner.lock().clone()),
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
@@ -189,11 +212,11 @@ impl Device for FakeDevice {
     fn discard_random_since_last_flush(&self) -> Result<(), Error> {
         let bs = self.allocator.block_size();
         let mut rng = rand::thread_rng();
-        let mut guard = self.data.lock();
-        let (ref mut data, ref mut blocks_written) = &mut *guard;
-        log::info!("Discarding from {blocks_written:?}");
+        let mut guard = self.inner.lock();
+        let Inner { ref mut data, ref mut blocks_written_since_last_barrier, .. } = &mut *guard;
+        log::info!("Discarding from {blocks_written_since_last_barrier:?}");
         let mut discarded = Vec::new();
-        for block in blocks_written.drain(..) {
+        for block in blocks_written_since_last_barrier.drain(..) {
             if rng.gen() {
                 data[block * bs..(block + 1) * bs].fill(0xaf);
                 discarded.push(block);
@@ -215,6 +238,81 @@ impl Drop for FakeDevice {
     fn drop(&mut self) {
         if self.poisoned.load(Ordering::Relaxed) {
             panic!("This device was poisoned to crash whomever is holding a reference here.");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FakeDevice;
+    use crate::Device;
+    use block_protocol::WriteOptions;
+    use rand::{thread_rng, Rng};
+
+    const TEST_DEVICE_BLOCK_SIZE: usize = 512;
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_discard_random_with_barriers() {
+        let device = FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE as u32);
+        // Loop 100 times to catch errors.
+        for _ in 0..1000 {
+            let mut data = vec![0; 7 * TEST_DEVICE_BLOCK_SIZE];
+            thread_rng().fill(&mut data[..]);
+            // Ensure that barriers work with overwrites.
+            let indices = [1, 2, 3, 4, 3, 5, 6];
+            for i in 0..indices.len() {
+                let mut buffer = device.allocate_buffer(TEST_DEVICE_BLOCK_SIZE).await;
+                if i == 2 || i == 5 {
+                    buffer.as_mut_slice().copy_from_slice(
+                        &data[indices[i] * TEST_DEVICE_BLOCK_SIZE
+                            ..indices[i] * TEST_DEVICE_BLOCK_SIZE + TEST_DEVICE_BLOCK_SIZE],
+                    );
+                    device.barrier();
+                    device
+                        .write(i as u64 * TEST_DEVICE_BLOCK_SIZE as u64, buffer.as_ref())
+                        .await
+                        .expect("Failed to write to FakeDevice");
+                } else {
+                    buffer.as_mut_slice().copy_from_slice(
+                        &data[indices[i] * TEST_DEVICE_BLOCK_SIZE
+                            ..indices[i] * TEST_DEVICE_BLOCK_SIZE + TEST_DEVICE_BLOCK_SIZE],
+                    );
+                    device
+                        .write_with_opts(
+                            i as u64 * TEST_DEVICE_BLOCK_SIZE as u64,
+                            buffer.as_ref(),
+                            WriteOptions::empty(),
+                        )
+                        .await
+                        .expect("Failed to write to FakeDevice");
+                }
+            }
+            device.discard_random_since_last_flush().expect("failed to randomly discard writes");
+            let mut discard = false;
+            let mut discard_2 = false;
+            for i in 0..7 {
+                let mut read_buffer = device.allocate_buffer(TEST_DEVICE_BLOCK_SIZE).await;
+                device
+                    .read(i as u64 * TEST_DEVICE_BLOCK_SIZE as u64, read_buffer.as_mut())
+                    .await
+                    .expect("failed to read from FakeDevice");
+                let expected_data = &data[indices[i] * TEST_DEVICE_BLOCK_SIZE
+                    ..indices[i] * TEST_DEVICE_BLOCK_SIZE + TEST_DEVICE_BLOCK_SIZE];
+                if i < 2 {
+                    if expected_data != read_buffer.as_slice() {
+                        discard = true;
+                    }
+                } else if i < 5 {
+                    if discard == true {
+                        assert_ne!(expected_data, read_buffer.as_slice());
+                        discard_2 = true;
+                    } else if expected_data != read_buffer.as_slice() {
+                        discard_2 = true;
+                    }
+                } else if discard_2 == true {
+                    assert_ne!(expected_data, read_buffer.as_slice());
+                }
+            }
         }
     }
 }

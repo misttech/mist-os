@@ -14,5 +14,6 @@ bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct WriteOptions: u32 {
         const FORCE_ACCESS = 1;
+        const PRE_BARRIER = 2;
     }
 }

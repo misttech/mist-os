@@ -126,6 +126,9 @@ struct FifoState {
 
     // The waker for the FifoPoller.
     poller_waker: Option<Waker>,
+
+    // If set, attach a barrier to the next write request
+    attach_barrier: bool,
 }
 
 impl FifoState {
@@ -331,6 +334,12 @@ pub trait BlockClient: Send + Sync {
         trace_flow_id: u64,
     ) -> Result<(), zx::Status>;
 
+    /// Attaches a barrier to the next write sent to the underlying block device. This barrier
+    /// method is an alternative to setting the WriteOption::PRE_BARRIER on `write_at_with_opts`.
+    /// This method makes it easier to guarantee that the barrier is attached to the correct
+    /// write operation when subsequent write operations can get reordered.
+    fn barrier(&self);
+
     async fn flush(&self) -> Result<(), zx::Status> {
         self.flush_traced(NO_TRACE_ID).await
     }
@@ -404,6 +413,16 @@ impl Common {
         async move {
             let (request_id, trace_flow_id) = {
                 let mut state = self.fifo_state.lock();
+
+                let mut flags = BlockIoFlag::from_bits_retain(request.command.flags);
+                if BlockOpcode::from_primitive(request.command.opcode) == Some(BlockOpcode::Write)
+                    && state.attach_barrier
+                {
+                    flags |= BlockIoFlag::PRE_BARRIER;
+                    request.command.flags = flags.bits();
+                    state.attach_barrier = false;
+                }
+
                 if state.fifo.is_none() {
                     // Fifo has been closed.
                     return Err(zx::Status::CANCELED);
@@ -517,17 +536,22 @@ impl Common {
         opts: WriteOptions,
         trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
-        let flags = if opts.contains(WriteOptions::FORCE_ACCESS) {
-            BlockIoFlag::FORCE_ACCESS.bits()
-        } else {
-            0
-        };
+        let mut flags = BlockIoFlag::empty();
+
+        if opts.contains(WriteOptions::FORCE_ACCESS) {
+            flags |= BlockIoFlag::FORCE_ACCESS;
+        }
+
+        if opts.contains(WriteOptions::PRE_BARRIER) {
+            flags |= BlockIoFlag::PRE_BARRIER;
+        }
+
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Write.into_primitive(),
-                        flags,
+                        flags: flags.bits(),
                         ..Default::default()
                     },
                     vmoid: vmo_id.id(),
@@ -552,7 +576,7 @@ impl Common {
                     self.send(BlockFifoRequest {
                         command: BlockFifoCommand {
                             opcode: BlockOpcode::Write.into_primitive(),
-                            flags,
+                            flags: flags.bits(),
                             ..Default::default()
                         },
                         vmoid: self.temp_vmo_id.id(),
@@ -604,6 +628,10 @@ impl Common {
             ..Default::default()
         })
         .await
+    }
+
+    fn barrier(&self) {
+        self.fifo_state.lock().attach_barrier = true;
     }
 
     fn block_size(&self) -> u32 {
@@ -746,6 +774,10 @@ impl BlockClient for RemoteBlockClient {
 
     async fn flush_traced(&self, trace_flow_id: u64) -> Result<(), zx::Status> {
         self.common.flush(trace_flow_id).await
+    }
+
+    fn barrier(&self) {
+        self.common.barrier()
     }
 
     async fn close(&self) -> Result<(), zx::Status> {

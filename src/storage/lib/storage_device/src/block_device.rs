@@ -115,6 +115,10 @@ impl Device for BlockDevice {
         Ok(self.remote.flush().await?)
     }
 
+    fn barrier(&self) {
+        self.remote.barrier()
+    }
+
     fn is_read_only(&self) -> bool {
         self.read_only
     }
