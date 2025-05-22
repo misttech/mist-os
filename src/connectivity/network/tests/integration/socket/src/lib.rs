@@ -3946,7 +3946,7 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         let (eth, ip, tcp) = frames.next().await.unwrap();
         assert!(tcp.syn_set());
 
-        // Send a SYN/ACK in response and wait for the ACK response.
+        // Send a SYN/ACK in response.
         let ethernet_builder = EthernetFrameBuilder::new(
             eth.dst_mac(),
             eth.src_mac(),
@@ -3976,7 +3976,15 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
             .expect("serialize SYN/ACK")
             .unwrap_b();
         fake_ep.write(frame.as_ref()).await.expect("write SYN/ACK");
-        let _ack = frames.next().await.unwrap();
+
+        // Wait for the ACK response, skipping any other packets (such as
+        // retransmitted SYNs).
+        loop {
+            let (_eth, _ip, tcp) = frames.next().await.unwrap();
+            if tcp.ack_num().is_some() {
+                break;
+            }
+        }
 
         // Now that the connection is established, respond to the next packet with an
         // ICMP error to cause a soft error on the connection.
