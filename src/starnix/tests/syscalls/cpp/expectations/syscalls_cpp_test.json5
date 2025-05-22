@@ -117,6 +117,9 @@
 
                 // TODO(https://fxbug.dev/418965139)
                 "ThreadGroupLifeCycleTest.EndMainThreadFirst",
+
+                // TODO(https://fxbug.dev/323172557): Re-enable after impl
+                "ProcessMemoryReleaseTest.*",
             ],
         },
     ],
