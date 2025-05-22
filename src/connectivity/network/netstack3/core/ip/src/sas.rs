@@ -49,9 +49,20 @@ where
         device_id: &Self::DeviceId,
         _remote: Option<SpecifiedAddr<Ipv4Addr>>,
     ) -> Option<CC::AddressId> {
-        // TODO(https://fxbug.dev/42077260) Consider whether the address is
-        // assigned.
-        self.with_address_ids(device_id, |mut addrs, _core_ctx| addrs.next())
+        self.with_address_ids(device_id, |addrs, core_ctx| {
+            // Tentative addresses are not considered available to the source
+            // selection algorithm.
+            addrs
+                .filter(|addr_id| {
+                    core_ctx.with_ip_address_data(
+                        device_id,
+                        addr_id,
+                        |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| *assigned,
+                    )
+                })
+                // Use the first viable candidate.
+                .next()
+        })
     }
 }
 
