@@ -34,7 +34,6 @@ fuchsia_board_configuration(
     },
     provided_features = [
         "fuchsia::bus_pci",
-        "fuchsia::driver_framework_v2_support",
         "fuchsia::paravirtualization",
         "fuchsia::pmm_checker_auto",
     ],
@@ -64,7 +63,6 @@ fuchsia_board_configuration(
     },
     provided_features = [
         "fuchsia::bus_pci",
-        "fuchsia::driver_framework_v2_support",
         "fuchsia::paravirtualization",
         "fuchsia::pmm_checker_auto",
     ],
