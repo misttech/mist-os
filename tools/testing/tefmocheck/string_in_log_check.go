@@ -887,5 +887,9 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", sshutilconstants.FailedToStartSshSessionMsg),
 			Type:   swarmingOutputType,
 		},
+		&stringInLogCheck{
+			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToDeriveSshConnectionMsg),
+			Type:   swarmingOutputType,
+		},
 	}
 }
