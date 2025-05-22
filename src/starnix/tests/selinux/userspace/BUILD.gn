@@ -104,6 +104,7 @@ test_names = [
   "load_policy",
   "memfd",
   "mount",
+  "mprotect",
   "pipe",
   "procattr",
   "selinuxfs",
@@ -122,6 +123,7 @@ resource("policies") {
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/ioctl_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/memfd_transition.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/mprotect.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/pipe_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_policy.pp",
@@ -147,6 +149,7 @@ foreach(test_name, test_names) {
       "//sdk/lib/fit",
       "//src/lib/files",
       "//src/lib/fxl",
+      "//src/starnix/tests/syscalls/cpp:test_utils",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/fbl",
     ]
