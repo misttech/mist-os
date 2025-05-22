@@ -946,7 +946,10 @@ config("Wno-undef") {
 
 config("Wno-character-conversion") {
   cflags = [ "-Wno-character-conversion" ]
-  visibility = [ "//src/lib/android/aidl:*" ]
+  visibility = [
+    "//src/lib/android/aidl:*",
+    "//third_party/googletest:*",
+  ]
 }
 
 config("Wno-bitfield-conversion") {

@@ -16,7 +16,10 @@ config("gtest_config") {
 
   # Silence undefined macro warnings in gtest-port.h when -Wundef flag is used
   # (e.g. in Pigweed libraries).
-  configs = [ "//build/config:Wno-undef" ]
+  configs = [
+    "//build/config:Wno-undef",
+    "//build/config:Wno-character-conversion",
+  ]
 }
 
 static_library("gtest_no_testonly") {
