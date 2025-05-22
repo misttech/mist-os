@@ -52,7 +52,7 @@ bool CompileAndWriteShader(HackFilesystemPtr filesystem, ShaderProgramData progr
         return false;
       }
     } else {
-      FX_LOGS(INFO) << "Shader already exists on disk.";
+      FX_LOGS(INFO) << "Identical shader already exists on disk.";
     }
   }
   return true;
