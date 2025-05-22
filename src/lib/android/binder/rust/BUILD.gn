@@ -16,6 +16,11 @@ rustc_library("binder_ndk_sys") {
   source_root = "third_party/binder_ndk_sys/lib.rs"
   sources = [ source_root ]
 
+  # Remove potential warn/deny to ensure the allow below is enforced
+  _lint_cfg = [ "//build/config/rust:cap_lints" ]
+  configs += _lint_cfg
+  configs -= _lint_cfg
+
   configs += [
     "//build/config/rust:cap_lints_allow",
     "//src/lib/android:android_rust_config",
@@ -51,6 +56,12 @@ rustc_library("binder") {
     "//third_party/android/platform/frameworks/native/libs/binder/rust/src/state.rs",
     "//third_party/android/platform/frameworks/native/libs/binder/rust/src/system_only.rs",
   ]
+
+  # Remove potential warn/deny to ensure the allow below is enforced
+  _lint_cfg = [ "//build/config/rust:cap_lints" ]
+  if (configs + _lint_cfg - _lint_cfg != configs) {
+    configs -= _lint_cfg
+  }
 
   configs += [
     "//build/config/rust:cap_lints_allow",
