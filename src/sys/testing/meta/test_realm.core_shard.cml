@@ -104,7 +104,7 @@
         },
         {
             protocol: "fuchsia.component.resolution.Resolver",
-            from: "#full-resolver",
+            from: "#pkg-resolver",
             to: "#testing",
             source_availability: "unknown",
         },

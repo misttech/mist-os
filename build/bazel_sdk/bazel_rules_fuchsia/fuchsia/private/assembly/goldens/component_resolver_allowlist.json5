@@ -1,10 +1,10 @@
 [
-    // List of all fuchsia-pkg components that can be resolved using
-    // /core/full-resolver, which has access to
-    // fuchsia.pkg.PackageResolver.
+    // List of all components that can register a resolver for "fuchsia-pkg" in their
+    // environment, where that resolver is provided by the "core/pkg-resolver" component which has
+    // access to fuchsia.pkg.PackageResolver.
     {
         scheme: "fuchsia-pkg",
-        moniker: "/core/full-resolver",
+        moniker: "/core/pkg-resolver",
         protocol: "fuchsia.pkg.PackageResolver",
         components: [],
     },

@@ -29,6 +29,7 @@ use {
 mod cache;
 mod cache_package_index;
 mod clock;
+mod component_resolver;
 mod config;
 mod eager_package_manager;
 mod error;
@@ -332,6 +333,14 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         }
     };
 
+    let component_resolver_cb = move |stream| {
+        fasync::Task::local(
+            async move { component_resolver::serve(stream).await }
+                .unwrap_or_else(|e| error!("serve_component_resolver_failed: {:#}", e)),
+        )
+        .detach()
+    };
+
     let mut fs = ServiceFs::new();
     fs.dir("svc")
         .add_fidl_service(make_resolver_cb(fpkg::GcProtection::OpenPackageTracking))
@@ -342,7 +351,8 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         .add_fidl_service(resolver_toolbox_cb)
         .add_fidl_service(repo_cb)
         .add_fidl_service(rewrite_cb)
-        .add_fidl_service(cup_cb);
+        .add_fidl_service(cup_cb)
+        .add_fidl_service(component_resolver_cb);
 
     fs.take_and_serve_directory_handle().context("while serving directory handle")?;
 

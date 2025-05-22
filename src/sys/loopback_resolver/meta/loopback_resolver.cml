@@ -1,28 +1,25 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/full_resolver",
+        binary: "bin/loopback_resolver",
     },
     capabilities: [
         {
-            resolver: "full-resolver",
+            resolver: "resolver",
             path: "/svc/fuchsia.component.resolution.Resolver",
         },
         { protocol: "fuchsia.component.resolution.Resolver" },
     ],
     use: [
-        { protocol: "fuchsia.pkg.PackageResolver" },
+        { protocol: "fuchsia.component.resolution.Resolver" },
     ],
     expose: [
         {
-            resolver: "full-resolver",
+            resolver: "resolver",
             from: "self",
         },
         {

@@ -199,6 +199,7 @@
         {
             protocol: [
                 "fuchsia.component.PersistenceBinder",
+                "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.component.SamplerBinder",
                 "fuchsia.exception.Handler",
                 "fuchsia.feedback.ComponentDataRegister",

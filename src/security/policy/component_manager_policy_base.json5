@@ -271,8 +271,29 @@
                 source_name: "fuchsia.pkg.PackageResolver",
                 capability: "protocol",
                 target_monikers: [
-                    "/core/full-resolver",
+                    "/core/pkg-resolver",
                     "/core/system-update/system-update-checker",
+                ],
+            },
+            {
+                // Enforce that full-resolver is only used on builds that explicitly enable it.
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "full-resolver",
+                capability: "resolver",
+                target_monikers: [],
+            },
+            {
+                // Enforce that full-resolver is only used on builds that explicitly enable it.
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    // These components expose the resolver protocol, so they need to be
+                    // allowlisted here.
+                    "/core",
+                    "/core/pkg-resolver",
                 ],
             },
             {

@@ -699,6 +699,11 @@
             from: "#pkg-resolver",
         },
         {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#pkg-resolver",
+            as: "fuchsia.component.resolution.Resolver-full",
+        },
+        {
             protocol: [ "fuchsia.ui.activity.Provider" ],
             from: "#activity",
         },

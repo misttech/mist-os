@@ -1,44 +1,19 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context as _};
 use fidl::endpoints::{create_proxy, ClientEnd, Proxy};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_component::server::ServiceFs;
-use futures::stream::{StreamExt as _, TryStreamExt as _};
-use log::{error, info, warn};
+use futures::prelude::*;
+use log::warn;
 use version_history::AbiRevision;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
 };
 
-enum IncomingService {
-    Resolver(fresolution::ResolverRequestStream),
-}
-
-#[fuchsia::main]
-async fn main() -> anyhow::Result<()> {
-    info!("started");
-
-    let mut service_fs = ServiceFs::new_local();
-    service_fs.dir("svc").add_fidl_service(IncomingService::Resolver);
-    service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
-    service_fs
-        .for_each_concurrent(None, |request| async {
-            if let Err(err) = match request {
-                IncomingService::Resolver(stream) => serve(stream).await,
-            } {
-                error!("failed to serve resolve request: {:#}", err);
-            }
-        })
-        .await;
-
-    Ok(())
-}
-
-async fn serve(mut stream: fresolution::ResolverRequestStream) -> anyhow::Result<()> {
+pub(crate) async fn serve(mut stream: fresolution::ResolverRequestStream) -> anyhow::Result<()> {
     let package_resolver = connect_to_protocol::<fpkg::PackageResolverMarker>()
         .context("failed to connect to PackageResolver service")?;
     while let Some(request) =
@@ -245,54 +220,89 @@ mod tests {
     use super::*;
     use anyhow::Error;
     use assert_matches::assert_matches;
+    use fidl::endpoints::ServerEnd;
     use fuchsia_component::server as fserver;
     use fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     };
     use futures::channel::mpsc;
     use futures::lock::Mutex;
-    use futures::SinkExt as _;
+    use std::sync;
     use std::sync::Arc;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
     use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-    async fn mock_pkg_resolver(
-        trigger: Arc<Mutex<Option<mpsc::Sender<Result<(), Error>>>>>,
+    type Trigger = mpsc::Sender<Result<(), Error>>;
+
+    async fn mock_pkg_cache(
+        trigger: Arc<Mutex<Option<Trigger>>>,
         handles: LocalComponentHandles,
     ) -> Result<(), Error> {
         let mut fs = fserver::ServiceFs::new();
-        fs.dir("svc").add_fidl_service(
-            move |mut req_stream: fpkg::PackageResolverRequestStream| {
-                let tx = trigger.clone();
-                fasync::Task::local(async move {
-                    while let Some(fpkg::PackageResolverRequest::Resolve { responder, .. }) =
-                        req_stream.try_next().await.expect("Serving package resolver stream failed")
-                    {
-                        responder
-                            .send(Err(fpkg::ResolveError::PackageNotFound))
-                            .expect("failed sending package resolver response to client");
-
-                        {
-                            let mut lock = tx.lock().await;
-                            let mut c = lock.take().unwrap();
-                            c.send(Ok(())).await.expect("failed sending oneshot to test");
-                            lock.replace(c);
+        fs.dir("svc").add_fidl_service(move |mut req_stream: fpkg::PackageCacheRequestStream| {
+            let tx = trigger.clone();
+            fasync::Task::local(async move {
+                while let Some(request) = req_stream.try_next().await.unwrap() {
+                    match request {
+                        fpkg::PackageCacheRequest::Get { responder, .. } => {
+                            responder.send(Err(zx::Status::NOT_FOUND.into_raw())).unwrap();
+                            {
+                                let mut lock = tx.lock().await;
+                                let mut c = lock.take().unwrap();
+                                c.send(Ok(())).await.unwrap();
+                                lock.replace(c);
+                            }
+                        }
+                        fpkg::PackageCacheRequest::BasePackageIndex { iterator, .. } => {
+                            mock_iterator(&[], iterator);
+                        }
+                        fpkg::PackageCacheRequest::CachePackageIndex { iterator, .. } => {
+                            mock_iterator(&["test-pkg-request"], iterator);
+                        }
+                        r => {
+                            panic!("unexpected pkg-cache request: {r:#?}");
                         }
                     }
-                })
-                .detach();
-            },
-        );
+                }
+            })
+            .detach();
+        });
 
         fs.serve_connection(handles.outgoing_dir)?;
         fs.collect::<()>().await;
         Ok(())
     }
 
+    fn mock_iterator(contents: &[&str], iterator: ServerEnd<fpkg::PackageIndexIteratorMarker>) {
+        let contents: Vec<_> = contents
+            .iter()
+            .map(|name| fpkg::PackageIndexEntry {
+                package_url: fpkg::PackageUrl { url: format!("fuchsia-pkg://fuchsia.com/{name}") },
+                meta_far_blob_id: fpkg::BlobId { merkle_root: [0xff; 32] },
+            })
+            .collect();
+        fasync::Task::local(async move {
+            let mut iterator = iterator.into_stream();
+            if !contents.is_empty() {
+                let fpkg::PackageIndexIteratorRequest::Next { responder, .. } =
+                    iterator.try_next().await.unwrap().unwrap();
+                {
+                    responder.send(&contents).unwrap();
+                }
+            }
+            let fpkg::PackageIndexIteratorRequest::Next { responder, .. } =
+                iterator.try_next().await.unwrap().unwrap();
+            {
+                responder.send(&[]).unwrap();
+            }
+        })
+        .detach();
+    }
+
     async fn component_requester(
-        trigger: Arc<Mutex<Option<mpsc::Sender<Result<(), Error>>>>>,
+        trigger: Arc<Mutex<Option<Trigger>>>,
         url: String,
         handles: LocalComponentHandles,
     ) -> Result<(), Error> {
@@ -310,20 +320,106 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fidl_wiring_and_serving() {
+        let ssl_certs =
+            fuchsia_fs::directory::open_in_namespace("/pkg/data/ssl", fio::PERM_READABLE).unwrap();
+        const OUT_DIR_FLAGS: fio::Flags =
+            fio::PERM_READABLE.union(fio::PERM_WRITABLE).union(fio::PERM_EXECUTABLE);
+
+        // Mocks for directory dependencies
+        let directories_out_dir = vfs::pseudo_directory! {
+            "config" => vfs::pseudo_directory! {
+                "data" => vfs::pseudo_directory! {
+                },
+                "build-info" => vfs::pseudo_directory! {
+                    "build" => read_only(b"test")
+                },
+                "ssl" => vfs::remote::remote_dir(
+                    ssl_certs
+                ),
+            },
+        };
+        let directories_out_dir = sync::Mutex::new(Some(directories_out_dir));
+
         let (sender, mut receiver) = mpsc::channel(2);
         let sender = Arc::new(Mutex::new(Some(sender)));
         let builder = RealmBuilder::new().await.expect("Failed to create test realm builder");
-        let full_resolver = builder
-            .add_child("full-resolver", "#meta/full-resolver.cm", ChildOptions::new())
+        let pkg_resolver = builder
+            .add_child("pkg-resolver", "#meta/pkg-resolver.cm", ChildOptions::new())
             .await
-            .expect("Failed add full-resolver to test topology");
-        let fake_pkg_resolver = builder
+            .unwrap();
+        let directories_component = builder
             .add_local_child(
-                "fake-pkg-resolver",
+                "directories",
+                move |handles| {
+                    let directories_out_dir = directories_out_dir
+                        .lock()
+                        .unwrap()
+                        .take()
+                        .expect("mock component should only be launched once");
+                    let scope = vfs::ExecutionScope::new();
+                    vfs::directory::serve_on(
+                        directories_out_dir,
+                        OUT_DIR_FLAGS,
+                        scope.clone(),
+                        handles.outgoing_dir,
+                    );
+                    async move {
+                        scope.wait().await;
+                        Ok(())
+                    }
+                    .boxed()
+                },
+                ChildOptions::new(),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("config-data")
+                            .path("/config/data")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .from(&directories_component)
+                    .to(&pkg_resolver),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("root-ssl-certificates")
+                            .path("/config/ssl")
+                            .rights(fio::R_STAR_DIR),
+                    )
+                    .from(&directories_component)
+                    .to(&pkg_resolver),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::directory("build-info")
+                            .rights(fio::R_STAR_DIR)
+                            .path("/config/build-info"),
+                    )
+                    .from(&directories_component)
+                    .to(&pkg_resolver),
+            )
+            .await
+            .unwrap();
+
+        let fake_pkg_cache = builder
+            .add_local_child(
+                "fake-pkg-cache",
                 {
                     let sender = sender.clone();
                     move |handles: LocalComponentHandles| {
-                        Box::pin(mock_pkg_resolver(sender.clone(), handles))
+                        Box::pin(mock_pkg_cache(sender.clone(), handles))
                     }
                 },
                 ChildOptions::new(),
@@ -347,38 +443,38 @@ mod tests {
                 ChildOptions::new().eager(),
             )
             .await
-            .expect("Failed adding mock request component");
+            .unwrap();
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver"))
-                    .from(&fake_pkg_resolver)
-                    .to(&full_resolver),
+                    .capability(Capability::protocol_by_name("fuchsia.pkg.PackageCache"))
+                    .from(&fake_pkg_cache)
+                    .to(&pkg_resolver),
             )
             .await
-            .expect("Failed adding resolver route from fake-base-resolver to full-resolver");
+            .unwrap();
         builder
             .add_route(
                 Route::new()
                     .capability(Capability::protocol_by_name(
                         "fuchsia.component.resolution.Resolver",
                     ))
-                    .from(&full_resolver)
+                    .from(&pkg_resolver)
                     .to(&requesting_component),
             )
             .await
-            .expect("Failed adding resolver route from full-resolver to requesting-component");
+            .unwrap();
         builder
             .add_route(
                 Route::new()
                     .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                     .from(Ref::parent())
-                    .to(&full_resolver)
-                    .to(&fake_pkg_resolver)
+                    .to(&pkg_resolver)
+                    .to(&fake_pkg_cache)
                     .to(&requesting_component),
             )
             .await
-            .expect("Failed adding LogSink route to test components");
+            .unwrap();
         let _test_topo = builder.build().await.unwrap();
 
         receiver.next().await.expect("Unexpected error waiting for response").expect("error sent");

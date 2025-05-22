@@ -3,11 +3,16 @@
 // found in the LICENSE file.
 {
     children: [
-        // TODO(https://fxbug.dev/42180879): Remove need for separate full_resolver component here.
-        // Full resolver clone to be used by the full-drivers collection
+        // Full-drivers collection needs the full_resolver to load components.
+        // But we can't use the full_resolver from the core realm, since that
+        // would create a cycle. Instead, we create a "local" instance of the
+        // full resolver, which simply delegates to the supplied resolver
+        // protocol
+        //
+        // TODO(https://fxbug.dev/42180879): Remove need for this component.
         {
             name: "full_resolver",
-            url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
+            url: "fuchsia-pkg://fuchsia.com/loopback_resolver#meta/loopback_resolver.cm",
             environment: "#base-resolver-env",
         },
     ],
@@ -34,11 +39,10 @@
                 "#full_resolver",
             ],
         },
-
-        // Full resolver dependencies
         {
-            protocol: "fuchsia.pkg.PackageResolver",
+            protocol: "fuchsia.component.resolution.Resolver-full",
             from: "parent",
+            as: "fuchsia.component.resolution.Resolver",
             to: "#full_resolver",
         },
         {
@@ -216,7 +220,7 @@
                     scheme: "fuchsia-boot",
                 },
                 {
-                    resolver: "full-resolver",
+                    resolver: "resolver",
                     from: "#full_resolver",
                     scheme: "fuchsia-pkg",
                 },

@@ -18,7 +18,6 @@ rustc_library("routing") {
     "//src/security/lib/scrutiny/frontend/*",
     "//src/security/lib/scrutiny/x/*",
     "//src/sys/component_manager/*",
-    "//src/sys/full-resolver:*",
     "//src/sys/lib/cm_rust/testing:*",
     "//src/sys/lib/component_debug/*",
     "//src/sys/lib/elf_runner/*",

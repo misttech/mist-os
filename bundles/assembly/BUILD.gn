@@ -2049,8 +2049,8 @@ assembly_input_bundle("standard_userdebug") {
 assembly_input_bundle("standard_eng") {
   testonly = true
   base_packages = [
-    # Used to resolve ephemeral components.
-    "//src/sys/full-resolver:full-resolver-pkg",
+    # Needed to resolve driver components from "full" packages
+    "//src/sys/loopback_resolver:loopback_resolver_pkg",
   ]
   cache_packages = [
     # Backend for ffx process command.
