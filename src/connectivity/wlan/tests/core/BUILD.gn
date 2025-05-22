@@ -13,6 +13,7 @@ assert(is_host, "WLAN end-to-end tests only supported for host testing")
 antlion_host_test("connect_to_ap_test") {
   main_source = "ConnectToApTest.py"
   libraries = [
+    "//src/connectivity/wlan/tests/core/core_testing",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_host_test_data",
     "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_host_test_data",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_host_test_data",
