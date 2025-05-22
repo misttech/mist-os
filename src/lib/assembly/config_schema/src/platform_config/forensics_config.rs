@@ -23,12 +23,20 @@ pub struct ForensicsConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct FeedbackConfig {
+    /// If true, Feedback will apply the config found at
+    /// //src/developer/forensics/feedback/configs/product/large_disk.json. Compared to the
+    /// default, this will persist snapshots to disk if the network is unavailable.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub large_disk: bool,
 
+    /// If true, Feedback will retrieve the device ID via the fuchsia.feedback.DeviceIdProvider
+    /// FIDL protocol rather than using its local implementation.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub remote_device_id_provider: bool,
 
+    /// The URL of the component, if any, that satisfies the requirements found at
+    /// //src/developer/forensics/flash_ts_feedback_id/meta/README.md. Namely, the component that
+    /// implements the fuchsia.feedback.DeviceIdProvider and google.flashts.Reader protocols.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub flash_ts_feedback_id_component_url: Option<String>,
 
