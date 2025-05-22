@@ -84,9 +84,9 @@ fn is_deadline_changed(
 // Errors returnable from [TimerOps] calls.
 #[derive(Debug)]
 pub(crate) enum TimerOpsError {
-    // The driver reported an error.
+    /// The driver reported an error.
     Driver(ffhh::DriverError),
-    // FIDL-specific RPC error.
+    /// FIDL-specific RPC error.
     Fidl(fidl::Error),
 }
 
@@ -94,20 +94,20 @@ trait SawResponseFut: std::future::Future<Output = Result<zx::EventPair, TimerOp
     // nop
 }
 
-// Abstracts away timer operations.
+/// Abstracts away timer operations.
 #[async_trait(?Send)]
 pub(crate) trait TimerOps {
-    // Stop the timer with the specified ID.
+    /// Stop the timer with the specified ID.
     async fn stop(&self, id: u64);
 
-    // Examine the timer's properties, such as supported resolutions and tick
-    // counts.
+    /// Examine the timer's properties, such as supported resolutions and tick
+    /// counts.
     async fn get_timer_properties(&self) -> TimerConfig;
 
-    // This method must return an actual future, to handle the borrow checker:
-    // making this async will assume that `self` remains borrowed, which will
-    // thwart attempts to move the return value of this call into a separate
-    // closure.
+    /// This method must return an actual future, to handle the borrow checker:
+    /// making this async will assume that `self` remains borrowed, which will
+    /// thwart attempts to move the return value of this call into a separate
+    /// closure.
     fn start_and_wait(
         &self,
         id: u64,
