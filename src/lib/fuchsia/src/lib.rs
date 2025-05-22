@@ -109,6 +109,7 @@ pub fn init_logging_for_component_with_threads<'a, R>(
 
 /// Initialize logging
 #[doc(hidden)]
+#[cfg(target_os = "fuchsia")]
 pub fn init_logging_for_test_with_executor<'a, R>(
     func: impl Fn(usize) -> R + 'a,
     logging: LoggingOptions<'a>,
@@ -121,6 +122,7 @@ pub fn init_logging_for_test_with_executor<'a, R>(
 
 /// Initialize logging
 #[doc(hidden)]
+#[cfg(target_os = "fuchsia")]
 pub fn init_logging_for_test_with_threads<'a, R>(
     func: impl Fn(usize) -> R + 'a,
     logging: LoggingOptions<'a>,
@@ -141,6 +143,26 @@ fn init_logging_with_threads(logging: LoggingOptions<'_>) -> impl Drop {
 #[cfg(not(target_os = "fuchsia"))]
 fn init_logging_with_threads(logging: LoggingOptions<'_>) {
     diagnostics_log::initialize(logging.into()).expect("initialize_logging");
+}
+
+/// Initialize logging
+#[doc(hidden)]
+#[cfg(not(target_os = "fuchsia"))]
+pub fn init_logging_for_test_with_executor<'a, R>(
+    func: impl Fn(usize) -> R + 'a,
+    _logging: LoggingOptions<'a>,
+) -> impl Fn(usize) -> R + 'a {
+    move |n| func(n)
+}
+
+/// Initialize logging
+#[doc(hidden)]
+#[cfg(not(target_os = "fuchsia"))]
+pub fn init_logging_for_test_with_threads<'a, R>(
+    func: impl Fn(usize) -> R + 'a,
+    _logging: LoggingOptions<'a>,
+) -> impl Fn(usize) -> R + 'a {
+    move |n| func(n)
 }
 
 #[cfg(target_os = "fuchsia")]
