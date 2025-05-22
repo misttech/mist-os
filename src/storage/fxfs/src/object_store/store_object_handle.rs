@@ -11,7 +11,7 @@ use crate::object_handle::ObjectHandle;
 use crate::object_store::extent_record::{ExtentKey, ExtentMode, ExtentValue};
 use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{
-    AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem, ObjectKey,
+    AttributeKey, EncryptionKey, ExtendedAttributeValue, ObjectAttributes, ObjectItem, ObjectKey,
     ObjectKeyData, ObjectValue, Timestamp,
 };
 use crate::object_store::transaction::{
@@ -787,16 +787,16 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let crypt = store.crypt().ok_or_else(|| anyhow!("No crypt!"))?;
 
         // Next, see if the keys are already created.
-        let (mut wrapped_keys, mut unwrapped_keys) = if let Some(item) =
+        let (mut encryption_keys, mut unwrapped_keys) = if let Some(item) =
             store.tree.find(&ObjectKey::keys(self.object_id)).await.context("find failed")?
         {
-            if let ObjectValue::Keys(EncryptionKeys::AES256XTS(wrapped_keys)) = item.value {
+            if let ObjectValue::Keys(encryption_keys) = item.value {
                 let unwrapped_keys = store
                     .key_manager
                     .get_keys(
                         self.object_id,
                         crypt.as_ref(),
-                        &mut Some(async || Ok(wrapped_keys.clone())),
+                        &mut Some(async || Ok(encryption_keys.clone())),
                         /* permanent= */ false,
                         /* force= */ false,
                     )
@@ -807,7 +807,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                     FindKeyResult::Unavailable => return Err(FxfsError::NoKey.into()),
                     FindKeyResult::Key(key) => return Ok(key),
                 }
-                (wrapped_keys, unwrapped_keys.ciphers().to_vec())
+                (encryption_keys, unwrapped_keys.ciphers().to_vec())
             } else {
                 return Err(anyhow!(FxfsError::Inconsistent));
             }
@@ -844,13 +844,13 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             }
         }
 
-        wrapped_keys.push((VOLUME_DATA_KEY_ID, key));
+        encryption_keys.insert(VOLUME_DATA_KEY_ID, EncryptionKey::Native(key));
 
         transaction.add_with_object(
             store.store_object_id(),
             Mutation::replace_or_insert_object(
                 ObjectKey::keys(self.object_id),
-                ObjectValue::keys(EncryptionKeys::AES256XTS(wrapped_keys)),
+                ObjectValue::keys(encryption_keys),
             ),
             AssocObj::Owned(Box::new(UnwrappedKeys {
                 object_id: self.object_id,
@@ -998,8 +998,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         _ => None,
                     };
                     reads.push(async move {
-                        self
-                            .read_and_decrypt(device_offset, offset, head.reborrow(), key_id)
+                        self.read_and_decrypt(device_offset, offset, head.reborrow(), key_id)
                             .await?;
                         if let Some(bitmap) = maybe_bitmap {
                             apply_bitmap_zeroing(self.block_size() as usize, &bitmap, head);

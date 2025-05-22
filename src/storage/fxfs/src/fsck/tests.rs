@@ -29,7 +29,7 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use futures::join;
-use fxfs_crypto::{Crypt, KeyPurpose, WrappedKeys};
+use fxfs_crypto::{Crypt, KeyPurpose};
 use fxfs_insecure_crypto::InsecureCrypt;
 use mundane::hash::{Digest, Hasher, Sha256};
 use std::ops::Deref;
@@ -2012,7 +2012,7 @@ async fn test_orphaned_keys() {
             store_id,
             Mutation::insert_object(
                 ObjectKey::keys(1000),
-                ObjectValue::Keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![]))),
+                ObjectValue::Keys(EncryptionKeys::default()),
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -2717,12 +2717,12 @@ async fn test_directory_missing_encryption_key_for_fscrypt() {
                     item:
                         Item {
                             key: ObjectKey { data: ObjectKeyData::Keys, .. },
-                            value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)),
+                            value: ObjectValue::Keys(keys),
                             ..
                         },
                     ..
                 }) => {
-                    assert!(keys.iter().find(|x| x.0 == 1).is_some());
+                    assert!(keys.get(1).is_some());
                     true
                 }
                 _ => false,
@@ -2734,15 +2734,13 @@ async fn test_directory_missing_encryption_key_for_fscrypt() {
         transaction.remove(store_id, mutation.clone());
 
         if let Mutation::ObjectStore(ObjectStoreMutation {
-            item: Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. },
+            item: Item { value: ObjectValue::Keys(keys), .. },
             ..
         }) = &mut mutation
         {
-            use std::ops::DerefMut as _;
-            let keys = keys.deref_mut();
-            let idx = keys.iter().position(|x| x.0 == 1).unwrap();
-            let (_, wrapped_key) = keys.remove(idx);
-            keys.push((0, wrapped_key));
+            // Move the key from index 1 (FSCRYPT_KEY_ID) to index 0 (VOLUME_DATA_KEY_ID).
+            let key = keys.remove(1).unwrap();
+            keys.insert(0, key);
         } else {
             unreachable!();
         }
@@ -2807,15 +2805,13 @@ async fn test_duplicate_key() {
 
         let key_id;
         if let Mutation::ObjectStore(ObjectStoreMutation {
-            item: Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. },
+            item: Item { value: ObjectValue::Keys(keys), .. },
             ..
         }) = &mut mutation
         {
-            use std::ops::DerefMut as _;
-            let keys = keys.deref_mut();
-            let duplicate = keys.first().unwrap().clone();
-            key_id = duplicate.0;
-            keys.push(duplicate);
+            let (id, key) = keys.first().unwrap().clone();
+            key_id = id;
+            keys.insert(id, key);
         } else {
             unreachable!();
         }

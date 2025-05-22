@@ -9,21 +9,21 @@ use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
 use crate::object_store::key_manager::ToCipherSet;
 use crate::object_store::object_record::{
-    ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey, ObjectKeyData,
-    ObjectKind, ObjectValue, Timestamp,
+    ChildValue, EncryptionKey, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
+    ObjectKeyData, ObjectKind, ObjectValue, Timestamp,
 };
 use crate::object_store::transaction::{
     lock_keys, LockKey, LockKeys, Mutation, Options, Transaction,
 };
 use crate::object_store::{
-    DataObjectHandle, EncryptionKeys, HandleOptions, HandleOwner, ObjectStore,
-    SetExtendedAttributeMode, StoreObjectHandle,
+    DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
+    StoreObjectHandle,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
 use fscrypt::proxy_filename::ProxyFilename;
 use fuchsia_sync::Mutex;
-use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
+use fxfs_crypto::{Cipher, CipherSet, Key};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -262,10 +262,9 @@ impl<S: HandleOwner> Directory<S> {
                     store.store_object_id(),
                     Mutation::insert_object(
                         ObjectKey::keys(object_id),
-                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
-                            FSCRYPT_KEY_ID,
-                            key,
-                        )]))),
+                        ObjectValue::keys(
+                            vec![(FSCRYPT_KEY_ID, EncryptionKey::Native(key))].into(),
+                        ),
                     ),
                 );
                 // Note that it's possible that this entry gets inserted into the key manager but
@@ -338,22 +337,19 @@ impl<S: HandleOwner> Directory<S> {
                         store.store_object_id(),
                         Mutation::insert_object(
                             ObjectKey::keys(object_id),
-                            ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![
-                                (FSCRYPT_KEY_ID, key),
-                            ]))),
+                            ObjectValue::keys(
+                                vec![(FSCRYPT_KEY_ID, EncryptionKey::Native(key))].into(),
+                            ),
                         ),
                     );
                 }
-                Some(Item {
-                    value: ObjectValue::Keys(EncryptionKeys::AES256XTS(mut keys)),
-                    ..
-                }) => {
-                    keys.push((FSCRYPT_KEY_ID, key));
+                Some(Item { value: ObjectValue::Keys(mut keys), .. }) => {
+                    keys.insert(FSCRYPT_KEY_ID, EncryptionKey::Native(key));
                     transaction.add(
                         store.store_object_id(),
                         Mutation::replace_or_insert_object(
                             ObjectKey::keys(object_id),
-                            ObjectValue::keys(EncryptionKeys::AES256XTS(keys)),
+                            ObjectValue::keys(keys),
                         ),
                     );
                 }
@@ -903,10 +899,9 @@ impl<S: HandleOwner> Directory<S> {
                     self.store().store_object_id(),
                     Mutation::insert_object(
                         ObjectKey::keys(symlink_id),
-                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
-                            FSCRYPT_KEY_ID,
-                            wrapped_key,
-                        )]))),
+                        ObjectValue::keys(
+                            vec![(FSCRYPT_KEY_ID, EncryptionKey::Native(wrapped_key))].into(),
+                        ),
                     ),
                 );
                 transaction.add(

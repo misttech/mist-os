@@ -16,6 +16,7 @@ rustc_library("crypto") {
     "//src/storage/type-fprint:fprint",
     "//third_party/rust_crates:aes",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:chacha20",

@@ -16,6 +16,7 @@ use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
+use fxfs::object_store::object_record::EncryptionKeyV47;
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::{DataObjectHandle, ObjectDescriptor, FSCRYPT_KEY_ID};
 use fxfs_macros::ToWeakNode;
@@ -243,13 +244,20 @@ impl FxFile {
     }
 
     async fn fscrypt_wrapping_key_id(&self) -> Result<Option<[u8; 16]>, zx::Status> {
-        if !self.handle.store().is_encrypted() {
-            return Ok(None);
-        } else {
-            let wrapped_keys =
-                self.handle.store().get_keys(self.object_id()).await.map_err(map_to_status)?;
-            Ok(wrapped_keys.get_wrapping_key_with_id(FSCRYPT_KEY_ID))
+        if self.handle.store().is_encrypted() {
+            if let Some(key) = self
+                .handle
+                .store()
+                .get_keys(self.object_id())
+                .await
+                .map_err(map_to_status)?
+                .get(FSCRYPT_KEY_ID)
+            {
+                let EncryptionKeyV47::Native(wrapped_key) = key;
+                return Ok(Some(wrapped_key.wrapping_key_id.to_le_bytes()));
+            }
         }
+        Ok(None)
     }
 
     /// Forcibly marks the file as clean.

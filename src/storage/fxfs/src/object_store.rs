@@ -63,7 +63,6 @@ use fuchsia_sync::Mutex;
 use fxfs_crypto::ff1::Ff1;
 use fxfs_crypto::{
     Crypt, KeyPurpose, StreamCipher, UnwrappedKey, WrappedKey, WrappedKeyV32, WrappedKeyV40,
-    WrappedKeys,
 };
 use mundane::hash::{Digest, Hasher, Sha256};
 use once_cell::sync::OnceCell;
@@ -80,8 +79,9 @@ pub use extent_record::{
     FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
 pub use object_record::{
-    AttributeKey, EncryptionKeys, ExtendedAttributeValue, FsverityMetadata, ObjectAttributes,
-    ObjectKey, ObjectKeyData, ObjectKind, ObjectValue, ProjectProperty, RootDigest,
+    AttributeKey, EncryptionKey, EncryptionKeys, ExtendedAttributeValue, FsverityMetadata,
+    ObjectAttributes, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue, ProjectProperty,
+    RootDigest,
 };
 pub use transaction::Mutation;
 
@@ -1044,9 +1044,7 @@ impl ObjectStore {
                 store.store_object_id(),
                 Mutation::insert_object(
                     ObjectKey::keys(object_id),
-                    ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
-                        key_id, key,
-                    )]))),
+                    ObjectValue::keys(vec![(key_id, EncryptionKey::Native(key))].into()),
                 ),
             );
             store.key_manager.insert(object_id, &vec![(key_id, Some(unwrapped_key))], permanent);
@@ -2151,9 +2149,9 @@ impl ObjectStore {
 
     /// Retrieves the wrapped keys for the given object.  The keys *should* be known to exist and it
     /// will be considered an inconsistency if they don't.
-    pub async fn get_keys(&self, object_id: u64) -> Result<WrappedKeys, Error> {
+    pub async fn get_keys(&self, object_id: u64) -> Result<EncryptionKeys, Error> {
         match self.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::Inconsistent)? {
-            Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => Ok(keys),
+            Item { value: ObjectValue::Keys(keys), .. } => Ok(keys),
             _ => Err(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys")),
         }
     }

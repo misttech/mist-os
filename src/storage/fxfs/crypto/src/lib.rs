@@ -11,6 +11,7 @@ use aes::cipher::{
 };
 use aes::Aes256;
 use anyhow::{anyhow, Error};
+use arbitrary::Arbitrary;
 use async_trait::async_trait;
 use chacha20::{self, ChaCha20};
 use fprint::TypeFingerprint;
@@ -148,7 +149,7 @@ impl<'de> Deserialize<'de> for WrappedKeyBytes {
 
 pub type WrappedKey = WrappedKeyV40;
 
-#[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, PartialEq)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, TypeFingerprint, PartialEq)]
 pub struct WrappedKeyV40 {
     /// The identifier of the wrapping key.  The identifier has meaning to whatever is doing the
     /// unwrapping.
@@ -168,12 +169,19 @@ pub struct WrappedKeyV32 {
     pub key: WrappedKeyBytesV32,
 }
 
+impl<'a> arbitrary::Arbitrary<'a> for WrappedKey {
+    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // There doesn't seem to be much point to randomly generate crypto keys.
+        return Ok(WrappedKey::default());
+    }
+}
+
 /// To support key rolling and clones, a file can have more than one key.  Each key has an ID that
 /// unique to the file.
 pub type WrappedKeys = WrappedKeysV40;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
-pub struct WrappedKeysV40(Vec<(u64, WrappedKeyV40)>);
+#[derive(Arbitrary, Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+pub struct WrappedKeysV40(pub Vec<(u64, WrappedKeyV40)>);
 
 impl From<WrappedKeysV32> for WrappedKeysV40 {
     fn from(value: WrappedKeysV32) -> Self {
