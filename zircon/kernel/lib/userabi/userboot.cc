@@ -438,9 +438,9 @@ void userboot_init(HandoffEnd handoff_end) {
   // that runs the userboot static PIE.  If it dies without creating more
   // processes that live, the system restarts.
   StartRootJobObserver();
-  auto kill_userboot = fit::defer([process = process_handle.dispatcher()]() {
-    process->Kill(ZX_TASK_RETCODE_CRITICAL_PROCESS_KILL);
-  });
+  fbl::RefPtr<ProcessDispatcher> process = process_handle.dispatcher();
+  auto kill_userboot =
+      fit::defer([process]() { process->Kill(ZX_TASK_RETCODE_CRITICAL_PROCESS_KILL); });
 
   // Create the user thread.
   fbl::RefPtr<ThreadDispatcher> thread;
@@ -488,7 +488,13 @@ void userboot_init(HandoffEnd handoff_end) {
   RETURN_IF_NOT(handles[userboot::kRootJob]);
 
   // Send the bootstrap message.
-  RETURN_IF_NOT_OK(bootstrap_channel->Send(ktl::move(msg)).status_value());
+  if (zx::result<> send_result = bootstrap_channel->Send(ktl::move(msg)); send_result.is_error()) {
+    zx_info_process_t info = process->GetInfo();
+    KERNEL_OOPS("write on userboot boostrap channel failed: %d; process retcode %" PRId64
+                ", flags %#" PRIx32 "\n",
+                send_result.error_value(), info.return_code, info.flags);
+    return;
+  }
 
   kill_userboot.cancel();
 
