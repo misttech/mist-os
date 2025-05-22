@@ -267,7 +267,7 @@ before commands are run for any package.
         )
 
     sys.stderr.write("\nRun this command to download the updated package:\n")
-    sys.stderr.write("$ jiri fetch-packages -local-manifest\n")
+    sys.stderr.write("$ jiri fetch-packages -local-manifest-project=fuchsia\n")
 
     return 0
 
