@@ -229,7 +229,7 @@ open protocol SuiteController {
     /// Iterator over events for the run. This method is a hanging get; it
     /// returns an empty vector only when there will be no further events
     /// (the run completed).
-    @available(deprecated=20)
+    @available(deprecated=20, removed=NEXT)
     flexible GetEvents() -> (resource struct {
         events vector<SuiteEvent>:MAX;
     }) error LaunchError;
@@ -550,7 +550,7 @@ open protocol EarlyBootProfile {
 // DEPRECATED ITEMS BELOW
 
 // Query server for tests which implement `fuchsia.test.Suite` protocol.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 @discoverable
 open protocol Query {
     /// Enumerates test cases.
@@ -575,7 +575,7 @@ open protocol Query {
 };
 
 /// Iterator for listing available test cases.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 closed protocol CaseIterator {
     /// Returns the next batch of test cases when they are available. Returns the empty vector
     /// to indicate that the iteration is complete.
@@ -585,19 +585,19 @@ closed protocol CaseIterator {
 };
 
 /// Description of an enumerated test case.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type Case = table {
     /// Name of the test case.
     1: name CaseName;
 };
 
 /// Human-readable name for a test case.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 alias CaseName = string:fuchsia.test.MAX_TEST_NAME;
 
 /// This is the entry point of running test suites. A test "run" consists of
 /// multiple test "suites" which consists of running multiple "test cases".
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 @discoverable(server="platform")
 open protocol RunBuilder {
     /// Add a suite to this run. A suite is a component that implements
@@ -643,7 +643,7 @@ open protocol RunBuilder {
 };
 
 /// Optional additional instructions for executing a test suite.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type RunOptions = table {
     /// If set to true, test cases that have been disabled by the test author
     /// will nonetheless be executed. Defaults to false.
@@ -707,7 +707,7 @@ type RunOptions = table {
 };
 
 /// Optional instructions for how to execute and schedule suites in the test run.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type SchedulingOptions = table {
     /// The maximum number of hermetic test suites to run in parallel. If unspecified,
     /// chosen by the server side.
@@ -723,7 +723,7 @@ type SchedulingOptions = table {
 /// the events are drained.
 /// If the client disconnects, the tests will be terminated immediately and all
 /// results discarded.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 @discoverable(server="platform")
 open protocol RunController {
     /// Stop the run gracefully. RunController will disconnect after all
@@ -745,7 +745,7 @@ open protocol RunController {
     });
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type RunEvent = resource table {
     // The monotonic timestamp for the event.
     1: timestamp zx.Time;
@@ -755,7 +755,7 @@ type RunEvent = resource table {
 /// Various events for run execution. The first event for a test run will
 /// always be `run_started`. `run_stopped` fires when the test run stops
 /// and will always fire after `run_started`.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type RunEventPayload = flexible resource union {
     /// The test run started execution.
     1: run_started RunStarted;
@@ -765,23 +765,23 @@ type RunEventPayload = flexible resource union {
     3: artifact Artifact;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type RunStarted = struct {};
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type RunStopped = struct {
         // possibly include result in the future
         };
 
 /// Option which specifies which kind of iterator the client supports
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type LogsIteratorOption = flexible enum {
     BATCH_ITERATOR = 0;
     ARCHIVE_ITERATOR = 1;
     SOCKET_BATCH_ITERATOR = 2;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type SuiteEvent = resource table {
     // The monotonic timestamp for the event.
     1: timestamp zx.Time;
@@ -800,7 +800,7 @@ type SuiteEvent = resource table {
 /// cases, even if the test component fails to report a result.
 /// In the case a test is hung, GetEvents will hang and not complete, unless
 /// a timeout has been specified in RunOptions.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type SuiteEventPayload = flexible resource union {
     /// A case was found.
     1: case_found CaseFound;
@@ -832,10 +832,10 @@ type SuiteEventPayload = flexible resource union {
     8: suite_stopped SuiteStopped;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type SuiteStarted = struct {};
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type CaseFound = struct {
     /// Name of this test case.
     test_case_name CaseName;
@@ -844,40 +844,40 @@ type CaseFound = struct {
     identifier TestCaseId;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type CaseStarted = struct {
     identifier TestCaseId;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type CaseArtifact = resource struct {
     identifier TestCaseId;
     artifact Artifact;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type CaseStopped = struct {
     identifier TestCaseId;
     status CaseStatus;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type CaseFinished = struct {
     identifier TestCaseId;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type SuiteArtifact = resource struct {
     artifact Artifact;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type SuiteStopped = struct {
     status SuiteStatus;
 };
 
 /// Represent status of a test case run execution.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type CaseStatus = flexible enum {
     /// The test case passed.
     PASSED = 0;
@@ -899,7 +899,7 @@ type CaseStatus = flexible enum {
 /// preference, from lowest priority to highest priority.
 /// for example, if all Cases PASSED except one that FAILED, the status for the
 /// whole suite will be FAILED.
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type SuiteStatus = flexible enum {
     /// All tests cases passed/skipped.
     PASSED = 0;
@@ -921,12 +921,12 @@ type SuiteStatus = flexible enum {
     INTERNAL_ERROR = 6;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type Stdout = resource struct {
     socket zx.Handle:SOCKET;
 };
 
-@available(deprecated=20)
+@available(deprecated=20, removed=NEXT)
 type Stderr = resource struct {
     socket zx.Handle:SOCKET;
 };
