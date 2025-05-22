@@ -487,8 +487,8 @@ impl<B: SplitByteSlice> TcpSegment<B> {
     where
         B: 'a,
     {
-        let builder = self.builder(src_ip, dst_ip);
-        ByteSliceInnerPacketBuilder(self.body).into_serializer().encapsulate(builder)
+        self.builder(src_ip, dst_ip)
+            .wrap_body(ByteSliceInnerPacketBuilder(self.body).into_serializer())
     }
 }
 
@@ -785,7 +785,7 @@ impl<B: SplitByteSlice> TcpSegmentRaw<B> {
     {
         self.builder(src_ip, dst_ip).map(|builder| {
             let _ = &self;
-            ByteSliceInnerPacketBuilder(self.body).into_serializer().encapsulate(builder)
+            builder.wrap_body(ByteSliceInnerPacketBuilder(self.body).into_serializer())
         })
     }
 }
@@ -1374,9 +1374,9 @@ mod tests {
         // `TcpSegmentBuilderWithOptions`, which simply copies the bytes of the
         // options without parsing or iterating over them.
         let buffer = Buf::new(segment.body().to_vec(), ..)
-            .encapsulate(segment.builder(packet.src_ip(), packet.dst_ip()))
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(segment.builder(packet.src_ip(), packet.dst_ip()))
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -1392,15 +1392,15 @@ mod tests {
         // middle of the sequence, while ours is to pad with End of Options
         // options at the end). Instead, we parse and verify the parsed segment.
         let mut buffer = Buf::new(segment.body().to_vec(), ..)
-            .encapsulate(
+            .wrap_in(
                 TcpSegmentBuilderWithOptions::new(
                     segment.builder(packet.src_ip(), packet.dst_ip()).prefix_builder,
                     segment.iter_options(),
                 )
                 .unwrap(),
             )
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         let _: EthernetFrame<_> = buffer.parse_with(EthernetFrameLengthCheck::Check).unwrap();
@@ -1433,9 +1433,9 @@ mod tests {
         // `TcpSegmentBuilderWithOptions`, which simply copies the bytes of the
         // options without parsing or iterating over them.
         let buffer = Buf::new(segment.body().to_vec(), ..)
-            .encapsulate(segment.builder(packet.src_ip(), packet.dst_ip()))
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(segment.builder(packet.src_ip(), packet.dst_ip()))
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -1451,15 +1451,15 @@ mod tests {
         // middle of the sequence, while ours is to pad with End of Options
         // options at the end). Instead, we parse and verify the parsed segment.
         let mut buffer = Buf::new(segment.body().to_vec(), ..)
-            .encapsulate(
+            .wrap_in(
                 TcpSegmentBuilderWithOptions::new(
                     segment.builder(packet.src_ip(), packet.dst_ip()).prefix_builder,
                     segment.iter_options(),
                 )
                 .unwrap(),
             )
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         let _: EthernetFrame<_> = buffer.parse_with(EthernetFrameLengthCheck::Check).unwrap();
@@ -1555,9 +1555,8 @@ mod tests {
         builder.rst(true);
         builder.syn(true);
 
-        let mut buf = (&[0, 1, 2, 3, 3, 4, 5, 7, 8, 9])
-            .into_serializer()
-            .encapsulate(builder)
+        let mut buf = builder
+            .wrap_body((&[0, 1, 2, 3, 3, 4, 5, 7, 8, 9]).into_serializer())
             .serialize_vec_outer()
             .unwrap();
         // assert that we get the literal bytes we expected
@@ -1586,14 +1585,14 @@ mod tests {
         // Test that TcpSegmentBuilder::serialize properly zeroes memory before
         // serializing the header.
         let mut buf_0 = [0; HDR_PREFIX_LEN];
-        let _: Buf<&mut [u8]> = Buf::new(&mut buf_0[..], HDR_PREFIX_LEN..)
-            .encapsulate(new_builder(TEST_SRC_IPV4, TEST_DST_IPV4))
+        let _: Buf<&mut [u8]> = new_builder(TEST_SRC_IPV4, TEST_DST_IPV4)
+            .wrap_body(Buf::new(&mut buf_0[..], HDR_PREFIX_LEN..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
         let mut buf_1 = [0xFF; HDR_PREFIX_LEN];
-        let _: Buf<&mut [u8]> = Buf::new(&mut buf_1[..], HDR_PREFIX_LEN..)
-            .encapsulate(new_builder(TEST_SRC_IPV4, TEST_DST_IPV4))
+        let _: Buf<&mut [u8]> = new_builder(TEST_SRC_IPV4, TEST_DST_IPV4)
+            .wrap_body(Buf::new(&mut buf_1[..], HDR_PREFIX_LEN..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -1607,9 +1606,8 @@ mod tests {
         // we will not reject them. Test that we serialize these bits when
         // serializing from the `builder` methods.
 
-        let mut buffer = (&[])
-            .into_serializer()
-            .encapsulate(new_builder(TEST_SRC_IPV4, TEST_DST_IPV4))
+        let mut buffer = new_builder(TEST_SRC_IPV4, TEST_DST_IPV4)
+            .wrap_body(EmptyBuf)
             .serialize_vec_outer()
             .unwrap()
             .unwrap_b();
@@ -1635,9 +1633,10 @@ mod tests {
 
         // Serialize using the results of `TcpSegmentRaw::builder` and `TcpSegment::builder`.
         assert_eq!(
-            (&[])
-                .into_serializer()
-                .encapsulate(segment_raw.builder(TEST_SRC_IPV4, TEST_DST_IPV4).unwrap())
+            segment_raw
+                .builder(TEST_SRC_IPV4, TEST_DST_IPV4)
+                .unwrap()
+                .wrap_body(EmptyBuf)
                 .serialize_vec_outer()
                 .unwrap()
                 .unwrap_b()
@@ -1645,9 +1644,9 @@ mod tests {
             buffer.as_ref()
         );
         assert_eq!(
-            (&[])
-                .into_serializer()
-                .encapsulate(segment.builder(TEST_SRC_IPV4, TEST_DST_IPV4))
+            segment
+                .builder(TEST_SRC_IPV4, TEST_DST_IPV4)
+                .wrap_body(EmptyBuf)
                 .serialize_vec_outer()
                 .unwrap()
                 .unwrap_b()
@@ -1663,8 +1662,8 @@ mod tests {
     fn test_serialize_panic_segment_too_long_ipv4() {
         // Test that a segment length which overflows u16 is rejected because it
         // can't fit in the length field in the IPv4 pseudo-header.
-        let _: Buf<&mut [u8]> = Buf::new(&mut [0; (1 << 16) - HDR_PREFIX_LEN][..], ..)
-            .encapsulate(new_builder(TEST_SRC_IPV4, TEST_DST_IPV4))
+        let _: Buf<&mut [u8]> = new_builder(TEST_SRC_IPV4, TEST_DST_IPV4)
+            .wrap_body(Buf::new(&mut [0; (1 << 16) - HDR_PREFIX_LEN][..], ..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -1676,8 +1675,8 @@ mod tests {
     fn test_serialize_panic_segment_too_long_ipv6() {
         // Test that a segment length which overflows u32 is rejected because it
         // can't fit in the length field in the IPv4 pseudo-header.
-        let _: Buf<&mut [u8]> = Buf::new(&mut [0; (1 << 32) - HDR_PREFIX_LEN][..], ..)
-            .encapsulate(new_builder(TEST_SRC_IPV6, TEST_DST_IPV6))
+        let _: Buf<&mut [u8]> = new_builder(TEST_SRC_IPV6, TEST_DST_IPV6)
+            .wrap_body(Buf::new(&mut [0; (1 << 32) - HDR_PREFIX_LEN][..], ..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -1791,7 +1790,7 @@ mod tests {
 
         b.iter(|| {
             let _: Buf<_> = black_box(
-                black_box(Buf::new(&mut buf[..], header_len..total_len).encapsulate(builder))
+                black_box(builder.wrap_body(Buf::new(&mut buf[..], header_len..total_len)))
                     .serialize_no_alloc_outer(),
             )
             .unwrap();

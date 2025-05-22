@@ -238,8 +238,8 @@ impl<B: SplitByteSlice> UdpPacket<B> {
     where
         B: 'a,
     {
-        let builder = self.builder(src_ip, dst_ip);
-        ByteSliceInnerPacketBuilder(self.body).into_serializer().encapsulate(builder)
+        self.builder(src_ip, dst_ip)
+            .wrap_body(ByteSliceInnerPacketBuilder(self.body).into_serializer())
     }
 }
 
@@ -443,7 +443,7 @@ impl<B: SplitByteSlice> UdpPacketRaw<B> {
         self.body
             .complete()
             .ok()
-            .map(|body| ByteSliceInnerPacketBuilder(body).into_serializer().encapsulate(builder))
+            .map(|body| builder.wrap_body(ByteSliceInnerPacketBuilder(body).into_serializer()))
     }
 }
 
@@ -668,9 +668,9 @@ mod tests {
         let buffer = udp_packet
             .body()
             .into_serializer()
-            .encapsulate(udp_packet.builder(ip_packet.src_ip(), ip_packet.dst_ip()))
-            .encapsulate(ip_packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(udp_packet.builder(ip_packet.src_ip(), ip_packet.dst_ip()))
+            .wrap_in(ip_packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -700,9 +700,9 @@ mod tests {
         let buffer = udp_packet
             .body()
             .into_serializer()
-            .encapsulate(udp_packet.builder(ip_packet.src_ip(), ip_packet.dst_ip()))
-            .encapsulate(ip_packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(udp_packet.builder(ip_packet.src_ip(), ip_packet.dst_ip()))
+            .wrap_in(ip_packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -733,18 +733,18 @@ mod tests {
         assert_eq!(packet.body().len(), core::u16::MAX as usize);
     }
 
+    fn new_test_udp_builder() -> UdpPacketBuilder<Ipv4Addr> {
+        UdpPacketBuilder::new(
+            TEST_SRC_IPV4,
+            TEST_DST_IPV4,
+            NonZeroU16::new(1),
+            NonZeroU16::new(2).unwrap(),
+        )
+    }
+
     #[test]
     fn test_serialize() {
-        let mut buf = (&[])
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
-                TEST_SRC_IPV4,
-                TEST_DST_IPV4,
-                NonZeroU16::new(1),
-                NonZeroU16::new(2).unwrap(),
-            ))
-            .serialize_vec_outer()
-            .unwrap();
+        let mut buf = new_test_udp_builder().wrap_body(EmptyBuf).serialize_vec_outer().unwrap();
         assert_eq!(buf.as_ref(), [0, 1, 0, 2, 0, 8, 239, 199]);
         let packet = buf
             .parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(TEST_SRC_IPV4, TEST_DST_IPV4))
@@ -761,24 +761,14 @@ mod tests {
         // Test that UdpPacket::serialize properly zeroes memory before serializing
         // the header.
         let mut buf_0 = [0; HEADER_BYTES];
-        let _: Buf<&mut [u8]> = Buf::new(&mut buf_0[..], HEADER_BYTES..)
-            .encapsulate(UdpPacketBuilder::new(
-                TEST_SRC_IPV4,
-                TEST_DST_IPV4,
-                NonZeroU16::new(1),
-                NonZeroU16::new(2).unwrap(),
-            ))
+        let _: Buf<&mut [u8]> = new_test_udp_builder()
+            .wrap_body(Buf::new(&mut buf_0[..], HEADER_BYTES..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
         let mut buf_1 = [0xFF; HEADER_BYTES];
-        let _: Buf<&mut [u8]> = Buf::new(&mut buf_1[..], HEADER_BYTES..)
-            .encapsulate(UdpPacketBuilder::new(
-                TEST_SRC_IPV4,
-                TEST_DST_IPV4,
-                NonZeroU16::new(1),
-                NonZeroU16::new(2).unwrap(),
-            ))
+        let _: Buf<&mut [u8]> = new_test_udp_builder()
+            .wrap_body(Buf::new(&mut buf_1[..], HEADER_BYTES..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -853,9 +843,9 @@ mod tests {
     #[should_panic(expected = "total UDP packet length of 65536 bytes overflows 16-bit length \
                                field of UDP header")]
     fn test_serialize_fail_packet_too_long_ipv4() {
-        let ser = (&[0; (1 << 16) - HEADER_BYTES][..]).into_serializer().encapsulate(
-            UdpPacketBuilder::new(TEST_SRC_IPV4, TEST_DST_IPV4, None, NonZeroU16::new(1).unwrap()),
-        );
+        let ser =
+            UdpPacketBuilder::new(TEST_SRC_IPV4, TEST_DST_IPV4, None, NonZeroU16::new(1).unwrap())
+                .wrap_body((&[0; (1 << 16) - HEADER_BYTES][..]).into_serializer());
         let _ = ser.serialize_vec_outer();
     }
 
@@ -938,15 +928,15 @@ mod tests {
 
     #[test]
     fn test_udp_checksum_0xffff() {
-        // Test the behavior when a UDP packet has to
-        // flip its checksum field.
-        let builder = (&[0xff, 0xd9]).into_serializer().encapsulate(UdpPacketBuilder::new(
+        // Test the behavior when a UDP packet has to  flip its checksum field.
+        let serializer = UdpPacketBuilder::new(
             Ipv4Addr::new([0, 0, 0, 0]),
             Ipv4Addr::new([0, 0, 0, 0]),
             None,
             NonZeroU16::new(1).unwrap(),
-        ));
-        let buf = builder.serialize_vec_outer().unwrap();
+        )
+        .wrap_body((&[0xff, 0xd9]).into_serializer());
+        let buf = serializer.serialize_vec_outer().unwrap();
         // The serializer has flipped the bits for us.
         // Normally, 0xFFFF can't be checksum because -0
         // can not be produced by adding non-negtive 16-bit
@@ -1004,7 +994,7 @@ mod tests {
 
         b.iter(|| {
             let _: Buf<_> = black_box(
-                black_box(Buf::new(&mut buf[..], header_len..total_len).encapsulate(builder))
+                black_box(builder.wrap_body(Buf::new(&mut buf[..], header_len..total_len)))
                     .serialize_no_alloc_outer(),
             )
             .unwrap();

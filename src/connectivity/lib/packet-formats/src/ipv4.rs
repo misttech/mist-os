@@ -491,7 +491,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
                         // updated due to changed IP addresses.
                         let tcp_serializer =
                             Nat64Serializer::Tcp(tcp.into_serializer(v6_src_addr, v6_dst_addr));
-                        Nat64TranslationResult::Forward(tcp_serializer.encapsulate(v6_pkt_builder))
+                        Nat64TranslationResult::Forward(v6_pkt_builder.wrap_body(tcp_serializer))
                     }
                     Err(msg) => {
                         debug!("Parsing of TCP segment failed: {:?}", msg);
@@ -503,9 +503,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
                         // as is from IPv4 to IPv6.
                         let common_serializer =
                             Nat64Serializer::Other(self.body().into_serializer());
-                        Nat64TranslationResult::Forward(
-                            common_serializer.encapsulate(v6_pkt_builder),
-                        )
+                        Nat64TranslationResult::Forward(v6_pkt_builder.wrap_body(common_serializer))
                     }
                 }
             }
@@ -520,7 +518,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
                         // updated due to changed IP addresses.
                         let udp_serializer =
                             Nat64Serializer::Udp(udp.into_serializer(v6_src_addr, v6_dst_addr));
-                        Nat64TranslationResult::Forward(udp_serializer.encapsulate(v6_pkt_builder))
+                        Nat64TranslationResult::Forward(v6_pkt_builder.wrap_body(udp_serializer))
                     }
                     Err(msg) => {
                         debug!("Parsing of UDP packet failed: {:?}", msg);
@@ -532,9 +530,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
                         // as is from IPv4 to IPv6.
                         let common_serializer =
                             Nat64Serializer::Other(self.body().into_serializer());
-                        Nat64TranslationResult::Forward(
-                            common_serializer.encapsulate(v6_pkt_builder),
-                        )
+                        Nat64TranslationResult::Forward(v6_pkt_builder.wrap_body(common_serializer))
                     }
                 }
             }
@@ -548,7 +544,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
             Ipv4Proto::Other(val) => {
                 let v6_pkt_builder = v6_builder(Ipv6Proto::Other(val));
                 let common_serializer = Nat64Serializer::Other(self.body().into_serializer());
-                Nat64TranslationResult::Forward(common_serializer.encapsulate(v6_pkt_builder))
+                Nat64TranslationResult::Forward(v6_pkt_builder.wrap_body(common_serializer))
             }
 
             // Don't forward packets that use IANA's reserved protocol; they're
@@ -1362,8 +1358,8 @@ mod tests {
         let buffer = packet
             .body()
             .into_serializer()
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -1388,8 +1384,8 @@ mod tests {
         let buffer = packet
             .body()
             .into_serializer()
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -1453,13 +1449,8 @@ mod tests {
     fn test_parse_padding() {
         // Test that we properly discard post-packet padding.
         let mut buffer = Buf::new(Vec::new(), ..)
-            .encapsulate(Ipv4PacketBuilder::new(
-                DEFAULT_DST_IP,
-                DEFAULT_DST_IP,
-                0,
-                IpProto::Tcp.into(),
-            ))
-            .encapsulate(EthernetFrameBuilder::new(
+            .wrap_in(Ipv4PacketBuilder::new(DEFAULT_DST_IP, DEFAULT_DST_IP, 0, IpProto::Tcp.into()))
+            .wrap_in(EthernetFrameBuilder::new(
                 DEFAULT_SRC_MAC,
                 DEFAULT_DST_MAC,
                 EtherType::Ipv4,
@@ -1524,7 +1515,7 @@ mod tests {
 
             let mut buf = [0; IPV4_MIN_HDR_LEN]
                 .into_serializer()
-                .encapsulate(builder)
+                .wrap_in(builder)
                 .serialize_vec_outer()
                 .unwrap();
 
@@ -1547,7 +1538,7 @@ mod tests {
 
         let mut buf = (&[0, 1, 2, 3, 3, 4, 5, 7, 8, 9])
             .into_serializer()
-            .encapsulate(builder)
+            .wrap_in(builder)
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(
@@ -1575,7 +1566,7 @@ mod tests {
 
         let mut buf = (&[0, 1, 2, 3, 3, 4, 5, 7, 8, 9])
             .into_serializer()
-            .encapsulate(builder)
+            .wrap_in(builder)
             .serialize_vec_outer()
             .unwrap();
         let packet = buf.parse::<Ipv4Packet<_>>().unwrap();
@@ -1592,13 +1583,13 @@ mod tests {
         // serializing the header.
         let mut buf_0 = [0; IPV4_MIN_HDR_LEN];
         let _: Buf<&mut [u8]> = Buf::new(&mut buf_0[..], IPV4_MIN_HDR_LEN..)
-            .encapsulate(new_builder())
+            .wrap_in(new_builder())
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
         let mut buf_1 = [0xFF; IPV4_MIN_HDR_LEN];
         let _: Buf<&mut [u8]> = Buf::new(&mut buf_1[..], IPV4_MIN_HDR_LEN..)
-            .encapsulate(new_builder())
+            .wrap_in(new_builder())
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -1610,7 +1601,7 @@ mod tests {
     fn test_serialize_panic_packet_length() {
         // Test that a packet which is longer than 2^16 - 1 bytes is rejected.
         let _: Buf<&mut [u8]> = Buf::new(&mut [0; (1 << 16) - IPV4_MIN_HDR_LEN][..], ..)
-            .encapsulate(new_builder())
+            .wrap_in(new_builder())
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -1718,8 +1709,8 @@ mod tests {
 
         let v4_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(tcp_builder)
-            .encapsulate(ipv4_builder)
+            .wrap_in(tcp_builder)
+            .wrap_in(ipv4_builder)
             .serialize_vec_outer()
             .unwrap();
 
@@ -1735,8 +1726,8 @@ mod tests {
 
         let v6_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(v6_tcp_builder)
-            .encapsulate(ipv6_builder)
+            .wrap_in(v6_tcp_builder)
+            .wrap_in(ipv6_builder)
             .serialize_vec_outer()
             .unwrap();
 
@@ -1781,8 +1772,8 @@ mod tests {
 
         let v4_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(udp_builder)
-            .encapsulate(ipv4_builder)
+            .wrap_in(udp_builder)
+            .wrap_in(ipv4_builder)
             .serialize_vec_outer()
             .unwrap();
 
@@ -1795,8 +1786,8 @@ mod tests {
 
         let v6_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(v6_udp_builder)
-            .encapsulate(ipv6_builder)
+            .wrap_in(v6_udp_builder)
+            .wrap_in(ipv6_builder)
             .serialize_vec_outer()
             .unwrap();
 
@@ -1835,10 +1826,10 @@ mod tests {
             create_ipv4_and_ipv6_builders(Ipv4Proto::Other(50), Ipv6Proto::Other(50));
 
         let mut v4_pkt_buf =
-            (&PAYLOAD).into_serializer().encapsulate(ipv4_builder).serialize_vec_outer().unwrap();
+            (&PAYLOAD).into_serializer().wrap_in(ipv4_builder).serialize_vec_outer().unwrap();
 
         let expected_v6_pkt_buf =
-            (&PAYLOAD).into_serializer().encapsulate(ipv6_builder).serialize_vec_outer().unwrap();
+            (&PAYLOAD).into_serializer().wrap_in(ipv6_builder).serialize_vec_outer().unwrap();
 
         let translated_v6_pkt_buf = {
             let parsed_v4_packet = v4_pkt_buf.parse::<Ipv4Packet<_>>().unwrap();

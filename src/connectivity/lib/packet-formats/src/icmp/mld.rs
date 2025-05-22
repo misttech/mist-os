@@ -881,8 +881,8 @@ mod tests {
         let complete_msg = &[header, body].concat();
         complete_msg
             .into_serializer()
-            .encapsulate(icmp.builder(src_ip, dst_ip))
-            .encapsulate(with_options)
+            .wrap_in(icmp.builder(src_ip, dst_ip))
+            .wrap_in(with_options)
             .serialize_vec_outer()
             .unwrap()
             .as_ref()
@@ -932,8 +932,8 @@ mod tests {
         // Serialize an MLD(ICMPv6) packet using the builder.
         Mldv1MessageBuilder::<M>::new_with_max_resp_delay(group_addr, max_resp_delay)
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpSenderZeroCode, msg))
-            .encapsulate(with_options)
+            .wrap_in(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpSenderZeroCode, msg))
+            .wrap_in(with_options)
             .serialize_vec_outer()
             .unwrap()
             .as_ref()
@@ -963,8 +963,8 @@ mod tests {
 
         builder
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpSenderZeroCode, msg))
-            .encapsulate(with_options)
+            .wrap_in(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpSenderZeroCode, msg))
+            .wrap_in(with_options)
             .serialize_vec_outer()
             .unwrap()
             .as_ref()
@@ -1327,8 +1327,8 @@ mod tests {
         let mut reports = reports.map(|builder| {
             builder
                 .into_serializer()
-                .encapsulate(icmp_builder.clone())
-                .encapsulate(ip_builder.clone())
+                .wrap_in(icmp_builder.clone())
+                .wrap_in(ip_builder.clone())
                 .serialize_vec_outer()
                 .unwrap_or_else(|(err, _)| panic!("{err:?}"))
                 .unwrap_b()
@@ -1423,8 +1423,8 @@ mod tests {
         let mut reports = reports.map(|builder| {
             builder
                 .into_serializer()
-                .encapsulate(icmp_builder.clone())
-                .encapsulate(ip_builder.clone())
+                .wrap_in(icmp_builder.clone())
+                .wrap_in(ip_builder.clone())
                 .serialize_vec_outer()
                 .unwrap_or_else(|(err, _)| panic!("{err:?}"))
                 .unwrap_b()

@@ -689,7 +689,7 @@ impl<B: SplitByteSlice> Ipv6Packet<B> {
                         // updated due to changed IP addresses.
                         let tcp_serializer =
                             Nat64Serializer::Tcp(tcp.into_serializer(v4_src_addr, v4_dst_addr));
-                        Nat64TranslationResult::Forward(tcp_serializer.encapsulate(v4_pkt_builder))
+                        Nat64TranslationResult::Forward(v4_pkt_builder.wrap_body(tcp_serializer))
                     }
                     Err(msg) => {
                         debug!("Parsing of TCP segment failed: {:?}", msg);
@@ -704,9 +704,7 @@ impl<B: SplitByteSlice> Ipv6Packet<B> {
                         // reasoning from RFC appiles here as well.
                         let common_serializer =
                             Nat64Serializer::Other(self.body().into_serializer());
-                        Nat64TranslationResult::Forward(
-                            common_serializer.encapsulate(v4_pkt_builder),
-                        )
+                        Nat64TranslationResult::Forward(v4_pkt_builder.wrap_body(common_serializer))
                     }
                 }
             }
@@ -725,7 +723,7 @@ impl<B: SplitByteSlice> Ipv6Packet<B> {
                         // updated due to changed IP addresses.
                         let udp_serializer =
                             Nat64Serializer::Udp(udp.into_serializer(v4_src_addr, v4_dst_addr));
-                        Nat64TranslationResult::Forward(udp_serializer.encapsulate(v4_pkt_builder))
+                        Nat64TranslationResult::Forward(v4_pkt_builder.wrap_body(udp_serializer))
                     }
                     Err(msg) => {
                         debug!("Parsing of UDP packet failed: {:?}", msg);
@@ -741,9 +739,7 @@ impl<B: SplitByteSlice> Ipv6Packet<B> {
 
                         let common_serializer =
                             Nat64Serializer::Other(self.body().into_serializer());
-                        Nat64TranslationResult::Forward(
-                            common_serializer.encapsulate(v4_pkt_builder),
-                        )
+                        Nat64TranslationResult::Forward(v4_pkt_builder.wrap_body(common_serializer))
                     }
                 }
             }
@@ -774,13 +770,13 @@ impl<B: SplitByteSlice> Ipv6Packet<B> {
             Ipv6Proto::Other(val) => {
                 let v4_pkt_builder = v4_builder(Ipv4Proto::Other(val));
                 let common_serializer = Nat64Serializer::Other(self.body().into_serializer());
-                Nat64TranslationResult::Forward(common_serializer.encapsulate(v4_pkt_builder))
+                Nat64TranslationResult::Forward(v4_pkt_builder.wrap_body(common_serializer))
             }
 
             Ipv6Proto::NoNextHeader => {
                 let v4_pkt_builder = v4_builder(Ipv4Proto::Other(Ipv6Proto::NoNextHeader.into()));
                 let common_serializer = Nat64Serializer::Other(self.body().into_serializer());
-                Nat64TranslationResult::Forward(common_serializer.encapsulate(v4_pkt_builder))
+                Nat64TranslationResult::Forward(v4_pkt_builder.wrap_body(common_serializer))
             }
 
             // Don't forward packets that use IANA's reserved protocol; they're
@@ -1600,8 +1596,8 @@ mod tests {
         let buffer = packet
             .body()
             .into_serializer()
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -1626,8 +1622,8 @@ mod tests {
         let buffer = packet
             .body()
             .into_serializer()
-            .encapsulate(packet.builder())
-            .encapsulate(frame.builder())
+            .wrap_in(packet.builder())
+            .wrap_in(frame.builder())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(buffer.as_ref(), ETHERNET_FRAME.bytes);
@@ -2067,7 +2063,7 @@ mod tests {
         builder.flowlabel(0x10405);
         let mut buf = (&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
             .into_serializer()
-            .encapsulate(builder)
+            .wrap_in(builder)
             .serialize_vec_outer()
             .unwrap();
         // assert that we get the literal bytes we expected
@@ -2094,13 +2090,13 @@ mod tests {
         // serializing the header.
         let mut buf_0 = [0; IPV6_FIXED_HDR_LEN];
         let _: Buf<&mut [u8]> = Buf::new(&mut buf_0[..], IPV6_FIXED_HDR_LEN..)
-            .encapsulate(new_builder())
+            .wrap_in(new_builder())
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
         let mut buf_1 = [0xFF; IPV6_FIXED_HDR_LEN];
         let _: Buf<&mut [u8]> = Buf::new(&mut buf_1[..], IPV6_FIXED_HDR_LEN..)
-            .encapsulate(new_builder())
+            .wrap_in(new_builder())
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -2114,7 +2110,7 @@ mod tests {
         // extension header.
         let mut buf = (&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
             .into_serializer()
-            .encapsulate(
+            .wrap_in(
                 Ipv6PacketBuilderWithHbhOptions::new(
                     new_builder(),
                     &[HopByHopOption {
@@ -2138,7 +2134,7 @@ mod tests {
         // Test that a packet whose payload is longer than 2^16 - 1 bytes is
         // rejected.
         let _: Buf<&mut [u8]> = Buf::new(&mut [0; 1 << 16][..], ..)
-            .encapsulate(new_builder())
+            .wrap_in(new_builder())
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -2574,8 +2570,8 @@ mod tests {
 
         let v4_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(tcp_builder)
-            .encapsulate(ipv4_builder)
+            .wrap_in(tcp_builder)
+            .wrap_in(ipv4_builder)
             .serialize_vec_outer()
             .expect("Failed to serialize to v4_pkt_buf");
 
@@ -2591,8 +2587,8 @@ mod tests {
 
         let v6_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(v6_tcp_builder)
-            .encapsulate(ipv6_builder)
+            .wrap_in(v6_tcp_builder)
+            .wrap_in(ipv6_builder)
             .serialize_vec_outer()
             .expect("Failed to serialize to v4_pkt_buf");
 
@@ -2642,8 +2638,8 @@ mod tests {
 
         let v4_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(v4_udp_builder)
-            .encapsulate(ipv4_builder)
+            .wrap_in(v4_udp_builder)
+            .wrap_in(ipv4_builder)
             .serialize_vec_outer()
             .expect("Unable to serialize to v4_pkt_buf");
 
@@ -2652,8 +2648,8 @@ mod tests {
 
         let v6_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(v6_udp_builder)
-            .encapsulate(ipv6_builder)
+            .wrap_in(v6_udp_builder)
+            .wrap_in(ipv6_builder)
             .serialize_vec_outer()
             .expect("Unable to serialize to v6_pkt_buf");
 
@@ -2691,13 +2687,13 @@ mod tests {
 
         let expected_v4_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(ipv4_builder)
+            .wrap_in(ipv4_builder)
             .serialize_vec_outer()
             .expect("Unable to serialize to expected_v4_pkt_buf");
 
         let mut v6_pkt_buf = (&PAYLOAD)
             .into_serializer()
-            .encapsulate(ipv6_builder)
+            .wrap_in(ipv6_builder)
             .serialize_vec_outer()
             .expect("Unable to serialize to v6_pkt_buf");
 
@@ -2748,12 +2744,8 @@ mod tests {
             more_fragments,
             identification,
         );
-        let mut serialized = PAYLOAD
-            .into_serializer()
-            .encapsulate(builder)
-            .serialize_vec_outer()
-            .unwrap()
-            .unwrap_b();
+        let mut serialized =
+            builder.wrap_body(PAYLOAD.into_serializer()).serialize_vec_outer().unwrap().unwrap_b();
         let packet = serialized.parse::<Ipv6Packet<_>>().unwrap();
         assert!(packet.fragment_header_present());
         assert_eq!(packet.proto(), Ipv6Proto::Proto(IpProto::Tcp));
