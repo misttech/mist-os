@@ -37,6 +37,9 @@ pub(crate) trait IfaceManager: Send + Sync {
     fn list_ifaces(&self) -> Vec<u16>;
     async fn get_country(&self, phy_id: u16) -> Result<[u8; 2], Error>;
     async fn set_country(&self, phy_id: u16, country: [u8; 2]) -> Result<(), Error>;
+    async fn power_down(&self, phy_id: u16) -> Result<(), Error>;
+    async fn power_up(&self, phy_id: u16) -> Result<(), Error>;
+    async fn get_power_state(&self, phy_id: u16) -> Result<bool, Error>;
     async fn query_iface(
         &self,
         iface_id: u16,
@@ -103,6 +106,39 @@ impl IfaceManager for DeviceMonitorIfaceManager {
         match zx::Status::ok(result) {
             Ok(()) => Ok(()),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    async fn power_down(&self, phy_id: u16) -> Result<(), Error> {
+        let result = self.monitor_svc.power_down(phy_id).await.map_err(Into::<Error>::into)?;
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) => match zx::Status::ok(e) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+
+    async fn power_up(&self, phy_id: u16) -> Result<(), Error> {
+        let result = self.monitor_svc.power_up(phy_id).await.map_err(Into::<Error>::into)?;
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) => match zx::Status::ok(e) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+
+    async fn get_power_state(&self, phy_id: u16) -> Result<bool, Error> {
+        let result = self.monitor_svc.get_power_state(phy_id).await.map_err(Into::<Error>::into)?;
+        match result {
+            Ok(power_state) => Ok(power_state),
+            Err(e) => match zx::Status::ok(e) {
+                Err(e) => Err(e.into()),
+                Ok(()) => Err(format_err!("get_power_state returned error with ok status")),
+            },
         }
     }
 
@@ -840,12 +876,16 @@ pub mod test_utils {
         CreateClientIface(u16),
         GetClientIface(u16),
         DestroyIface(u16),
+        PowerDown(u16),
+        PowerUp(u16),
+        GetPowerState(u16),
     }
 
     pub struct TestIfaceManager {
         pub client_iface: Mutex<Option<Arc<TestClientIface>>>,
         pub calls: Arc<Mutex<Vec<IfaceManagerCall>>>,
         country: Arc<Mutex<[u8; 2]>>,
+        power_state: Arc<Mutex<bool>>,
     }
 
     impl TestIfaceManager {
@@ -854,6 +894,7 @@ pub mod test_utils {
                 client_iface: Mutex::new(None),
                 calls: Arc::new(Mutex::new(vec![])),
                 country: Arc::new(Mutex::new(*b"WW")),
+                power_state: Arc::new(Mutex::new(true)),
             }
         }
 
@@ -862,6 +903,7 @@ pub mod test_utils {
                 client_iface: Mutex::new(Some(Arc::new(TestClientIface::new()))),
                 calls: Arc::new(Mutex::new(vec![])),
                 country: Arc::new(Mutex::new(*b"WW")),
+                power_state: Arc::new(Mutex::new(true)),
             }
         }
 
@@ -876,6 +918,7 @@ pub mod test_utils {
                     }))),
                     calls: Arc::new(Mutex::new(vec![])),
                     country: Arc::new(Mutex::new(*b"WW")),
+                    power_state: Arc::new(Mutex::new(true)),
                 },
                 sender,
             )
@@ -959,6 +1002,23 @@ pub mod test_utils {
             self.calls.lock().push(IfaceManagerCall::DestroyIface(iface_id));
             *self.client_iface.lock() = None;
             Ok(())
+        }
+
+        async fn power_down(&self, phy_id: u16) -> Result<(), Error> {
+            self.calls.lock().push(IfaceManagerCall::PowerDown(phy_id));
+            *self.power_state.lock() = false;
+            Ok(())
+        }
+
+        async fn power_up(&self, phy_id: u16) -> Result<(), Error> {
+            self.calls.lock().push(IfaceManagerCall::PowerUp(phy_id));
+            *self.power_state.lock() = true;
+            Ok(())
+        }
+
+        async fn get_power_state(&self, phy_id: u16) -> Result<bool, Error> {
+            self.calls.lock().push(IfaceManagerCall::GetPowerState(phy_id));
+            Ok(*self.power_state.lock())
         }
     }
 }

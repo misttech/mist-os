@@ -290,41 +290,90 @@ async fn handle_wifi_request<I: IfaceManager>(
         }
         fidl_wlanix::WifiRequest::Start { responder } => {
             info!("fidl_wlanix::WifiRequest::Start");
-            let mut state = state.lock();
-            state.started = true;
-            responder.send(Ok(())).context("send Start response")?;
-            maybe_run_callback(
-                "WifiEventCallbackProxy::OnStart",
-                fidl_wlanix::WifiEventCallbackProxy::on_start,
-                &mut state.callback,
-            );
+            let mut result: Result<(), i32> = Ok(());
+            let mut driver_started: bool = true;
+            let phy_ids = iface_manager.list_phys().await?;
+            for phy_id in phy_ids {
+                // Get the current state from the driver.
+                let power_state = iface_manager.get_power_state(phy_id).await?;
 
-            let event = wlan_telemetry::ClientConnectionsToggleEvent::Enabled;
-            telemetry_sender.send(TelemetryEvent::ClientConnectionsToggle { event });
-        }
-        fidl_wlanix::WifiRequest::Stop { responder } => {
-            info!("fidl_wlanix::WifiRequest::Stop");
-            // This should look like a reset of the chip. Tear down all ifaces.
-            for iface in iface_manager.list_ifaces() {
-                if let Err(e) = iface_manager.destroy_iface(iface).await {
-                    error!(
-                        "Failed to destroy iface {} in response to WifiRequest::Stop: {}",
-                        iface, e
-                    );
+                if !power_state {
+                    if let Err(e) = iface_manager.power_up(phy_id).await {
+                        error!(
+                            "Failed to start phy {} in response to WifiRequest::Start: {}",
+                            phy_id, e
+                        );
+                        driver_started = false;
+                        result = Err(zx::sys::ZX_ERR_BAD_STATE);
+                    }
+                } else {
+                    warn!("Phy {} already started", phy_id);
                 }
             }
             let mut state = state.lock();
-            state.started = false;
-            maybe_run_callback(
-                "WifiEventCallbackProxy::OnStop",
-                fidl_wlanix::WifiEventCallbackProxy::on_stop,
-                &mut state.callback,
-            );
+            state.started = driver_started;
+            if driver_started {
+                maybe_run_callback(
+                    "WifiEventCallbackProxy::OnStart",
+                    fidl_wlanix::WifiEventCallbackProxy::on_start,
+                    &mut state.callback,
+                );
 
-            let event = wlan_telemetry::ClientConnectionsToggleEvent::Disabled;
-            telemetry_sender.send(TelemetryEvent::ClientConnectionsToggle { event });
-            responder.send(Ok(())).context("send Stop response")?;
+                let event = wlan_telemetry::ClientConnectionsToggleEvent::Enabled;
+                telemetry_sender.send(TelemetryEvent::ClientConnectionsToggle { event });
+            }
+            responder.send(result).context("send Start response")?;
         }
+
+        fidl_wlanix::WifiRequest::Stop { responder } => {
+            info!("fidl_wlanix::WifiRequest::Stop");
+            let mut result: Result<(), i32> = Ok(());
+            let mut driver_stopped: bool = true;
+            let phy_ids = iface_manager.list_phys().await?;
+            for phy_id in phy_ids {
+                // Get the current state from the driver.
+                let power_state = iface_manager.get_power_state(phy_id).await?;
+
+                // If powered up, attempt to power it down.
+                if power_state {
+                    // Tear down all ifaces before calling power_down.
+                    for iface in iface_manager.list_ifaces() {
+                        if let Err(e) = iface_manager.destroy_iface(iface).await {
+                            error!(
+                                "Failed to destroy iface {} in response to WifiRequest::Stop: {}",
+                                iface, e
+                            );
+                        } else {
+                            info!("Successfully deleted iface {} in phy {}", iface, phy_id);
+                        }
+                    }
+                    if let Err(e) = iface_manager.power_down(phy_id).await {
+                        error!(
+                            "Failed to stop phy {} in response to WifiRequest::Stop: {}",
+                            phy_id, e
+                        );
+                        driver_stopped = false;
+                        result = Err(zx::sys::ZX_ERR_BAD_STATE);
+                    }
+                } else {
+                    warn!("Phy {} already stopped", phy_id);
+                }
+            }
+            let mut state = state.lock();
+            state.started = !driver_stopped;
+            if driver_stopped {
+                maybe_run_callback(
+                    "WifiEventCallbackProxy::OnStop",
+                    fidl_wlanix::WifiEventCallbackProxy::on_stop,
+                    &mut state.callback,
+                );
+
+                let event = wlan_telemetry::ClientConnectionsToggleEvent::Disabled;
+                telemetry_sender.send(TelemetryEvent::ClientConnectionsToggle { event });
+            }
+            responder.send(result).context("send Stop response")?;
+        }
+
         fidl_wlanix::WifiRequest::GetState { responder } => {
             info!("fidl_wlanix::WifiRequest::GetState");
             let response = fidl_wlanix::WifiGetStateResponse {
@@ -1695,6 +1744,7 @@ mod tests {
         let mut start_fut = pin!(start_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
 
+        // The chip is assumed to be powered on by default
         let get_state_fut = test_helper.wifi_proxy.get_state();
         let mut get_state_fut = pin!(get_state_fut);
         assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
@@ -1704,6 +1754,99 @@ mod tests {
             Poll::Ready(Ok(response)) => response
         );
         assert_eq!(response.is_started, Some(true));
+        let calls = test_helper.iface_manager.calls.lock();
+        assert!(!calls.is_empty());
+        assert_variant!(
+            &calls[calls.len() - 1],
+            ifaces::test_utils::IfaceManagerCall::GetPowerState(_)
+        );
+
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ClientConnectionsToggle {
+                event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
+            }))
+        );
+    }
+
+    #[test]
+    fn test_wifi_already_started() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+
+        let start_fut = test_helper.wifi_proxy.start();
+        let mut start_fut = pin!(start_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+
+        let start_fut2 = test_helper.wifi_proxy.start();
+        let mut start_fut2 = pin!(start_fut2);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut2), Poll::Pending);
+
+        let get_state_fut = test_helper.wifi_proxy.get_state();
+        let mut get_state_fut = pin!(get_state_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut), Poll::Pending);
+
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut get_state_fut),
+            Poll::Ready(Ok(response)) => response
+        );
+        assert_eq!(response.is_started, Some(true));
+        let calls = test_helper.iface_manager.calls.lock();
+        assert_variant!(calls.len(), 5);
+        assert_variant!(&calls[2], ifaces::test_utils::IfaceManagerCall::GetPowerState(_));
+        assert_variant!(&calls[1], ifaces::test_utils::IfaceManagerCall::ListPhys);
+
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ClientConnectionsToggle {
+                event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
+            }))
+        );
+    }
+
+    #[test]
+    fn test_wifi_start_stop_start() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+
+        // PowerUp
+        let start_fut = test_helper.wifi_proxy.start();
+        let mut start_fut = pin!(start_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+
+        // PowerDown
+        let stop_fut = test_helper.wifi_proxy.stop();
+        let mut stop_fut = pin!(stop_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+
+        // State should be false (stopped)
+        let get_state_fut1 = test_helper.wifi_proxy.get_state();
+        let mut get_state_fut1 = pin!(get_state_fut1);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut1), Poll::Pending);
+
+        // PowerUp again
+        let start_fut2 = test_helper.wifi_proxy.start();
+        let mut start_fut2 = pin!(start_fut2);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut2), Poll::Pending);
+
+        // State should be true (started)
+        let get_state_fut2 = test_helper.wifi_proxy.get_state();
+        let mut get_state_fut2 = pin!(get_state_fut2);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut get_state_fut2), Poll::Pending);
+
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response1 = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut get_state_fut1),
+            Poll::Ready(Ok(response1)) => response1
+        );
+        let response2 = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut get_state_fut2),
+            Poll::Ready(Ok(response2)) => response2
+        );
+        assert_eq!(response1.is_started, Some(false));
+        assert_eq!(response2.is_started, Some(true));
+        let calls = test_helper.iface_manager.calls.lock();
+        assert!(!calls.is_empty());
+        assert_variant!(&calls[calls.len() - 1], ifaces::test_utils::IfaceManagerCall::PowerUp(_));
 
         assert_variant!(
             test_helper.telemetry_receiver.try_next(),
@@ -1735,11 +1878,15 @@ mod tests {
         );
         assert_eq!(response.is_started, Some(false));
 
-        // On stop, we shut down all remaining ifaces.
+        // On stop, we shut down all remaining ifaces and power down.
         let calls = test_helper.iface_manager.calls.lock();
         assert!(!calls.is_empty());
         assert_variant!(
             &calls[calls.len() - 1],
+            ifaces::test_utils::IfaceManagerCall::PowerDown(_)
+        );
+        assert_variant!(
+            &calls[calls.len() - 2],
             ifaces::test_utils::IfaceManagerCall::DestroyIface(_)
         );
 
