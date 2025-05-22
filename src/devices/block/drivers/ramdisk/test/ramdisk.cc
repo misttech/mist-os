@@ -1725,6 +1725,72 @@ TEST_P(RamdiskTestWithClient, DiscardRandomOnWake) {
   } while (found != 0xf);
 }
 
+TEST_P(RamdiskTestWithClient, DiscardRandomOnWakeWithBarriers) {
+  if (GetParam()) {
+    ASSERT_EQ(ramdisk_set_flags(
+                  ramdisk_->ramdisk_client(),
+                  static_cast<uint32_t>(
+                      fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake |
+                      fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardRandom)),
+              ZX_OK);
+
+    // Loop 100 times to try and catch an error.
+    for (size_t i = 0; i < 100; ++i) {
+      ASSERT_EQ(ramdisk_sleep_after(ramdisk_->ramdisk_client(), 100), ZX_OK);
+      fill_random(buf_.get(), vmo_size_);
+      ASSERT_EQ(vmo_.write(buf_.get(), 0, vmo_size_), ZX_OK);
+
+      block_fifo_request_t requests[4];
+      for (size_t i = 0; i < std::size(requests); ++i) {
+        if (i == 2) {
+          // Insert a barrier midway through
+          requests[i].group = 0;
+          requests[i].vmoid = vmoid_.id;
+          requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_PRE_BARRIER};
+          requests[i].length = 1;
+          requests[i].vmo_offset = i;
+          requests[i].dev_offset = i;
+        } else {
+          requests[i].group = 0;
+          requests[i].vmoid = vmoid_.id;
+          requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
+          requests[i].length = 1;
+          requests[i].vmo_offset = i;
+          requests[i].dev_offset = i;
+        }
+      }
+      ASSERT_EQ(client_->Transaction(requests, std::size(requests)), ZX_OK);
+
+      // Wake the device and it should randomly discard blocks.
+      ASSERT_EQ(ramdisk_wake(ramdisk_->ramdisk_client()), ZX_OK);
+
+      memset(mapping_.start(), 0, vmo_size_);
+
+      // Read back all the blocks.
+      for (size_t i = 0; i < std::size(requests); ++i) {
+        requests[i].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
+      }
+      ASSERT_EQ(client_->Transaction(requests, std::size(requests)), ZX_OK);
+
+      // Verify that if either of the first two blocks was discarded, all the blocks following the
+      // barrier were also discarded
+      bool discard = false;
+      for (size_t i = 0; i < std::size(requests); ++i) {
+        if (i < 2) {
+          if (memcmp(static_cast<uint8_t*>(mapping_.start()) + zx_system_get_page_size() * i,
+                     &buf_[zx_system_get_page_size() * i], zx_system_get_page_size()) != 0) {
+            discard = true;
+          }
+        } else if (discard == true) {
+          EXPECT_NE(memcmp(static_cast<uint8_t*>(mapping_.start()) + zx_system_get_page_size() * i,
+                           &buf_[zx_system_get_page_size() * i], zx_system_get_page_size()),
+                    0);
+        }
+      }
+    }
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(/* no prefix */, RamdiskTestWithClient, testing::Values(false, true));
 
 }  // namespace

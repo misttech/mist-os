@@ -34,6 +34,7 @@ struct BlockServer;
 class WriteOptions {
  public:
   bool is_force_access() const { return (options_ & 1) != 0; }
+  bool is_pre_barrier() const { return (options_ & 2) != 0; }
 
  private:
   uint32_t options_;
