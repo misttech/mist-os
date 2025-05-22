@@ -53,6 +53,18 @@ rust_library(
         ],
     ),
     crate_features = select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [
+            "default",  # aarch64-apple-darwin
+            "graphmap",  # aarch64-apple-darwin
+            "matrix_graph",  # aarch64-apple-darwin
+            "stable_graph",  # aarch64-apple-darwin
+        ],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [
+            "default",  # x86_64-apple-darwin
+            "graphmap",  # x86_64-apple-darwin
+            "matrix_graph",  # x86_64-apple-darwin
+            "stable_graph",  # x86_64-apple-darwin
+        ],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
             "default",  # x86_64-unknown-linux-gnu
             "graphmap",  # x86_64-unknown-linux-gnu
@@ -74,7 +86,9 @@ rust_library(
         "norustfmt",
     ],
     target_compatible_with = select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
