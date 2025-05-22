@@ -365,7 +365,15 @@ async fn test_add_remove_interface<N: Netstack>(name: &str) {
 /// addresses.
 #[netstack_test]
 #[variant(N, Netstack)]
-async fn test_include_all_addresses<N: Netstack>(name: &str) {
+#[variant(I, Ip)]
+async fn test_include_all_addresses<N: Netstack, I: Ip>(name: &str) {
+    match (N::VERSION, I::VERSION) {
+        // Netstack2 doesn't support `AddressParameters.perform_dad`.
+        // Skip the test.
+        (NetstackVersion::Netstack2 { .. }, IpVersion::V4) => return,
+        (_, _) => {}
+    }
+
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
@@ -393,10 +401,9 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
     .await
     .expect("observe interface addition");
 
-    const IPV6_ADDRESS: fidl_fuchsia_net::Subnet = fidl_subnet!("a::1/64");
-
-    async fn want_until_address_state(
+    async fn wait_until_address_state(
         want_assignment_state: fidl_fuchsia_net_interfaces::AddressAssignmentState,
+        want_addr: fidl_fuchsia_net::Subnet,
         state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<
             (),
             fidl_fuchsia_net_interfaces_ext::AllInterest,
@@ -419,7 +426,7 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
                     |fidl_fuchsia_net_interfaces_ext::Address {
                          addr, assignment_state, ..
                      }| {
-                        *addr == IPV6_ADDRESS && *assignment_state == want_assignment_state
+                        *addr == want_addr && *assignment_state == want_assignment_state
                     },
                 )
                 .then_some(())
@@ -428,6 +435,22 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
         .expect("observe address change")
     }
 
+    let (addr, addr_params) = match I::VERSION {
+        IpVersion::V4 => (
+            fidl_subnet!("192.0.2.1/24"),
+            fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                perform_dad: Some(true),
+                ..Default::default()
+            },
+        ),
+        IpVersion::V6 => (
+            fidl_subnet!("a::1/64"),
+            // NB: For IPv6 DAD is performed by default, so there's no need to
+            // opt in like for IPv4.
+            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        ),
+    };
+
     // Address should appear as unavailable when it is added on a disabled
     // interface.
     {
@@ -435,14 +458,7 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
         >();
         address_state_provider.detach().expect("detach address lifetime");
-        iface
-            .control()
-            .add_address(
-                &IPV6_ADDRESS,
-                &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
-                server,
-            )
-            .expect("send add address request");
+        iface.control().add_address(&addr, &addr_params, server).expect("send add address request");
         // We need to wait for the `OnAddressAdded` before dropping the
         // ASP to make sure that the `Detach` request above is handled.
         // See https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=131322
@@ -453,8 +469,9 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
         .await
         .expect("wait for address successfully added");
     }
-    want_until_address_state(
+    wait_until_address_state(
         fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable,
+        addr,
         &mut state,
         event_stream.by_ref(),
     )
@@ -463,14 +480,16 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
     // We should see the address transition from unavailable to tentative then
     // assigned when the interface is assigned.
     assert!(iface.control().enable().await.expect("send enable").expect("enable interface"));
-    want_until_address_state(
+    wait_until_address_state(
         fidl_fuchsia_net_interfaces::AddressAssignmentState::Tentative,
+        addr,
         &mut state,
         event_stream.by_ref(),
     )
     .await;
-    want_until_address_state(
+    wait_until_address_state(
         fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
+        addr,
         &mut state,
         event_stream.by_ref(),
     )
@@ -479,8 +498,9 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
     // We should see the address transition from assigned to unavailable when
     // the interface is disabled.
     assert!(iface.control().disable().await.expect("send enable").expect("enable interface"));
-    want_until_address_state(
+    wait_until_address_state(
         fidl_fuchsia_net_interfaces::AddressAssignmentState::Unavailable,
+        addr,
         &mut state,
         event_stream.by_ref(),
     )
