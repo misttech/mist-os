@@ -43,7 +43,7 @@ fn _get_string_or_file_content(
     undefined_message: &str,
     both_defined_message: &str,
 ) -> Result<String> {
-    Ok(match (field, field_file) {
+    let s = match (field, field_file) {
         (None, None) => undefined_message.to_string(),
         (Some(_), Some(_)) => bail!(both_defined_message.to_string()),
         (Some(field), _) => field.to_string(),
@@ -51,7 +51,11 @@ fn _get_string_or_file_content(
             let s = fs::read_to_string(field_file)?;
             s.trim().to_string()
         }
-    })
+    };
+    if &s == "" {
+        return Ok(undefined_message.to_string());
+    }
+    Ok(s)
 }
 
 #[cfg(test)]
@@ -90,6 +94,20 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_version_string() {
+        let version: Option<String> = Some("".to_string());
+        let version_file: Option<Utf8PathBuf> = None;
+        let version = _get_string_or_file_content(
+            &version,
+            &version_file,
+            "unversioned",
+            "version and version_file cannot both be supplied",
+        )
+        .unwrap();
+        assert_eq!("unversioned".to_string(), version);
+    }
+
+    #[test]
     fn test_version_file() {
         let mut file = tempfile::NamedTempFile::new().unwrap();
         write!(&mut file, "version_file").unwrap();
@@ -105,6 +123,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!("version_file".to_string(), version);
+    }
+
+    #[test]
+    fn test_empty_version_file() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        write!(&mut file, "").unwrap();
+
+        let version: Option<String> = None;
+        let version_file: Option<Utf8PathBuf> =
+            Some(Utf8Path::from_path(file.path()).unwrap().into());
+        let version = _get_string_or_file_content(
+            &version,
+            &version_file,
+            "unversioned",
+            "version and version_file cannot both be supplied",
+        )
+        .unwrap();
+        assert_eq!("unversioned".to_string(), version);
     }
 
     #[test]
