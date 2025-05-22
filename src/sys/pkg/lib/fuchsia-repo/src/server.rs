@@ -805,7 +805,7 @@ impl From<TcpStream> for TcpStreamWithPeerAddr {
 #[derive(Debug)]
 pub enum ConnectionStream {
     Tcp(TcpStreamWithPeerAddr),
-    Socket(fasync::Socket, rcs::port_forward::SocketKeepAliveToken),
+    Socket(fasync::Socket),
 }
 
 impl tokio::io::AsyncRead for ConnectionStream {
@@ -818,7 +818,7 @@ impl tokio::io::AsyncRead for ConnectionStream {
             ConnectionStream::Tcp(t) => {
                 Pin::new(&mut t.stream).poll_read(cx, buf.initialize_unfilled())
             }
-            ConnectionStream::Socket(t, _) => {
+            ConnectionStream::Socket(t) => {
                 futures::AsyncRead::poll_read(Pin::new(t), cx, buf.initialize_unfilled())
             }
         }
@@ -836,21 +836,21 @@ impl tokio::io::AsyncWrite for ConnectionStream {
     ) -> Poll<io::Result<usize>> {
         match &mut *self {
             ConnectionStream::Tcp(t) => Pin::new(&mut t.stream).poll_write(cx, buf),
-            ConnectionStream::Socket(t, _) => futures::AsyncWrite::poll_write(Pin::new(t), cx, buf),
+            ConnectionStream::Socket(t) => futures::AsyncWrite::poll_write(Pin::new(t), cx, buf),
         }
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
             ConnectionStream::Tcp(t) => Pin::new(&mut t.stream).poll_flush(cx),
-            ConnectionStream::Socket(t, _) => futures::AsyncWrite::poll_flush(Pin::new(t), cx),
+            ConnectionStream::Socket(t) => futures::AsyncWrite::poll_flush(Pin::new(t), cx),
         }
     }
 
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut *self {
             ConnectionStream::Tcp(t) => Pin::new(&mut t.stream).poll_close(cx),
-            ConnectionStream::Socket(t, _) => Pin::new(t).poll_close(cx),
+            ConnectionStream::Socket(t) => Pin::new(t).poll_close(cx),
         }
     }
 }
