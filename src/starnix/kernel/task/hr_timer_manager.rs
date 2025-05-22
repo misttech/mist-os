@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Result};
 use fidl::endpoints::Proxy;
 use fuchsia_inspect::ArrayProperty;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
@@ -31,6 +32,49 @@ const TEMPORARY_STARNIX_TIMER_ID: &str = "starnix-hrtimer";
 
 /// Max value for inspect event history.
 const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 128;
+
+// TODO: b/388568736 - will be in use shortly.
+#[allow(dead_code)]
+fn to_errno_with_log<T: std::fmt::Debug>(v: T) -> Errno {
+    log_error!("hr_timer_manager internal error: {v:?}");
+    from_status_like_fdio!(zx::Status::IO)
+}
+
+// TODO: b/388568736 - will be in use shortly.
+#[allow(dead_code)]
+fn signal_handle<H: HandleBased>(
+    handle: &H,
+    clear_mask: zx::Signals,
+    set_mask: zx::Signals,
+) -> Result<(), zx::Status> {
+    handle.signal_handle(clear_mask, set_mask).map_err(|err| {
+        log_error!("while signaling handle: {err:?}: clear: {clear_mask:?}, set: {set_mask:?}");
+        err
+    })
+}
+
+// TODO: b/388568736 - will be in use shortly.
+#[allow(dead_code)]
+fn duplicate_handle<H: HandleBased>(h: &H) -> Result<H, Errno> {
+    h.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|status| from_status_like_fdio!(status))
+}
+
+/// Waits forever synchronously for EVENT_SIGNALED.
+// TODO: b/388568736 - will be in use shortly.
+#[allow(dead_code)]
+fn wait_handle_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
+    handle.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE)
+}
+
+/// Waits forever asynchronously for EVENT_SIGNALED.
+// TODO: b/388568736 - will be in use shortly.
+#[allow(dead_code)]
+async fn wait_handle<H: HandleBased>(handle: &H) -> Result<()> {
+    fasync::OnSignals::new(handle, zx::Signals::EVENT_SIGNALED)
+        .await
+        .context("hr_timer_manager:wait_signaled")?;
+    Ok(())
+}
 
 // Used to inject a fake proxy in tests.
 fn get_wake_proxy_internal(mut wake_channel: Option<zx::Channel>) -> fta::WakeProxy {
@@ -79,9 +123,10 @@ fn connect_to_wake_alarms() -> Result<fta::WakeSynchronousProxy, Errno> {
 
 // This function is swapped out for an injected proxy in tests.
 fn connect_to_wake_alarms_async() -> Result<fta::WakeProxy, Errno> {
-    log_debug!("connecting to ASYNC wake alarms");
-    fuchsia_component::client::connect_to_protocol::<fta::WakeMarker>()
-        .map_err(|e| errno!(EINVAL, format!("Failed to connect to fuchsia.time.alarms/Wake : {e}")))
+    log_debug!("connecting to wake alarms");
+    fuchsia_component::client::connect_to_protocol::<fta::WakeMarker>().map_err(|err| {
+        errno!(EINVAL, format!("Failed to connect to fuchsia.time.alarms/Wake: {err}"))
+    })
 }
 
 #[derive(Debug)]
@@ -98,8 +143,7 @@ enum InspectHrTimerEvent {
 impl InspectHrTimerEvent {
     fn retain_err(prev_len: usize, after_len: usize, context: &str) -> InspectHrTimerEvent {
         InspectHrTimerEvent::Error(format!(
-            "retain the timer heap incorrectly, before len: {}, after len: {}, context: {}",
-            prev_len, after_len, context
+            "retain the timer heap incorrectly, before len: {prev_len}, after len: {after_len}, context: {context}",
         ))
     }
 }
