@@ -478,7 +478,7 @@ pub(in crate::security) fn fs_node_init_on_create(
 }
 
 /// Called to label file nodes not linked in any filesystem's directory structure, e.g.
-/// usereventfds, etc.
+/// usereventfds, kernel-private sockets, etc.
 pub(in crate::security) fn fs_node_init_anon(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -486,9 +486,9 @@ pub(in crate::security) fn fs_node_init_anon(
     node_type: &str,
 ) {
     let fs_node_class = FileClass::AnonFsNode.into();
-
+    let is_private_node = Anon::is_private(new_node);
     // TODO: https://fxbug.dev/405062002 - Fold this into the `fs_node_init_with_dentry*()` logic?
-    let sid = if Anon::is_private(new_node) {
+    let sid = if is_private_node {
         // TODO: https://fxbug.dev/404773987 - Introduce a new `FsNode` labeling state for this?
         SecurityId::initial(InitialSid::Unlabeled)
     } else if security_server.has_policy() {
@@ -503,7 +503,14 @@ pub(in crate::security) fn fs_node_init_anon(
     };
 
     let mut state = new_node.security_state.lock();
-    state.class = fs_node_class;
+    // TODO: https://fxbug.dev/364569157 - The class and label of kernel-private sockets are not
+    // used in access decisions since permissions are always allowed in this case. But we need to
+    // know the socket-like class before calling into `has_socket_permission()`, so don't overwrite
+    // the class for kernel-private sockets.
+    if !is_private_node {
+        assert!(matches!(state.class, FsNodeClass::File(_)));
+        state.class = fs_node_class;
+    }
     state.label = FsNodeLabel::SecurityId { sid };
 }
 

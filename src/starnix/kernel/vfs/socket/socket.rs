@@ -1115,6 +1115,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_sendmsg_access(current_task, self)?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops.write(&mut locked, self, current_task, data, dest_address, ancillary_data)
     }

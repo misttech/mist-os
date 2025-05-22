@@ -166,6 +166,71 @@ TEST(SocketTest, ListenDenied) {
   EXPECT_THAT(listen(sockfd.get(), kTestBacklog), SyscallFailsWithErrno(EACCES));
 }
 
+TEST(SocketTest, SendmsgAllowed) {
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_sendmsg_test_t:s0"), fit::ok());
+  auto sockcreate =
+      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_sendmsg_yes_t:s0");
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+  char data[] = "y";
+  struct iovec iov[] = {{
+      .iov_base = data,
+      .iov_len = 1,
+  }};
+  struct msghdr msg = {0};
+  msg.msg_iov = iov;
+  msg.msg_iovlen = 1;
+
+  EXPECT_THAT(sendmsg(fds[0], &msg, 0), SyscallSucceeds());
+}
+
+TEST(SocketTest, SendmsgDenied) {
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_sendmsg_test_t:s0"), fit::ok());
+  auto sockcreate =
+      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_sendmsg_no_t:s0");
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+
+  char data[] = "n";
+  struct iovec iov[] = {{
+      .iov_base = data,
+      .iov_len = 1,
+  }};
+  struct msghdr msg = {0};
+  msg.msg_iov = iov;
+  msg.msg_iovlen = 1;
+
+  EXPECT_THAT(sendmsg(fds[0], &msg, 0), SyscallFailsWithErrno(EACCES));
+}
+
+TEST(SocketTest, WriteAllowed) {
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_sendmsg_test_t:s0"), fit::ok());
+  auto sockcreate =
+      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_sendmsg_yes_t:s0");
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+  char data[] = "y";
+  EXPECT_THAT(write(fds[0], &data, 1), SyscallSucceeds());
+}
+
+TEST(SocketTest, WriteDenied) {
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_sendmsg_test_t:s0"), fit::ok());
+  auto sockcreate =
+      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_sendmsg_no_t:s0");
+  auto enforce = ScopedEnforcement::SetEnforcing();
+
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+  char data[] = "n";
+  EXPECT_THAT(write(fds[0], &data, 1), SyscallFailsWithErrno(EACCES));
+}
+
 fit::result<int, std::string> GetPeerSec(int fd) {
   char label_buf[256]{};
   socklen_t label_len = sizeof(label_buf);

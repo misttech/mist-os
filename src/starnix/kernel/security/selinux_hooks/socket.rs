@@ -366,6 +366,38 @@ pub(in crate::security) fn check_socket_setsockopt_access(
     )
 }
 
+/// Checks that `current_task` has permission to send a message on `socket`.
+pub(in crate::security) fn check_socket_sendmsg_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_sendmsg_access without FsNode"
+        );
+        return Ok(());
+    };
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!(
+            "check_socket_sendmsg_access called for non-Socket class {:?}",
+            socket_node.security_state.lock().class
+        )
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_sendmsg checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonFsNodePermission::Write.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
 /// Checks that `current_task` has permission to shutdown `socket`.
 pub(in crate::security) fn check_socket_shutdown_access(
     security_server: &SecurityServer,
