@@ -84,8 +84,11 @@ class KTraceTests {
     // * Metadata should have been reported.
     ktrace.Init(total_bufsize, 0xff1u);
     ASSERT_NONNULL(ktrace.percpu_buffers_);
-    ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
-    ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    {
+      TestKTrace::KTraceGuard guard(&ktrace.lock_);
+      ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
+      ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    }
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0xff1u, ktrace.categories_bitmask());
     ASSERT_EQ(1u, ktrace.report_metadata_count());
@@ -123,8 +126,11 @@ class KTraceTests {
     // Init should correctly round the buffer size per-CPU down to PAGE_SIZE.
     ktrace.Init(total_bufsize, 0xff1u);
     ASSERT_NONNULL(ktrace.percpu_buffers_);
-    ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
-    ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    {
+      TestKTrace::KTraceGuard guard(&ktrace.lock_);
+      ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
+      ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    }
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0xff1u, ktrace.categories_bitmask());
     ASSERT_EQ(1u, ktrace.report_metadata_count());
@@ -147,8 +153,11 @@ class KTraceTests {
     // * Metadata should _not_ have been reported.
     ktrace.Init(total_bufsize, 0u);
     ASSERT_NULL(ktrace.percpu_buffers_);
-    ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
-    ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    {
+      TestKTrace::KTraceGuard guard(&ktrace.lock_);
+      ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
+      ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    }
     ASSERT_FALSE(ktrace.WritesEnabled());
     ASSERT_EQ(0u, ktrace.categories_bitmask());
     ASSERT_EQ(0u, ktrace.report_metadata_count());
