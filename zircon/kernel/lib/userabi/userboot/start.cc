@@ -195,8 +195,10 @@ std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap)
   // Read the command line and the essential handles from the kernel.
   std::array<zx_handle_t, kChildHandleCount> handles = {};
   uint32_t actual_handles;
-  zx_status_t status =
-      bootstrap.read(0, nullptr, handles.data(), 0, handles.size(), nullptr, &actual_handles);
+  zx_signals_t pending;
+  zx_status_t status = bootstrap.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), &pending);
+  check(log, status, "cannot wait for bootstrap channel to be readable");
+  bootstrap.read(0, nullptr, handles.data(), 0, handles.size(), nullptr, &actual_handles);
   check(log, status, "cannot read bootstrap message");
 
   if (actual_handles != kHandleCount) {
