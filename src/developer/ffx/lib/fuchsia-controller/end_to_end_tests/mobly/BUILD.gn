@@ -23,10 +23,7 @@ group("fuchsia_controller_tests_staging") {
 }
 
 if (is_host) {
-  target_identity_deps = [
-    "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
-    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
-  ]
+  target_identity_deps = [ "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data" ]
 
   target_identity_libraries = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_python",
@@ -88,10 +85,7 @@ if (is_host) {
       nuc7_env,
       nuc11_env,
     ]
-    deps = [
-      "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
-      "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
-    ]
+    deps = [ "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data" ]
   }
 
   python_mobly_test("reboot_test") {
@@ -108,10 +102,7 @@ if (is_host) {
       nuc7_env,
       nuc11_env,
     ]
-    deps = [
-      "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
-      "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
-    ]
+    deps = [ "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data" ]
   }
 
   host_test_data("tracing_runtime_deps") {
@@ -136,7 +127,6 @@ if (is_host) {
     ]
     deps = [
       ":tracing_runtime_deps",
-      "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
       "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
     ]
   }
