@@ -174,7 +174,7 @@ impl ThermalShutdown {
                 self.send_message(&self.platform_metrics_node, &msg).await,
                 format!("Failed to log platform metric {:?}", msg)
             );
-            self.send_message(&self.system_shutdown_node, &Message::HighTemperatureReboot)
+            self.send_message(&self.system_shutdown_node, &Message::HighTemperatureShutdown)
                 .await
                 .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
         }
@@ -238,7 +238,7 @@ mod tests {
         );
         let shutdown_node = mock_maker.make(
             "Shutdown",
-            vec![(msg_eq!(HighTemperatureReboot), msg_ok_return!(SystemShutdown))],
+            vec![(msg_eq!(HighTemperatureShutdown), msg_ok_return!(SystemShutdown))],
         );
 
         let node_futures = FuturesUnordered::new();
@@ -265,7 +265,7 @@ mod tests {
             ),
             mock_maker.make(
                 "Shutdown",
-                vec![(msg_eq!(HighTemperatureReboot), msg_ok_return!(SystemShutdown))],
+                vec![(msg_eq!(HighTemperatureShutdown), msg_ok_return!(SystemShutdown))],
             ),
             mock_maker.make(
                 "Metrics",
