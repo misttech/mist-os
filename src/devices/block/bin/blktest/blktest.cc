@@ -546,6 +546,71 @@ TEST(BlkdevTests, blkdev_test_fifo_bad_client_unaligned_request) {
   ASSERT_EQ(block_client.Transaction(&request, 1), ZX_ERR_INVALID_ARGS, "");
 }
 
+TEST(BlkdevTests, blkdev_test_barriers) {
+  uint64_t blk_size, blk_count;
+  // Set up the initial handshake connection with the blkdev
+  fidl::ClientEnd<fuchsia_hardware_block::Block> client;
+  ASSERT_NO_FATAL_FAILURE(get_testdev(&blk_size, &blk_count, &client));
+
+  zx::result block_client_ptr = CreateSession(client);
+  ASSERT_OK(block_client_ptr);
+  block_client::Client& block_client = *block_client_ptr.value();
+
+  groupid_t group = 0;
+
+  // Create an arbitrary VMO, fill it with some stuff
+  const uint64_t vmo_size = blk_size;
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo), "Failed to create VMO");
+  std::unique_ptr<uint8_t[]> random_buf(new uint8_t[vmo_size]);
+  fill_random(random_buf.get(), vmo_size);
+
+  ASSERT_OK(vmo.write(random_buf.get(), 0, vmo_size));
+
+  // Send a handle to the vmo to the block device, get a vmoid which identifies it
+  zx::result vmoid_result = block_client.RegisterVmo(vmo);
+  ASSERT_OK(vmoid_result);
+  vmoid_t vmoid = vmoid_result->get();
+
+  // Write the VMO to the blkdev with a barrier.
+  block_fifo_request_t request;
+  request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_PRE_BARRIER};
+  request.group = group;
+  request.vmoid = vmoid;
+  request.length = 1;
+  request.vmo_offset = 0;
+  request.dev_offset = 0;
+
+  zx_status_t barrier_status = block_client.Transaction(&request, 1);
+  if (barrier_status != ZX_OK) {
+    ASSERT_EQ(barrier_status, ZX_ERR_NOT_SUPPORTED);
+
+    // Close the current vmo
+    request.command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
+    ASSERT_OK(block_client.Transaction(&request, 1));
+
+    return;
+  }
+  ASSERT_OK(barrier_status);
+
+  // Empty the vmo, then read the info we just wrote to the disk
+  std::unique_ptr<uint8_t[]> out(new uint8_t[vmo_size]());
+  // Fill the buffer with known data
+  memset(out.get(), 0xaa, vmo_size);
+
+  // Read and verify blkdev.
+  ASSERT_OK(vmo.write(out.get(), 0, vmo_size));
+  request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
+  ASSERT_OK(block_client.Transaction(&request, 1));
+  ASSERT_OK(vmo.read(out.get(), 0, vmo_size));
+  ASSERT_EQ(memcmp(random_buf.get(), out.get(), vmo_size), 0,
+            "Read data not equal to written data");
+
+  // Close the current vmo
+  request.command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
+  ASSERT_OK(block_client.Transaction(&request, 1));
+}
+
 TEST(BlkdevTests, blkdev_test_fifo_bad_client_overflow) {
   // Try to flex the server's error handling by sending 'malicious' client requests.
   // Set up the blkdev

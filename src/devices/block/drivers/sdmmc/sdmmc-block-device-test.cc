@@ -2061,6 +2061,7 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
+    out_data[MMC_EXT_CSD_BARRIER_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_FLUSH_POLICY] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;

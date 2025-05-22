@@ -718,6 +718,31 @@ zx_status_t SdmmcBlockDevice::Flush() {
   return st;
 }
 
+zx_status_t SdmmcBlockDevice::Barrier() {
+  if (!cache_enabled_) {
+    return ZX_OK;
+  }
+
+  // TODO(https://fxbug.dev/42075502): Enable the cache and add barrier support for SD.
+  ZX_ASSERT(!is_sd_);
+
+  // If the device uses a FIFO cache policy, barriers do nothing so return early.
+  if (cache_flush_fifo_) {
+    return ZX_OK;
+  }
+
+  // If the device does not have barriers enabled, flush the device instead.
+  if (!barrier_enabled_) {
+    return Flush();
+  }
+
+  zx_status_t st = MmcDoSwitch(MMC_EXT_CSD_FLUSH_CACHE, MMC_EXT_CSD_BARRIER_MASK);
+  if (st != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to set a barrier: %s", zx_status_get_string(st));
+  }
+  return st;
+}
+
 zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition partition) {
   // TODO(b/312236221): Add trim support for SD.
   if (is_sd_) {
@@ -904,6 +929,11 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
       }
       // MMC supports FUA writes, but not FUA reads. SD does not support FUA.
       if (btxn->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
+        BlockComplete(txn, ZX_ERR_NOT_SUPPORTED);
+        return;
+      }
+      // The legacy driver does not support barriers.
+      if (btxn->command.flags & BLOCK_IO_FLAG_PRE_BARRIER) {
         BlockComplete(txn, ZX_ERR_NOT_SUPPORTED);
         return;
       }
@@ -1324,6 +1354,19 @@ void SdmmcBlockDevice::OnRequests(PartitionDevice& partition,
         read_packer.Push(request);
         break;
       case block_server::Operation::Tag::Write:
+        if (request.operation.write.options.is_pre_barrier()) {
+          TRACE_DURATION_BEGIN("sdmmc", "barrier");
+
+          if (status = Barrier(); status != ZX_OK) {
+            partition.SendReply(request.request_id, zx::make_result(status));
+          }
+          TRACE_DURATION_END("sdmmc", "barrier", "opcode",
+                             TA_INT32(static_cast<int32_t>(request.operation.tag)), "txn_status",
+                             TA_INT32(status));
+          if (status != ZX_OK) {
+            break;
+          }
+        }
         write_packer.Push(request);
         break;
 
