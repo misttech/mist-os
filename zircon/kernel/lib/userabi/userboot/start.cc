@@ -377,6 +377,8 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
   status = to_child.write(0, &child_message, sizeof(child_message), child.handles.data(),
                           static_cast<uint32_t>(handle_count));
   check(log, status, "zx_channel_write to child failed");
+  // Clear child handles so that they're not closed in the ChildContext destructor.
+  child.handles.fill(ZX_HANDLE_INVALID);
 
   // Start the process going.
   status = child.process.start(child.thread, entry, sp, std::move(bootstrap), vdso_base);
