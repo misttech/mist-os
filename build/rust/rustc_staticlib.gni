@@ -100,6 +100,10 @@ import("//build/rust/rustc_test.gni")
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
 #
+#   dynamic_libstd (optional)
+#     Specifies that the Rust standard library will be dynamically linked.
+#     Defaults to true.
+#
 # Example of usage:
 #
 #   rustc_staticlib("foo") {
@@ -136,6 +140,7 @@ template("rustc_staticlib") {
                                "output_name",
                                "test_configs",
                                "test_deps",
+                               "dynamic_libstd",
                              ])
 
       # Use a different visibility for this test target if specified.
@@ -196,7 +201,11 @@ template("rustc_staticlib") {
       deps += invoker.non_rust_deps
     }
 
-    if (is_fuchsia) {
+    _dynamic_libstd = true
+    if (defined(invoker.dynamic_libstd)) {
+      _dynamic_libstd = invoker.dynamic_libstd
+    }
+    if (_dynamic_libstd && is_fuchsia) {
       rustflags = [
         # This nightly flag is needed to support having dylibs in this target's
         # dependencies or transitive dependencies.
