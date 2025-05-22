@@ -41,6 +41,32 @@
 // userland code.
 static bool is_from_user(const iframe_t* frame) { return SELECTOR_PL(frame->cs) != 0; }
 
+static void dump_double_fault(iframe_t* frame) {
+  printf("\ndouble fault, dumping stack of inital faulting thread: \n");
+  const auto current_thread = Thread::Current::Get();
+  if (current_thread == nullptr) {
+    printf("no current thread\n");
+    return;
+  }
+
+  const KernelStack& thread_stack = current_thread->stack();
+  const vaddr_t main_stack_base = thread_stack.base();
+  const vaddr_t main_stack_top = thread_stack.top();
+  const size_t main_stack_size = main_stack_top - main_stack_base;
+
+  printf("kernel stack base: 0x%lx size: %zu \n", main_stack_base, main_stack_size);
+  hexdump(reinterpret_cast<void*>(main_stack_base), main_stack_size);
+
+#if __has_feature(safe_stack)
+  const vaddr_t unsafe_stack_base = thread_stack.unsafe_base();
+  const vaddr_t unsafe_stack_top = thread_stack.unsafe_top();
+  printf("\nunsafe stack enabled. base: %lx size: %zu\n\n", unsafe_stack_base,
+         (unsafe_stack_top - unsafe_stack_base));
+#else
+  printf("no unsafe stack.\n");
+#endif
+}
+
 static void dump_fault_frame(iframe_t* frame) {
   PrintFrame(stdout, *frame);
 
@@ -72,11 +98,18 @@ KCOUNTER(exceptions_user, "exceptions.user")
 __NO_RETURN static void exception_die(iframe_t* frame, const char* msg) {
   platform_panic_start();
 
+  g_crashlog.regs.iframe = frame;
+  g_crashlog.regs.cr2 = x86_get_cr2();
+
   printf("vector %lu\n", (ulong)frame->vector);
   dprintf(CRITICAL, "%s", msg);
   dump_fault_frame(frame);
-  g_crashlog.regs.iframe = frame;
-  g_crashlog.regs.cr2 = x86_get_cr2();
+
+  // Attempt to dump additional debugging info in the event of a double fault. Update crash logs
+  // first in case we trigger an additional fault.
+  if (frame->vector == X86_INT_DOUBLE_FAULT) {
+    dump_double_fault(frame);
+  }
 
   // try to dump the user stack
   if (is_user_accessible(frame->user_sp)) {
