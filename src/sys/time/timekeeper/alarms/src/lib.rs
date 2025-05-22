@@ -25,6 +25,9 @@
 //! Of course, for everything to work well, your component will need appropriate
 //! capability routing.  Refer to capability routing docs for those details.
 
+mod emu;
+
+use crate::emu::EmulationTimerOps;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use fidl::encoding::ProxyChannelBox;
@@ -80,22 +83,20 @@ fn is_deadline_changed(
 
 // Errors returnable from [TimerOps] calls.
 #[derive(Debug)]
-enum TimerOpsError {
+pub(crate) enum TimerOpsError {
     // The driver reported an error.
     Driver(ffhh::DriverError),
     // FIDL-specific RPC error.
     Fidl(fidl::Error),
 }
 
-trait SawResponseFut:
-    Send + std::future::Future<Output = Result<zx::EventPair, TimerOpsError>>
-{
+trait SawResponseFut: std::future::Future<Output = Result<zx::EventPair, TimerOpsError>> {
     // nop
 }
 
 // Abstracts away timer operations.
-#[async_trait]
-trait TimerOps {
+#[async_trait(?Send)]
+pub(crate) trait TimerOps {
     // Stop the timer with the specified ID.
     async fn stop(&self, id: u64);
 
@@ -127,7 +128,7 @@ impl HardwareTimerOps {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl TimerOps for HardwareTimerOps {
     async fn stop(&self, id: u64) {
         let _ = self
@@ -222,7 +223,6 @@ struct HwResponseFut {
 
 use std::task::Poll;
 impl SawResponseFut for HwResponseFut {}
-unsafe impl Send for HwResponseFut {}
 impl std::future::Future for HwResponseFut {
     type Output = Result<zx::EventPair, TimerOpsError>;
     fn poll(
@@ -486,10 +486,20 @@ impl Loop {
     /// `device_proxy` is a connection to a low-level timer device.
     pub fn new(device_proxy: ffhh::DeviceProxy, inspect: finspect::Node) -> Self {
         let hw_device_timer_ops = HardwareTimerOps::new(device_proxy);
+        Loop::new_internal(hw_device_timer_ops, inspect)
+    }
+
+    // Creates a new instance of [Loop] with emulated wake alarms.
+    pub fn new_emulated(inspect: finspect::Node) -> Self {
+        let timer_ops = Box::new(EmulationTimerOps::new());
+        Loop::new_internal(timer_ops, inspect)
+    }
+
+    fn new_internal(timer_ops: Box<dyn TimerOps>, inspect: finspect::Node) -> Self {
         let (snd, rcv) = mpsc::channel(CHANNEL_SIZE);
         let snd_clone = snd.clone();
         let _task = fasync::Task::local(async move {
-            wake_timer_loop(snd_clone, rcv, hw_device_timer_ops, inspect).await
+            wake_timer_loop(snd_clone, rcv, timer_ops, inspect).await
         });
         Self { _task, snd_cloneable: snd }
     }
@@ -759,7 +769,7 @@ impl Timers {
 }
 
 // Clones a handle. Needed for 1:N notifications.
-fn clone_handle<H: HandleBased>(handle: &H) -> H {
+pub(crate) fn clone_handle<H: HandleBased>(handle: &H) -> H {
     handle.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("infallible")
 }
 
@@ -767,7 +777,7 @@ async fn wait_signaled<H: HandleBased>(handle: &H) {
     fasync::OnSignals::new(handle, zx::Signals::EVENT_SIGNALED).await.expect("infallible");
 }
 
-fn signal<H: HandleBased>(handle: &H) {
+pub(crate) fn signal<H: HandleBased>(handle: &H) {
     handle.signal_handle(zx::Signals::NONE, zx::Signals::EVENT_SIGNALED).expect("infallible");
 }
 
@@ -899,7 +909,7 @@ impl std::ops::Mul<u64> for TimerDuration {
 
 /// Contains the configuration of a specific timer.
 #[derive(Debug)]
-struct TimerConfig {
+pub(crate) struct TimerConfig {
     /// The resolutions supported by this timer. Each entry is one possible
     /// duration for on timer "tick".  The resolution is picked when a timer
     /// request is sent.
