@@ -127,6 +127,17 @@ impl<T: Symlink> Connection<T> {
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(Ok(()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedGetAttr { responder } => {
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                let (status, attrs) = crate::common::io2_to_io1_attrs(
+                    self.symlink.as_ref(),
+                    fio::Rights::GET_ATTRIBUTES,
+                )
+                .await;
+                responder.send(status.into_raw(), &attrs)?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::GetAttr { responder } => {
                 // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
                 let (status, attrs) = crate::common::io2_to_io1_attrs(

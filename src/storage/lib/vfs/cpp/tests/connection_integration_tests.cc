@@ -249,7 +249,7 @@ TEST_F(ConnectionTest, DeprecatedGetSetAttrs) {
                           fc->server.TakeChannel().release()),
             ZX_OK);
   {
-    auto io1_attrs = fidl::WireCall(fc->client)->GetAttr();
+    auto io1_attrs = fidl::WireCall(fc->client)->DeprecatedGetAttr();
     ASSERT_EQ(io1_attrs.status(), ZX_OK);
     EXPECT_EQ(io1_attrs->attributes.modification_time, 0u);
   }
@@ -273,7 +273,7 @@ TEST_F(ConnectionTest, DeprecatedGetSetAttrs) {
 
   // Check modification time was updated.
   {
-    auto io1_attrs = fidl::WireCall(fc->client)->GetAttr();
+    auto io1_attrs = fidl::WireCall(fc->client)->DeprecatedGetAttr();
     ASSERT_EQ(io1_attrs.status(), ZX_OK);
     EXPECT_EQ(io1_attrs->attributes.modification_time, 1234u);
   }

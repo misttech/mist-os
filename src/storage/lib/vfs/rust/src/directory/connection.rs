@@ -105,6 +105,20 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedGetAttr { responder } => {
+                async move {
+                    let (status, attrs) = crate::common::io2_to_io1_attrs(
+                        self.directory.as_ref(),
+                        self.options.rights,
+                    )
+                    .await;
+                    responder.send(status.into_raw(), &attrs)
+                }
+                .trace(trace::trace_future_args!(c"storage", c"Directory::GetAttr"))
+                .await?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) = crate::common::io2_to_io1_attrs(

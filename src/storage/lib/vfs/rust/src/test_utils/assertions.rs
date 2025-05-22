@@ -126,7 +126,7 @@ macro_rules! assert_get_attr {
     ($proxy:expr, $expected:expr) => {{
         use $crate::test_utils::assertions::reexport::Status;
 
-        let (status, attrs) = $proxy.get_attr().await.expect("get_attr failed");
+        let (status, attrs) = $proxy.deprecated_get_attr().await.expect("get_attr failed");
 
         assert_eq!(Status::from_raw(status), Status::OK);
         assert_eq!(attrs, $expected);

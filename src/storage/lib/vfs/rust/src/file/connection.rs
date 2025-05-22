@@ -603,6 +603,18 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::Sync"))
                 .await?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::DeprecatedGetAttr { responder } => {
+                async move {
+                    let (status, attrs) =
+                        crate::common::io2_to_io1_attrs(self.file.as_ref(), self.options.rights)
+                            .await;
+                    responder.send(status.into_raw(), &attrs)
+                }
+                .trace(trace::trace_future_args!(c"storage", c"File::GetAttr"))
+                .await?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) =

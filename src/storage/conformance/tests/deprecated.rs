@@ -716,7 +716,7 @@ async fn deprecated_set_attr_file_with_sufficient_rights() {
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let file = deprecated_open_file_with_flags(&dir, file_flags, "file").await;
 
-        let (status, old_attr) = file.get_attr().await.expect("get_attr failed");
+        let (status, old_attr) = file.deprecated_get_attr().await.expect("get_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
 
         // Set CREATION_TIME flag, but not MODIFICATION_TIME.
@@ -733,7 +733,7 @@ async fn deprecated_set_attr_file_with_sufficient_rights() {
             .expect("set_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
 
-        let (status, new_attr) = file.get_attr().await.expect("get_attr failed");
+        let (status, new_attr) = file.deprecated_get_attr().await.expect("get_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         // Check that only creation_time was updated.
         let expected = fio::NodeAttributes { creation_time: 111, ..old_attr };
@@ -783,7 +783,7 @@ async fn deprecated_set_attr_directory_with_sufficient_rights() {
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let dir = deprecated_open_dir_with_flags(&dir, dir_flags, "dir").await;
 
-        let (status, old_attr) = dir.get_attr().await.expect("get_attr failed");
+        let (status, old_attr) = dir.deprecated_get_attr().await.expect("get_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
 
         // Set CREATION_TIME flag, but not MODIFICATION_TIME.
@@ -800,7 +800,7 @@ async fn deprecated_set_attr_directory_with_sufficient_rights() {
             .expect("set_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
 
-        let (status, new_attr) = dir.get_attr().await.expect("get_attr failed");
+        let (status, new_attr) = dir.deprecated_get_attr().await.expect("get_attr failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         // Check that only creation_time was updated.
         let expected = fio::NodeAttributes { creation_time: 111, ..old_attr };
