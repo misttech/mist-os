@@ -543,9 +543,7 @@ where
 
 pub async fn finish<F: FastbootInterface>(fastboot_interface: &mut F) -> Result<()> {
     set_slot_a_active(fastboot_interface).await?;
-    // LINT.IfChange
     fastboot_interface.continue_boot().await.map_err(|_| anyhow!("Could not reboot device"))?;
-    // LINT.ThenChange(//tools/lib/ffxutil/flash.go)
     Ok(())
 }
 
