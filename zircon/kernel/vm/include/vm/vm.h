@@ -49,6 +49,9 @@
 #define VM_KTRACE_FLOW_END(level, string, flow_id, args...) \
   KTRACE_FLOW_END_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, flow_id, ##args)
 
+#define VM_KTRACE_INSTANT(level, string, args...) \
+  KTRACE_INSTANT_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, ##args)
+
 class VmAspace;
 
 // kernel address space

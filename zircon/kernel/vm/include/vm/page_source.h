@@ -133,6 +133,7 @@ class PageProvider : public fbl::RefCounted<PageProvider> {
   static page_request_type GetRequestType(const PageRequest* request);
   static uint64_t GetRequestOffset(const PageRequest* request);
   static uint64_t GetRequestLen(const PageRequest* request);
+  static uint64_t GetRequestVmoId(const PageRequest* request);
 
  private:
   // The returned properties will last at least as long as PageProvider.
@@ -578,6 +579,10 @@ inline uint64_t PageProvider::GetRequestOffset(const PageRequest* request) {
 inline uint64_t PageProvider::GetRequestLen(const PageRequest* request) {
   DEBUG_ASSERT(request->provider_owned_);
   return request->len_;
+}
+inline uint64_t PageProvider::GetRequestVmoId(const PageRequest* request) {
+  DEBUG_ASSERT(request->provider_owned_);
+  return request->vmo_debug_info_.vmo_id;
 }
 
 // Wrapper around PageRequest that performs construction on first access. This is useful when a

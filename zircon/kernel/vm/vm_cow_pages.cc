@@ -6743,6 +6743,18 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
     return ReclaimCounts{};
   }
 
+  char vmo_name[ZX_MAX_NAME_LEN] __UNINITIALIZED = "\0";
+  // Lambda so that vmo_name is only filled out if tracing is enabled.
+  auto get_vmo_name = [&]() __ALWAYS_INLINE {
+    AssertHeld(lock_);
+    if (paged_ref_) {
+      paged_ref_->get_name(vmo_name, sizeof(vmo_name));
+    }
+    return vmo_name;
+  };
+  VM_KTRACE_INSTANT(1, "evict_page", ("vmo_id", paged_ref_ ? paged_ref_->user_id() : 0),
+                    ("offset", offset), ("vmo_name", get_vmo_name()));
+
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
   vm_page_t* p = page_list_.RemoveContent(offset).ReleasePage();
