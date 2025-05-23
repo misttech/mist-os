@@ -154,7 +154,9 @@ impl FsNodeOps for NanohubCommsDirectory {
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/time_sync".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
+                // should be set to FsCred::root().
+                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
             )),
             b"wakeup_event_msec" => Ok(node.fs().create_node(
                 current_task,
