@@ -853,11 +853,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_invalid_partition_table_entry() {
-        let mut header = VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM;
-        let mut invalid_partition = VALID_PARTITION_TABLE_ENTRY;
+        let header = VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM;
 
         // Check that there is validation check for extent list.
         {
+            let mut invalid_partition = VALID_PARTITION_TABLE_ENTRY;
             invalid_partition.first_extent_index = 10;
             assert!(header.partitions.num_entries < invalid_partition.first_extent_index);
             invalid_partition
@@ -867,6 +867,7 @@ mod tests {
 
         // Check that there is validation check for group index.
         {
+            let mut invalid_partition = VALID_PARTITION_TABLE_ENTRY;
             invalid_partition.group_index = 8;
             assert!(header.groups.num_entries < invalid_partition.group_index);
             invalid_partition
@@ -876,16 +877,19 @@ mod tests {
 
         // Check that there is validation check for partition attributes.
         {
-            header.minor_version = 0;
-            assert!(header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN);
+            let mut invalid_partition = VALID_PARTITION_TABLE_ENTRY;
+            let mut invalid_header = VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM;
+            invalid_header.minor_version = 0;
+            assert!(invalid_header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN);
             invalid_partition.attributes = PARTITION_ATTRIBUTE_MASK_V1;
             invalid_partition
-                .validate(&header)
+                .validate(&invalid_header)
                 .expect_err("metadata partition passed validation unexpectedly");
         }
 
         // Check that there is validation check for partition name.
         {
+            let mut invalid_partition = VALID_PARTITION_TABLE_ENTRY;
             invalid_partition.name[0] = 0x81;
             assert!(!invalid_partition.name[0].is_ascii());
             invalid_partition
@@ -911,10 +915,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_invalid_extent() {
-        let mut invalid_extent = VALID_EXTENT;
-
         // Check that target_source is validated
         {
+            let mut invalid_extent = VALID_EXTENT;
             invalid_extent.target_source = 10;
             assert!(
                 invalid_extent.target_source
@@ -927,6 +930,7 @@ mod tests {
 
         // Check that TARGET_TYPE_ZERO must have target_data and target_source as zero.
         {
+            let mut invalid_extent = VALID_EXTENT;
             invalid_extent.target_type = TARGET_TYPE_ZERO;
             invalid_extent.target_data = 1;
             invalid_extent
@@ -934,6 +938,7 @@ mod tests {
                 .expect_err("metadata extent passed validation unexpectedly");
         }
         {
+            let mut invalid_extent = VALID_EXTENT;
             invalid_extent.target_type = TARGET_TYPE_ZERO;
             invalid_extent.target_source = 1;
             invalid_extent
@@ -1051,10 +1056,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_invalid_block_device() {
-        let mut invalid_metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
         // Check that first logical sector can be converted to bytes (used to verify that the
         // logical partition contents don't overlap with the metadata region) without an overflow.
         {
+            let mut invalid_metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
             invalid_metadata_block_device.first_logical_sector = u64::MAX;
             invalid_metadata_block_device
                 .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
@@ -1063,6 +1068,7 @@ mod tests {
 
         // Check that there is validation check for block device partition name.
         {
+            let mut invalid_metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
             invalid_metadata_block_device.partition_name[0] = 0x81;
             assert!(!invalid_metadata_block_device.partition_name[0].is_ascii());
             invalid_metadata_block_device
@@ -1072,6 +1078,7 @@ mod tests {
 
         // Check that there is validation check for enough characters in name to add suffix.
         {
+            let mut invalid_metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
             invalid_metadata_block_device.partition_name = [b'a'; 36];
             invalid_metadata_block_device.flags = BlockDeviceFlags::SLOT_SUFFIXED;
             invalid_metadata_block_device
