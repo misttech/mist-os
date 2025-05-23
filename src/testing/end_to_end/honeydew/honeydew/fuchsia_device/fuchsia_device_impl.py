@@ -60,6 +60,10 @@ from honeydew.affordances.session import session, session_using_ffx
 from honeydew.affordances.tracing import tracing, tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input, user_input_using_fc
+from honeydew.affordances.virtual_audio import (
+    audio,
+    audio_using_fuchsia_controller,
+)
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
@@ -398,6 +402,28 @@ class FuchsiaDeviceImpl(
             screenshot.Screenshot object
         """
         return screenshot_using_ffx.ScreenshotUsingFfx(self.ffx)
+
+    @properties.Affordance
+    def virtual_audio(self) -> audio.VirtualAudio:
+        """Returns a virtual audio affordance object.
+
+        Connecting to the protocols this connects to on startup will inject
+        the virtual audio device which does the following things:
+
+        - Input audio will only come from the virtual device. Actual microphones are disabled.
+        - Output audio will only go to the virtual device. Actual speakers are disabled.
+
+        TODO(https://fxbug.dev/417759272): There is currently no way to disable this
+        behavior other than rebooting the device.
+
+        Returns:
+            audio.VirtualAudio object
+        """
+        return (
+            audio_using_fuchsia_controller.VirtualAudioUsingFuchsiaController(
+                fuchsia_controller=self.fuchsia_controller,
+            )
+        )
 
     @properties.Affordance
     def system_power_state_controller(

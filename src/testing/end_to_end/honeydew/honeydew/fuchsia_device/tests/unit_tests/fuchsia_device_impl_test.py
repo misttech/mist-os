@@ -39,6 +39,7 @@ from honeydew.affordances.session import session_using_ffx
 from honeydew.affordances.tracing import tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input_using_fc
+from honeydew.affordances.virtual_audio import audio_using_fuchsia_controller
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
@@ -426,6 +427,15 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_fc_obj.screenshot,
             screenshot_using_ffx.ScreenshotUsingFfx,
+        )
+
+    def test_audio(self) -> None:
+        """Test case to make sure fuchsia_device supports audio
+        affordance implemented using Fuchsia controller"""
+        self.fd_fc_obj.fuchsia_controller.ctx = mock.Mock()
+        self.assertIsInstance(
+            self.fd_fc_obj.virtual_audio,
+            audio_using_fuchsia_controller.VirtualAudioUsingFuchsiaController,
         )
 
     @mock.patch.object(

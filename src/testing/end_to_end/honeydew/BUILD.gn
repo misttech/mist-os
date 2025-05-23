@@ -102,6 +102,11 @@ python_library("honeydew_no_testonly") {
     "affordances/ui/user_input/types.py",
     "affordances/ui/user_input/user_input.py",
     "affordances/ui/user_input/user_input_using_fc.py",
+    "affordances/virtual_audio/__init__.py",
+    "affordances/virtual_audio/audio.py",
+    "affordances/virtual_audio/audio_using_fuchsia_controller.py",
+    "affordances/virtual_audio/errors.py",
+    "affordances/virtual_audio/types.py",
     "affordances_capable.py",
     "auxiliary_devices/__init__.py",
     "auxiliary_devices/power_switch/__init__.py",
@@ -198,6 +203,7 @@ group("honeydew_fidl_ir_and_deps") {
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_python",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_python",
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_python",
+    "//src/testing/sl4f/fidl:fuchsia.test.audio_python",
   ]
 }
 
@@ -271,6 +277,7 @@ group("functional_tests") {
       "honeydew/affordances/tracing/tests/functional_tests:tests",
       "honeydew/affordances/ui/screenshot/tests/functional_tests:tests",
       "honeydew/affordances/ui/user_input/tests/functional_tests:tests",
+      "honeydew/affordances/virtual_audio/tests/functional_tests:tests",
       "honeydew/auxiliary_devices/power_switch/tests/functional_tests:tests",
       "honeydew/fuchsia_device/tests/functional_tests:tests",
       "honeydew/transports/fastboot/tests/functional_tests:tests",

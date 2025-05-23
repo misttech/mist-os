@@ -25,6 +25,7 @@ from honeydew.affordances.session import session
 from honeydew.affordances.tracing import tracing
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
+from honeydew.affordances.virtual_audio import audio
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
@@ -233,6 +234,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             screenshot.Screenshot object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def virtual_audio(self) -> audio.VirtualAudio:
+        """Returns an audio affordance object.
+
+        Returns:
+            audio.Audio object
         """
 
     @properties.Affordance

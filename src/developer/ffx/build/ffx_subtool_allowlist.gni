@@ -105,6 +105,9 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal",
   "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme",
+
+  # Used by Honeydew for input injection testing
+  "//src/testing/sl4f/fidl:fuchsia.test.audio",
 ]
 
 ffx_subtool_fidl_allowlist += ffx_subtool_fidl_partner_unstable_allowlist
