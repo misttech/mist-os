@@ -360,7 +360,7 @@ async fn add_route_and_await_installed<I: Ip>(
     );
 }
 
-#[ip_test(I)]
+#[ip_test(I, test = false)]
 #[fuchsia::test]
 async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -577,7 +577,7 @@ async fn rules_select_correct_table_for_marked_socket<I: Ip>() {
     }
 }
 
-#[ip_test(I)]
+#[ip_test(I, test = false)]
 #[fuchsia::test]
 async fn successfully_installs_rule_referencing_main_table<
     I: Ip + FidlRuleIpExt + FidlRouteIpExt + FidlRouteAdminIpExt,
@@ -701,7 +701,7 @@ async fn await_disappearance_of_table(
     }
 }
 
-#[ip_test(I)]
+#[ip_test(I, test = false)]
 #[fuchsia::test]
 async fn route_table_kept_alive_by_rules<I: Ip + FidlRuleIpExt + FidlRouteIpExt>() {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -912,7 +912,7 @@ enum Order {
     RouteThenRule,
 }
 
-#[ip_test(I)]
+#[ip_test(I, test = false)]
 #[test_matrix(
     [Order::RuleThenRoute, Order::RouteThenRule],
     [Order::RuleThenRoute, Order::RouteThenRule]
