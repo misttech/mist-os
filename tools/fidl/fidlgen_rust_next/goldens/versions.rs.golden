@@ -476,6 +476,11 @@ where
 #[derive(Debug)]
 pub struct Service;
 
+impl ::fidl_next::Service for Service {
+    const SERVICE_NAME: &'static str = "test.versions.Service";
+    const MEMBER_NAMES: &'static [&'static str] = &["p"];
+}
+
 /// A helper trait for instances of the `Service` service.
 pub trait ServiceInstance {
     /// The error type for the instance.
@@ -484,16 +489,14 @@ pub trait ServiceInstance {
     /// The transport type created by connecting to a member.
     type Transport: ::fidl_next::Transport;
 
-    /// Attempts to connect to the `p` member.
-    fn p(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    /// Attempts to connect the given server end to the `p` member.
+    fn connect_to_p(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
         >,
-        Self::Error,
-    >;
+    ) -> Result<(), Self::Error>;
 }
 
 impl<___I> ServiceInstance for ::fidl_next::ServiceInstance<___I, Service>
@@ -503,16 +506,14 @@ where
     type Error = ___I::Error;
     type Transport = ___I::Transport;
 
-    fn p(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    fn connect_to_p(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Protocol>,
         >,
-        Self::Error,
-    > {
-        self.as_untyped_mut().connect("p").map(::fidl_next::ClientEnd::from_untyped)
+    ) -> Result<(), Self::Error> {
+        self.as_untyped().connect_to("p", server_end.into_untyped())
     }
 }
 

@@ -6,6 +6,11 @@
 #[derive(Debug)]
 pub struct DriverOnlyService;
 
+impl ::fidl_next::Service for DriverOnlyService {
+    const SERVICE_NAME: &'static str = "test.driverservice.DriverOnlyService";
+    const MEMBER_NAMES: &'static [&'static str] = &["member"];
+}
+
 /// A helper trait for instances of the `DriverOnlyService` service.
 pub trait DriverOnlyServiceInstance {
     /// The error type for the instance.
@@ -14,16 +19,14 @@ pub trait DriverOnlyServiceInstance {
     /// The transport type created by connecting to a member.
     type Transport: ::fidl_next::Transport;
 
-    /// Attempts to connect to the `member` member.
-    fn member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    /// Attempts to connect the given server end to the `member` member.
+    fn connect_to_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>,
         >,
-        Self::Error,
-    >;
+    ) -> Result<(), Self::Error>;
 }
 
 impl<___I> DriverOnlyServiceInstance for ::fidl_next::ServiceInstance<___I, DriverOnlyService>
@@ -33,16 +36,14 @@ where
     type Error = ___I::Error;
     type Transport = ___I::Transport;
 
-    fn member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    fn connect_to_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SomeDriverProtocol>,
         >,
-        Self::Error,
-    > {
-        self.as_untyped_mut().connect("member").map(::fidl_next::ClientEnd::from_untyped)
+    ) -> Result<(), Self::Error> {
+        self.as_untyped().connect_to("member", server_end.into_untyped())
     }
 }
 

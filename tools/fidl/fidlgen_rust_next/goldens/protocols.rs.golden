@@ -7,7 +7,7 @@
 pub struct AnotherDiscoverableProtocol;
 
 impl ::fidl_next::Discoverable for AnotherDiscoverableProtocol {
-    const PROTOCOL_NAME: &'static str = "another_discoverable_protocol";
+    const PROTOCOL_NAME: &'static str = "fake.library.FakeProtocol";
 }
 
 pub mod another_discoverable_protocol {
@@ -1677,7 +1677,7 @@ where
 pub struct DiscoverableProtocol;
 
 impl ::fidl_next::Discoverable for DiscoverableProtocol {
-    const PROTOCOL_NAME: &'static str = "discoverable_protocol";
+    const PROTOCOL_NAME: &'static str = "test.protocols.DiscoverableProtocol";
 }
 
 pub mod discoverable_protocol {
@@ -4218,7 +4218,7 @@ where
 pub struct PlatformServer;
 
 impl ::fidl_next::Discoverable for PlatformServer {
-    const PROTOCOL_NAME: &'static str = "platform_server";
+    const PROTOCOL_NAME: &'static str = "test.protocols.PlatformServer";
 }
 
 pub mod platform_server {

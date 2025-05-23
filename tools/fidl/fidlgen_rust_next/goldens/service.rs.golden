@@ -6,6 +6,11 @@
 #[derive(Debug)]
 pub struct EmptyService;
 
+impl ::fidl_next::Service for EmptyService {
+    const SERVICE_NAME: &'static str = "test.service.EmptyService";
+    const MEMBER_NAMES: &'static [&'static str] = &[];
+}
+
 /// A helper trait for instances of the `EmptyService` service.
 pub trait EmptyServiceInstance {
     /// The error type for the instance.
@@ -154,6 +159,11 @@ where
 #[derive(Debug)]
 pub struct MultiHeterogeneousMemberService;
 
+impl ::fidl_next::Service for MultiHeterogeneousMemberService {
+    const SERVICE_NAME: &'static str = "test.service.MultiHeterogeneousMemberService";
+    const MEMBER_NAMES: &'static [&'static str] = &["first_member", "second_member"];
+}
+
 /// A helper trait for instances of the `MultiHeterogeneousMemberService` service.
 pub trait MultiHeterogeneousMemberServiceInstance {
     /// The error type for the instance.
@@ -162,27 +172,23 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     /// The transport type created by connecting to a member.
     type Transport: ::fidl_next::Transport;
 
-    /// Attempts to connect to the `first_member` member.
-    fn first_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    /// Attempts to connect the given server end to the `first_member` member.
+    fn connect_to_first_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    >;
+    ) -> Result<(), Self::Error>;
 
-    /// Attempts to connect to the `second_member` member.
-    fn second_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    /// Attempts to connect the given server end to the `second_member` member.
+    fn connect_to_second_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>,
         >,
-        Self::Error,
-    >;
+    ) -> Result<(), Self::Error>;
 }
 
 impl<___I> MultiHeterogeneousMemberServiceInstance
@@ -193,34 +199,35 @@ where
     type Error = ___I::Error;
     type Transport = ___I::Transport;
 
-    fn first_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    fn connect_to_first_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    > {
-        self.as_untyped_mut().connect("first_member").map(::fidl_next::ClientEnd::from_untyped)
+    ) -> Result<(), Self::Error> {
+        self.as_untyped().connect_to("first_member", server_end.into_untyped())
     }
 
-    fn second_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    fn connect_to_second_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>,
         >,
-        Self::Error,
-    > {
-        self.as_untyped_mut().connect("second_member").map(::fidl_next::ClientEnd::from_untyped)
+    ) -> Result<(), Self::Error> {
+        self.as_untyped().connect_to("second_member", server_end.into_untyped())
     }
 }
 
 /// The type corresponding to the MultiHomogeneousMemberService service.
 #[derive(Debug)]
 pub struct MultiHomogeneousMemberService;
+
+impl ::fidl_next::Service for MultiHomogeneousMemberService {
+    const SERVICE_NAME: &'static str = "test.service.MultiHomogeneousMemberService";
+    const MEMBER_NAMES: &'static [&'static str] = &["first_member", "second_member"];
+}
 
 /// A helper trait for instances of the `MultiHomogeneousMemberService` service.
 pub trait MultiHomogeneousMemberServiceInstance {
@@ -230,27 +237,23 @@ pub trait MultiHomogeneousMemberServiceInstance {
     /// The transport type created by connecting to a member.
     type Transport: ::fidl_next::Transport;
 
-    /// Attempts to connect to the `first_member` member.
-    fn first_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    /// Attempts to connect the given server end to the `first_member` member.
+    fn connect_to_first_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    >;
+    ) -> Result<(), Self::Error>;
 
-    /// Attempts to connect to the `second_member` member.
-    fn second_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    /// Attempts to connect the given server end to the `second_member` member.
+    fn connect_to_second_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    >;
+    ) -> Result<(), Self::Error>;
 }
 
 impl<___I> MultiHomogeneousMemberServiceInstance
@@ -261,28 +264,24 @@ where
     type Error = ___I::Error;
     type Transport = ___I::Transport;
 
-    fn first_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    fn connect_to_first_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    > {
-        self.as_untyped_mut().connect("first_member").map(::fidl_next::ClientEnd::from_untyped)
+    ) -> Result<(), Self::Error> {
+        self.as_untyped().connect_to("first_member", server_end.into_untyped())
     }
 
-    fn second_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    fn connect_to_second_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    > {
-        self.as_untyped_mut().connect("second_member").map(::fidl_next::ClientEnd::from_untyped)
+    ) -> Result<(), Self::Error> {
+        self.as_untyped().connect_to("second_member", server_end.into_untyped())
     }
 }
 
@@ -417,6 +416,11 @@ where
 #[derive(Debug)]
 pub struct SingleMemberService;
 
+impl ::fidl_next::Service for SingleMemberService {
+    const SERVICE_NAME: &'static str = "test.service.SingleMemberService";
+    const MEMBER_NAMES: &'static [&'static str] = &["single_member"];
+}
+
 /// A helper trait for instances of the `SingleMemberService` service.
 pub trait SingleMemberServiceInstance {
     /// The error type for the instance.
@@ -425,16 +429,14 @@ pub trait SingleMemberServiceInstance {
     /// The transport type created by connecting to a member.
     type Transport: ::fidl_next::Transport;
 
-    /// Attempts to connect to the `single_member` member.
-    fn single_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    /// Attempts to connect the given server end to the `single_member` member.
+    fn connect_to_single_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    >;
+    ) -> Result<(), Self::Error>;
 }
 
 impl<___I> SingleMemberServiceInstance for ::fidl_next::ServiceInstance<___I, SingleMemberService>
@@ -444,16 +446,14 @@ where
     type Error = ___I::Error;
     type Transport = ___I::Transport;
 
-    fn single_member(
-        &mut self,
-    ) -> Result<
-        ::fidl_next::ClientEnd<
+    fn connect_to_single_member(
+        &self,
+        server_end: ::fidl_next::ServerEnd<
             Self::Transport,
             ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
-        Self::Error,
-    > {
-        self.as_untyped_mut().connect("single_member").map(::fidl_next::ClientEnd::from_untyped)
+    ) -> Result<(), Self::Error> {
+        self.as_untyped().connect_to("single_member", server_end.into_untyped())
     }
 }
 

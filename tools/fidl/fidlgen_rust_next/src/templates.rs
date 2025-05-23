@@ -283,6 +283,16 @@ impl BitsTemplate<'_> {
 }
 
 impl ProtocolTemplate<'_> {
+    fn discoverable_name(&self) -> Option<String> {
+        let attr = self.protocol.attributes.attributes.get("discoverable")?;
+        if let Some(name) = attr.args.get("name") {
+            Some(name.value.value.clone())
+        } else {
+            let (library, name) = self.protocol.name.split();
+            Some(format!("{}.{}", library, name.camel()))
+        }
+    }
+
     fn prelude_method_type_idents(&self) -> BTreeSet<CompIdent> {
         let mut result = BTreeSet::new();
 
@@ -316,6 +326,13 @@ impl ProtocolTemplate<'_> {
         }
 
         result
+    }
+}
+
+impl ServiceTemplate<'_> {
+    fn service_name(&self) -> String {
+        let (library, name) = self.service.name.split();
+        format!("{}.{}", library, name.camel())
     }
 }
 

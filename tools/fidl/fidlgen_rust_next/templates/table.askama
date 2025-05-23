@@ -20,7 +20,7 @@ pub struct {{ name }} {
 
 impl {{ name }} {
     fn __max_ordinal(&self) -> usize {
-        {% for member in table.members %}
+        {% for member in table.members.iter().rev() %}
             if self.{{ member.name.snake()|ident }}.is_some() { return {{ member.ordinal }}; }
         {% endfor %}
         0

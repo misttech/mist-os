@@ -238,12 +238,12 @@ pub struct T {
 
 impl T {
     fn __max_ordinal(&self) -> usize {
-        if self.zircon_handle.is_some() {
-            return 1;
-        }
-
         if self.fdf_handle.is_some() {
             return 2;
+        }
+
+        if self.zircon_handle.is_some() {
+            return 1;
         }
 
         0

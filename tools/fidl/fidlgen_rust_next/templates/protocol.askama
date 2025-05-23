@@ -16,9 +16,9 @@
 {%- endif %}
 pub struct {{ protocol_name }};
 
-{% if protocol.attributes.attributes.contains_key("discoverable") %}
+{% if let Some(discoverable_name) = self.discoverable_name() %}
     impl ::fidl_next::Discoverable for {{ protocol_name }} {
-        const PROTOCOL_NAME: &'static str = "{{ protocol.name.decl_name().snake() }}";
+        const PROTOCOL_NAME: &'static str = "{{ discoverable_name }}";
     }
 {% endif %}
 

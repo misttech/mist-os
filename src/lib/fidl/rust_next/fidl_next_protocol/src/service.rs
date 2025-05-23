@@ -15,5 +15,5 @@ pub trait ServiceInstance {
     type Transport: Transport;
 
     /// Attempts to connect the given member.
-    fn connect(&mut self, member: &str) -> Result<Self::Transport, Self::Error>;
+    fn connect_to(&self, member: &str, server_end: Self::Transport) -> Result<(), Self::Error>;
 }
