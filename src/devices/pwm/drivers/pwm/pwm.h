@@ -8,51 +8,60 @@
 #include <fidl/fuchsia.hardware.pwm/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/platform-defs.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 #include <mutex>
 
-#include <ddktl/device.h>
-
 namespace pwm {
 
-class PwmDevice;
-using PwmDeviceType =
-    ddk::Device<PwmDevice, ddk::Initializable, ddk::Messageable<fuchsia_hardware_pwm::Pwm>::Mixin>;
-
-class PwmDevice : public PwmDeviceType {
+class PwmChannel : public fidl::WireServer<fuchsia_hardware_pwm::Pwm> {
  public:
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  static constexpr std::string_view kClassName = "pwm";
 
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease() { delete this; }
+  explicit PwmChannel(uint32_t id, async_dispatcher_t* dispatcher,
+                      ddk::PwmImplProtocolClient pwm_impl)
+      : id_(id), pwm_impl_(pwm_impl), dispatcher_(dispatcher) {}
 
-  // Ddk Mixins.
-  zx_status_t PwmGetConfig(pwm_config_t* out_config);
-  zx_status_t PwmSetConfig(const pwm_config_t* config);
-  zx_status_t PwmEnable();
-  zx_status_t PwmDisable();
+  zx::result<> Init(const std::shared_ptr<fdf::Namespace>& incoming,
+                    std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                    fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent);
 
+  // fidl::WireServer<fuchsia_hardware_pwm::Pwm> implementation.
   void GetConfig(GetConfigCompleter::Sync& completer) override;
   void SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) override;
   void Enable(EnableCompleter::Sync& completer) override;
   void Disable(DisableCompleter::Sync& completer) override;
 
  private:
-  explicit PwmDevice(zx_device_t* parent, pwm_impl_protocol_t* pwm,
-                     fuchsia_hardware_pwm::PwmChannelInfo channel)
-      : PwmDeviceType(parent), pwm_(pwm), channel_(std::move(channel)) {}
+  void Connect(fidl::ServerEnd<fuchsia_hardware_pwm::Pwm> request);
 
-  ddk::PwmImplProtocolClient pwm_ __TA_GUARDED(lock_);
-  fuchsia_hardware_pwm::PwmChannelInfo channel_;
+  // ID of the pwm channel.
+  const uint32_t id_;
 
-  // Protect against concurrent access from both the FIDL and Banjo interfaces.
-  std::mutex lock_;
+  ddk::PwmImplProtocolClient pwm_impl_;
 
-  std::optional<component::OutgoingDirectory> outgoing_;
-  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
+  async_dispatcher_t* dispatcher_;
+  compat::SyncInitializedDeviceServer compat_server_;
   fidl::ServerBindingGroup<fuchsia_hardware_pwm::Pwm> bindings_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
+  driver_devfs::Connector<fuchsia_hardware_pwm::Pwm> devfs_connector_{
+      fit::bind_member<&PwmChannel::Connect>(this)};
+};
+
+class Pwm : public fdf::DriverBase {
+ public:
+  static constexpr std::string_view kDriverName = "pwm";
+
+  Pwm(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
+
+  // fdf::DriverBase implementation.
+  zx::result<> Start() override;
+
+ private:
+  std::vector<std::unique_ptr<PwmChannel>> pwm_channels_;
 };
 
 }  // namespace pwm

@@ -15,18 +15,12 @@ driver_bind_rules("pwm-bind") {
 }
 
 fuchsia_cc_driver("pwm-driver") {
-  legacy = true
   output_name = "pwm"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "pwm.cc" ]
-  deps = [
-    ":common",
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
-    "//src/devices/lib/driver",
-  ]
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("pwm") {
@@ -37,7 +31,10 @@ fuchsia_driver_component("pwm") {
   ]
   info = "meta/pwm-info.json"
   component_name = "pwm"
-  deps = [ ":pwm-driver" ]
+  deps = [
+    ":pwm-bind",
+    ":pwm-driver",
+  ]
   manifest = "meta/pwm.cml"
 }
 
@@ -48,32 +45,33 @@ fuchsia_driver_package("package") {
 
 test("pwm-test-bin") {
   output_name = "pwm-test"
-  sources = [
-    "pwm-test.cc",
-    "pwm.cc",
-  ]
+  sources = [ "pwm-test.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/lib/ddk:ddk_metadata",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
-group("common") {
+source_set("common") {
+  sources = [
+    "pwm.cc",
+    "pwm.h",
+  ]
+  deps = [
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/lib/ddk:ddk_metadata",
+  ]
   public_deps = [
-    ":pwm-bind",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
   ]
 }

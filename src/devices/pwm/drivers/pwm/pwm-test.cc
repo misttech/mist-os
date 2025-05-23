@@ -4,15 +4,14 @@
 
 #include "pwm.h"
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace pwm {
 
@@ -69,6 +68,12 @@ class FakePwmImpl : public ddk::PwmImplProtocol<FakePwmImpl> {
     return ZX_OK;
   }
 
+  compat::DeviceServer::BanjoConfig GetBanjoConfig() {
+    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_PWM_IMPL};
+    config.callbacks[ZX_PROTOCOL_PWM_IMPL] = banjo_server_.callback();
+    return config;
+  }
+
   // Accessors
   unsigned int GetConfigCount() const { return get_config_count_; }
   unsigned int SetConfigCount() const { return set_config_count_; }
@@ -84,180 +89,199 @@ class FakePwmImpl : public ddk::PwmImplProtocol<FakePwmImpl> {
   pwm_impl_protocol_t proto_;
   pwm_config_t config_;
   std::unique_ptr<uint8_t[]> buffer_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_PWM_IMPL, this, &pwm_impl_protocol_ops_};
 };
 
-class PwmDeviceTest : public zxtest::Test {
+class PwmTestEnvironment : public fdf_testing::Environment {
  public:
-  PwmDeviceTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
-  void SetUp() override {
-    fake_parent_ = MockDevice::FakeRootParent();
-    fake_parent_->AddProtocol(ZX_PROTOCOL_PWM_IMPL, fake_pwm_impl_.proto()->ops,
-                              fake_pwm_impl_.proto()->ctx);
-    fuchsia_hardware_pwm::PwmChannelsMetadata kTestMetadataChannels = {
-        {.channels = {{{{.id = 0}}}}}};
-    fit::result encoded_metadata = fidl::Persist(kTestMetadataChannels);
-    ASSERT_TRUE(encoded_metadata.is_ok());
+  void Init(const fuchsia_hardware_pwm::PwmChannelsMetadata& metadata) {
+    device_server_.Initialize("default", std::nullopt, pwm_impl_.GetBanjoConfig());
 
-    fake_parent_->SetMetadata(DEVICE_METADATA_PWM_CHANNELS, encoded_metadata.value().data(),
-                              encoded_metadata.value().size());
-
-    ASSERT_OK(PwmDevice::Create(nullptr, fake_parent_.get()));
-
-    ASSERT_EQ(fake_parent_->child_count(), 1u);
-
-    MockDevice* child_dev = fake_parent_->GetLatestChild();
-    pwm_ = child_dev->GetDeviceContext<PwmDevice>();
-
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_pwm::Pwm>();
-    std::optional<fidl::ServerBindingRef<fuchsia_hardware_pwm::Pwm>> fidl_server;
-    fidl_server = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), pwm_);
-    loop_.StartThread("pwm-fidl-test");
-
-    client_ = fidl::WireSyncClient(std::move(endpoints->client));
-    ASSERT_TRUE(client_.client_end().is_valid());
+    fit::result persisted_metadata = fidl::Persist(metadata);
+    ASSERT_TRUE(persisted_metadata.is_ok());
+    device_server_.AddMetadata(DEVICE_METADATA_PWM_CHANNELS, persisted_metadata.value().data(),
+                               persisted_metadata.value().size());
   }
 
-  void TearDown() override { loop_.Shutdown(); }
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    if (zx_status_t status =
+            device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+        status != ZX_OK) {
+      return zx::error(status);
+    }
 
- protected:
-  PwmDevice* pwm_;
-  fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> client_;
-  std::shared_ptr<MockDevice> fake_parent_;
-  FakePwmImpl fake_pwm_impl_;
-  async::Loop loop_;
+    return zx::ok();
+  }
+
+  FakePwmImpl& pwm_impl() { return pwm_impl_; }
+
+ private:
+  FakePwmImpl pwm_impl_;
+  compat::DeviceServer device_server_;
 };
 
-TEST_F(PwmDeviceTest, GetConfigTest) {
-  pwm_config_t fake_config = {
-      false, 0, 0.0, nullptr, 0,
-  };
-  EXPECT_OK(pwm_->PwmGetConfig(&fake_config));
-  EXPECT_OK(pwm_->PwmGetConfig(&fake_config));  // Second time
+class FixtureConfig final {
+ public:
+  using DriverType = Pwm;
+  using EnvironmentType = PwmTestEnvironment;
+};
+
+class PwmTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    static const fuchsia_hardware_pwm::PwmChannelsMetadata kTestMetadataChannels{
+        {.channels{{{{.id = 0}}}}}};
+
+    driver_test_.RunInEnvironmentTypeContext([&](auto& env) { env.Init(kTestMetadataChannels); });
+    ASSERT_OK(driver_test_.StartDriver());
+
+    zx::result pwm = driver_test_.Connect<fuchsia_hardware_pwm::Service::Pwm>("pwm-0");
+    ASSERT_OK(pwm);
+    pwm_.Bind(std::move(pwm.value()));
+  }
+
+  void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
+
+ protected:
+  void WithPwmImpl(fit::callback<void(FakePwmImpl& pwm_impl)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](auto& env) mutable { callback(env.pwm_impl()); });
+  }
+
+  fidl::SyncClient<fuchsia_hardware_pwm::Pwm>& pwm() { return pwm_; }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
+  fidl::SyncClient<fuchsia_hardware_pwm::Pwm> pwm_;
+};
+
+TEST_F(PwmTest, GetConfigTest) {
+  EXPECT_OK(pwm()->GetConfig());
+  EXPECT_OK(pwm()->GetConfig());  // Second time
 }
 
-TEST_F(PwmDeviceTest, SetConfigTest) {
+TEST_F(PwmTest, SetConfigTest) {
   fake_mode_config fake_mode{
       .mode = 0,
   };
-  pwm_config_t fake_config{
-      .polarity = false,
-      .period_ns = 1000,
-      .duty_cycle = 45.0,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fake_mode),
-      .mode_config_size = sizeof(fake_mode),
-  };
-  EXPECT_OK(pwm_->PwmSetConfig(&fake_config));
+  const auto* fake_mode_bytes = reinterpret_cast<uint8_t*>(&fake_mode);
+  fuchsia_hardware_pwm::PwmConfig fake_config{
+      {.polarity = false,
+       .period_ns = 1000,
+       .duty_cycle = 45.0,
+       .mode_config =
+           std::vector<uint8_t>{&fake_mode_bytes[0], &fake_mode_bytes[sizeof(fake_mode) - 1]}}};
+  EXPECT_OK(pwm()->SetConfig(fake_config));
 
   fake_mode.mode = 3;
-  fake_config.polarity = true;
-  fake_config.duty_cycle = 68.0;
-  EXPECT_OK(pwm_->PwmSetConfig(&fake_config));
+  fake_mode_bytes = reinterpret_cast<uint8_t*>(&fake_mode);
+  fake_config.mode_config() =
+      std::vector<uint8_t>{&fake_mode_bytes[0], &fake_mode_bytes[sizeof(fake_mode) - 1]};
+  fake_config.polarity() = true;
+  fake_config.duty_cycle() = 68.0;
+  EXPECT_OK(pwm()->SetConfig(fake_config));
 
-  EXPECT_OK(pwm_->PwmSetConfig(&fake_config));
+  EXPECT_OK(pwm()->SetConfig(fake_config));
 }
 
-TEST_F(PwmDeviceTest, EnableTest) {
-  EXPECT_OK(pwm_->PwmEnable());
-  EXPECT_OK(pwm_->PwmEnable());  // Second time
+TEST_F(PwmTest, EnableTest) {
+  EXPECT_OK(pwm()->Enable());
+  EXPECT_OK(pwm()->Enable());  // Second time
 }
 
-TEST_F(PwmDeviceTest, DisableTest) {
-  EXPECT_OK(pwm_->PwmDisable());
-  EXPECT_OK(pwm_->PwmDisable());  // Second time
+TEST_F(PwmTest, DisableTest) {
+  EXPECT_OK(pwm()->Disable());
+  EXPECT_OK(pwm()->Disable());  // Second time
 }
 
-TEST_F(PwmDeviceTest, GetConfigFidlTest) {
+TEST_F(PwmTest, GetConfigFidlTest) {
   // Set a config via the Banjo interface and validate that the same config is
   // returned via the FIDL interface.
   fake_mode_config fake_mode{
       .mode = 0xdeadbeef,
   };
-  pwm_config_t fake_config{
+  const auto* fake_mode_bytes = reinterpret_cast<uint8_t*>(&fake_mode);
+  fuchsia_hardware_pwm::PwmConfig fake_config{{
       .polarity = false,
       .period_ns = 1000,
       .duty_cycle = 45.0,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fake_mode),
-      .mode_config_size = sizeof(fake_mode),
-  };
-  EXPECT_OK(pwm_->PwmSetConfig(&fake_config));
+      .mode_config =
+          std::vector<uint8_t>{&fake_mode_bytes[0], &fake_mode_bytes[sizeof(fake_mode) - 1]},
+  }};
+  EXPECT_OK(pwm()->SetConfig(fake_config));
 
-  auto resp = client_->GetConfig();
+  fidl::Result resp = pwm()->GetConfig();
 
-  ASSERT_TRUE(resp.ok());
-  ASSERT_TRUE(resp->is_ok());
-  auto& config = resp->value()->config;
+  ASSERT_OK(resp);
+  auto& config = resp.value().config();
 
-  EXPECT_EQ(fake_pwm_impl_.EnableCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.DisableCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.GetConfigCount(), 1);
-  EXPECT_EQ(fake_pwm_impl_.SetConfigCount(), 1);
+  WithPwmImpl([](auto& pwm_impl) {
+    EXPECT_EQ(pwm_impl.EnableCount(), 0u);
+    EXPECT_EQ(pwm_impl.DisableCount(), 0u);
+    EXPECT_EQ(pwm_impl.GetConfigCount(), 1u);
+    EXPECT_EQ(pwm_impl.SetConfigCount(), 1u);
+  });
 
-  EXPECT_EQ(config.polarity, fake_config.polarity);
-  EXPECT_EQ(config.period_ns, fake_config.period_ns);
-  EXPECT_EQ(config.duty_cycle, fake_config.duty_cycle);
-  EXPECT_EQ(config.mode_config.count(), fake_config.mode_config_size);
-  EXPECT_BYTES_EQ(config.mode_config.data(), fake_config.mode_config_buffer,
-                  config.mode_config.count());
+  EXPECT_EQ(config.polarity(), fake_config.polarity());
+  EXPECT_EQ(config.period_ns(), fake_config.period_ns());
+  EXPECT_EQ(config.duty_cycle(), fake_config.duty_cycle());
+  EXPECT_EQ(config.mode_config(), fake_config.mode_config());
 }
 
-TEST_F(PwmDeviceTest, SetConfigFidlTest) {
+TEST_F(PwmTest, SetConfigFidlTest) {
   // Set a config via the FIDL interface and validate that the same config is
   // returned via the Banjo interface.
   fake_mode_config fake_mode{
       .mode = 0xdeadbeef,
   };
-  fuchsia_hardware_pwm::wire::PwmConfig config;
-  config.polarity = true;
-  config.period_ns = 1235;
-  config.duty_cycle = 45.0;
-  config.mode_config = fidl::VectorView<uint8_t>::FromExternal(
-      reinterpret_cast<uint8_t*>(&fake_mode), sizeof(fake_mode));
+  const auto* fake_mode_bytes = reinterpret_cast<uint8_t*>(&fake_mode);
+  fuchsia_hardware_pwm::PwmConfig config{{
+      .polarity = true,
+      .period_ns = 1235,
+      .duty_cycle = 45.0,
+      .mode_config =
+          std::vector<uint8_t>{&fake_mode_bytes[0], &fake_mode_bytes[sizeof(fake_mode) - 1]},
+  }};
 
-  EXPECT_OK(client_->SetConfig(config));
+  EXPECT_OK(pwm()->SetConfig(config));
 
-  pwm_config_t fake_config;
-  auto buffer = std::make_unique<uint8_t[]>(kMaxConfigBufferSize);
-  fake_config.mode_config_buffer = buffer.get();
-  fake_config.mode_config_size = kMaxConfigBufferSize;
-  EXPECT_OK(pwm_->PwmGetConfig(&fake_config));
+  fidl::Result fake_config_result = pwm()->GetConfig();
+  EXPECT_OK(fake_config_result);
+  const auto& fake_config = fake_config_result.value().config();
 
-  EXPECT_EQ(fake_pwm_impl_.EnableCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.DisableCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.GetConfigCount(), 1);
-  EXPECT_EQ(fake_pwm_impl_.SetConfigCount(), 1);
+  WithPwmImpl([](auto& pwm_impl) {
+    EXPECT_EQ(pwm_impl.EnableCount(), 0u);
+    EXPECT_EQ(pwm_impl.DisableCount(), 0u);
+    EXPECT_EQ(pwm_impl.GetConfigCount(), 1u);
+    EXPECT_EQ(pwm_impl.SetConfigCount(), 1u);
+  });
 
-  EXPECT_EQ(config.polarity, fake_config.polarity);
-  EXPECT_EQ(config.period_ns, fake_config.period_ns);
-  EXPECT_EQ(config.duty_cycle, fake_config.duty_cycle);
-  EXPECT_EQ(config.mode_config.count(), fake_config.mode_config_size);
-  EXPECT_BYTES_EQ(config.mode_config.data(), fake_config.mode_config_buffer,
-                  config.mode_config.count());
+  EXPECT_EQ(config.polarity(), fake_config.polarity());
+  EXPECT_EQ(config.period_ns(), fake_config.period_ns());
+  EXPECT_EQ(config.duty_cycle(), fake_config.duty_cycle());
+  EXPECT_EQ(config.mode_config(), fake_config.mode_config());
 }
 
-TEST_F(PwmDeviceTest, EnableFidlTest) {
-  auto enable_resp = client_->Enable();
+TEST_F(PwmTest, EnableFidlTest) {
+  ASSERT_OK(pwm()->Enable());
 
-  ASSERT_OK(enable_resp.status());
-
-  ASSERT_FALSE(enable_resp->is_error());
-
-  EXPECT_EQ(fake_pwm_impl_.EnableCount(), 1);
-  EXPECT_EQ(fake_pwm_impl_.DisableCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.GetConfigCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.SetConfigCount(), 0);
+  WithPwmImpl([](auto& pwm_impl) {
+    EXPECT_EQ(pwm_impl.EnableCount(), 1u);
+    EXPECT_EQ(pwm_impl.DisableCount(), 0u);
+    EXPECT_EQ(pwm_impl.GetConfigCount(), 0u);
+    EXPECT_EQ(pwm_impl.SetConfigCount(), 0u);
+  });
 }
 
-TEST_F(PwmDeviceTest, DisableFidlTest) {
-  auto enable_resp = client_->Disable();
+TEST_F(PwmTest, DisableFidlTest) {
+  ASSERT_OK(pwm()->Disable());
 
-  ASSERT_OK(enable_resp.status());
-
-  ASSERT_FALSE(enable_resp->is_error());
-
-  EXPECT_EQ(fake_pwm_impl_.EnableCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.DisableCount(), 1);
-  EXPECT_EQ(fake_pwm_impl_.GetConfigCount(), 0);
-  EXPECT_EQ(fake_pwm_impl_.SetConfigCount(), 0);
+  WithPwmImpl([](auto& pwm_impl) {
+    EXPECT_EQ(pwm_impl.EnableCount(), 0u);
+    EXPECT_EQ(pwm_impl.DisableCount(), 1u);
+    EXPECT_EQ(pwm_impl.GetConfigCount(), 0u);
+    EXPECT_EQ(pwm_impl.SetConfigCount(), 0u);
+  });
 }
 
 }  // namespace pwm
