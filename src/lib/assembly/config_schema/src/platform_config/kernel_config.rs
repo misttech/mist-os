@@ -45,22 +45,11 @@ pub enum MemoryReclamationStrategy {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformKernelConfig {
-    /// What should happen if the device runs out-of-memory.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub oom_behavior: OOMBehavior,
-
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub memory_compression: bool,
 
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub lru_memory_compression: bool,
-
-    /// Configures kernel eviction to run continually in the background to try
-    /// and keep the system out of memory pressure, as opposed to triggering
-    /// one-shot eviction only at memory pressure level transitions.
-    /// Enables the `kernel_evict_continuous` assembly input bundle.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub continuous_eviction: bool,
 
     /// Configures cprng related behaviors
     #[serde(default)]
