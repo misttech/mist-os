@@ -62,14 +62,14 @@ fn duplicate_handle<H: HandleBased>(h: &H) -> Result<H, Errno> {
 /// Waits forever synchronously for EVENT_SIGNALED.
 // TODO: b/388568736 - will be in use shortly.
 #[allow(dead_code)]
-fn wait_handle_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
+fn wait_signaled_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
     handle.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE)
 }
 
 /// Waits forever asynchronously for EVENT_SIGNALED.
 // TODO: b/388568736 - will be in use shortly.
 #[allow(dead_code)]
-async fn wait_handle<H: HandleBased>(handle: &H) -> Result<()> {
+async fn wait_signaled<H: HandleBased>(handle: &H) -> Result<()> {
     fasync::OnSignals::new(handle, zx::Signals::EVENT_SIGNALED)
         .await
         .context("hr_timer_manager:wait_signaled")?;
@@ -151,6 +151,67 @@ impl InspectHrTimerEvent {
 impl std::fmt::Display for InspectHrTimerEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Debug)]
+// TODO: b/388568736 - will be in use shortly.
+#[allow(dead_code)]
+struct TimerState {
+    /// The task that waits for the timer to expire.
+    // TODO: b/388568736 - will be in use shortly.
+    #[allow(dead_code)]
+    task: fasync::Task<()>,
+    /// The desired deadline for the timer.
+    deadline: zx::BootInstant,
+}
+
+impl std::fmt::Display for TimerState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TimerState[deadline:{:?}]", self.deadline)
+    }
+}
+
+/// Prevents the Starnix container from going to sleep as long as it is in scope.
+///
+/// Each live SuspendLock is responsible for one increment of the underlying `zx::Counter` while it
+/// in scope, and removes it from the counter when it goes out of scope.  Processes that need to
+/// cooperate can pass a SuspendLock to each other to ensure that once the work is done, the lock
+/// goes out of scope as well. This allows for precise accounting of remaining work, and should
+/// give us control over container suspension which is guarded by the compiler, not conventions.
+#[derive(Debug)]
+struct SuspendLock {
+    counter: Arc<zx::Counter>,
+}
+
+impl Drop for SuspendLock {
+    fn drop(&mut self) {
+        self.counter.add(-1).expect("decrement counter");
+    }
+}
+
+impl SuspendLock {
+    /// Creates a suspend lock on the provided counter. The counter will be incrementeed
+    /// at creation, and decremented at disposition.
+    // TODO: b/388568736 - will be in use shortly.
+    #[allow(dead_code)]
+    fn new_with_increment(prototype: Arc<zx::Counter>) -> Self {
+        prototype.add(1).expect("increment counter");
+        Self::new_internal(prototype)
+    }
+
+    /// Creates a suspend lock on the provided counter, but does not increase the counter.
+    // TODO: b/388568736 - will be in use shortly.
+    #[allow(dead_code)]
+    fn new_without_increment(prototype: Arc<zx::Counter>) -> Self {
+        // No increment - the counter was already incremented by the wake proxy
+        Self::new_internal(prototype)
+    }
+
+    // TODO: b/388568736 - will be in use shortly.
+    #[allow(dead_code)]
+    fn new_internal(prototype: Arc<zx::Counter>) -> Self {
+        Self { counter: prototype }
     }
 }
 
@@ -1230,6 +1291,37 @@ mod tests {
             message_counter
                 .wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
             zx::WaitResult::Ok(zx::Signals::COUNTER_NON_POSITIVE),
+        );
+    }
+
+    #[fuchsia::test]
+    async fn suspend_locks_behaviors() {
+        let counter = Arc::new(zx::Counter::create().unwrap());
+
+        assert_eq!(counter.read().unwrap(), 0, "no locks");
+        let lock1 = SuspendLock::new_with_increment(counter.clone());
+        assert_eq!(counter.read().unwrap(), 1, "lock1 is created");
+        {
+            let _lock2 = SuspendLock::new_with_increment(counter.clone());
+            assert_eq!(counter.read().unwrap(), 2, "lock1 and _lock2 are live");
+            let _lock3 = SuspendLock::new_with_increment(counter.clone());
+            assert_eq!(counter.read().unwrap(), 3, "lock1, and _lock2 and _lock 3 are all live");
+        }
+
+        assert_eq!(counter.read().unwrap(), 1, "lock1 is still live");
+        {
+            let _lock4 = SuspendLock::new_without_increment(counter.clone());
+            assert_eq!(counter.read().unwrap(), 1, "2 locks live, but only one increment");
+            let _lock5 = SuspendLock::new_with_increment(counter.clone());
+            assert_eq!(counter.read().unwrap(), 2, "3 locks, 2 with increment");
+        }
+        assert_eq!(counter.read().unwrap(), 0, "only lock1 is live");
+
+        drop(lock1);
+        assert_eq!(
+            counter.read().unwrap(),
+            -1,
+            "no locks live, but 1 no-increment lock was available"
         );
     }
 }
