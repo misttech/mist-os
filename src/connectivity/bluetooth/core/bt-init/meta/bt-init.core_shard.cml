@@ -44,7 +44,7 @@
         },
         {
             config: "fuchsia.bluetooth.ScoOffloadPathIndex",
-            from: "void",
+            from: "parent",
             to: "#bluetooth-core",
             availability: "optional",
         },
