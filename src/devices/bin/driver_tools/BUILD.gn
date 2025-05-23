@@ -14,11 +14,6 @@ group("tests") {
   ]
 }
 
-_host_or_test = [
-  "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_rust",
-  "//src/lib/fuchsia-fs",
-]
-
 rustc_library("lib") {
   edition = "2021"
   name = "driver_tools"
@@ -42,26 +37,23 @@ rustc_library("lib") {
     "//third_party/rust_crates:itertools",
   ]
   if (is_host) {
-    deps +=
-        [
-          "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
-          "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_rust",
-          "//src/developer/ffx/lib/errors:lib",
-          "//src/devices/lib/driver-conformance:lib",
-          "//src/devices/lib/driver-static-checks:lib",
-          "//src/devices/pci/bin/lspci:lib",
-          "//src/devices/usb/bin/lsusb:lib",
-          "//src/lib/fuchsia-fs",
-          "//third_party/rust_crates:blocking",
-          "//third_party/rust_crates:zstd",
-          "//third_party/zstd",
-        ] + _host_or_test
+    deps += [
+      "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
+      "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_rust",
+      "//src/developer/ffx/lib/errors:lib",
+      "//src/devices/lib/driver-conformance:lib",
+      "//src/devices/lib/driver-static-checks:lib",
+      "//src/devices/pci/bin/lspci:lib",
+      "//src/devices/usb/bin/lsusb:lib",
+      "//third_party/rust_crates:blocking",
+      "//third_party/rust_crates:zstd",
+      "//third_party/zstd",
+    ]
   }
   test_deps = [
-                "//src/lib/fuchsia",
-                "//src/lib/fuchsia-async",
-                "//src/lib/fuchsia-component",
-              ] + _host_or_test
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+  ]
   sources = [
     "src/args.rs",
     "src/common.rs",
@@ -72,17 +64,6 @@ rustc_library("lib") {
     "src/subcommands/disable/mod.rs",
     "src/subcommands/dump/args.rs",
     "src/subcommands/dump/mod.rs",
-    "src/subcommands/i2c/args.rs",
-    "src/subcommands/i2c/mod.rs",
-    "src/subcommands/i2c/subcommands/mod.rs",
-    "src/subcommands/i2c/subcommands/ping/args.rs",
-    "src/subcommands/i2c/subcommands/ping/mod.rs",
-    "src/subcommands/i2c/subcommands/read/args.rs",
-    "src/subcommands/i2c/subcommands/read/mod.rs",
-    "src/subcommands/i2c/subcommands/transact/args.rs",
-    "src/subcommands/i2c/subcommands/transact/mod.rs",
-    "src/subcommands/i2c/subcommands/write/args.rs",
-    "src/subcommands/i2c/subcommands/write/mod.rs",
     "src/subcommands/list/args.rs",
     "src/subcommands/list/mod.rs",
     "src/subcommands/list_composite_node_specs/args.rs",

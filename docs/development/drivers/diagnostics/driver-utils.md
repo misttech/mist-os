@@ -5,12 +5,11 @@ version of the driver framework (DFv1).
 
 Driver utilities are Fuchsia applications that communicate with devices used for
 diagnostics and exported by drivers. For example Inter-Integrated Circuit (I2C)
-devices can be scanned and communicated through the [driver
-i2c](/src/devices/bin/driver_tools/src/subcommands/i2c) command line utility.
-For example:
+devices can be scanned and communicated through the [i2cutil](/src/devices/i2c/bin)
+command line utility. For example:
 
 ```
-driver i2c ping
+i2cutil ping
 /dev/class/i2c/000: OK
 [00164.657] 04506:05266> i2c: error on bus
 Error -1

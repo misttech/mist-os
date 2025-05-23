@@ -7,11 +7,6 @@ ffx/driver/device/rebind.golden
 ffx/driver/device/unbind.golden
 ffx/driver/disable.golden
 ffx/driver/dump.golden
-ffx/driver/i2c.golden
-ffx/driver/i2c/ping.golden
-ffx/driver/i2c/read.golden
-ffx/driver/i2c/transact.golden
-ffx/driver/i2c/write.golden
 ffx/driver/list-composite-node-specs.golden
 ffx/driver/list-composites.golden
 ffx/driver/list-devices.golden

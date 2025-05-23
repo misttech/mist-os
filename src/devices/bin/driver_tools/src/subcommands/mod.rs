@@ -5,8 +5,6 @@
 pub mod device;
 pub mod disable;
 pub mod dump;
-#[cfg(any(not(target_os = "fuchsia"), test))]
-pub mod i2c;
 pub mod list;
 pub mod list_composite_node_specs;
 pub mod list_composites;

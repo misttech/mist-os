@@ -18,8 +18,7 @@ use argh::{ArgsInfo, FromArgs};
 #[cfg(not(target_os = "fuchsia"))]
 use {
     super::subcommands::{
-        i2c::args::I2cCommand, lspci::args::LspciCommand, lsusb::args::LsusbCommand,
-        runtool::args::RunToolCommand,
+        lspci::args::LspciCommand, lsusb::args::LsusbCommand, runtool::args::RunToolCommand,
     },
     // Driver conformance testing is run on the host against a target device's driver.
     // So, this subcommand is only relevant on the host side.
@@ -63,7 +62,6 @@ pub enum DriverSubCommand {
     Device(DeviceCommand),
     Disable(DisableCommand),
     Dump(DumpCommand),
-    I2c(I2cCommand),
     List(ListCommand),
     ListComposites(ListCompositesCommand),
     ListDevices(ListDevicesCommand),
