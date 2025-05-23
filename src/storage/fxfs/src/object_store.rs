@@ -4,7 +4,7 @@
 
 pub mod allocator;
 pub mod caching_object_handle;
-mod data_object_handle;
+pub mod data_object_handle;
 pub mod directory;
 mod extent_record;
 mod flush;

@@ -56,6 +56,23 @@ type StartOptions = resource struct {
     /// first launch with this option records the profile and all other launches with this option
     /// will replay that profile.
     startup_profiling_seconds uint32;
+
+    /// If true, configures the filesystem to use the hardware's inline encryption engine when
+    /// writing encrypted data. This allows the filesystem to store user-encrypted data without
+    /// being able to read or write the plaintext contents, which enhances security and privacy.
+    /// Requires the block device to support inline encryption and for `barriers_enabled` to be
+    /// true.
+    /// TODO(https://fxbug.dev/393196849): For now, this flag only prevents the filesystem from
+    /// computing checksums. Update this comment when the filesystem actually uses inline
+    /// encryption.
+    inline_crypto_enabled bool;
+
+    /// Configures the filesystem to use barriers instead of checksums to ensure consistency. If
+    /// set, barriers will be used to enforce proper ordering of data and metadata writes, which
+    /// is otherwise provided by computing and verifying data checksums.  Requires filesystem
+    /// support; at the time of writing, only Fxfs uses this argument.
+    /// Must be set to true if `inline_crypto_enabled` is true.
+    barriers_enabled bool;
 };
 
 /// Options for how to format filesystems.

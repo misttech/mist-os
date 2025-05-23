@@ -779,9 +779,12 @@ impl Environment for FshostEnvironment {
             expected_format = "fxfs";
             "Mounting fxblob"
         );
+        // In production, barriers should only be enabled when inline encryption is enabled.
         let config = Fxfs {
             component_type: ComponentType::StaticChild,
             startup_profiling_seconds: Some(60),
+            inline_crypto_enabled: self.config.inline_crypto,
+            barriers_enabled: self.config.inline_crypto,
             ..Default::default()
         };
         let serving_fs =

@@ -31,6 +31,7 @@ use crate::lsm_tree::cache::NullCache;
 use crate::lsm_tree::types::Layer;
 use crate::object_handle::{ObjectHandle as _, ReadObjectHandle};
 use crate::object_store::allocator::Allocator;
+use crate::object_store::data_object_handle::OverwriteOptions;
 use crate::object_store::extent_record::{
     ExtentKey, ExtentMode, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID,
 };
@@ -302,6 +303,11 @@ struct Inner {
     reclaim_size: u64,
 
     image_builder_mode: Option<SuperBlockInstance>,
+
+    // If true, issue a pre-barrier on the first device write of each journal write (which happens
+    // in multiples of `BLOCK_SIZE`). This ensures that all the corresponding data writes make it
+    // to disk before the journal gets written to.
+    barriers_enabled: bool,
 }
 
 impl Inner {
@@ -332,11 +338,16 @@ pub struct JournalOptions {
     /// number and this number.  New super-blocks will be written every time about half of this
     /// amount is written to the journal.
     pub reclaim_size: u64,
+
+    // If true, issue a pre-barrier on the first device write of each journal write (which happens
+    // in multiples of `BLOCK_SIZE`). This ensures that all the corresponding data writes make it
+    // to disk before the journal gets written to.
+    pub barriers_enabled: bool,
 }
 
 impl Default for JournalOptions {
     fn default() -> Self {
-        JournalOptions { reclaim_size: DEFAULT_RECLAIM_SIZE }
+        JournalOptions { reclaim_size: DEFAULT_RECLAIM_SIZE, barriers_enabled: false }
     }
 }
 
@@ -432,6 +443,7 @@ impl Journal {
                 discard_offset: None,
                 reclaim_size: options.reclaim_size,
                 image_builder_mode: None,
+                barriers_enabled: options.barriers_enabled,
             }),
             writer_mutex: Mutex::new(()),
             sync_mutex: futures::lock::Mutex::new(()),
@@ -691,7 +703,8 @@ impl Journal {
             }
         }
 
-        // Validate the checksums.
+        // Validate the checksums. Note if barriers are enabled, there will be no checksums in
+        // practice to verify.
         let valid_to = checksum_list
             .verify(device.as_ref(), valid_to)
             .await
@@ -1712,9 +1725,23 @@ impl Journal {
     async fn flush(&self, amount: usize) -> Result<(), Error> {
         let handle = self.handle.get().unwrap();
         let mut buf = handle.allocate_buffer(amount).await;
-        let offset = self.inner.lock().writer.take_flushable(buf.as_mut());
-        let len = buf.len() as u64;
-        self.handle.get().unwrap().overwrite(offset, buf.as_mut(), false).await?;
+        let (offset, len, barrier_on_first_write) = {
+            let mut inner = self.inner.lock();
+            let offset = inner.writer.take_flushable(buf.as_mut());
+            (offset, buf.len() as u64, inner.barriers_enabled)
+        };
+        // TODO(https://fxbug.dev/415296349): Only issue a barrier if this journal write includes
+        // a transaction that contains data (i.e. has an extent mutation).
+        self.handle
+            .get()
+            .unwrap()
+            .overwrite(
+                offset,
+                buf.as_mut(),
+                OverwriteOptions { barrier_on_first_write, ..Default::default() },
+            )
+            .await?;
+
         let mut inner = self.inner.lock();
         if let Some(waker) = inner.sync_waker.take() {
             waker.wake();

@@ -12,6 +12,7 @@ use crate::lsm_tree::types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Val
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::allocator::{AllocatorKey, AllocatorValue, CoalescingIterator};
+use crate::object_store::data_object_handle::OverwriteOptions;
 use crate::object_store::directory::{self, Directory, MutableAttributesInternal};
 use crate::object_store::transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options};
 use crate::object_store::volume::root_volume;
@@ -3247,7 +3248,14 @@ async fn test_full_disk() {
         )
         .await
         .expect("open allocator handle failed");
-        handle.overwrite(0, buf.as_mut(), true).await.expect("overwrite failed");
+        handle
+            .overwrite(
+                0,
+                buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
 
         // Add "layer_handle" to the layer stack for the allocator but be careful not to
         // allocate anything in the process.
@@ -3267,7 +3275,14 @@ async fn test_full_disk() {
         )
         .await
         .expect("open allocator handle failed");
-        handle.overwrite(0, buf.as_mut(), true).await.expect("overwrite failed");
+        handle
+            .overwrite(
+                0,
+                buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
     }
 
     test.remount().await.expect_err("Remount succeeded");

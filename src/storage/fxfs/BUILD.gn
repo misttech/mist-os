@@ -58,6 +58,7 @@ fxfs_deps = [
 fxfs_test_deps = [
   "//src/lib/fuchsia",
   "//src/storage/fxfs/crypto/insecure",
+  "//third_party/rust_crates:test-case",
 ]
 
 fxfs_sources = [

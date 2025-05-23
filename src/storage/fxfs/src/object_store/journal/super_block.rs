@@ -30,6 +30,7 @@ use crate::lsm_tree::{LSMTree, LayerSet, Query};
 use crate::metrics;
 use crate::object_handle::ObjectHandle as _;
 use crate::object_store::allocator::Reservation;
+use crate::object_store::data_object_handle::OverwriteOptions;
 use crate::object_store::journal::bootstrap_handle::BootstrapObjectHandle;
 use crate::object_store::journal::reader::{JournalReader, ReadResult};
 use crate::object_store::journal::writer::JournalWriter;
@@ -646,7 +647,7 @@ impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
         self.writer.pad_to_block()?;
         let mut buf = self.handle.allocate_buffer(self.writer.flushable_bytes()).await;
         let offset = self.writer.take_flushable(buf.as_mut());
-        self.handle.overwrite(offset, buf.as_mut(), false).await?;
+        self.handle.overwrite(offset, buf.as_mut(), OverwriteOptions::default()).await?;
         let len =
             std::cmp::max(MIN_SUPER_BLOCK_SIZE, self.writer.journal_file_checkpoint().file_offset)
                 + SUPER_BLOCK_CHUNK_SIZE;

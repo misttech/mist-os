@@ -16,6 +16,7 @@ use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
+use fxfs::object_store::data_object_handle::OverwriteOptions;
 use fxfs::object_store::object_record::EncryptionKeyV47;
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::{DataObjectHandle, ObjectDescriptor, FSCRYPT_KEY_ID};
@@ -218,7 +219,11 @@ impl FxFile {
         let _ = self
             .handle
             .uncached_handle()
-            .overwrite(offset, buf.as_mut(), true)
+            .overwrite(
+                offset,
+                buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
             .await
             .map_err(map_to_status)?;
         Ok(content.len() as u64)

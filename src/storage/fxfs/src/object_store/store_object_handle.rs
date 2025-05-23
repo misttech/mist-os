@@ -343,7 +343,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         owner: Arc<S>,
         object_id: u64,
         permanent_keys: bool,
-        options: HandleOptions,
+        mut options: HandleOptions,
         trace: bool,
     ) -> Self {
         let encryption = if permanent_keys {
@@ -353,6 +353,10 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         } else {
             Encryption::None
         };
+        let store: &ObjectStore = owner.as_ref().as_ref();
+        if store.is_encrypted() && store.filesystem().options().inline_crypto_enabled {
+            options.skip_checksums = true;
+        }
         Self { owner, object_id, encryption, options, trace: AtomicBool::new(trace) }
     }
 
@@ -1299,9 +1303,13 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         for m in mutations {
             transaction.add(store_id, m);
         }
-        for (r, c) in checksums {
-            transaction.add_checksum(r, c, true);
+        // Only store checksums in the journal if barriers are not enabled.
+        if !store.filesystem().options().barriers_enabled {
+            for (r, c) in checksums {
+                transaction.add_checksum(r, c, true);
+            }
         }
+
         self.update_allocated_size(transaction, allocated, deallocated).await
     }
 
@@ -1498,8 +1506,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         }
 
         let checksums = writes.try_collect::<Vec<_>>().await?;
-        for (r, c, first_write) in checksums.into_iter().flatten() {
-            transaction.add_checksum(r, c, first_write);
+        // Only store checksums in the journal if barriers are not enabled.
+        if !store.filesystem().options().barriers_enabled {
+            for (r, c, first_write) in checksums.into_iter().flatten() {
+                transaction.add_checksum(r, c, first_write);
+            }
         }
 
         for m in mutations {

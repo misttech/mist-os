@@ -265,6 +265,8 @@ impl Component {
         let fs = FxFilesystemBuilder::new()
             .fsck_after_every_transaction(options.fsck_after_every_transaction)
             .read_only(options.read_only)
+            .inline_crypto_enabled(options.inline_crypto_enabled)
+            .barriers_enabled(options.barriers_enabled)
             .open(DeviceHolder::new(BlockDevice::new(Box::new(client), options.read_only).await?))
             .await?;
         let root_volume = root_volume(fs.clone()).await?;
@@ -566,6 +568,8 @@ mod tests {
                         write_compression_level: 0,
                         cache_eviction_policy_override: EvictionPolicyOverride::None,
                         startup_profiling_seconds: 0,
+                        inline_crypto_enabled: false,
+                        barriers_enabled: false,
                     },
                 )
                 .await

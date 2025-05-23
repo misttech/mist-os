@@ -484,6 +484,8 @@ mod tests {
                             write_compression_level: 0,
                             cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
                             startup_profiling_seconds: 0,
+                            inline_crypto_enabled: false,
+                            barriers_enabled: false,
                         },
                     )
                     .await
@@ -556,6 +558,8 @@ mod tests {
                             write_compression_level: 0,
                             cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
                             startup_profiling_seconds: 0,
+                            inline_crypto_enabled: false,
+                            barriers_enabled: false,
                         },
                     )
                     .await
@@ -623,6 +627,8 @@ mod tests {
                             write_compression_level: 0,
                             cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
                             startup_profiling_seconds: 0,
+                            inline_crypto_enabled: false,
+                            barriers_enabled: false,
                         },
                     )
                     .await

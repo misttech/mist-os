@@ -79,6 +79,14 @@ pub struct FsverityStateInner {
     merkle_tree: Box<[u8]>,
 }
 
+#[derive(Debug, Default)]
+pub struct OverwriteOptions {
+    // If false, then all the extents for the overwrite range must have been preallocated using
+    // preallocate_range or from existing writes.
+    pub allow_allocations: bool,
+    pub barrier_on_first_write: bool,
+}
+
 impl FsverityStateInner {
     pub fn new(descriptor: FsverityMetadata, merkle_tree: Box<[u8]>) -> Self {
         FsverityStateInner { descriptor, merkle_tree }
@@ -805,9 +813,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.handle.multi_write(transaction, attribute_id, None, ranges, buf).await
     }
 
-    // If allow_allocations is false, then all the extents for the range must have been
-    // preallocated using preallocate_range or from existing writes.
-    //
     // `buf` is mutable as an optimization, since the write may require encryption, we can
     // encrypt the buffer in-place rather than copying to another buffer if the write is
     // already aligned.
@@ -819,7 +824,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         &self,
         mut offset: u64,
         mut buf: MutableBufferRef<'_>,
-        allow_allocations: bool,
+        options: OverwriteOptions,
     ) -> Result<(), Error> {
         assert_eq!((buf.len() as u32) % self.store().device.block_size(), 0);
         let end = offset + buf.len() as u64;
@@ -828,10 +833,14 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 
         // The transaction only ends up being used if allow_allocations is true
         let mut transaction =
-            if allow_allocations { Some(self.new_transaction().await?) } else { None };
+            if options.allow_allocations { Some(self.new_transaction().await?) } else { None };
 
         // We build up a list of writes to perform later
         let writes = FuturesUnordered::new();
+
+        if options.barrier_on_first_write {
+            self.store().device.barrier();
+        }
 
         // We create a new scope here, so that the merger iterator will get dropped before we try to
         // commit our transaction. Otherwise the transaction commit would block.
@@ -933,7 +942,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     }
                     maybe_item_ref => {
                         if let Some(transaction) = transaction.as_mut() {
-                            assert_eq!(allow_allocations, true);
+                            assert_eq!(options.allow_allocations, true);
                             assert_eq!(offset % self.block_size(), 0);
 
                             // We are going to make a new extent, but let's check if there is an
@@ -1016,7 +1025,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         writes.try_collect::<Vec<MaybeChecksums>>().await?;
 
         if let Some(mut transaction) = transaction {
-            assert_eq!(allow_allocations, true);
+            assert_eq!(options.allow_allocations, true);
             if !transaction.is_empty() {
                 if end > self.get_size() {
                     self.grow(&mut transaction, self.get_size(), end).await?;
@@ -1766,7 +1775,7 @@ mod tests {
     use crate::object_handle::{
         ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
     };
-    use crate::object_store::data_object_handle::WRITE_ATTR_BATCH_SIZE;
+    use crate::object_store::data_object_handle::{OverwriteOptions, WRITE_ATTR_BATCH_SIZE};
     use crate::object_store::directory::replace_child;
     use crate::object_store::object_record::{ObjectKey, ObjectValue, Timestamp};
     use crate::object_store::transaction::{lock_keys, Mutation, Options};
@@ -2164,7 +2173,10 @@ mod tests {
             .expect("write failed");
         buf.as_mut_slice().fill(95);
         let offset = round_up(TEST_OBJECT_SIZE, fs.block_size()).unwrap();
-        object.overwrite(offset, buf.as_mut(), false).await.expect("write failed");
+        object
+            .overwrite(offset, buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect("write failed");
 
         // Make sure there were no more allocations.
         assert_eq!(allocator.get_allocated_bytes(), allocated_after);
@@ -2236,7 +2248,10 @@ mod tests {
 
         // First try to overwrite without allowing allocations
         // We expect this to fail, since nothing is allocated yet
-        object.overwrite(0, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
+        object
+            .overwrite(0, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
 
         // Now preallocate some space (exactly one block)
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
@@ -2253,7 +2268,10 @@ mod tests {
             object.read(0, read_buf.as_mut()).await.expect("read failed");
             assert_eq!(&read_buf.as_slice(), &[0; 4096]);
         }
-        object.overwrite(0, write_buf.as_mut(), false).await.expect("overwrite failed");
+        object
+            .overwrite(0, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(0, read_buf.as_mut()).await.expect("read failed");
@@ -2262,11 +2280,21 @@ mod tests {
 
         // Now try to overwrite at offset 4096. We expect this to fail, since we only preallocated
         // one block earlier at offset 0
-        object.overwrite(4096, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
+        object
+            .overwrite(4096, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
 
         // We can't assert anything about the existing bytes, because they haven't been allocated
         // yet and they could contain any values
-        object.overwrite(4096, write_buf.as_mut(), true).await.expect("overwrite failed");
+        object
+            .overwrite(
+                4096,
+                write_buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(4096, read_buf.as_mut()).await.expect("read failed");
@@ -2329,10 +2357,22 @@ mod tests {
         write_buf.as_mut_slice().fill(95);
 
         // We shouldn't be able to overwrite in the holes if new allocations aren't enabled
-        object.overwrite(0, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
-        object.overwrite(8192, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
-        object.overwrite(32768, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
-        object.overwrite(131072, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
+        object
+            .overwrite(0, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
+        object
+            .overwrite(8192, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
+        object
+            .overwrite(32768, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
+        object
+            .overwrite(131072, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
 
         // But we should be able to overwrite in the prealloc'd areas without needing allocations
         {
@@ -2340,7 +2380,10 @@ mod tests {
             object.read(4096, read_buf.as_mut()).await.expect("read failed");
             assert_eq!(&read_buf.as_slice(), &[0; 4096]);
         }
-        object.overwrite(4096, write_buf.as_mut(), false).await.expect("overwrite failed");
+        object
+            .overwrite(4096, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(4096, read_buf.as_mut()).await.expect("read failed");
@@ -2351,7 +2394,10 @@ mod tests {
             object.read(16384, read_buf.as_mut()).await.expect("read failed");
             assert_eq!(&read_buf.as_slice(), &[0; 4096]);
         }
-        object.overwrite(16384, write_buf.as_mut(), false).await.expect("overwrite failed");
+        object
+            .overwrite(16384, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(16384, read_buf.as_mut()).await.expect("read failed");
@@ -2362,7 +2408,10 @@ mod tests {
             object.read(65536, read_buf.as_mut()).await.expect("read failed");
             assert_eq!(&read_buf.as_slice(), &[0; 4096]);
         }
-        object.overwrite(65536, write_buf.as_mut(), false).await.expect("overwrite failed");
+        object
+            .overwrite(65536, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(65536, read_buf.as_mut()).await.expect("read failed");
@@ -2373,7 +2422,10 @@ mod tests {
             object.read(262144, read_buf.as_mut()).await.expect("read failed");
             assert_eq!(&read_buf.as_slice(), &[0; 4096]);
         }
-        object.overwrite(262144, write_buf.as_mut(), false).await.expect("overwrite failed");
+        object
+            .overwrite(262144, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(262144, read_buf.as_mut()).await.expect("read failed");
@@ -2385,9 +2437,19 @@ mod tests {
         huge_write_buf.as_mut_slice().fill(96);
 
         // With allocations disabled, the big overwrite should fail...
-        object.overwrite(0, huge_write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
+        object
+            .overwrite(0, huge_write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
         // ... but it should work when allocations are enabled
-        object.overwrite(0, huge_write_buf.as_mut(), true).await.expect("overwrite failed");
+        object
+            .overwrite(
+                0,
+                huge_write_buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(524288).await;
             object.read(0, read_buf.as_mut()).await.expect("read failed");
@@ -2428,10 +2490,20 @@ mod tests {
 
         // First try to overwrite without allowing allocations
         // We expect this to fail, since nothing is allocated yet
-        object.overwrite(0, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
+        object
+            .overwrite(0, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
 
         // Now try the same overwrite command as before, but allow allocations
-        object.overwrite(0, write_buf.as_mut(), true).await.expect("overwrite failed");
+        object
+            .overwrite(
+                0,
+                write_buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(0, read_buf.as_mut()).await.expect("read failed");
@@ -2439,10 +2511,20 @@ mod tests {
         }
 
         // Now try to overwrite at the next block. This should fail if allocations are disabled
-        object.overwrite(4096, write_buf.as_mut(), false).await.expect_err("overwrite succeeded");
+        object
+            .overwrite(4096, write_buf.as_mut(), OverwriteOptions::default())
+            .await
+            .expect_err("overwrite succeeded");
 
         // ... but it should work if allocations are enabled
-        object.overwrite(4096, write_buf.as_mut(), true).await.expect("overwrite failed");
+        object
+            .overwrite(
+                4096,
+                write_buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
         {
             let mut read_buf = object.allocate_buffer(4096).await;
             object.read(4096, read_buf.as_mut()).await.expect("read failed");
@@ -2487,12 +2569,16 @@ mod tests {
 
         // Expected to fail with allocations disabled
         object
-            .overwrite(last_block_offset, write_buf.as_mut(), false)
+            .overwrite(last_block_offset, write_buf.as_mut(), OverwriteOptions::default())
             .await
             .expect_err("overwrite succeeded");
         // ... but expected to succeed with allocations enabled
         object
-            .overwrite(last_block_offset, write_buf.as_mut(), true)
+            .overwrite(
+                last_block_offset,
+                write_buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
             .await
             .expect("overwrite failed");
         {
@@ -2508,12 +2594,16 @@ mod tests {
 
         // Expected to fail with allocations disabled
         object
-            .overwrite(next_block_offset, write_buf.as_mut(), false)
+            .overwrite(next_block_offset, write_buf.as_mut(), OverwriteOptions::default())
             .await
             .expect_err("overwrite succeeded");
         // ... but expected to succeed with allocations enabled
         object
-            .overwrite(next_block_offset, write_buf.as_mut(), true)
+            .overwrite(
+                next_block_offset,
+                write_buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
             .await
             .expect("overwrite failed");
         {

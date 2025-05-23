@@ -1165,6 +1165,8 @@ impl Component {
                             write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                             cache_eviction_policy_override: EvictionPolicyOverride::None,
                             startup_profiling_seconds: 0,
+                            inline_crypto_enabled: false,
+                            barriers_enabled: false,
                         },
                         component_type: ComponentType::DynamicChild {
                             // Use a separate collection for blobfs because it needs additional
@@ -1962,6 +1964,8 @@ mod tests {
                         write_compression_level: 0,
                         cache_eviction_policy_override: EvictionPolicyOverride::None,
                         startup_profiling_seconds: 0,
+                        inline_crypto_enabled: false,
+                        barriers_enabled: false,
                     },
                 )
                 .await

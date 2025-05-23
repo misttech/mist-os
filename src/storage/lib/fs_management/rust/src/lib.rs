@@ -196,6 +196,8 @@ impl FSConfig for Blobfs {
                     write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                     cache_eviction_policy_override: EvictionPolicyOverride::None,
                     startup_profiling_seconds: 0,
+                    inline_crypto_enabled: false,
+                    barriers_enabled: false,
                 };
                 start_options.write_compression_algorithm = match &self.write_compression_algorithm
                 {
@@ -269,6 +271,8 @@ impl FSConfig for Minfs {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
                 startup_profiling_seconds: 0,
+                inline_crypto_enabled: false,
+                barriers_enabled: false,
             },
             component_type: self.component_type.clone(),
         }
@@ -289,6 +293,8 @@ pub struct Fxfs {
     pub fsck_after_every_transaction: bool,
     pub component_type: ComponentType,
     pub startup_profiling_seconds: Option<u32>,
+    pub inline_crypto_enabled: bool,
+    pub barriers_enabled: bool,
 }
 
 impl Default for Fxfs {
@@ -298,6 +304,8 @@ impl Default for Fxfs {
             fsck_after_every_transaction: false,
             component_type: Default::default(),
             startup_profiling_seconds: None,
+            inline_crypto_enabled: false,
+            barriers_enabled: false,
         }
     }
 }
@@ -333,6 +341,8 @@ impl FSConfig for Fxfs {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
                 startup_profiling_seconds: self.startup_profiling_seconds.unwrap_or(0),
+                inline_crypto_enabled: self.inline_crypto_enabled,
+                barriers_enabled: self.barriers_enabled,
             },
             component_type: self.component_type.clone(),
         }
@@ -385,6 +395,8 @@ impl FSConfig for F2fs {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
                 startup_profiling_seconds: 0,
+                inline_crypto_enabled: false,
+                barriers_enabled: false,
             },
             component_type: self.component_type.clone(),
         }
@@ -441,6 +453,8 @@ impl FSConfig for Fvm {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
                 startup_profiling_seconds: 0,
+                inline_crypto_enabled: false,
+                barriers_enabled: false,
             },
             component_type: self.component_type.clone(),
         }
@@ -498,6 +512,8 @@ impl FSConfig for Gpt {
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
                 cache_eviction_policy_override: EvictionPolicyOverride::None,
                 startup_profiling_seconds: 0,
+                inline_crypto_enabled: false,
+                barriers_enabled: false,
             },
             component_type: self.component_type.clone(),
         }
