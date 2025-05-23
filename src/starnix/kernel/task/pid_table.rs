@@ -10,6 +10,9 @@ use starnix_uapi::{pid_t, tid_t};
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 
+// The maximal pid considered.
+const PID_MAX_LIMIT: pid_t = 1 << 15;
+
 #[derive(Default, Debug)]
 enum ProcessEntry {
     #[default]
@@ -37,6 +40,12 @@ struct PidEntry {
     task: Option<WeakRef<Task>>,
     process: ProcessEntry,
     process_group: Option<Weak<ProcessGroup>>,
+}
+
+impl PidEntry {
+    fn is_empty(&self) -> bool {
+        self.task.is_none() && self.process.is_none() && self.process_group.is_none()
+    }
 }
 
 pub enum ProcessEntryRef<'a> {
@@ -75,7 +84,7 @@ impl PidTable {
     {
         let entry = self.get_entry_mut(pid);
         do_remove(entry);
-        if entry.task.is_none() && entry.process.is_none() && entry.process_group.is_none() {
+        if entry.is_empty() {
             self.table.remove(&pid);
         }
     }
@@ -88,11 +97,18 @@ impl PidTable {
     }
 
     pub fn allocate_pid(&mut self) -> pid_t {
-        match self.last_pid.checked_add(1) {
-            Some(p) => self.last_pid = p,
-            None => {
-                track_stub!(TODO("https://fxbug.dev/322874557"), "pid wraparound");
-                self.last_pid = self.last_pid.overflowing_add(1).0;
+        loop {
+            self.last_pid = {
+                let r = self.last_pid + 1;
+                if r > PID_MAX_LIMIT {
+                    track_stub!(TODO("https://fxbug.dev/322874557"), "pid wraparound");
+                    2
+                } else {
+                    r
+                }
+            };
+            if self.get_entry(self.last_pid).is_none() {
+                break;
             }
         }
         self.last_pid
