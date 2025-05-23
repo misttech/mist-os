@@ -7,7 +7,7 @@ use driver_tools::args::DriverCommand;
 use fuchsia_component::client;
 use {
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr,
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm, fuchsia_async as fasync,
+    fidl_fuchsia_test_manager as ftm, fuchsia_async as fasync,
 };
 
 struct DriverConnector {}
@@ -26,14 +26,6 @@ impl driver_connector::DriverConnector for DriverConnector {
         }
         client::connect_to_protocol::<fdd::ManagerMarker>()
             .context("Failed to connect to driver development service")
-    }
-
-    async fn get_dev_proxy(&self, select: bool) -> Result<fio::DirectoryProxy> {
-        if select {
-            anyhow::bail!("The 'driver' tool cannot use the select flag. Please use 'ffx driver' in order to select a component.");
-        }
-        fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::Flags::empty())
-            .map_err(Into::into)
     }
 
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy> {

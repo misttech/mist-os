@@ -10,7 +10,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use target_holders::RemoteControlProxyHolder;
 use {
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_sys2 as fsys,
     fidl_fuchsia_test_manager as ftm,
 };
 
@@ -175,47 +175,6 @@ impl DriverConnector {
             anyhow::bail!("Failed to get remote control proxy");
         }
     }
-
-    async fn get_component_with_directory(
-        &self,
-        moniker: &str,
-        capability_options: impl Into<CapabilityOptions>,
-        select: bool,
-    ) -> Result<fio::DirectoryProxy> {
-        let CapabilityOptions { capability_name, default_capability_name_for_query } =
-            capability_options.into();
-
-        if let Some(ref remote_control) = self.remote_control {
-            let query_proxy =
-                rcs::root_realm_query(remote_control, std::time::Duration::from_secs(15))
-                    .await
-                    .context("opening query")?;
-            let (moniker, capability): (String, &str) = match select {
-                true => {
-                    (user_choose_selector(&query_proxy, capability_name).await?, capability_name)
-                }
-                false => (moniker.to_string(), default_capability_name_for_query),
-            };
-            let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            query_proxy
-                .open_directory(&moniker, fsys::OpenDirType::ExposedDir, server_end)
-                .await?
-                .expect("open exposed directory error");
-            let (capability_dir, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            exposed_dir
-                .open(
-                    capability,
-                    fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
-                    &Default::default(),
-                    server_end.into_channel(),
-                )
-                .expect("open capability directory error");
-            Ok(capability_dir)
-        } else {
-            anyhow::bail!("Failed to get remote control proxy");
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -228,19 +187,6 @@ impl driver_connector::DriverConnector for DriverConnector {
         )
         .await
         .context("Failed to get driver development component")
-    }
-
-    async fn get_dev_proxy(&self, select: bool) -> Result<fio::DirectoryProxy> {
-        self.get_component_with_directory(
-            "/bootstrap/devfs",
-            CapabilityOptions {
-                capability_name: "dev",
-                default_capability_name_for_query: "dev-topological",
-            },
-            select,
-        )
-        .await
-        .context("Failed to get dev component")
     }
 
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy> {
