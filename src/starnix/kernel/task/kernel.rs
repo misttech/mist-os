@@ -726,10 +726,10 @@ impl Kernel {
                         });
                     }
                 };
-                if task.id == thread_group.leader {
+                if task.tid == thread_group.leader {
                     set_properties(&tg_node);
                 } else {
-                    tasks_node.record_child(task.id.to_string(), |task_node| {
+                    tasks_node.record_child(task.tid.to_string(), |task_node| {
                         set_properties(task_node);
                     });
                 };

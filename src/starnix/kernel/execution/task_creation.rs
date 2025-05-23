@@ -187,7 +187,7 @@ where
         let mut init_writer = init_task.thread_group().write();
         let mut new_process_writer = task.thread_group().write();
         new_process_writer.parent = Some(ThreadGroupParent::from(init_task.thread_group()));
-        init_writer.children.insert(task.id, OwnedRef::downgrade(task.thread_group()));
+        init_writer.children.insert(task.tid, OwnedRef::downgrade(task.thread_group()));
     }
     // A child process created via fork(2) inherits its parent's
     // resource limits.  Resource limits are preserved across execve(2).
@@ -359,7 +359,7 @@ where
     // https://man7.org/linux/man-pages/man2/prctl.2.html
     let default_timerslack = 50_000;
     let builder = TaskBuilder {
-        task: OwnedRef::new(Task::new(
+        task: Task::new(
             pid,
             initial_name,
             thread_group,
@@ -382,7 +382,7 @@ where
             RobustListHeadPtr::null(&ArchWidth::Arch64),
             default_timerslack,
             security_state,
-        )),
+        ),
         thread_state: Default::default(),
     };
     release_on_error!(builder, locked, {

@@ -611,7 +611,7 @@ impl Releasable for TransactionState {
                 if let Err(error) = resource_accessor.close_files(self.owned_fds) {
                     log_warn!(
                         "Error when dropping transaction state while closing fd for task {}: {:?}",
-                        task.id,
+                        task.tid,
                         error
                     );
                 }
@@ -3029,7 +3029,7 @@ impl Releasable for SchedulerGuard {
         if let Some(policy) = self.0 {
             let policy = ReleaseGuard::take(policy);
             if let Err(e) = task.set_scheduler_policy(policy) {
-                log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", task.id);
+                log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", task.tid);
             }
         }
     }
@@ -3653,7 +3653,7 @@ impl BinderDriver {
         log_trace!(
             "Task {} tried to get context manager but one is not registered or dead. \
             Avoid the race condition by waiting until the context manager is ready.",
-            current_task.id
+            current_task.tid
         );
         error!(ENOENT)
     }
@@ -4401,7 +4401,7 @@ impl BinderDriver {
                                     match current_task.set_scheduler_policy(policy) {
                                         Ok(()) => return SchedulerGuard::from(old_policy),
                                         Err(e) => {
-                                            log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", current_task.id);
+                                            log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", current_task.tid);
                                         }
                                     }
                                 }

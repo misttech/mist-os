@@ -124,7 +124,7 @@ pub fn do_clone(
         new_task.thread_state.registers.set_thread_pointer_register(args.tls);
     }
 
-    let tid = new_task.task.id;
+    let tid = new_task.task.tid;
     let task_ref = WeakRef::from(&new_task.task);
     execute_task(locked, new_task, |_, _| Ok(()), |_| {}, ptrace_state)?;
 
@@ -1455,7 +1455,7 @@ pub fn sys_capset(
     user_data: UserRef<__user_cap_data_struct>,
 ) -> Result<(), Errno> {
     let mut header = current_task.read_object(user_header)?;
-    if header.pid != 0 && header.pid != current_task.id {
+    if header.pid != 0 && header.pid != current_task.tid {
         return error!(EPERM);
     }
     let weak = get_task_or_current(current_task, header.pid);
