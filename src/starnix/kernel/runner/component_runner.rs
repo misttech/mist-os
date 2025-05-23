@@ -240,7 +240,7 @@ pub async fn start_component(
                 current_task.set_creds(credentials);
 
                 for mount in &program.component_mounts {
-                    let action = MountAction::from_spec(locked, current_task, &pkg, mount)
+                    let action = MountAction::from_spec(locked, current_task, None, &pkg, mount)
                         .map_err(|e| {
                             log_error!("Error while mounting the filesystems: {e:?}");
                             errno!(EINVAL)
