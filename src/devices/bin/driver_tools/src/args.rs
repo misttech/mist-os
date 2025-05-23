@@ -20,11 +20,6 @@ use {
     super::subcommands::{
         lspci::args::LspciCommand, lsusb::args::LsusbCommand, runtool::args::RunToolCommand,
     },
-    // Driver conformance testing is run on the host against a target device's driver.
-    // So, this subcommand is only relevant on the host side.
-    // If we are host-side, then we will import the conformance library.
-    // Otherwise, we will use the placeholder subcommand declared above.
-    conformance_lib::args::ConformanceCommand,
     static_checks_lib::args::StaticChecksCommand,
 };
 
@@ -58,7 +53,6 @@ pub enum DriverSubCommand {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum DriverSubCommand {
-    Conformance(ConformanceCommand),
     Device(DeviceCommand),
     Disable(DisableCommand),
     Dump(DumpCommand),

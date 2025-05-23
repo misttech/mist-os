@@ -17,12 +17,6 @@ pub async fn driver(
     writer: &mut dyn io::Write,
 ) -> Result<()> {
     match cmd.subcommand {
-        #[cfg(not(target_os = "fuchsia"))]
-        DriverSubCommand::Conformance(_subcmd) => {
-            conformance_lib::conformance(_subcmd, &driver_connector)
-                .await
-                .context("Conformance subcommand failed")?;
-        }
         DriverSubCommand::Device(subcmd) => {
             let dev = driver_connector
                 .get_dev_proxy(subcmd.select)

@@ -41,7 +41,6 @@ rustc_library("lib") {
       "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
       "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_rust",
       "//src/developer/ffx/lib/errors:lib",
-      "//src/devices/lib/driver-conformance:lib",
       "//src/devices/lib/driver-static-checks:lib",
       "//src/devices/pci/bin/lspci:lib",
       "//src/devices/usb/bin/lsusb:lib",

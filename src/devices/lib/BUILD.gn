@@ -19,7 +19,6 @@ group("tests") {
     "dev-operation:tests",
     "dma-buffer:tests",
     "driver:tests",
-    "driver-conformance:tests",
     "fidl-metadata:tests",
     "fragment-irq:tests",
     "goldfish/pipe_io:tests",
