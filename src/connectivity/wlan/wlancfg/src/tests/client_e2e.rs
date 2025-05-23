@@ -1832,6 +1832,61 @@ fn test_destroy_iface_recovery() {
     );
 }
 
+#[fuchsia::test]
+fn test_create_iface_recovery() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values =
+        test_setup(&mut exec, "thresholded_recovery", true, RoamingPolicy::Disabled);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Add a fake PHY.
+    add_phy(&mut exec, &mut test_values);
+
+    // Start client connections so that a CreateIface request is made.
+    let start_connections_fut =
+        test_values.external_interfaces.client_controller.start_client_connections();
+    let mut start_connections_fut = pin!(start_connections_fut);
+    assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
+
+    // Expect an interface creation request and reply with a failure to trigger recovery.
+    let iface_creation_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        iface_creation_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
+            payload,
+            responder
+        })) => {
+            assert_eq!(payload.phy_id.unwrap(), TEST_PHY_ID);
+            assert_eq!(payload.role.unwrap(), fidl_common::WlanMacRole::Client);
+            assert_eq!(payload.sta_address.unwrap(), [0, 0, 0, 0, 0, 0]);
+            assert!(responder.send(Err(fidl_fuchsia_wlan_device_service::DeviceMonitorError::unknown())).is_ok());
+        }
+    );
+
+    // Run the internal futures to process the failure causing the reset request to be made.
+    let phy_reset_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        phy_reset_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::Reset {
+            phy_id: TEST_PHY_ID,
+            ..
+        }))
+    );
+}
+
 fn request_scan_and_reply(
     exec: &mut TestExecutor,
     test_values: &mut TestValues,
