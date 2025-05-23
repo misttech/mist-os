@@ -57,6 +57,9 @@ pub struct ImageAssemblyConfigBuilder {
     /// The name of the board that these images can be OTA'd to.
     board_name: String,
 
+    /// The partitions that this assembly can be flashed to.
+    partitions_config: Option<Utf8PathBuf>,
+
     /// How to generate the filesystem image.
     image_mode: FilesystemImageMode,
 
@@ -122,12 +125,14 @@ impl ImageAssemblyConfigBuilder {
     pub fn new(
         build_type: BuildType,
         board_name: String,
+        partitions_config: Option<Utf8PathBuf>,
         image_mode: FilesystemImageMode,
         feature_set_level: FeatureSetLevel,
     ) -> Self {
         Self {
             build_type,
             board_name,
+            partitions_config,
             image_mode,
             packages: Packages::default(),
             base_drivers: NamedMap::new("base_drivers"),
@@ -858,6 +863,7 @@ impl ImageAssemblyConfigBuilder {
         let Self {
             build_type: _,
             board_name,
+            partitions_config,
             image_mode,
             package_configs,
             domain_configs,
@@ -1120,6 +1126,7 @@ impl ImageAssemblyConfigBuilder {
             bootfs_files,
             images_config: images_config.unwrap_or_default(),
             board_name,
+            partitions_config,
             board_driver_arguments,
             devicetree,
             devicetree_overlay,
@@ -1660,6 +1667,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -1675,6 +1683,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -1732,6 +1741,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::UserDebug,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -1784,6 +1794,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::User,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -1835,6 +1846,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2281,6 +2293,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2310,6 +2323,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2349,6 +2363,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2394,6 +2409,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2439,6 +2455,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2474,6 +2491,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2488,6 +2506,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2534,6 +2553,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );
@@ -2551,6 +2571,7 @@ mod tests {
         let mut builder = ImageAssemblyConfigBuilder::new(
             BuildType::Eng,
             "my_board".into(),
+            None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
         );

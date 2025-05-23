@@ -4,14 +4,21 @@
 
 use crate::{common, BoardArgs, HybridBoardArgs};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use assembly_config_schema::release_info::{BoardReleaseInfo, ReleaseInfo};
 use assembly_config_schema::{BoardInformation, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
+use assembly_partitions_config::PartitionsConfig;
 use std::collections::BTreeMap;
 
 pub fn new(args: &BoardArgs) -> Result<()> {
     let mut config = BoardInformation::from_config_path(&args.config)?;
+    if let Some(partitions_config) = &args.partitions_config {
+        let _ = PartitionsConfig::from_dir(partitions_config)
+            .context("Validating partitions config")?;
+    }
+    config.partitions_config = args.partitions_config.clone().map(|p| DirectoryPathBuf(p));
+
     for (i, board_input_bundle) in args.board_input_bundles.iter().enumerate() {
         let key = format!("tmp{}", i);
         let directory = DirectoryPathBuf(board_input_bundle.clone());
@@ -240,6 +247,7 @@ mod tests {
         let board_path = tmp_path.join("my_board");
         let args = BoardArgs {
             config: config_path,
+            partitions_config: None,
             board_input_bundles: vec![],
             board_input_bundle_sets: vec![bib_set_path.clone()],
             output: board_path.clone(),

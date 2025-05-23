@@ -70,6 +70,8 @@ if (is_fuchsia) {
 
   board_configuration("board_config") {
     name = "test"
+    testonly = true
+    partitions_config = ":partitions_config"
     version = "fake_version"
     filesystems = {
       fvm = {

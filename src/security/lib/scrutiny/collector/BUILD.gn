@@ -117,7 +117,9 @@ if (is_fuchsia) {
 
   board_configuration("board_config") {
     name = "test"
+    testonly = true
     version = "fake_version"
+    partitions_config = ":partitions"
     filesystems = {
       fvm = {
         sparse_output = {

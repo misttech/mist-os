@@ -165,6 +165,7 @@ Resulting product is not supported and may misbehave!
     let mut builder = ImageAssemblyConfigBuilder::new(
         platform.build_type,
         board_config.name.clone(),
+        board_config.partitions_config.clone().map(|p| p.0),
         image_mode,
         platform.feature_set_level,
     );

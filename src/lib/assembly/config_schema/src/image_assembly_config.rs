@@ -64,6 +64,9 @@ pub struct ImageAssemblyConfig {
     /// The name of the board that these images can be flashed to.
     pub board_name: String,
 
+    /// The partitions that this assembly can be flashed to.
+    pub partitions_config: Option<Utf8PathBuf>,
+
     /// Optionally-provided data to pass to the board's Board Driver via a ZBI
     /// item.
     pub board_driver_arguments: Option<BoardDriverArguments>,
@@ -90,6 +93,7 @@ impl ImageAssemblyConfig {
             cache: Vec::default(),
             on_demand: Vec::default(),
             boot_args: Vec::default(),
+            partitions_config: None,
             bootfs_files: Vec::default(),
             bootfs_packages: Vec::default(),
             kernel: KernelConfig { path: kernel_path.as_ref().into(), args: Vec::default() },

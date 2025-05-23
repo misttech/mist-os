@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
@@ -80,7 +79,11 @@ if (is_host) {
       testonly = true
       name = "ffx-symbolize-test"
 
-      partitions = ":partitions_config"
+      if (target_cpu == "arm64") {
+        partitions = "//boards/partitions:arm64"
+      } else if (target_cpu == "x64") {
+        partitions = "//boards/partitions:x64"
+      }
       system_a = files.outdir
 
       deps = [ ":assembly" ]
@@ -90,15 +93,14 @@ if (is_host) {
       testonly = true
       image_name = "fuchsia"
 
+      if (target_cpu == "arm64") {
+        board_config_label = "//boards/arm64"
+      } else if (target_cpu == "x64") {
+        board_config_label = "//boards/x64"
+      }
       generate_fxfs = true
       generate_vbmeta = true
-      board_config_label = board_configuration_label
       product_assembly_config_label = ":product_assembly_config"
-    }
-
-    generated_partitions_config("partitions_config") {
-      testonly = true
-      hw_revision = board_name
     }
 
     product_assembly_configuration("product_assembly_config") {

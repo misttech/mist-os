@@ -101,6 +101,30 @@ def main() -> int:
         if config.qemu_kernel:
             inputs.add(config.qemu_kernel)
 
+        # Add the files from the partitions config.
+        if config.partitions_config:
+            path = os.path.join(
+                config.partitions_config, "partitions_config.json"
+            )
+            deps.add(path)
+            inputs.add(path)
+            with open(path, "r") as f:
+                partitions_config = json.load(f)
+                partitions = partitions_config.get("bootstrap_partitions", [])
+                for part in partitions:
+                    inputs.add(
+                        os.path.join(config.partitions_config, part["image"])
+                    )
+                partitions = partitions_config.get("bootloader_partitions", [])
+                for part in partitions:
+                    inputs.add(
+                        os.path.join(config.partitions_config, part["image"])
+                    )
+                creds = partitions_config.get("unlock_credentials", [])
+                for cred in creds:
+                    inputs.add(os.path.join(config.partitions_config, cred))
+
+    # Add the files from the images config.
     with open(args.image_assembly_config, "r") as f:
         image_assembly_config = json.load(f)
         images_config = image_assembly_config["images_config"]

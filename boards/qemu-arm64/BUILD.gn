@@ -7,6 +7,7 @@ import("//build/info/info.gni")
 import("//src/devices/board/drivers/qemu-arm64/pci.gni")
 
 board_configuration("qemu-arm64") {
+  partitions_config = "//boards/partitions:qemu-arm64"
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::real_time_clock",
