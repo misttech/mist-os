@@ -384,6 +384,9 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
 }
 
 ktl::pair<uint64_t, uint64_t> MemoryWatchdog::FreeMemBoundsForLevel(PressureLevel level) const {
+  // If ImminentOOM is disabled, we will never enter that level, and so we should never be asked to
+  // compute its bounds.
+  DEBUG_ASSERT(IsImminentOomEnabled() || level != PressureLevel::kImminentOutOfMemory);
   // Calculate the range, including debounce, for the current memory level.
   uint64_t lower = 0;
   uint64_t upper = UINT64_MAX;
@@ -415,6 +418,8 @@ MemoryWatchdog::PressureLevel MemoryWatchdog::CalculatePressureLevel() const {
     new_level++;
   }
   DEBUG_ASSERT(new_level != mem_event_idx_);
+  // If ImminentOOM is disabled, we should never compute it as the current level.
+  DEBUG_ASSERT(IsImminentOomEnabled() || new_level != PressureLevel::kImminentOutOfMemory);
   return static_cast<PressureLevel>(new_level);
 }
 
@@ -440,13 +445,13 @@ uint64_t MemoryWatchdog::DebugNumBytesTillPressureLevel(PressureLevel level) {
 void MemoryWatchdog::Dump() {
   printf("watermarks: [");
   for (uint8_t i = 0; i < kNumWatermarks; i++) {
-    printf("%s%s", FormattedBytes(mem_watermarks_[i]).c_str(),
-           i + 1 == kNumWatermarks ? "]\n" : ", ");
+    printf("%s: %s%s", PressureLevelToString(PressureLevel(i)),
+           FormattedBytes(mem_watermarks_[i]).c_str(), i + 1 == kNumWatermarks ? "]\n" : ", ");
   }
   const PressureLevel current = mem_event_idx_;
   auto [lower, upper] = FreeMemBoundsForLevel(current);
   printf("debounce: %s\n", FormattedBytes(watermark_debounce_).c_str());
-  printf("current state: %u\n", mem_event_idx_.load());
+  printf("current state: %u [%s]\n", current, PressureLevelToString(current));
   printf("current bounds: [%s, %s]\n", FormattedBytes(lower).c_str(),
          FormattedBytes(upper).c_str());
   printf("free memory: %s\n", FormattedBytes(pmm_count_free_pages() * PAGE_SIZE).c_str());
@@ -493,10 +498,19 @@ void MemoryWatchdog::Init(Executor* executor) {
     for (uint8_t j = 0; j < kNumWatermarks; j++) {
       uint64_t prev = j == 0 ? 0 : mem_watermarks_[j - 1];
       uint64_t next = (j == kNumWatermarks - 1) ? UINT64_MAX : mem_watermarks_[j + 1];
-      ASSERT(mem_watermarks_[j] > prev);
-      ASSERT(mem_watermarks_[j] < next);
-      ASSERT(mem_watermarks_[j] - prev > watermark_debounce_);
-      ASSERT(next - mem_watermarks_[j] > watermark_debounce_);
+      // The watermarks should be in increasing order, with a minimum of watermark_debounce_
+      // difference between consecutive levels. The only exception is if the ImminentOOM level is
+      // disabled (by setting oom_imminent_oom_delta_mb to 0), in which case the OOM and ImminentOOM
+      // watermarks will be the same, and the ImminentOOM level will never be entered; we will
+      // either be in OOM or Critical.
+      ASSERT(mem_watermarks_[j] > prev ||
+             (j == PressureLevel::kImminentOutOfMemory && mem_watermarks_[j] == prev));
+      ASSERT(mem_watermarks_[j] < next ||
+             (j == PressureLevel::kOutOfMemory && mem_watermarks_[j] == next));
+      ASSERT(mem_watermarks_[j] - prev > watermark_debounce_ ||
+             (j == PressureLevel::kImminentOutOfMemory && mem_watermarks_[j] == prev));
+      ASSERT(next - mem_watermarks_[j] > watermark_debounce_ ||
+             (j == PressureLevel::kOutOfMemory && mem_watermarks_[j] == next));
     }
 
     // Set our eviction target to be such that we try to get completely out of the max eviction
@@ -527,8 +541,10 @@ void MemoryWatchdog::Init(Executor* executor) {
            gBootOptions->oom_evict_continuous ? "continuous" : "one-shot",
            eviction_delay_ms_ / ZX_MSEC(1));
 
-    printf("memory-pressure: ImminentOutOfMemory watermark - %zuMB\n",
-           mem_watermarks_[PressureLevel::kImminentOutOfMemory] / MB);
+    if (IsImminentOomEnabled()) {
+      printf("memory-pressure: ImminentOutOfMemory watermark - %zuMB\n",
+             mem_watermarks_[PressureLevel::kImminentOutOfMemory] / MB);
+    }
 
     auto memory_worker_thread = [](void* arg) -> int {
       MemoryWatchdog* watchdog = reinterpret_cast<MemoryWatchdog*>(arg);

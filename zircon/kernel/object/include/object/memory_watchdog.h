@@ -61,6 +61,11 @@ class MemoryWatchdog {
 
   PressureLevel CalculatePressureLevel() const;
 
+  bool IsImminentOomEnabled() const {
+    return mem_watermarks_[PressureLevel::kImminentOutOfMemory] !=
+           mem_watermarks_[PressureLevel::kOutOfMemory];
+  }
+
   // Kernel-owned events used to signal userspace at different levels of memory pressure.
   ktl::array<fbl::RefPtr<EventDispatcher>, PressureLevel::kNumLevels> mem_pressure_events_;
 
