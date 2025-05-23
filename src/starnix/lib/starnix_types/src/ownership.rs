@@ -367,6 +367,16 @@ impl<T> PartialEq for WeakRefKey<T> {
         WeakRef::ptr_eq(&self.0, &other.0)
     }
 }
+impl<T> PartialOrd for WeakRefKey<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<T> Ord for WeakRefKey<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        WeakRef::as_ptr(&self.0).cmp(&WeakRef::as_ptr(&other.0))
+    }
+}
 impl<T> From<WeakRef<T>> for WeakRefKey<T> {
     fn from(weak_ref: WeakRef<T>) -> Self {
         Self(weak_ref)

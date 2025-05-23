@@ -2062,7 +2062,7 @@ mod tests {
             Ok(())
         );
         // The previous wait matched child2, only child1 should be in the available zombies.
-        assert_eq!(current_task.thread_group().read().zombie_children[0].pid, child1_pid);
+        assert_eq!(current_task.thread_group().read().zombie_children[0].pid(), child1_pid);
 
         assert_eq!(
             sys_waitid(

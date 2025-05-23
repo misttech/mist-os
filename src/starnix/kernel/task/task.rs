@@ -1094,7 +1094,7 @@ impl Task {
                 };
                 let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
                 let zombie = ZombieProcess {
-                    pid: self.get_pid(),
+                    thread_group_key: self.thread_group_key.clone(),
                     pgid,
                     uid,
                     exit_info: exit_info,

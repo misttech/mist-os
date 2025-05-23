@@ -45,7 +45,7 @@ use std::sync::Arc;
 use zx::AsHandleRef;
 
 /// A weak reference to a thread group that can be used in set and maps.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ThreadGroupKey {
     pid: pid_t,
     key: WeakRefKey<ThreadGroup>,
@@ -95,6 +95,31 @@ impl Into<u64> for ThreadGroupLifecycleWaitValue {
     }
 }
 
+/// Child process that have exited, but the zombie ptrace needs to be consumed
+/// before they can be waited for.
+#[derive(Clone, Debug)]
+pub struct DeferredZombiePTracer {
+    /// Original tracer
+    pub tracer_thread_group_key: ThreadGroupKey,
+    /// Tracee tid
+    pub tracee_tid: tid_t,
+    /// Tracee pgid
+    pub tracee_pgid: pid_t,
+    /// Tracee thread group
+    pub tracee_thread_group_key: ThreadGroupKey,
+}
+
+impl DeferredZombiePTracer {
+    fn new(tracer: &ThreadGroup, tracee: &Task) -> Self {
+        Self {
+            tracer_thread_group_key: tracer.into(),
+            tracee_tid: tracee.tid,
+            tracee_pgid: tracee.thread_group().read().process_group.leader,
+            tracee_thread_group_key: tracee.thread_group_key.clone(),
+        }
+    }
+}
+
 /// The mutable state of the ThreadGroup.
 pub struct ThreadGroupMutableState {
     /// The parent thread group.
@@ -125,11 +150,9 @@ pub struct ThreadGroupMutableState {
     /// ptracees of this process that have exited, but not yet been waited for.
     pub zombie_ptracees: ZombiePtraces,
 
-    // Child tasks that have exited, but the zombie ptrace needs to be consumed
-    // before they can be waited for.  (ThreadGroupKey, tid_t) is the original tracer and
-    // tracee, so the tracer can be updated with a reaper if this thread group
-    // exits.
-    pub deferred_zombie_ptracers: Vec<(ThreadGroupKey, tid_t)>,
+    /// Child processes that have exited, but the zombie ptrace needs to be consumed
+    /// before they can be waited for.
+    pub deferred_zombie_ptracers: Vec<DeferredZombiePTracer>,
 
     /// Unified [WaitQueue] for all waited ThreadGroup events.
     pub lifecycle_waiters: TypedWaitQueue<ThreadGroupLifecycleWaitValue>,
@@ -413,7 +436,7 @@ impl WaitResult {
 
 #[derive(Debug)]
 pub struct ZombieProcess {
-    pub pid: pid_t,
+    pub thread_group_key: ThreadGroupKey,
     pub pgid: pid_t,
     pub uid: uid_t,
 
@@ -430,7 +453,7 @@ pub struct ZombieProcess {
 impl PartialEq for ZombieProcess {
     fn eq(&self, other: &Self) -> bool {
         // We assume only one set of ZombieProcess data per process, so this should cover it.
-        self.pid == other.pid
+        self.thread_group_key == other.thread_group_key
             && self.pgid == other.pgid
             && self.uid == other.uid
             && self.is_canonical == other.is_canonical
@@ -441,14 +464,13 @@ impl Eq for ZombieProcess {}
 
 impl PartialOrd for ZombieProcess {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // pid by itself seems good enough.
-        self.pid.partial_cmp(&other.pid)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for ZombieProcess {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.pid.cmp(&other.pid)
+        self.thread_group_key.cmp(&other.thread_group_key)
     }
 }
 
@@ -460,7 +482,7 @@ impl ZombieProcess {
     ) -> OwnedRef<Self> {
         let time_stats = thread_group.base.time_stats() + thread_group.children_time_stats;
         OwnedRef::new(ZombieProcess {
-            pid: thread_group.base.leader,
+            thread_group_key: thread_group.base.into(),
             pgid: thread_group.process_group.leader,
             uid: credentials.uid,
             exit_info,
@@ -469,9 +491,13 @@ impl ZombieProcess {
         })
     }
 
+    pub fn pid(&self) -> pid_t {
+        self.thread_group_key.pid()
+    }
+
     pub fn to_wait_result(&self) -> WaitResult {
         WaitResult {
-            pid: self.pid,
+            pid: self.pid(),
             uid: self.uid,
             exit_info: self.exit_info.clone(),
             time_stats: self.time_stats,
@@ -480,7 +506,7 @@ impl ZombieProcess {
 
     pub fn as_artificial(&self) -> Self {
         ZombieProcess {
-            pid: self.pid,
+            thread_group_key: self.thread_group_key.clone(),
             pgid: self.pgid,
             uid: self.uid,
             exit_info: self.exit_info.clone(),
@@ -492,9 +518,9 @@ impl ZombieProcess {
     pub fn matches_selector(&self, selector: &ProcessSelector) -> bool {
         match *selector {
             ProcessSelector::Any => true,
-            ProcessSelector::Pid(pid) => self.pid == pid,
+            ProcessSelector::Pid(pid) => self.pid() == pid,
             ProcessSelector::Pgid(pgid) => self.pgid == pgid,
-            ProcessSelector::Process(ref key) => key.pid() == self.pid,
+            ProcessSelector::Process(ref key) => self.thread_group_key == *key,
         }
     }
 
@@ -522,7 +548,7 @@ impl Releasable for ZombieProcess {
 
     fn release<'a: 'b, 'b>(self, pids: &mut PidTable) {
         if self.is_canonical {
-            pids.remove_zombie(self.pid);
+            pids.remove_zombie(self.pid());
         }
     }
 }
@@ -785,17 +811,16 @@ impl ThreadGroup {
                     tracer_pid = Some(ptrace.get_pid());
                 }
 
-                let mut maybe_zombie = Some(zombie);
-                if let Some(tracer_pid) = tracer_pid {
-                    if let Some(ref tracer) = pids.get_task(tracer_pid).upgrade() {
-                        maybe_zombie = tracer.thread_group().maybe_notify_tracer(
-                            task,
-                            pids,
-                            &parent,
-                            maybe_zombie.unwrap(),
-                        );
+                let maybe_zombie = 'compute_zombie: {
+                    if let Some(tracer_pid) = tracer_pid {
+                        if let Some(ref tracer) = pids.get_task(tracer_pid).upgrade() {
+                            break 'compute_zombie tracer
+                                .thread_group()
+                                .maybe_notify_tracer(task, pids, &parent, zombie);
+                        }
                     }
-                }
+                    Some(zombie)
+                };
                 if let Some(zombie) = maybe_zombie {
                     parent.do_zombie_notifications(zombie);
                 }
@@ -818,8 +843,10 @@ impl ThreadGroup {
     pub fn do_zombie_notifications(&self, zombie: OwnedRef<ZombieProcess>) {
         let mut state = self.write();
 
-        state.children.remove(&zombie.pid);
-        state.deferred_zombie_ptracers.retain(|&(_, tracee)| tracee != zombie.pid);
+        state.children.remove(&zombie.pid());
+        state
+            .deferred_zombie_ptracers
+            .retain(|dzp| dzp.tracee_thread_group_key != zombie.thread_group_key);
 
         let exit_signal = zombie.exit_info.exit_signal;
         let mut signal_info = zombie.to_wait_result().as_signal_info();
@@ -857,8 +884,10 @@ impl ThreadGroup {
                 {
                     // Tell the parent to expect a notification later.
                     let mut parent_state = parent.write();
-                    parent_state.deferred_zombie_ptracers.push((self.into(), tracee.tid));
-                    parent_state.children.remove(&tracee.thread_group().leader);
+                    parent_state
+                        .deferred_zombie_ptracers
+                        .push(DeferredZombiePTracer::new(self, tracee));
+                    parent_state.children.remove(&tracee.get_pid());
                 }
                 // Tell the tracer that there is a notification pending.
                 let mut state = self.write();
@@ -1369,8 +1398,10 @@ impl ThreadGroup {
                     } else {
                         {
                             let mut state = tg.write();
-                            state.children.remove(&z.pid);
-                            state.deferred_zombie_ptracers.retain(|&(_, tracee)| tracee != z.pid);
+                            state.children.remove(&z.pid());
+                            state
+                                .deferred_zombie_ptracers
+                                .retain(|dzp| dzp.tracee_thread_group_key != z.thread_group_key);
                         }
 
                         z.release(pids);
@@ -1825,13 +1856,11 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             .peekable();
         if selected_children.peek().is_none() {
             // There still might be a process that ptrace hasn't looked at yet.
-            if self.deferred_zombie_ptracers.iter().any(|&(_, tracee)| match *selector {
+            if self.deferred_zombie_ptracers.iter().any(|dzp| match *selector {
                 ProcessSelector::Any => true,
-                ProcessSelector::Pid(pid) => tracee == pid,
-                ProcessSelector::Pgid(pgid) => {
-                    pids.get_process_group(pgid).as_ref() == pids.get_process_group(tracee).as_ref()
-                }
-                ProcessSelector::Process(ref key) => key.pid() == tracee,
+                ProcessSelector::Pid(pid) => dzp.tracee_thread_group_key.pid() == pid,
+                ProcessSelector::Pgid(pgid) => pgid == dzp.tracee_pgid,
+                ProcessSelector::Process(ref key) => *key == dzp.tracee_thread_group_key,
             }) {
                 return WaitableChildResult::ShouldWait;
             }

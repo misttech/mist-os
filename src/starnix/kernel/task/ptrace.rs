@@ -556,9 +556,13 @@ impl ZombiePtraces {
     pub fn reparent(old_parent: &ThreadGroup, new_parent: &ThreadGroup) {
         let mut lockless_list = old_parent.read().deferred_zombie_ptracers.clone();
 
-        for (ptracer, tracee) in &lockless_list {
-            if let Some(tg) = ptracer.upgrade() {
-                tg.write().zombie_ptracees.set_parent_of(*tracee, None, new_parent);
+        for deferred_zombie_ptracer in &lockless_list {
+            if let Some(tg) = deferred_zombie_ptracer.tracer_thread_group_key.upgrade() {
+                tg.write().zombie_ptracees.set_parent_of(
+                    deferred_zombie_ptracer.tracee_tid,
+                    None,
+                    new_parent,
+                );
             }
         }
         let mut new_state = new_parent.write();
