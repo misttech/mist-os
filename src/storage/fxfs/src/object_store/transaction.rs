@@ -14,6 +14,7 @@ use crate::object_store::object_record::{
     ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectItemV46, ObjectItemV47,
     ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
 };
+use crate::object_store::AttributeKey;
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use anyhow::Error;
 use either::{Either, Left, Right};
@@ -695,6 +696,9 @@ pub struct Transaction<'a> {
 
     /// Any data checksums which should be evaluated when replaying this transaction.
     checksums: Vec<(Range<u64>, Vec<Checksum>, bool)>,
+
+    /// Set if this transaction contains data (i.e. includes any extent mutations).
+    includes_write: bool,
 }
 
 impl<'a> Transaction<'a> {
@@ -724,6 +728,7 @@ impl<'a> Transaction<'a> {
             metadata_reservation,
             new_objects: BTreeSet::new(),
             checksums: Vec::new(),
+            includes_write: false,
         };
 
         ScopeGuard::into_inner(guard);
@@ -778,6 +783,18 @@ impl<'a> Transaction<'a> {
         associated_object: AssocObj<'a>,
     ) -> Option<Mutation> {
         assert!(object_id != INVALID_OBJECT_ID);
+        if let Mutation::ObjectStore(ObjectStoreMutation {
+            item:
+                Item {
+                    key:
+                        ObjectKey { data: ObjectKeyData::Attribute(_, AttributeKey::Extent(_)), .. },
+                    ..
+                },
+            ..
+        }) = &mutation
+        {
+            self.includes_write = true;
+        }
         let txn_mutation = TxnMutation { object_id, mutation, associated_object };
         self.verify_locks(&txn_mutation);
         self.mutations.replace(txn_mutation).map(|m| m.mutation)
@@ -785,6 +802,10 @@ impl<'a> Transaction<'a> {
 
     pub fn add_checksum(&mut self, range: Range<u64>, checksums: Vec<Checksum>, first_write: bool) {
         self.checksums.push((range, checksums, first_write));
+    }
+
+    pub fn includes_write(&self) -> bool {
+        self.includes_write
     }
 
     pub fn checksums(&self) -> &[(Range<u64>, Vec<Checksum>, bool)] {

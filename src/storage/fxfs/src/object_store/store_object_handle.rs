@@ -1300,9 +1300,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 Result::<_, Error>::Ok(deallocated)
             }
         )?;
+
         for m in mutations {
             transaction.add(store_id, m);
         }
+
         // Only store checksums in the journal if barriers are not enabled.
         if !store.filesystem().options().barriers_enabled {
             for (r, c) in checksums {

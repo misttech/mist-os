@@ -19,6 +19,10 @@ pub enum Op {
     Flush,
 }
 
+pub trait Observer: Send + Sync {
+    fn barrier(&self) {}
+}
+
 #[derive(Debug, Default, Clone)]
 struct Inner {
     data: Vec<u8>,
@@ -34,6 +38,7 @@ pub struct FakeDevice {
     operation_closure: Box<dyn Fn(Op) -> Result<(), Error> + Send + Sync>,
     read_only: AtomicBool,
     poisoned: AtomicBool,
+    observer: Option<Box<dyn Observer>>,
 }
 
 const TRANSFER_HEAP_SIZE: usize = 64 * 1024 * 1024;
@@ -53,7 +58,12 @@ impl FakeDevice {
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
             poisoned: AtomicBool::new(false),
+            observer: None,
         }
+    }
+
+    pub fn set_observer(&mut self, observer: Box<dyn Observer>) {
+        self.observer = Some(observer);
     }
 
     /// Sets a callback that will run at the beginning of read, write, and flush which will forward
@@ -86,6 +96,7 @@ impl FakeDevice {
             operation_closure: Box::new(|_| Ok(())),
             read_only: AtomicBool::new(false),
             poisoned: AtomicBool::new(false),
+            observer: None,
         })
     }
 }
@@ -180,6 +191,9 @@ impl Device for FakeDevice {
     }
 
     fn barrier(&self) {
+        if let Some(observer) = &self.observer {
+            observer.barrier();
+        }
         self.inner.lock().attach_barrier = true;
     }
 
@@ -206,6 +220,7 @@ impl Device for FakeDevice {
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
             poisoned: AtomicBool::new(false),
+            observer: None,
         }))
     }
 

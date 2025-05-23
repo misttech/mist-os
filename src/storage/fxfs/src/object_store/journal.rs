@@ -304,10 +304,14 @@ struct Inner {
 
     image_builder_mode: Option<SuperBlockInstance>,
 
-    // If true, issue a pre-barrier on the first device write of each journal write (which happens
-    // in multiples of `BLOCK_SIZE`). This ensures that all the corresponding data writes make it
-    // to disk before the journal gets written to.
+    // If true and `needs_barrier`, issue a pre-barrier on the first device write of each journal
+    // write (which happens in multiples of `BLOCK_SIZE`). This ensures that all the corresponding
+    // data writes make it to disk before the journal gets written to.
     barriers_enabled: bool,
+
+    // If true, indicates that data write requests have been made to the device since the last
+    // journal write.
+    needs_barrier: bool,
 }
 
 impl Inner {
@@ -444,6 +448,7 @@ impl Journal {
                 reclaim_size: options.reclaim_size,
                 image_builder_mode: None,
                 barriers_enabled: options.barriers_enabled,
+                needs_barrier: false,
             }),
             writer_mutex: Mutex::new(()),
             sync_mutex: futures::lock::Mutex::new(()),
@@ -1603,6 +1608,9 @@ impl Journal {
             let _guard = self.writer_mutex.lock();
             checkpoint_before = {
                 let mut inner = self.inner.lock();
+                if transaction.includes_write() {
+                    inner.needs_barrier = true;
+                }
                 let checkpoint = inner.writer.journal_file_checkpoint();
                 for TxnMutation { object_id, mutation, .. } in transaction.mutations() {
                     self.objects.write_mutation(
@@ -1728,10 +1736,12 @@ impl Journal {
         let (offset, len, barrier_on_first_write) = {
             let mut inner = self.inner.lock();
             let offset = inner.writer.take_flushable(buf.as_mut());
-            (offset, buf.len() as u64, inner.barriers_enabled)
+            let barrier_on_first_write = inner.needs_barrier && inner.barriers_enabled;
+            // Reset `needs_barrier` before instead of after the overwrite in case a txn commit
+            // that contains data happens during the overwrite.
+            inner.needs_barrier = false;
+            (offset, buf.len() as u64, barrier_on_first_write)
         };
-        // TODO(https://fxbug.dev/415296349): Only issue a barrier if this journal write includes
-        // a transaction that contains data (i.e. has an extent mutation).
         self.handle
             .get()
             .unwrap()
