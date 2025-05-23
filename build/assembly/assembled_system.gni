@@ -630,6 +630,18 @@ template("assembled_system") {
       inputs += invoker.inputs
     }
 
+    # Tools used by create-system.
+    deps += [
+      blobfs_tool_target,
+      fvm_tool_target,
+      zbi_tool_target,
+    ]
+    inputs += [
+      blobfs_tool_path,
+      fvm_tool_path,
+      zbi_tool_path,
+    ]
+
     outputs = [
       files.bootfs_files,
       files.additional_boot_args,

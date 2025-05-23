@@ -135,7 +135,6 @@ template("ffx_tool") {
     ffx_tool = ":$target_unversioned"
     ffx_tool_output_name = output_versioned  # without _unversioned suffix
 
-    needs_sdk = false
     inputs = []
     outputs = [ "$root_out_dir/$output_metadata" ]
     args = [

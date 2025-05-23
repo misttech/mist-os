@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/python/python_action.gni")
+import("//build/zircon/tools.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
 template("update_package") {
@@ -180,6 +181,10 @@ template("update_package") {
       invoker.version_file,
     ]
     deps += [ invoker.partitions ]
+
+    # Used by create-update for size checks.
+    deps += [ blobfs_tool_target ]
+    inputs += [ blobfs_tool_path ]
 
     if (defined(invoker.system_a)) {
       args += [
