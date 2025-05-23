@@ -110,6 +110,9 @@ struct percpu {
   // The accumulated memory stall timers for this CPU.
   StallAccumulator memory_stall_accumulator;
 
+  // See |PlatformResumeState| type declaration.
+  PlatformCpuResumeState resume_state;
+
   // Returns a reference to the percpu instance for given CPU number.
   static percpu& Get(cpu_num_t cpu_num) {
     DEBUG_ASSERT(cpu_num < processor_count());

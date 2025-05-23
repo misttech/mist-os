@@ -28,6 +28,13 @@ typedef enum {
   HALT_ACTION_SHUTDOWN,           // Shutdown and power off.
 } platform_halt_action;
 
+// Holds platform-specific, per-cpu state used to suspend/resume a CPU.
+struct PlatformCpuResumeState {
+#if defined(__aarch64__)
+  uint64_t cntkctl_el1{};
+#endif
+};
+
 /* super early platform initialization, before almost everything */
 void platform_early_init();
 

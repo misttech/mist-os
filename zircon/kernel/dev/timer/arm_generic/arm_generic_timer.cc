@@ -158,9 +158,7 @@ static ReadArmCounterFunc read_cntvct_a73;
 static ReadArmCounterFunc read_cntpct;
 static ReadArmCounterFunc read_cntvct;
 
-static uint64_t read_zero() {
-  return 0;
-}
+static uint64_t read_zero() { return 0; }
 
 static uint64_t read_cntpct_a73() {
   // Workaround for Cortex-A73 erratum 858921.
@@ -413,6 +411,33 @@ void platform_stop_timer() {
 void platform_shutdown_timer() {
   DEBUG_ASSERT(arch_ints_disabled());
   mask_interrupt(timer_irq);
+}
+
+zx_status_t platform_suspend_timer_curr_cpu() {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  // Save the cntkctl_el1 register, which includes the event stream state and
+  // whether EL0 can read PCT.
+  percpu::GetCurrent().resume_state.cntkctl_el1 = __arm_rsr64("cntkctl_el1");
+
+  write_ctl(0);
+
+  return mask_interrupt(timer_irq);
+}
+
+zx_status_t platform_resume_timer_curr_cpu() {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  __arm_wsr64("cntkctl_el1", percpu::GetCurrent().resume_state.cntkctl_el1);
+
+  unmask_interrupt(timer_irq);
+
+  // Kick the timer to get things going again.
+  //
+  // TODO(https://fxbug.dev/414456459): Remove/merge this with the logic in
+  // IdlePowerThread::UpdateMonotonicClock such that we don't kick the platform
+  // timer twice.
+  return platform_set_oneshot_timer(0);
 }
 
 bool platform_usermode_can_access_tick_registers() {

@@ -35,6 +35,10 @@ void platform_stop_timer() { timer_stop(); }
 
 void platform_shutdown_timer() { timer_shutdown(); }
 
+zx_status_t platform_suspend_timer_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t platform_resume_timer_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 bool platform_usermode_can_access_tick_registers() {
   // If the cpu claims to have Zicntr support, then it's relatively cheap for user
   // space to access the time CSR via rdtime instruction.

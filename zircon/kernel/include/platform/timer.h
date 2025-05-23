@@ -107,6 +107,16 @@ void platform_stop_timer();
 // TODO(maniscalco): Provide a "resume" function so we can suspend/resume.
 void platform_shutdown_timer();
 
+// Suspend the platform timer for the calling CPU.
+//
+// It is an error to call this function with interrupts enabled.
+zx_status_t platform_suspend_timer_curr_cpu();
+
+// Resume the platform timer for the calling CPU.
+//
+// It is an error to call this function with interrupts enabled.
+zx_status_t platform_resume_timer_curr_cpu();
+
 void timer_tick();
 
 // A bool indicating whether or not user mode has direct access to the registers
