@@ -134,7 +134,7 @@ async fn executable_read() {
     const FILE_CONTENTS: &'static str = "file-contents";
     let vmo = Vmo::create(FILE_CONTENTS.len() as u64).unwrap();
     vmo.write(FILE_CONTENTS.as_bytes(), 0).unwrap();
-    let file = VmoFile::new(vmo, true, false, true);
+    let file = VmoFile::new_with_inode_and_executable(vmo, fio::INO_UNKNOWN, true);
     let proxy = file::serve_proxy(file, fio::PERM_READABLE | fio::PERM_EXECUTABLE);
     assert_read!(proxy, FILE_CONTENTS);
     assert_close!(proxy);
@@ -242,7 +242,7 @@ async fn get_attr_read_only_with_inode() {
     let content_len: u64 = CONTENT.len().try_into().unwrap();
     let vmo = Vmo::create(content_len).unwrap();
     vmo.write(&CONTENT, 0).unwrap();
-    let file = VmoFile::new_with_inode(vmo, true, false, false, INODE);
+    let file = VmoFile::new_with_inode(vmo, INODE);
     let proxy = file::serve_proxy(file, fio::PERM_READABLE);
     assert_get_attr!(
         proxy,
@@ -327,9 +327,7 @@ async fn read_only_vmo_file() {
     let data = b"Read only str";
     vmo.write(data, 0).expect("write failed");
     vmo.set_content_size(&(data.len() as u64)).expect("set_content_size failed");
-    let file = VmoFile::new(
-        vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
-    );
+    let file = VmoFile::new(vmo);
     let proxy = file::serve_proxy(file, fio::PERM_READABLE);
     assert_read!(proxy, "Read only str");
     assert_close!(proxy);

@@ -112,10 +112,7 @@ fn build_directory(
                 .context("could not add directory to directory")?,
             DirectoryOrFile::File(vmo) => {
                 let vmo_handle = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-                let file = VmoFile::new(
-                    vmo_handle, /*readable*/ true, /*writable*/ false,
-                    /*executable*/ false,
-                );
+                let file = VmoFile::new(vmo_handle);
                 directory
                     .clone()
                     .add_entry(&path, file)

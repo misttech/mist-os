@@ -141,10 +141,7 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
         let file_contents = self.hash.to_string();
         let vmo = zx::Vmo::create(usize_to_u64_safe(file_contents.len()))?;
         let () = vmo.write(file_contents.as_bytes(), 0)?;
-        Ok(VmoFile::new_with_inode(
-            vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
-            /*inode*/ 1,
-        ))
+        Ok(VmoFile::new_with_inode(vmo, /*inode*/ 1))
     }
 
     /// Creates and returns a meta file if one exists at `path`.
@@ -174,10 +171,7 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
                 zx::Status::INTERNAL
             })?;
 
-        Ok(Some(VmoFile::new_with_inode(
-            vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
-            /*inode*/ 1,
-        )))
+        Ok(Some(VmoFile::new_with_inode(vmo, /*inode*/ 1)))
     }
 
     /// Creates and returns a `MetaSubdir` if one exists at `path`. `path` must end in '/'.

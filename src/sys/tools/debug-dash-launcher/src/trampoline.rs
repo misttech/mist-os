@@ -233,8 +233,10 @@ fn make_executable_vmo_file(
 
     // Make it into a VMO that can be loaded as an executable.
     let exec_vmo = vmo.replace_as_executable(&resource).map_err(|_| LauncherError::Internal)?;
-    let exec_file = vmo::VmoFile::new(
-        exec_vmo, /*readable*/ true, /*writable*/ false, /*executable*/ true,
+    let exec_file = vmo::VmoFile::new_with_inode_and_executable(
+        exec_vmo,
+        fio::INO_UNKNOWN,
+        /*executable*/ true,
     );
     Ok(exec_file)
 }

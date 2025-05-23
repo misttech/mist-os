@@ -145,9 +145,7 @@ impl BootfsSvc {
     }
 
     fn create_dir_entry(vmo: zx::Vmo, executable: bool, inode: u64) -> Arc<vmo::VmoFile> {
-        vmo::VmoFile::new_with_inode(
-            vmo, /*readable*/ true, /*writable*/ false, executable, inode,
-        )
+        vmo::VmoFile::new_with_inode_and_executable(vmo, inode, executable)
     }
 
     /// Read configs from the parsed bootfs image before the filesystem has been fully initialized.

@@ -39,7 +39,7 @@ pub fn read_only(content: impl AsRef<[u8]>) -> Arc<VmoFile> {
     if bytes.len() > 0 {
         vmo.write(bytes, 0).unwrap();
     }
-    VmoFile::new(vmo, true, false, false)
+    VmoFile::new(vmo)
 }
 
 /// Implementation of a VMO-backed file in a virtual file system.
@@ -62,35 +62,28 @@ impl VmoFile {
     /// # Arguments
     ///
     /// * `vmo` - Vmo backing this file object.
-    /// * `readable` - Must be `true`, VmoFile needs to be readable.
-    /// * `writable` - Must be `false`, VmoFile no longer supports writing.
-    /// * `executable` - If true, allow connections with Flags::PERM_EXECUTE.
-    pub fn new(vmo: zx::Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
-        // TODO(https://fxbug.dev/294078001) Remove the readable and writable arguments.
-        assert!(readable, "VmoFile must be readable");
-        assert!(!writable, "VmoFile no longer supports writing");
-        Self::new_with_inode(vmo, readable, writable, executable, fio::INO_UNKNOWN)
+    pub fn new(vmo: zx::Vmo) -> Arc<Self> {
+        Self::new_with_inode(vmo, fio::INO_UNKNOWN)
     }
 
-    /// Create a new VmoFile with the specified options and inode value.
+    /// Create a new VmoFile with a specified inode value.
     ///
     /// # Arguments
     ///
     /// * `vmo` - Vmo backing this file object.
-    /// * `readable` - Must be `true`, VmoFile needs to be readable.
-    /// * `writable` - Must be `false`, VmoFile no longer supports writing.
-    /// * `executable` - If true, allow connections with Flags::PERM_EXECUTE.
     /// * `inode` - Inode value to report when getting the VmoFile's attributes.
-    pub fn new_with_inode(
-        vmo: zx::Vmo,
-        readable: bool,
-        writable: bool,
-        executable: bool,
-        inode: u64,
-    ) -> Arc<Self> {
-        // TODO(https://fxbug.dev/294078001) Remove the readable and writable arguments.
-        assert!(readable, "VmoFile must be readable");
-        assert!(!writable, "VmoFile no longer supports writing");
+    pub fn new_with_inode(vmo: zx::Vmo, inode: u64) -> Arc<Self> {
+        Self::new_with_inode_and_executable(vmo, inode, false)
+    }
+
+    /// Create a new VmoFile with specified inode and executable values.
+    ///
+    /// # Arguments
+    ///
+    /// * `vmo` - Vmo backing this file object.
+    /// * `inode` - Inode value to report when getting the VmoFile's attributes.
+    /// * `executable` - If true, allow connections with OpenFlags::PERM_EXECUTE.
+    pub fn new_with_inode_and_executable(vmo: zx::Vmo, inode: u64, executable: bool) -> Arc<Self> {
         Arc::new(VmoFile { executable, inode, vmo })
     }
 }
