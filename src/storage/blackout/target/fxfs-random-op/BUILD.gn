@@ -7,7 +7,7 @@ import("//build/rust/rustc_binary.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":blackout-fxfs-allocate" ]
+  deps = [ ":blackout-fxfs-random-op" ]
 }
 
 rustc_binary("blackout-fxfs-allocate-bin") {
@@ -36,6 +36,36 @@ rustc_binary("blackout-fxfs-allocate-bin") {
     "//src/storage/fxfs",
   ]
   sources = [ "src/main.rs" ]
+  rustenv = [ "BARRIERS_ENABLED=false" ]
+}
+
+rustc_binary("blackout-fxfs-barriers-bin") {
+  output_name = "blackout_fxfs_barriers_bin"
+  testonly = true
+  edition = "2021"
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//src/storage/blackout/target/lib:blackout-config",
+    "//src/storage/blackout/target/lib:blackout-target",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
+    "//src/storage/lib/fs_management/rust:fs_management",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:rand",
+  ]
+  data_deps = [
+    "//src/storage/crypt/fxfs:fxfs-crypt",
+    "//src/storage/fxfs",
+  ]
+  sources = [ "src/main.rs" ]
+  rustenv = [ "BARRIERS_ENABLED=true" ]
 }
 
 fuchsia_component("blackout-fxfs-allocate-component") {
@@ -49,7 +79,21 @@ fuchsia_component("blackout-fxfs-allocate-component") {
   manifest = "meta/blackout_fxfs_allocate.cml"
 }
 
-fuchsia_package("blackout-fxfs-allocate") {
+fuchsia_component("blackout-fxfs-barriers-component") {
   testonly = true
-  deps = [ ":blackout-fxfs-allocate-component" ]
+  deps = [
+    ":blackout-fxfs-barriers-bin",
+    "//src/storage/fs_test:test_crypt_service",
+    "//src/storage/fxfs:fxfs_component",
+    "//src/storage/fxfs:test_fxfs_component_manifest_shard",
+  ]
+  manifest = "meta/blackout_fxfs_barriers.cml"
+}
+
+fuchsia_package("blackout-fxfs-random-op") {
+  testonly = true
+  deps = [
+    ":blackout-fxfs-allocate-component",
+    ":blackout-fxfs-barriers-component",
+  ]
 }

@@ -48,6 +48,8 @@ group("blackout_workbench_vim3_unstable") {
     # Fxfs tests
     "tests:blackout_fxfs_allocate_hard_reboot($host_toolchain)",
     "tests:blackout_fxfs_allocate_soft_reboot($host_toolchain)",
+    "tests:blackout_fxfs_barriers_hard_reboot($host_toolchain)",
+    "tests:blackout_fxfs_barriers_soft_reboot($host_toolchain)",
 
     # Minfs tests
     "tests:blackout_minfs_tree_soft_reboot($host_toolchain)",

@@ -18,6 +18,8 @@ use rand::{distributions, Rng, SeedableRng};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
+const BARRIERS_ENABLED: &'static str = std::env!("BARRIERS_ENABLED");
+
 // Sort of arbitrary maximum file size just to put a cap on it.
 const BLACKOUT_MAX_FILE_SIZE: usize = 1 << 16;
 
@@ -32,11 +34,12 @@ const METADATA_KEY: [u8; 32] = [
 ];
 
 #[derive(Copy, Clone)]
-struct FxfsAllocate {
+struct FxfsRandomOp {
     storage_host: bool,
+    barriers_enabled: bool,
 }
 
-impl FxfsAllocate {
+impl FxfsRandomOp {
     fn connect_to_crypt_service(&self) -> Result<ClientEnd<CryptMarker>> {
         Ok(connect_to_protocol::<CryptMarker>()?.into_client_end().unwrap())
     }
@@ -168,7 +171,7 @@ impl File {
 }
 
 #[async_trait]
-impl Test for FxfsAllocate {
+impl Test for FxfsRandomOp {
     async fn setup(
         self: Arc<Self>,
         device_label: String,
@@ -178,7 +181,10 @@ impl Test for FxfsAllocate {
         log::info!(device_label:%; "setting up");
         let block_connector = set_up_partition(device_label, self.storage_host).await?;
 
-        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
+        let mut fxfs = Filesystem::from_boxed_config(
+            block_connector,
+            Box::new(Fxfs { barriers_enabled: self.barriers_enabled, ..Default::default() }),
+        );
         fxfs.format().await?;
         let mut fs = fxfs.serve_multi_volume().await?;
         let crypt = Some(self.setup_crypt_service().await?);
@@ -203,7 +209,10 @@ impl Test for FxfsAllocate {
         let block_connector =
             find_partition(device_label, self.storage_host).await.context("find partition")?;
 
-        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
+        let mut fxfs = Filesystem::from_boxed_config(
+            block_connector,
+            Box::new(Fxfs { barriers_enabled: self.barriers_enabled, ..Default::default() }),
+        );
         let mut fs = fxfs.serve_multi_volume().await.context("serve multi volume")?;
         let crypt = Some(self.setup_crypt_service().await.context("set up crypt service")?);
         let volume = fs
@@ -360,7 +369,10 @@ impl Test for FxfsAllocate {
         log::info!(device_label:%; "verifying disk consistency");
         let block_connector = find_partition(device_label, self.storage_host).await?;
 
-        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
+        let mut fxfs = Filesystem::from_boxed_config(
+            block_connector,
+            Box::new(Fxfs { barriers_enabled: self.barriers_enabled, ..Default::default() }),
+        );
         fxfs.fsck().await.context("overall fsck")?;
 
         let mut fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
@@ -372,10 +384,12 @@ impl Test for FxfsAllocate {
     }
 }
 
-#[fuchsia::main(logging_tags = ["blackout", "fxfs-allocate"])]
+#[fuchsia::main(logging_tags = ["blackout", "fxfs-random-op"])]
 async fn main() -> Result<()> {
     let config = blackout_config::Config::take_from_startup_handle();
-    let server = TestServer::new(FxfsAllocate { storage_host: config.storage_host })?;
+    let barriers_enabled = BARRIERS_ENABLED == "true";
+    let server =
+        TestServer::new(FxfsRandomOp { storage_host: config.storage_host, barriers_enabled })?;
     server.serve().await;
 
     Ok(())
