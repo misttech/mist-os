@@ -17,13 +17,6 @@ pub async fn driver(
     writer: &mut dyn io::Write,
 ) -> Result<()> {
     match cmd.subcommand {
-        DriverSubCommand::Device(subcmd) => {
-            let dev = driver_connector
-                .get_dev_proxy(subcmd.select)
-                .await
-                .context("Failed to get dev proxy")?;
-            subcommands::device::device(subcmd, dev).await.context("Device subcommand failed")?;
-        }
         DriverSubCommand::Dump(subcmd) => {
             let driver_development_proxy = driver_connector
                 .get_driver_development_proxy(subcmd.select)
