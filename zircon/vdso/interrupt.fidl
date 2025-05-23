@@ -30,8 +30,8 @@ closed protocol Interrupt {
     ///
     /// Otherwise *src_obj* must be a suitable resource for creating platform interrupts
     /// or a PCI object, and *src_num* is the associated interrupt number.  This restricts
-    /// the creation of interrupts to the internals of the DDK (driver development kit).
-    /// Physical interrupts are obtained by drivers through various DDK APIs.
+    /// the creation of interrupts to the internals of the Driver Framework.
+    /// Physical interrupts are obtained by drivers through various Driver Framework APIs.
     ///
     /// Physical interrupts honor the options `ZX_INTERRUPT_EDGE_LOW`, `ZX_INTERRUPT_EDGE_HIGH`,
     /// `ZX_INTERRUPT_LEVEL_LOW`, `ZX_INTERRUPT_LEVEL_HIGH`, and `ZX_INTERRUPT_REMAP_IRQ`.
