@@ -224,8 +224,7 @@ impl PartitionImageMapper {
         for mapping in mappings {
             let PartitionAndImage { partition, path } = mapping;
             if let (Some(size), name) = (partition.size(), partition.name()) {
-                let metadata = std::fs::metadata(&path)
-                    .with_context(|| format!("Getting image metadata: {}", &path))?;
+                let metadata = std::fs::metadata(path).context("Getting image metadata")?;
                 let measured_size = metadata.len();
                 report.insert(format!("{}-{}", prefix, name), json!(measured_size));
                 report.insert(format!("{}-{}.budget", prefix, name), json!(size));

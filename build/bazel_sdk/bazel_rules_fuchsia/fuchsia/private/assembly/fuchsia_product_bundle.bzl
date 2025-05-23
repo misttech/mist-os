@@ -570,6 +570,7 @@ def _extract_structured_config(ctx, ffx_invocation, ffx_scrutiny_inputs, pb_out_
 
 def _build_fuchsia_product_bundle_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
+    partitions_configuration = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
     system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
     ffx_tool = fuchsia_toolchain.ffx
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
@@ -593,6 +594,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         product_bundle_name,
         "--product-version",
         product_version,
+        "--partitions $PARTITIONS_PATH",
         "--system-a $SYSTEM_A_MANIFEST",
         "--out-dir $OUTDIR",
         "--gerrit-size-report $SIZE_REPORT",
@@ -600,14 +602,12 @@ def _build_fuchsia_product_bundle_impl(ctx):
 
     if delivery_blob_type:
         ffx_invocation.append("--delivery-blob-type " + delivery_blob_type)
-    if ctx.attr.partitions_config:
-        partitions_config = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
-        ffx_invocation.append("--partitions " + partitions_config.directory)
 
     # Gather the environment variables needed in the script.
     env = {
         "FFX": ffx_tool.path,
         "OUTDIR": pb_out_dir.path,
+        "PARTITIONS_PATH": partitions_configuration.directory,
         "SYSTEM_A_MANIFEST": system_a_out.path,
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "SIZE_REPORT": size_report.path,
@@ -743,6 +743,7 @@ _build_fuchsia_product_bundle = rule(
         "partitions_config": attr.label(
             doc = "Partitions config to use.",
             providers = [FuchsiaPartitionsConfigInfo],
+            mandatory = True,
         ),
         "main": attr.label(
             doc = "fuchsia_product target to put in slot A.",

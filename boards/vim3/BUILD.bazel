@@ -173,7 +173,6 @@ fuchsia_board_configuration(
     kernel = {
         "contiguous_physical_pages": True,
     },
-    partitions_configuration = "//boards/partitions/vim3",
     platform = _COMMON_PLATFORM,
     provided_features = _COMMON_PROVIDED_FEATURES,
     version = build_info_version,
@@ -197,7 +196,6 @@ fuchsia_board_configuration(
         # include this work is sensibly avoided.
         "quiet_early_boot": True,
     },
-    partitions_configuration = "//boards/partitions/vim3",
     platform = _COMMON_PLATFORM,
     provided_features = _COMMON_PROVIDED_FEATURES,
     version = build_info_version,

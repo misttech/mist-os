@@ -67,7 +67,6 @@ fuchsia_board_configuration(
     kernel = {
         "contiguous_physical_pages": True,
     },
-    partitions_configuration = "//boards/partitions/vim3",
     platform = {
         "connectivity": {
             "network": {

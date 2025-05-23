@@ -5,7 +5,7 @@
 //! FFX plugin for constructing product bundles, which are distributable containers for a product's
 //! images and packages, and can be used to emulate, flash, or update a product.
 
-use anyhow::{anyhow, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use assembled_system::{AssembledSystem, BlobfsContents, Image, PackagesMetadata};
 use assembly_container::AssemblyContainer;
 use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
@@ -60,10 +60,6 @@ impl FfxMain for ProductCreateTool {
     }
 }
 
-fn partitions_from_system<'a>(system: Option<&'a AssembledSystem>) -> Option<&'a Utf8PathBuf> {
-    system.map(|a| a.partitions_config.as_ref().map(|p| &p.0)).flatten()
-}
-
 /// Create a product bundle using the provided sdk.
 pub async fn pb_create_with_sdk_version(
     cmd: CreateCommand,
@@ -98,6 +94,7 @@ pub async fn pb_create_with_sdk_version(
     }
     std::fs::create_dir_all(&cmd.out_dir).context("Creating the out_dir")?;
 
+    let partitions = load_partitions_config(&cmd.partitions, &cmd.out_dir.join("partitions"))?;
     let (system_a, packages_a) =
         load_assembled_system(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
     let (system_b, _packages_b) =
@@ -105,45 +102,9 @@ pub async fn pb_create_with_sdk_version(
     let (system_r, packages_r) =
         load_assembled_system(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
 
-    // Load the partitions config from the boards and product bundle, and
-    // ensure they are all identical.
-    let mut partitions: Option<PartitionsConfig> = None;
-    let mut maybe_add_partitions_config = |path: Option<&Utf8PathBuf>| -> Result<()> {
-        if let Some(path) = path {
-            let another_config = PartitionsConfig::from_dir(&path)
-                .with_context(|| format!("Parsing partitions config: {}", &path))?;
-
-            // If we already found a config, check that this new one is identical.
-            if let Some(current_config) = &partitions {
-                ensure!(
-                    current_config.contents_eq(&another_config)?,
-                    "The partitions config ({}) does not match the partitions config ({})",
-                    another_config.hardware_revision,
-                    current_config.hardware_revision
-                );
-            }
-            // If this is the first config we found, save it.
-            else {
-                partitions = Some(another_config);
-            }
-        }
-        Ok(())
-    };
-    maybe_add_partitions_config(cmd.partitions.as_ref())?;
-    maybe_add_partitions_config(partitions_from_system(system_a.as_ref()))?;
-    maybe_add_partitions_config(partitions_from_system(system_b.as_ref()))?;
-    maybe_add_partitions_config(partitions_from_system(system_r.as_ref()))?;
-
-    let partitions = partitions.ok_or_else(|| anyhow!("Missing a partitions config"))?;
-    let partitions =
-        partitions.write_to_dir(&cmd.out_dir.join("partitions"), None::<Utf8PathBuf>)?;
-
     // We must assert that the board_name for the system of images matches the hardware_revision in
     // the partitions config, otherwise OTAs may not work.
-    let ensure_system_board = &mut |system: &AssembledSystem| -> Result<()> {
-        // We must assert that the board_name for the system of images matches
-        // the hardware_revision in the partitions config, otherwise OTAs may
-        // not work.
+    let ensure_system_board = |system: &AssembledSystem| -> Result<()> {
         if partitions.hardware_revision != "" {
             ensure!(
                 &system.board_name == &partitions.hardware_revision,
@@ -344,6 +305,15 @@ pub async fn pb_create_with_sdk_version(
     Ok(())
 }
 
+/// Open and parse a PartitionsConfig from a path, copying the images into `out_dir`.
+fn load_partitions_config(
+    path: impl AsRef<Utf8Path>,
+    out_dir: impl AsRef<Utf8Path>,
+) -> Result<PartitionsConfig> {
+    let config = PartitionsConfig::from_dir(path)?;
+    config.write_to_dir(out_dir, None::<Utf8PathBuf>)
+}
+
 /// Open and parse an AssembledSystem from a path, copying the images into `out_dir`.
 /// Returns None if the given path is None.
 fn load_assembled_system(
@@ -476,6 +446,32 @@ mod test {
     }
 
     #[test]
+    fn test_load_partitions_config() {
+        let temp = TempDir::new().unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
+        let pb_dir = tempdir.join("pb");
+        fs::create_dir(&pb_dir).unwrap();
+
+        let config_dir = tempdir.join("config");
+        fs::create_dir(&config_dir).unwrap();
+        let config_path = config_dir.join("partitions_config.json");
+        let config_file = File::create(&config_path).unwrap();
+        serde_json::to_writer(&config_file, &PartitionsConfig::default()).unwrap();
+
+        let error_dir = tempdir.join("error");
+        fs::create_dir(&error_dir).unwrap();
+        let error_path = error_dir.join("partitions_config.json");
+        let mut error_file = File::create(&error_path).unwrap();
+        error_file.write_all("error".as_bytes()).unwrap();
+
+        let parsed = load_partitions_config(&config_dir, &pb_dir);
+        assert!(parsed.is_ok());
+
+        let error = load_partitions_config(&error_dir, &pb_dir);
+        assert!(error.is_err());
+    }
+
+    #[test]
     fn test_load_assembled_system() {
         let temp = TempDir::new().unwrap();
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
@@ -523,7 +519,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: Some(partitions_dir),
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -589,7 +585,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: Some(partitions_dir),
+                partitions: partitions_dir,
                 system_a: Some(system_dir.clone()),
                 system_b: None,
                 system_r: Some(system_dir.clone()),
@@ -660,7 +656,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: Some(partitions_dir),
+                partitions: partitions_dir,
                 system_a: Some(system_dir.clone()),
                 system_b: None,
                 system_r: Some(system_dir.clone()),
@@ -712,7 +708,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: Some(partitions_dir),
+                partitions: partitions_dir,
                 system_a: Some(system_dir.clone()),
                 system_b: None,
                 system_r: Some(system_dir.clone()),
@@ -783,7 +779,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: Some(partitions_dir),
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -860,7 +856,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: Some(partitions_dir),
+                partitions: partitions_dir,
                 system_a: None,
                 system_b: None,
                 system_r: None,

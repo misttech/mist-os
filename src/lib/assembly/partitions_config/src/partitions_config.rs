@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Context, Result};
-use assembly_container::{assembly_container, AssemblyContainer, FileType, WalkPaths};
+use anyhow::{bail, Result};
+use assembly_container::{assembly_container, AssemblyContainer, WalkPaths};
 use camino::Utf8PathBuf;
-use ring::digest;
 use serde::{Deserialize, Serialize};
 
 /// The configuration file specifying where the generated images should be placed when flashing of
@@ -61,48 +60,6 @@ impl PartitionsConfig {
             }
         }
         Ok(recovery_style)
-    }
-
-    /// Compare self with `other`, ignoring file paths, and instead comparing
-    /// the contents of the file paths.
-    pub fn contents_eq(&self, other: &Self) -> Result<bool> {
-        let start_time = std::time::Instant::now();
-
-        // Clone so that we can replace the paths with digests for comparison.
-        let mut one = self.clone();
-        let mut two = other.clone();
-
-        // Replace the path with the digest of the contents so that we compare
-        // the contents rather than the file paths.
-        let replace_paths_with_digest = |config: &mut Self| {
-            config.walk_paths(&mut |path: &mut Utf8PathBuf,
-                                    _dest: Utf8PathBuf,
-                                    filetype: FileType| {
-                match filetype {
-                    FileType::Unknown => {
-                        let bytes = std::fs::read(&path)
-                            .with_context(|| format!("Reading contents of {}", &path))?;
-                        let digest = digest::digest(&digest::SHA256, &bytes);
-                        let digest_string = hex::encode(digest.as_ref());
-                        *path = digest_string.into();
-                        Ok(())
-                    }
-                    FileType::PackageManifest => {
-                        bail!("contents_eq does not support package manifests")
-                    }
-                    FileType::Directory => bail!("contents_eq does not support directories"),
-                }
-            })
-        };
-        replace_paths_with_digest(&mut one)?;
-        replace_paths_with_digest(&mut two)?;
-
-        // Compare.
-        // Note: At the time of writing, this is taking less than 3ms for arm64.
-        let equal = one.eq(&two);
-        let duration = start_time.elapsed();
-        log::info!("Comparing partitions config took: {:?}", duration);
-        Ok(equal)
     }
 }
 
@@ -313,11 +270,7 @@ mod tests {
     use std::io::Write;
     use tempfile::TempDir;
 
-    fn write_partition_config(
-        json: &str,
-        additional_files: &[&str],
-        contents_are_filename: bool,
-    ) -> TempDir {
+    fn write_partition_config(json: &str, additional_files: &[&str]) -> TempDir {
         let temp_dir = TempDir::new().unwrap();
         let base_path = temp_dir.path();
 
@@ -326,11 +279,7 @@ mod tests {
 
         additional_files.iter().for_each(|&file_name| {
             let mut file = File::create(base_path.join(file_name)).unwrap();
-            if contents_are_filename {
-                file.write_all(file_name.as_bytes()).unwrap();
-            } else {
-                file.write_all(b"").unwrap();
-            }
+            file.write_all(file_name.as_bytes()).unwrap();
         });
 
         temp_dir
@@ -393,8 +342,7 @@ mod tests {
                 ],
             }
         "#;
-        let temp_dir =
-            write_partition_config(json, &["tpl_image", "unlock_credentials.zip"], false);
+        let temp_dir = write_partition_config(json, &["tpl_image", "unlock_credentials.zip"]);
         let test_dir = Utf8Path::from_path(temp_dir.path()).unwrap();
 
         let config = PartitionsConfig::from_dir(test_dir).unwrap();
@@ -420,188 +368,11 @@ mod tests {
                 "hardware_revision": "hw",
             }
         "#;
-        let temp_dir = write_partition_config(json, &[], false);
+        let temp_dir = write_partition_config(json, &[]);
         let test_dir = Utf8Path::from_path(temp_dir.path()).unwrap();
 
         let config = PartitionsConfig::from_dir(test_dir);
 
         assert!(config.is_err());
-    }
-
-    #[test]
-    fn compare_equal() {
-        let json1 = r#"
-            {
-                bootloader_partitions: [
-                    {
-                        type: "tpl",
-                        name: "firmware_tpl",
-                        image: "tpl_image1",
-                    }
-                ],
-                partitions: [
-                    {
-                        type: "ZBI",
-                        name: "zircon_a",
-                        slot: "A",
-                    },
-                ],
-                hardware_revision: "hw",
-                unlock_credentials: [
-                    "unlock_credentials1.zip",
-                ],
-            }
-        "#;
-        let temp_dir1 =
-            write_partition_config(json1, &["tpl_image1", "unlock_credentials1.zip"], false);
-        let test_dir1 = Utf8Path::from_path(temp_dir1.path()).unwrap();
-        let config1 = PartitionsConfig::from_dir(test_dir1).unwrap();
-
-        let json2 = r#"
-            {
-                bootloader_partitions: [
-                    {
-                        type: "tpl",
-                        name: "firmware_tpl",
-                        image: "tpl_image2",
-                    }
-                ],
-                partitions: [
-                    {
-                        type: "ZBI",
-                        name: "zircon_a",
-                        slot: "A",
-                    },
-                ],
-                hardware_revision: "hw",
-                unlock_credentials: [
-                    "unlock_credentials2.zip",
-                ],
-            }
-        "#;
-        let temp_dir2 =
-            write_partition_config(json2, &["tpl_image2", "unlock_credentials2.zip"], false);
-        let test_dir2 = Utf8Path::from_path(temp_dir2.path()).unwrap();
-        let config2 = PartitionsConfig::from_dir(test_dir2).unwrap();
-
-        assert!(config1.contents_eq(&config2).unwrap());
-    }
-
-    #[test]
-    fn compare_not_equal_partition_names() {
-        let json1 = r#"
-            {
-                bootloader_partitions: [
-                    {
-                        type: "tpl",
-                        name: "firmware_tpl",
-                        image: "tpl_image1",
-                    }
-                ],
-                partitions: [
-                    {
-                        type: "ZBI",
-                        name: "zircon_a",
-                        slot: "A",
-                    },
-                ],
-                hardware_revision: "hw",
-                unlock_credentials: [
-                    "unlock_credentials1.zip",
-                ],
-            }
-        "#;
-        let temp_dir1 =
-            write_partition_config(json1, &["tpl_image1", "unlock_credentials1.zip"], false);
-        let test_dir1 = Utf8Path::from_path(temp_dir1.path()).unwrap();
-        let config1 = PartitionsConfig::from_dir(test_dir1).unwrap();
-
-        let json2 = r#"
-            {
-                bootloader_partitions: [
-                    {
-                        type: "tpl",
-                        name: "firmware_tpl",
-                        image: "tpl_image2",
-                    }
-                ],
-                partitions: [
-                    {
-                        type: "ZBI",
-                        name: "zircon_a_different",
-                        slot: "A",
-                    },
-                ],
-                hardware_revision: "hw",
-                unlock_credentials: [
-                    "unlock_credentials2.zip",
-                ],
-            }
-        "#;
-        let temp_dir2 =
-            write_partition_config(json2, &["tpl_image2", "unlock_credentials2.zip"], false);
-        let test_dir2 = Utf8Path::from_path(temp_dir2.path()).unwrap();
-        let config2 = PartitionsConfig::from_dir(test_dir2).unwrap();
-
-        assert!(!config1.contents_eq(&config2).unwrap());
-    }
-
-    #[test]
-    fn compare_not_equal_contents() {
-        let json1 = r#"
-            {
-                bootloader_partitions: [
-                    {
-                        type: "tpl",
-                        name: "firmware_tpl",
-                        image: "tpl_image1",
-                    }
-                ],
-                partitions: [
-                    {
-                        type: "ZBI",
-                        name: "zircon_a",
-                        slot: "A",
-                    },
-                ],
-                hardware_revision: "hw",
-                unlock_credentials: [
-                    "unlock_credentials1.zip",
-                ],
-            }
-        "#;
-        let temp_dir1 =
-            write_partition_config(json1, &["tpl_image1", "unlock_credentials1.zip"], true);
-        let test_dir1 = Utf8Path::from_path(temp_dir1.path()).unwrap();
-        let config1 = PartitionsConfig::from_dir(test_dir1).unwrap();
-
-        let json2 = r#"
-            {
-                bootloader_partitions: [
-                    {
-                        type: "tpl",
-                        name: "firmware_tpl",
-                        image: "tpl_image2",
-                    }
-                ],
-                partitions: [
-                    {
-                        type: "ZBI",
-                        name: "zircon_a",
-                        slot: "A",
-                    },
-                ],
-                hardware_revision: "hw",
-                unlock_credentials: [
-                    "unlock_credentials2.zip",
-                ],
-            }
-        "#;
-        let temp_dir2 =
-            write_partition_config(json2, &["tpl_image2", "unlock_credentials2.zip"], true);
-        let test_dir2 = Utf8Path::from_path(temp_dir2.path()).unwrap();
-        let config2 = PartitionsConfig::from_dir(test_dir2).unwrap();
-
-        assert!(!config1.contents_eq(&config2).unwrap());
     }
 }

@@ -41,7 +41,7 @@
           "arg_name": "partitions"
         }
       },
-      "optionality": "optional",
+      "optionality": "required",
       "long": "--partitions",
       "short": null,
       "description": "path to a partitions config, which lists the physical partitions of the target.",
