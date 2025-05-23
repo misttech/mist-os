@@ -28,7 +28,6 @@ rustc_library("ffx_driver") {
     ":ffx_driver_args",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
-    "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",

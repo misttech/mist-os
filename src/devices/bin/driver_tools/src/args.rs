@@ -16,9 +16,7 @@ use super::subcommands::test_node::args::TestNodeCommand;
 use argh::{ArgsInfo, FromArgs};
 
 #[cfg(not(target_os = "fuchsia"))]
-use {
-    super::subcommands::runtool::args::RunToolCommand, static_checks_lib::args::StaticChecksCommand,
-};
+use static_checks_lib::args::StaticChecksCommand;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(name = "driver", description = "Support driver development workflows")]
@@ -60,7 +58,6 @@ pub enum DriverSubCommand {
     ListCompositeNodeSpecs(ListCompositeNodeSpecsCommand),
     Register(RegisterCommand),
     Restart(RestartCommand),
-    RunTool(RunToolCommand),
     StaticChecks(StaticChecksCommand),
     TestNode(TestNodeCommand),
 }

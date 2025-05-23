@@ -37,12 +37,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:itertools",
   ]
   if (is_host) {
-    deps += [
-      "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
-      "//src/developer/ffx/lib/errors:lib",
-      "//src/devices/lib/driver-static-checks:lib",
-      "//third_party/rust_crates:blocking",
-    ]
+    deps += [ "//src/devices/lib/driver-static-checks:lib" ]
   }
   test_deps = [
     "//src/lib/fuchsia",
@@ -81,12 +76,6 @@ rustc_library("lib") {
     "src/subcommands/test_node/subcommands/remove/args.rs",
     "src/subcommands/test_node/subcommands/remove/mod.rs",
   ]
-  if (is_host) {
-    sources += [
-      "src/subcommands/runtool/args.rs",
-      "src/subcommands/runtool/mod.rs",
-    ]
-  }
   inputs = [
     "tests/golden/list_composites_verbose",
     "tests/golden/list_composites_verbose_empty_fields",
@@ -106,7 +95,6 @@ rustc_binary("driver_tools") {
     ":lib",
     "connector:lib",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
-    "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",

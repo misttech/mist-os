@@ -10,8 +10,8 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use target_holders::RemoteControlProxyHolder;
 use {
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_playground as fdp, fidl_fuchsia_driver_registrar as fdr,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_test_manager as ftm,
+    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_test_manager as ftm,
 };
 
 struct DriverConnector {
@@ -251,16 +251,6 @@ impl driver_connector::DriverConnector for DriverConnector {
         )
         .await
         .context("Failed to get driver registrar component")
-    }
-
-    async fn get_tool_runner_proxy(&self, select: bool) -> Result<fdp::ToolRunnerProxy> {
-        self.get_component_with_capability::<fdp::ToolRunnerMarker>(
-            "/core/driver_playground",
-            DiscoverableCapabilityOptions::<fdp::ToolRunnerMarker>::default(),
-            select,
-        )
-        .await
-        .context("Failed to get tool runner component")
     }
 
     async fn get_run_builder_proxy(&self) -> Result<ftm::RunBuilderProxy> {

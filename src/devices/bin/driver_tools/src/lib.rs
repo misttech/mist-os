@@ -110,16 +110,6 @@ pub async fn driver(
                 .context("Restart subcommand failed")?;
         }
         #[cfg(not(target_os = "fuchsia"))]
-        DriverSubCommand::RunTool(subcmd) => {
-            let tool_runner_proxy = driver_connector
-                .get_tool_runner_proxy(false)
-                .await
-                .context("Failed to get tool runner proxy")?;
-            subcommands::runtool::run_tool(subcmd, writer, tool_runner_proxy)
-                .await
-                .context("RunTool subcommand failed")?;
-        }
-        #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::StaticChecks(subcmd) => {
             static_checks_lib::static_checks(subcmd, writer)
                 .await

@@ -6,9 +6,8 @@ use anyhow::{Context, Result};
 use driver_tools::args::DriverCommand;
 use fuchsia_component::client;
 use {
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_playground as fdp,
-    fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm,
-    fuchsia_async as fasync,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr,
+    fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftm, fuchsia_async as fasync,
 };
 
 struct DriverConnector {}
@@ -43,14 +42,6 @@ impl driver_connector::DriverConnector for DriverConnector {
         }
         client::connect_to_protocol::<fdr::DriverRegistrarMarker>()
             .context("Failed to connect to driver registrar service")
-    }
-
-    async fn get_tool_runner_proxy(&self, select: bool) -> Result<fdp::ToolRunnerProxy> {
-        if select {
-            anyhow::bail!("The 'driver' tool cannot use the select flag. Please use 'ffx driver' in order to select a component.");
-        }
-        client::connect_to_protocol::<fdp::ToolRunnerMarker>()
-            .context("Failed to connect to tool runner service")
     }
 
     async fn get_run_builder_proxy(&self) -> Result<ftm::RunBuilderProxy> {

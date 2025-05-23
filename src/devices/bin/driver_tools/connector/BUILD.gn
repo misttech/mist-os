@@ -11,7 +11,6 @@ rustc_library("lib") {
   with_unit_tests = true
   deps = [
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
-    "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",

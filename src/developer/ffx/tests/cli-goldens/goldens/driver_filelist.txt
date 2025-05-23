@@ -12,7 +12,6 @@ ffx/driver/list-hosts.golden
 ffx/driver/list.golden
 ffx/driver/register.golden
 ffx/driver/restart.golden
-ffx/driver/run-tool.golden
 ffx/driver/static-checks.golden
 ffx/driver/test-node.golden
 ffx/driver/test-node/add.golden

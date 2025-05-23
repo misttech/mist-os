@@ -12,6 +12,4 @@ pub mod list_devices;
 pub mod list_hosts;
 pub mod register;
 pub mod restart;
-#[cfg(not(target_os = "fuchsia"))]
-pub mod runtool;
 pub mod test_node;
