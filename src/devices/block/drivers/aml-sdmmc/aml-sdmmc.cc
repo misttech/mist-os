@@ -416,13 +416,12 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(fdf::PDev& pdev) {
 }
 
 void AmlSdmmc::GetToken(GetTokenCompleter::Sync& completer) {
-  zx::event dupe;
-  zx_status_t status = hardware_power_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
-  if (status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to duplicate token.");
-    completer.Reply(fit::error(status));
+  if (!hardware_power_assertive_token_.is_valid()) {
+    completer.Reply(fit::error(ZX_ERR_BAD_HANDLE));
     return;
   }
+  zx::event dupe;
+  ZX_ASSERT(hardware_power_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe) == ZX_OK);
 
   // Drop the lease on the hardware power element, and allow the caller to declare a dependency on
   // it using the power dependency token returned in this call.
