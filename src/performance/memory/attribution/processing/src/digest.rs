@@ -96,7 +96,7 @@ struct DigestComputer<'a> {
 }
 
 impl<'a> DigestComputer<'a> {
-    fn new(bucket_definitions: &'a Vec<BucketDefinition>) -> DigestComputer<'a> {
+    fn new(bucket_definitions: &'a [BucketDefinition]) -> DigestComputer<'a> {
         DigestComputer {
             buckets: bucket_definitions
                 .iter()
@@ -162,7 +162,7 @@ impl Digest {
         attribution_data_service: &impl AttributionDataProvider,
         kmem_stats: &fkernel::MemoryStats,
         kmem_stats_compression: &fkernel::MemoryStatsCompression,
-        bucket_definitions: &Vec<BucketDefinition>,
+        bucket_definitions: &[BucketDefinition],
     ) -> Result<Digest, anyhow::Error> {
         let mut digest_visitor = DigestComputer::new(bucket_definitions);
         attribution_data_service.for_each_resource(&mut digest_visitor)?;

@@ -168,7 +168,7 @@ pub async fn collect_metrics_forever(
     attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
     kernel_stats_proxy: fkernel::StatsProxy,
     metric_event_logger: fmetrics::MetricEventLoggerProxy,
-    bucket_definitions: Vec<BucketDefinition>,
+    bucket_definitions: Arc<[BucketDefinition]>,
 ) {
     let mut timer = fuchsia_async::Interval::new(zx::Duration::from_minutes(5));
     loop {
@@ -178,7 +178,7 @@ pub async fn collect_metrics_forever(
             &*attribution_data_service,
             &kernel_stats_proxy,
             &metric_event_logger,
-            &bucket_definitions,
+            &*bucket_definitions,
         )
         .await;
 
@@ -192,7 +192,7 @@ async fn collect_metrics_once(
     attribution_data_service: &impl AttributionDataProvider,
     kernel_stats_proxy: &fkernel::StatsProxy,
     metric_event_logger: &fmetrics::MetricEventLoggerProxy,
-    bucket_definitions: &Vec<BucketDefinition>,
+    bucket_definitions: &[BucketDefinition],
 ) -> Result<()> {
     let timestamp = zx::BootInstant::get();
     let (kmem_stats, kmem_stats_compression) = try_join!(
@@ -338,7 +338,7 @@ mod tests {
             serve_kernel_stats(stats_request_stream).await.unwrap();
         })
         .detach();
-        let bucket_definitions = vec![];
+        let bucket_definitions = Arc::new([]);
 
         // Setup test proxy to observe emitted events from the service.
         let (metric_event_logger, metric_event_request_stream) =

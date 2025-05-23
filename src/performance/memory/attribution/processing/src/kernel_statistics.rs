@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "fkernel::MemoryStats")]
 pub struct MemoryStatsDef {
     pub total_bytes: Option<u64>,
@@ -28,10 +28,10 @@ pub struct MemoryStatsDef {
     pub vmo_discardable_locked_bytes: Option<u64>,
     pub vmo_discardable_unlocked_bytes: Option<u64>,
     #[doc(hidden)]
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub __source_breaking: fidl::marker::SourceBreaking,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "fkernel::MemoryStatsCompression")]
 pub struct MemoryStatsCompressionDef {
     pub uncompressed_storage_bytes: Option<u64>,
@@ -49,11 +49,11 @@ pub struct MemoryStatsCompressionDef {
     pub pages_decompressed_unit_ns: Option<u64>,
     pub pages_decompressed_within_log_time: Option<[u64; 8]>,
     #[doc(hidden)]
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
-#[derive(Default, PartialEq, Debug, Clone, Serialize)]
+#[derive(Default, PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct KernelStatistics {
     #[serde(with = "MemoryStatsDef")]
     pub memory_statistics: fkernel::MemoryStats,

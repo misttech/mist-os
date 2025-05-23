@@ -190,12 +190,12 @@ pub mod raw {
         pub vmos: Vec<Vmo>,
     }
 
-    /// Defines a memory bucket.
+    /// Criteria for VMO matching within a bucket and for publishing aggregated metrics.
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     pub struct BucketDefinition {
-        /// The Cobalt event code associated with this bucket.
+        /// Cobalt event code associated with this bucket.
         pub event_code: u64,
-        /// The human-readable name of the bucket.
+        /// Human-readable name of the bucket.
         pub name: String,
         /// String saying which process to match. Will be interpreted as a regex.
         /// If the string is empty, will be interpreted as ".*".

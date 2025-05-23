@@ -34,7 +34,7 @@ pub fn start_service(
     stall_provider: Arc<impl StallProvider>,
     memory_monitor2_config: Config,
     memorypressure_proxy: fpressure::ProviderProxy,
-    bucket_definitions: Vec<BucketDefinition>,
+    bucket_definitions: Arc<[BucketDefinition]>,
 ) -> Result<ServiceTask> {
     debug!("Start serving inspect tree.");
 
@@ -196,7 +196,7 @@ fn digest_service(
     stall_provider: Arc<impl StallProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
     memorypressure_proxy: fpressure::ProviderProxy,
-    bucket_definitions: Vec<BucketDefinition>,
+    bucket_definitions: Arc<[BucketDefinition]>,
     digest_node: Node,
 ) -> Result<Task<Result<(), Error>>> {
     // Initialize pressure monitoring.
@@ -265,7 +265,7 @@ fn digest_service(
                 &*attribution_data_service,
                 &kmem_stats,
                 &kmem_stats_compression,
-                &bucket_definitions,
+                &*bucket_definitions,
             )?;
 
             // Initialize the inspect property containing the buckets names, if necessary.
@@ -520,7 +520,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         // Expects digst_service to register a watcher, answers with
@@ -658,7 +658,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         // digest_service registers a watcher; make sure we answer.  Also, make sure not to drop the
@@ -781,7 +781,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         let watcher =
@@ -835,7 +835,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         let watcher =

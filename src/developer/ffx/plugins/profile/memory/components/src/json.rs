@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use attribution_processing::kernel_statistics::{MemoryStatsCompressionDef, MemoryStatsDef};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
@@ -23,6 +25,7 @@ impl JsonConvertible for fplugin::Snapshot {
             "resources": self.resources.to_json(),
             "resource_names": self.resource_names.to_json(),
             "kernel_statistics": self.kernel_statistics.to_json(),
+            "bucket_definitions": self.bucket_definitions.to_json(),
         })
     }
 
@@ -50,6 +53,10 @@ impl JsonConvertible for fplugin::Snapshot {
             kernel_statistics: obj
                 .get("kernel_statistics")
                 .map(|o| fplugin::KernelStatistics::from_json(o))
+                .flatten(),
+            bucket_definitions: obj
+                .get("bucket_definitions")
+                .map(|o| Vec::<fplugin::BucketDefinition>::from_json(o))
                 .flatten(),
             ..Default::default()
         })
@@ -371,6 +378,7 @@ impl JsonConvertible for fplugin::Mapping {
     }
 }
 
+// TODO(https://github.com/serde-rs/serde/issues/723): Use remote serialization.
 impl JsonConvertible for fplugin::KernelStatistics {
     fn to_json(&self) -> Value {
         json!({
@@ -399,153 +407,47 @@ impl JsonConvertible for fplugin::KernelStatistics {
 
 impl JsonConvertible for fkernel::MemoryStats {
     fn to_json(&self) -> Value {
-        json!({
-            "total_bytes": self.total_bytes.to_json(),
-            "free_bytes": self.free_bytes.to_json(),
-            "free_loaned_bytes": self.free_loaned_bytes.to_json(),
-            "wired_bytes": self.wired_bytes.to_json(),
-            "total_heap_bytes": self.total_heap_bytes.to_json(),
-            "free_heap_bytes": self.free_heap_bytes.to_json(),
-            "vmo_bytes": self.vmo_bytes.to_json(),
-            "mmu_overhead_bytes": self.mmu_overhead_bytes.to_json(),
-            "ipc_bytes": self.ipc_bytes.to_json(),
-            "cache_bytes": self.cache_bytes.to_json(),
-            "slab_bytes": self.slab_bytes.to_json(),
-            "zram_bytes": self.zram_bytes.to_json(),
-            "other_bytes": self.other_bytes.to_json(),
-            "vmo_reclaim_total_bytes": self.vmo_reclaim_total_bytes.to_json(),
-            "vmo_reclaim_newest_bytes": self.vmo_reclaim_newest_bytes.to_json(),
-            "vmo_reclaim_oldest_bytes": self.vmo_reclaim_oldest_bytes.to_json(),
-            "vmo_reclaim_disabled_bytes": self.vmo_reclaim_disabled_bytes.to_json(),
-            "vmo_discardable_locked_bytes": self.vmo_discardable_locked_bytes.to_json(),
-            "vmo_discardable_unlocked_bytes": self.vmo_discardable_unlocked_bytes.to_json(),
-        })
+        #[derive(Serialize)]
+        struct Helper<'a>(#[serde(with = "MemoryStatsDef")] &'a fkernel::MemoryStats);
+        serde_json::to_value(Helper(self)).expect("invalid data")
     }
-
-    fn from_json(value: &Value) -> Option<Self> {
-        let Some(obj) = value.as_object() else {
-            return None;
-        };
-        Some(Self {
-            total_bytes: obj.get("total_bytes").map(|v| u64::from_json(v)).flatten(),
-            free_bytes: obj.get("free_bytes").map(|v| u64::from_json(v)).flatten(),
-            free_loaned_bytes: obj.get("free_loaned_bytes").map(|v| u64::from_json(v)).flatten(),
-            wired_bytes: obj.get("wired_bytes").map(|v| u64::from_json(v)).flatten(),
-            total_heap_bytes: obj.get("total_heap_bytes").map(|v| u64::from_json(v)).flatten(),
-            free_heap_bytes: obj.get("free_heap_bytes").map(|v| u64::from_json(v)).flatten(),
-            vmo_bytes: obj.get("vmo_bytes").map(|v| u64::from_json(v)).flatten(),
-            mmu_overhead_bytes: obj.get("mmu_overhead_bytes").map(|v| u64::from_json(v)).flatten(),
-            ipc_bytes: obj.get("ipc_bytes").map(|v| u64::from_json(v)).flatten(),
-            cache_bytes: obj.get("cache_bytes").map(|v| u64::from_json(v)).flatten(),
-            slab_bytes: obj.get("slab_bytes").map(|v| u64::from_json(v)).flatten(),
-            zram_bytes: obj.get("zram_bytes").map(|v| u64::from_json(v)).flatten(),
-            other_bytes: obj.get("other_bytes").map(|v| u64::from_json(v)).flatten(),
-            vmo_reclaim_total_bytes: obj
-                .get("vmo_reclaim_total_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            vmo_reclaim_newest_bytes: obj
-                .get("vmo_reclaim_newest_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            vmo_reclaim_oldest_bytes: obj
-                .get("vmo_reclaim_oldest_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            vmo_reclaim_disabled_bytes: obj
-                .get("vmo_reclaim_disabled_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            vmo_discardable_locked_bytes: obj
-                .get("vmo_discardable_locked_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            vmo_discardable_unlocked_bytes: obj
-                .get("vmo_discardable_unlocked_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            ..Default::default()
-        })
+    fn from_json(value: &Value) -> Option<fkernel::MemoryStats> {
+        Some(MemoryStatsDef::deserialize(value).unwrap())
     }
 }
 
 impl JsonConvertible for fkernel::MemoryStatsCompression {
     fn to_json(&self) -> Value {
-        json!({
-        "uncompressed_storage_bytes": self.uncompressed_storage_bytes.to_json(),
-        "compressed_storage_bytes": self.compressed_storage_bytes.to_json(),
-        "compressed_fragmentation_bytes": self.compressed_fragmentation_bytes.to_json(),
-        "compression_time": self.compression_time.to_json(),
-        "decompression_time": self.decompression_time.to_json(),
-        "total_page_compression_attempts": self.total_page_compression_attempts.to_json(),
-        "failed_page_compression_attempts": self.failed_page_compression_attempts.to_json(),
-        "total_page_decompressions": self.total_page_decompressions.to_json(),
-        "compressed_page_evictions": self.compressed_page_evictions.to_json(),
-        "eager_page_compressions": self.eager_page_compressions.to_json(),
-        "memory_pressure_page_compressions": self.memory_pressure_page_compressions.to_json(),
-        "critical_memory_page_compressions": self.critical_memory_page_compressions.to_json(),
-        "pages_decompressed_unit_ns": self.pages_decompressed_unit_ns.to_json(),
-        "pages_decompressed_within_log_time": self.pages_decompressed_within_log_time.to_json(),
-        })
+        #[derive(Serialize)]
+        struct Helper<'a>(
+            #[serde(with = "MemoryStatsCompressionDef")] &'a fkernel::MemoryStatsCompression,
+        );
+        serde_json::to_value(Helper(self)).expect("invalid data")
     }
+    fn from_json(value: &Value) -> Option<fkernel::MemoryStatsCompression> {
+        Some(MemoryStatsCompressionDef::deserialize(value).unwrap())
+    }
+}
 
-    fn from_json(value: &Value) -> Option<Self> {
-        let Some(obj) = value.as_object() else {
-            return None;
-        };
-        Some(Self {
-            uncompressed_storage_bytes: obj
-                .get("uncompressed_storage_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            compressed_storage_bytes: obj
-                .get("compressed_storage_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            compressed_fragmentation_bytes: obj
-                .get("compressed_fragmentation_bytes")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            compression_time: obj.get("compression_time").map(|v| i64::from_json(v)).flatten(),
-            decompression_time: obj.get("decompression_time").map(|v| i64::from_json(v)).flatten(),
-            total_page_compression_attempts: obj
-                .get("total_page_compression_attempts")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            failed_page_compression_attempts: obj
-                .get("failed_page_compression_attempts")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            total_page_decompressions: obj
-                .get("total_page_decompressions")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            compressed_page_evictions: obj
-                .get("compressed_page_evictions")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            eager_page_compressions: obj
-                .get("eager_page_compressions")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            memory_pressure_page_compressions: obj
-                .get("memory_pressure_page_compressions")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            critical_memory_page_compressions: obj
-                .get("critical_memory_page_compressions")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            pages_decompressed_unit_ns: obj
-                .get("pages_decompressed_unit_ns")
-                .map(|v| u64::from_json(v))
-                .flatten(),
-            pages_decompressed_within_log_time: obj
-                .get("pages_decompressed_within_log_time")
-                .map(|v| <[u64; 8]>::from_json(v))
-                .flatten(),
-            ..Default::default()
-        })
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "fplugin::BucketDefinition")]
+struct BucketDefinitionDef {
+    pub name: Option<String>,
+    pub process: Option<String>,
+    pub vmo: Option<String>,
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+
+impl JsonConvertible for fplugin::BucketDefinition {
+    fn to_json(&self) -> Value {
+        #[derive(Serialize)]
+        struct Helper<'a>(#[serde(with = "BucketDefinitionDef")] &'a fplugin::BucketDefinition);
+        serde_json::to_value(Helper(self)).expect("invalid data")
+    }
+    fn from_json(value: &Value) -> Option<fplugin::BucketDefinition> {
+        Some(BucketDefinitionDef::deserialize(value).unwrap())
     }
 }
 
@@ -801,6 +703,12 @@ mod tests {
                 }),
                 ..Default::default()
             }),
+            bucket_definitions: Some(vec![fplugin::BucketDefinition {
+                name: Some("abc".to_string()),
+                process: None,
+                vmo: Some("def".to_string()),
+                ..Default::default()
+            }]),
             ..Default::default()
         };
         let expected_snapshot_json = r#"
@@ -842,6 +750,13 @@ mod tests {
                             }
                         ]
                     ]
+                ],
+                "bucket_definitions": [
+                    {
+                        "name": "abc",
+                        "process": null,
+                        "vmo": "def"
+                    }
                 ],
                 "kernel_statistics": {
                     "compression_stats": {
@@ -1098,7 +1013,9 @@ mod tests {
         let actual_json_value = example_snapshot.to_json();
         assert_eq!(
             actual_json_value,
-            serde_json::from_str::<Value>(expected_snapshot_json).unwrap()
+            serde_json::from_str::<Value>(expected_snapshot_json).unwrap(),
+            "`actual_json_value` json was:\n======\n{}\n\n======",
+            actual_json_value
         );
 
         let actual_snapshot = fplugin::Snapshot::from_json(&actual_json_value)
