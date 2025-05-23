@@ -6,6 +6,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <lib/fit/function.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
@@ -99,7 +100,7 @@ testing::AssertionResult ForkHelper::WaitForChildren() {
   return WaitForChildrenInternal(death_signum_);
 }
 
-pid_t ForkHelper::RunInForkedProcess(std::function<void()> action) {
+pid_t ForkHelper::RunInForkedProcess(fit::function<void()> action) {
   pid_t pid = SAFE_SYSCALL(fork());
   if (pid != 0) {
     child_pids_.push_back(pid);

@@ -580,10 +580,9 @@ TEST_F(CgroupTest, ForkedProcessInheritsCgroup) {
   test_helper::ForkHelper fork_helper;
   fork_helper.OnlyWaitForForkedChildren();
 
-  fork_helper.RunInForkedProcess([&]() {
+  fork_helper.RunInForkedProcess([procfs_cgroup_path, procfs_cgroup_str]() {
     // Child process should be in same cgroup as parent.
     EXPECT_TRUE(CheckFileHasLine(procfs_cgroup_path, procfs_cgroup_str));
-    return 0;
   });
   EXPECT_TRUE(fork_helper.WaitForChildren());
 
