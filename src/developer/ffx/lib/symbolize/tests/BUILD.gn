@@ -74,7 +74,6 @@ if (is_host) {
   if (current_toolchain == default_toolchain) {
     files = {
       outdir = target_out_dir + "/fuchsia"
-      images_json = "${outdir}/images.json"
     }
 
     product_bundle("product_bundle") {
@@ -82,7 +81,7 @@ if (is_host) {
       name = "ffx-symbolize-test"
 
       partitions = ":partitions_config"
-      system_a = files.images_json
+      system_a = files.outdir
 
       deps = [ ":assembly" ]
     }

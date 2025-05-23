@@ -24,7 +24,6 @@ files = {
   zbi = "${outdir}/bringup.zbi"
   zbi_signed = "${outdir}/bringup.zbi.signed"
   vbmeta = "${outdir}/bringup.vbmeta"
-  images_json = "${outdir}/images.json"
 
   # Outputs of recovery.
   recovery_name = get_label_info(recovery_label, "name")
@@ -33,7 +32,6 @@ files = {
   recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
   recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
   recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
-  recovery_images_json = "${recovery_outdir}/images.json"
 
   qemu_kernel = qemu_boot_shim.path
 }
@@ -82,8 +80,8 @@ product_bundle("product_bundle") {
 
   name = main_product_bundle_name
   partitions = _partitions_config
-  system_a = files.images_json
-  system_r = files.recovery_images_json
+  system_a = files.outdir
+  system_r = files.recovery_outdir
 
   # Create lists of the files that are referenced by the assembly manifests.
   _assembly_contents = [ files.qemu_kernel ]

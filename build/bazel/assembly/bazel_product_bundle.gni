@@ -29,7 +29,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    product image build steps:
 #
 #      * ${target_name}_product_assembly: for image_assembly.json
-#      * ${target_name}_create_system: for images.json
+#      * ${target_name}_create_system: for assembled_system.json
 #
 #    NOTE: This template does NOT check this is the actual product image target
 #    used in `bazel_product_bundle_target`.
@@ -53,7 +53,7 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    When set, one extra subtarget is provided to access outputs from Bazel
 #    recovery image build steps:
 #
-#      * ${target_name}_create_recovery_system: for images.json
+#      * ${target_name}_create_recovery_system: for assembled_system.json
 #
 #    NOTE: This template does NOT check this is the actual recovery image target
 #    used in `bazel_product_bundle_target`.
@@ -276,7 +276,7 @@ template("bazel_product_bundle") {
         {
           bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
           ninja_dir = _create_system_target
-          tracked_files = [ "images.json" ]
+          tracked_files = [ "assembled_system.json" ]
           copy_debug_symbols = true
         },
       ]
@@ -290,7 +290,7 @@ template("bazel_product_bundle") {
               image_name = "fuchsia"
               label = _full_label
               assembly_manifest_path = rebase_path(
-                      "${target_out_dir}/${_create_system_target}/images.json",
+                      "${target_out_dir}/${_create_system_target}/assembled_system.json",
                       root_build_dir)
             },
           ]

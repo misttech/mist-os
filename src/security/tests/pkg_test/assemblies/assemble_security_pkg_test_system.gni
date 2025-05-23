@@ -158,7 +158,6 @@ template("assemble_security_pkg_test_system") {
     packages_json =
         "${directories.assembly_gen}/security_pkg_test_packages.json"
     board_config = "${directories.assembly_gen}/board_config.json"
-    images_json = "${directories.assembly_out}/images.json"
     base_package_manifests_list =
         "${target_out_dir}/${assembly_name}.base_packages.list"
     update_packages_manifests_list =
@@ -310,7 +309,7 @@ template("assemble_security_pkg_test_system") {
     testonly = true
     deps = [ ":${labels.assembly_image_assembler}" ]
     partitions = ":${labels.assembly_partitions_config}"
-    system_a = files.images_json
+    system_a = directories.assembly_out
     board_name = board_name
     version_file = invoker.system_version_file
     epoch = "1"

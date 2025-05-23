@@ -13,13 +13,15 @@ rustc_library("assembled_system") {
   version = "0.1.0"
   with_unit_tests = true
   deps = [
-    "//src/lib/assembly/util",
+    "//src/lib/assembly/container",
     "//src/lib/utf8_path",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:pathdiff",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:serde_json5",
   ]
   sources = [
     "src/assembled_system.rs",

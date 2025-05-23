@@ -344,7 +344,8 @@ template("boot_test") {
     # build directory. `ffx product create`, however, expects these paths to be
     # relative to the manifest itself. To account for the mismatch we run the
     # metadata through some simple post-processing.
-    rebased_image_manifest = "${target_out_dir}/${main_target}.images.json"
+    system_out_dir = "${target_out_dir}/${main_target}"
+    rebased_image_manifest = "${system_out_dir}/assembled_system.json"
     action(rebased_image_manifest_target) {
       testonly = true
 
@@ -369,7 +370,7 @@ template("boot_test") {
       testonly = true
 
       name = main_target
-      system_a = rebased_image_manifest
+      system_a = system_out_dir
       partitions = _partition_config_label
 
       deps = [ ":$rebased_image_manifest_target" ]
@@ -405,7 +406,7 @@ template("boot_test") {
       testonly = true
 
       name = main_target
-      system_a = "$target_out_dir/$assembled_system_target/images.json"
+      system_a = "$target_out_dir/$assembled_system_target"
       partitions = _partition_config_label
 
       deps = [ ":$assembled_system_target" ]

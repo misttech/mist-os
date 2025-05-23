@@ -141,7 +141,7 @@ template("_cuckoo_product_bundle") {
     testonly = true
 
     name = main_target
-    system_a = "${target_out_dir}/${assembled_system_namespace}/images.json"
+    system_a = "${target_out_dir}/${assembled_system_namespace}"
     partitions = _partition_config_label
 
     deps = [

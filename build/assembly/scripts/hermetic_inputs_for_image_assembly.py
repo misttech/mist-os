@@ -96,6 +96,10 @@ def main() -> int:
             inputs.add(config.kernel.path)
         if config.devicetree:
             inputs.add(config.devicetree)
+        if config.devicetree_overlay:
+            inputs.add(config.devicetree_overlay)
+        if config.qemu_kernel:
+            inputs.add(config.qemu_kernel)
 
     with open(args.image_assembly_config, "r") as f:
         image_assembly_config = json.load(f)

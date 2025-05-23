@@ -608,7 +608,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         "FFX": ffx_tool.path,
         "OUTDIR": pb_out_dir.path,
         "PARTITIONS_PATH": partitions_configuration.directory,
-        "SYSTEM_A_MANIFEST": system_a_out.path + "/images.json",
+        "SYSTEM_A_MANIFEST": system_a_out.path,
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "SIZE_REPORT": size_report.path,
     }
@@ -633,7 +633,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         system_r_out = ctx.attr.recovery[FuchsiaProductImageInfo].images_out
         build_id_dirs += ctx.attr.recovery[FuchsiaProductImageInfo].build_id_dirs
         ffx_invocation.append("--system-r $SYSTEM_R_MANIFEST")
-        env["SYSTEM_R_MANIFEST"] = system_r_out.path + "/images.json"
+        env["SYSTEM_R_MANIFEST"] = system_r_out.path
         inputs.extend(ctx.files.recovery)
 
     # If update info is supplied, add it to the product bundle.

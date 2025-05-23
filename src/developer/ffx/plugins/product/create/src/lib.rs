@@ -326,7 +326,7 @@ fn load_assembled_system(
         // Make sure `out_dir` is created.
         std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
 
-        let system = AssembledSystem::try_load_from(path)
+        let system = AssembledSystem::from_dir(path)
             .with_context(|| format!("Loading assembly manifest: {}", path))?;
 
         // Filter out the base package, and the blobfs contents.
@@ -477,20 +477,20 @@ mod test {
         let tempdir = Utf8Path::from_path(temp.path()).unwrap();
         let pb_dir = tempdir.join("pb");
 
-        let manifest_path = tempdir.join("manifest.json");
+        let system_dir = tempdir.join("system");
+        fs::create_dir(&system_dir).unwrap();
         AssembledSystem { images: Default::default(), board_name: "my_board".into() }
-            .write(&manifest_path)
+            .write_to_dir(&system_dir, None::<Utf8PathBuf>)
             .unwrap();
 
-        let error_path = tempdir.join("error.json");
-        let mut error_file = File::create(&error_path).unwrap();
-        error_file.write_all("error".as_bytes()).unwrap();
+        let error_dir = tempdir.join("error");
+        fs::create_dir(&error_dir).unwrap();
 
-        let (parsed, packages) = load_assembled_system(&Some(manifest_path), &pb_dir).unwrap();
+        let (parsed, packages) = load_assembled_system(&Some(system_dir), &pb_dir).unwrap();
         assert!(parsed.is_some());
         assert_eq!(packages, Vec::new());
 
-        let error = load_assembled_system(&Some(error_path), &pb_dir);
+        let error = load_assembled_system(&Some(error_dir), &pb_dir);
         assert!(error.is_err());
 
         let (none, _) = load_assembled_system(&None, &pb_dir).unwrap();
@@ -565,9 +565,10 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
-        let system_path = tempdir.join("system.json");
+        let system_dir = tempdir.join("system");
+        fs::create_dir(&system_dir).unwrap();
         AssembledSystem { images: Default::default(), board_name: "my_board".into() }
-            .write(&system_path)
+            .write_to_dir(&system_dir, None::<Utf8PathBuf>)
             .unwrap();
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
@@ -577,9 +578,9 @@ mod test {
                 product_name: String::default(),
                 product_version: String::default(),
                 partitions: partitions_dir,
-                system_a: Some(system_path.clone()),
+                system_a: Some(system_dir.clone()),
                 system_b: None,
-                system_r: Some(system_path.clone()),
+                system_r: Some(system_dir.clone()),
                 tuf_keys: None,
                 update_package_version_file: None,
                 update_package_epoch: None,
@@ -626,14 +627,17 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
-        let system_path = tempdir.join("system.json");
+        let system_dir = tempdir.join("system");
+        fs::create_dir(&system_dir).unwrap();
         let mut manifest =
             AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         manifest.images = vec![
-            Image::ZBI { path: Utf8PathBuf::from("path1"), signed: false },
-            Image::ZBI { path: Utf8PathBuf::from("path2"), signed: true },
+            Image::ZBI { path: tempdir.join("path1"), signed: false },
+            Image::ZBI { path: tempdir.join("path2"), signed: true },
         ];
-        manifest.write(&system_path).unwrap();
+        std::fs::write(&tempdir.join("path1"), "").unwrap();
+        std::fs::write(&tempdir.join("path2"), "").unwrap();
+        manifest.write_to_dir(&system_dir, None::<Utf8PathBuf>).unwrap();
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
 
@@ -642,9 +646,9 @@ mod test {
                 product_name: String::default(),
                 product_version: String::default(),
                 partitions: partitions_dir,
-                system_a: Some(system_path.clone()),
+                system_a: Some(system_dir.clone()),
                 system_b: None,
-                system_r: Some(system_path.clone()),
+                system_r: Some(system_dir.clone()),
                 tuf_keys: None,
                 update_package_version_file: None,
                 update_package_epoch: None,
@@ -674,9 +678,10 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
-        let system_path = tempdir.join("system.json");
+        let system_dir = tempdir.join("system");
+        fs::create_dir(&system_dir).unwrap();
         AssembledSystem { images: Default::default(), board_name: "my_board".into() }
-            .write(&system_path)
+            .write_to_dir(&system_dir, None::<Utf8PathBuf>)
             .unwrap();
 
         let tuf_keys = tempdir.join("keys");
@@ -689,9 +694,9 @@ mod test {
                 product_name: String::default(),
                 product_version: String::default(),
                 partitions: partitions_dir,
-                system_a: Some(system_path.clone()),
+                system_a: Some(system_dir.clone()),
                 system_b: None,
-                system_r: Some(system_path.clone()),
+                system_r: Some(system_dir.clone()),
                 tuf_keys: Some(tuf_keys),
                 update_package_version_file: None,
                 update_package_epoch: None,

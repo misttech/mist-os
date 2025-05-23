@@ -21,8 +21,7 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
         .context("Failed to parse the partitions config")?;
     let epoch: EpochFile = EpochFile::Version1 { epoch: args.epoch };
 
-    let system_a_manifest =
-        args.system_a.as_ref().map(AssembledSystem::try_load_from).transpose()?;
+    let system_a_manifest = args.system_a.as_ref().map(AssembledSystem::from_dir).transpose()?;
 
     let subpackage_blobs_package = if let Some(manifest) = &system_a_manifest {
         Some(construct_subpackage_blobs_package(
@@ -84,9 +83,7 @@ pub fn create_update(args: CreateUpdateArgs) -> Result<()> {
     }
 
     // Set the images to update in the recovery slot.
-    if let Some(manifest) =
-        args.system_r.as_ref().map(AssembledSystem::try_load_from).transpose()?
-    {
+    if let Some(manifest) = args.system_r.as_ref().map(AssembledSystem::from_dir).transpose()? {
         builder.add_slot_images(Slot::Recovery(manifest));
     }
 

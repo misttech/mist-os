@@ -389,7 +389,7 @@ template("assembled_system") {
     base_meta_package = "${gendir}/system_image/meta/package"
     base_pkg_abi_revision =
         "${gendir}/system_image/meta/fuchsia.abi/abi-revision"
-    assembly_manifest = "${outdir}/images.json"
+    assembly_manifest = "${outdir}/assembled_system.json"
     config_data_manifest = "${gendir}/config_data/package_manifest.json"
     image_command_log = "${gendir}/command_log.json"
 
@@ -593,6 +593,12 @@ template("assembled_system") {
 
     hermetic_inputs_target = ":${labels.image_assembly_inputs}"
     hermetic_inputs_file = files.image_assembly_inputs
+
+    # The contents of these folders are dynamic, and managed entirely by this
+    # action.  Further, this action will need to delete items from these
+    # directories that are not added back (on an incremental build, if an item
+    # is removed from one of these sets)
+    hermetic_action_ignored_prefixes = [ files.outdir ]
 
     ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"

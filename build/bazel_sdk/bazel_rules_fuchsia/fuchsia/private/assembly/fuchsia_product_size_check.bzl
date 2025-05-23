@@ -60,7 +60,7 @@ def _fuchsia_product_size_check_impl(ctx):
         ),
         env = {
             "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
-            "IMAGES_PATH": images_out.path + "/images.json",
+            "IMAGES_PATH": images_out.path + "/assembled_system.json",
             "SIZE_FILE": size_file.path,
             "VISUALIZATION_DIR": visualization_dir_path,
             "SIZE_REPORT_PRODUCT_FILE": size_report_product_file.path,

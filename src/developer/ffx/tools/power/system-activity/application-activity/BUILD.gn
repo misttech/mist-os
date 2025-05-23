@@ -63,7 +63,6 @@ if (is_host) {
 if (is_fuchsia && has_board) {
   files = {
     outdir = target_out_dir + "/fuchsia"
-    images_json = "${outdir}/images.json"
   }
 
   product_bundle("product_bundle") {
@@ -71,7 +70,7 @@ if (is_fuchsia && has_board) {
     name = "application-activity-test"
 
     partitions = ":partitions_config"
-    system_a = files.images_json
+    system_a = files.outdir
 
     deps = [ ":assembly" ]
   }

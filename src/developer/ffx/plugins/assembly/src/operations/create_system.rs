@@ -11,6 +11,7 @@ use anyhow::{anyhow, Context, Result};
 use assembled_system::AssembledSystem;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_constants::PackageDestination;
+use assembly_container::AssemblyContainer;
 use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, Image, VBMeta, Zbi};
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
@@ -190,8 +191,9 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     }
 
     // Write the images manifest.
-    let images_json_path = outdir.join("images.json");
-    assembled_system.write(images_json_path).context("Creating the assembly manifest")?;
+    assembled_system
+        .write_to_dir(&outdir, None::<Utf8PathBuf>)
+        .context("Creating the assembly manifest")?;
 
     // Write the packages manifest.
     create_package_manifest(

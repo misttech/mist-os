@@ -52,7 +52,7 @@ pub struct ProcessCommand {
 
 impl ProcessCommand {
     pub async fn execute(self) -> Result<()> {
-        let manifest = AssembledSystem::try_load_from(&self.assembly_manifest)?;
+        let manifest = AssembledSystem::from_relative_config_path(&self.assembly_manifest)?;
 
         if self.debug_no_parallel {
             ThreadPoolBuilder::new().num_threads(1).build_global().expect("make thread pool");

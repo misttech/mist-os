@@ -55,13 +55,13 @@ if (is_fuchsia) {
 
   files = {
     outdir = target_out_dir + "/assembly"
-    packages_json = "${outdir}/packages.json"
-    images_json = "${outdir}/images.json"
+    gendir = target_out_dir + "/assembly_gen"
+    packages_json = "${gendir}/packages.json"
 
-    blobfs = "${outdir}/blob.blk"
-    zbi = "${outdir}/assembly.zbi"
-    fvm = "${outdir}/fvm.blk"
-    fvm_sparse = "${outdir}/fvm.sparse.blk"
+    blobfs = "${gendir}/blob.blk"
+    zbi = "${gendir}/assembly.zbi"
+    fvm = "${gendir}/fvm.blk"
+    fvm_sparse = "${gendir}/fvm.sparse.blk"
 
     qemu_kernel = qemu_boot_shim.path
 
@@ -152,7 +152,7 @@ if (is_fuchsia) {
       "//build/info:build_info_files",
     ]
     partitions = ":partitions_config"
-    system_a = files.images_json
+    system_a = files.outdir
     version_file = build_info_files.version
     board_name = "fake_board"
     epoch = "1"
@@ -172,7 +172,7 @@ if (is_fuchsia) {
     }
 
     partitions = ":partitions_config"
-    system_a = files.images_json
+    system_a = files.outdir
 
     # Create lists of the files that are referenced by the assembly manifests.
     system_a_contents = [

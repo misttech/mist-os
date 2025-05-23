@@ -125,7 +125,6 @@ if (is_fuchsia) {
       fxfs = "${outdir}/fxfs.blk"
       fxfs_sparse = "${outdir}/fxfs.sparse.blk"
       packages_json = "${outdir}/packages.json"
-      images_json = "${outdir}/images.json"
 
       # Outputs of recovery.
       recovery_name = get_label_info(recovery_label, "name")
@@ -140,7 +139,6 @@ if (is_fuchsia) {
       recovery_fvm_fastboot = "${recovery_outdir}/fvm.fastboot.blk"
       recovery_fxfs = "${recovery_outdir}/fxfs.blk"
       recovery_fxfs_sparse = "${recovery_outdir}/fxfs.sparse.blk"
-      recovery_images_json = "${recovery_outdir}/images.json"
 
       esp_image_path = "${root_build_dir}/fuchsia.esp.blk"
 
@@ -163,8 +161,8 @@ if (is_fuchsia) {
         recovery_label,
       ]
       partitions = _partitions_config
-      system_a = files.images_json
-      system_r = files.recovery_images_json
+      system_a = files.outdir
+      system_r = files.recovery_outdir
       board_name = board_name
       version_file = build_info_files.version
       epoch = "${update_epoch}"
@@ -186,8 +184,8 @@ if (is_fuchsia) {
       }
 
       partitions = _partitions_config
-      system_a = files.images_json
-      system_r = files.recovery_images_json
+      system_a = files.outdir
+      system_r = files.recovery_outdir
 
       # Create lists of the files that are referenced by the assembly manifests.
       _assembly_contents = [ files.qemu_kernel ]

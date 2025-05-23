@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
+use assembly_container::{assembly_container, AssemblyContainer, FileType, WalkPaths, WalkPathsFn};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
+use pathdiff::diff_paths;
 use serde::de::{self, Deserializer};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
@@ -33,25 +35,19 @@ use utf8_path::path_relative_from;
 /// println!("{:?}", serde_json::to_value(manifest).unwrap());
 /// ```
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Deserialize, Serialize, PartialEq, WalkPaths)]
+#[assembly_container(assembled_system.json)]
 pub struct AssembledSystem {
     /// List of images in the manifest.
+    #[walk_paths]
     pub images: Vec<Image>,
+
     /// The board name that these images can be OTA'd to, which will be used to create an update
     /// package. OTAs will fail if this board_name changes across builds.
     ///
     /// The images contain this name inside build_info, and the software delivery code asserts that
     /// build_info.board.name == update_package.board_name.
     pub board_name: String,
-}
-
-/// Private helper for serializing the AssembledSystem. An AssembledSystem cannot be deserialized
-/// without going through `try_from_path` in order to require that we use this helper
-/// which ensure that the paths get relativized/derelativized properly
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-struct SerializationHelper {
-    images: Vec<Image>,
-    board_name: String,
 }
 
 /// An item in the AssembledSystem.
@@ -124,6 +120,23 @@ impl Image {
         }
     }
 
+    /// Get the mutable path of the image on the host.
+    pub fn mut_source(&mut self) -> &mut Utf8PathBuf {
+        match self {
+            Image::BasePackage(s) => s,
+            Image::ZBI { path, signed: _ } => path,
+            Image::VBMeta(s) => s,
+            Image::Dtbo(s) => s,
+            Image::BlobFS { path, .. } => path,
+            Image::FVM(s) => s,
+            Image::FVMSparse(s) => s,
+            Image::FVMFastboot(s) => s,
+            Image::Fxfs(s) => s,
+            Image::FxfsSparse { path, .. } => path,
+            Image::QemuKernel(s) => s,
+        }
+    }
+
     /// Set the path of the image on the host.
     pub fn set_source(&mut self, source: impl Into<Utf8PathBuf>) {
         let source = source.into();
@@ -158,128 +171,73 @@ impl Image {
             | Image::QemuKernel(_) => None,
         }
     }
+
+    /// For image types that contain blobs, return the mutable contents.
+    pub fn get_mut_blobfs_contents(&mut self) -> Option<&mut BlobfsContents> {
+        match self {
+            Image::BlobFS { contents, .. } => Some(contents),
+            Image::FxfsSparse { contents, .. } => Some(contents),
+            Image::BasePackage(_)
+            | Image::ZBI { .. }
+            | Image::VBMeta(_)
+            | Image::Dtbo(_)
+            | Image::FVM(_)
+            | Image::FVMSparse(_)
+            | Image::FVMFastboot(_)
+            | Image::Fxfs { .. }
+            | Image::QemuKernel(_) => None,
+        }
+    }
+}
+
+impl WalkPaths for Image {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> Result<()> {
+        if let Some(contents) = self.get_mut_blobfs_contents() {
+            contents.walk_paths_with_dest(found, dest.join("contents"))?;
+        }
+        found(self.mut_source(), dest, FileType::Unknown)
+    }
 }
 
 impl AssembledSystem {
-    /// Return a new Assembly Manifest with all the paths relativized to a
-    /// target path
-    fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<AssembledSystem> {
-        // Change the images list in-place so fields can be added to the AssembledSystem without
-        // changing this method
-        let mut images = Vec::default();
-        for image in self.images {
-            match image {
-                Image::BasePackage(path) => {
-                    images.push(Image::BasePackage(path_relative_from(path, &base_path)?))
-                }
-                Image::VBMeta(path) => {
-                    images.push(Image::VBMeta(path_relative_from(path, &base_path)?))
-                }
-                Image::Dtbo(path) => {
-                    images.push(Image::Dtbo(path_relative_from(path, &base_path)?))
-                }
-                Image::FVM(path) => images.push(Image::FVM(path_relative_from(path, &base_path)?)),
-                Image::FVMSparse(path) => {
-                    images.push(Image::FVMSparse(path_relative_from(path, &base_path)?))
-                }
-                Image::FVMFastboot(path) => {
-                    images.push(Image::FVMFastboot(path_relative_from(path, &base_path)?))
-                }
-                Image::QemuKernel(path) => {
-                    images.push(Image::QemuKernel(path_relative_from(path, &base_path)?))
-                }
-                Image::ZBI { path, signed } => {
-                    images.push(Image::ZBI { path: path_relative_from(path, &base_path)?, signed })
-                }
-                Image::BlobFS { path, contents } => images.push(Image::BlobFS {
-                    path: path_relative_from(path, &base_path)?,
-                    contents: contents.relativize(&base_path)?,
-                }),
-                Image::Fxfs(path) => {
-                    images.push(Image::Fxfs(path_relative_from(path, &base_path)?))
-                }
-                Image::FxfsSparse { path, contents } => images.push(Image::FxfsSparse {
-                    path: path_relative_from(path, &base_path)?,
-                    contents: contents.relativize(&base_path)?,
-                }),
-            }
-        }
-        self.images = images;
-
+    /// Relativize all paths in the manifest to `reference`, but don't copy any
+    /// files. The returned object will not be writable or readable.
+    fn relativize(mut self, reference: impl AsRef<Utf8Path>) -> Result<Self> {
+        self.walk_paths(&mut |path: &mut Utf8PathBuf, _dest: Utf8PathBuf, _filetype: FileType| {
+            let new_path = diff_paths(&path, reference.as_ref())
+                .ok_or_else(|| anyhow!("Failed to make the path relative: {}", &path))?;
+            *path = Utf8PathBuf::try_from(new_path)?;
+            Ok(())
+        })
+        .with_context(|| format!("Making all paths relative to: {}", reference.as_ref()))?;
         Ok(self)
     }
 
-    /// Return a new AssembledSystem with all the paths made joined to the
-    /// provided directory where the manifest is located
-    fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<AssembledSystem> {
-        // Change the images list in-place so fields can be added to the AssembledSystem without
-        // changing this method
-        let mut images = Vec::default();
-        for image in self.images {
-            match image {
-                Image::BasePackage(path) => {
-                    images.push(Image::BasePackage(manifest_dir.as_ref().join(path)))
-                }
-                Image::VBMeta(path) => images.push(Image::VBMeta(manifest_dir.as_ref().join(path))),
-                Image::Dtbo(path) => images.push(Image::Dtbo(manifest_dir.as_ref().join(path))),
-                Image::FVM(path) => images.push(Image::FVM(manifest_dir.as_ref().join(path))),
-                Image::FVMSparse(path) => {
-                    images.push(Image::FVMSparse(manifest_dir.as_ref().join(path)))
-                }
-                Image::FVMFastboot(path) => {
-                    images.push(Image::FVMFastboot(manifest_dir.as_ref().join(path)))
-                }
-                Image::QemuKernel(path) => {
-                    images.push(Image::QemuKernel(manifest_dir.as_ref().join(path)))
-                }
-                Image::ZBI { path, signed } => {
-                    images.push(Image::ZBI { path: manifest_dir.as_ref().join(path), signed })
-                }
-                Image::BlobFS { path, contents } => images.push(Image::BlobFS {
-                    path: manifest_dir.as_ref().join(path),
-                    contents: contents.derelativize(&manifest_dir)?,
-                }),
-                Image::Fxfs(path) => images.push(Image::Fxfs(manifest_dir.as_ref().join(path))),
-                Image::FxfsSparse { path, contents } => images.push(Image::FxfsSparse {
-                    path: manifest_dir.as_ref().join(path),
-                    contents: contents.derelativize(&manifest_dir)?,
-                }),
-            }
-        }
-        self.images = images;
+    /// Construct an AssembledSystem from a config file with relative paths.
+    pub fn from_relative_config_path(path: impl AsRef<Utf8Path>) -> Result<Self> {
+        // Read the config to a string first because it offers better
+        // performance for serde.
+        let data = std::fs::read_to_string(path.as_ref())
+            .with_context(|| format!("Reading config: {}", path.as_ref()))?;
+        let mut config: Self = serde_json5::from_str(&data)
+            .with_context(|| format!("Parsing config: {}", path.as_ref()))?;
 
-        Ok(self)
-    }
-
-    /// Load an AssembledSystem from a path on disk, handling path
-    /// relativization
-    pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
-        let deserialized: SerializationHelper = assembly_util::read_config(path.as_ref())?;
-        let manifest =
-            AssembledSystem { images: deserialized.images, board_name: deserialized.board_name };
-        manifest.derelativize(path.as_ref().parent().context("Invalid path")?)
-    }
-
-    /// Write an assembly manifest to a directory on disk at `path`.
-    /// Make the paths recorded in the file relative to the file's location
-    /// so it is portable.
-    pub fn write(self, path: impl AsRef<Utf8Path>) -> Result<()> {
-        let path = path.as_ref();
-        // Relativize the paths in the Assembly Manifest
-        let assembled_system =
-            self.relativize(path.parent().with_context(|| format!("Invalid output path {path}"))?)?;
-
-        // Write the images manifest.
-        let images_json = File::create(path).context("Creating assembly manifest")?;
-        serde_json::to_writer_pretty(
-            images_json,
-            &SerializationHelper {
-                images: assembled_system.images,
-                board_name: assembled_system.board_name,
-            },
-        )
-        .context("Writing assembly manifest")?;
-        Ok(())
+        // Make all the paths absolute.
+        let dir = path
+            .as_ref()
+            .parent()
+            .with_context(|| format!("Getting parent directory for: {}", path.as_ref()))?;
+        config
+            .walk_paths(&mut |path: &mut Utf8PathBuf, _dest: Utf8PathBuf, _filetype: FileType| {
+                *path = dir.join(&path);
+                Ok(())
+            })
+            .context("Making all config paths absolute")?;
+        Ok(config)
     }
 
     /// Write an assembly manifest to a directory on disk at `path` using the 'old' format.
@@ -408,9 +366,10 @@ impl Serialize for Image {
 }
 
 /// Detailed metadata on the contents of a particular image output.
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize, WalkPaths)]
 pub struct BlobfsContents {
     /// Information about packages included in the image.
+    #[walk_paths]
     pub packages: PackagesMetadata,
     /// Maximum total size of all the blobs stored in this image.
     pub maximum_contents_size: Option<u64>,
@@ -506,34 +465,25 @@ impl BlobfsContents {
         }
         Ok(self)
     }
-
-    /// Join all manifest paths in the BlobFsContents to the location of the file it is serialized in
-    fn derelativize(mut self, manifest_dir: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
-        // Modify in-place so we can add fields without updating this code
-        for package in self.packages.base.metadata.iter_mut() {
-            package.manifest = manifest_dir.as_ref().join(&package.manifest)
-        }
-        for package in self.packages.cache.metadata.iter_mut() {
-            package.manifest = manifest_dir.as_ref().join(&package.manifest)
-        }
-        Ok(self)
-    }
 }
 
 /// Metadata on packages included in a given image.
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize, WalkPaths)]
 pub struct PackagesMetadata {
     /// Paths to package manifests for the base package set.
+    #[walk_paths]
     pub base: PackageSetMetadata,
     /// Paths to package manifests for the cache package set.
+    #[walk_paths]
     pub cache: PackageSetMetadata,
 }
 
 /// Metadata for a certain package set (e.g. base or cache).
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize, WalkPaths)]
 #[serde(transparent)]
 pub struct PackageSetMetadata {
     /// Inner set of metadata.
+    #[walk_paths]
     pub metadata: Vec<PackageMetadata>,
 }
 
@@ -546,6 +496,16 @@ pub struct PackageMetadata {
     pub manifest: Utf8PathBuf,
     /// List of blobs in this package.
     pub blobs: Vec<PackageBlob>,
+}
+
+impl WalkPaths for PackageMetadata {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> Result<()> {
+        found(&mut self.manifest, dest, FileType::PackageManifest)
+    }
 }
 
 #[derive(Clone, Debug, Ord, PartialOrd, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -689,137 +649,60 @@ mod tests {
     }
 
     #[test]
-    fn derelativize() {
-        let manifest = AssembledSystem {
-            images: vec![
-                Image::BasePackage("base.far".into()),
-                Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
-                Image::VBMeta("fuchsia.vbmeta".into()),
-                Image::Dtbo("dtbo".into()),
-                Image::BlobFS { path: "blob.blk".into(), contents: Default::default() },
-                Image::FVM("fvm.blk".into()),
-                Image::FVMSparse("fvm.sparse.blk".into()),
-                Image::FVMFastboot("fvm.fastboot.blk".into()),
-                Image::QemuKernel("qemu/kernel".into()),
-            ],
-            board_name: "my_board".into(),
-        };
-
-        let derelativized_manifest = manifest.derelativize(Utf8PathBuf::from("path/to")).unwrap();
-        let manifest = generate_test_manifest();
-        assert_eq!(manifest, derelativized_manifest);
-    }
-
-    #[test]
-    fn derelativize_fxfs() {
-        let manifest = AssembledSystem {
-            images: vec![
-                Image::BasePackage("base.far".into()),
-                Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
-                Image::VBMeta("fuchsia.vbmeta".into()),
-                Image::Dtbo("dtbo".into()),
-                Image::Fxfs("fxfs.blk".into()),
-                Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
-                Image::QemuKernel("qemu/kernel".into()),
-            ],
-            board_name: "my_board".into(),
-        };
-
-        let derelativized_manifest = manifest.derelativize(Utf8PathBuf::from("path/to")).unwrap();
-        let manifest = generate_test_manifest_fxfs();
-        assert_eq!(manifest, derelativized_manifest);
-    }
-
-    #[test]
     fn serialize() {
-        let manifest = AssembledSystem {
-            images: vec![
-                Image::BasePackage("path/to/base.far".into()),
-                Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
-                Image::VBMeta("path/to/fuchsia.vbmeta".into()),
-                Image::Dtbo("path/to/dtbo".into()),
-                Image::BlobFS { path: "path/to/blob.blk".into(), contents: Default::default() },
-                Image::FVM("path/to/fvm.blk".into()),
-                Image::FVMSparse("path/to/fvm.sparse.blk".into()),
-                Image::FVMFastboot("path/to/fvm.fastboot.blk".into()),
-                Image::QemuKernel("path/to/qemu/kernel".into()),
-            ],
-            board_name: "my_board".into(),
-        };
-
-        assert_eq!(
-            generate_test_value(),
-            serde_json::to_value(SerializationHelper {
-                images: manifest.images,
-                board_name: "my_board".into()
-            })
-            .unwrap()
-        );
+        let images = vec![
+            Image::BasePackage("path/to/base.far".into()),
+            Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
+            Image::VBMeta("path/to/fuchsia.vbmeta".into()),
+            Image::Dtbo("path/to/dtbo".into()),
+            Image::BlobFS { path: "path/to/blob.blk".into(), contents: Default::default() },
+            Image::FVM("path/to/fvm.blk".into()),
+            Image::FVMSparse("path/to/fvm.sparse.blk".into()),
+            Image::FVMFastboot("path/to/fvm.fastboot.blk".into()),
+            Image::QemuKernel("path/to/qemu/kernel".into()),
+        ];
+        assert_eq!(generate_test_value(), serde_json::to_value(images).unwrap());
     }
 
     #[test]
     fn serialize_fxfs() {
-        let manifest = AssembledSystem {
-            images: vec![
-                Image::BasePackage("path/to/base.far".into()),
-                Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
-                Image::VBMeta("path/to/fuchsia.vbmeta".into()),
-                Image::Dtbo("path/to/dtbo".into()),
-                Image::Fxfs("path/to/fxfs.blk".into()),
-                Image::FxfsSparse {
-                    path: "path/to/fxfs.sparse.blk".into(),
-                    contents: Default::default(),
-                },
-                Image::QemuKernel("path/to/qemu/kernel".into()),
-            ],
-            board_name: "my_board".into(),
-        };
+        let images = vec![
+            Image::BasePackage("path/to/base.far".into()),
+            Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
+            Image::VBMeta("path/to/fuchsia.vbmeta".into()),
+            Image::Dtbo("path/to/dtbo".into()),
+            Image::Fxfs("path/to/fxfs.blk".into()),
+            Image::FxfsSparse {
+                path: "path/to/fxfs.sparse.blk".into(),
+                contents: Default::default(),
+            },
+            Image::QemuKernel("path/to/qemu/kernel".into()),
+        ];
 
-        assert_eq!(
-            generate_test_value_fxfs(),
-            serde_json::to_value(SerializationHelper {
-                images: manifest.images,
-                board_name: "my_board".into()
-            })
-            .unwrap()
-        );
+        assert_eq!(generate_test_value_fxfs(), serde_json::to_value(images).unwrap());
     }
 
     #[test]
     fn serialize_unsigned_zbi() {
-        let manifest = AssembledSystem {
-            images: vec![Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: false }],
-            board_name: "my_board".into(),
-        };
+        let images = vec![Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: false }];
 
-        let value = json!({
-            "images": [
-                {
-                    "type": "zbi",
-                    "name": "zircon-a",
-                    "path": "path/to/fuchsia.zbi",
-                    "signed": false,
-                }
-            ],
-            "board_name": "my_board",
-        });
-        assert_eq!(
-            value,
-            serde_json::to_value(SerializationHelper {
-                images: manifest.images,
-                board_name: manifest.board_name
-            })
-            .unwrap()
-        );
+        let value = json!([
+            {
+                "type": "zbi",
+                "name": "zircon-a",
+                "path": "path/to/fuchsia.zbi",
+                "signed": false,
+            }
+        ]);
+        assert_eq!(value, serde_json::to_value(images).unwrap());
     }
 
     #[test]
     fn deserialize() {
-        let manifest: AssembledSystem = generate_test_manifest();
-        assert_eq!(manifest.board_name, "my_board".to_string());
-        assert_eq!(manifest.images.len(), 9);
+        let images: Vec<Image> = serde_json::from_value(generate_test_value()).unwrap();
+        assert_eq!(images.len(), 9);
 
-        for image in &manifest.images {
+        for image in &images {
             let (expected, actual) = match image {
                 Image::BasePackage(path) => ("path/to/base.far", path),
                 Image::ZBI { path, signed } => {
@@ -844,11 +727,10 @@ mod tests {
 
     #[test]
     fn deserialize_fxfs() {
-        let manifest: AssembledSystem = generate_test_manifest_fxfs();
-        assert_eq!(manifest.board_name, "my_board".to_string());
-        assert_eq!(manifest.images.len(), 7);
+        let images: Vec<Image> = serde_json::from_value(generate_test_value_fxfs()).unwrap();
+        assert_eq!(images.len(), 7);
 
-        for image in &manifest.images {
+        for image in &images {
             let (expected, actual) = match image {
                 Image::BasePackage(path) => ("path/to/base.far", path),
                 Image::ZBI { path, signed } => {
@@ -871,96 +753,63 @@ mod tests {
 
     #[test]
     fn deserialize_invalid() {
-        let invalid = json!({
-            "images": [
-                {
-                    "type": "far-invalid",
-                    "name": "base-package",
-                    "path": "path/to/base.far",
-                },
-            ],
-            "board_name": "my_board",
-        });
-        let result: Result<SerializationHelper, _> = serde_json::from_value(invalid);
+        let invalid = json!([
+            {
+                "type": "far-invalid",
+                "name": "base-package",
+                "path": "path/to/base.far",
+            },
+        ]);
+        let result: Result<Vec<Image>, _> = serde_json::from_value(invalid);
         assert!(result.unwrap_err().is_data());
     }
 
     #[test]
     fn deserialize_zbi_with_arbitrary_name() {
-        let value = json!({
-            "images": [
-                {
-                    "type": "zbi",
-                    "name": "my-zbi",
-                    "path": "path/to/my.zbi",
-                }
-            ],
-            "board_name": "my_board",
-        });
+        let value = json!([
+            {
+                "type": "zbi",
+                "name": "my-zbi",
+                "path": "path/to/my.zbi",
+            }
+        ]);
 
-        let expected = AssembledSystem {
-            images: vec![Image::ZBI { path: "path/to/my.zbi".into(), signed: false }],
-            board_name: "my_board".into(),
-        };
-
-        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
+        let expected = vec![Image::ZBI { path: "path/to/my.zbi".into(), signed: false }];
+        let result: Result<Vec<Image>, _> = serde_json::from_value(value);
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            SerializationHelper { images: expected.images, board_name: "my_board".into() }
-        );
+        assert_eq!(result.unwrap(), expected,);
     }
 
     #[test]
     fn deserialize_vbmeta_with_arbitrary_name() {
-        let value = json!({
-            "images": [
-                {
-                    "type": "vbmeta",
-                    "name": "my-vbmeta",
-                    "path": "path/to/my.vbmeta",
-                }
-            ],
-            "board_name": "my_board",
-        });
+        let value = json!([
+            {
+                "type": "vbmeta",
+                "name": "my-vbmeta",
+                "path": "path/to/my.vbmeta",
+            }
+        ]);
 
-        let expected = AssembledSystem {
-            images: vec![Image::VBMeta("path/to/my.vbmeta".into())],
-            board_name: "my_board".into(),
-        };
-
-        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
+        let expected = vec![Image::VBMeta("path/to/my.vbmeta".into())];
+        let result: Result<Vec<Image>, _> = serde_json::from_value(value);
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            SerializationHelper { images: expected.images, board_name: "my_board".into() }
-        );
+        assert_eq!(result.unwrap(), expected,);
     }
 
     #[test]
     fn deserialize_qemu_kernel_with_arbitrary_name() {
-        let value = json!({
-            "images": [
-                {
-                    "type": "kernel",
-                    "name": "my-qemu-kernel",
-                    "path": "path/to/my-qemu-kernel.bin",
-                }
-            ],
-            "board_name": "my_board",
-        });
+        let value = json!([
+            {
+                "type": "kernel",
+                "name": "my-qemu-kernel",
+                "path": "path/to/my-qemu-kernel.bin",
+            }
+        ]);
 
-        let expected = AssembledSystem {
-            images: vec![Image::QemuKernel("path/to/my-qemu-kernel.bin".into())],
-            board_name: "my_board".into(),
-        };
-
-        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
+        let expected = vec![Image::QemuKernel("path/to/my-qemu-kernel.bin".into())];
+        let result: Result<Vec<Image>, _> = serde_json::from_value(value);
         assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap(),
-            SerializationHelper { images: expected.images, board_name: "my_board".into() }
-        );
+        assert_eq!(result.unwrap(), expected,);
     }
 
     #[test]
@@ -1112,25 +961,20 @@ mod tests {
 
     fn generate_test_manifest() -> AssembledSystem {
         AssembledSystem {
-            images: serde_json::from_value::<SerializationHelper>(generate_test_value())
-                .unwrap()
-                .images,
+            images: serde_json::from_value(generate_test_value()).unwrap(),
             board_name: "my_board".into(),
         }
     }
 
     fn generate_test_manifest_fxfs() -> AssembledSystem {
         AssembledSystem {
-            images: serde_json::from_value::<SerializationHelper>(generate_test_value_fxfs())
-                .unwrap()
-                .images,
+            images: serde_json::from_value(generate_test_value_fxfs()).unwrap(),
             board_name: "my_board".into(),
         }
     }
 
     fn generate_test_value() -> Value {
-        json!({
-            "images": [
+        json!([
                 {
                     "type": "far",
                     "name": "base-package",
@@ -1184,59 +1028,54 @@ mod tests {
                     "name": "qemu-kernel",
                     "path": "path/to/qemu/kernel",
                 },
-            ],
-            "board_name": "my_board",
-        })
+        ])
     }
 
     fn generate_test_value_fxfs() -> Value {
-        json!({
-            "images": [
-                {
-                    "type": "far",
-                    "name": "base-package",
-                    "path": "path/to/base.far",
-                },
-                {
-                    "type": "zbi",
-                    "name": "zircon-a",
-                    "path": "path/to/fuchsia.zbi",
-                    "signed": true,
-                },
-                {
-                    "type": "vbmeta",
-                    "name": "zircon-a",
-                    "path": "path/to/fuchsia.vbmeta",
-                },
-                {
-                    "type": "dtbo",
-                    "name": "dtbo-a",
-                    "path": "path/to/dtbo",
-                },
-                {
-                    "type": "fxfs-blk",
-                    "name": "storage-full",
-                    "path": "path/to/fxfs.blk",
-                },
-                {
-                    "type": "blk",
-                    "name": "fxfs.fastboot",
-                    "path": "path/to/fxfs.sparse.blk",
-                    "contents": {
-                        "packages": {
-                            "base": [],
-                            "cache": [],
-                        },
-                        "maximum_contents_size": None::<u64>
+        json!([
+            {
+                "type": "far",
+                "name": "base-package",
+                "path": "path/to/base.far",
+            },
+            {
+                "type": "zbi",
+                "name": "zircon-a",
+                "path": "path/to/fuchsia.zbi",
+                "signed": true,
+            },
+            {
+                "type": "vbmeta",
+                "name": "zircon-a",
+                "path": "path/to/fuchsia.vbmeta",
+            },
+            {
+                "type": "dtbo",
+                "name": "dtbo-a",
+                "path": "path/to/dtbo",
+            },
+            {
+                "type": "fxfs-blk",
+                "name": "storage-full",
+                "path": "path/to/fxfs.blk",
+            },
+            {
+                "type": "blk",
+                "name": "fxfs.fastboot",
+                "path": "path/to/fxfs.sparse.blk",
+                "contents": {
+                    "packages": {
+                        "base": [],
+                        "cache": [],
                     },
+                    "maximum_contents_size": None::<u64>
                 },
-                {
-                    "type": "kernel",
-                    "name": "qemu-kernel",
-                    "path": "path/to/qemu/kernel",
-                },
-            ],
-            "board_name": "my_board",
-        })
+            },
+            {
+                "type": "kernel",
+                "name": "qemu-kernel",
+                "path": "path/to/qemu/kernel",
+            },
+        ])
     }
 }

@@ -164,15 +164,12 @@ template("product_bundle") {
       args += [ "--system" ]
       if (defined(invoker.system_a)) {
         args += [ rebase_path(invoker.system_a, root_build_dir) ]
-        inputs += [ invoker.system_a ]
       }
       if (defined(invoker.system_b)) {
         args += [ rebase_path(invoker.system_b, root_build_dir) ]
-        inputs += [ invoker.system_b ]
       }
       if (defined(invoker.system_r)) {
         args += [ rebase_path(invoker.system_r, root_build_dir) ]
-        inputs += [ invoker.system_r ]
       }
     }
   }
@@ -273,7 +270,7 @@ template("product_bundle") {
         "--system-a",
         rebase_path(invoker.system_a, root_build_dir),
       ]
-      inputs += [ invoker.system_a ]
+      hermetic_action_ignored_prefixes += [ invoker.system_a ]
     }
 
     if (defined(invoker.system_b)) {
@@ -281,7 +278,7 @@ template("product_bundle") {
         "--system-b",
         rebase_path(invoker.system_b, root_build_dir),
       ]
-      inputs += [ invoker.system_b ]
+      hermetic_action_ignored_prefixes += [ invoker.system_b ]
     }
 
     if (defined(invoker.system_r)) {
@@ -289,7 +286,7 @@ template("product_bundle") {
         "--system-r",
         rebase_path(invoker.system_r, root_build_dir),
       ]
-      inputs += [ invoker.system_r ]
+      hermetic_action_ignored_prefixes += [ invoker.system_r ]
     }
 
     if (virtual_devices != []) {

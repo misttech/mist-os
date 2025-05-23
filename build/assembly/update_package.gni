@@ -96,15 +96,12 @@ template("update_package") {
       args += [ "--system" ]
       if (defined(invoker.system_a)) {
         args += [ rebase_path(invoker.system_a, root_build_dir) ]
-        inputs += [ invoker.system_a ]
       }
       if (defined(invoker.system_b)) {
         args += [ rebase_path(invoker.system_b, root_build_dir) ]
-        inputs += [ invoker.system_b ]
       }
       if (defined(invoker.system_r)) {
         args += [ rebase_path(invoker.system_r, root_build_dir) ]
-        inputs += [ invoker.system_r ]
       }
     }
   }
@@ -122,6 +119,7 @@ template("update_package") {
 
     hermetic_inputs_target = ":${labels.hermetic_inputs}"
     hermetic_inputs_file = files.hermetic_inputs
+    hermetic_action_ignored_prefixes = []
 
     ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
     ffx_tool_output_name = "ffx-assembly"
@@ -188,7 +186,7 @@ template("update_package") {
         "--system-a",
         rebase_path(invoker.system_a, root_build_dir),
       ]
-      inputs += [ invoker.system_a ]
+      hermetic_action_ignored_prefixes += [ invoker.system_a ]
     }
 
     if (defined(invoker.system_b)) {
@@ -196,7 +194,7 @@ template("update_package") {
         "--system-b",
         rebase_path(invoker.system_b, root_build_dir),
       ]
-      inputs += [ invoker.system_b ]
+      hermetic_action_ignored_prefixes += [ invoker.system_b ]
     }
 
     if (defined(invoker.system_r)) {
@@ -204,7 +202,7 @@ template("update_package") {
         "--system-r",
         rebase_path(invoker.system_r, root_build_dir),
       ]
-      inputs += [ invoker.system_r ]
+      hermetic_action_ignored_prefixes += [ invoker.system_r ]
     }
 
     if (defined(invoker.update_package_name)) {
