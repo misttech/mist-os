@@ -348,11 +348,12 @@ impl CgroupSkbProgram {
             .chain(ebpf_api::get_socket_filter_helpers().drain(..))
             .collect::<HashMap<_, _>>();
 
-        let program = ebpf::link_program(&program, &[SK_BUF_MAPPING.clone()], maps, helpers)
-            .map_err(|e| {
-                error!("Failed to link eBPF program: {:?}", e);
-                EbpfError::LinkFailed
-            })?;
+        let program =
+            ebpf::link_program(&program, std::slice::from_ref(&SK_BUF_MAPPING), maps, helpers)
+                .map_err(|e| {
+                    error!("Failed to link eBPF program: {:?}", e);
+                    EbpfError::LinkFailed
+                })?;
 
         Ok(Self { program })
     }

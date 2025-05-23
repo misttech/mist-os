@@ -739,7 +739,7 @@ impl PeerInner {
         remote_id: &StreamEndpointId,
     ) -> avdtp::Result<()> {
         trace!(permit:?, local_id:?, remote_id:?; "Making outgoing start request");
-        let to_start = &[remote_id.clone()];
+        let to_start = std::slice::from_ref(remote_id);
         avdtp.start(to_start).await?;
         trace!("Start response received: {permit:?}");
         let peer = Self::upgrade(weak.clone())?;

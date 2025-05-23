@@ -146,7 +146,7 @@ impl Controller {
                 }
             }
             PeerControllerRequest::StartStream { responder } => {
-                match a2dp.avdtp().start(&[endpoint_id.clone()]).await {
+                match a2dp.avdtp().start(&std::slice::from_ref(endpoint_id)).await {
                     Ok(resp) => {
                         info!("StartStream was successful: {:?}", resp);
                         responder.send(Ok(()))?;

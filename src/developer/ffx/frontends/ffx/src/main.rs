@@ -226,13 +226,15 @@ fn build_required_args(info: &CliArgsInfo) -> Result<Vec<String>> {
                 ffx_command::FlagKind::Option { arg_name } => {
                     args.extend_from_slice(&[f.long.clone(), arg_name.clone()])
                 }
-                ffx_command::FlagKind::Switch => args.extend_from_slice(&[f.long.clone()]),
+                ffx_command::FlagKind::Switch => {
+                    args.extend_from_slice(std::slice::from_ref(&f.long))
+                }
             };
         }
     }
     for p in &info.positionals {
         if p.optionality == Optionality::Required {
-            args.extend_from_slice(&[p.name.clone()])
+            args.extend_from_slice(std::slice::from_ref(&p.name))
         }
     }
     Ok(args)
