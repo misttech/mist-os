@@ -174,9 +174,6 @@ config("thinlto-clang") {
   configs = [
     ":fat-lto-objects",
     ":lto-workarounds",
-
-    # As thin lto is multi-threaded, use the larger RBE workers
-    "//build/config:big_rbe_machine",
   ]
 
   # These switches have the same meaning but different spellings for
@@ -229,12 +226,7 @@ config("thinlto-rust") {
 
   rustflags += [ "${rust_linkarg}${_cache_dir}${thinlto_cache_dir}" ]
 
-  configs = [
-    ":lto-workarounds",
-
-    # As thin lto is multi-threaded, use the larger RBE workers
-    "//build/config:big_rbe_machine",
-  ]
+  configs = [ ":lto-workarounds" ]
 }
 
 variant("thinlto") {
