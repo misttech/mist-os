@@ -5,6 +5,13 @@
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("processargs") {
+  visibility = [
+    ":*",
+    "//sdk/lib/ld/*",
+    "//zircon/system/ulib/c/*",
+    "//zircon/third_party/ulib/musl/*",
+  ]
+
   sdk = "source"
   sdk_headers = [ "lib/processargs/processargs.h" ]
   sources = [ "processargs.c" ]

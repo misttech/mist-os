@@ -6,7 +6,6 @@
 
 #include <lib/elfldltl/machine.h>
 #include <lib/fidl/txn_header.h>
-#include <lib/processargs/processargs.h>
 #include <lib/userabi/userboot.h>
 #include <lib/zircon-internal/default_stack_size.h>
 #include <lib/zx/channel.h>
