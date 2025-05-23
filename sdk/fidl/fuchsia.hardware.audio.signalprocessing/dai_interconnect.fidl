@@ -31,6 +31,10 @@ type PlugDetectCapabilities = flexible enum {
 };
 
 /// Endpoint types.
+///
+/// # Deprecation
+///
+/// Use `ElementType` `RING_BUFFER` or `DAI_INTERCONNECT` instead.
 @available(removed=20)
 type EndpointType = flexible enum : uint8 {
     /// The endpoint represents a ring buffer.
@@ -44,6 +48,10 @@ type EndpointType = flexible enum : uint8 {
 };
 
 /// Parameters for an `Element` with `type` equal to `ENDPOINT`.
+///
+/// # Deprecation
+///
+/// Use `DaiInterconnect` and `ElementType` `DAI_INTERCONNECT` instead.
 @available(removed=20)
 type Endpoint = table {
     /// Specifies what the endpoint represents.
@@ -57,6 +65,10 @@ type Endpoint = table {
 };
 
 /// State for an `Element` with `type` equal to `ENDPOINT`.
+///
+/// # Deprecation
+///
+/// Use `DaiInterconnectElementState` and `ElementType` `DAI_INTERCONNECT` instead.
 @available(removed=20)
 type EndpointElementState = table {
     /// If included the plug detect state for this endpoint.
@@ -65,7 +77,7 @@ type EndpointElementState = table {
     1: plug_state PlugState;
 };
 
-/// Parameters for an `Element` with `type` equal to `DAI_INTERCONNECT`.
+/// Parameters for an `Element` with `ElementType` `DAI_INTERCONNECT`.
 @available(added=20)
 type DaiInterconnect = table {
     /// Plug Detect Capabilities.
@@ -74,7 +86,7 @@ type DaiInterconnect = table {
     1: plug_detect_capabilities PlugDetectCapabilities;
 };
 
-/// State for an `Element` with `type` equal to `DAI_INTERCONNECT`.
+/// State for an `Element` with `ElementType` `DAI_INTERCONNECT`.
 @available(added=20)
 type DaiInterconnectElementState = table {
     /// The plug state for this DAI interconnect.
@@ -91,6 +103,6 @@ type DaiInterconnectElementState = table {
     /// If not included, `external_delay` is unknown; the client may treat it however it chooses
     /// (e.g. consider it zero or some other duration, autodetect it, etc).
     ///
-    /// Optional.
+    /// Optional. If specified, must be non-negative.
     2: external_delay zx.Duration;
 };

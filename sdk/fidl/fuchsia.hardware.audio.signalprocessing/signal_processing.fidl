@@ -52,6 +52,10 @@ type ElementType = flexible enum {
     SAMPLE_RATE_CONVERSION = 11;
 
     /// The start/end of a pipeline.
+    ///
+    /// # Deprecation
+    ///
+    /// Use `RING_BUFFER` or `DAI_INTERCONNECT` instead.
     @available(removed=20)
     ENDPOINT = 12;
 
@@ -81,6 +85,10 @@ type TypeSpecificElement = flexible union {
     4: dynamics Dynamics;
 
     // See dai_interconnect.fidl.
+    //
+    // # Deprecation
+    //
+    // Use `DaiInterconnect` instead.
     @available(removed=20)
     5: endpoint Endpoint;
 
@@ -89,6 +97,10 @@ type TypeSpecificElement = flexible union {
     6: dai_interconnect DaiInterconnect;
 };
 
+///
+/// # Deprecation
+///
+/// Use `processing_delay` instead.
 @available(removed=20)
 type Latency = flexible union {
     /// Latency added to the pipeline as a zx.Duration.
@@ -110,16 +122,14 @@ type Element = table {
     /// Required.
     2: type ElementType;
 
-    /// If included, type-specific parameters for the processing element.
+    /// Type-specific parameters for the processing element.
     ///
-    /// Optional.
+    /// Required for `ElementType`s DAI_INTERCONNECT, DYNAMICS, EQUALIZER, GAIN, VENDOR_SPECIFIC.
+    /// Invalid if specified for elements of type AUTOMATIC_GAIN_CONTROL, AUTOMATIC_GAIN_LIMITER,
+    ///         CONNECTION_POINT, DELAY, MUTE, RING_BUFFER or SAMPLE_RATE_CONVERSION.
     3: type_specific TypeSpecificElement;
 
-    /// If included and true, the processing element can be disabled via
-    /// `ElementSetState`.
-    /// If not included or false, the processing element is always enabled.
-    ///
-    /// Optional.
+    /// Can the processing element be disabled via `SetElementState`.
     ///
     /// # Deprecation
     ///
@@ -129,17 +139,17 @@ type Element = table {
 
     /// If included, a textual description of the processing element.
     ///
-    /// Optional.
+    /// Optional. If present, must not be empty.
     5: description string:MAX_STRING_SIZE;
 
-    /// If included and true, the processing element can be stopped via `ElementSetState`.
+    /// If true, the processing element can be stopped via `SetElementState`.
     /// If not included or false, the processing element is always started.
     ///
     /// Optional.
     @available(added=20)
     6: can_stop bool;
 
-    /// If included and true, the processing element can be bypassed via `ElementSetState`.
+    /// If true, the processing element can be bypassed via `SetElementState`.
     /// If not included or false, the processing element cannot be bypassed.
     ///
     /// Optional.
@@ -147,10 +157,10 @@ type Element = table {
     7: can_bypass bool;
 };
 
-/// Type-specific processing element state.
+/// Type-specific processing element state, as returned from the driver.
 /// The type of processing element control is defined by the type of parameters provided in this
-/// union. Must match the type returned in the corresponding `ElementType` entry in the
-/// corresponding `Element`.
+/// union. This type-specific variant must match the `ElementType` entry in the corresponding
+/// `Element`.
 type TypeSpecificElementState = flexible union {
     // See vendor_specific.fidl.
     1: vendor_specific VendorSpecificState;
@@ -165,6 +175,10 @@ type TypeSpecificElementState = flexible union {
     4: dynamics DynamicsElementState;
 
     // See dai_interconnect.fidl.
+    //
+    // # Deprecation
+    //
+    // Use `DaiInterconnectElementState` instead.
     @available(removed=20)
     5: endpoint EndpointElementState;
 
@@ -174,24 +188,20 @@ type TypeSpecificElementState = flexible union {
 };
 
 /// The current state of an element, as returned from the driver. Note that this table contains
-/// fields that are not present in `SettableElementState`, since they cannot be set by clients.
+/// fields that are not present in `SettableElementState`, since they cannot be changed by clients.
 type ElementState = table {
-    /// If included, type-specific state parameters for the processing element.
+    /// Type-specific state parameters for the processing element.
     ///
     /// If this processing element is disabled and its type-specific state is provided, then the
     /// type-specific state is only informational (e.g. the state of a stopped element, if it were
     /// to be re-started without also providing additional superceding state information).
     ///
-    /// Optional.
+    /// Required for DAI_INTERCONNECT, DYNAMICS, EQUALIZER, GAIN and VENDOR_SPECIFIC elements.
+    /// Invalid if specified for elements of type AUTOMATIC_GAIN_CONTROL, AUTOMATIC_GAIN_LIMITER,
+    ///         CONNECTION_POINT, DELAY, MUTE, RING_BUFFER or SAMPLE_RATE_CONVERSION.
     1: type_specific TypeSpecificElementState;
 
-    /// Process element enable/disable state. By default processing elements are enabled.
-    /// If the corresponding `Element` returned `can_disable` equals to `false`, then
-    /// this field can't be set to `false`.
-    /// If `enabled` is not included, then `state` must be included if and only if the processing
-    /// element is currently enabled.
-    ///
-    /// Optional.
+    /// Enable/disable state for the processing element.
     ///
     /// # Deprecation
     ///
@@ -199,41 +209,44 @@ type ElementState = table {
     @available(removed=20)
     2: enabled bool;
 
-    /// If included, how much latency is added to the pipeline if this processing element is
-    /// enabled. This field must not be present in a `SetElementState` `state` since
-    /// the latency can't be set by a client, it can only provided by the server in a
-    /// `WatchElementState` reply.
+    /// How much latency this element adds, if enabled.
     ///
-    /// Optional.
+    /// # Deprecation
+    ///
+    /// Use `processing_delay` instead.
     @available(removed=20)
     3: latency Latency;
 
-    /// If included, an opaque object of octets for exchanging vendor specific information.
+    /// If included, an opaque object of octets for conveying vendor-specific information from the
+    /// driver to `SignalProcessing` clients.
     ///
-    /// Optional.
+    /// Optional (permitted even if the element's type is not VENDOR_SPECIFIC).
     @available(added=27)
     4: vendor_specific_data vector<uint8>:MAX_BYTES_ELEMENT_VENDOR_SPECIFIC;
 
-    /// The started/stopped state for this processing element.
-    /// If true, the hardware associated with the element is started. If false, stopped.
+    /// The start/stop state for this processing element.
+    /// If true, the hardware associated with the element is started. If false, it is stopped.
     ///
-    /// By default processing elements are started.
+    /// If the corresponding `Element` omitted `can_stop` or set it to `false`, then this field
+    /// can never be `false`.
     ///
     /// A stopped processing element does not provide its abstracted functionality.
-    /// Specifically, no audio data flows through a stopped element.
+    /// No audio data flows through stopped elements.
     ///
     /// Required.
     @available(added=20)
     5: started bool;
 
-    /// The bypassed state for this processing element.
-    /// If true, the hardware associated with the element is bypassed. If false, not bypassed.
+    /// The bypass state for this processing element.
+    /// If true, the hardware associated with the element is bypassed. If false or missing, the
+    /// associated hardware is not bypassed.
     ///
-    /// By default processing elements are not bypassed.
-    /// If the corresponding `Element` returned `can_bypass` equals to `false`, then
-    /// this field can't be set to `true`.
+    /// By default, processing elements are not bypassed.
+    /// If the corresponding `Element` omitted `can_bypass` or set it to `false`, then this field
+    /// can never be set to `true`.
     ///
     /// A bypassed element does not affect the flow of audio through the topology.
+    /// Audio flows through a bypassed element, unchanged.
     ///
     /// Optional.
     @available(added=20)
@@ -241,49 +254,49 @@ type ElementState = table {
 
     /// If included, the driver's best estimate of the amount of time it takes the element's
     /// hardware to enter a fully operational mode after `started` has changed from false to true.
-    /// Hardware may require some duration to get into a fully operational mode after a change in
+    /// Hardware may require some duration to reach a fully operational mode after changing its
     /// power state, for example.
     ///
-    /// If this delay is not taken into account, then the initial frames of an audio stream may be
-    /// lost while an audio element is powering up.
+    /// If `turn_on_delay` is not taken into account, then an audio stream's initial frames might
+    /// be lost while audio elements are powering up.
     /// If not included, `turn_on_delay` is unknown.
     ///
-    /// Optional.
+    /// Optional. If specified, must be non-negative.
     @available(added=20)
     7: turn_on_delay zx.Duration;
 
     /// If included, the driver's best estimate of the amount of time it takes the element's
-    /// hardware to enter a fully disabled mode after  `started` has changed from true to false.
+    /// hardware to enter a fully disabled mode after `started` has changed from true to false.
     /// Hardware may require some duration to get into a fully stopped state after a change in
     /// power state, for example.
     ///
-    /// If this delay is not taken into account, more frames will be emitted/captured than a
-    /// client may realize, specifically when elements are powering down.
+    /// If `turn_off_delay` is not taken into account, more frames will be emitted/captured than a
+    /// client might expect, while audio elements are powering down.
     /// If not included, `turn_off_delay` is unknown.
     ///
-    /// Optional.
+    /// Optional. If specified, must be non-negative.
     @available(added=20)
     8: turn_off_delay zx.Duration;
 
-    /// If included, the driver's best estimate (as currently configured, including `bypassed`) of
-    /// the delay added by this processing element.
+    /// If included, the driver's best estimate of the delay added by this processing element,
+    /// as it is currently configured  (including `bypassed` state).
     ///
-    /// This value must be taken into account by clients when determining the requirements for
-    /// minimum lead time (during playback) and minimum capture delay (during capture).
+    /// This value should be taken into account by timing-sensitive clients, when determining the
+    /// requirements for (playback) minimum lead time and minimum capture delay.
     ///
     /// For an element of type `RING_BUFFER`, this delay should not include the inherent delay
     /// added by the temporary buffering needed to copy data in and out of a ring buffer, which
     /// is contained in the `RingBufferProperties` field `driver_transfer_bytes`.
     ///
-    /// Optional.
+    /// Optional. If specified, must be non-negative.
     @available(added=20)
     9: processing_delay zx.Duration;
 };
 
 /// Type-specific processing element state that can be set by clients.
 /// The type of processing element control is defined by the type of parameters provided in this
-/// union. Must match the type returned in the corresponding `ElementType` entry in the
-/// corresponding `Element`.
+/// union. This type-specific variant must match the `ElementType` entry in the corresponding
+/// `Element`.
 @available(added=20)
 type SettableTypeSpecificElementState = flexible union {
     // See vendor_specific.fidl.
@@ -302,58 +315,59 @@ type SettableTypeSpecificElementState = flexible union {
 /// Processing element state that can be set by clients.
 @available(added=20)
 type SettableElementState = table {
-
-    /// Type-specific state parameters for the processing element.
+    /// Type-specific element-state parameters that can be set by clients.
     ///
-    /// If this processing element is disabled and its type-specific state is provided, then the
-    /// type-specific state is only informational, for instance if a `SetElementState` enables a
-    /// disabled processing element providing a `SettableTypeSpecificElementState`, then any
-    /// previous informational `SettableTypeSpecificElementState` is superceded.
+    /// If an element is disabled, changes in this field (and all others in SettableElementState)
+    /// are purely informational and take no effect until the element is enabled.
     ///
-    /// If not set, then the element's previous `type_specific` state will be unchanged.
+    /// If not set, then the element's previous `type_specific` state is preserved.
     ///
-    /// Optional for Dynamics, Equalizer, Gain and VendorSpecific types.
-    /// Invalid if included for any other element type.
+    /// Optional for DYNAMICS, EQUALIZER, GAIN and VENDOR_SPECIFIC types.
+    /// Invalid if specified for AUTOMATIC_GAIN_CONTROL, AUTOMATIC_GAIN_LIMITER, CONNECTION_POINT,
+    ///         DAI_INTERCONNECT, DELAY, MUTE, RING_BUFFER or SAMPLE_RATE_CONVERSION elements.
     1: type_specific SettableTypeSpecificElementState;
 
-    /// If included, an opaque object of octets for exchanging vendor specific information.
-    /// This can send vendor-specific data to any element, not just the VendorSpecific type.
+    /// If included, an opaque object of octets for conveying vendor-specific information from
+    /// a client to the audio driver.
+    /// This can be used with any element type, not just VENDOR_SPECIFIC elements.
     ///
     /// Optional.
     @available(added=27)
     2: vendor_specific_data vector<uint8>:MAX_BYTES_ELEMENT_VENDOR_SPECIFIC;
 
-    /// Whether to start this processing element (or to stop it, if false).
+    /// Whether to start or stop this processing element.
     /// A stopped processing element does not provide its abstracted functionality.
     /// Specifically, no audio data flows through a stopped element.
     ///
-    /// If the corresponding `Element` returned `can_stop` equals to `false`, then this field
-    /// must not be set to `false`.
+    /// If the corresponding `Element` returned `can_stop` equals to `false`, then this field must
+    /// not be set to `false` -- `SetElementState` will return ZX_ERR_INVALID_ARGS in that case.
     /// If not set, then the element's previous `started` state will be unchanged.
     ///
     /// Optional.
     3: started bool;
 
-    /// Whether to bypass this processing element (or to enable/"unbypass" it, if false).
+    /// Whether to bypass this processing element.
     /// A bypassed element does not affect the flow of audio through the topology.
-    /// Specifically, audio flows through the element without any change.
+    /// Specifically, audio flows through a bypassed element, without change.
     ///
-    /// If the corresponding `Element` contains a `can_bypass` of `false`, then this field
-    /// must not be set to `true`.
+    /// If the corresponding `Element` omits `can_bypass` or sets it to `false`, then this field
+    /// must not be set to `true`. If this occurs, `SetElementState` will fail and return error
+    /// `ZX_ERR_INVALID_ARGS`.
     /// If not set, then the element's previous `bypassed` state will be unchanged.
     ///
     /// Optional.
     4: bypassed bool;
 };
 
-/// Edge pairs between processing elements used to define ordering in processing elements
+/// Edge pairs between processing elements, used to specify how audio flows sequentially through
+/// a collection of processing elements
 /// arrangements.
 type EdgePair = struct {
     processing_element_id_from ElementId;
     processing_element_id_to ElementId;
 };
 
-/// A `Topology` specifies one way processing elements are arranged within the hardware.
+/// A `Topology` specifies how processing elements are arranged within the hardware.
 type Topology = table {
     /// Unique ID for this topology. The scope of this id is only within the `SignalProcessing`
     /// protocol lifespan, i.e. until the channel associated with the protocol is closed.
@@ -361,48 +375,94 @@ type Topology = table {
     /// Required.
     1: id TopologyId;
 
-    /// Vector of processing elements edge pairs in this order.
-    /// The ordering of processing elements with edge pairs form pipelines.
-    /// To define multiple possible pipelines, return more `Topology` entries in `GetTopologies`.
+    /// Vector of processing elements edge pairs that specify connections between elements.
+    /// Processing elements are connected by edge pairs, to form multi-element pipelines.
+    /// A Topology can contain more than one distinct pipeline: the Topology need not be a single
+    /// interconnected sequence (e.g. Topology  A->B->C  D->E->F  is valid).
     ///
-    /// Required.
+    /// To define multiple possible configurations where one possibility can be selected by the
+    /// client, return multiple `Topology` entries in `GetTopologies`.
+    ///
+    /// If a device does support multiple Topology entries, then each specific Topology is not
+    /// required to include every Element. However, every element must be included in at least one
+    /// Topology.
+    ///
+    /// Within each Topology, every sequence of connected elements must begin with an element
+    /// of type DAI_INTERCONNECT or RING_BUFFER, and must end with an element of type
+    /// DAI_INTERCONNECT or RING_BUFFER.
+    ///
+    /// An DAI_INTERCONNECT element is permitted to be the endpoint for an element sequence, but a
+    /// RING_BUFFER is required to be one. If a certain RING_BUFFER element is listed in an EdgeList
+    /// entry as a `processing_element_id_from`, then within that Topology it must not be listed in
+    /// any EdgeList entry as a `processing_element_id_to` (and vice versa).
+    ///
+    /// Required. Must contain at least one entry.
     2: processing_elements_edge_pairs vector<EdgePair>:MAX_COUNT_PROCESSING_ELEMENTS_EDGE_PAIRS;
 };
 
+/// This protocol is required for Composite audio drivers, and unsupported for other audio driver
+/// types (Codec, Dai, StreamConfig).
+///
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
 closed(removed=24) open(added=24) protocol SignalProcessing {
     /// Exposes read-only signal processing properties.
     compose Reader;
 
-    /// Controls a processing element using a unique ElementId returned by `GetElements`.
-    /// Note that `SettableElementState` is a subset of `ElementState`, because some fields returned
-    /// from `WatchElementState` (e.g. `latency`) can only be observed (not set) by the client.
+    /// Sets the currently active topology by specifying a `topology_id`, which matches to an entry
+    /// in the vector returned by `GetTopologies`.
+    /// The currently active topology is communicated by `WatchTopology` responses. To change which
+    /// topology is active, a client uses `SetTopology`.
     ///
-    /// Returns `ZX_ERR_INVALID_ARGS` if the `processing_element_id` does not match an id returned
-    /// by `GetElements` or the type of `SettableTypeSpecificElementState` does not
-    /// match the `ElementType` of the processing element returned by
-    /// `GetElements` for this id.
-    /// The driver may return `ZX_ERR_INVALID_ARGS` if the `state` values are invalid, i.e. any
-    /// of the values violates rules specified in this protocol, e.g. trying to change an
-    /// `EQUALIZER` processing element's `EqualizerBandState` `frequency` when this processing
-    /// element did not advertise `CAN_CONTROL_FREQUENCY` in its `supported_controls`.
+    /// If `GetTopologies` returns only one `Topology`, `SetTopology` is optional and has no effect.
     ///
-    /// `SetElementState` may be called before or after non-`SignalProcessing` protocol
-    /// calls. If called after non-`SignalProcessing` protocol calls then
-    /// `SetElementState` may or may not require renegotiation of the driver state as
-    /// reached with calls of the protocol composing `SignalProcessing`, e.g. `Dai`.
-    /// For instance, `SetElementState` changing an `AGL` processing element's parameters
-    /// may not require renegotiation of the `Dai` state because changing a gain parameter usually
-    /// does not change the set of supported audio formats.
-    /// By contrast, if `SetElementState` changes the parameters of a `CONNECTION_POINT`
-    /// element, the change may require renegotiation because it may invalidate the set of
-    /// supported formats returned in a previous `GetDaiFormats` `Dai` protocol call.
+    /// This call will fail and return `ZX_ERR_INVALID_ARGS` if the specified `topology_id` is not
+    /// found within the`topologies` returned by `GetTopologies`.
     ///
-    /// It is the driver's job to determine when renegotiation is required. If renegotiation is
-    /// required, then `SetElementState` must return `ZX_ERR_BAD_STATE` and the client must
-    /// close the protocol channel such that the protocol negotiations are started over.
-    /// The client then must make the `SetElementState` call that returned
+    /// `SetTopology` may be called before or after non-`SignalProcessing` protocol calls.
+    /// If called after non-`SignalProcessing` protocol calls, then `SetTopology` may return
+    /// `ZX_ERR_BAD_STATE` to indicate that the operation can not proceed without renegotiation of
+    /// the driver state. See `SetElementState` for further discussion.
+    strict SetTopology(struct {
+        topology_id TopologyId;
+    }) -> () error zx.Status;
+
+    /// Controls the processing element specified by `processing_element_id`, a unique ElementId
+    /// returned by `GetElements`.
+    /// The `state` specified in calls to `SetElementState` is a `SettableElementState`. This is a
+    /// subset of `ElementState` because some fields returned by `WatchElementState` (e.g. `latency`
+    /// or `plug_state`) can only be observed (not set) by the client.
+    ///
+    /// Returns `ZX_ERR_INVALID_ARGS` if `processing_element_id` does not match a known ElementId
+    /// returned by `GetElements`, or if `state` is not valid for the element. This entails any
+    /// violation of the rules specified in this protocol.
+    ///
+    /// Examples:
+    /// `state` specifies that an element should be stopped or bypassed, but the corresponding
+    ///     element does not specify (or explicitly set to false) `can_stop` or `can_bypass`.
+    /// `state` includes a `type_specific` entry, but that `SettableTypeSpecificElementState` does
+    ///     not match the `ElementType` of the element corresponding to `processing_element_id`.
+    /// `state` changes an `EqualizerBandState` for an `EQUALIZER` element (so far so good), but
+    ///     specifies a change to `frequency` when this element did not set `CAN_CONTROL_FREQUENCY`
+    ///     in its `supported_controls`.
+    /// `state` specifies a `GainElementState` for a `GAIN` element with a `gain` value that is
+    ///     -infinity, NAN, or outside the Element's stated [`min_gain`, `max_gain`] range.
+    ///
+    /// Callers may intersperse method calls to the `SignalProcessing` protocol with calls to other
+    /// driver protocols. Some non-`SignalProcessing` configuration changes may require a
+    /// renegotiation of the driver state before certain elements can receive a `SetElementState`.
+    /// For example, if a `DaiFormat` is changed, then `SetElementState` changing an `AGL` element's
+    /// parameters may not require renegotiation of driver state because changing gain parameters
+    /// usually does not change the set of supported audio formats.
+    /// By contrast, following the same `DaiFormat` change, before `SetElementState` can be called
+    /// on a `CONNECTION_POINT` element, the driver state may need to be reestablished because the
+    /// format change may invalidate the set of supported formats returned in a previous
+    /// `GetDaiFormats` protocol call for another part of the Topology.
+    ///
+    /// It is the driver's job to determine when renegotiation is required. When this is needed,
+    /// the related `SetElementState` call must return `ZX_ERR_BAD_STATE` and the client must
+    /// close the protocol channel entirely, such that the protocol negotiations are started over.
+    /// The client then must re-invoke the `SetElementState` call that returned
     /// `ZX_ERR_BAD_STATE` before any non-`SignalProcessing` protocol calls.
     strict SetElementState(struct {
         processing_element_id ElementId;
@@ -412,44 +472,32 @@ closed(removed=24) open(added=24) protocol SignalProcessing {
         @available(added=20)
         state SettableElementState;
     }) -> () error zx.Status;
-
-    /// Sets the topology to be used using an id to the vector returned by `GetTopologies`.
-    /// The current topology is communicated by `WatchTopology` responses. To change which topology
-    /// is active, a client uses `SetTopology`.
-    /// If the specified `topology_id` is not within the`topologies` returned by `GetTopologies`,
-    /// this call will return `ZX_ERR_INVALID_ARGS`.
-    /// If `GetTopologies` returns only one `Topology`, `SetTopology` is optional and has no effect.
-    ///
-    /// `SetTopology` may be called before or after non-`SignalProcessing` protocol calls.
-    /// If called after non-`SignalProcessing` protocol calls, then `SetTopology` may return
-    /// `ZX_ERR_BAD_STATE` to indicate that the operation can not proceed without renegotiation of
-    /// the driver state. See `SetElementState` for further discussion.
-    strict SetTopology(struct {
-        topology_id TopologyId;
-    }) -> () error zx.Status;
 };
 
+/// This protocol is required for Composite audio drivers, and unsupported for other audio driver
+/// types (Codec, Dai, StreamConfig).
+///
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
 closed(removed=24) open(added=24) protocol Reader {
     /// Returns a vector of supported processing elements.
-    /// Must return one or more processing elements, or `ZX_ERR_NOT_SUPPORTED`.
-    /// If `GetTopologies` returns one or more topologies, then `GetElements` must return one or
-    /// more elements.
-    // TODO(https://fxbug.dev/355468611): Don't rely on errors to detect signalprocessing support.
+    /// This vector must include one or more processing elements.
     strict GetElements() -> (struct {
         processing_elements vector<Element>:MAX_COUNT_PROCESSING_ELEMENTS;
     }) error zx.Status;
 
     /// Get the processing element state via a hanging get.
-    /// For a given `processing_element_id`, the driver will reply to the first `WatchElementState`
-    /// sent by the client. The driver will not respond to subsequent client `WatchElementState`
-    /// calls for a given `processing_element_id` until any field of the `Element` table changes
-    /// from what was most recently reported for that `processing_element_id`.
+    /// For a given `processing_element_id`, the driver will immediately reply to the first
+    /// `WatchElementState` sent by the client. The driver will not respond to subsequent client
+    /// `WatchElementState` calls for that `processing_element_id` until any portion of the
+    /// `ElementState` has changed from what was most recently reported for that element.
+    ///
+    /// The driver will close the protocol channel with an error of `ZX_ERR_INVALID_ARGS`, if
+    /// `processing_element_id` does not match an ElementId returned by `GetElements`.
     ///
     /// The driver will close the protocol channel with an error of `ZX_ERR_BAD_STATE`, if this
     /// method is called again while there is already a pending `WatchElementState` for this client
-    /// and processing_element_id.
+    /// and `processing_element_id`.
     strict WatchElementState(struct {
         processing_element_id ElementId;
     }) -> (struct {
@@ -457,22 +505,22 @@ closed(removed=24) open(added=24) protocol Reader {
     });
 
     /// Returns a vector of supported topologies.
-    /// Must return one or more topologies, or `ZX_ERR_NOT_SUPPORTED`.
-    /// If more than one topology is returned, then the client may choose any of the topologies from
-    /// the list with `SetTopology`.
-    /// If only one topology is returned, then the topology definition is informational only since
-    /// the one and only topology used can't be changed with `SetTopology`.
-    /// If `GetElements` returns one or more elements, then `GetTopologies` must return one or
-    /// more topologies.
-    // TODO(https://fxbug.dev/355468611): Don't rely on errors to detect signalprocessing support.
+    /// This vector must include one or more topologies.
+    /// If more than one topology is returned, then the client may select any topology from the
+    /// list by calling `SetTopology`.
+    /// If only one topology is returned, `SetTopology` can still be called but causes no change.
+    ///
+    /// Each Element must be included in at least one Topology, but need not be included in every
+    /// Topology.
     strict GetTopologies() -> (struct {
         topologies vector<Topology>:MAX_COUNT_TOPOLOGIES;
     }) error zx.Status;
 
     /// Get the current topology via a hanging get.
-    /// The driver will immediately reply to the first `WatchTopology` sent by each client. The
-    /// driver will not respond to subsequent `WatchTopology` calls from that client until the
-    /// signal-processing topology changes, which occurs as a result of a `SetTopology` call.
+    /// The driver will immediately reply to the first `WatchTopology` sent by each client.
+    /// The driver will not respond to subsequent `WatchTopology` calls from that client until the
+    /// signal processing topology changes; this occurs as a result of a `SetTopology` call.
+    ///
     /// The driver will close the protocol channel with an error of `ZX_ERR_BAD_STATE`, if this
     /// method is called again while there is already a pending `WatchTopology` for this client.
     @available(added=27)
