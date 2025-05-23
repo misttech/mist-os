@@ -19,11 +19,6 @@ ffx/driver/list-hosts.golden
 ffx/driver/list.golden
 ffx/driver/lspci.golden
 ffx/driver/lsusb.golden
-ffx/driver/print-input-report.golden
-ffx/driver/print-input-report/descriptor.golden
-ffx/driver/print-input-report/feature.golden
-ffx/driver/print-input-report/get.golden
-ffx/driver/print-input-report/read.golden
 ffx/driver/register.golden
 ffx/driver/restart.golden
 ffx/driver/run-tool.golden

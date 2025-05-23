@@ -19,7 +19,7 @@ use argh::{ArgsInfo, FromArgs};
 use {
     super::subcommands::{
         i2c::args::I2cCommand, lspci::args::LspciCommand, lsusb::args::LsusbCommand,
-        print_input_report::args::PrintInputReportCommand, runtool::args::RunToolCommand,
+        runtool::args::RunToolCommand,
     },
     // Driver conformance testing is run on the host against a target device's driver.
     // So, this subcommand is only relevant on the host side.
@@ -71,7 +71,6 @@ pub enum DriverSubCommand {
     ListCompositeNodeSpecs(ListCompositeNodeSpecsCommand),
     Lspci(LspciCommand),
     Lsusb(LsusbCommand),
-    PrintInputReport(PrintInputReportCommand),
     Register(RegisterCommand),
     Restart(RestartCommand),
     RunTool(RunToolCommand),

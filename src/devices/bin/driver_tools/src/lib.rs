@@ -11,9 +11,6 @@ use args::{DriverCommand, DriverSubCommand};
 use driver_connector::DriverConnector;
 use std::io;
 
-#[cfg(not(target_os = "fuchsia"))]
-use {futures::lock::Mutex, std::sync::Arc};
-
 pub async fn driver(
     cmd: DriverCommand,
     driver_connector: impl DriverConnector,
@@ -112,15 +109,6 @@ pub async fn driver(
                 .await
                 .context("Failed to get device watcher proxy")?;
             subcommands::lsusb::lsusb(subcmd, &dev).await.context("Lsusb subcommand failed")?;
-        }
-        #[cfg(not(target_os = "fuchsia"))]
-        DriverSubCommand::PrintInputReport(ref subcmd) => {
-            let writer = Arc::new(Mutex::new(io::stdout()));
-            let dev =
-                driver_connector.get_dev_proxy(false).await.context("Failed to get dev proxy")?;
-            subcommands::print_input_report::print_input_report(subcmd, writer, dev)
-                .await
-                .context("Print-input-report subcommand failed")?;
         }
         DriverSubCommand::Register(subcmd) => {
             let driver_registrar_proxy = driver_connector

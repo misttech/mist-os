@@ -16,11 +16,7 @@ group("tests") {
 
 _host_or_test = [
   "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_rust",
-  "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
-  "//sdk/lib/device-watcher/rust",
-  "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-fs",
-  "//third_party/rust_crates:log",
 ]
 
 rustc_library("lib") {
@@ -62,7 +58,6 @@ rustc_library("lib") {
         ] + _host_or_test
   }
   test_deps = [
-                "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
                 "//src/lib/fuchsia",
                 "//src/lib/fuchsia-async",
                 "//src/lib/fuchsia-component",
@@ -99,17 +94,6 @@ rustc_library("lib") {
     "src/subcommands/list_hosts/args.rs",
     "src/subcommands/list_hosts/mod.rs",
     "src/subcommands/mod.rs",
-    "src/subcommands/print_input_report/args.rs",
-    "src/subcommands/print_input_report/mod.rs",
-    "src/subcommands/print_input_report/subcommands/descriptor/args.rs",
-    "src/subcommands/print_input_report/subcommands/descriptor/mod.rs",
-    "src/subcommands/print_input_report/subcommands/feature/args.rs",
-    "src/subcommands/print_input_report/subcommands/feature/mod.rs",
-    "src/subcommands/print_input_report/subcommands/get/args.rs",
-    "src/subcommands/print_input_report/subcommands/get/mod.rs",
-    "src/subcommands/print_input_report/subcommands/mod.rs",
-    "src/subcommands/print_input_report/subcommands/read/args.rs",
-    "src/subcommands/print_input_report/subcommands/read/mod.rs",
     "src/subcommands/register/args.rs",
     "src/subcommands/register/mod.rs",
     "src/subcommands/restart/args.rs",
