@@ -132,7 +132,7 @@ group("bt-gatt") {
 }
 
 group("bumpalo") {
-  public_deps = [ ":bumpalo-v3_2_1" ]
+  public_deps = [ ":bumpalo-v3_17_0" ]
 }
 
 group("byteorder") {
@@ -3095,19 +3095,19 @@ rustc_library("bt-gatt-v0_0_1") {
   applicable_licenses = [ ":bt-gatt-v0_0_1.license" ]
 }
 
-license("bumpalo-v3_2_1.license") {
+license("bumpalo-v3_17_0.license") {
   public_package_name = "bumpalo"
   license_files = [
-    "//third_party/rust_crates/vendor/bumpalo-3.2.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/bumpalo-3.2.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/bumpalo-3.17.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bumpalo-3.17.0/LICENSE-MIT",
   ]
 }
 
-rustc_library("bumpalo-v3_2_1") {
+rustc_library("bumpalo-v3_17_0") {
   crate_name = "bumpalo"
-  source_root = "//third_party/rust_crates/vendor/bumpalo-3.2.1/src/lib.rs"
-  output_name = "bumpalo-6c0f43d1ab0e9655"
-  edition = "2018"
+  source_root = "//third_party/rust_crates/vendor/bumpalo-3.17.0/src/lib.rs"
+  output_name = "bumpalo-40b8c6d7da3c4af7"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -3118,15 +3118,15 @@ rustc_library("bumpalo-v3_2_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=6c0f43d1ab0e9655",
-    "-Cextra-filename=-6c0f43d1ab0e9655",
+    "-Cmetadata=40b8c6d7da3c4af7",
+    "-Cextra-filename=-40b8c6d7da3c4af7",
     "--cfg=feature=\"collections\"",
     "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":bumpalo-v3_2_1.license" ]
+  applicable_licenses = [ ":bumpalo-v3_17_0.license" ]
 }
 
 license("bytecount-v0_6_0.license") {

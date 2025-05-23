@@ -379,14 +379,14 @@ alias(
 )
 
 alias(
-    name = "bumpalo-3.2.1",
-    actual = "//third_party/rust_crates/vendor/bumpalo-3.2.1:bumpalo",
+    name = "bumpalo-3.17.0",
+    actual = "//third_party/rust_crates/vendor/bumpalo-3.17.0:bumpalo",
     tags = ["manual"],
 )
 
 alias(
     name = "bumpalo",
-    actual = "//third_party/rust_crates/vendor/bumpalo-3.2.1:bumpalo",
+    actual = "//third_party/rust_crates/vendor/bumpalo-3.17.0:bumpalo",
     tags = ["manual"],
 )
 
