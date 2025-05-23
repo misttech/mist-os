@@ -107,6 +107,9 @@ config("codegen_units_16") {
   # https://doc.rust-lang.org/rustc/codegen-options/index.html#lto
   if (rust_incremental == "") {
     rustflags = [ "-Ccodegen-units=16" ]
+
+    # Use the larger RBE workers when using 16 threads for codegen.
+    configs = [ "//build/config:big_rbe_machine" ]
   }
 }
 
