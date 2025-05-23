@@ -83,14 +83,6 @@ pub async fn driver(
             .context("list-composite-node-specs subcommand failed")?;
         }
         #[cfg(not(target_os = "fuchsia"))]
-        DriverSubCommand::Lspci(subcmd) => {
-            let dev = driver_connector
-                .get_dev_proxy(subcmd.select)
-                .await
-                .context("Failed to get dev proxy")?;
-            subcommands::lspci::lspci(subcmd, &dev).await.context("Lspci subcommand failed")?;
-        }
-        #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::Lsusb(subcmd) => {
             let dev = driver_connector
                 .get_dev_proxy(false)

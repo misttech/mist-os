@@ -10,7 +10,6 @@ ffx/driver/list-composites.golden
 ffx/driver/list-devices.golden
 ffx/driver/list-hosts.golden
 ffx/driver/list.golden
-ffx/driver/lspci.golden
 ffx/driver/lsusb.golden
 ffx/driver/register.golden
 ffx/driver/restart.golden

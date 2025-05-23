@@ -17,9 +17,7 @@ use argh::{ArgsInfo, FromArgs};
 
 #[cfg(not(target_os = "fuchsia"))]
 use {
-    super::subcommands::{
-        lspci::args::LspciCommand, lsusb::args::LsusbCommand, runtool::args::RunToolCommand,
-    },
+    super::subcommands::{lsusb::args::LsusbCommand, runtool::args::RunToolCommand},
     static_checks_lib::args::StaticChecksCommand,
 };
 
@@ -61,7 +59,6 @@ pub enum DriverSubCommand {
     ListDevices(ListDevicesCommand),
     ListHosts(ListHostsCommand),
     ListCompositeNodeSpecs(ListCompositeNodeSpecsCommand),
-    Lspci(LspciCommand),
     Lsusb(LsusbCommand),
     Register(RegisterCommand),
     Restart(RestartCommand),
