@@ -52,13 +52,6 @@ pub struct BoardInformation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub devicetree_overlay: Option<Utf8PathBuf>,
 
-    /// The partitions config that details what partitions are available for
-    /// this board.
-    #[serde(default)]
-    #[walk_paths]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub partitions_config: Option<DirectoryPathBuf>,
-
     /// Configuration for the various filesystems that the product can choose to
     /// include.
     #[serde(default)]

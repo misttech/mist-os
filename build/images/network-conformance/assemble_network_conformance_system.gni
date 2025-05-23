@@ -30,7 +30,6 @@ template("assemble_network_conformance_system") {
   board_configuration(labels.board_config) {
     name = "network-conformance"
     version = build_info_version
-    partitions_config = "//boards/partitions:default"
     kernel = {
       halt_on_panic = true
     }

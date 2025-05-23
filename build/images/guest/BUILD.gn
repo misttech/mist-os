@@ -106,7 +106,6 @@ if (labels.images == "//build/images/bringup") {
   }
 
   board_configuration("board") {
-    partitions_config = "//boards/partitions:default"
     hardware_info = {
       name = "guest-board"
     }

@@ -51,9 +51,6 @@ import("//build/compiled_action.gni")
 #    The list if valid strings is currently an unstable API between boards and
 #    assembly and can change at any time.
 #
-#  partitions_config (required)
-#    [GN label] Label of the generated_partitions_config() to add to the board.
-#
 #  input_bundles (optional)
 #    [list; GN Labels] The GN labels of the Board Input Bundles for this board.
 #    Each must be the label of a board_input_bundle() target.  If the target
@@ -107,8 +104,6 @@ import("//build/compiled_action.gni")
 #  testonly, visibility
 #
 template("board_configuration") {
-  assert(defined(invoker.partitions_config), "partitions_config is required")
-
   bundles_dir = target_out_dir
 
   board_name = target_name
@@ -146,10 +141,6 @@ template("board_configuration") {
 
     # The directories of the board input bundle sets.
     board_input_bundle_set_dirs = []
-
-    partitions_config =
-        get_label_info(invoker.partitions_config, "target_out_dir") + "/" +
-        get_label_info(invoker.partitions_config, "name")
   }
 
   if (defined(invoker.input_bundles)) {
@@ -250,10 +241,8 @@ template("board_configuration") {
     # directories that are not added back (on an incremental build, if an item
     # is removed from one of these sets)
     hermetic_action_ignored_prefixes =
-        [
-          files.board_config_dir,
-          files.partitions_config,
-        ] + files.input_bundle_dirs + files.board_input_bundle_set_dirs
+        [ "${files.board_config_dir}" ] + files.input_bundle_dirs +
+        files.board_input_bundle_set_dirs
 
     tool = "//build/assembly/tools/assembly_config"
     tool_output_name = "assembly_config"
@@ -268,8 +257,6 @@ template("board_configuration") {
       rebase_path(files.board_config_file_intermediate, root_build_dir),
       "--repo",
       "fuchsia",
-      "--partitions-config",
-      rebase_path(files.partitions_config, root_build_dir),
       "--output",
       rebase_path(files.board_config_dir, root_build_dir),
       "--depfile",
@@ -305,10 +292,7 @@ template("board_configuration") {
       ]
     }
 
-    public_deps = [
-      ":${labels.base_info}",
-      invoker.partitions_config,
-    ]
+    public_deps = [ ":${labels.base_info}" ]
     deps = []
     if (defined(invoker.input_bundles)) {
       deps += invoker.input_bundles

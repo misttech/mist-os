@@ -14,9 +14,8 @@ assert(current_cpu == "x64",
 
 common_board_configuration = {
   name = "x64"
+
   version = build_info_version
-  testonly = true
-  partitions_config = "//boards/partitions:x64"
 
   hardware_info = {
     name = "default-board"

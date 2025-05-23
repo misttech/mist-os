@@ -135,7 +135,6 @@ mod tests {
                 contents: blobfs_contents,
             }],
             board_name: "my_board".into(),
-            partitions_config: None,
         };
 
         // Construct the subpackage blobs package.

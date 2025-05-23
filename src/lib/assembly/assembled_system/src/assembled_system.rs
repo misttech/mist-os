@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use assembly_container::{
-    assembly_container, AssemblyContainer, DirectoryPathBuf, FileType, WalkPaths, WalkPathsFn,
-};
+use assembly_container::{assembly_container, AssemblyContainer, FileType, WalkPaths, WalkPathsFn};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use pathdiff::diff_paths;
@@ -50,10 +48,6 @@ pub struct AssembledSystem {
     /// The images contain this name inside build_info, and the software delivery code asserts that
     /// build_info.board.name == update_package.board_name.
     pub board_name: String,
-
-    /// The partitions these images can be flashed to.
-    #[walk_paths]
-    pub partitions_config: Option<DirectoryPathBuf>,
 }
 
 /// An item in the AssembledSystem.
@@ -627,7 +621,6 @@ mod tests {
                 Image::QemuKernel("qemu/kernel".into()),
             ],
             board_name: "my_board".into(),
-            partitions_config: None,
         };
 
         let relativized_manifest =
@@ -648,7 +641,6 @@ mod tests {
                 Image::QemuKernel("qemu/kernel".into()),
             ],
             board_name: "my_board".into(),
-            partitions_config: None,
         };
 
         let relativized_manifest =
@@ -971,7 +963,6 @@ mod tests {
         AssembledSystem {
             images: serde_json::from_value(generate_test_value()).unwrap(),
             board_name: "my_board".into(),
-            partitions_config: None,
         }
     }
 
@@ -979,7 +970,6 @@ mod tests {
         AssembledSystem {
             images: serde_json::from_value(generate_test_value_fxfs()).unwrap(),
             board_name: "my_board".into(),
-            partitions_config: None,
         }
     }
 

@@ -15,7 +15,6 @@ load(
     "FuchsiaBoardConfigInfo",
     "FuchsiaBoardInputBundleInfo",
     "FuchsiaBoardInputBundleSetInfo",
-    "FuchsiaPartitionsConfigInfo",
     "FuchsiaPostProcessingScriptInfo",
 )
 load(
@@ -144,12 +143,6 @@ def _fuchsia_board_configuration_impl(ctx):
         }
         board_config["filesystems"]["zbi"] = zbi
 
-    if ctx.attr.partitions_configuration:
-        creation_args += [
-            "--partitions-config",
-            ctx.attr.partitions_configuration[FuchsiaPartitionsConfigInfo].directory,
-        ]
-
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
     input_files.append(board_config_file)
@@ -166,7 +159,7 @@ def _fuchsia_board_configuration_impl(ctx):
     ctx.actions.run(
         executable = sdk.assembly_config,
         arguments = args,
-        inputs = input_files + ctx.files.filesystems_labels + ctx.files.partitions_configuration,
+        inputs = input_files + ctx.files.filesystems_labels,
         outputs = [board_config_dir],
         progress_message = "Creating board config for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
@@ -256,10 +249,6 @@ _fuchsia_board_configuration = rule(
         "_release_repository_flag": attr.label(
             doc = "String flag used to set the name of the release repository.",
             default = "@rules_fuchsia//fuchsia/flags:fuchsia_release_repository",
-        ),
-        "partitions_configuration": attr.label(
-            doc = "The partitions config to include into the board configuration",
-            providers = [FuchsiaPartitionsConfigInfo],
         ),
     },
 )

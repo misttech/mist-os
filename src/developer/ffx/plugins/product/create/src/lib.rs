@@ -396,7 +396,7 @@ fn load_assembled_system(
             new_images.push(image);
         }
 
-        Ok((Some(AssembledSystem { images: new_images, ..system }), packages))
+        Ok((Some(AssembledSystem { images: new_images, board_name: system.board_name }), packages))
     } else {
         Ok((None, vec![]))
     }
@@ -479,13 +479,9 @@ mod test {
 
         let system_dir = tempdir.join("system");
         fs::create_dir(&system_dir).unwrap();
-        AssembledSystem {
-            images: Default::default(),
-            board_name: "my_board".into(),
-            partitions_config: None,
-        }
-        .write_to_dir(&system_dir, None::<Utf8PathBuf>)
-        .unwrap();
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
+            .write_to_dir(&system_dir, None::<Utf8PathBuf>)
+            .unwrap();
 
         let error_dir = tempdir.join("error");
         fs::create_dir(&error_dir).unwrap();
@@ -571,13 +567,9 @@ mod test {
 
         let system_dir = tempdir.join("system");
         fs::create_dir(&system_dir).unwrap();
-        AssembledSystem {
-            images: Default::default(),
-            board_name: "my_board".into(),
-            partitions_config: None,
-        }
-        .write_to_dir(&system_dir, None::<Utf8PathBuf>)
-        .unwrap();
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
+            .write_to_dir(&system_dir, None::<Utf8PathBuf>)
+            .unwrap();
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
 
@@ -637,11 +629,8 @@ mod test {
 
         let system_dir = tempdir.join("system");
         fs::create_dir(&system_dir).unwrap();
-        let mut manifest = AssembledSystem {
-            images: Default::default(),
-            board_name: "my_board".into(),
-            partitions_config: None,
-        };
+        let mut manifest =
+            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
         manifest.images = vec![
             Image::ZBI { path: tempdir.join("path1"), signed: false },
             Image::ZBI { path: tempdir.join("path2"), signed: true },
@@ -691,13 +680,9 @@ mod test {
 
         let system_dir = tempdir.join("system");
         fs::create_dir(&system_dir).unwrap();
-        AssembledSystem {
-            images: Default::default(),
-            board_name: "my_board".into(),
-            partitions_config: None,
-        }
-        .write_to_dir(&system_dir, None::<Utf8PathBuf>)
-        .unwrap();
+        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
+            .write_to_dir(&system_dir, None::<Utf8PathBuf>)
+            .unwrap();
 
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);

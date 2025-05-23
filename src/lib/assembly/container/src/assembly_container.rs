@@ -318,7 +318,7 @@ where
 
 /// A path to a directory that should be copied wholesale inside an
 /// AssemblyContainer.
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 pub struct DirectoryPathBuf(pub Utf8PathBuf);
 
 impl WalkPaths for DirectoryPathBuf {
