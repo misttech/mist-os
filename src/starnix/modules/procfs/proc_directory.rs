@@ -30,10 +30,9 @@ use maplit::btreemap;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject, FileOps,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
-    SimpleFileNode,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
+    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SimpleFileNode,
 };
 use starnix_logging::{bug_ref, track_stub, BugRef};
 use starnix_sync::{FileOpsCore, Locked};
@@ -42,7 +41,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
-use starnix_uapi::{errno, off_t, pid_t};
+use starnix_uapi::{errno, pid_t};
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -221,17 +220,7 @@ impl FsNodeOps for ProcDirectoryNode {
 impl FileOps for ProcDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,

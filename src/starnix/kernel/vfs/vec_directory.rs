@@ -4,12 +4,12 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, unbounded_seek,
-    DirectoryEntryType, DirentSink, FileObject, FileOps, FsString, SeekTarget,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
+    DirectoryEntryType, DirentSink, FileObject, FileOps, FsString,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{ino_t, off_t};
+use starnix_uapi::ino_t;
 
 /// A directory entry used for [`VecDirectory`].
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
@@ -36,17 +36,7 @@ impl VecDirectory {
 impl FileOps for VecDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,

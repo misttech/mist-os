@@ -14,8 +14,8 @@ use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, parse_unsigned_file,
-    serialize_for_file, unbounded_seek, BytesFile, BytesFileOps, CallbackSymlinkNode,
+    fileops_impl_noop_sync, fileops_impl_unbounded_seek, fs_node_impl_dir_readonly, parse_i32_file,
+    parse_unsigned_file, serialize_for_file, BytesFile, BytesFileOps, CallbackSymlinkNode,
     DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FdNumber,
     FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
     FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode,
@@ -270,17 +270,7 @@ impl FsNodeOps for TaskDirectoryNode {
 impl FileOps for TaskDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,

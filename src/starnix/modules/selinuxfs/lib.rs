@@ -17,11 +17,12 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekable,
-    fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
-    BytesFile, BytesFileOps, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryRegularNode, NamespaceNode, SeekTarget,
-    SimpleFileNode, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
+    fileops_impl_unbounded_seek, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
+    parse_unsigned_file, BytesFile, BytesFileOps, CacheMode, DirEntry, DirectoryEntryType,
+    DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    MemoryRegularNode, NamespaceNode, SimpleFileNode, StaticDirectoryBuilder, VecDirectory,
+    VecDirectoryEntry,
 };
 use starnix_uapi::auth::FsCred;
 
@@ -37,7 +38,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
+use starnix_uapi::{errno, error, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::num::NonZeroU32;
 use std::str::FromStr;
@@ -732,18 +733,7 @@ impl FsNodeOps for BooleansDirectory {
 impl FileOps for BooleansDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        profile_duration!("selinuxfs.booleans.seek");
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,

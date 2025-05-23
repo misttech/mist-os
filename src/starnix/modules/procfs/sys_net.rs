@@ -5,16 +5,16 @@
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::stub_bytes_file::StubBytesFile;
 use starnix_core::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FsNode, FsNodeHandle,
-    FsNodeOps, FsStr, SeekTarget, StaticDirectoryBuilder,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
+    fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps, FsNode,
+    FsNodeHandle, FsNodeOps, FsStr, StaticDirectoryBuilder,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::{FileOpsCore, Locked};
+use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{error, off_t};
 
 const FILE_MODE: FileMode = mode!(IFREG, 0o644);
 
@@ -116,17 +116,7 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
 impl FileOps for ProcSysNetIpv4Conf {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
@@ -210,17 +200,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
 impl FileOps for ProcSysNetIpv4Neigh {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
@@ -403,17 +383,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
 impl FileOps for ProcSysNetIpv6Conf {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
@@ -497,17 +467,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
 impl FileOps for ProcSysNetIpv6Neigh {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,

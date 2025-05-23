@@ -857,6 +857,22 @@ macro_rules! fileops_impl_directory {
 }
 
 #[macro_export]
+macro_rules! fileops_impl_unbounded_seek {
+    () => {
+        fn seek(
+            &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
+            current_offset: starnix_uapi::off_t,
+            target: $crate::vfs::SeekTarget,
+        ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
+            $crate::vfs::unbounded_seek(current_offset, target)
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! fileops_impl_noop_sync {
     () => {
         fn sync(
@@ -877,6 +893,7 @@ macro_rules! fileops_impl_noop_sync {
 pub use {
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_nonseekable, fileops_impl_noop_sync, fileops_impl_seekable, fileops_impl_seekless,
+    fileops_impl_unbounded_seek,
 };
 pub const AES256_KEY_SIZE: usize = 32;
 
