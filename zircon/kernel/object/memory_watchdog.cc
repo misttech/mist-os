@@ -26,6 +26,8 @@ KCOUNTER(pressure_level_critical, "memory_watchdog.pressure.critical")
 KCOUNTER(pressure_level_warning, "memory_watchdog.pressure.warning")
 KCOUNTER(pressure_level_normal, "memory_watchdog.pressure.normal")
 
+KCOUNTER(eviction_triggered, "memory_watchdog.eviction.triggered")
+
 void CountPressureEvent(MemoryWatchdog::PressureLevel level) {
   switch (level) {
     case MemoryWatchdog::PressureLevel::kOutOfMemory:
@@ -169,6 +171,7 @@ void MemoryWatchdog::EvictionTrigger() {
     // the WorkerThread knows it should bump the evictor when memory states change.
     continuous_eviction_active_ = true;
   }
+  eviction_triggered.Add(1);
   pmm_evictor()->EvictAsynchronous(min_free_target_, free_mem_target_,
                                    Evictor::EvictionLevel::OnlyOldest, Evictor::Output::Print);
 }

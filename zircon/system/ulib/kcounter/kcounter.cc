@@ -185,6 +185,8 @@ bool VmoToInspectMapper::ShouldInclude(const counters::Descriptor& entry) {
       "lockup_detector.",  //
       "thread.suspend",    //
       "vm.pmm.",           //
+      "vm.reclamation.",   //
+      "memory_watchdog.",  //
   };
   for (size_t i = 0; i < std::size(kByPrefix); ++i) {
     if (strncmp(kByPrefix[i], entry.name, strlen(kByPrefix[i])) == 0) {
