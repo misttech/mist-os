@@ -132,6 +132,7 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
               Config{"fuchsia.fshost.UseDiskMigration"},
               Config{"fuchsia.fshost.FxfsCryptUrl"},
               Config{"fuchsia.fshost.StarnixVolumeName"},
+              Config{"fuchsia.fshost.InlineCrypto"},
           },
       .source = {ChildRef{"fshost_config"}},
       .targets = {ChildRef{"fshost"}},

@@ -79,6 +79,7 @@ template("generated_fshost_config") {
       storage_host = false
       disable_automount = false
       starnix_volume_name = ""
+      inline_crypto = false
       blobfs_write_compression_algorithm = ""
       blobfs_cache_eviction_policy = ""
 

@@ -79,6 +79,7 @@
                 "fuchsia.fshost.FxfsCryptUrl",
                 "fuchsia.fshost.Gpt",
                 "fuchsia.fshost.GptAll",
+                "fuchsia.fshost.InlineCrypto",
                 "fuchsia.fshost.Mbr",
                 "fuchsia.fshost.Nand",
                 "fuchsia.fshost.Netboot",
