@@ -111,38 +111,13 @@ if (is_fuchsia) {
     }
 
     files = {
-      platform_aib_dir = get_label_info("//bundles/assembly", "target_out_dir")
-
       # Outputs of assembly.
       outdir = target_out_dir + "/fuchsia"
-      zbi = "${outdir}/fuchsia.zbi"
-      zbi_signed = "${outdir}/fuchsia.zbi.signed"
-      vbmeta = "${outdir}/fuchsia.vbmeta"
-      blobfs = "${outdir}/blob.blk"
-      fvm = "${outdir}/fvm.blk"
-      fvm_sparse = "${outdir}/fvm.sparse.blk"
-      fvm_fastboot = "${outdir}/fvm.fastboot.blk"
-      fxfs = "${outdir}/fxfs.blk"
-      fxfs_sparse = "${outdir}/fxfs.sparse.blk"
-      packages_json = "${outdir}/packages.json"
 
       # Outputs of recovery.
       recovery_name = get_label_info(recovery_label, "name")
       recovery_outdir =
           get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
-      recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
-      recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
-      recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
-      recovery_blobfs = "${recovery_outdir}/blob.blk"
-      recovery_fvm = "${recovery_outdir}/fvm.blk"
-      recovery_fvm_sparse = "${recovery_outdir}/fvm.sparse.blk"
-      recovery_fvm_fastboot = "${recovery_outdir}/fvm.fastboot.blk"
-      recovery_fxfs = "${recovery_outdir}/fxfs.blk"
-      recovery_fxfs_sparse = "${recovery_outdir}/fxfs.sparse.blk"
-
-      esp_image_path = "${root_build_dir}/fuchsia.esp.blk"
-
-      qemu_kernel = qemu_boot_shim.path
     }
 
     _partitions_config = "//boards/partitions:default"
@@ -186,58 +161,6 @@ if (is_fuchsia) {
       partitions = _partitions_config
       system_a = files.outdir
       system_r = files.recovery_outdir
-
-      # Create lists of the files that are referenced by the assembly manifests.
-      _assembly_contents = [ files.qemu_kernel ]
-      if (fxfs_blob) {
-        _assembly_contents += [
-          files.fxfs,
-          files.fxfs_sparse,
-        ]
-      } else {
-        _assembly_contents += [
-          files.blobfs,
-          files.fvm,
-          files.fvm_sparse,
-        ]
-      }
-      _recovery_contents = [ files.qemu_kernel ]
-      if (files.recovery_name != "zedboot") {
-        if (fxfs_blob) {
-          _recovery_contents += [
-            files.recovery_fxfs,
-            files.recovery_fxfs_sparse,
-          ]
-        } else {
-          _recovery_contents += [
-            files.blobfs,
-            files.fvm,
-            files.fvm_sparse,
-          ]
-        }
-      }
-      if (!fxfs_blob &&
-          (assembly_generate_fvm_fastboot || assembly_generate_fvm_nand)) {
-        _assembly_contents += [ files.fvm_fastboot ]
-        if (files.recovery_name != "zedboot") {
-          _recovery_contents += [ files.recovery_fvm_fastboot ]
-        }
-      }
-      if (custom_signing_script != "" || use_vboot) {
-        _assembly_contents += [ files.zbi_signed ]
-        _recovery_contents += [ files.recovery_zbi_signed ]
-      } else {
-        _assembly_contents += [ files.zbi ]
-        _recovery_contents += [ files.recovery_zbi ]
-      }
-      if (use_vbmeta) {
-        _assembly_contents += [ files.vbmeta ]
-        _recovery_contents += [ files.recovery_vbmeta ]
-      }
-
-      # List the contents of each input so that the outputs can be calculated.
-      system_a_contents = _assembly_contents
-      system_r_contents = _recovery_contents
 
       if (delivery_blob_type != false) {
         delivery_blob_type = delivery_blob_type
