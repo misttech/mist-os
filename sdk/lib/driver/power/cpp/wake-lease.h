@@ -39,12 +39,18 @@ class ManualWakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGo
                   fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
                   inspect::Node* parent_node = nullptr, bool log = false);
 
-  // Start an atomic operation. The system is guaranteed to stay running until
-  // `End()` is called or this instance is dropped. Returns whether a wake
-  // lease was actually taken as a result of this call. Note that if `Start`
-  // is called twice in succession, the first call *may* return true whereas
-  // the second call would may return false, assuming the lease from taken
-  // because of the first call is still held.
+  // Start an atomic operation. If `ActivityGovernor` protocol connection is
+  // valid the system is guaranteed to stay running until `End()` is called or
+  // this instance is dropped.
+  //
+  // Returns `true` if one of the following is true:
+  //   * It was not necessary to take a system wake lease at this time because
+  //     the system is resumed
+  //   * A system wake lease was acquired
+  //   * A system wake lease was previously acquired
+  // Returns `false` if it was necessary to acquire a system wake lease, but
+  // an error occurred during acquisition. In this case, the `ManualWakeLease`
+  // instance should be replaced with a new one.
   bool Start(bool ignore_system_state = false);
 
   // Indicate that the operation is complete. The system may suspend after this
@@ -129,15 +135,13 @@ class TimeoutWakeLease {
   // this method is called.
   bool HandleInterrupt(zx::duration timeout);
 
-  // Acquire a wake lease (if not already held) and automatically drop it after the specified
-  // timeout. If a lease was held from an earlier invocation, it will be extended until the new
-  // timeout. Note that a duration is taken because the deadline is computed once the lease is
-  // acquired, rather than at the point this method is called.
+  // Acquire a wake lease and automatically drop it after the specified timeout. If a lease was
+  // still held from an earlier invocation, it will be extended until the new timeout.
+  // Note that a duration is taken because the deadline is computed once the lease is acquired,
+  // rather than at the point this method is called.
   //
-  // This return value alone is not sufficient to understand if we currently hold a wake lease.
-  // Returns `false` if we previously held a lease or we failed to acquire one. Returns `true` if
-  // we did **not** already have a lease and we succeeded in acquiring one. To know whether we
-  // currently hold a wake lease after calling, call `GetWakeLeaseCopy` and examine the result.
+  // Returns `false` if it was necessary to obtain a wake lease and it failed to do so. Returns
+  // `true` if it already had a wake lease or if it did not and it succeeded in obtaining one.
   bool AcquireWakeLease(zx::duration timeout);
 
   // Provide a wake lease which will be dropped either:
