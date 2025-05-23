@@ -453,7 +453,13 @@ impl AnonymizedAggregateServiceDir {
 
                     match result {
                         Err(StreamErrorType::Found) => {
-                            cur_path.push(segment.clone());
+                            if !cur_path.push(segment.into()) {
+                                return Err(RoutingError::PathTooLong {
+                                    moniker: moniker.clone().into(),
+                                    path: format!("{cur_path}/{segment}"),
+                                    keyword: "source_path from service watcher (this should be impossible)".into(),
+                                }.into());
+                            }
                             continue;
                         }
                         Err(StreamErrorType::StreamError(err)) => {

@@ -77,7 +77,17 @@ async fn open_storage_root(
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let (mut dir_proxy, local_server_end) = create_proxy::<fio::DirectoryMarker>();
     let mut full_backing_directory_path = storage_source_info.backing_directory_path.clone();
-    full_backing_directory_path.extend(storage_source_info.backing_directory_subdir.clone());
+    if !full_backing_directory_path.extend(storage_source_info.backing_directory_subdir.clone()) {
+        return Err(RoutingError::PathTooLong {
+            moniker: storage_source_info.storage_source_moniker.clone().into(),
+            path: format!(
+                "{}/{}",
+                full_backing_directory_path, storage_source_info.backing_directory_subdir
+            ),
+            keyword: "backing_directory_path".into(),
+        }
+        .into());
+    }
     let path = full_backing_directory_path.to_string();
     if let Some(dir_source_component) = storage_source_info.storage_provider.as_ref() {
         // TODO(https://fxbug.dev/42127827): This should be StartReason::AccessCapability, but we haven't

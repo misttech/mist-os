@@ -584,7 +584,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> Dependencies {
                         let path = use_.source_path();
                         let dictionary =
                             path.iter_segments().next().expect("must contain at least one segment");
-                        Some(vec![ComponentRef::Capability(dictionary.clone())])
+                        Some(vec![ComponentRef::Capability(dictionary.into())])
                     } else {
                         // Self is the other node, no need to add a loop.
                         None
@@ -735,7 +735,7 @@ fn find_offer_sources(
             {
                 let path = offer.source_path();
                 let name = path.iter_segments().next().expect("must contain at least one segment");
-                vec![ComponentRef::Capability(name.clone())]
+                vec![ComponentRef::Capability(name.into())]
             } else {
                 vec![ComponentRef::Self_]
             }

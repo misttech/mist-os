@@ -5,6 +5,7 @@
 use crate::{Capability, CapabilityBound};
 use derivative::Derivative;
 use fidl_fuchsia_component_sandbox as fsandbox;
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -12,6 +13,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use fuchsia_async as fasync;
 
 pub type Key = cm_types::Name;
+pub type BorrowedKey = cm_types::BorrowedName;
 
 /// A capability that represents a dictionary of capabilities.
 #[derive(Debug, Clone)]
@@ -65,8 +67,8 @@ impl Drop for DictInner {
 /// Represents a change to a dictionary, where an entry is either added or removed.
 #[derive(Debug, Copy, Clone)]
 pub enum EntryUpdate<'a> {
-    Add(&'a Key, &'a Capability),
-    Remove(&'a Key),
+    Add(&'a BorrowedKey, &'a Capability),
+    Remove(&'a BorrowedKey),
     Idle,
 }
 
@@ -166,7 +168,11 @@ impl Dict {
     /// `None` is returned.
     ///
     /// If the value could not be cloned, returns an error.
-    pub fn get(&self, key: &Key) -> Result<Option<Capability>, ()> {
+    pub fn get<Q: ?Sized>(&self, key: &Q) -> Result<Option<Capability>, ()>
+    where
+        Key: Borrow<Q> + Ord,
+        Q: Ord,
+    {
         self.lock().entries.get(key).map(|c| c.try_clone()).transpose().map_err(|_| ())
     }
 
@@ -176,7 +182,7 @@ impl Dict {
         let mut this = self.lock();
         let result = this.entries.remove(key);
         if result.is_some() {
-            this.call_update_notifiers(EntryUpdate::Remove(&key))
+            this.call_update_notifiers(EntryUpdate::Remove(key))
         }
         result
     }

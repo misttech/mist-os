@@ -1459,7 +1459,7 @@ pub mod capability_util {
             .sandbox
             .component_output
             .framework()
-            .get(&capability_name)
+            .get(capability_name)
             .expect(
                 "component is missing capability in sandbox, does the expose to framework exist?",
             )

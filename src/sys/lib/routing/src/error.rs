@@ -342,6 +342,9 @@ pub enum RoutingError {
 
     #[error("{name} at {moniker} is missing porcelain type metadata.")]
     MissingPorcelainType { name: Name, moniker: Moniker },
+
+    #[error("path at `{moniker}` was too long for `{keyword}`: {path}")]
+    PathTooLong { moniker: ExtendedMoniker, path: String, keyword: String },
 }
 
 impl Explain for RoutingError {
@@ -388,7 +391,8 @@ impl Explain for RoutingError {
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
-            | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
+            | RoutingError::AvailabilityRoutingError(_)
+            | RoutingError::PathTooLong { .. } => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
             | RoutingError::NonDebugRoutesUnsupported { .. }
             | RoutingError::DebugRoutesUnsupported { .. }
@@ -438,6 +442,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::RouteSourceShutdown { moniker }
             | RoutingError::UseFromSelfNotFound { moniker, .. }
             | RoutingError::MissingPorcelainType { moniker, .. } => moniker.into(),
+            RoutingError::PathTooLong { moniker, .. } => moniker,
 
             RoutingError::BedrockMemberAccessUnsupported { moniker }
             | RoutingError::BedrockNotPresentInDictionary { moniker, .. }

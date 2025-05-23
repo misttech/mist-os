@@ -379,18 +379,19 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     .capabilities()
             }
             cm_rust::OfferTarget::Capability(name) => {
-                let dict =
-                    match declared_dictionaries.get(&name).expect("dictionaries must be cloneable")
-                    {
-                        Some(dict) => dict,
-                        None => {
-                            let dict = Dict::new();
-                            declared_dictionaries
-                                .insert(name.clone(), Capability::Dictionary(dict.clone()))
-                                .ok();
-                            Capability::Dictionary(dict)
-                        }
-                    };
+                let dict = match declared_dictionaries
+                    .get(name)
+                    .expect("dictionaries must be cloneable")
+                {
+                    Some(dict) => dict,
+                    None => {
+                        let dict = Dict::new();
+                        declared_dictionaries
+                            .insert(name.clone(), Capability::Dictionary(dict.clone()))
+                            .ok();
+                        Capability::Dictionary(dict)
+                    }
+                };
                 let Capability::Dictionary(dict) = dict else {
                     panic!("wrong type in dict");
                 };

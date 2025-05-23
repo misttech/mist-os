@@ -36,8 +36,8 @@ use std::{cmp, fmt, path};
 use validate::offer_to_all_from_offer;
 
 pub use cm_types::{
-    AllowedOffers, Availability, DeliveryType, DependencyType, Durability, Name, NamespacePath,
-    OnTerminate, ParseError, Path, RelativePath, StartupMode, StorageId, Url,
+    AllowedOffers, Availability, BorrowedName, DeliveryType, DependencyType, Durability, Name,
+    NamespacePath, OnTerminate, ParseError, Path, RelativePath, StartupMode, StorageId, Url,
 };
 use error::Location;
 
@@ -86,9 +86,9 @@ pub fn parse_many_documents(
 /// namespace they are in.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum CapabilityId<'a> {
-    Service(&'a Name),
-    Protocol(&'a Name),
-    Directory(&'a Name),
+    Service(&'a BorrowedName),
+    Protocol(&'a BorrowedName),
+    Directory(&'a BorrowedName),
     // A service in a `use` declaration has a target path in the component's namespace.
     UsedService(Path),
     // A protocol in a `use` declaration has a target path in the component's namespace.
@@ -100,20 +100,20 @@ pub enum CapabilityId<'a> {
     // An event stream in a `use` declaration has a target path in the component's namespace.
     UsedEventStream(Path),
     // A configuration in a `use` declaration has a target name that matches a config.
-    UsedConfiguration(&'a Name),
-    UsedRunner(&'a Name),
-    Storage(&'a Name),
-    Runner(&'a Name),
-    Resolver(&'a Name),
-    EventStream(&'a Name),
-    Dictionary(&'a Name),
-    Configuration(&'a Name),
+    UsedConfiguration(&'a BorrowedName),
+    UsedRunner(&'a BorrowedName),
+    Storage(&'a BorrowedName),
+    Runner(&'a BorrowedName),
+    Resolver(&'a BorrowedName),
+    EventStream(&'a BorrowedName),
+    Dictionary(&'a BorrowedName),
+    Configuration(&'a BorrowedName),
 }
 
-/// Generates a `Vec<Name>` -> `Vec<CapabilityId>` conversion function.
+/// Generates a `Vec<&BorrowedName>` -> `Vec<CapabilityId>` conversion function.
 macro_rules! capability_ids_from_names {
     ($name:ident, $variant:expr) => {
-        fn $name(names: Vec<&'a Name>) -> Vec<Self> {
+        fn $name(names: Vec<&'a BorrowedName>) -> Vec<Self> {
             names.into_iter().map(|n| $variant(n)).collect()
         }
     };
@@ -404,11 +404,11 @@ impl<'a> CapabilityId<'a> {
 
     /// Returns the target names as a `Vec`  from a declaration with `names` and `alias` as a `Vec`.
     fn get_one_or_many_names<'b>(
-        names: OneOrMany<&'b Name>,
-        alias: Option<&'b Name>,
+        names: OneOrMany<&'b BorrowedName>,
+        alias: Option<&'b BorrowedName>,
         capability_type: &str,
-    ) -> Result<Vec<&'b Name>, Error> {
-        let names: Vec<&Name> = names.into_iter().collect();
+    ) -> Result<Vec<&'b BorrowedName>, Error> {
+        let names: Vec<&BorrowedName> = names.into_iter().collect();
         if names.len() == 1 {
             Ok(vec![alias_or_name(alias, &names[0])])
         } else {
@@ -424,7 +424,7 @@ impl<'a> CapabilityId<'a> {
 
     /// Returns the target paths as a `Vec` from a `use` declaration with `names` and `alias`.
     fn get_one_or_many_svc_paths(
-        names: OneOrMany<&Name>,
+        names: OneOrMany<&BorrowedName>,
         alias: Option<&Path>,
         capability_type: &str,
     ) -> Result<Vec<Path>, Error> {
@@ -601,7 +601,7 @@ impl<'de> de::Deserialize<'de> for StopTimeoutMs {
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum AnyRef<'a> {
     /// A named reference. Parsed as `#name`.
-    Named(&'a Name),
+    Named(&'a BorrowedName),
     /// A reference to the parent. Parsed as `parent`.
     Parent,
     /// A reference to the framework (component manager). Parsed as `framework`.
@@ -616,7 +616,7 @@ pub enum AnyRef<'a> {
     Dictionary(&'a DictionaryRef),
     /// A reference to a dictionary defined by this component. Parsed as
     /// `self/<dictionary>`.
-    OwnDictionary(&'a Name),
+    OwnDictionary(&'a BorrowedName),
 }
 
 /// Format an `AnyRef` as a string.
@@ -1433,8 +1433,8 @@ where
                 to_keep.push(c.clone());
                 return;
             }
-            let mut names = c.names().into_iter().cloned().collect();
-            let mut copy = c.clone();
+            let mut names: Vec<Name> = c.names().into_iter().map(Into::into).collect();
+            let mut copy: T = c.clone();
             copy.set_names(vec![Name::from_str("a").unwrap()]); // The name here is arbitrary.
             let r = to_merge.iter().position(|(t, _)| t == &copy);
             match r {
@@ -1563,8 +1563,8 @@ fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
         return;
     };
 
-    let mut our_names: Vec<_> = ours.names().into_iter().cloned().collect();
-    let mut their_names: Vec<_> = theirs.names().into_iter().cloned().collect();
+    let mut our_names: Vec<Name> = ours.names().into_iter().map(Into::into).collect();
+    let mut their_names: Vec<Name> = theirs.names().into_iter().map(Into::into).collect();
 
     let mut our_entries_to_remove = HashSet::new();
     let mut their_entries_to_remove = HashSet::new();
@@ -1872,35 +1872,37 @@ impl Document {
         self.include.clone().unwrap_or_default()
     }
 
-    pub fn all_children_names(&self) -> Vec<&Name> {
+    pub fn all_children_names(&self) -> Vec<&BorrowedName> {
         if let Some(children) = self.children.as_ref() {
-            children.iter().map(|c| &c.name).collect()
+            children.iter().map(|c| c.name.as_ref()).collect()
         } else {
             vec![]
         }
     }
 
-    pub fn all_collection_names(&self) -> Vec<&Name> {
+    pub fn all_collection_names(&self) -> Vec<&BorrowedName> {
         if let Some(collections) = self.collections.as_ref() {
-            collections.iter().map(|c| &c.name).collect()
+            collections.iter().map(|c| c.name.as_ref()).collect()
         } else {
             vec![]
         }
     }
 
-    pub fn all_storage_names(&self) -> Vec<&Name> {
+    pub fn all_storage_names(&self) -> Vec<&BorrowedName> {
         if let Some(capabilities) = self.capabilities.as_ref() {
-            capabilities.iter().filter_map(|c| c.storage.as_ref()).collect()
+            capabilities.iter().filter_map(|c| c.storage.as_ref().map(|n| n.as_ref())).collect()
         } else {
             vec![]
         }
     }
 
-    pub fn all_storage_with_sources<'a>(&'a self) -> HashMap<&'a Name, &'a CapabilityFromRef> {
+    pub fn all_storage_with_sources<'a>(
+        &'a self,
+    ) -> HashMap<&'a BorrowedName, &'a CapabilityFromRef> {
         if let Some(capabilities) = self.capabilities.as_ref() {
             capabilities
                 .iter()
-                .filter_map(|c| match (c.storage.as_ref(), c.from.as_ref()) {
+                .filter_map(|c| match (c.storage.as_ref().map(Name::as_ref), c.from.as_ref()) {
                     (Some(s), Some(f)) => Some((s, f)),
                     _ => None,
                 })
@@ -1910,58 +1912,66 @@ impl Document {
         }
     }
 
-    pub fn all_service_names(&self) -> Vec<&Name> {
+    pub fn all_service_names(&self) -> Vec<&BorrowedName> {
         self.capabilities
             .as_ref()
             .map(|c| {
-                c.iter().filter_map(|c| c.service.as_ref()).map(|p| p.iter()).flatten().collect()
+                c.iter()
+                    .filter_map(|c| c.service.as_ref().map(|o| o.as_ref()))
+                    .map(|p| p.into_iter())
+                    .flatten()
+                    .collect()
             })
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_protocol_names(&self) -> Vec<&Name> {
+    pub fn all_protocol_names(&self) -> Vec<&BorrowedName> {
         self.capabilities
             .as_ref()
             .map(|c| {
-                c.iter().filter_map(|c| c.protocol.as_ref()).map(|p| p.iter()).flatten().collect()
+                c.iter()
+                    .filter_map(|c| c.protocol.as_ref().map(|o| o.as_ref()))
+                    .map(|p| p.into_iter())
+                    .flatten()
+                    .collect()
             })
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_directory_names(&self) -> Vec<&Name> {
+    pub fn all_directory_names(&self) -> Vec<&BorrowedName> {
         self.capabilities
             .as_ref()
-            .map(|c| c.iter().filter_map(|c| c.directory.as_ref()).collect())
+            .map(|c| c.iter().filter_map(|c| c.directory.as_ref().map(Name::as_ref)).collect())
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_runner_names(&self) -> Vec<&Name> {
+    pub fn all_runner_names(&self) -> Vec<&BorrowedName> {
         self.capabilities
             .as_ref()
-            .map(|c| c.iter().filter_map(|c| c.runner.as_ref()).collect())
+            .map(|c| c.iter().filter_map(|c| c.runner.as_ref().map(Name::as_ref)).collect())
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_resolver_names(&self) -> Vec<&Name> {
+    pub fn all_resolver_names(&self) -> Vec<&BorrowedName> {
         self.capabilities
             .as_ref()
-            .map(|c| c.iter().filter_map(|c| c.resolver.as_ref()).collect())
+            .map(|c| c.iter().filter_map(|c| c.resolver.as_ref().map(Name::as_ref)).collect())
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_dictionary_names(&self) -> Vec<&Name> {
+    pub fn all_dictionary_names(&self) -> Vec<&BorrowedName> {
         if let Some(capabilities) = self.capabilities.as_ref() {
-            capabilities.iter().filter_map(|c| c.dictionary.as_ref()).collect()
+            capabilities.iter().filter_map(|c| c.dictionary.as_ref().map(Name::as_ref)).collect()
         } else {
             vec![]
         }
     }
 
-    pub fn all_dictionaries<'a>(&'a self) -> HashMap<&'a Name, &'a Capability> {
+    pub fn all_dictionaries<'a>(&'a self) -> HashMap<&'a BorrowedName, &'a Capability> {
         if let Some(capabilities) = self.capabilities.as_ref() {
             capabilities
                 .iter()
-                .filter_map(|c| match c.dictionary.as_ref() {
+                .filter_map(|c| match c.dictionary.as_ref().map(Name::as_ref) {
                     Some(s) => Some((s, c)),
                     _ => None,
                 })
@@ -1971,21 +1981,21 @@ impl Document {
         }
     }
 
-    pub fn all_config_names(&self) -> Vec<&Name> {
+    pub fn all_config_names(&self) -> Vec<&BorrowedName> {
         self.capabilities
             .as_ref()
-            .map(|c| c.iter().filter_map(|c| c.config.as_ref()).collect())
+            .map(|c| c.iter().filter_map(|c| c.config.as_ref().map(Name::as_ref)).collect())
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_environment_names(&self) -> Vec<&Name> {
+    pub fn all_environment_names(&self) -> Vec<&BorrowedName> {
         self.environments
             .as_ref()
-            .map(|c| c.iter().map(|s| &s.name).collect())
+            .map(|c| c.iter().map(|s| s.name.as_ref()).collect())
             .unwrap_or_else(|| vec![])
     }
 
-    pub fn all_capability_names(&self) -> HashSet<&Name> {
+    pub fn all_capability_names(&self) -> HashSet<&BorrowedName> {
         self.capabilities
             .as_ref()
             .map(|c| {
@@ -3400,15 +3410,15 @@ pub trait FromClause {
 }
 
 pub trait CapabilityClause: Clone + PartialEq + std::fmt::Debug {
-    fn service(&self) -> Option<OneOrMany<&Name>>;
-    fn protocol(&self) -> Option<OneOrMany<&Name>>;
-    fn directory(&self) -> Option<OneOrMany<&Name>>;
-    fn storage(&self) -> Option<OneOrMany<&Name>>;
-    fn runner(&self) -> Option<OneOrMany<&Name>>;
-    fn resolver(&self) -> Option<OneOrMany<&Name>>;
-    fn event_stream(&self) -> Option<OneOrMany<&Name>>;
-    fn dictionary(&self) -> Option<OneOrMany<&Name>>;
-    fn config(&self) -> Option<OneOrMany<&Name>>;
+    fn service(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn protocol(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn directory(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn storage(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn runner(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn resolver(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn event_stream(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn dictionary(&self) -> Option<OneOrMany<&BorrowedName>>;
+    fn config(&self) -> Option<OneOrMany<&BorrowedName>>;
     fn set_service(&mut self, o: Option<OneOrMany<Name>>);
     fn set_protocol(&mut self, o: Option<OneOrMany<Name>>);
     fn set_directory(&mut self, o: Option<OneOrMany<Name>>);
@@ -3486,7 +3496,7 @@ pub trait CapabilityClause: Clone + PartialEq + std::fmt::Debug {
 
     /// Returns the names of the capabilities in this clause.
     /// If `protocol()` returns `Some(OneOrMany::Many(vec!["a", "b"]))`, this returns!["a", "b"].
-    fn names(&self) -> Vec<&Name> {
+    fn names(&self) -> Vec<&BorrowedName> {
         let res = vec![
             self.service(),
             self.protocol(),
@@ -3499,7 +3509,7 @@ pub trait CapabilityClause: Clone + PartialEq + std::fmt::Debug {
             self.dictionary(),
         ];
         res.into_iter()
-            .map(|o| o.map(|o| o.into_iter().collect::<Vec<&Name>>()).unwrap_or(vec![]))
+            .map(|o| o.map(|o| o.into_iter().collect::<Vec<&BorrowedName>>()).unwrap_or(vec![]))
             .flatten()
             .collect()
     }
@@ -3541,7 +3551,7 @@ trait Canonicalize {
 }
 
 pub trait AsClause {
-    fn r#as(&self) -> Option<&Name>;
+    fn r#as(&self) -> Option<&BorrowedName>;
 }
 
 pub trait PathClause {
@@ -3576,37 +3586,40 @@ impl Canonicalize for Capability {
     }
 }
 
-fn option_one_or_many_as_ref<T>(o: &Option<OneOrMany<T>>) -> Option<OneOrMany<&T>> {
+fn option_one_or_many_as_ref<T, S: ?Sized>(o: &Option<OneOrMany<T>>) -> Option<OneOrMany<&S>>
+where
+    T: AsRef<S>,
+{
     o.as_ref().map(|o| o.as_ref())
 }
 
 impl CapabilityClause for Capability {
-    fn service(&self) -> Option<OneOrMany<&Name>> {
+    fn service(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+    fn protocol(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<&Name>> {
-        self.directory.as_ref().map(|n| OneOrMany::One(n))
+    fn directory(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.directory.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn storage(&self) -> Option<OneOrMany<&Name>> {
-        self.storage.as_ref().map(|n| OneOrMany::One(n))
+    fn storage(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.storage.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn runner(&self) -> Option<OneOrMany<&Name>> {
-        self.runner.as_ref().map(|n| OneOrMany::One(n))
+    fn runner(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.runner.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn resolver(&self) -> Option<OneOrMany<&Name>> {
-        self.resolver.as_ref().map(|n| OneOrMany::One(n))
+    fn resolver(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.resolver.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+    fn event_stream(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
-    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
-        self.dictionary.as_ref().map(|n| OneOrMany::One(n))
+    fn dictionary(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.dictionary.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn config(&self) -> Option<OneOrMany<&Name>> {
-        self.config.as_ref().map(|n| OneOrMany::One(n))
+    fn config(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.config.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3665,7 +3678,7 @@ impl CapabilityClause for Capability {
 }
 
 impl AsClause for Capability {
-    fn r#as(&self) -> Option<&Name> {
+    fn r#as(&self) -> Option<&BorrowedName> {
         None
     }
 }
@@ -3689,31 +3702,31 @@ impl RightsClause for Capability {
 }
 
 impl CapabilityClause for DebugRegistration {
-    fn service(&self) -> Option<OneOrMany<&Name>> {
+    fn service(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+    fn protocol(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<&Name>> {
+    fn directory(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn storage(&self) -> Option<OneOrMany<&Name>> {
+    fn storage(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn runner(&self) -> Option<OneOrMany<&Name>> {
+    fn runner(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn resolver(&self) -> Option<OneOrMany<&Name>> {
+    fn resolver(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+    fn event_stream(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+    fn dictionary(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn config(&self) -> Option<OneOrMany<&Name>> {
+    fn config(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
 
@@ -3746,8 +3759,8 @@ impl CapabilityClause for DebugRegistration {
 }
 
 impl AsClause for DebugRegistration {
-    fn r#as(&self) -> Option<&Name> {
-        self.r#as.as_ref()
+    fn r#as(&self) -> Option<&BorrowedName> {
+        self.r#as.as_ref().map(Name::as_ref)
     }
 }
 
@@ -3780,32 +3793,32 @@ impl Canonicalize for Use {
 }
 
 impl CapabilityClause for Use {
-    fn service(&self) -> Option<OneOrMany<&Name>> {
+    fn service(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+    fn protocol(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<&Name>> {
-        self.directory.as_ref().map(|n| OneOrMany::One(n))
+    fn directory(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.directory.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn storage(&self) -> Option<OneOrMany<&Name>> {
-        self.storage.as_ref().map(|n| OneOrMany::One(n))
+    fn storage(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.storage.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn runner(&self) -> Option<OneOrMany<&Name>> {
-        self.runner.as_ref().map(|n| OneOrMany::One(n))
+    fn runner(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.runner.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
-    fn resolver(&self) -> Option<OneOrMany<&Name>> {
+    fn resolver(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+    fn event_stream(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
-    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+    fn dictionary(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn config(&self) -> Option<OneOrMany<&Name>> {
-        self.config.as_ref().map(|n| OneOrMany::One(n))
+    fn config(&self) -> Option<OneOrMany<&BorrowedName>> {
+        self.config.as_ref().map(|n| OneOrMany::One(n.as_ref()))
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3907,31 +3920,31 @@ impl Canonicalize for Expose {
 }
 
 impl CapabilityClause for Expose {
-    fn service(&self) -> Option<OneOrMany<&Name>> {
+    fn service(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+    fn protocol(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<&Name>> {
+    fn directory(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.directory)
     }
-    fn storage(&self) -> Option<OneOrMany<&Name>> {
+    fn storage(&self) -> Option<OneOrMany<&BorrowedName>> {
         None
     }
-    fn runner(&self) -> Option<OneOrMany<&Name>> {
+    fn runner(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.runner)
     }
-    fn resolver(&self) -> Option<OneOrMany<&Name>> {
+    fn resolver(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.resolver)
     }
-    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+    fn event_stream(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
-    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+    fn dictionary(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.dictionary)
     }
-    fn config(&self) -> Option<OneOrMany<&Name>> {
+    fn config(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.config)
     }
 
@@ -3997,8 +4010,8 @@ impl CapabilityClause for Expose {
 }
 
 impl AsClause for Expose {
-    fn r#as(&self) -> Option<&Name> {
-        self.r#as.as_ref()
+    fn r#as(&self) -> Option<&BorrowedName> {
+        self.r#as.as_ref().map(Name::as_ref)
     }
 }
 
@@ -4051,31 +4064,31 @@ impl Canonicalize for Offer {
 }
 
 impl CapabilityClause for Offer {
-    fn service(&self) -> Option<OneOrMany<&Name>> {
+    fn service(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.service)
     }
-    fn protocol(&self) -> Option<OneOrMany<&Name>> {
+    fn protocol(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.protocol)
     }
-    fn directory(&self) -> Option<OneOrMany<&Name>> {
+    fn directory(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.directory)
     }
-    fn storage(&self) -> Option<OneOrMany<&Name>> {
+    fn storage(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.storage)
     }
-    fn runner(&self) -> Option<OneOrMany<&Name>> {
+    fn runner(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.runner)
     }
-    fn resolver(&self) -> Option<OneOrMany<&Name>> {
+    fn resolver(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.resolver)
     }
-    fn event_stream(&self) -> Option<OneOrMany<&Name>> {
+    fn event_stream(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
-    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+    fn dictionary(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.dictionary)
     }
-    fn config(&self) -> Option<OneOrMany<&Name>> {
+    fn config(&self) -> Option<OneOrMany<&BorrowedName>> {
         option_one_or_many_as_ref(&self.config)
     }
 
@@ -4145,8 +4158,8 @@ impl CapabilityClause for Offer {
 }
 
 impl AsClause for Offer {
-    fn r#as(&self) -> Option<&Name> {
-        self.r#as.as_ref()
+    fn r#as(&self) -> Option<&BorrowedName> {
+        self.r#as.as_ref().map(Name::as_ref)
     }
 }
 
@@ -4186,7 +4199,10 @@ where
     r.into()
 }
 
-pub fn alias_or_name<'a>(alias: Option<&'a Name>, name: &'a Name) -> &'a Name {
+pub fn alias_or_name<'a>(
+    alias: Option<&'a BorrowedName>,
+    name: &'a BorrowedName,
+) -> &'a BorrowedName {
     alias.unwrap_or(name)
 }
 
@@ -4318,7 +4334,7 @@ pub fn offer_to_all_and_component_diff_capabilities_message<'a>(
 pub fn offer_to_all_would_duplicate(
     offer_to_all: &Offer,
     specific_offer: &Offer,
-    target: &cm_types::Name,
+    target: &cm_types::BorrowedName,
 ) -> Result<bool, Error> {
     // Only protocols and dictionaries may be offered to all
     assert!(offer_to_all.protocol.is_some() || offer_to_all.dictionary.is_some());
@@ -4336,10 +4352,9 @@ pub fn offer_to_all_would_duplicate(
         return Ok(false);
     }
 
-    let to_field_matches = specific_offer
-        .to
-        .iter()
-        .any(|specific_offer_to| matches!(specific_offer_to, OfferToRef::Named(c) if c == target));
+    let to_field_matches = specific_offer.to.iter().any(
+        |specific_offer_to| matches!(specific_offer_to, OfferToRef::Named(c) if **c == *target),
+    );
 
     if !to_field_matches {
         return Ok(false);
@@ -4807,8 +4822,8 @@ mod tests {
 
         // runner
         assert_eq!(
-            CapabilityId::from_use(&Use { runner: Some("elf".parse().unwrap()), ..empty_use() },)?,
-            vec![CapabilityId::UsedRunner(&"elf".parse().unwrap())]
+            CapabilityId::from_use(&Use { runner: Some("elf".parse().unwrap()), ..empty_use() })?,
+            vec![CapabilityId::UsedRunner(BorrowedName::new("elf").unwrap())]
         );
 
         // "as" aliasing.

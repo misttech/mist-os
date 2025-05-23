@@ -7,11 +7,11 @@ use crate::{
     offer_to_all_would_duplicate, AnyRef, Availability, Capability, CapabilityClause,
     CapabilityFromRef, CapabilityId, Child, Collection, ConfigKey, ConfigType, ConfigValueType,
     DependencyType, DictionaryRef, Document, Environment, EnvironmentExtends, EnvironmentRef,
-    Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name, Offer, OfferFromRef,
+    Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef,
     OfferToRef, OneOrMany, Program, RegistrationRef, Rights, RootDictionaryRef, SourceAvailability,
     Use, UseFromRef,
 };
-use cm_types::IterablePath;
+use cm_types::{BorrowedName, IterablePath, Name};
 use directed_graph::DirectedGraph;
 use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -139,18 +139,18 @@ struct ValidationContext<'a> {
     document: &'a Document,
     features: &'a FeatureSet,
     capability_requirements: &'a CapabilityRequirements<'a>,
-    all_children: HashMap<&'a Name, &'a Child>,
-    all_collections: HashSet<&'a Name>,
-    all_storages: HashMap<&'a Name, &'a CapabilityFromRef>,
-    all_services: HashSet<&'a Name>,
-    all_protocols: HashSet<&'a Name>,
-    all_directories: HashSet<&'a Name>,
-    all_runners: HashSet<&'a Name>,
-    all_resolvers: HashSet<&'a Name>,
-    all_dictionaries: HashMap<&'a Name, &'a Capability>,
-    all_configs: HashSet<&'a Name>,
-    all_environment_names: HashSet<&'a Name>,
-    all_capability_names: HashSet<&'a Name>,
+    all_children: HashMap<&'a BorrowedName, &'a Child>,
+    all_collections: HashSet<&'a BorrowedName>,
+    all_storages: HashMap<&'a BorrowedName, &'a CapabilityFromRef>,
+    all_services: HashSet<&'a BorrowedName>,
+    all_protocols: HashSet<&'a BorrowedName>,
+    all_directories: HashSet<&'a BorrowedName>,
+    all_runners: HashSet<&'a BorrowedName>,
+    all_resolvers: HashSet<&'a BorrowedName>,
+    all_dictionaries: HashMap<&'a BorrowedName, &'a Capability>,
+    all_configs: HashSet<&'a BorrowedName>,
+    all_environment_names: HashSet<&'a BorrowedName>,
+    all_capability_names: HashSet<&'a BorrowedName>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
 }
 
@@ -222,7 +222,7 @@ impl<'a> ValidationContext<'a> {
 
         // Populate the sets of children and collections.
         if let Some(children) = &self.document.children {
-            self.all_children = children.iter().map(|c| (&c.name, c)).collect();
+            self.all_children = children.iter().map(|c| (c.name.as_ref(), c)).collect();
         }
         self.all_collections = self.document.all_collection_names().into_iter().collect();
         self.all_storages = self.document.all_storage_with_sources();
@@ -419,13 +419,13 @@ which is almost certainly a mistake: {}",
         if let Some(environment_ref) = &child.environment {
             match environment_ref {
                 EnvironmentRef::Named(environment_name) => {
-                    if !self.all_environment_names.contains(&environment_name) {
+                    if !self.all_environment_names.contains(&environment_name.as_ref()) {
                         return Err(Error::validate(format!(
                             "\"{}\" does not appear in \"environments\"",
                             &environment_name
                         )));
                     }
-                    let source = DependencyNode::Named(&environment_name);
+                    let source = DependencyNode::Named(environment_name);
                     let target = DependencyNode::Named(&child.name);
                     self.add_strong_dep(source, target);
                 }
@@ -441,13 +441,13 @@ which is almost certainly a mistake: {}",
         if let Some(environment_ref) = &collection.environment {
             match environment_ref {
                 EnvironmentRef::Named(environment_name) => {
-                    if !self.all_environment_names.contains(&environment_name) {
+                    if !self.all_environment_names.contains(&environment_name.as_ref()) {
                         return Err(Error::validate(format!(
                             "\"{}\" does not appear in \"environments\"",
                             &environment_name
                         )));
                     }
-                    let source = DependencyNode::Named(&environment_name);
+                    let source = DependencyNode::Named(environment_name);
                     let target = DependencyNode::Named(&collection.name);
                     self.add_strong_dep(source, target);
                 }
@@ -486,7 +486,7 @@ which is almost certainly a mistake: {}",
             // The storage capability depends on its backing dir.
             let target = DependencyNode::Named(name);
             let source = capability.from.as_ref().unwrap();
-            let names = vec![capability.backing_dir.as_ref().unwrap()];
+            let names = vec![capability.backing_dir.as_ref().unwrap().as_ref()];
             for source in self.expand_source_dependencies(names, &source.into()) {
                 self.add_strong_dep(source, target);
             }
@@ -771,8 +771,8 @@ which is almost certainly a mistake: {}",
                 for scope in scopes {
                     match scope {
                         EventScope::Named(name) => {
-                            if !self.all_children.contains_key(name)
-                                && !self.all_collections.contains(name)
+                            if !self.all_children.contains_key(&name.as_ref())
+                                && !self.all_collections.contains(&name.as_ref())
                             {
                                 return Err(Error::validate(format!("event_stream scope {} did not match a component or collection in this .cml file.", name.as_str())));
                             }
@@ -920,7 +920,7 @@ which is almost certainly a mistake: {}",
             // Ensure the "to" value is a child, collection, or dictionary capability.
             let to_target = match to {
                 OfferToRef::All => continue,
-                OfferToRef::Named(ref to_target) => {
+                OfferToRef::Named(to_target) => {
                     // Verify that only a legal set of offers-to-all are made, including that any
                     // offer to all duplicated as an offer to a specific component are exactly the same
                     for offer_to_all in protocols_offered_to_all {
@@ -928,8 +928,8 @@ which is almost certainly a mistake: {}",
                     }
 
                     // Check that any referenced child actually exists.
-                    if self.all_children.contains_key(to_target)
-                        || self.all_collections.contains(to_target)
+                    if self.all_children.contains_key(&to_target.as_ref())
+                        || self.all_collections.contains(&to_target.as_ref())
                     {
                         // Allowed.
                     } else {
@@ -953,7 +953,7 @@ which is almost certainly a mistake: {}",
                             // verified.
                             if let OneOrMany::One(OfferFromRef::Self_) = &offer.from {
                                 if let Some(CapabilityFromRef::Named(source)) =
-                                    self.all_storages.get(storage)
+                                    self.all_storages.get(&storage.as_ref())
                                 {
                                     if to_target == source {
                                         return Err(Error::validate(format!(
@@ -983,7 +983,7 @@ which is almost certainly a mistake: {}",
                     }
                     to_target
                 }
-                OfferToRef::OwnDictionary(ref to_target) => {
+                OfferToRef::OwnDictionary(to_target) => {
                     if let Ok(capability_ids) = CapabilityId::from_offer_expose(offer) {
                         for id in capability_ids {
                             match &id {
@@ -1015,7 +1015,7 @@ which is almost certainly a mistake: {}",
                         }
                     }
                     // Check that any referenced child actually exists.
-                    let Some(d) = self.all_dictionaries.get(&to_target) else {
+                    let Some(d) = self.all_dictionaries.get(&to_target.as_ref()) else {
                         return Err(Error::validate(format!(
                             "\"offer\" has dictionary target \"{to}\" but \"{to_target}\" \
                                 is not a dictionary capability defined by this component"
@@ -1114,11 +1114,11 @@ which is almost certainly a mistake: {}",
 
     fn has_required_offer(
         offer: &Offer,
-        target_name: &Name,
+        target_name: &BorrowedName,
         required_offer: &OfferToAllCapability<'_>,
     ) -> bool {
         let names_this_collection = offer.to.iter().any(|target| match target {
-            OfferToRef::Named(ref name) => name == target_name,
+            OfferToRef::Named(name) => **name == *target_name,
             OfferToRef::All => true,
             OfferToRef::OwnDictionary(_) => false,
         });
@@ -1162,7 +1162,7 @@ which is almost certainly a mistake: {}",
 
     fn expand_source_dependencies(
         &self,
-        names: Vec<&'a Name>,
+        names: Vec<&'a BorrowedName>,
         source: &AnyRef<'a>,
     ) -> Vec<DependencyNode<'a>> {
         let mut sources = vec![];
@@ -1186,7 +1186,7 @@ which is almost certainly a mistake: {}",
                 match d.root {
                     RootDictionaryRef::Self_ => {
                         let dictionary_name = d.path.iter_segments().next().unwrap();
-                        if self.all_dictionaries.contains_key(dictionary_name) {
+                        if self.all_dictionaries.contains_key(&*dictionary_name) {
                             // This should be true, if the cml didn't contain a syntax error that
                             // omitted the definition for `dictionary_name`.
                             sources.push(DependencyNode::Named(dictionary_name));
@@ -1546,7 +1546,7 @@ which is almost certainly a mistake: {}",
 
                 // Ensure that the environment is defined in `runners` if it comes from `self`.
                 if registration.from == RegistrationRef::Self_
-                    && !self.all_runners.contains(&registration.runner)
+                    && !self.all_runners.contains(&registration.runner.as_ref())
                 {
                     return Err(Error::validate(format!(
                         "Runner \"{}\" registered in environment is not in \"runners\"",
@@ -1719,7 +1719,7 @@ which is almost certainly a mistake: {}",
 /// Helper type that assists with validating declarations of `{use, offer, expose} from self`.
 struct RouteFromSelfChecker<'a> {
     /// The value of the capability property (protocol, service, etc.)
-    capability_name: Option<OneOrMany<&'a Name>>,
+    capability_name: Option<OneOrMany<&'a BorrowedName>>,
 
     /// The value of `from`.
     from: OneOrMany<AnyRef<'a>>,
@@ -1728,7 +1728,7 @@ struct RouteFromSelfChecker<'a> {
     container: &'a dyn Container,
 
     /// Reference to [ValidationContext::all_dictionaries].
-    all_dictionaries: &'a HashMap<&'a Name, &'a Capability>,
+    all_dictionaries: &'a HashMap<&'a BorrowedName, &'a Capability>,
 
     /// The string name for the capability's type.
     typename: &'static str,
@@ -1770,17 +1770,17 @@ impl<'a> RouteFromSelfChecker<'a> {
 /// capability definition of a particular type. This is useful for writing common validation
 /// functions.
 trait Container {
-    fn contains(&self, key: &Name) -> bool;
+    fn contains(&self, key: &BorrowedName) -> bool;
 }
 
-impl<'a> Container for HashSet<&'a Name> {
-    fn contains(&self, key: &Name) -> bool {
+impl<'a> Container for HashSet<&'a BorrowedName> {
+    fn contains(&self, key: &BorrowedName) -> bool {
         self.contains(key)
     }
 }
 
-impl<'a, T> Container for HashMap<&'a Name, T> {
-    fn contains(&self, key: &Name) -> bool {
+impl<'a, T> Container for HashMap<&'a BorrowedName, T> {
+    fn contains(&self, key: &BorrowedName) -> bool {
         self.contains_key(key)
     }
 }
@@ -1840,7 +1840,7 @@ pub fn use_config_to_value_type(u: &Use) -> Result<ConfigValueType, Error> {
 /// appear twice. `name` is used in generated error messages.
 fn ensure_no_duplicate_names<'a, I>(values: I) -> Result<(), Error>
 where
-    I: Iterator<Item = (&'a Name, &'a str)>,
+    I: Iterator<Item = (&'a BorrowedName, &'a str)>,
 {
     let mut seen_keys = HashMap::new();
     for (key, name) in values {
@@ -1872,7 +1872,7 @@ where
 /// A node in the DependencyGraph. This enum is used to differentiate between node types.
 #[derive(Copy, Clone, Hash, Ord, Debug, PartialOrd, PartialEq, Eq)]
 enum DependencyNode<'a> {
-    Named(&'a Name),
+    Named(&'a BorrowedName),
     Self_,
 }
 

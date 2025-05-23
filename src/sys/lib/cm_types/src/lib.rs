@@ -12,6 +12,7 @@ use serde::{de, ser, Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::ffi::CString;
 use std::fmt::{self, Display};
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::{cmp, iter};
@@ -126,89 +127,120 @@ pub type LongName = BoundedName<MAX_LONG_NAME_LENGTH>;
 pub struct BoundedName<const N: usize>(FlyStr);
 
 impl Name {
+    #[inline]
     pub fn to_long(self) -> LongName {
         BoundedName(self.0)
     }
 }
 
 impl<const N: usize> BoundedName<N> {
-    /// Creates a `BoundedName` from a `String`, returning an `Err` if the string
+    /// Creates a `BoundedName` from a `&str` slice, returning an `Err` if the string
     /// fails validation. The string must be non-empty, no more than `N`
     /// characters in length, and consist of one or more of the
     /// following characters: `A-Z`, `a-z`, `0-9`, `_`, `.`, `-`. It may not start
     /// with `.` or `-`.
-    pub fn new(name: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
-        {
-            let name = name.as_ref();
-            if name.is_empty() {
-                return Err(ParseError::Empty);
-            }
-            if name.len() > N {
-                return Err(ParseError::TooLong);
-            }
-            let mut char_iter = name.chars();
-            let first_char = char_iter.next().unwrap();
-            if !first_char.is_ascii_alphanumeric() && first_char != '_' {
-                return Err(ParseError::InvalidValue);
-            }
-            let valid_fn = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.';
-            if !char_iter.all(valid_fn) {
-                return Err(ParseError::InvalidValue);
-            }
-        }
-        Ok(Self(FlyStr::new(name)))
+    pub fn new(s: impl AsRef<str>) -> Result<Self, ParseError> {
+        let s = s.as_ref();
+        validate_name::<N>(s)?;
+        Ok(Self(FlyStr::new(s)))
     }
 
+    /// Private variant of [`BoundedName::new`] that does not perform correctness checks.
+    /// For efficiency when the caller is sure `s` is a valid [`BoundedName`].
+    fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> Self {
+        Self(FlyStr::new(s.as_ref()))
+    }
+
+    #[inline]
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 }
 
 impl<const N: usize> AsRef<str> for BoundedName<N> {
+    #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
+impl<const N: usize> AsRef<BoundedBorrowedName<N>> for BoundedName<N> {
+    #[inline]
+    fn as_ref(&self) -> &BoundedBorrowedName<N> {
+        BoundedBorrowedName::<N>::new_unchecked(self)
+    }
+}
+
+impl<const N: usize> AsRef<BoundedName<N>> for BoundedName<N> {
+    #[inline]
+    fn as_ref(&self) -> &BoundedName<N> {
+        self
+    }
+}
+
 impl<const N: usize> Borrow<FlyStr> for BoundedName<N> {
+    #[inline]
     fn borrow(&self) -> &FlyStr {
         &self.0
     }
 }
 
-impl<'a, const N: usize> From<BoundedName<N>> for FlyStr {
+impl<const N: usize> Deref for BoundedName<N> {
+    type Target = BoundedBorrowedName<N>;
+
+    #[inline]
+    fn deref(&self) -> &BoundedBorrowedName<N> {
+        BoundedBorrowedName::new_unchecked(self.0.as_str())
+    }
+}
+
+impl<const N: usize> Borrow<BoundedBorrowedName<N>> for BoundedName<N> {
+    #[inline]
+    fn borrow(&self) -> &BoundedBorrowedName<N> {
+        self.deref()
+    }
+}
+
+impl<const N: usize> From<BoundedName<N>> for FlyStr {
+    #[inline]
     fn from(o: BoundedName<N>) -> Self {
         o.0
     }
 }
 
 impl<'a, const N: usize> From<&'a BoundedName<N>> for &'a FlyStr {
+    #[inline]
     fn from(o: &'a BoundedName<N>) -> Self {
         &o.0
     }
 }
 
 impl<const N: usize> PartialEq<&str> for BoundedName<N> {
+    #[inline]
     fn eq(&self, o: &&str) -> bool {
         &*self.0 == *o
     }
 }
 
 impl<const N: usize> PartialEq<String> for BoundedName<N> {
+    #[inline]
     fn eq(&self, o: &String) -> bool {
         &*self.0 == *o
     }
 }
 
 impl<const N: usize> fmt::Display for BoundedName<N> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         <FlyStr as fmt::Display>::fmt(&self.0, f)
     }
@@ -217,20 +249,159 @@ impl<const N: usize> fmt::Display for BoundedName<N> {
 impl<const N: usize> FromStr for BoundedName<N> {
     type Err = ParseError;
 
+    #[inline]
     fn from_str(name: &str) -> Result<Self, Self::Err> {
         Self::new(name)
     }
 }
 
+impl<const N: usize> From<&BoundedBorrowedName<N>> for BoundedName<N> {
+    #[inline]
+    fn from(o: &BoundedBorrowedName<N>) -> Self {
+        Self(o.0.into())
+    }
+}
+
 impl<const N: usize> From<BoundedName<N>> for String {
+    #[inline]
     fn from(name: BoundedName<N>) -> String {
         name.0.into()
     }
 }
 
 impl From<Name> for LongName {
+    #[inline]
     fn from(name: Name) -> Self {
         Self(name.0)
+    }
+}
+
+/// Unowned variant of [`Name`]. [`Name`] for more details.
+pub type BorrowedName = BoundedBorrowedName<MAX_NAME_LENGTH>;
+/// Unowned variant of [`LongName`]. [`LongName`] for more details.
+pub type BorrowedLongName = BoundedBorrowedName<MAX_LONG_NAME_LENGTH>;
+
+/// Like [`BoundedName`], except it holds a string slice rather than an allocated string. For
+/// example, the [`Path`] API uses this to return path segments without making an allocation.
+#[derive(Serialize, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct BoundedBorrowedName<const N: usize>(str);
+
+impl BorrowedName {
+    #[inline]
+    pub fn to_long(&self) -> &BorrowedLongName {
+        // SAFETY: `BorrowedName` and `BorrowedLongName` share the same representation.
+        // Furthermore, every `BorrowedName` is a valid `BorrowedLongName`. Therefore, this
+        // typecast is safe.
+        unsafe { &*(self as *const BorrowedName as *const BorrowedLongName) }
+    }
+}
+
+impl<const N: usize> BoundedBorrowedName<N> {
+    /// Creates a `BoundedBorrowedName` from a `&str` slice, which obeys the same
+    /// rules as `BoundedName`.
+    pub fn new<S: AsRef<str> + ?Sized>(s: &S) -> Result<&Self, ParseError> {
+        validate_name::<N>(s.as_ref())?;
+        Ok(Self::new_unchecked(s))
+    }
+
+    /// Private variant of [`BoundedBorrowedName::new`] that does not perform correctness checks.
+    /// For efficiency when the caller is sure `s` is a valid [`BoundedName`].
+    fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> &Self {
+        // SAFETY: `&str` is the transparent representation of `BorrowedName`. This function is
+        // private, and it is only called from places that are certain the `&str` matches the
+        // `BorrowedName` requirements. Therefore, this typecast is safe.
+        unsafe { &*(s.as_ref() as *const str as *const Self) }
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+fn validate_name<const N: usize>(name: &str) -> Result<(), ParseError> {
+    if name.is_empty() {
+        return Err(ParseError::Empty);
+    }
+    if name.len() > N {
+        return Err(ParseError::TooLong);
+    }
+    let mut char_iter = name.chars();
+    let first_char = char_iter.next().unwrap();
+    if !first_char.is_ascii_alphanumeric() && first_char != '_' {
+        return Err(ParseError::InvalidValue);
+    }
+    let valid_fn = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.';
+    if !char_iter.all(valid_fn) {
+        return Err(ParseError::InvalidValue);
+    }
+    Ok(())
+}
+
+impl<const N: usize> AsRef<str> for BoundedBorrowedName<N> {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<const N: usize> Borrow<str> for BoundedBorrowedName<N> {
+    #[inline]
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<const N: usize> Borrow<str> for &BoundedBorrowedName<N> {
+    #[inline]
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'a, const N: usize> From<&'a BoundedBorrowedName<N>> for &'a str {
+    #[inline]
+    fn from(o: &'a BoundedBorrowedName<N>) -> Self {
+        &o.0
+    }
+}
+
+impl<const N: usize> PartialEq<&str> for BoundedBorrowedName<N> {
+    #[inline]
+    fn eq(&self, o: &&str) -> bool {
+        &self.0 == *o
+    }
+}
+
+impl<const N: usize> PartialEq<String> for BoundedBorrowedName<N> {
+    #[inline]
+    fn eq(&self, o: &String) -> bool {
+        &self.0 == &*o
+    }
+}
+
+impl<const N: usize> fmt::Display for BoundedBorrowedName<N> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <str as fmt::Display>::fmt(&self.0, f)
+    }
+}
+
+impl<'a> From<&'a BorrowedName> for &'a BorrowedLongName {
+    #[inline]
+    fn from(name: &'a BorrowedName) -> Self {
+        name.to_long()
     }
 }
 
@@ -277,14 +448,14 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
 }
 
 impl IterablePath for Name {
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
-        iter::once(self)
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send {
+        iter::once(self as &BorrowedName)
     }
 }
 
 impl IterablePath for &Name {
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
-        iter::once(*self)
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send {
+        iter::once(*self as &BorrowedName)
     }
 }
 
@@ -333,7 +504,7 @@ impl NamespacePath {
     }
 
     /// Splits the path according to `"/"`.
-    pub fn split(&self) -> Vec<Name> {
+    pub fn split(&self) -> Vec<&BorrowedName> {
         self.0.split()
     }
 
@@ -361,7 +532,7 @@ impl NamespacePath {
     }
 
     /// The last path segment, or None.
-    pub fn basename(&self) -> Option<&Name> {
+    pub fn basename(&self) -> Option<&BorrowedName> {
         self.0.basename()
     }
 
@@ -371,7 +542,7 @@ impl NamespacePath {
 }
 
 impl IterablePath for NamespacePath {
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send {
         self.0.iter_segments()
     }
 }
@@ -498,7 +669,7 @@ impl Path {
     }
 
     /// Splits the path according to "/".
-    pub fn split(&self) -> Vec<Name> {
+    pub fn split(&self) -> Vec<&BorrowedName> {
         self.0.split()
     }
 
@@ -513,21 +684,44 @@ impl Path {
         NamespacePath(p)
     }
 
-    pub fn basename(&self) -> &Name {
+    pub fn basename(&self) -> &BorrowedName {
         self.0.basename().expect("can't be root")
     }
 
-    pub fn extend(&mut self, other: RelativePath) {
-        self.0.extend(other);
+    // Attaches the path `other` to the end of `self`. Returns `true` on success, and false
+    // if the resulting path's length would exceed `MAX_PATH_LENGTH`.
+    #[must_use]
+    pub fn extend(&mut self, other: RelativePath) -> bool {
+        let rep: FlyStr = if !other.is_dot() {
+            format!("{}/{}", self.0.rep, other.rep).into()
+        } else {
+            // Nothing to do.
+            return true;
+        };
+        // Account for leading /
+        if rep.len() > MAX_PATH_LENGTH - 1 {
+            return false;
+        }
+        self.0.rep = rep;
+        true
     }
 
-    pub fn push(&mut self, other: Name) {
-        self.0.push(other);
+    // Attaches `segment` to the end of `self`. Returns `true` on success, and false
+    // if the resulting path's length would exceed `MAX_PATH_LENGTH`.
+    #[must_use]
+    pub fn push(&mut self, segment: Name) -> bool {
+        let rep: FlyStr = format!("{}/{}", self.0.rep, segment).into();
+        // Account for leading /
+        if rep.len() > MAX_PATH_LENGTH - 1 {
+            return false;
+        }
+        self.0.rep = rep;
+        true
     }
 }
 
 impl IterablePath for Path {
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send {
         Box::new(self.0.iter_segments())
     }
 }
@@ -615,9 +809,9 @@ impl<'de> de::Deserialize<'de> for Path {
 }
 
 /// Same as [Path] except the path does not begin with `/`.
-#[derive(Eq, Ord, PartialOrd, PartialEq, Hash, Clone, Default)]
+#[derive(Eq, Ord, PartialOrd, PartialEq, Hash, Clone)]
 pub struct RelativePath {
-    segments: Vec<Name>,
+    rep: FlyStr,
 }
 
 impl RelativePath {
@@ -633,42 +827,51 @@ impl RelativePath {
         if path.len() > MAX_PATH_LENGTH {
             return Err(ParseError::TooLong);
         }
-        let segments = path
-            .split('/')
-            .map(|s| {
-                Name::new(s).map_err(|e| match e {
-                    ParseError::Empty => ParseError::InvalidValue,
-                    _ => ParseError::InvalidSegment,
-                })
+        path.split('/').try_for_each(|s| {
+            Name::new(s).map(|_| ()).map_err(|e| match e {
+                ParseError::Empty => ParseError::InvalidValue,
+                _ => ParseError::InvalidSegment,
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { segments })
+        })?;
+        Ok(Self { rep: path.into() })
     }
 
     pub fn dot() -> Self {
-        Self { segments: vec![] }
+        Self { rep: ".".into() }
     }
 
     pub fn is_dot(&self) -> bool {
-        self.segments.is_empty()
+        self.rep == "."
     }
 
     pub fn parent(&self) -> Option<Self> {
-        if self.segments.is_empty() {
+        if self.is_dot() {
             None
         } else {
-            let segments: Vec<_> =
-                self.segments[0..self.segments.len() - 1].into_iter().map(Clone::clone).collect();
-            Some(Self { segments })
+            match self.rep.rfind('/') {
+                Some(idx) => Some(Self::new(&self.rep[0..idx]).unwrap()),
+                None => Some(Self::dot()),
+            }
         }
     }
 
-    pub fn split(&self) -> Vec<Name> {
-        self.segments.clone()
+    pub fn split(&self) -> Vec<&BorrowedName> {
+        if self.is_dot() {
+            vec![]
+        } else {
+            self.rep.split('/').map(|s| BorrowedName::new_unchecked(s)).collect()
+        }
     }
 
-    pub fn basename(&self) -> Option<&Name> {
-        self.segments.last()
+    pub fn basename(&self) -> Option<&BorrowedName> {
+        if self.is_dot() {
+            None
+        } else {
+            match self.rep.rfind('/') {
+                Some(idx) => Some(BorrowedName::new_unchecked(&self.rep[idx + 1..])),
+                None => Some(BorrowedName::new_unchecked(&self.rep)),
+            }
+        }
     }
 
     pub fn to_path_buf(&self) -> PathBuf {
@@ -679,26 +882,68 @@ impl RelativePath {
         }
     }
 
-    pub fn extend(&mut self, other: Self) {
-        self.segments.extend(other.segments);
+    // Attaches the path `other` to the end of `self`. Returns `true` on success, and false
+    // if the resulting path's length would exceed `MAX_PATH_LENGTH`.
+    #[must_use]
+    pub fn extend(&mut self, other: Self) -> bool {
+        let rep = if self.is_dot() {
+            other.rep
+        } else if !other.is_dot() {
+            format!("{}/{}", self.rep, other.rep).into()
+        } else {
+            // Nothing to do.
+            return true;
+        };
+        if rep.len() > MAX_PATH_LENGTH {
+            return false;
+        }
+        self.rep = rep;
+        true
     }
 
-    pub fn push(&mut self, segment: Name) {
-        self.segments.push(segment);
+    // Attaches `segment` to the end of `self`. Returns `true` on success, and false
+    // if the resulting path's length would exceed `MAX_PATH_LENGTH`.
+    #[must_use]
+    pub fn push(&mut self, segment: Name) -> bool {
+        let rep: FlyStr = if self.is_dot() {
+            format!("{segment}").into()
+        } else {
+            format!("{}/{}", self.rep, segment).into()
+        };
+        if rep.len() > MAX_PATH_LENGTH {
+            return false;
+        }
+        self.rep = rep;
+        true
     }
 
     pub fn pop_front(&mut self) -> Option<Name> {
-        if self.segments.is_empty() {
+        if self.is_dot() {
             None
         } else {
-            Some(self.segments.remove(0))
+            let (rep, front) = match self.rep.find('/') {
+                Some(idx) => {
+                    let rep = self.rep[idx + 1..].into();
+                    let front = Name::new_unchecked(&self.rep[0..idx]);
+                    (rep, front)
+                }
+                None => (".".into(), Name::new_unchecked(&self.rep)),
+            };
+            self.rep = rep;
+            Some(front)
         }
     }
 }
 
+impl Default for RelativePath {
+    fn default() -> Self {
+        Self::dot()
+    }
+}
+
 impl IterablePath for RelativePath {
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
-        Box::new(self.segments.iter())
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send {
+        Box::new(self.split().into_iter())
     }
 }
 
@@ -718,7 +963,23 @@ impl From<RelativePath> for String {
 
 impl From<Vec<Name>> for RelativePath {
     fn from(segments: Vec<Name>) -> Self {
-        Self { segments }
+        if segments.is_empty() {
+            Self::dot()
+        } else {
+            Self { rep: segments.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("/").into() }
+        }
+    }
+}
+
+impl From<Vec<&BorrowedName>> for RelativePath {
+    fn from(segments: Vec<&BorrowedName>) -> Self {
+        if segments.is_empty() {
+            Self::dot()
+        } else {
+            Self {
+                rep: segments.into_iter().map(|s| s.as_str()).collect::<Vec<_>>().join("/").into(),
+            }
+        }
     }
 }
 
@@ -730,11 +991,7 @@ impl fmt::Debug for RelativePath {
 
 impl fmt::Display for RelativePath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.is_dot() {
-            write!(f, ".")
-        } else {
-            write!(f, "{}", self.segments.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("/"))
-        }
+        write!(f, "{}", self.rep)
     }
 }
 
@@ -817,8 +1074,8 @@ impl fmt::Display for BorrowedSeparatedPath<'_> {
 }
 
 impl IterablePath for BorrowedSeparatedPath<'_> {
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
-        Box::new(self.dirname.iter_segments().chain(iter::once(self.basename)))
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send {
+        Box::new(self.dirname.iter_segments().chain(iter::once(self.basename as &BorrowedName)))
     }
 }
 
@@ -839,8 +1096,8 @@ impl SeparatedPath {
 }
 
 impl IterablePath for SeparatedPath {
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
-        Box::new(self.dirname.iter_segments().chain(iter::once(&self.basename)))
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send {
+        Box::new(self.dirname.iter_segments().chain(iter::once(&self.basename as &BorrowedName)))
     }
 }
 
@@ -857,7 +1114,7 @@ impl fmt::Display for SeparatedPath {
 /// Trait implemented by path types that provides an API to iterate over path segments.
 pub trait IterablePath: Clone + Send + Sync {
     /// Returns a double-sided iterator over the segments in this path.
-    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send;
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &BorrowedName> + Send;
 }
 
 /// A component URL. The URL is validated, but represented as a string to avoid
@@ -866,7 +1123,7 @@ pub trait IterablePath: Clone + Send + Sync {
 pub struct Url(FlyStr);
 
 impl Url {
-    /// Creates a `Url` from a `String`, returning an `Err` if the string fails
+    /// Creates a `Url` from a `&str` slice, returning an `Err` if the string fails
     /// validation. The string must be non-empty, no more than 4096 characters
     /// in length, and be a valid URL. See the [`url`](../../url/index.html) crate.
     pub fn new(url: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
@@ -1430,6 +1687,56 @@ mod tests {
         );
     }
 
+    // Keep in sync with test_relative_path_methods()
+    #[test]
+    fn test_path_methods() {
+        let dot = RelativePath::dot();
+        let prefix = Path::new("/some/path").unwrap();
+        let suffix = RelativePath::new("another/path").unwrap();
+        let segment = Name::new("segment").unwrap();
+
+        let mut path = prefix.clone();
+        assert!(path.extend(suffix.clone()));
+        assert_eq!(path, "/some/path/another/path".parse().unwrap());
+        assert_eq!(
+            path.split(),
+            [
+                BorrowedName::new("some").unwrap(),
+                BorrowedName::new("path").unwrap(),
+                BorrowedName::new("another").unwrap(),
+                BorrowedName::new("path").unwrap(),
+            ]
+        );
+
+        let mut path = prefix.clone();
+        assert!(path.extend(dot.clone()));
+        assert_eq!(path, "/some/path".parse().unwrap());
+
+        let mut path = prefix.clone();
+        assert!(path.push(segment.clone()));
+        assert_eq!(path, "/some/path/segment".parse().unwrap());
+        assert!(path.push(segment.clone()));
+        assert_eq!(path, "/some/path/segment/segment".parse().unwrap());
+        assert_eq!(
+            path.split(),
+            [
+                BorrowedName::new("some").unwrap(),
+                BorrowedName::new("path").unwrap(),
+                BorrowedName::new("segment").unwrap(),
+                BorrowedName::new("segment").unwrap(),
+            ]
+        );
+
+        let long_path =
+            Path::new(format!("{}/xx", repeat("/x").take(4092 / 2).collect::<String>())).unwrap();
+        let mut path = long_path.clone();
+        // One more than the maximum size.
+        assert!(!path.push("a".parse().unwrap()));
+        assert_eq!(path, long_path);
+        assert!(!path.extend("a".parse().unwrap()));
+        assert_eq!(path, long_path);
+    }
+
     #[test]
     fn test_valid_namespace_path() {
         expect_ok_no_serialize!(NamespacePath, "/");
@@ -1473,32 +1780,25 @@ mod tests {
     #[test]
     fn test_path_parent_basename() {
         let path = Path::new("/foo").unwrap();
-        assert_eq!(
-            (path.parent(), path.basename()),
-            ("/".parse().unwrap(), &"foo".parse().unwrap())
-        );
+        assert_eq!((path.parent().to_string().as_str(), path.basename().as_str()), ("/", "foo"));
         let path = Path::new("/foo/bar").unwrap();
-        assert_eq!(
-            (path.parent(), path.basename()),
-            ("/foo".parse().unwrap(), &"bar".parse().unwrap())
-        );
+        assert_eq!((path.parent().to_string().as_str(), path.basename().as_str()), ("/foo", "bar"));
         let path = Path::new("/foo/bar/baz").unwrap();
         assert_eq!(
-            (path.parent(), path.basename()),
-            ("/foo/bar".parse().unwrap(), &"baz".parse().unwrap())
+            (path.parent().to_string().as_str(), path.basename().as_str()),
+            ("/foo/bar", "baz")
         );
     }
 
     #[test]
     fn test_separated_path() {
         fn test_path(path: SeparatedPath, in_expected_segments: Vec<&str>) {
-            let expected_segments: Vec<_> =
-                in_expected_segments.iter().map(|s| Name::new(*s).unwrap()).collect();
-            let expected_segments: Vec<_> = expected_segments.iter().collect();
-            let segments: Vec<_> = path.iter_segments().collect();
+            let expected_segments: Vec<&BorrowedName> =
+                in_expected_segments.iter().map(|s| BorrowedName::new(*s).unwrap()).collect();
+            let segments: Vec<&BorrowedName> = path.iter_segments().collect();
             assert_eq!(segments, expected_segments);
             let borrowed_path = path.as_ref();
-            let segments: Vec<_> = borrowed_path.iter_segments().collect();
+            let segments: Vec<&BorrowedName> = borrowed_path.iter_segments().collect();
             assert_eq!(segments, expected_segments);
             let owned_path = borrowed_path.to_owned();
             assert_eq!(path, owned_path);
@@ -1543,6 +1843,72 @@ mod tests {
             ParseError::TooLong,
             &format!("x{}", repeat("/x").take(2048).collect::<String>())
         );
+    }
+
+    // Keep in sync with test_path_methods()
+    #[test]
+    fn test_relative_path_methods() {
+        let dot = RelativePath::dot();
+        let prefix = RelativePath::new("some/path").unwrap();
+        let suffix = RelativePath::new("another/path").unwrap();
+        let segment = Name::new("segment").unwrap();
+
+        let mut path = prefix.clone();
+        assert!(path.extend(suffix.clone()));
+        assert_eq!(path, "some/path/another/path".parse().unwrap());
+        assert_eq!(
+            path.split(),
+            [
+                BorrowedName::new("some").unwrap(),
+                BorrowedName::new("path").unwrap(),
+                BorrowedName::new("another").unwrap(),
+                BorrowedName::new("path").unwrap(),
+            ]
+        );
+        assert_eq!(path.pop_front(), Some(Name::new("some").unwrap()));
+        assert_eq!(path.pop_front(), Some(Name::new("path").unwrap()));
+        assert_eq!(path.pop_front(), Some(Name::new("another").unwrap()));
+        assert_eq!(path.pop_front(), Some(Name::new("path").unwrap()));
+        assert_eq!(path.pop_front(), None);
+
+        let mut path = prefix.clone();
+        assert!(path.extend(dot.clone()));
+        assert_eq!(path, "some/path".parse().unwrap());
+        let mut path = dot.clone();
+        assert!(path.extend(suffix));
+        assert_eq!(path, "another/path".parse().unwrap());
+        let mut path = dot.clone();
+        assert!(path.extend(dot.clone()));
+        assert_eq!(path, RelativePath::dot());
+
+        let mut path = prefix.clone();
+        assert!(path.push(segment.clone()));
+        assert_eq!(path, "some/path/segment".parse().unwrap());
+        assert!(path.push(segment.clone()));
+        assert_eq!(path, "some/path/segment/segment".parse().unwrap());
+        assert_eq!(
+            path.split(),
+            [
+                BorrowedName::new("some").unwrap(),
+                BorrowedName::new("path").unwrap(),
+                BorrowedName::new("segment").unwrap(),
+                BorrowedName::new("segment").unwrap(),
+            ]
+        );
+
+        let mut path = dot.clone();
+        assert!(path.push(segment.clone()));
+        assert_eq!(path, "segment".parse().unwrap());
+
+        let long_path =
+            RelativePath::new(format!("{}x", repeat("x/").take(4094 / 2).collect::<String>()))
+                .unwrap();
+        let mut path = long_path.clone();
+        // One more than the maximum size.
+        assert!(!path.push("a".parse().unwrap()));
+        assert_eq!(path, long_path);
+        assert!(!path.extend("a".parse().unwrap()));
+        assert_eq!(path, long_path);
     }
 
     #[test]

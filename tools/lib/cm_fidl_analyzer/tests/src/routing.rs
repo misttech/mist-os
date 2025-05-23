@@ -348,7 +348,7 @@ impl RoutingTestForAnalyzer {
             | CheckUse::Service { path, expected_res, .. } => (
                 decl.exposes
                     .iter()
-                    .find(|&e| e.target_name() == path.basename())
+                    .find(|e| **e.target_name() == *path.basename())
                     .cloned()
                     .ok_or(TestModelError::ExposeDeclNotFound),
                 expected_res,
@@ -536,7 +536,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
             .unwrap()
             .component_output
             .framework()
-            .get(&capability_name)
+            .get(capability_name)
             .expect(
                 "component is missing capability in sandbox, does the expose to framework exist?",
             )

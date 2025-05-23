@@ -13,8 +13,8 @@ use fuchsia_component::client::{
 };
 use fuchsia_component::directory::{AsRefDirectory, Directory};
 use fuchsia_component::DEFAULT_SERVICE_INSTANCE;
-use namespace::{Entry, Namespace};
 use log::error;
+use namespace::{Entry, Namespace};
 use zx::Status;
 
 /// Implements access to the incoming namespace for a driver. It provides methods
@@ -171,7 +171,7 @@ fn match_prefix(match_in: &impl IterablePath, prefix: &impl IterablePath) -> Opt
         // did not match all prefix segments
         return None;
     }
-    let segments = Vec::from_iter(my_segments.cloned());
+    let segments = Vec::from_iter(my_segments);
     Some(RelativePath::from(segments))
 }
 

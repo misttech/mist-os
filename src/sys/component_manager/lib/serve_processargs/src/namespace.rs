@@ -79,7 +79,7 @@ impl NamespaceBuilder {
         };
 
         // Insert the capability into the Dict.
-        dict.insert(path.basename().clone(), cap)
+        dict.insert(path.basename().into(), cap)
             .map_err(|_| NamespaceError::Duplicate(path.clone().into()).into())
     }
 
