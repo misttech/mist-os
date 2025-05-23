@@ -1060,6 +1060,7 @@ class FuchsiaDeviceImpl(
             raise fc_errors.FuchsiaControllerError(
                 "get_attributes() returned empty content size"
             )
+        expected_size: int = attr_resp.immutable_attributes.content_size
 
         # Read until channel is empty.
         ret: bytearray = bytearray()
@@ -1075,7 +1076,6 @@ class FuchsiaDeviceImpl(
             raise fc_errors.FuchsiaControllerError("read() failed") from e
 
         # Verify transfer.
-        expected_size: int = attr_resp.immutable_attributes.content_size
         if len(ret) != expected_size:
             raise fc_errors.FuchsiaControllerError(
                 f"Expected {expected_size} bytes, but read {len(ret)} bytes"
