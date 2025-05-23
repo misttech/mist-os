@@ -2700,26 +2700,98 @@ fn test_roam_profile_scans_obey_wait_time<F>(
 #[test_case(
     RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
     solicit_roam_scan_weak_rssi,
+    Saved::None,
+    Scanned::Open,
     true;
     "enabled stationary weak rssi should roam"
 )]
 #[test_case(
     RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
     solicit_roam_scan_weak_rssi,
+    Saved::None,
+    Scanned::Open,
     false;
     "enabled stationary metrics only weak rssi should not roam"
 )]
 #[test_case(
     RoamingPolicy::Disabled,
     solicit_roam_scan_weak_rssi,
+    Saved::None,
+    Scanned::Open,
     false;
     "disabled weak rssi should not roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa,
+    Scanned::Wpa1Wpa2Personal,
+    true;
+    "enabled wpa saved wpa1wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa1Wpa2Personal,
+    true;
+    "enabled wpa2 saved wpa1wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa,
+    Scanned::Wpa2Personal,
+    true;
+    "enabled wpa saved wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa2Personal,
+    true;
+    "enabled wpa2 saved wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa2Wpa3Personal,
+    true;
+    "enabled wpa2 saved wpa2wpa3 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa3,
+    Scanned::Wpa2Wpa3Personal,
+    true;
+    "enabled wpa3 saved wpa2wpa3 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa3Personal,
+    true;
+    "enabled wpa2 saved wpa3 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa3,
+    Scanned::Wpa3Personal,
+    true;
+    "enabled wpa3 saved wpa3 ap should roam"
 )]
 #[fuchsia::test(add_test_attr = false)]
 // Tests if roaming policies trigger roam requests in different scenarios.
 fn test_roam_policy_sends_roam_request<F>(
     roaming_policy: RoamingPolicy,
     mut roam_scan_solicit_func: F,
+    saved_security: Saved,
+    ap_security: Scanned,
     should_trigger_roam_request: bool,
 ) where
     F: RoamScanSolicitFunc,
@@ -2728,12 +2800,19 @@ fn test_roam_policy_sends_roam_request<F>(
     let mut test_values =
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, roaming_policy);
 
+    // Choose an appropriate credential for the security type.
+    let credential = if saved_security == Saved::None {
+        TEST_CREDS.none.clone()
+    } else {
+        TEST_CREDS.wpa_pass_min.clone()
+    };
+
     // Connect to a network.
     let mut existing_connection = save_and_connect(
         TEST_SSID.clone(),
-        Saved::None,
-        Scanned::Open,
-        TEST_CREDS.none.clone(),
+        saved_security,
+        ap_security,
+        credential,
         &mut exec,
         &mut test_values,
     );
@@ -2741,11 +2820,11 @@ fn test_roam_policy_sends_roam_request<F>(
     // Create a mock scan result roam candidate with a very strong BSS.
     let mock_scan_results = vec![fidl_sme::ScanResult {
         compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-            mutual_security_protocols: security_protocols_from_protection(Scanned::Open),
+            mutual_security_protocols: security_protocols_from_protection(ap_security),
         }),
         timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
         bss_description: random_fidl_bss_description!(
-            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Open),
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(ap_security),
             bssid: [1, 1, 1, 1, 1, 1],
             ssid: TEST_SSID.clone(),
             rssi_dbm: -10,
