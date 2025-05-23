@@ -49,7 +49,7 @@ The `fx set` and `fx build` commands that `fx repro` prints both set the
   from standard command-line arguments.
 - `fx build` will bootstrap and run `fint` instead of running `ninja` directly.
 
-## Command-line interface
+## CLI
 
 fint has two subcommands, intended to be run in succession:
 
