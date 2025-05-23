@@ -1764,6 +1764,74 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
     }
 }
 
+#[fuchsia::test]
+fn test_destroy_iface_recovery() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values =
+        test_setup(&mut exec, "thresholded_recovery", true, RoamingPolicy::Disabled);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Enable client connections.
+    let _iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
+
+    // Turn off client connections via Policy API
+    let stop_connections_fut =
+        test_values.external_interfaces.client_controller.stop_client_connections();
+    let mut stop_connections_fut = pin!(stop_connections_fut);
+    assert_variant!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
+
+    // Device monitor gets an iface destruction request and responds indicating that the interface
+    // destruction was unsuccessful.
+    let iface_destruction_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        iface_destruction_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::DestroyIface {
+            req: fidl_fuchsia_wlan_device_service::DestroyIfaceRequest {
+                iface_id: TEST_CLIENT_IFACE_ID
+            },
+            responder
+        })) => {
+            assert!(responder.send(
+                zx::sys::ZX_ERR_INTERNAL
+            ).is_ok());
+        }
+    );
+
+    // Check for a response to the Policy API stop client connections request
+    let stop_connections_resp = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut stop_connections_fut,
+    );
+    assert_variant!(
+        stop_connections_resp,
+        Ok(fidl_fuchsia_wlan_policy::RequestStatus::Acknowledged)
+    );
+
+    // Run the wlancfg internals and verify that a PHY reset has been requested.
+    let phy_reset_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        phy_reset_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::Reset {
+            phy_id: TEST_PHY_ID,
+            ..
+        }))
+    );
+}
+
 fn request_scan_and_reply(
     exec: &mut TestExecutor,
     test_values: &mut TestValues,
