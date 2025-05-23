@@ -5,13 +5,13 @@
 mod format;
 
 use crate::format::{
-    MetadataExtent, MetadataGeometry, MetadataHeader, METADATA_GEOMETRY_RESERVED_SIZE,
-    PARTITION_RESERVED_BYTES,
+    BlockDeviceFlags, MetadataExtent, MetadataGeometry, MetadataHeader, PartitionGroupFlags,
+    METADATA_GEOMETRY_RESERVED_SIZE, PARTITION_RESERVED_BYTES,
 };
 use anyhow::{anyhow, ensure, Error};
 use format::{
-    MetadataBlockDevice, MetadataPartition, MetadataPartitionGroup, MetadataTableDescriptor,
-    ValidateTable,
+    AdjustSlotSuffix, MetadataBlockDevice, MetadataPartition, MetadataPartitionGroup,
+    MetadataTableDescriptor, ValidateTable,
 };
 use sha2::Digest;
 use storage_device::fake_device::FakeDevice;
@@ -47,25 +47,28 @@ impl Metadata {
 
         ensure!(slot_number < geometry.metadata_slot_count, "Invalid metadata slot count");
 
-        match Self::load_metadata(
+        let mut metadata = match Self::load_metadata(
             &device,
             geometry,
             geometry.get_primary_metadata_offset(slot_number)?,
         )
         .await
         {
-            Ok(metadata) => {
-                return Ok(metadata);
-            }
+            Ok(metadata) => metadata,
             Err(_) => {
-                return Self::load_metadata(
+                Self::load_metadata(
                     &device,
                     geometry,
                     geometry.get_backup_metadata_offset(slot_number)?,
                 )
-                .await
+                .await?
             }
-        }
+        };
+
+        // Need to update names for slot suffix before returning metadata.
+        metadata.adjust_for_slot_suffix(slot_number)?;
+
+        Ok(metadata)
     }
 
     // Load and validate geometry information from a block device that holds logical partitions.
@@ -241,6 +244,21 @@ impl Metadata {
         }
         Ok(entries)
     }
+
+    fn adjust_for_slot_suffix(&mut self, slot_number: u32) -> Result<(), Error> {
+        for partition in &mut self.partitions {
+            partition.adjust_for_slot_suffix(slot_number)?;
+        }
+
+        for block_device in &mut self.block_devices {
+            block_device.adjust_for_slot_suffix(slot_number)?;
+        }
+
+        for partition_group in &mut self.partition_groups {
+            partition_group.adjust_for_slot_suffix(slot_number)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -253,7 +271,7 @@ mod tests {
 
     const BLOCK_SIZE: u32 = 4096;
     const IMAGE_PATH: &str = "/pkg/data/simple_super.img.zstd";
-    const IMAGE_METADATA_MAX_SIZE: u32 = 65536;
+    const IMAGE_METADATA_MAX_SIZE: u32 = 4096;
 
     fn open_image(path: &Path) -> FakeDevice {
         // If image changes at the file path, need to update the `verify_*` functions below that
@@ -284,31 +302,44 @@ mod tests {
     }
 
     // Verify metadata partitions table against the image at `IMAGE_PATH`.
-    fn verify_partitions_table(metadata: &Metadata) -> Result<(), Error> {
+    fn verify_partitions_table(metadata: &Metadata, slot_number: u32) -> Result<(), Error> {
         let partitions = &metadata.partitions;
         // The first entry in the partitions table is "system".
-        let expected_name = "system".to_string();
         let partition_name = String::from_utf8(partitions[0].name.to_vec())
             .expect("failed to convert partition entry name to string");
-        assert_eq!(partition_name[..expected_name.len()], expected_name);
+        let expected_name = match slot_number {
+            0 => "system_a".to_string(),
+            1 => "system_b".to_string(),
+            _ => return Err(anyhow!("unexpected slot number: should be 0 or 1")),
+        };
+        assert_eq!(partition_name.trim_end_matches(|c| c == '\0'), expected_name);
         let partition_attributes = partitions[0].attributes;
         assert_eq!(partition_attributes, PartitionAttributes::READONLY);
         let system_partition_extent_index = partitions[0].first_extent_index;
         let system_partition_num_extents = partitions[0].num_extents;
         assert_eq!(system_partition_extent_index, 0);
         assert_eq!(system_partition_num_extents, 1);
+        // The slot suffix flag should be removed after parsing Metadata.
+        let attributes = partitions[0].attributes;
+        assert!(!attributes.contains(PartitionAttributes::SLOT_SUFFIXED));
 
         // The next entry in the partitions table is "system_ext".
-        let expected_name = "system_ext".to_string();
         let partition_name = String::from_utf8(partitions[1].name.to_vec())
             .expect("failed to convert partition entry name to string");
-        assert_eq!(partition_name[..expected_name.len()], expected_name);
+        let expected_name = match slot_number {
+            0 => "system_ext_a".to_string(),
+            1 => "system_ext_b".to_string(),
+            _ => return Err(anyhow!("unexpected slot number: should be 0 or 1")),
+        };
+        assert_eq!(partition_name.trim_end_matches(|c| c == '\0'), expected_name);
         let partition_attributes = partitions[1].attributes;
         assert_eq!(partition_attributes, PartitionAttributes::READONLY);
         let system_partition_extent_index = partitions[1].first_extent_index;
         let system_partition_num_extents = partitions[1].num_extents;
         assert_eq!(system_partition_extent_index, 1);
         assert_eq!(system_partition_num_extents, 1);
+        let attributes = partitions[1].attributes;
+        assert!(!attributes.contains(PartitionAttributes::SLOT_SUFFIXED));
         Ok(())
     }
 
@@ -327,38 +358,62 @@ mod tests {
     }
 
     // Verify metadata partition groups table against the image at `IMAGE_PATH`.
-    fn verify_partition_groups_table(metadata: &Metadata) -> Result<(), Error> {
-        // Expect to see one group, "default", of unlimited maximum size.
-        assert_eq!(metadata.partition_groups.len(), 1);
-        let group = metadata.partition_groups[0];
-        let expected_name = "default".to_string();
+    fn verify_partition_groups_table(metadata: &Metadata, slot_numer: u32) -> Result<(), Error> {
+        // Expect to see two groups, "default" of unlimited maximum size and "example" of size 0.
+        assert_eq!(metadata.partition_groups.len(), 2);
+
+        // The default group does not have a slot suffix applied.
+        let default_group = metadata.partition_groups[0];
+        let name = String::from_utf8(default_group.name.to_vec())
+            .expect("failed to convert partition group name to string");
+        assert_eq!(name.trim_end_matches(|c| c == '\0'), "default".to_string());
+        let maximum_size = default_group.maximum_size;
+        assert_eq!(maximum_size, 0);
+
+        let group = metadata.partition_groups[1];
         let name = String::from_utf8(group.name.to_vec())
             .expect("failed to convert partition group name to string");
-        assert_eq!(name[..expected_name.len()], expected_name);
+        let expected_name = match slot_numer {
+            0 => "example_a".to_string(),
+            1 => "example_b".to_string(),
+            _ => return Err(anyhow!("unexpected slot number: should be 0 or 1")),
+        };
+        assert_eq!(name.trim_end_matches(|c| c == '\0'), expected_name);
         let maximum_size = group.maximum_size;
         assert_eq!(maximum_size, 0);
+
+        // The slot suffix flag should be removed after parsing Metadata.
+        let group_flag = group.flags;
+        assert!(!group_flag.contains(PartitionGroupFlags::SLOT_SUFFIXED));
         Ok(())
     }
 
     // Verify metadata block devices table against the image at `IMAGE_PATH`.
-    fn verify_block_devices_table(metadata: &Metadata) -> Result<(), Error> {
+    fn verify_block_devices_table(metadata: &Metadata, slot_number: u32) -> Result<(), Error> {
         let block_devices = &metadata.block_devices;
-        let expected_name = "super".to_string();
         let partition_name = String::from_utf8(block_devices[0].partition_name.to_vec())
             .expect("failed to convert partition entry name to string");
-        assert_eq!(partition_name[..expected_name.len()], expected_name);
+        let expected_name = match slot_number {
+            0 => "super_a".to_string(),
+            1 => "super_b".to_string(),
+            _ => return Err(anyhow!("unexpected slot number: should be 0 or 1")),
+        };
+        assert_eq!(partition_name.trim_end_matches(|c| c == '\0'), expected_name);
         let device_size = block_devices[0].size;
-        assert_eq!(device_size, 10485760);
+        assert_eq!(device_size, 4194304);
+        let flag = block_devices[0].flags;
+        assert!(!flag.contains(BlockDeviceFlags::SLOT_SUFFIXED));
         Ok(())
     }
 
-    fn verify_super_metadata(metadata: &Metadata) -> Result<(), Error> {
+    fn verify_super_metadata(metadata: &Metadata, slot_number: u32) -> Result<(), Error> {
         verify_geometry(metadata).expect("incorrect geometry");
         verify_header(metadata).expect("incorrect header");
-        verify_partitions_table(metadata).expect("incorrect partitions table");
+        verify_partitions_table(metadata, slot_number).expect("incorrect partitions table");
         verify_extents_table(metadata).expect("incorrect extents table");
-        verify_partition_groups_table(metadata).expect("incorrect partition groups table");
-        verify_block_devices_table(metadata).expect("incorrect block devices table");
+        verify_partition_groups_table(metadata, slot_number)
+            .expect("incorrect partition groups table");
+        verify_block_devices_table(metadata, slot_number).expect("incorrect block devices table");
         Ok(())
     }
 
@@ -369,7 +424,7 @@ mod tests {
         let super_partition =
             Metadata::load_from_device(&device, 0).await.expect("failed to load super metatata.");
 
-        verify_super_metadata(&super_partition).expect("incorrect metadata");
+        verify_super_metadata(&super_partition, 0).expect("incorrect metadata");
         device.close().await.expect("failed to close device");
     }
 
@@ -394,7 +449,7 @@ mod tests {
 
         let super_partition =
             Metadata::load_from_device(&device, 0).await.expect("failed to load super metatata.");
-        verify_super_metadata(&super_partition).expect("incorrect metadata");
+        verify_super_metadata(&super_partition, 0).expect("incorrect metadata");
         device.close().await.expect("failed to close device");
     }
 
@@ -454,11 +509,11 @@ mod tests {
 
         let metadata_slot0 =
             Metadata::load_from_device(&device, 0).await.expect("failed to load super metatata.");
-        verify_super_metadata(&metadata_slot0).expect("incorrect metadata");
+        verify_super_metadata(&metadata_slot0, 0).expect("incorrect metadata");
 
         let metadata_slot1 =
             Metadata::load_from_device(&device, 1).await.expect("failed to load super metatata.");
-        verify_super_metadata(&metadata_slot1).expect("incorrect metadata");
+        verify_super_metadata(&metadata_slot1, 1).expect("incorrect metadata");
     }
 
     #[fuchsia::test]

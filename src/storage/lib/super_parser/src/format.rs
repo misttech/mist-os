@@ -292,8 +292,7 @@ bitflags! {
         const READONLY = 1 << 0;
         /// If set, indicates that the partition name needs a slot suffix applied. The slot suffix
         /// is determined by the metadata slot number (e.g. slot 0 will have suffix "_a", and slot 1
-        /// will have suffix "_b").
-        // TODO(https://fxbug.dev/404952286): Adjust partition name to have suffix applied if set.
+        /// will have suffix "_b"). This will be applied when the metadata is read.
         const SLOT_SUFFIXED = 1 << 1;
         /// If set, indicates the the partition was created (or modified) for a snapshot-based
         /// update. If not present, the partition was likely flashed via fastboot.
@@ -312,6 +311,39 @@ pub trait ValidateTable {
     // entry, for example, `MetadataPartition` table entry has `attributes` and we check that it
     // only contains the allowed attributes.
     fn validate(&self, header: &MetadataHeader) -> Result<(), Error>;
+}
+
+/// Adjust names of the slot to include a slot suffix. The suffix attached will be dependent on the
+/// slot number. Only two slot numbers are accepted. Slot number 0 will map to suffix "_a" and slot
+/// number 1 will map to suffix "_b". The names are adjusted when metadata is read and if the
+/// `*::SLOT_SUFFIXED` flag is set. There must be enough characters in the name (total 36) to allow
+/// for adding the suffix. On success, unset the `*::SLOT_SUFFIXED` flag.
+pub trait AdjustSlotSuffix {
+    fn adjust_for_slot_suffix(&mut self, slot_number: u32) -> Result<(), Error>;
+}
+
+// Some of the structs contain u8 arrays representing ASCII characters. They may contain trailing
+// zeros. This function returns the length of the sub-slice before we encounter the first zero (if
+// there are no zeroes, then the returned length will be the size of the original array).
+fn get_trimmed_len(chars: &[u8]) -> usize {
+    chars.iter().position(|&x| x == 0).unwrap_or(chars.len())
+}
+
+// Used to update slot names to include the slot suffix.
+fn add_slot_suffix(name: &mut [u8], slot_number: u32) -> Result<(), Error> {
+    ensure!(slot_number < 2, "Invalid slot number. Must be 0 or 1.");
+
+    let trimmed_len = get_trimmed_len(&name);
+    // This should have been check in `validate()` , but just in case the caller did not
+    // call it, check that we can add suffix.
+    ensure!(trimmed_len <= name.len() - 2, "Logical partition name is too long");
+
+    name[trimmed_len..trimmed_len + 2].copy_from_slice(if slot_number == 0 {
+        b"_a"
+    } else {
+        b"_b"
+    });
+    Ok(())
 }
 
 pub const PARTITION_ATTRIBUTE_MASK_V0: PartitionAttributes =
@@ -351,6 +383,29 @@ impl ValidateTable for MetadataPartition {
             self.group_index < header.groups.num_entries,
             "Logical partition has invalid group index."
         );
+        ensure!(self.name.is_ascii(), "Logical parition name is not ASCII.");
+
+        let attributes = self.attributes;
+        if attributes.contains(PartitionAttributes::SLOT_SUFFIXED) {
+            // If `PartitionAttributes::SLOT_SUFFIXED`, `name` will have a slot suffix applied (
+            // either "_a" or "_b" depending on the slot number) when the metadata is read. Ensure
+            // that there are enough characters to add the suffix.
+            ensure!(
+                get_trimmed_len(&self.name) <= self.name.len() - 2,
+                "Logical partition name is too long"
+            );
+        }
+        Ok(())
+    }
+}
+
+impl AdjustSlotSuffix for MetadataPartition {
+    fn adjust_for_slot_suffix(&mut self, slot_number: u32) -> Result<(), Error> {
+        let attributes = self.attributes;
+        if attributes.contains(PartitionAttributes::SLOT_SUFFIXED) {
+            add_slot_suffix(&mut self.name, slot_number)?;
+            self.attributes = attributes.difference(PartitionAttributes::SLOT_SUFFIXED);
+        }
         Ok(())
     }
 }
@@ -401,8 +456,9 @@ impl ValidateTable for MetadataExtent {
 pub struct PartitionGroupFlags(u32);
 bitflags! {
     impl PartitionGroupFlags: u32 {
-        /// If this is set, then the group needs the slot suffix to be interpreted correctly.
-        // TODO(https://fxbug.dev/404952286): Adjust group name to have suffix applied if set.
+        /// If this is set, indicates that the partition group name needs a slot suffix applied. The
+        /// slot suffix is determined by the metadata slot number (e.g. slot 0 will have suffix
+        /// "_a", and slot 1 will have suffix "_b"). This will be applied when the metadata is read.
         const SLOT_SUFFIXED = 1 << 0;
     }
 }
@@ -419,7 +475,28 @@ pub struct MetadataPartitionGroup {
 
 impl ValidateTable for MetadataPartitionGroup {
     fn validate(&self, _header: &MetadataHeader) -> Result<(), Error> {
-        // Nothing to validate
+        ensure!(self.name.is_ascii(), "Partition group name is not ASCII.");
+        let flags = self.flags;
+        if flags.contains(PartitionGroupFlags::SLOT_SUFFIXED) {
+            // If `PartitionGroupFlags::SLOT_SUFFIXED`, `name` will have a slot suffix applied (
+            // either "_a" or "_b" depending on the slot number) when the metadata is read. Ensure
+            // that there are enough characters to add the suffix.
+            ensure!(
+                get_trimmed_len(&self.name) <= self.name.len() - 2,
+                "Partition group name is too long"
+            );
+        }
+        Ok(())
+    }
+}
+
+impl AdjustSlotSuffix for MetadataPartitionGroup {
+    fn adjust_for_slot_suffix(&mut self, slot_number: u32) -> Result<(), Error> {
+        let flags = self.flags;
+        if flags.contains(PartitionGroupFlags::SLOT_SUFFIXED) {
+            add_slot_suffix(&mut self.name, slot_number)?;
+            self.flags = flags.difference(PartitionGroupFlags::SLOT_SUFFIXED);
+        }
         Ok(())
     }
 }
@@ -430,8 +507,8 @@ bitflags! {
     impl BlockDeviceFlags: u32 {
         /// Similar to the other `*_Flags::SLOT_SUFFIXED` flag. If this is set, then the
         /// `partition_name` in block device needs the slot suffix applied. The slot suffix is
-        /// determined by the metadata slot number (e.g. 0 => "_a" and 1 => "_b").
-        // TODO(https://fxbug.dev/404952286): Adjust partition_name to have suffix applied if set.
+        /// determined by the metadata slot number (e.g. 0 => "_a" and 1 => "_b"). This will be
+        /// applied when the metadata is read.
         const SLOT_SUFFIXED = 1 << 0;
     }
 }
@@ -470,7 +547,31 @@ pub struct MetadataBlockDevice {
 
 impl ValidateTable for MetadataBlockDevice {
     fn validate(&self, _header: &MetadataHeader) -> Result<(), Error> {
-        ensure!(self.get_first_logical_sector_in_bytes().is_ok(), "Invalid first logical sector.");
+        let _ = self
+            .get_first_logical_sector_in_bytes()
+            .map_err(|e| anyhow!("Invalid first logical sector: {e}"))?;
+        ensure!(self.partition_name.is_ascii(), "Block device name is not ASCII.");
+        let flags = self.flags;
+        if flags.contains(BlockDeviceFlags::SLOT_SUFFIXED) {
+            // If `BlockDeviceFlags::SLOT_SUFFIXED`, `name` will have a slot suffix applied (
+            // either "_a" or "_b" depending on the slot number) when the metadata is read. Ensure
+            // that there are enough characters to add the suffix.
+            ensure!(
+                get_trimmed_len(&self.partition_name) <= self.partition_name.len() - 2,
+                "Block device name is too long"
+            );
+        }
+        Ok(())
+    }
+}
+
+impl AdjustSlotSuffix for MetadataBlockDevice {
+    fn adjust_for_slot_suffix(&mut self, slot_number: u32) -> Result<(), Error> {
+        let flags = self.flags;
+        if flags.contains(BlockDeviceFlags::SLOT_SUFFIXED) {
+            add_slot_suffix(&mut self.partition_name, slot_number)?;
+            self.flags = flags.difference(BlockDeviceFlags::SLOT_SUFFIXED);
+        }
         Ok(())
     }
 }
@@ -726,6 +827,31 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_partition_table_entry_with_slot_suffixed() {
+        let mut partition = VALID_PARTITION_TABLE_ENTRY;
+        partition.attributes = PartitionAttributes::SLOT_SUFFIXED;
+        partition
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata partition failed validation");
+
+        let original_name = String::from_utf8(partition.name.to_vec())
+            .expect("failed to convert partition name to string");
+
+        for (num, suffix) in [(0, "_a"), (1, "_b")] {
+            let mut partition = partition.clone();
+            partition.adjust_for_slot_suffix(num).expect("adjust for slot suffix failed");
+            let expected_name =
+                format!("{}{}", original_name.clone().trim_end_matches(|c| c == '\0'), suffix);
+            let updated_name = String::from_utf8(partition.name.to_vec())
+                .expect("failed to convert partition name to string");
+
+            assert_eq!(updated_name.trim_end_matches(|c| c == '\0'), expected_name);
+            let attributes = partition.attributes;
+            assert!(attributes.is_empty());
+        }
+    }
+
+    #[fuchsia::test]
     async fn test_invalid_partition_table_entry() {
         let mut header = VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM;
         let mut invalid_partition = VALID_PARTITION_TABLE_ENTRY;
@@ -753,6 +879,15 @@ mod tests {
             header.minor_version = 0;
             assert!(header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN);
             invalid_partition.attributes = PARTITION_ATTRIBUTE_MASK_V1;
+            invalid_partition
+                .validate(&header)
+                .expect_err("metadata partition passed validation unexpectedly");
+        }
+
+        // Check that there is validation check for partition name.
+        {
+            invalid_partition.name[0] = 0x81;
+            assert!(!invalid_partition.name[0].is_ascii());
             invalid_partition
                 .validate(&header)
                 .expect_err("metadata partition passed validation unexpectedly");
@@ -824,6 +959,44 @@ mod tests {
             .expect("metadata partition group failed validation");
     }
 
+    #[fuchsia::test]
+    async fn test_partition_group_with_slot_suffixed() {
+        let mut group = VALID_PARTITION_GROUP;
+        group.flags = PartitionGroupFlags::SLOT_SUFFIXED;
+        group
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata partition group failed validation");
+
+        let original_group_name = String::from_utf8(group.name.to_vec())
+            .expect("failed to convert partition name to string");
+
+        for (num, suffix) in [(0, "_a"), (1, "_b")] {
+            let mut group = group.clone();
+            group.adjust_for_slot_suffix(num).expect("adjust for slot suffix failed");
+            let expected_name = format!(
+                "{}{}",
+                original_group_name.clone().trim_end_matches(|c| c == '\0'),
+                suffix
+            );
+            let updated_name = String::from_utf8(group.name.to_vec())
+                .expect("failed to convert partition name to string");
+
+            assert_eq!(updated_name.trim_end_matches(|c| c == '\0'), expected_name);
+            let flags = group.flags;
+            assert!(flags.is_empty());
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_invalid_partition_group() {
+        let mut invalid_group = VALID_PARTITION_GROUP;
+        invalid_group.name[0] = 0x81;
+        assert!(!invalid_group.name[0].is_ascii());
+        invalid_group
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect_err("metadata partition group failed validation");
+    }
+
     const VALID_METADATA_BLOCK_DEVICE: MetadataBlockDevice = MetadataBlockDevice {
         first_logical_sector: 2048,
         alignment: 1048576,
@@ -845,11 +1018,65 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_block_device_with_slot_suffixed() {
+        let mut metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
+        metadata_block_device.flags = BlockDeviceFlags::SLOT_SUFFIXED;
+        metadata_block_device
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata block device failed validation");
+
+        let original_partition_name =
+            String::from_utf8(metadata_block_device.partition_name.to_vec())
+                .expect("failed to convert partition name to string");
+
+        for (num, suffix) in [(0, "_a"), (1, "_b")] {
+            let mut metadata_block_device = metadata_block_device.clone();
+            metadata_block_device
+                .adjust_for_slot_suffix(num)
+                .expect("adjust for slot suffix failed");
+            let expected_name = format!(
+                "{}{}",
+                original_partition_name.clone().trim_end_matches(|c| c == '\0'),
+                suffix
+            );
+            let updated_partition_name =
+                String::from_utf8(metadata_block_device.partition_name.to_vec())
+                    .expect("failed to convert partition name to string");
+
+            assert_eq!(updated_partition_name.trim_end_matches(|c| c == '\0'), expected_name);
+            let flags = metadata_block_device.flags;
+            assert!(flags.is_empty());
+        }
+    }
+
+    #[fuchsia::test]
     async fn test_invalid_block_device() {
         let mut invalid_metadata_block_device = VALID_METADATA_BLOCK_DEVICE;
-        invalid_metadata_block_device.first_logical_sector = u64::MAX;
-        invalid_metadata_block_device
-            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
-            .expect_err("metadata block device passed validation unexpectedly");
+        // Check that first logical sector can be converted to bytes (used to verify that the
+        // logical partition contents don't overlap with the metadata region) without an overflow.
+        {
+            invalid_metadata_block_device.first_logical_sector = u64::MAX;
+            invalid_metadata_block_device
+                .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+                .expect_err("metadata block device passed validation unexpectedly");
+        }
+
+        // Check that there is validation check for block device partition name.
+        {
+            invalid_metadata_block_device.partition_name[0] = 0x81;
+            assert!(!invalid_metadata_block_device.partition_name[0].is_ascii());
+            invalid_metadata_block_device
+                .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+                .expect_err("metadata block device passed validation unexpectedly");
+        }
+
+        // Check that there is validation check for enough characters in name to add suffix.
+        {
+            invalid_metadata_block_device.partition_name = [b'a'; 36];
+            invalid_metadata_block_device.flags = BlockDeviceFlags::SLOT_SUFFIXED;
+            invalid_metadata_block_device
+                .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+                .expect_err("metadata block device passed validation unexpectedly");
+        }
     }
 }
