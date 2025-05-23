@@ -220,7 +220,6 @@ fuchsia_board_input_bundle = rule(
         ),
         "version": attr.string(
             doc = "Release version string",
-            default = "__unset",
         ),
         "version_file": attr.label(
             doc = "Path to a file containing the current release version.",
