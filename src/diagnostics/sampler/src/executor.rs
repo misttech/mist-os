@@ -531,17 +531,15 @@ impl ProjectSampler {
 
                 match done {
                     ProjectSamplerEvent::TimerDied => {
-                        return Err(format_err!(concat!(
+                        return Err(format_err!(
                             "The ProjectSampler timer died, something went wrong.",
-                        )));
+                        ));
                     }
                     ProjectSamplerEvent::RebootChannelClosed(e) => {
                         // TODO(https://fxbug.dev/42118220): Consider differentiating errors if
                         // we ever want to recover a sampler after a oneshot channel death.
                         return Err(format_err!(
-                            concat!(
-                                "The Reboot signaling oneshot died, something went wrong: {:?}",
-                            ),
+                            "The Reboot signaling oneshot died, something went wrong: {:?}",
                             e
                         ));
                     }
@@ -809,14 +807,12 @@ fn sanitize_unsigned_numerical(diff: u64, data_source: &MetricCacheKey) -> Resul
     match diff.try_into() {
         Ok(diff) => Ok(diff),
         Err(e) => Err(format_err!(
-            concat!(
-                "Selector used for EventCount type",
-                " refered to an unsigned int property,",
-                " but cobalt requires i64, and casting introduced overflow",
-                " which produces a negative int: {:?}. This could be due to",
-                " a single sample being larger than i64, or a diff between",
-                " samples being larger than i64. Error: {:?}"
-            ),
+            "Selector used for EventCount type \
+            refered to an unsigned int property, \
+            but cobalt requires i64, and casting introduced overflow \
+            which produces a negative int: {:?}. This could be due to \
+            a single sample being larger than i64, or a diff between \
+            samples being larger than i64. Error: {:?}",
             data_source,
             e
         )),
@@ -860,13 +856,11 @@ fn compute_histogram_diff(
 
     if old_histogram_buckets.len() != new_histogram_buckets.len() {
         return Err(format_err!(
-            concat!(
-                "Selector referenced an Inspect IntArray",
-                " that was specified as an IntHistogram type ",
-                " but the histogram bucket count changed between",
-                " samples, which is incompatible with Cobalt.",
-                " Selector: {:?}, Inspect type: {}"
-            ),
+            "Selector referenced an Inspect IntArray \
+                that was specified as an IntHistogram type \
+                but the histogram bucket count changed between \
+                samples, which is incompatible with Cobalt. \
+                Selector: {:?}, Inspect type: {}",
             data_source,
             new_sample.discriminant_name()
         ));
