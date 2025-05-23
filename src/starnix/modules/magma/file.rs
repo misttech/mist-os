@@ -711,26 +711,22 @@ impl FileOps for MagmaFile {
                 let mut result_semaphore_id = 0;
 
                 // Use counter semaphores for compatibility with sync files, which need timestamps.
-                if let Ok(counter) = zx::Counter::create() {
-                    let flags: u64 = 0;
-                    let semaphore;
-                    let semaphore_id;
-                    (status, semaphore, semaphore_id) =
-                        import_semaphore2(&connection, counter, flags);
-                    if status == MAGMA_STATUS_OK {
-                        result_semaphore_id = self.semaphore_id_generator.next();
+                let counter = zx::Counter::create();
+                let flags: u64 = 0;
+                let semaphore;
+                let semaphore_id;
+                (status, semaphore, semaphore_id) = import_semaphore2(&connection, counter, flags);
+                if status == MAGMA_STATUS_OK {
+                    result_semaphore_id = self.semaphore_id_generator.next();
 
-                        self.semaphores.lock().insert(
-                            result_semaphore_id,
-                            Arc::new(MagmaSemaphore {
-                                connection,
-                                handles: vec![semaphore; 1],
-                                ids: vec![semaphore_id; 1],
-                            }),
-                        );
-                    }
-                } else {
-                    status = MAGMA_STATUS_MEMORY_ERROR;
+                    self.semaphores.lock().insert(
+                        result_semaphore_id,
+                        Arc::new(MagmaSemaphore {
+                            connection,
+                            handles: vec![semaphore; 1],
+                            ids: vec![semaphore_id; 1],
+                        }),
+                    );
                 }
                 response.result_return = status as u64;
                 response.semaphore_out = result_semaphore_id;

@@ -243,7 +243,7 @@ mod test {
     async fn test_peer_closed_kernel() {
         let (local_client, local_server) = zx::Channel::create();
         let (remote_client, remote_server) = zx::Channel::create();
-        let message_counter = zx::Counter::create().expect("failed to create counter");
+        let message_counter = zx::Counter::create();
 
         let channel_proxy = ChannelProxy {
             container_channel: local_server,
@@ -262,7 +262,7 @@ mod test {
     async fn test_peer_closed_remote() {
         let (local_client, local_server) = zx::Channel::create();
         let (remote_client, remote_server) = zx::Channel::create();
-        let message_counter = zx::Counter::create().expect("failed to create counter");
+        let message_counter = zx::Counter::create();
 
         let channel_proxy = ChannelProxy {
             container_channel: local_server,
@@ -281,7 +281,7 @@ mod test {
     async fn test_counter_sequential() {
         let (_local_client, local_server) = zx::Channel::create();
         let (remote_client, remote_server) = zx::Channel::create();
-        let message_counter = zx::Counter::create().expect("Failed to create counter");
+        let message_counter = zx::Counter::create();
         let local_message_counter = message_counter
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .expect("Failed to duplicate counter");
@@ -318,7 +318,7 @@ mod test {
     async fn test_counter_multiple() {
         let (_local_client, local_server) = zx::Channel::create();
         let (remote_client, remote_server) = zx::Channel::create();
-        let message_counter = zx::Counter::create().expect("Failed to create counter");
+        let message_counter = zx::Counter::create();
         let local_message_counter = message_counter
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .expect("Failed to duplicate counter");

@@ -1879,7 +1879,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_counter() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let counter = zx::Counter::create().expect("Counter::create");
+        let counter = zx::Counter::create();
 
         let fd = new_remote_file(&current_task, counter.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");

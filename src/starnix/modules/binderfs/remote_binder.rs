@@ -1490,7 +1490,7 @@ mod tests {
         let (kernel, _init_task) = create_kernel_and_task();
 
         let (power_controller, power_controller_server_end) = fidl::endpoints::create_proxy();
-        let message_counter = zx::Counter::create().expect("Failed to create message counter");
+        let message_counter = zx::Counter::create();
         let message_counter_clone =
             message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed handle dup");
         // Simulate the proxy incrementing the message counter.
@@ -1513,7 +1513,7 @@ mod tests {
         let (kernel, _init_task) = create_kernel_and_task();
 
         let (power_controller, power_controller_server_end) = fidl::endpoints::create_proxy();
-        let message_counter = zx::Counter::create().expect("Failed to create message counter");
+        let message_counter = zx::Counter::create();
         let message_counter_clone =
             message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed handle dup");
         // Simulate the proxy incrementing the message counter.

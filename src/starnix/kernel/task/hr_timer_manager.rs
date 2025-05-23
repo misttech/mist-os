@@ -1053,7 +1053,7 @@ mod tests {
     // If `emulate == true`, the mock WakeAlarms will emulate some of the behavior. Most
     // tests here only exercise timer heap management, and need `emulate == false`.
     fn init_hr_timer_manager(emulate: bool) -> (HrTimerManagerHandle, zx::Counter) {
-        let message_counter = zx::Counter::create().expect("Failed to create counter");
+        let message_counter = zx::Counter::create();
         let emulate_channel = if emulate {
             Some(message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup"))
         } else {
@@ -1296,7 +1296,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn suspend_locks_behaviors() {
-        let counter = Arc::new(zx::Counter::create().unwrap());
+        let counter = Arc::new(zx::Counter::create());
 
         assert_eq!(counter.read().unwrap(), 0, "no locks");
         let lock1 = SuspendLock::new_with_increment(counter.clone());

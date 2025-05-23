@@ -410,7 +410,7 @@ pub fn create_proxy_for_wake_events_counter_zero(
     name: String,
 ) -> (zx::Channel, zx::Counter) {
     let (local_proxy, kernel_channel) = zx::Channel::create();
-    let counter = zx::Counter::create().expect("failed to create counter");
+    let counter = zx::Counter::create();
 
     let local_counter =
         counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("Failed to duplicate counter");
