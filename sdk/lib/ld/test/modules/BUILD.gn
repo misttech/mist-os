@@ -23,7 +23,7 @@ per_test_modules = [
   ":multiple-transitive-foo-deps",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
-  ":soname-filename-mismatch",
+  ":soname-filename-match",
 ]
 
 per_test_executables = [
@@ -57,7 +57,7 @@ per_test_suffices = [
   "MissingTransitiveDependency",
   "BasicModuleReuse",
   "UniqueModules",
-  "SonameFilenameMismatch",
+  "SonameFilenameMatch",
   "DepOrder",
   "TransitiveDepOrder",
   "CyclicalDependency",
@@ -1596,24 +1596,22 @@ foreach(test, [ "" ] + per_test_suffices) {
     deps = [ ":ld-dep-foo-v1$suffix" ]
   }
 
-  # This has a dependency referenced by its DT_SONAME.
-  # soname-filename-mismatch:
+  # soname-filename-match:
   #   - libbar-soname
-  test_loadable_module("soname-filename-mismatch$suffix.module") {
-    # Create a DT_NEEDED entry for libbar-soname.
-    deps = [ ":foo-filename$suffix.ifs" ]
-  }
-
-  # This satisfies the static link-time dep for soname-filename-mismatch.
-  test_ifs_shared_library("foo-filename$suffix.ifs") {
-    soname = "libbar-soname$suffix.so"
-    symbols = []
+  test_loadable_module("soname-filename-match$suffix.module") {
+    deps = [ ":bar-soname$suffix" ]
     data_deps = [ ":foo-filename$suffix" ]
   }
 
-  # A shared lib with a filename foo-filename and DT_SONAME of libbar-soname.
   test_shared_library("foo-filename$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
     ldflags = [ "-Wl,-soname=libbar-soname$suffix.so" ]
+  }
+
+  test_shared_library("bar-soname$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
   }
 }
 

@@ -2,12 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "dl-iterate-phdr-tests.h"
 #include "dl-load-tests.h"
 
 namespace {
 
 using dl::testing::DlTests;
 TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
+
+using ::testing::Contains;
+using ::testing::Not;
+using ::testing::Property;
+
+using dl::testing::CollectModulePhdrInfo;
+using dl::testing::GetGlobalCounters;
+using dl::testing::ModuleInfoList;
+using dl::testing::ModulePhdrInfo;
 
 using dl::testing::RunFunction;
 using dl::testing::TestModule;
@@ -195,13 +205,17 @@ TYPED_TEST(DlTests, UniqueModules) {
 
 // Test that the same module can be located by either its DT_SONAME or filename.
 // dlopen libfoo-filename (with DT_SONAME libbar-soname)
-// dlopen libar-soname and expect the same module handle for libfoo-filename.
-// dlopen soname-filename-mismatch which has a dependency on libbar-soname and
-// expect to reuse libfoo-filename module.
-TYPED_TEST(DlTests, SonameFilenameMismatch) {
+// dlopen libbar-soname and expect the same module handle for libfoo-filename.
+// dlopen soname-filename-match:
+//    - libbar-soname
+// Expect dlopen for soname-filename-match to reuse libfoo-filename module.
+// Expect only 2 modules are loaded: libfoo-filename, soname-filename-match.
+TYPED_TEST(DlTests, SonameFilenameMatch) {
   const std::string kFilename = TestShlib("libfoo-filename");
   const std::string kSoname = TestShlib("libbar-soname");
-  const std::string kParentFile = TestModule("soname-filename-mismatch");
+  const std::string kParentFile = TestModule("soname-filename-match");
+
+  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
 
   this->Needed({kFilename});
 
@@ -225,6 +239,18 @@ TYPED_TEST(DlTests, SonameFilenameMismatch) {
   auto open_parent = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
   ASSERT_TRUE(open_parent.value());
+
+  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+  if constexpr (TestFixture::kInaccurateLoadCountAfterSonameMatch) {
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
+  } else {
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 2);
+  }
+  // Expect a file named libbar-soname to be absent from loaded modules.
+  ModuleInfoList info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &info_list), 0);
+  EXPECT_THAT(info_list,
+              Not(Contains(Property(&ModulePhdrInfo::name, TestShlib("libbar-soname")))));
 
   ASSERT_TRUE(this->DlClose(open_parent.value()).is_ok());
   ASSERT_TRUE(this->DlClose(open_filename.value()).is_ok());

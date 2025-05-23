@@ -53,6 +53,10 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture's dlclose function will unload the module.
   static constexpr bool kDlCloseUnloadsModules = true;
 
+  // This is false if the test fixture's dl_iterate_pdhr output reflects the
+  // true number of loaded modules after a module is looked up by DT_SONAME.
+  static constexpr bool kInaccurateLoadCountAfterSonameMatch = false;
+
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 

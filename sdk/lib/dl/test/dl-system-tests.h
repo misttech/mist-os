@@ -35,6 +35,12 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // Fuchsia's dlclose is a no-op.
   static constexpr bool kDlCloseCanRunFinalizers = false;
   static constexpr bool kDlCloseUnloadsModules = false;
+  // Musl will "double-count" in its `.dlpi_adds` counter a module that was
+  // reused because of DT_SONAME match. For example, if a previously loaded
+  // module had a DT_SONAME that matched the filename of a module that is about
+  // to be loaded, Musl will reuse the previously loaded module, but it will
+  // still increment the counter as if a new module was loaded.
+  static constexpr bool kInaccurateLoadCountAfterSonameMatch = true;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
