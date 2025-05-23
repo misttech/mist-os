@@ -26,6 +26,7 @@
 #define VIRTIO_BLK_T_FLUSH      4
 #define VIRTIO_BLK_T_GET_ID     8
 #define VIRTIO_BLK_T_DISCARD    11
+#define VIRTIO_BLK_T_BARRIER    0x80000000
 
 #define VIRTIO_BLK_S_OK         0
 #define VIRTIO_BLK_S_IOERR      1

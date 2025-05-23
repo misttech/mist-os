@@ -151,7 +151,8 @@ void BlockDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback comp
         completion_cb(cookie, status, bop);
         return;
       }
-      if (txn->op.command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
+      if (txn->op.command.flags & BLOCK_IO_FLAG_FORCE_ACCESS ||
+          txn->op.command.flags & BLOCK_IO_FLAG_PRE_BARRIER) {
         completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, bop);
         return;
       }
@@ -195,7 +196,6 @@ void BlockDevice::OnNewSession(block_server::Session session) {
 
 void BlockDevice::OnRequests(std::span<block_server::Request> requests) {
   for (auto& request : requests) {
-    FDF_LOGL(TRACE, logger(), "Received request %lu", request.request_id);
     if (zx_status_t status = block_server::CheckIoRange(request, config_.capacity);
         status != ZX_OK) {
       FDF_LOGL(WARNING, logger(), "Invalid request range.");
@@ -204,6 +204,18 @@ void BlockDevice::OnRequests(std::span<block_server::Request> requests) {
         block_server_->SendReply(request.request_id, zx::make_result(status));
       }
       continue;
+    }
+    if (request.operation.tag == block_server::Operation::Tag::Write &&
+        request.operation.write.options.is_pre_barrier() && !supports_barriers_) {
+      zx::result status = FlushSync(request);
+      if (status.is_error()) {
+        FDF_LOGL(WARNING, logger(), "FlushSync failed: %s", status.status_string());
+        std::lock_guard lock(block_server_lock_);
+        if (block_server_) {
+          block_server_->SendReply(request.request_id, status.take_error());
+        }
+        continue;
+      }
     }
     zx::result status = SubmitBlockServerRequest(request);
     if (status.is_error()) {
@@ -260,6 +272,12 @@ zx_status_t BlockDevice::Init() {
     FDF_LOG(INFO, "virtio device supports discard");
     supports_discard_ = true;
   }
+
+  if (features & VIRTIO_BLK_F_BARRIER) {
+    FDF_LOG(INFO, "virtio device supports barriers");
+    supports_barriers_ = true;
+  }
+
   features &= (VIRTIO_F_VERSION_1 | VIRTIO_BLK_F_DISCARD);
   DriverFeaturesAck(features);
   if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
@@ -436,6 +454,12 @@ void BlockDevice::QueueTxn(block_txn_t* txn, RequestContext context) {
   auto req = &blk_req_[txn->req_index];
   req->type = type;
   req->ioprio = 0;
+
+  // If the device does not support barriers, we issue a flush before the write instead.
+  if (txn->op.rw.command.flags & BLOCK_IO_FLAG_PRE_BARRIER && supports_barriers_) {
+    req->type |= VIRTIO_BLK_T_BARRIER;
+  }
+
   if (req->type == VIRTIO_BLK_T_FLUSH) {
     req->sector = 0;
   } else {
@@ -556,6 +580,44 @@ zx::result<zx_handle_t> BlockDevice::PinPages(zx_handle_t bti, zx_handle_t vmo,
   return zx::ok(pmt);
 }
 
+zx::result<> BlockDevice::FlushSync(const block_server::Request& request) {
+  struct Context {
+    zx_status_t status;
+    sync_completion_t completion;
+  } cookie_context;
+
+  zx::result<RequestContext> request_context = AllocateRequestContext(
+      VIRTIO_BLK_T_FLUSH, request.vmo->get(), request.operation.read.vmo_offset / config_.blk_size,
+      request.operation.read.block_count, nullptr);
+  if (request_context.is_error()) {
+    return request_context.take_error();
+  }
+  block_txn_t* txn = &block_server_request_pool_[request_context->req_index()];
+
+  txn->request = request.request_id;
+  txn->completion_cb = +[](void* cookie, zx_status_t status, block_op_t* op) {
+    Context* context = reinterpret_cast<Context*>(cookie);
+    context->status = status;
+    sync_completion_signal(&context->completion);
+  };
+  txn->cookie = &cookie_context;
+  txn->op.command.opcode = BLOCK_OPCODE_FLUSH;
+
+  FlushPendingTxns();
+  if (worker_shutdown_.load()) {
+    std::lock_guard lock1(txn_lock_);
+    std::lock_guard lock2(ring_lock_);
+    FreeRequestContext(*request_context);
+    return zx::error(ZX_ERR_IO_NOT_PRESENT);
+  }
+
+  QueueTxn(txn, std::move(*request_context));
+
+  sync_completion_wait(&cookie_context.completion, ZX_TIME_INFINITE);
+
+  return zx::make_result(cookie_context.status);
+}
+
 zx::result<> BlockDevice::SubmitBlockServerRequest(const block_server::Request& request) {
   uint32_t type = VirtioRequestType(request);
   std::array<zx_paddr_t, MAX_SCATTER> pages;
@@ -583,6 +645,9 @@ zx::result<> BlockDevice::SubmitBlockServerRequest(const block_server::Request& 
       if (request.operation.write.options.is_force_access()) {
         txn->op.rw.command.flags |= BLOCK_IO_FLAG_FORCE_ACCESS;
       }
+      if (request.operation.write.options.is_pre_barrier()) {
+        txn->op.rw.command.flags |= BLOCK_IO_FLAG_PRE_BARRIER;
+      }
       txn->op.rw.vmo = request.vmo->get();
       txn->op.rw.length = request.operation.write.block_count;
       txn->op.rw.offset_dev = request.operation.write.device_block_offset;
@@ -601,9 +666,9 @@ zx::result<> BlockDevice::SubmitBlockServerRequest(const block_server::Request& 
       __UNREACHABLE;
   }
 
-  // A flush operation should complete after any in-flight transactions, so wait for all pending
-  // txns to complete before submitting a flush txn. This is necessary because a virtio block device
-  // may service requests in any order.
+  // A flush operation should complete after any in-flight transactions, so wait for all
+  // pending txns to complete before submitting a flush txn. This is necessary because a virtio
+  // block device may service requests in any order.
   if (type == VIRTIO_BLK_T_FLUSH) {
     FlushPendingTxns();
     if (worker_shutdown_.load()) {
@@ -616,8 +681,8 @@ zx::result<> BlockDevice::SubmitBlockServerRequest(const block_server::Request& 
 
   QueueTxn(txn, std::move(*context));
 
-  // A flush operation should complete before any subsequent transactions. So, we wait for all
-  // pending transactions (including the flush) to complete before continuing.
+  // A flush operation should complete before any subsequent transactions. So, we wait
+  // for all pending transactions (including the flush) to complete before continuing.
   if (type == VIRTIO_BLK_T_FLUSH) {
     FlushPendingTxns();
   }

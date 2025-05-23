@@ -148,6 +148,8 @@ class BlockDevice : public virtio::Device, public block_server::Interface {
   zx::result<> SubmitBanjoRequest(block_txn_t*);
   zx::result<> SubmitBlockServerRequest(const block_server::Request& request);
 
+  zx::result<> FlushSync(const block_server::Request& request);
+
   // Allocates all of the resources necessary for enqueueing a virtio request.  Blocks until
   // resources are available.
   // The RequestContext object will point at `pages`, so must not outlive it.
@@ -274,6 +276,7 @@ class BlockDevice : public virtio::Device, public block_server::Interface {
   std::atomic_bool watchdog_shutdown_ = false;
 
   bool supports_discard_ = false;
+  bool supports_barriers_ = false;
 
   fdf::Logger& logger_;
 };
