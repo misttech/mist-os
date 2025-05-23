@@ -73,10 +73,6 @@ impl File for BlockFile {
         Err(zx::Status::NOT_SUPPORTED)
     }
 
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
-    }
-
     async fn get_size(&self) -> Result<u64, zx::Status> {
         let block_size = self.block_client.block_size();
         let block_count = self.block_client.block_count();

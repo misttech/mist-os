@@ -155,8 +155,10 @@ pub trait File: Node {
     #[cfg(target_os = "fuchsia")]
     fn get_backing_memory(
         &self,
-        flags: fio::VmoFlags,
-    ) -> impl Future<Output = Result<zx::Vmo, Status>> + Send;
+        _flags: fio::VmoFlags,
+    ) -> impl Future<Output = Result<zx::Vmo, Status>> + Send {
+        ready(Err(Status::NOT_SUPPORTED))
+    }
 
     /// Get the size of this file.
     /// This is used to calculate seek offset relative to the end.

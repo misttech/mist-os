@@ -502,9 +502,6 @@ impl File for AllocateFile {
     async fn truncate(&self, _length: u64) -> Result<(), Status> {
         unimplemented!()
     }
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        unimplemented!()
-    }
     async fn get_size(&self) -> Result<u64, Status> {
         unimplemented!()
     }

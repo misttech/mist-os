@@ -271,10 +271,6 @@ impl VfsFile for FatFile {
         Ok(())
     }
 
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
     // Unfortunately, fatfs has deprecated the "set_created" and "set_modified" methods,
     // saying that a TimeProvider should be used instead. There doesn't seem to be a good way to
     // use a TimeProvider to change the creation/modification time of a file after the fact,
