@@ -94,7 +94,13 @@ if (is_host) {
 # Build the fake product bundle for testing.
 if (is_fuchsia) {
   files = {
+    board_config = "$target_out_dir/board_config.json"
+
     assembly_outdir = "$target_out_dir/assembly"
+    assembly_gendir = "$target_out_dir/assembly_gen"
+    zbi = "$assembly_gendir/assembly.zbi"
+    qemu_kernel = qemu_boot_shim.path
+
     version = "$target_out_dir/version"
   }
 
@@ -149,6 +155,10 @@ if (is_fuchsia) {
     ]
     partitions = ":partitions"
     system_a = files.assembly_outdir
+    system_a_contents = [
+      files.qemu_kernel,
+      files.zbi,
+    ]
     update = {
       version_file = files.version
       epoch = "1"

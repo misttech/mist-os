@@ -34,7 +34,19 @@ main_product_bundle_name = "${build_info_product}.${build_info_board}"
 #   system_r (optional)
 #     [path] The path to the images manifest that describes images intended
 #     for slot R.
-##
+#
+#   system_a_contents (optional)
+#     [list] A list of files referenced in the system_a config that will
+#     be copied into the outputs.
+#
+#   system_b_contents (optional)
+#     [list] A list of files referenced in the system_b config that will
+#     be copied into the outputs.
+#
+#   system_r_contents (optional)
+#     [list] A list of files referenced in the system_r config that will
+#     be copied into the outputs.
+#
 #   update (optional)
 #     [scope] If provided, an update package will be built. The scope has
 #     a couple required fields.
@@ -172,6 +184,24 @@ template("product_bundle") {
                            ])
     deps = bundle_deps
     outputs = []
+    if (defined(invoker.system_a_contents)) {
+      foreach(file, invoker.system_a_contents) {
+        filename = get_path_info(file, "file")
+        outputs += [ "${files.outdir}/system_a/${filename}" ]
+      }
+    }
+    if (defined(invoker.system_b_contents)) {
+      foreach(file, invoker.system_b_contents) {
+        filename = get_path_info(file, "file")
+        outputs += [ "${files.outdir}/system_b/${filename}" ]
+      }
+    }
+    if (defined(invoker.system_r_contents)) {
+      foreach(file, invoker.system_r_contents) {
+        filename = get_path_info(file, "file")
+        outputs += [ "${files.outdir}/system_r/${filename}" ]
+      }
+    }
 
     hermetic_inputs_target = ":${targets.hermetic_inputs}"
     hermetic_inputs_file = files.hermetic_inputs
