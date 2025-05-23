@@ -241,34 +241,22 @@ async fn do_phy(cmd: opts::PhyCmd, monitor_proxy: DeviceMonitor) -> Result<(), E
         opts::PhyCmd::PowerDown { phy_id } => {
             let response = monitor_proxy.power_down(phy_id).await.context("error powering down")?;
             match response {
-                Ok(_) => {
-                    println!("response: OK");
-                }
-                Err(status) => {
-                    println!("response: Failed {:?}", zx_status::Status::from_raw(status));
-                }
+                Ok(_) => {}
+                Err(e) => println!("response: {:?}", zx_status::Status::from_raw(e)),
             }
         }
         opts::PhyCmd::PowerUp { phy_id } => {
             let response = monitor_proxy.power_up(phy_id).await.context("error powering up")?;
             match response {
-                Ok(_) => {
-                    println!("response: OK");
-                }
-                Err(status) => {
-                    println!("response: Failed {:?}", zx_status::Status::from_raw(status));
-                }
+                Ok(_) => {}
+                Err(e) => println!("response: {:?}", zx_status::Status::from_raw(e)),
             }
         }
         opts::PhyCmd::Reset { phy_id } => {
             let response = monitor_proxy.reset(phy_id).await.context("error resetting")?;
             match response {
-                Ok(_) => {
-                    println!("response: OK");
-                }
-                Err(status) => {
-                    println!("response: Failed {:?}", zx_status::Status::from_raw(status));
-                }
+                Ok(_) => {}
+                Err(e) => println!("response: {:?}", zx_status::Status::from_raw(e)),
             }
         }
         opts::PhyCmd::GetPowerState { phy_id } => {
