@@ -7,6 +7,7 @@ use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::io;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 
 use crate::experimental::series::buffer::encoding;
 
@@ -33,6 +34,8 @@ impl<T> UncompressedRingBuffer<T> {
         Self { buffer: VecDeque::new(), min_samples }
     }
 
+    /// Push |value| to the ring buffer, evicting and returning the oldest
+    /// value if there are more than the required number of samples.
     pub fn push(&mut self, value: T) -> Option<T> {
         let mut popped = None;
         if self.buffer.len() >= self.min_samples {
@@ -40,6 +43,25 @@ impl<T> UncompressedRingBuffer<T> {
         }
         self.buffer.push_back(value);
         popped
+    }
+}
+
+impl<T: Clone> UncompressedRingBuffer<T> {
+    /// Push |value| to the ring buffer |count| times, evicting the oldest
+    /// values if there are more than the required number of samples.
+    ///
+    /// Internally, the ring buffer performs batch allocation rather than
+    /// pushing the value individually. Additionally, for |count| larger
+    /// than the buffer size, the ring buffer would only create enough
+    /// values to fill the buffer as an optimization.
+    pub fn push_multiple(&mut self, value: T, count: NonZeroUsize) {
+        let num_samples_to_push = std::cmp::min(self.min_samples, count.get());
+        let total_before_pop = self.buffer.len() + num_samples_to_push;
+        if total_before_pop > self.min_samples {
+            let remove_count = total_before_pop - self.min_samples;
+            self.buffer.drain(..remove_count);
+        }
+        self.buffer.append(&mut vec![value; num_samples_to_push].into());
     }
 }
 
@@ -110,6 +132,44 @@ mod tests {
             13, 0, 0, 0, // first item
             37, 0, 0, 0, // second item
             42, 0, 0, 0, // third item
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_ring_buffer_push_multiple() {
+        let mut ring_buffer: UncompressedRingBuffer<f32> =
+            UncompressedRingBuffer::<f32>::with_min_samples(3);
+        ring_buffer.push(f32::from_bits(1u32));
+        ring_buffer.push(f32::from_bits(13u32));
+        ring_buffer.push_multiple(f32::from_bits(37u32), NonZeroUsize::new(2).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            3, 0, // length
+            13, 0, 0, 0, // first item
+            37, 0, 0, 0, // second item
+            37, 0, 0, 0, // third item
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_ring_buffer_push_multiple_evicts_all_old_values() {
+        let mut ring_buffer: UncompressedRingBuffer<f32> =
+            UncompressedRingBuffer::<f32>::with_min_samples(3);
+        ring_buffer.push(f32::from_bits(1u32));
+        ring_buffer.push(f32::from_bits(13u32));
+        ring_buffer.push_multiple(f32::from_bits(37u32), NonZeroUsize::new(99999).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            3, 0, // length
+            37, 0, 0, 0, // first item
+            37, 0, 0, 0, // second item
+            37, 0, 0, 0, // third item
         ];
         assert_eq!(&buffer[..], expected_bytes);
     }
