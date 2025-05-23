@@ -486,7 +486,7 @@ group("libc") {
 }
 
 group("libm") {
-  public_deps = [ ":libm-v0_2_1" ]
+  public_deps = [ ":libm-v0_2_15" ]
 }
 
 group("linked-hash-map") {
@@ -9027,10 +9027,10 @@ rustc_library("libc-v0_2_171") {
   applicable_licenses = [ ":libc-v0_2_171.license" ]
 }
 
-rustc_library("libm-v0_2_1") {
+rustc_library("libm-v0_2_15") {
   crate_name = "libm"
   source_root = "//third_party/rust_crates/forks/libm/src/lib.rs"
-  output_name = "libm-9acc3111b7a9209b"
+  output_name = "libm-826204f4c2a2d438"
   edition = "2015"
   disable_clippy = true
   enforce_source_listing = false
@@ -9043,8 +9043,8 @@ rustc_library("libm-v0_2_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=9acc3111b7a9209b",
-    "-Cextra-filename=-9acc3111b7a9209b",
+    "-Cmetadata=826204f4c2a2d438",
+    "-Cextra-filename=-826204f4c2a2d438",
   ]
 
   visibility = [ ":*" ]
@@ -10586,7 +10586,7 @@ rustc_library("num-bigint-dig-v0_8_4") {
 
   deps = []
   deps += [ ":byteorder-v1_5_0" ]
-  deps += [ ":libm-v0_2_1" ]
+  deps += [ ":libm-v0_2_15" ]
   deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":num-integer-v0_1_46" ]
@@ -10856,7 +10856,7 @@ rustc_library("num-traits-v0_2_19") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":libm-v0_2_1" ]
+  deps += [ ":libm-v0_2_15" ]
 
   rustenv = []
 

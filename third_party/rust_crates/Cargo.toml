@@ -141,7 +141,7 @@ itoa = "1.0"
 json5format = "0.2.6"
 lazy_static = "1.4"
 libc = { version = "0.2.171", features = ["extra_traits"] }
-libm = "0.2.1"
+libm = "0.2.15"
 linked-hash-map = "0.5.6"
 lock_api = "0.4.11"
 log = { version = "0.4.22", features = ["kv", "std"] }
@@ -669,7 +669,7 @@ rustflags = [
 [gn.package.libc."0.2.171".platform."cfg(target_os = \"freebsd\")"]
 rustflags = ["--cfg=freebsd11"]
 
-[gn.package.libm."0.2.1"]
+[gn.package.libm."0.2.15"]
 # It is a fork:
 uses_fuchsia_license = true
 
