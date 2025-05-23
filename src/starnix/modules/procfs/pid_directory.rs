@@ -26,6 +26,7 @@ use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_types::time::duration_to_scheduler_clock;
 use starnix_uapi::auth::{CAP_SYS_NICE, CAP_SYS_RESOURCE};
+use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
@@ -214,7 +215,6 @@ impl FsNodeOps for TaskDirectoryNode {
             }
             b"attr" => {
                 let mut subdir = StaticDirectoryBuilder::new(&fs);
-                subdir.entry_creds(creds);
                 subdir.dir_creds(creds);
                 for (attr, name) in [
                     (security::ProcAttr::Current, "current"),
@@ -223,23 +223,24 @@ impl FsNodeOps for TaskDirectoryNode {
                     (security::ProcAttr::KeyCreate, "keycreate"),
                     (security::ProcAttr::SockCreate, "sockcreate"),
                 ] {
-                    subdir.entry(
+                    subdir.entry_etc(
                         current_task,
                         name,
                         AttrNode::new(task_weak.clone(), attr),
                         mode!(IFREG, 0o666),
+                        DeviceType::NONE,
+                        creds,
                     );
                 }
-                subdir.entry(
+                subdir.entry_etc(
                     current_task,
                     "prev",
                     AttrNode::new(task_weak, security::ProcAttr::Previous),
                     mode!(IFREG, 0o444),
+                    DeviceType::NONE,
+                    creds,
                 );
-                let (ops, _file_ops) = subdir.build_ops();
-                // We need to return the FsNodeOps, not the FileOps here.
-                // The FsNode will handle creating the FileOps when opened.
-                ops
+                subdir.build_ops()
             }
             b"ns" => Box::new(NsDirectory { task: task_weak }),
             b"mountinfo" => Box::new(ProcMountinfoFile::new_node(task_weak)),

@@ -24,25 +24,13 @@ pub struct StaticDirectoryBuilder<'a> {
     fs: &'a Arc<FileSystem>,
     mode: FileMode,
     creds: FsCred,
-    entry_creds: FsCred,
     entries: BTreeMap<&'static FsStr, FsNodeHandle>,
 }
 
 impl<'a> StaticDirectoryBuilder<'a> {
     /// Creates a new builder using the given [`FileSystem`] to acquire inode numbers.
     pub fn new(fs: &'a FileSystemHandle) -> Self {
-        Self {
-            fs,
-            mode: mode!(IFDIR, 0o777),
-            creds: FsCred::root(),
-            entry_creds: FsCred::root(),
-            entries: BTreeMap::new(),
-        }
-    }
-
-    /// Set the creds used for future entries.
-    pub fn entry_creds(&mut self, creds: FsCred) {
-        self.entry_creds = creds;
+        Self { fs, mode: mode!(IFDIR, 0o777), creds: FsCred::root(), entries: BTreeMap::new() }
     }
 
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
@@ -53,22 +41,22 @@ impl<'a> StaticDirectoryBuilder<'a> {
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
     ) {
-        let ops = ops.into();
-        self.entry_dev(current_task, name, ops, mode, DeviceType::NONE);
+        self.entry_etc(current_task, name, ops, mode, DeviceType::NONE, FsCred::root());
     }
 
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
-    pub fn entry_dev(
+    pub fn entry_etc(
         &mut self,
         current_task: &CurrentTask,
         name: &'static str,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
         dev: DeviceType,
+        creds: FsCred,
     ) {
         let ops = ops.into();
         let node = self.fs.create_node(current_task, ops, |id| {
-            let mut info = FsNodeInfo::new(id, mode, self.entry_creds.clone());
+            let mut info = FsNodeInfo::new(id, mode, creds);
             info.rdev = dev;
             info
         });
@@ -130,10 +118,10 @@ impl<'a> StaticDirectoryBuilder<'a> {
         self.fs.set_root_node(node);
     }
 
-    /// Builds [`FsNodeOps`] and [`FsFileOps`] for this directory.
-    pub fn build_ops(self) -> (Box<dyn FsNodeOps>, Box<dyn FileOps>) {
+    /// Builds [`FsNodeOps`] for this directory.
+    pub fn build_ops(self) -> Box<dyn FsNodeOps> {
         let directory = Arc::new(StaticDirectory { entries: self.entries });
-        (Box::new(directory.clone()), Box::new(directory))
+        Box::new(directory)
     }
 }
 
