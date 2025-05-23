@@ -23,7 +23,8 @@ per_test_modules = [
   ":multiple-transitive-foo-deps",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
-  ":soname-filename-match",
+  ":soname-filename-loaded-dep",
+  ":soname-filename-dep",
 ]
 
 per_test_executables = [
@@ -58,6 +59,8 @@ per_test_suffices = [
   "BasicModuleReuse",
   "UniqueModules",
   "SonameFilenameMatch",
+  "SonameFilenameDep",
+  "SonameFilenameLoadedDep",
   "DepOrder",
   "TransitiveDepOrder",
   "CyclicalDependency",
@@ -1598,9 +1601,15 @@ foreach(test, [ "" ] + per_test_suffices) {
 
   # soname-filename-match:
   #   - libbar-soname
-  test_loadable_module("soname-filename-match$suffix.module") {
+  test_shared_library("soname-filename-match$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
     deps = [ ":bar-soname$suffix" ]
-    data_deps = [ ":foo-filename$suffix" ]
+  }
+
+  test_shared_library("bar-soname$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
   }
 
   test_shared_library("foo-filename$suffix") {
@@ -1609,9 +1618,45 @@ foreach(test, [ "" ] + per_test_suffices) {
     ldflags = [ "-Wl,-soname=libbar-soname$suffix.so" ]
   }
 
-  test_shared_library("bar-soname$suffix") {
-    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
-    sources = [ "ret17.cc" ]
+  # A stub for foo-filename, to guarantee that GN will insert libfoo-filename as
+  # a DT_NEEDED.
+  test_ifs_shared_library("foo-filename$suffix.ifs") {
+    soname = "libfoo-filename$suffix.so"
+    symbols = []
+
+    # Pull in the actual target so that it can be loaded by tests directly.
+    data_deps = [ ":foo-filename$suffix" ]
+  }
+
+  # soname-filename-dep:
+  #  - soname-filename-match
+  #    - libbar-soname
+  #  - libfoo-filename (with DT_SONAME libbar-soname)
+  test_loadable_module("soname-filename-dep$suffix.module") {
+    deps = [
+      # This inserts a DT_NEEDED entry for "foo-filename". When the test looks
+      # for this file, it will fetch the shlib belonging to :foo-filename.
+      ":soname-filename-match$suffix",
+    ]
+
+    # Prevent formatting from re-ordering deps, this dependency must come second
+    # in this list.
+    deps += [ ":foo-filename$suffix.ifs" ]
+  }
+
+  # soname-filename-loaded-dep:
+  #  - libfoo-filename (with DT_SONAME libbar-soname)
+  #  - soname-filename-match
+  #    - libbar-soname
+  test_loadable_module("soname-filename-loaded-dep$suffix.module") {
+    deps = [
+      # This inserts a DT_NEEDED entry for "foo-filename". When the test looks
+      # for this file, it will fetch the shlib belonging to :foo-filename.
+      ":foo-filename$suffix.ifs",
+
+      # This dependency must come second in this list.
+      ":soname-filename-match$suffix",
+    ]
   }
 }
 

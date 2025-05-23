@@ -65,6 +65,16 @@ class DlImplTests : public Base {
   static constexpr bool kDlCloseCanRunFinalizers = false;
   // TODO(https://fxbug.dev/342028933): Have dlclose() unload modules
   static constexpr bool kDlCloseUnloadsModules = false;
+  // TODO(https://fxbug.dev/368112176): enable DT_SONAME lookup among pending
+  // modules waiting to be loaded in a LinkingSession. See
+  // DlTests.SonameFilenameLoadedDep for current vs expected behavior.
+  static constexpr bool kSonameLookupInPendingDeps = false;
+
+#ifndef __Fuchsia__
+  // TODO(https://fxbug.dev/419872720): Disable a DT_SONAME lookup test on host
+  // because the DT_NEEDED order in the module is generated in the wrong order.
+  static constexpr bool kSonameLookupInLoadedDeps = false;
+#endif
 
   class DynamicTlsHelper {
    public:

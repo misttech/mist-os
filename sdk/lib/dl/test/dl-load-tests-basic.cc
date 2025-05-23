@@ -213,7 +213,7 @@ TYPED_TEST(DlTests, UniqueModules) {
 TYPED_TEST(DlTests, SonameFilenameMatch) {
   const std::string kFilename = TestShlib("libfoo-filename");
   const std::string kSoname = TestShlib("libbar-soname");
-  const std::string kParentFile = TestModule("soname-filename-match");
+  const std::string kParentFile = TestShlib("libsoname-filename-match");
 
   const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
 
@@ -234,7 +234,7 @@ TYPED_TEST(DlTests, SonameFilenameMatch) {
 
   // Expect only the parent-file to be fetched from the filesystem; its dep
   // should already be loaded.
-  this->ExpectRootModule(kParentFile);
+  this->Needed({kParentFile});
 
   auto open_parent = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
@@ -255,6 +255,99 @@ TYPED_TEST(DlTests, SonameFilenameMatch) {
   ASSERT_TRUE(this->DlClose(open_parent.value()).is_ok());
   ASSERT_TRUE(this->DlClose(open_filename.value()).is_ok());
   ASSERT_TRUE(this->DlClose(open_soname.value()).is_ok());
+}
+
+// Test a linking session will match the DT_SONAME of a module that is in the
+// loading queue but has not yet been loaded.
+// dlopen soname-filename-dep:
+//  - soname-filename-match
+//    - libbar-soname
+//  - libfoo-filename (with DT_SONAME libbar-soname)
+// Since libbar-soname was enqueued before libfoo-filename was loaded, this
+// tests if the loading logic can match libbar-soname with libfoo-filename's
+// DT_SONAME. Glibc does perform this matching, but Musl/Libdl does not.
+// Check there should be 3 modules that were loaded after this dlopen:
+// soname-filename-loaded-dep, soname-filename-match, and libfoo-filename.
+TYPED_TEST(DlTests, SonameFilenameDep) {
+  const std::string kLibFooFile = TestShlib("libfoo-filename");
+  const std::string kHasLibBarFile = TestShlib("libsoname-filename-match");
+  const std::string kHasDepsFile = TestModule("soname-filename-loaded-dep");
+
+  if constexpr (!TestFixture::kSonameLookupInPendingDeps) {
+    GTEST_SKIP()
+        << "Fixture should be able to look up DT_SONAME in pending deps in a linking session";
+  }
+
+  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+
+  this->ExpectRootModule(kHasDepsFile);
+  this->Needed({kHasLibBarFile, kLibFooFile});
+
+  auto open_has_deps = this->DlOpen(kHasDepsFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_deps.is_ok()) << open_has_deps.error_value();
+  ASSERT_TRUE(open_has_deps.value());
+
+  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+  EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
+
+  // Expect a file named libar-soname to be absent from loaded modules.
+  ModuleInfoList info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &info_list), 0);
+  EXPECT_THAT(info_list,
+              Not(Contains(Property(&ModulePhdrInfo::name, TestShlib("libbar-soname")))));
+
+  ASSERT_TRUE(this->DlClose(open_has_deps.value()).is_ok());
+}
+
+// Test a linking session will match the DT_SONAME of a module that has already
+// been loaded in the same linking session. This test is similar to above,
+// except the module with the matching DT_SONAME has been loaded by the time the
+// pending module is looking for a match.
+// dlopen soname-filename-loaded-dep:
+//  - libfoo-filename (with DT_SONAME libbar-soname)
+//  - soname-filename-match
+//    - libbar-soname
+// Expect that libbar-soname will reuse the module for libfoo-filename, because
+// libfoo-filename was loaded/decoded by the time libbar-soname is added to the
+// loading queue.
+// Check there should be 3 modules that were loaded after this dlopen:
+// soname-filename-loaded-dep, libfoo-filename, and
+// soname-filename-match
+TYPED_TEST(DlTests, SonameFilenameLoadedDep) {
+  const std::string kLibFooFile = TestShlib("libfoo-filename");
+  const std::string kHasLibBarFile = TestShlib("libsoname-filename-match");
+  const std::string kHasDepsFile = TestModule("soname-filename-loaded-dep");
+
+  if constexpr (!TestFixture::kSonameLookupInLoadedDeps) {
+    GTEST_SKIP()
+        << "Fixture should be able to look up DT_SONAME in loaded deps in a linking session.";
+  }
+
+  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+
+  this->ExpectRootModule(kHasDepsFile);
+  this->Needed({kLibFooFile, kHasLibBarFile});
+
+  auto open_has_deps = this->DlOpen(kHasDepsFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_deps.is_ok()) << open_has_deps.error_value();
+  ASSERT_TRUE(open_has_deps.value());
+
+  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+
+  if constexpr (TestFixture::kInaccurateLoadCountAfterSonameMatch) {
+    // For some reason, Musl only counts one additional module.
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 1);
+  } else {
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
+  }
+
+  // Expect a file named libar-soname to be absent from loaded modules.
+  ModuleInfoList info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &info_list), 0);
+  EXPECT_THAT(info_list,
+              Not(Contains(Property(&ModulePhdrInfo::name, TestShlib("libbar-soname")))));
+
+  ASSERT_TRUE(this->DlClose(open_has_deps.value()).is_ok());
 }
 
 }  // namespace

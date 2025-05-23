@@ -41,6 +41,9 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // to be loaded, Musl will reuse the previously loaded module, but it will
   // still increment the counter as if a new module was loaded.
   static constexpr bool kInaccurateLoadCountAfterSonameMatch = true;
+  // Musl attempts to fetch the same shlib from the filesystem twice, when its
+  // DT_SONAME is matched with another module in a linking session.
+  static constexpr bool kSonameLookupInPendingDeps = false;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
