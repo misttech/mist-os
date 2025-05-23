@@ -56,6 +56,7 @@ syscall_tests = [
   "reboot_test",
   "restart_read_test",
   "rlimit_test",
+  "sched_test",
   "seccomp_test",
   "sendfile_test",
   "setpriority_test",
