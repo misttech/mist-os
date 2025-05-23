@@ -45,7 +45,7 @@ if [[ -z $LABEL ]]; then
   exit 1
 fi
 
-GN_ARGS_ENTRY="main_pb_label = \"${LABEL}\""
+GN_ARGS_ENTRY="main_pb_label = \"$LABEL\""
 
 OUT="$FUCHSIA_BUILD_DIR/args.gn"
 TMP="$OUT.tmp"
@@ -53,34 +53,34 @@ rm -f $TMP
 
 PRETTY_OUT=${OUT#$FUCHSIA_DIR/}
 
-# If args.gn already has `main_pb_label`, then we update it.
-if grep -q "main_pb_label" $OUT; then
-  # If args.gn already has the fully-correct line, then we exit early
-  if grep -qoPz "main_pb_label\s*=\s*\"$LABEL\"" $OUT; then
+# Loop over every line in args.gn.
+found=false
+while IFS= read -r line; do
+  if [[ $line == $GN_ARGS_ENTRY ]]; then
+    # Exit early, because we already have this main PB set.
     echo "main_pb_label already set to $LABEL."
     echo "args.gn not changed."
     rm -f $TMP
     exit 0
-
-  # args.gn has the wrong label, so update it.
-  else
+  elif [[ $line =~ "main_pb_label" ]]; then
+    # Replace the current main PB with the new one.
     echo "Adding to $PRETTY_OUT:"
     echo "  $GN_ARGS_ENTRY"
-
-    # This prefix ensures that we match multiple lines in sed in case
-    # the GN has been formatted to wrap to a new line.
-    PREFIX=':a;N;$!ba;'
-    FIND='main_pb_label[[:space:]]*=[[:space:]]*"[^"]*"'
-    cat $OUT | sed "${PREFIX}s#${FIND}#${GN_ARGS_ENTRY}#g" > $TMP
-    mv $TMP $OUT
+    found=true
+    echo "$GN_ARGS_ENTRY" >> $TMP
+  else
+    # Not a relevant line, so pass it through.
+    echo "${line}" >> $TMP
   fi
+done < "$OUT"
 
 # If we didn't find an existing main PB, then we add it to the end.
-else
-  echo "Adding to $PRETTY_OUT:"
-  echo "  $GN_ARGS_ENTRY"
-  echo "$GN_ARGS_ENTRY" >> $OUT
+if [[ "$found" = false ]]; then
+  echo "$GN_ARGS_ENTRY" >> $TMP
 fi
+
+# Replace the real args.gn with the temporary file.
+mv $TMP $OUT
 
 echo ""
 echo "Running 'fx gen'"
