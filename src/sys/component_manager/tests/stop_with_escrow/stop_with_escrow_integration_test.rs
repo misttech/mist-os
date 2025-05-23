@@ -2,11 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::events::{ExitStatus, Started, Stopped};
+use std::pin::pin;
+
+use assert_matches::assert_matches;
+use component_events::events::{EventStream, ExitStatus, Started, Stopped};
 use component_events::matcher::EventMatcher;
 use fidl_fidl_test_components::TriggerMarker;
-use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_process as fprocess};
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route, ScopedInstanceFactory,
+};
+use futures::{select, FutureExt};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
+};
 
 /// Tests a component can stop with a request buffered in its outgoing dir,
 /// and that request is handled on the next start (which should be automatic).
@@ -117,7 +126,7 @@ async fn stop_with_escrowed_dictionary() {
         .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
         .unwrap();
     event_stream.wait_for_ready().await.unwrap();
-    let mut event_stream = component_events::events::EventStream::new(event_stream);
+    let mut event_stream = EventStream::new(event_stream);
 
     // Create the component.
     let realm = instance
@@ -143,13 +152,139 @@ async fn stop_with_escrowed_dictionary() {
         .wait::<Started>(&mut event_stream)
         .await
         .expect("failed to observe Started event");
-    let stopped = EventMatcher::ok()
-        .moniker(instance.moniker())
-        .wait::<Stopped>(&mut event_stream)
-        .await
-        .expect("failed to observe Stopped event");
-    assert_eq!(stopped.result().unwrap().status, ExitStatus::Clean);
+    assert_eq!(
+        EventMatcher::ok()
+            .moniker(instance.moniker())
+            .wait::<Stopped>(&mut event_stream)
+            .await
+            .expect("failed to observe Stopped event")
+            .result()
+            .expect("failed to extract Stopped result")
+            .status,
+        ExitStatus::Clean
+    );
 
     // Send second request, which should start the component again and continue the counter.
     assert_eq!(trigger.run().await.unwrap(), "2");
+    EventMatcher::ok()
+        .moniker(instance.moniker())
+        .wait::<Started>(&mut event_stream)
+        .await
+        .expect("failed to observe Started event");
+    assert_eq!(
+        EventMatcher::ok()
+            .moniker(instance.moniker())
+            .wait::<Stopped>(&mut event_stream)
+            .await
+            .expect("failed to observe Stopped event")
+            .result()
+            .expect("failed to extract Stopped result")
+            .status,
+        ExitStatus::Clean
+    );
+}
+
+/// Tests a component can idle with a connection to a capability exposed by a
+/// dynamic dictionary.
+#[fuchsia::test]
+async fn stop_with_dynamic_dictionary() {
+    let builder = RealmBuilder::new().await.unwrap();
+
+    let stop_with_dynamic_dictionary = builder
+        .add_child(
+            "stop_with_dynamic_dictionary",
+            "#meta/stop_with_dynamic_dictionary.cm",
+            ChildOptions::new().eager(),
+        )
+        .await
+        .unwrap();
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fsandbox::CapabilityStoreMarker>())
+                .from(Ref::framework())
+                .to(&stop_with_dynamic_dictionary),
+        )
+        .await
+        .unwrap();
+
+    // Route the capability exposed by the dynamic dictionary to the test.
+    builder
+        .add_route(
+            Route::new()
+                .capability(
+                    Capability::protocol_by_name("fidl.test.components.Trigger-dynamic")
+                        .as_("fidl.test.components.Trigger"),
+                )
+                .from_dictionary("bundle")
+                .from(&stop_with_dynamic_dictionary)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+
+    let instance = builder.build().await.unwrap();
+
+    // Observe the component start then stop due to being idle.
+    let moniker = format!(".*{}.*stop_with_dynamic_dictionary$", instance.root.child_name());
+    let mut event_stream = EventStream::open().await.unwrap();
+    EventMatcher::ok()
+        .moniker_regex(moniker.clone())
+        .wait::<Started>(&mut event_stream)
+        .await
+        .unwrap();
+    assert_eq!(
+        EventMatcher::ok()
+            .moniker_regex(moniker.clone())
+            .wait::<Stopped>(&mut event_stream)
+            .await
+            .expect("failed to observe Stopped event")
+            .result()
+            .expect("failed to extract Stopped result")
+            .status,
+        ExitStatus::Clean
+    );
+
+    // Accessing the protocol from the dynamic dictionary will wake up the
+    // component since fuchsia.component.sandbox.DictionaryRouter is configured
+    // in the CML to have on_readable delivery.
+    let trigger = instance.root.connect_to_protocol_at_exposed_dir::<TriggerMarker>().unwrap();
+
+    EventMatcher::ok()
+        .moniker_regex(moniker.clone())
+        .wait::<Started>(&mut event_stream)
+        .await
+        .unwrap();
+
+    // The component will go back to idle after not seeing any traffic on the
+    // protocol.
+    assert_eq!(
+        EventMatcher::ok()
+            .moniker_regex(moniker.clone())
+            .wait::<Stopped>(&mut event_stream)
+            .await
+            .expect("failed to observe Stopped event")
+            .result()
+            .expect("failed to extract Stopped result")
+            .status,
+        ExitStatus::Clean
+    );
+
+    // Sending over the channel erroneously doesn't start the component nor
+    // deliver the request.
+    //
+    // TODO(https://fxbug.dev/417243432): Update once component manager supports
+    // escrowing capabilities exposed by a dictionary.
+    assert_matches!(&trigger.run().await, Err(fidl::Error::ClientChannelClosed { .. }));
+
+    // Observe the component erroneously not start again within 1 second.
+    let mut start_event = pin!(EventMatcher::ok()
+        .moniker_regex(moniker.clone())
+        .wait::<Started>(&mut event_stream)
+        .fuse());
+    select! {
+        event = &mut start_event => panic!("Unexpected start event {event:?}"),
+        _ = fasync::Timer::new(zx::MonotonicDuration::from_seconds(1)).fuse() => {},
+    };
 }

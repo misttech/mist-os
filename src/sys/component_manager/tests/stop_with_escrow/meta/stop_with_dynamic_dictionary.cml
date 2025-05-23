@@ -1,0 +1,38 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/stop_with_dynamic_dictionary",
+        lifecycle: { stop_event: "notify" },
+    },
+    capabilities: [
+        {
+            dictionary: "bundle",
+            path: "/svc/fuchsia.component.sandbox.DictionaryRouter",
+        },
+        {
+            protocol: "fuchsia.component.sandbox.DictionaryRouter",
+            delivery: "on_readable",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.sandbox.DictionaryRouter",
+            from: "self",
+            path: "/escrow/fuchsia.component.sandbox.DictionaryRouter",
+        },
+        {
+            protocol: "fuchsia.component.sandbox.CapabilityStore",
+            from: "framework",
+        },
+    ],
+    expose: [
+        {
+            dictionary: "bundle",
+            from: "self",
+        },
+    ],
+}

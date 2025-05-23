@@ -11,4 +11,12 @@
     program: {
         binary: "bin/stop_with_escrow_integration_test",
     },
+    use: [
+        {
+            event_stream: [
+                "started",
+                "stopped",
+            ],
+        },
+    ],
 }
