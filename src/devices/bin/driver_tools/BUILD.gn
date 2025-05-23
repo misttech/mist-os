@@ -41,7 +41,6 @@ rustc_library("lib") {
       "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
       "//src/developer/ffx/lib/errors:lib",
       "//src/devices/lib/driver-static-checks:lib",
-      "//src/devices/usb/bin/lsusb:lib",
       "//third_party/rust_crates:blocking",
     ]
   }
@@ -84,8 +83,6 @@ rustc_library("lib") {
   ]
   if (is_host) {
     sources += [
-      "src/subcommands/lsusb/args.rs",
-      "src/subcommands/lsusb/mod.rs",
       "src/subcommands/runtool/args.rs",
       "src/subcommands/runtool/mod.rs",
     ]

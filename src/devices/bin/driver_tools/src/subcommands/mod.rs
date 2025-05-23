@@ -10,8 +10,6 @@ pub mod list_composite_node_specs;
 pub mod list_composites;
 pub mod list_devices;
 pub mod list_hosts;
-#[cfg(not(target_os = "fuchsia"))]
-pub mod lsusb;
 pub mod register;
 pub mod restart;
 #[cfg(not(target_os = "fuchsia"))]

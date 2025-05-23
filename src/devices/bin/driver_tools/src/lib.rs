@@ -82,14 +82,6 @@ pub async fn driver(
             .await
             .context("list-composite-node-specs subcommand failed")?;
         }
-        #[cfg(not(target_os = "fuchsia"))]
-        DriverSubCommand::Lsusb(subcmd) => {
-            let dev = driver_connector
-                .get_dev_proxy(false)
-                .await
-                .context("Failed to get device watcher proxy")?;
-            subcommands::lsusb::lsusb(subcmd, &dev).await.context("Lsusb subcommand failed")?;
-        }
         DriverSubCommand::Register(subcmd) => {
             let driver_registrar_proxy = driver_connector
                 .get_driver_registrar_proxy(subcmd.select)
