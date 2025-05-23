@@ -13,7 +13,7 @@ repositories and Gerrit hosts.
 
 Format:
 
-```txt
+```none {:.devsite-disable-click-to-copy}
 [foo] Do something
 
 Depends-on: Idc82d1483b4be8480aaa87bb48af8d03cfa45858
