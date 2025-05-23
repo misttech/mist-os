@@ -52,7 +52,7 @@ fn add_lazies(inspector: Inspector, num_nodes: usize) {
     let node = inspector.root().create_child("node");
 
     for i in 0..num_nodes {
-        node.record_lazy_child(format!("child-{}", i), move || {
+        node.record_lazy_child(format!("child-{i}"), move || {
             let insp = Inspector::default();
             insp.root().record_int("int", 1);
             async move { Ok(insp) }.boxed()
@@ -337,7 +337,7 @@ fn main() {
         // inspect hierarchy in a vmo and then applies the given selectors
         // to the snapshot to filter it down.
         let size = 10i32.pow(exponent);
-        bench = bench.with_function(format!("SnapshotAndParse/{}", size), move |b| {
+        bench = bench.with_function(format!("SnapshotAndParse/{size}"), move |b| {
             snapshot_and_parse_bench(b, size as usize);
         });
     }
