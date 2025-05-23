@@ -1100,6 +1100,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_recvmsg_access(current_task, self)?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops.read(&mut locked, self, current_task, data, flags)
     }

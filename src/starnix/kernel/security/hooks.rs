@@ -1055,6 +1055,18 @@ pub fn check_socket_sendmsg_access(
     })
 }
 
+/// Checks if the `current_task` is allowed to receive a message on `socket`.
+/// Corresponds to the `socket_recvmsg()` LSM hook.
+pub fn check_socket_recvmsg_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_recvmsg_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_recvmsg_access(&security_server, current_task, socket)
+    })
+}
+
 /// Checks if the `current_task` is allowed to shutdown `socket`.
 /// Corresponds to the `socket_shutdown()` LSM hook.
 pub fn check_socket_shutdown_access(
