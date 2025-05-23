@@ -1306,7 +1306,7 @@ mod tests {
     #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
     #[fixture::teardown(TestSetup::shutdown)]
     #[ip_test(I)]
-    #[fasync::run_singlethreaded(test)]
+    #[fasync::run_singlethreaded]
     async fn table_added_in_both_core_and_bindings<I: IpExt>() {
         set_logger_for_test();
         let t = TestSetupBuilder::new()

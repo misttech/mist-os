@@ -4834,7 +4834,7 @@ mod tests {
         test_select_route_for_deletion_helper(args, existing_routes, expected_index);
     }
 
-    #[ip_test(I)]
+    #[ip_test(I, test = false)]
     #[fuchsia::test]
     async fn garbage_collects_empty_table<
         I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,

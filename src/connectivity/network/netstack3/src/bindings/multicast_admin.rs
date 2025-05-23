@@ -714,7 +714,7 @@ mod tests {
 
     #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
     #[ip_test(I)]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia_async::run_singlethreaded]
     async fn worker_teardown_with_client<I: IpExt + FidlMulticastAdminIpExt>() {
         let mut netstack = NetstackSeed::default();
         let ctx = netstack.netstack.ctx;
@@ -739,7 +739,7 @@ mod tests {
 
     #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
     #[ip_test(I)]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia_async::run_singlethreaded]
     async fn duplicate_table_controller<I: IpExt + FidlMulticastAdminIpExt>() {
         let mut netstack = NetstackSeed::default();
         let ctx = netstack.netstack.ctx;

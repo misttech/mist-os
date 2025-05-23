@@ -1299,7 +1299,7 @@ mod tests {
         scope.join().await;
     }
 
-    #[ip_test(I)]
+    #[ip_test(I, test = false)]
     #[fuchsia::test]
     async fn test_default_rules<I: IpExt>() {
         let scope = fasync::Scope::new();
