@@ -152,11 +152,7 @@ impl OpenedNode<FxBlob> {
             // increment the open count after the blob has been purged.
             blob.open_count_add_one();
         }
-        // Only allow read access to the VMO.
-        // TODO(https://fxbug.dev/329429293): Remove when RFC-0238 is implemented.
-        child_vmo.replace_handle(
-            zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY | zx::Rights::READ,
-        )
+        Ok(child_vmo)
     }
 }
 
