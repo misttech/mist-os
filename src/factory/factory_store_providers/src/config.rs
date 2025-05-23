@@ -118,7 +118,6 @@ impl Config {
 #[serde(rename_all = "snake_case")]
 pub enum FactoryConfig {
     FactoryItems,
-    Ext4(String),
     FactoryVerity,
 }
 
@@ -267,20 +266,8 @@ mod tests {
 
     #[test]
     fn test_load_configs() {
-        let ext4_config_json = json!({
-            "ext4": "/pkg/data/factory_ext4.img"
-        });
-        let mut buf = std::io::Cursor::new(Vec::new());
-        serde_json::to_writer(&mut buf, &ext4_config_json).unwrap();
-        buf.set_position(0);
-        let ext4_config = FactoryConfig::load(buf).unwrap();
-        match ext4_config {
-            FactoryConfig::Ext4(_) => {}
-            _ => panic!("expected ext4 factory config"),
-        }
-
         let verity_config_json = json!("factory_verity");
-        buf = std::io::Cursor::new(Vec::new());
+        let mut buf = std::io::Cursor::new(Vec::new());
         serde_json::to_writer(&mut buf, &verity_config_json).unwrap();
         buf.set_position(0);
         let verity_config = FactoryConfig::load(buf).unwrap();

@@ -6,7 +6,6 @@ mod config;
 mod validators;
 
 use anyhow::{format_err, Error};
-use block_client::BlockClient as _;
 use config::{Config, ConfigContext, FactoryConfig};
 use fidl::endpoints::{create_proxy, ProtocolMarker, Request, RequestStream};
 use fidl_fuchsia_boot::FactoryItemsMarker;
@@ -21,17 +20,16 @@ use fidl_fuchsia_factory::{
     WeaveFactoryStoreProviderRequestStream, WidevineFactoryStoreProviderMarker,
     WidevineFactoryStoreProviderRequest, WidevineFactoryStoreProviderRequestStream,
 };
-use fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker};
+use fidl_fuchsia_io as fio;
 use fuchsia_bootfs::BootfsParser;
 use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use std::io;
 use std::sync::Arc;
-use vfs::directory::{self};
+use vfs::directory;
 use vfs::file::vmo::read_only;
 use vfs::tree_builder::TreeBuilder;
-use {fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio};
 
 const CONCURRENT_LIMIT: usize = 10_000;
 const DEFAULT_BOOTFS_FACTORY_ITEM_EXTRA: u32 = 0;
@@ -44,20 +42,6 @@ enum IncomingServices {
     PlayReadyFactoryStoreProvider(PlayReadyFactoryStoreProviderRequestStream),
     WeaveFactoryStoreProvider(WeaveFactoryStoreProviderRequestStream),
     WidevineFactoryStoreProvider(WidevineFactoryStoreProviderRequestStream),
-}
-
-async fn find_block_device_filepath(partition_path: &str) -> Result<String, Error> {
-    const DEV_CLASS_BLOCK: &str = "/dev/class/block";
-
-    let dir = fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::PERM_READABLE)?;
-    device_watcher::wait_for_device_with(
-        &dir,
-        |device_watcher::DeviceInfo { filename, topological_path }| {
-            (topological_path == partition_path)
-                .then(|| format!("{}/{}", DEV_CLASS_BLOCK, filename))
-        },
-    )
-    .await
 }
 
 fn parse_bootfs<'a>(vmo: zx::Vmo) -> Arc<directory::immutable::Simple> {
@@ -200,47 +184,6 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
                     directory::immutable::simple()
                 });
             Ok(vfs::directory::serve_read_only(factory_items_directory))
-        }
-        FactoryConfig::Ext4(partition_path) => {
-            log::info!("Reading from EXT4-formatted source: {}", partition_path);
-            let block_path = find_block_device_filepath(&partition_path).await?;
-            log::info!("found the block path {}", block_path);
-            let proxy = fuchsia_component::client::connect_to_protocol_at_path::<
-                fhardware_block::BlockMarker,
-            >(&block_path)?;
-            let block_client = block_client::RemoteBlockClient::new(proxy).await?;
-            let block_count = block_client.block_count();
-            let block_size = block_client.block_size();
-            let size = block_count.checked_mul(block_size.into()).ok_or_else(|| {
-                format_err!("size overflows: block_count={} block_size={}", block_count, block_size)
-            })?;
-            let buf = async {
-                let size = size.try_into()?;
-                let mut buf = vec![0u8; size];
-                let () = block_client
-                    .read_at(block_client::MutableBufferSlice::Memory(buf.as_mut_slice()), 0)
-                    .await?;
-                Ok::<_, Error>(buf)
-            }
-            .await?;
-            let vmo = zx::Vmo::create(size)?;
-            let () = vmo.write(&buf, 0)?;
-
-            let ext4_server = fuchsia_component::client::connect_to_protocol::<Server_Marker>()?;
-
-            log::info!("Mounting EXT4 VMO");
-            let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
-            match ext4_server.mount_vmo(vmo, directory_server_end).await {
-                Ok(MountVmoResult::Success(_)) => Ok(directory_proxy),
-                Ok(MountVmoResult::VmoReadFailure(status)) => {
-                    Err(format_err!("Failed to read ext4 vmo: {}", status))
-                }
-                Ok(MountVmoResult::ParseError(parse_error)) => {
-                    Err(format_err!("Failed to parse ext4 data: {:?}", parse_error))
-                }
-                Err(err) => Err(Error::from(err)),
-                _ => Err(format_err!("Unknown error while mounting ext4 vmo")),
-            }
         }
         FactoryConfig::FactoryVerity => {
             log::info!("reading from factory verity");
