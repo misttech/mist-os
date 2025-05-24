@@ -8,7 +8,7 @@ use core::mem::{ManuallyDrop, MaybeUninit};
 
 use crate::{
     munge, Chunk, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
-    RawWireUnion, Slot, Wire,
+    FromWire, FromWireRef, RawWireUnion, Slot, Wire,
 };
 
 /// A FIDL result union.
@@ -160,16 +160,30 @@ where
     }
 }
 
-impl<T, E, WT, WE> From<WireResult<'_, WT, WE>> for Result<T, E>
+impl<T, E, WT, WE> FromWire<WireResult<'_, WT, WE>> for Result<T, E>
 where
-    T: From<WT>,
-    E: From<WE>,
+    T: FromWire<WT>,
+    E: FromWire<WE>,
 {
     #[inline]
-    fn from(from: WireResult<'_, WT, WE>) -> Self {
-        match from.into_result() {
-            Ok(value) => Ok(value.into()),
-            Err(error) => Err(error.into()),
+    fn from_wire(wire: WireResult<'_, WT, WE>) -> Self {
+        match wire.into_result() {
+            Ok(value) => Ok(T::from_wire(value)),
+            Err(error) => Err(E::from_wire(error)),
+        }
+    }
+}
+
+impl<T, E, WT, WE> FromWireRef<WireResult<'_, WT, WE>> for Result<T, E>
+where
+    T: FromWireRef<WT>,
+    E: FromWireRef<WE>,
+{
+    #[inline]
+    fn from_wire_ref(wire: &WireResult<'_, WT, WE>) -> Self {
+        match wire.as_ref() {
+            Ok(value) => Ok(T::from_wire_ref(value)),
+            Err(error) => Err(E::from_wire_ref(error)),
         }
     }
 }
