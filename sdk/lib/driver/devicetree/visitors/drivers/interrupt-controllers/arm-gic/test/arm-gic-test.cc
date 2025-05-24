@@ -102,8 +102,22 @@ TEST_F(ArmGicVisitorTest, TestInterruptProperty3) {
   EXPECT_EQ(static_cast<uint32_t>(IRQ6_SPI) + 32, *(*irq)[1].irq());
   EXPECT_EQ(static_cast<uint32_t>(IRQ5_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[0].mode()));
   EXPECT_EQ(static_cast<uint32_t>(IRQ6_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[1].mode()));
-  ASSERT_FALSE((*irq)[0].name().has_value());
-  ASSERT_FALSE((*irq)[1].name().has_value());
+}
+
+TEST_F(ArmGicVisitorTest, WakeVectorsWithoutInterruptNames) {
+  std::vector<fuchsia_hardware_platform_bus::Irq> irqs =
+      (*NodeByName("wake-vectors-without-names").irq());
+  ASSERT_EQ(irqs.size(), 2u);
+  for (const auto& irq : irqs) {
+    EXPECT_FALSE(irq.wake_vector().value_or(false));
+  }
+}
+
+TEST_F(ArmGicVisitorTest, WakeVectors) {
+  std::vector<fuchsia_hardware_platform_bus::Irq> irqs = (*NodeByName("wake-vectors").irq());
+  ASSERT_EQ(irqs.size(), 2u);
+  EXPECT_FALSE(irqs[0].wake_vector().value_or(false));
+  EXPECT_TRUE(irqs[1].wake_vector().value_or(false));
 }
 
 }  // namespace

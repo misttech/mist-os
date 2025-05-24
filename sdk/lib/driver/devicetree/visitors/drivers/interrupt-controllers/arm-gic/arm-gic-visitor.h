@@ -22,10 +22,9 @@ class ArmGicVisitor : public fdf_devicetree::DriverVisitor {
 
  private:
   // Decodes interrupt cell values and adds the interrupt to `node`.
-  static zx::result<> ParseInterrupt(fdf_devicetree::Node& fdf_node,
-                                     fdf_devicetree::ReferenceNode& parent,
-                                     fdf_devicetree::PropertyCells interrupt_cells,
-                                     std::optional<std::string> interrupt_name);
+  static zx::result<fuchsia_hardware_platform_bus::Irq> ParseInterrupt(
+      const std::string& node_name, fdf_devicetree::ReferenceNode& parent,
+      fdf_devicetree::PropertyCells interrupt_cells, std::optional<std::string> interrupt_name);
 
   fdf_devicetree::InterruptParser interrupt_parser_;
 };

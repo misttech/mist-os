@@ -49,4 +49,19 @@
                                &gicv3 0 IRQ6_SPI IRQ6_MODE 0>;
         reg = <0x0 0x3 0x0 0x1>;
     };
+
+    wake-vectors-without-names {
+        compatible = "wakeup-source-device";
+        interrupts = <0 IRQ1_SPI IRQ1_MODE
+                      1 IRQ2_PPI IRQ2_MODE>;
+        fuchsia,interrupt-wake-vectors = "irq1";
+    };
+
+    wake-vectors {
+        compatible = "wakeup-source-device";
+        interrupts = <0 IRQ1_SPI IRQ1_MODE
+                      1 IRQ2_PPI IRQ2_MODE>;
+        interrupt-names = "irq1", "irq2";
+        fuchsia,interrupt-wake-vectors = "irq2";
+    };
 };

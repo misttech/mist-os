@@ -25,6 +25,8 @@ Properties MakeInterruptProperties() {
                                                          /*required=*/false));
   props.emplace_back(
       std::make_unique<StringListProperty>(InterruptParser::kInterruptNames, /*required=*/false));
+  props.emplace_back(std::make_unique<BoolProperty>(InterruptParser::kFuchsiaInterruptWakeVectors,
+                                                    /*required=*/false));
   return props;
 }
 
@@ -33,7 +35,7 @@ Properties MakeInterruptProperties() {
 InterruptParser::InterruptParser() : PropertyParser(MakeInterruptProperties()) {}
 
 zx::result<PropertyValues> InterruptParser::Parse(Node& node) {
-  auto interrupt_values = PropertyParser::Parse(node);
+  zx::result<PropertyValues> interrupt_values = PropertyParser::Parse(node);
   if (interrupt_values.is_error()) {
     FDF_LOG(ERROR, "Interrupts-extended parser failed for node '%s - %s", node.name().c_str(),
             interrupt_values.status_string());
