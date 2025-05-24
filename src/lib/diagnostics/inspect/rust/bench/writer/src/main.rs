@@ -73,7 +73,7 @@ macro_rules! bench_numeric_property_fn {
                     let root = inspector.root();
                     b.iter_with_large_setup(
                         || root.[<create_ $name>](NAME, 0 as $type),
-                        |p| criterion::black_box(drop(p)));
+                        |p| drop(criterion::black_box(p)));
                 });
                 bench = bench.with_function(
                     concat!("Node/record_", stringify!($name), "_property"),
@@ -162,7 +162,7 @@ macro_rules! bench_property_fn {
                     let root = inspector.root();
                     b.iter_with_large_setup(
                         || root.[<create_ $name>](NAME, &initial_val),
-                        |p| criterion::black_box(drop(p)));
+                        |p| drop(criterion::black_box(p)));
                 });
                 let initial_val = initial_value.clone();
                 bench = bench.with_function(
@@ -258,7 +258,7 @@ macro_rules! bench_numeric_array_property_fn {
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || root.[<create_ $name _array>](NAME, array_size),
-                            |p| criterion::black_box(drop(p)));
+                            |p| drop(criterion::black_box(p)));
                     }
                 );
                 bench
