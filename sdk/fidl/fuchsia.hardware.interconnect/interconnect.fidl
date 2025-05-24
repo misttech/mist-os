@@ -60,6 +60,13 @@ type PathEndpoints = table {
     4: dst_node_id uint32;
 };
 
+@serializable
+type Metadata = table {
+    /// Paths need not be between adjacent nodes, but a valid path from source node
+    /// to destination node must exist in the node graph.
+    1: paths vector<PathEndpoints>:MAX;
+};
+
 @discoverable(client="platform", server="external")
 open protocol Device {
     flexible SetNodesBandwidth(struct {

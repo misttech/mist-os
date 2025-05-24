@@ -39,6 +39,9 @@ class PropertyParser {
  public:
   explicit PropertyParser(Properties properties) : properties_(std::move(properties)) {}
 
+  PropertyParser(PropertyParser&&) = default;
+  PropertyParser& operator=(PropertyParser&&) = default;
+
   virtual ~PropertyParser() = default;
 
   virtual zx::result<PropertyValues> Parse(Node& node);
