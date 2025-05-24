@@ -486,7 +486,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/page_tables:*",
     "//zircon/system/ulib/perftest:*",
     "//zircon/system/ulib/pretty:*",
-    "//zircon/system/ulib/processargs:*",
     "//zircon/system/ulib/profile:*",
     "//zircon/system/ulib/ram-crashlog:*",
     "//zircon/system/ulib/range:*",
