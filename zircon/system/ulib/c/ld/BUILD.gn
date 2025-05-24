@@ -111,6 +111,7 @@ libc_source_set("musl-glue.basic") {
     "../stdlib:hermetic",
     "../string:hermetic",
     "//sdk/lib/ld:ld-log-zircon",
+    "//sdk/lib/ld:processargs",
     "//src/lib/elfldltl:headers",
     "//zircon/system/ulib/c/stdio/printf_core:wrapper",
     "//zircon/system/ulib/fbl",

@@ -4,7 +4,6 @@
 
 #include "lib/ld/log-zircon.h"
 
-#include <lib/fdio/processargs.h>
 #include <lib/zircon-internal/unique-backtrace.h>
 #include <lib/zx/debuglog.h>
 #include <lib/zx/result.h>
@@ -105,8 +104,6 @@ int Log::operator()(std::string_view str) const {
   // If there's no socket, always report full success if anything got out.
   return debuglog_ ? static_cast<int>(str.size()) : -1;
 }
-
-bool Log::IsProcessArgsLogFd(uint32_t arg) { return (arg & FDIO_FLAG_USE_FOR_STDIO) || arg == 2; }
 
 void Log::TakeLogFd(zx::handle handle) {
   zx_info_handle_basic_t info;

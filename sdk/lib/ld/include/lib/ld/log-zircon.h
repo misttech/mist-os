@@ -32,10 +32,6 @@ class Log {
 
   zx::socket set_socket(zx::socket socket) { return std::exchange(socket_, std::move(socket)); }
 
-  // If PA_HND_TYPE() is PA_FD, this returns true if the given PD_HND_ARG()
-  // value denotes the log handle (stderr file descriptor).
-  static bool IsProcessArgsLogFd(uint32_t arg);
-
   // Consume a log handle as transferred by the bootstrap protocol.  This does
   // set_debuglog() or set_socket() if the handle is of a recognized type.
   void TakeLogFd(zx::handle handle);

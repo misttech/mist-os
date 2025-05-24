@@ -108,7 +108,6 @@ static_library("ld-log-zircon") {
   public_deps = [ ":ld-log-zircon.headers" ]
   sources = [ "log-zircon.cc" ]
   deps = [
-    "//sdk/lib/fdio:constants",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
@@ -420,14 +419,11 @@ source_set("zircon") {
     "procargs.cc",
   ]
   deps = [
+    ":processargs",
     ":startup-diagnostics",
-    "//zircon/system/ulib/c/startup/processargs",
     "//zircon/system/ulib/ldmsg",
     "//zircon/system/ulib/zircon-internal",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 source_set("startup-load") {
@@ -575,6 +571,14 @@ static_library("fuchsia-debugdata") {
   sources = [ "fuchsia-debugdata.cc" ]
   deps = [
     "//sdk/lib/fidl_base",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+library_headers("processargs") {
+  headers = [ "lib/ld/processargs.h" ]
+  public_deps = [
+    "//sdk/lib/fdio:constants",
     "//zircon/system/ulib/zx",
   ]
 }

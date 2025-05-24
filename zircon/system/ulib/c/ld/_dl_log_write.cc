@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/ld/processargs.h>
+
 #include "dynlink.h"
 #include "log.h"
 
@@ -12,7 +14,7 @@ void _dl_log_write(const char* buffer, size_t len) { gLog({buffer, len}); }
 // This is called by __dls3 for any PA_FD handle in the bootstrap message.
 void _dl_log_write_init(zx_handle_t handle, uint32_t info) {
   zx::handle fd{handle};
-  if (ld::Log::IsProcessArgsLogFd(info)) {
+  if (ld::IsProcessargsLogFd(info)) {
     gLog.TakeLogFd(std::move(fd));
   }
 }

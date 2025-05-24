@@ -913,7 +913,6 @@ config("Wno-vla-cxx-extension") {
   visibility = [
     "//sdk/lib/fdio:*",
     "//sdk/lib/fdio/tests:*",
-    "//sdk/lib/ld:*",
     "//sdk/lib/zxio:*",
     "//src/bringup/bin/console:*",
     "//src/bringup/bin/console-launcher:*",

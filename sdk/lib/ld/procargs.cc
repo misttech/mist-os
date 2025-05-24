@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/processargs/processargs.h>
+#include <lib/ld/processargs.h>
 #include <lib/zircon-internal/unique-backtrace.h>
 
 #include <string_view>
@@ -18,7 +18,6 @@ constexpr std::string_view kLdDebugPrefix = "\0LD_DEBUG="sv;
 constexpr std::string_view kLdDebugPrefixFirst = kLdDebugPrefix.substr(1);
 
 constexpr bool HasLdDebug(std::string_view env) {
-  // This should be constexpr, but substr isn't until C++20.
   std::string_view debug;
   if (env.starts_with(kLdDebugPrefixFirst)) {
     debug = env.substr(kLdDebugPrefixFirst.size());
@@ -33,23 +32,16 @@ constexpr bool HasLdDebug(std::string_view env) {
 StartupData ReadBootstrap(zx::unowned_channel bootstrap) {
   StartupData startup;
 
-  uint32_t nbytes, nhandles;
-  zx_status_t status = processargs_message_size(bootstrap->get(), &nbytes, &nhandles);
-  if (status != ZX_OK) [[unlikely]] {
+  ProcessargsBuffer<> message;
+  ProcessargsBuffer<>::HandlesBuffer handles_buffer;
+  zx::result read = message.Read(bootstrap->borrow(), handles_buffer);
+  if (read.is_error()) [[unlikely]] {
     CRASH_WITH_UNIQUE_BACKTRACE();
   }
-  PROCESSARGS_BUFFER(buffer, nbytes);
-  zx_handle_t handles[nhandles];
-  // These will be filled to point into the buffer.
-  zx_proc_args_t* procargs;
-  uint32_t* handle_info;
-  status = processargs_read(bootstrap->get(), buffer, nbytes, handles, nhandles, &procargs,
-                            &handle_info);
-  if (status != ZX_OK) [[unlikely]] {
-    CRASH_WITH_UNIQUE_BACKTRACE();
-  }
+  std::span handles = std::span{handles_buffer}.subspan(0, read->handles);
+  const std::span handle_info = message.handle_info(read->handles);
 
-  for (uint32_t i = 0; i < nhandles; ++i) {
+  for (uint32_t i = 0; i < handles.size(); ++i) {
     // If not otherwise consumed below, the handle will be closed.
     zx::handle handle{std::exchange(handles[i], {})};
     switch (PA_HND_TYPE(handle_info[i])) {
@@ -66,7 +58,7 @@ StartupData ReadBootstrap(zx::unowned_channel bootstrap) {
         break;
 
       case PA_FD:
-        if (Log::IsProcessArgsLogFd(PA_HND_ARG(handle_info[i]))) {
+        if (ld::IsProcessargsLogFd(handle_info[i])) {
           startup.log.TakeLogFd(std::move(handle));
         }
         break;
@@ -74,16 +66,15 @@ StartupData ReadBootstrap(zx::unowned_channel bootstrap) {
       case PA_LDSVC_LOADER:
         startup.ldsvc.reset(handle.release());
         break;
+
+      default:  // Other handles are not interesting and get dropped.
+        break;
     }
   }
 
   // The only part of the strings of interest is the environment, and only to
-  // search it for LD_DEBUG.
-  std::string_view env{
-      reinterpret_cast<const char*>(&buffer[procargs->environ_off]),
-      nbytes - procargs->environ_off,
-  };
-  startup.ld_debug = HasLdDebug(env);
+  // search it for LD_DEBUG rather than finding all the individual strings.
+  startup.ld_debug = HasLdDebug(message.environ_chars(read->bytes));
 
   return startup;
 }
