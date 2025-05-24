@@ -421,8 +421,8 @@ source_set("zircon") {
   ]
   deps = [
     ":startup-diagnostics",
+    "//zircon/system/ulib/c/startup/processargs",
     "//zircon/system/ulib/ldmsg",
-    "//zircon/system/ulib/processargs",
     "//zircon/system/ulib/zircon-internal",
   ]
 

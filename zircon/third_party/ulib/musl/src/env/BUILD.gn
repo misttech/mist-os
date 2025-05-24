@@ -30,7 +30,7 @@ source_set("start-main") {
 
   deps = [
     "//zircon/system/ulib/c/startup:startup-random-impl",
-    "//zircon/system/ulib/processargs",
+    "//zircon/system/ulib/c/startup/processargs:hermetic",
     "//zircon/third_party/ulib/musl:musl_internal",
   ]
 
