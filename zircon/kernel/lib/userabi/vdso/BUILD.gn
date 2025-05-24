@@ -108,7 +108,7 @@ if (toolchain_environment == "user.basic") {
     }
 
     # workaround for b/349448459 to remote-link successfully
-    configs += [ "//build/config:remote_link_scandeps_workaround" ]
+    configs += [ "//build/config/rbe:remote_link_scandeps_workaround" ]
   }
 
   source_set("syscall-asm") {

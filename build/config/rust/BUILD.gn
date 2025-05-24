@@ -109,7 +109,7 @@ config("codegen_units_16") {
     rustflags = [ "-Ccodegen-units=16" ]
 
     # Use the larger RBE workers when using 16 threads for codegen.
-    configs = [ "//build/config:big_rbe_machine" ]
+    configs = [ "//build/config/rbe:big_rbe_machine" ]
   }
 }
 

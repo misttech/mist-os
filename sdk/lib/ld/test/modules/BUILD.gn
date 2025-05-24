@@ -856,7 +856,7 @@ test_executable("tls-exec-only") {
   ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("tls-shlib-only") {
@@ -1108,7 +1108,7 @@ test_executable("fixed-load-address") {
   deps = [ "//src/lib/elfldltl" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("second-session") {
@@ -1991,7 +1991,7 @@ test_shared_library("static-tls-var") {
   sources = [ "static-tls-var.cc" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 # This resolves a static TLS symbol with tls-desc.
@@ -2026,7 +2026,7 @@ test_loadable_module("static-tls-module") {
   configs += [ "//build/config/lto:no-lto" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs += [ "//build/config:remote_link_scandeps_workaround" ]
+  configs += [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 source_set("mock-tls-get-addr") {
@@ -2056,7 +2056,7 @@ test_loadable_module("tls-get-addr-global-dynamic-reloc") {
   configs += [ "//build/config:no-tlsdesc" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs += [ "//build/config:remote_link_scandeps_workaround" ]
+  configs += [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_loadable_module("tls-get-addr-local-dynamic-reloc") {
@@ -2077,7 +2077,7 @@ test_loadable_module("tls-get-addr-local-dynamic-reloc") {
   configs += [ "//build/config/lto:no-lto" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs += [ "//build/config:remote_link_scandeps_workaround" ]
+  configs += [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("llvm-profdata") {
@@ -2089,7 +2089,7 @@ test_executable("llvm-profdata") {
   ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("backtrace") {

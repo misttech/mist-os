@@ -38,7 +38,7 @@ concurrent_jobs = {
   # Remotely: run on bigger remote worker
   rust_highmem = {
     if (rust_rbe_enable) {
-      configs = [ "//build/config:big_rbe_machine" ]
+      configs = [ "//build/config/rbe:big_rbe_machine" ]
       vars = {
         # unbounded concurrency
       }
@@ -64,7 +64,7 @@ concurrent_jobs = {
   # Remotely: run on bigger remote worker
   link_highmem = {
     if (link_rbe_enable) {
-      configs = [ "//build/config:big_rbe_machine" ]
+      configs = [ "//build/config/rbe:big_rbe_machine" ]
       vars = {
         # unbounded concurrency
       }
@@ -78,7 +78,7 @@ concurrent_jobs = {
 
   # Force a memory-intensive link job to run locally.
   link_highmem_local_only = {
-    configs = [ "//build/config:no_remote_link" ]
+    configs = [ "//build/config/rbe:no_remote_link" ]
     vars = {
       pool = "//build/config:highmem($default_toolchain)"
     }
