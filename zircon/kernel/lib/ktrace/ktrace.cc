@@ -9,6 +9,7 @@
 #include <lib/fit/defer.h>
 #include <lib/fxt/fields.h>
 #include <lib/fxt/interned_category.h>
+#include <lib/fxt/interned_string.h>
 #include <lib/ktrace.h>
 #include <lib/syscalls/zx-syscall-numbers.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -182,7 +183,11 @@ void KTrace::ReportMetadata() {
     DEBUG_ASSERT(status == ZX_OK);
 
     // Emit strings needed to improve readability, such as syscall names, to the trace buffer.
-    fxt::InternedString::RegisterStrings();
+    for (const fxt::InternedString& interned_string : fxt::InternedString::Iterate()) {
+      fxt::WriteStringRecord(
+          ktrace, interned_string.id(), interned_string.string(),
+          strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
+    }
 
     // Emit the KOIDs of each CPU to the trace buffer.
     const uint32_t max_cpus = arch_max_num_cpus();
@@ -392,15 +397,6 @@ void KTrace::InitHook(unsigned) {
   if (!initial_grpmask) {
     dprintf(INFO, "ktrace: delaying buffer allocation\n");
   }
-
-  // Set the callback to emit fxt string records for the set of interned strings when
-  // fxt::InternedString::RegisterStrings() is called at the beginning of a trace session.
-  // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
-  fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
-    fxt::WriteStringRecord(
-        &GetInstance(), interned_string.id(), interned_string.string(),
-        strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
-  });
 
   // Initialize the singleton data structures.
   GetInstance().Init(bufsize, initial_grpmask);
