@@ -35,8 +35,9 @@ zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
     case PSCI_DISABLED:
       return ZX_ERR_NOT_SUPPORTED;
     case PSCI_INVALID_PARAMETERS:
-    case PSCI_INVALID_ADDRESS:
       return ZX_ERR_INVALID_ARGS;
+    case PSCI_INVALID_ADDRESS:
+      return ZX_ERR_OUT_OF_RANGE;
     case PSCI_DENIED:
       return ZX_ERR_ACCESS_DENIED;
     case PSCI_ALREADY_ON:
