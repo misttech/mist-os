@@ -26,7 +26,7 @@ impl core::fmt::Display for UnknownStrictEnumMemberError {
 impl core::error::Error for UnknownStrictEnumMemberError {}
 
 /// An encoding, decoding, or transport FIDL error.
-#[derive(Error, Debug)]
+#[derive(Error, Clone, Debug)]
 pub enum Error<E> {
     /// A FIDL encoding error.
     #[error("encoding error: {0}")]
@@ -37,4 +37,17 @@ pub enum Error<E> {
     /// A FIDL transport error.
     #[error("transport error: {0}")]
     Transport(E),
+    /// The FIDL transport was closed.
+    #[error("the transport was closed")]
+    Closed,
+}
+
+impl<E> From<Option<E>> for Error<E> {
+    fn from(value: Option<E>) -> Self {
+        if let Some(e) = value {
+            Self::Transport(e)
+        } else {
+            Self::Closed
+        }
+    }
 }

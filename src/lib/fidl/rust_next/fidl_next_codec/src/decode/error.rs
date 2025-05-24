@@ -5,7 +5,7 @@
 use thiserror::Error;
 
 /// Errors that can be produced when decoding FIDL messages.
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug)]
 pub enum DecodeError {
     /// A required handle was absent
     #[error("required handle is absent")]

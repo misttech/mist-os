@@ -6,6 +6,7 @@
 
 use core::future::Future;
 use core::pin::Pin;
+use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll};
 use std::sync::{Arc, Mutex};
 
@@ -17,12 +18,13 @@ use crate::{decode_header, encode_header, ProtocolError, SendFuture, Transport, 
 use super::lockers::LockerError;
 
 struct Shared<T: Transport> {
+    is_closed: AtomicBool,
     responses: Mutex<Lockers<T::RecvBuffer>>,
 }
 
 impl<T: Transport> Shared<T> {
     fn new() -> Self {
-        Self { responses: Mutex::new(Lockers::new()) }
+        Self { is_closed: AtomicBool::new(false), responses: Mutex::new(Lockers::new()) }
     }
 }
 
@@ -132,6 +134,11 @@ impl<T: Transport> Drop for ResponseFuture<'_, T> {
 
 impl<T: Transport> ResponseFuture<'_, T> {
     fn poll_receiving(&mut self, cx: &mut Context<'_>) -> Poll<<Self as Future>::Output> {
+        if self.shared.is_closed.load(Ordering::Relaxed) {
+            self.state = ResponseFutureState::Completed;
+            return Poll::Ready(Err(None));
+        }
+
         let mut responses = self.shared.responses.lock().unwrap();
         if let Some(ready) = responses.get(self.index).unwrap().read(cx.waker()) {
             responses.free(self.index);
@@ -144,7 +151,7 @@ impl<T: Transport> ResponseFuture<'_, T> {
 }
 
 impl<T: Transport> Future for ResponseFuture<'_, T> {
-    type Output = Result<T::RecvBuffer, T::Error>;
+    type Output = Result<T::RecvBuffer, Option<T::Error>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // SAFETY: We treat the state as pinned as long as it is sending.
@@ -169,7 +176,7 @@ impl<T: Transport> Future for ResponseFuture<'_, T> {
 
                         this.shared.responses.lock().unwrap().free(this.index);
                         this.state = ResponseFutureState::Completed;
-                        Poll::Ready(Err(e))
+                        Poll::Ready(Err(Some(e)))
                     }
                 }
             }
@@ -218,6 +225,7 @@ impl<T: Transport> Client<T> {
         H: ClientHandler<T>,
     {
         let result = self.run_to_completion(&mut handler).await;
+        self.sender.shared.is_closed.store(true, Ordering::Relaxed);
         self.sender.shared.responses.lock().unwrap().wake_all();
 
         result
@@ -259,6 +267,8 @@ impl<T: Transport> Client<T> {
                 }
             }
         }
+
+        self.sender.close();
 
         Ok(())
     }

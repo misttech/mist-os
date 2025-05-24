@@ -158,7 +158,7 @@ where
         // SAFETY: `self` is pinned, and `future` is a subfield of `self`, so `future` will not be
         // moved.
         let future = unsafe { self.map_unchecked_mut(|this| &mut this.future) };
-        if let Poll::Ready(ready) = future.poll(cx).map_err(Error::Transport)? {
+        if let Poll::Ready(ready) = future.poll(cx)? {
             Poll::Ready(ready.decode().map_err(Error::Decode))
         } else {
             Poll::Pending
