@@ -22,7 +22,7 @@ library_headers("headers") {
 # caller functions just have equivalent per-function attributes.  The easy and
 # thorough way to make this compatible with being in deps of those targets is
 # to use a basic_abi hermetic_source_set().
-libc_source_set("hermetic") {
+libc_source_set("musl-processargs") {
   visibility = [ "//zircon/third_party/ulib/musl/*" ]
 
   public_deps = [ ":headers" ]
