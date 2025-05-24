@@ -9,8 +9,19 @@ py_binary(
     srcs = [
         "__init__.py",
         "cmd.py",
+        "validate_idk.py",
     ],
     legacy_create_init = False,
     main = "cmd.py",
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "validate_idk",
+    srcs = [
+        "validate_idk.py",
+    ],
+    legacy_create_init = False,
+    main = "validate_idk.py",
     visibility = ["//visibility:public"],
 )
