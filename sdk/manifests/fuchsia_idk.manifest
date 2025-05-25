@@ -17,6 +17,7 @@ bind_library://bind/fuchsia.focaltech.platform
 bind_library://bind/fuchsia.google.platform
 bind_library://bind/fuchsia.gpio
 bind_library://bind/fuchsia.i2c
+bind_library://bind/fuchsia.interconnect
 bind_library://bind/fuchsia.khadas.platform
 bind_library://bind/fuchsia.mailbox
 bind_library://bind/fuchsia.nxp.platform
