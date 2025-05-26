@@ -452,6 +452,8 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   }
 
   if (!display_support_already_set) {
+    // TODO(https://fxbug.dev/386263977): this makes blocking FIDL calls while `lock_` is held.
+    // This isn't great, because means that a Flatland session thread can block the render thread.
     const auto pixel_format_modifier =
         DetermineDisplaySupportFor(TakeDisplayBufferCollectionPtr(collection_id));
     buffer_collection_supports_display_[collection_id] = pixel_format_modifier.has_value();
