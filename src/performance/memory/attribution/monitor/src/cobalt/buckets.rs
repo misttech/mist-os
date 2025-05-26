@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use crate::error_from_metrics_error;
+use anyhow::Result;
 use attribution_processing::digest::{BucketDefinition, Digest};
 use attribution_processing::AttributionDataProvider;
 use cobalt_client::traits::{AsEventCode, AsEventCodes};
@@ -13,10 +14,6 @@ use std::sync::Arc;
 
 use cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot as TimeSinceBoot;
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_metrics as fmetrics};
-
-fn error_from_metrics_error(error: fmetrics::Error) -> anyhow::Error {
-    anyhow!("{:?}", error)
-}
 
 /// Sorted list mapping durations to the largest event that is lower.
 const UPTIME_LEVEL_INDEX: &[(zx::BootDuration, TimeSinceBoot)] = &[
@@ -145,24 +142,6 @@ fn digest_events(digest: Digest) -> impl Iterator<Item = fmetrics::MetricEvent> 
     })
 }
 
-/// Provided a connection to a MetricEventLoggerFactory, request a MetricEventLogger appropriately
-/// configured to log memory metrics.
-pub async fn create_metric_event_logger(
-    factory: fmetrics::MetricEventLoggerFactoryProxy,
-) -> Result<fmetrics::MetricEventLoggerProxy> {
-    let project_spec = fmetrics::ProjectSpec {
-        customer_id: Some(cobalt_registry::CUSTOMER_ID),
-        project_id: Some(cobalt_registry::PROJECT_ID),
-        ..Default::default()
-    };
-    let (metric_event_logger, server_end) = fidl::endpoints::create_proxy();
-    factory
-        .create_metric_event_logger(&project_spec, server_end)
-        .await?
-        .map_err(error_from_metrics_error)?;
-    Ok(metric_event_logger)
-}
-
 /// Periodically upload metrics related to memory usage.
 pub async fn collect_metrics_forever(
     attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
@@ -219,6 +198,7 @@ async fn collect_metrics_once(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
     use attribution_processing::testing::FakeAttributionDataProvider;
     use attribution_processing::{
         Attribution, AttributionData, Principal, PrincipalDescription, PrincipalIdentifier,

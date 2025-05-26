@@ -418,14 +418,6 @@ mod tests {
         fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
             Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
         }
-
-        fn get_stall_rate(&self) -> Option<stalls::MemoryStallRate> {
-            Some(stalls::MemoryStallRate {
-                interval: fasync::MonotonicDuration::from_seconds(60),
-                rate_some: 1,
-                rate_full: 2,
-            })
-        }
     }
 
     #[test]

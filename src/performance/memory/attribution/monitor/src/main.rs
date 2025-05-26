@@ -6,6 +6,7 @@ use anyhow::{Context, Error};
 use attribution_data::AttributionDataProviderImpl;
 use attribution_processing::digest::BucketDefinition;
 use attribution_processing::AttributionDataProvider;
+use cobalt::{collect_metrics_forever, collect_stalls_forever, create_metric_event_logger};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use fuchsia_component::server::ServiceFs;
@@ -14,13 +15,11 @@ use fuchsia_trace::duration;
 use futures::StreamExt;
 use log::{error, warn};
 use memory_monitor2_config::Config;
-use metrics::{collect_metrics_forever, create_metric_event_logger};
 use resources::Job;
 use snapshot::AttributionSnapshot;
 use stalls::StallProvider;
 use std::sync::Arc;
 use traces::CATEGORY_MEMORY_CAPTURE;
-use zx::MonotonicDuration;
 
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
@@ -32,7 +31,6 @@ use {
 mod attribution_client;
 mod attribution_data;
 mod common;
-mod metrics;
 mod resources;
 mod snapshot;
 
@@ -74,10 +72,9 @@ async fn main() -> Result<(), Error> {
     let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
         .context("Failed to connect to the kernel stats provider")?;
 
-    let stall_provider = Arc::new(stalls::StallProviderImpl::new(
-        MonotonicDuration::from_hours(1),
-        Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
-    )?);
+    let stall_provider = Arc::new(stalls::StallProviderImpl::new(Arc::new(
+        connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?,
+    ))?);
 
     // Serves Fuchsia performance trace system.
     // https://fuchsia.dev/fuchsia-src/concepts/kernel/tracing-system
@@ -107,8 +104,12 @@ async fn main() -> Result<(), Error> {
     let _collect_metrics_task = fuchsia_async::Task::spawn(collect_metrics_forever(
         attribution_data_provider.clone(),
         kernel_stats.clone(),
-        create_metric_event_logger(metric_event_logger_factory).await?,
+        create_metric_event_logger(metric_event_logger_factory.clone()).await?,
         bucket_definitions.clone(),
+    ));
+    let _collect_stalls_task = fuchsia_async::Task::spawn(collect_stalls_forever(
+        stall_provider.clone(),
+        create_metric_event_logger(metric_event_logger_factory).await?,
     ));
 
     service_fs

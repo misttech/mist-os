@@ -5,7 +5,7 @@
 use fidl_fuchsia_kernel::{
     CpuStats, MemoryStats, MemoryStatsCompression, MemoryStatsExtended, StatsProxyInterface,
 };
-use stalls::{MemoryStallRate, StallProvider};
+use stalls::StallProvider;
 use std::future::{self, Ready};
 use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -18,10 +18,6 @@ struct FakeStallProvider {}
 impl StallProvider for FakeStallProvider {
     fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
         Ok(zx::MemoryStall { stall_time_some: 1, stall_time_full: 2 })
-    }
-
-    fn get_stall_rate(&self) -> Option<MemoryStallRate> {
-        unimplemented!();
     }
 }
 struct FakeStatsProxy {
