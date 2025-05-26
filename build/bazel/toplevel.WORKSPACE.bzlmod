@@ -167,17 +167,15 @@ local_repository(
     path = "%s/regenerator_outputs/fuchsia_build_info" % ninja_output_dir,
 )
 
-# googletest is a dependency from @fuchsia_sdk amd requires a local
-# patch for now for Fuchsia support, which is handled by a repository rule.
+# com_googlesource_code_re2 is a dependency of com_google_googletest
+local_repository(
+    name = "com_googlesource_code_re2",
+    path = "third_party/re2/src",
+)
 
-# buildifier: disable=load-on-top
-load("//build/bazel/repository_rules:googletest_repository.bzl", "googletest_repository")
-
-googletest_repository(
+local_repository(
     name = "com_google_googletest",
-    # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/com_google_googletest.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
+    path = "third_party/googletest/src",
 )
 
 # buildifier: disable=load-on-top
