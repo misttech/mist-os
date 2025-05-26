@@ -75,8 +75,13 @@ server.
 From the device shell prompt, attempt to resolve the package:
 
 ```posix-terminal
-fx shell pkgctl resolve fuchsia-pkg://fuchsia.com/spinning-square-rs
+ffx target package resolve fuchsia-pkg://fuchsia.com/spinning-square-rs
 ```
+
+Note: If you work on an older version of Fuchsia, `ffx target package` might not
+be available, and the above command will error out. If this is the case, use
+the following as a fallback:
+`fx shell pkgctl resolve fuchsia-pkg://fuchsia.com/spinning-square-rs`
 
 Notice the new lines added to the log output for `pkg-resolver`:
 
