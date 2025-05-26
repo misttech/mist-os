@@ -1167,6 +1167,7 @@ mod tests {
     use starnix_uapi::file_mode::mode;
     use starnix_uapi::mount_flags::MountFlags;
     use starnix_uapi::restricted_aspace::RESTRICTED_ASPACE_RANGE;
+    use starnix_uapi::signals::SIGCHLD;
     use std::collections::BTreeMap;
     use std::ffi::CString;
     use std::sync::LazyLock;
@@ -1234,6 +1235,7 @@ mod tests {
                                     process,
                                     None,
                                     pid,
+                                    Some(SIGCHLD),
                                     process_group,
                                     SignalActions::default(),
                                 );

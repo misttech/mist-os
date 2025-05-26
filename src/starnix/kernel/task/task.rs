@@ -885,9 +885,6 @@ pub struct TaskPersistentInfoState {
 
     /// The security credentials for this task.
     creds: Credentials,
-
-    /// The signal this task generates on exit.
-    exit_signal: Option<Signal>,
 }
 
 impl TaskPersistentInfoState {
@@ -896,9 +893,8 @@ impl TaskPersistentInfoState {
         thread_group_key: ThreadGroupKey,
         command: CString,
         creds: Credentials,
-        exit_signal: Option<Signal>,
     ) -> TaskPersistentInfo {
-        Arc::new(Mutex::new(Self { tid, thread_group_key, command, creds, exit_signal }))
+        Arc::new(Mutex::new(Self { tid, thread_group_key, command, creds }))
     }
 
     pub fn tid(&self) -> tid_t {
@@ -919,10 +915,6 @@ impl TaskPersistentInfoState {
 
     pub fn creds_mut(&mut self) -> &mut Credentials {
         &mut self.creds
-    }
-
-    pub fn exit_signal(&self) -> &Option<Signal> {
-        &self.exit_signal
     }
 }
 
@@ -1088,10 +1080,8 @@ impl Task {
                     starnix_logging::log_error!("Exiting without an exit code.");
                     ExitStatus::Exit(u8::MAX)
                 });
-                let (uid, exit_signal) = {
-                    let persistent_state = self.persistent_info.lock();
-                    (persistent_state.creds().uid, persistent_state.exit_signal().clone())
-                };
+                let uid = self.persistent_info.lock().creds().uid;
+                let exit_signal = self.thread_group().exit_signal.clone();
                 let exit_info = ProcessExitInfo { status: exit_status, exit_signal };
                 let zombie = ZombieProcess {
                     thread_group_key: self.thread_group_key.clone(),
@@ -1159,7 +1149,6 @@ impl Task {
         creds: Credentials,
         abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
-        exit_signal: Option<Signal>,
         signal_mask: SigSet,
         kernel_signals: VecDeque<KernelSignal>,
         vfork_event: Option<Arc<zx::Event>>,
@@ -1211,7 +1200,6 @@ impl Task {
                     thread_group_key,
                     command,
                     creds,
-                    exit_signal,
                 ),
                 seccomp_filter_state,
                 trace_syscalls: AtomicBool::new(false),
@@ -1250,10 +1238,6 @@ impl Task {
         };
 
         self.get_task(ptracer)
-    }
-
-    pub fn exit_signal(&self) -> Option<Signal> {
-        self.persistent_info.lock().exit_signal
     }
 
     pub fn fs(&self) -> Arc<FsContext> {

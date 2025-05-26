@@ -174,9 +174,9 @@ pub struct ThreadGroupMutableState {
     /// the value of `stopped`. If not None, contains the SignalInfo to return.
     pub last_signal: Option<SignalInfo>,
 
-    pub leader_exit_info: Option<ProcessExitInfo>,
-
-    pub terminating: bool,
+    /// Whether the thread_group is terminating or not, and if it is, the exit info of the thread
+    /// group.
+    run_state: ThreadGroupRunState,
 
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
@@ -242,6 +242,9 @@ pub struct ThreadGroup {
     ///
     /// The lead task is typically the initial thread created in the thread group.
     pub leader: pid_t,
+
+    /// The signal this process generates on exit.
+    pub exit_signal: Option<Signal>,
 
     /// The signal actions that are registered for this process.
     pub signal_actions: Arc<SignalActions>,
@@ -408,6 +411,13 @@ pub struct ProcessExitInfo {
     pub exit_signal: Option<Signal>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+enum ThreadGroupRunState {
+    #[default]
+    Running,
+    Terminating(ExitStatus),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WaitResult {
     pub pid: pid_t,
@@ -560,6 +570,7 @@ impl ThreadGroup {
         process: zx::Process,
         parent: Option<ThreadGroupWriteGuard<'_>>,
         leader: pid_t,
+        exit_signal: Option<Signal>,
         process_group: Arc<ProcessGroup>,
         signal_actions: Arc<SignalActions>,
     ) -> OwnedRef<ThreadGroup>
@@ -572,6 +583,7 @@ impl ThreadGroup {
                 kernel,
                 process,
                 leader,
+                exit_signal,
                 signal_actions,
                 drop_notifier: Default::default(),
                 // A child process created via fork(2) inherits its parent's
@@ -602,8 +614,7 @@ impl ThreadGroup {
                     timers: Default::default(),
                     did_exec: false,
                     last_signal: None,
-                    leader_exit_info: None,
-                    terminating: false,
+                    run_state: Default::default(),
                     children_time_stats: Default::default(),
                     personality: parent
                         .as_ref()
@@ -650,12 +661,13 @@ impl ThreadGroup {
         }
         let mut pids = self.kernel.pids.write();
         let mut state = self.write();
-        if state.terminating {
+        if state.is_terminating() {
             // The thread group is already terminating and all threads in the thread group have
             // already been interrupted.
             return;
         }
-        state.terminating = true;
+
+        state.run_state = ThreadGroupRunState::Terminating(exit_status.clone());
 
         // Drop ptrace zombies
         state.zombie_ptracees.release(&mut pids);
@@ -692,7 +704,7 @@ impl ThreadGroup {
 
     pub fn add(&self, task: &TempRef<'_, Task>) -> Result<(), Errno> {
         let mut state = self.write();
-        if state.terminating {
+        if state.is_terminating() {
             if state.tasks_count() == 0 {
                 log_warn!(
                     "Task {} with leader {} terminating while adding its first task, \
@@ -735,27 +747,26 @@ impl ThreadGroup {
             } else {
                 // The task has never been added. The only expected case is that this thread was
                 // already terminating.
-                debug_assert!(state.terminating);
+                debug_assert!(state.is_terminating());
                 return;
             };
 
-        if task.tid == self.leader {
-            let exit_status = task.exit_status().unwrap_or_else(|| {
-                log_error!("Exiting without an exit code.");
-                ExitStatus::Exit(u8::MAX)
-            });
-            state.leader_exit_info = Some(ProcessExitInfo {
-                status: exit_status,
-                exit_signal: *persistent_info.lock().exit_signal(),
-            });
-        }
-
         if state.tasks.is_empty() {
-            state.terminating = true;
+            let exit_status =
+                if let ThreadGroupRunState::Terminating(exit_status) = &state.run_state {
+                    exit_status.clone()
+                } else {
+                    let exit_status = task.exit_status().unwrap_or_else(|| {
+                        log_error!("Exiting without an exit code.");
+                        ExitStatus::Exit(u8::MAX)
+                    });
+                    state.run_state = ThreadGroupRunState::Terminating(exit_status.clone());
+                    exit_status
+                };
 
             // Replace PID table entry with a zombie.
             let exit_info =
-                state.leader_exit_info.take().expect("Failed to capture leader exit status");
+                ProcessExitInfo { status: exit_status, exit_signal: self.exit_signal.clone() };
             let zombie =
                 ZombieProcess::new(state.as_ref(), persistent_info.lock().creds(), exit_info);
             pids.kill_process(self.leader, OwnedRef::downgrade(&zombie));
@@ -1438,7 +1449,7 @@ impl ThreadGroup {
                 let info = process_state.tasks.values().next().unwrap().info().clone();
                 let uid = info.creds().uid;
                 let mut exit_status = None;
-                let exit_signal = info.exit_signal();
+                let exit_signal = process_state.base.exit_signal.clone();
                 let time_stats =
                     process_state.base.time_stats() + process_state.children_time_stats;
                 let task_stopped = task_ref.load_stopped();
@@ -1541,10 +1552,7 @@ impl ThreadGroup {
                     return Some(WaitResult {
                         pid,
                         uid,
-                        exit_info: ProcessExitInfo {
-                            status: exit_status,
-                            exit_signal: *exit_signal,
-                        },
+                        exit_info: ProcessExitInfo { status: exit_status, exit_signal },
                         time_stats,
                     });
                 }
@@ -1706,6 +1714,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         self.base.leader
     }
 
+    pub fn is_terminating(&self) -> bool {
+        !matches!(self.run_state, ThreadGroupRunState::Running)
+    }
+
     pub fn children(&self) -> impl Iterator<Item = TempRef<'_, ThreadGroup>> + '_ {
         self.children.values().map(|v| {
             v.upgrade().expect("Weak references to processes in ThreadGroup must always be valid")
@@ -1825,25 +1837,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             if options.wait_for_all {
                 return true;
             }
-            let child_state = child.read();
-            if child_state.terminating {
-                // Child is terminating.  In addition to its original location,
-                // the leader may have exited, and its exit signal may be in the
-                // leader_exit_info.
-                if let Some(info) = &child_state.leader_exit_info {
-                    if info.exit_signal.is_some() {
-                        return Self::is_correct_exit_signal(
-                            options.wait_for_clone,
-                            info.exit_signal,
-                        );
-                    }
-                }
-            };
-
-            child_state.tasks.values().any(|container| {
-                let info = container.info();
-                Self::is_correct_exit_signal(options.wait_for_clone, *info.exit_signal())
-            })
+            Self::is_correct_exit_signal(options.wait_for_clone, child.exit_signal)
         };
 
         // If wait_for_exited flag is disabled or no terminated children were found we look for living children.
@@ -1890,7 +1884,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
                         uid: info.creds().uid,
                         exit_info: ProcessExitInfo {
                             status: exit_status,
-                            exit_signal: *info.exit_signal(),
+                            exit_signal: child.base.exit_signal,
                         },
                         time_stats: child.base.time_stats() + child.children_time_stats,
                     }

@@ -90,6 +90,12 @@ syscall_tests = [
 
 syscall_tests_etc = [
   {
+    name = "exit_test"
+
+    # Test exit without running at_exit and this mislead sanitizers.
+    disable_sanitizers_on_host = true
+  },
+  {
     name = "input_test"
     container_config = {
       extra_features = [ "framebuffer" ]

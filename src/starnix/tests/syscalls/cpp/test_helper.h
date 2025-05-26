@@ -79,6 +79,10 @@ class ForkHelper {
   // the forked process to terminate normally.
   void ExpectSignal(int signum);
 
+  // If called, checks for process termination with the given exit value,
+  // instead of expecting the forked process to terminate normally.
+  void ExpectExitValue(int value);
+
   // If called, only waits for the children explicitly forked by the ForkHelper, instead
   // of waiting for all children.
   void OnlyWaitForForkedChildren();
@@ -87,8 +91,9 @@ class ForkHelper {
   std::vector<pid_t> child_pids_;
   bool wait_for_all_children_;
   int death_signum_;
+  int exit_value_;
 
-  ::testing::AssertionResult WaitForChildrenInternal(int death_signum);
+  ::testing::AssertionResult WaitForChildrenInternal(int exit_value, int death_signum);
 };
 
 // Helper class to handle tests that needs to clone processes.

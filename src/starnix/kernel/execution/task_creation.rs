@@ -17,7 +17,7 @@ use starnix_types::release_on_error;
 use starnix_uapi::auth::Credentials;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::signals::SIGCHLD;
+use starnix_uapi::signals::{Signal, SIGCHLD};
 use starnix_uapi::{errno, error, from_status_like_fdio, pid_t, rlimit};
 use std::ffi::CString;
 use std::sync::Arc;
@@ -48,6 +48,7 @@ pub fn create_zircon_process<L>(
     kernel: &Arc<Kernel>,
     parent: Option<ThreadGroupWriteGuard<'_>>,
     pid: pid_t,
+    exit_signal: Option<Signal>,
     process_group: Arc<ProcessGroup>,
     signal_actions: Arc<SignalActions>,
     name: &[u8],
@@ -77,6 +78,7 @@ where
         process,
         parent,
         pid,
+        exit_signal,
         process_group,
         signal_actions,
     );
@@ -176,6 +178,7 @@ where
                 kernel,
                 None,
                 pid,
+                Some(SIGCHLD),
                 process_group,
                 SignalActions::default(),
                 &initial_name_bytes,
@@ -241,6 +244,7 @@ where
                 kernel,
                 None,
                 pid,
+                Some(SIGCHLD),
                 process_group,
                 SignalActions::default(),
                 &initial_name_bytes,
@@ -287,6 +291,7 @@ where
                 process,
                 None,
                 pid,
+                Some(SIGCHLD),
                 process_group,
                 SignalActions::default(),
             );
@@ -370,7 +375,6 @@ where
             creds,
             Arc::clone(&kernel.default_abstract_socket_namespace),
             Arc::clone(&kernel.default_abstract_vsock_namespace),
-            Some(SIGCHLD),
             Default::default(),
             Default::default(),
             None,
@@ -440,7 +444,6 @@ where
         system_task.creds(),
         Arc::clone(&system_task.abstract_socket_namespace),
         Arc::clone(&system_task.abstract_vsock_namespace),
-        None,
         Default::default(),
         Default::default(),
         None,
