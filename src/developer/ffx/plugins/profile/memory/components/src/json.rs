@@ -26,6 +26,7 @@ impl JsonConvertible for fplugin::Snapshot {
             "resource_names": self.resource_names.to_json(),
             "kernel_statistics": self.kernel_statistics.to_json(),
             "bucket_definitions": self.bucket_definitions.to_json(),
+            "performance_metrics": self.performance_metrics.to_json(),
         })
     }
 
@@ -57,6 +58,10 @@ impl JsonConvertible for fplugin::Snapshot {
             bucket_definitions: obj
                 .get("bucket_definitions")
                 .map(|o| Vec::<fplugin::BucketDefinition>::from_json(o))
+                .flatten(),
+            performance_metrics: obj
+                .get("performance_metrics")
+                .map(|o| fplugin::PerformanceImpactMetrics::from_json(o))
                 .flatten(),
             ..Default::default()
         })
@@ -451,6 +456,29 @@ impl JsonConvertible for fplugin::BucketDefinition {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "fplugin::PerformanceImpactMetrics")]
+struct PerformanceImpactMetricsDef {
+    pub some_memory_stalls_ns: Option<i64>,
+    pub full_memory_stalls_ns: Option<i64>,
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub __source_breaking: fidl::marker::SourceBreaking,
+}
+
+impl JsonConvertible for fplugin::PerformanceImpactMetrics {
+    fn to_json(&self) -> Value {
+        #[derive(Serialize)]
+        struct Helper<'a>(
+            #[serde(with = "PerformanceImpactMetricsDef")] &'a fplugin::PerformanceImpactMetrics,
+        );
+        serde_json::to_value(Helper(self)).expect("invalid data")
+    }
+    fn from_json(value: &Value) -> Option<fplugin::PerformanceImpactMetrics> {
+        Some(PerformanceImpactMetricsDef::deserialize(value).unwrap())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -709,6 +737,11 @@ mod tests {
                 vmo: Some("def".to_string()),
                 ..Default::default()
             }]),
+            performance_metrics: Some(fplugin::PerformanceImpactMetrics {
+                some_memory_stalls_ns: Some(33),
+                full_memory_stalls_ns: Some(44),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         let expected_snapshot_json = r#"
@@ -805,6 +838,10 @@ mod tests {
                         "wired_bytes": 4,
                         "zram_bytes": 12
                     }
+                },
+                "performance_metrics": {
+                    "full_memory_stalls_ns": 44,
+                    "some_memory_stalls_ns": 33
                 },
                 "principals": [
                     [
@@ -1022,6 +1059,11 @@ mod tests {
             .context("Unable to deserialize snapshot")
             .unwrap();
 
-        assert_eq!(example_snapshot, actual_snapshot);
+        assert_eq!(
+            example_snapshot,
+            actual_snapshot,
+            "`actual_snapshot` json was:\n======\n{}\n\n======",
+            actual_snapshot.to_json()
+        );
     }
 }
