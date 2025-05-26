@@ -25,6 +25,7 @@ ffx/target/get-time.golden
 ffx/target/list.golden
 ffx/target/off.golden
 ffx/target/package.golden
+ffx/target/package/explore.golden
 ffx/target/package/resolve.golden
 ffx/target/reboot.golden
 ffx/target/remove.golden

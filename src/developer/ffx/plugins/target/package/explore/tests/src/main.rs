@@ -12,7 +12,8 @@ async fn cat_file_from_package_and_subpackages_using_full_resolver() {
     info!("resolving [sub]packages and cat'ing file");
     let output = emu
         .ffx_output(&[
-            "target-package",
+            "target",
+            "package",
             "explore",
             "fuchsia-pkg://fuchsia.com/verify_ffx_target_package_explore_superpackage",
             "-c",
@@ -24,7 +25,8 @@ async fn cat_file_from_package_and_subpackages_using_full_resolver() {
 
     let output = emu
         .ffx_output(&[
-            "target-package",
+            "target",
+            "package",
             "explore",
             "fuchsia-pkg://fuchsia.com/verify_ffx_target_package_explore_superpackage",
             "--subpackage",
@@ -38,7 +40,8 @@ async fn cat_file_from_package_and_subpackages_using_full_resolver() {
 
     let output = emu
         .ffx_output(&[
-            "target-package",
+            "target",
+            "package",
             "explore",
             "fuchsia-pkg://fuchsia.com/verify_ffx_target_package_explore_superpackage",
             "--subpackage",
@@ -60,7 +63,8 @@ async fn cat_file_from_package_using_base_resolver() {
     info!("resolving base package and cat'ing file");
     let output = emu
         .ffx_output(&[
-            "target-package",
+            "target",
+            "package",
             "explore",
             "fuchsia-pkg://fuchsia.com/system_image",
             "--fuchsia-pkg-resolver",

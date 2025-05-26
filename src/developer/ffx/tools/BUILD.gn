@@ -37,7 +37,6 @@ _tools = [
   "profiler",
   "starnix",
   "storage",
-  "target-package",
   "triage",
 ]
 
@@ -80,8 +79,5 @@ group("tests") {
 
 group("host_tests") {
   testonly = true
-  deps = [
-    "power:host_tests",
-    "target-package:host_tests",
-  ]
+  deps = [ "power:host_tests" ]
 }
