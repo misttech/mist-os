@@ -21,6 +21,8 @@ from honeydew.affordances.power.system_power_state_controller import (
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
+from honeydew.affordances.starnix import errors as starnix_errors
+from honeydew.affordances.starnix import starnix
 from honeydew.transports.ffx import ffx as ffx_transport
 
 # TODO: b/354239403: This can not be done today, but probably should be done at
@@ -168,20 +170,15 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         self.mock_inspect = mock.MagicMock(
             spec=affordances_capable.InspectCapableDevice
         )
+        self.mock_starnix = mock.MagicMock(spec=starnix.Starnix)
 
-        with mock.patch.object(
-            system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
-            "_run_starnix_console_shell_cmd",
-            autospec=True,
-        ) as mock_run_starnix_console_shell_cmd:
-            self.system_power_state_controller_using_starnix_obj = system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix(
-                ffx=self.mock_ffx,
-                device_logger=self.mock_device_logger,
-                inspect=self.mock_inspect,
-                device_name=str(_INPUT_ARGS["device_name"]),
-            )
-
-            mock_run_starnix_console_shell_cmd.assert_called_once()
+        self.system_power_state_controller_using_starnix_obj = system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix(
+            ffx=self.mock_ffx,
+            device_logger=self.mock_device_logger,
+            inspect=self.mock_inspect,
+            device_name=str(_INPUT_ARGS["device_name"]),
+            starnix=self.mock_starnix,
+        )
 
     @mock.patch.object(
         system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
@@ -365,41 +362,29 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
 
         mock_perform_idle_suspend.assert_called_once_with(mock.ANY)
 
-    @mock.patch.object(
-        system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
-        "_run_starnix_console_shell_cmd",
-        autospec=True,
-    )
     def test_perform_idle_suspend(
         self,
-        mock_run_starnix_console_shell_cmd: mock.Mock,
     ) -> None:
         """Test case for SystemPowerStateControllerUsingStarnix._perform_idle_suspend()"""
         self.system_power_state_controller_using_starnix_obj._perform_idle_suspend()
 
-        mock_run_starnix_console_shell_cmd.assert_called_once_with(
-            mock.ANY,
+        self.mock_starnix.run_console_shell_cmd.assert_called_once_with(
             cmd=system_power_state_controller_using_starnix._StarnixCmds.IDLE_SUSPEND,
         )
 
-    @mock.patch.object(
-        system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
-        "_run_starnix_console_shell_cmd",
-        side_effect=errors.StarnixError("Error"),
-        autospec=True,
-    )
     def test_perform_idle_suspend_failure(
         self,
-        mock_run_starnix_console_shell_cmd: mock.Mock,
     ) -> None:
         """Test case for SystemPowerStateControllerUsingStarnix._perform_idle_suspend() raising exception"""
+        self.mock_starnix.run_console_shell_cmd.side_effect = (
+            starnix_errors.StarnixError("Error")
+        )
         with self.assertRaises(
             system_power_state_controller_interface.SystemPowerStateControllerError
         ):
             self.system_power_state_controller_using_starnix_obj._perform_idle_suspend()
 
-        mock_run_starnix_console_shell_cmd.assert_called_once_with(
-            mock.ANY,
+        self.mock_starnix.run_console_shell_cmd.assert_called_once_with(
             cmd=system_power_state_controller_using_starnix._StarnixCmds.IDLE_SUSPEND,
         )
 
@@ -555,70 +540,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
             self.system_power_state_controller_using_starnix_obj._wait_for_timer_end(
                 proc=mock_subprocess_popen,
             )
-
-    @mock.patch(
-        "os.read",
-        return_value=system_power_state_controller_using_starnix._RegExPatterns.STARNIX_CMD_SUCCESS.pattern.encode(),
-        autospec=True,
-    )
-    @mock.patch(
-        "pty.openpty",
-        return_value=(1, 1),
-        autospec=True,
-    )
-    def test_run_starnix_console_shell_cmd(
-        self, mock_openpty: mock.Mock, mock_os_read: mock.Mock
-    ) -> None:
-        """Test case for SystemPowerStateControllerUsingStarnix._run_starnix_console_shell_cmd()"""
-        self.system_power_state_controller_using_starnix_obj._run_starnix_console_shell_cmd(
-            cmd=["something"]
-        )
-        mock_openpty.assert_called_once()
-        mock_os_read.assert_called_once()
-
-    @mock.patch(
-        "os.read",
-        return_value=system_power_state_controller_using_starnix._RegExPatterns.STARNIX_NOT_SUPPORTED.pattern.encode(),
-        autospec=True,
-    )
-    @mock.patch(
-        "pty.openpty",
-        return_value=(1, 1),
-        autospec=True,
-    )
-    def test_run_starnix_console_shell_cmd_raises_not_supported_error(
-        self, mock_openpty: mock.Mock, mock_os_read: mock.Mock
-    ) -> None:
-        """Test case for SystemPowerStateControllerUsingStarnix._run_starnix_console_shell_cmd()
-        raising NotSupportedError"""
-        with self.assertRaises(errors.NotSupportedError):
-            self.system_power_state_controller_using_starnix_obj._run_starnix_console_shell_cmd(
-                cmd=["something"]
-            )
-        mock_openpty.assert_called_once()
-        mock_os_read.assert_called_once()
-
-    @mock.patch(
-        "os.read",
-        return_value="something".encode(),
-        autospec=True,
-    )
-    @mock.patch(
-        "pty.openpty",
-        return_value=(1, 1),
-        autospec=True,
-    )
-    def test_run_starnix_console_shell_cmd_raises_starnix_error(
-        self, mock_openpty: mock.Mock, mock_os_read: mock.Mock
-    ) -> None:
-        """Test case for SystemPowerStateControllerUsingStarnix._run_starnix_console_shell_cmd()
-        raising StarnixError"""
-        with self.assertRaises(errors.StarnixError):
-            self.system_power_state_controller_using_starnix_obj._run_starnix_console_shell_cmd(
-                cmd=["something"]
-            )
-        mock_openpty.assert_called_once()
-        mock_os_read.assert_called_once()
 
     def test_get_suspend_stats_from_sag_inspect_data_fail(
         self,

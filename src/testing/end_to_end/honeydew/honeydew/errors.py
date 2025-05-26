@@ -81,10 +81,6 @@ class NotSupportedError(HoneydewError):
     underlying Fuchsia platform."""
 
 
-class StarnixError(HoneydewError):
-    """Exception to be raised if a starnix operation fails."""
-
-
 class InspectError(HoneydewError):
     """Exception to be raised for Inspect affordance related failures."""
 

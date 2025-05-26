@@ -22,6 +22,7 @@ from honeydew.affordances.power.system_power_state_controller import (
 )
 from honeydew.affordances.rtc import rtc
 from honeydew.affordances.session import session
+from honeydew.affordances.starnix import starnix
 from honeydew.affordances.tracing import tracing
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
@@ -252,6 +253,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             session.Session object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def starnix(self) -> starnix.Starnix:
+        """Returns a starnix affordance object.
+
+        Returns:
+            starnix.Starnix object
         """
 
     @properties.Affordance

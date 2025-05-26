@@ -36,6 +36,7 @@ from honeydew.affordances.power.system_power_state_controller import (
 )
 from honeydew.affordances.rtc import rtc_using_fc
 from honeydew.affordances.session import session_using_ffx
+from honeydew.affordances.starnix import starnix_using_ffx
 from honeydew.affordances.tracing import tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input_using_fc
@@ -439,13 +440,13 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
-        "_run_starnix_console_shell_cmd",
+        starnix_using_ffx.StarnixUsingFfx,
+        "run_console_shell_cmd",
         autospec=True,
     )
     def test_system_power_state_controller(
         self,
-        mock_run_starnix_console_shell_cmd: mock.Mock,
+        mock_run_console_shell_cmd: mock.Mock,
     ) -> None:
         """Test case to make sure fuchsia_device supports
         system_power_state_controller affordance implemented using starnix"""
@@ -453,7 +454,23 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
             self.fd_fc_obj.system_power_state_controller,
             system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
         )
-        mock_run_starnix_console_shell_cmd.assert_called_once()
+        mock_run_console_shell_cmd.assert_called_once()
+
+    @mock.patch.object(
+        starnix_using_ffx.StarnixUsingFfx,
+        "run_console_shell_cmd",
+        autospec=True,
+    )
+    def test_starnix(
+        self,
+        mock_run_console_shell_cmd: mock.Mock,
+    ) -> None:
+        """Test case to make sure fuchsia_device supports
+        starnix affordance implemented using starnix"""
+        self.assertIsInstance(
+            self.fd_fc_obj.starnix, starnix_using_ffx.StarnixUsingFfx
+        )
+        mock_run_console_shell_cmd.assert_called_once()
 
     @mock.patch.object(
         rtc_using_fc.RtcUsingFc,
