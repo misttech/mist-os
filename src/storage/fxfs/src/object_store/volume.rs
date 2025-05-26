@@ -112,7 +112,7 @@ impl RootVolume {
     }
 
     /// Returns the volume with the given id.  This is not thread-safe.
-    pub async fn volume_from_id(
+    async fn volume_from_id(
         &self,
         store_object_id: u64,
         owner: Weak<dyn StoreOwner>,
@@ -122,7 +122,8 @@ impl RootVolume {
             self.filesystem.object_manager().store(store_object_id).ok_or(FxfsError::NotFound)?;
         store.set_trace(self.filesystem.trace());
         if let Some(crypt) = crypt {
-            store.unlock(owner, crypt).await.context("Failed to unlock volume")?;
+            let read_only = self.filesystem.options().read_only;
+            store.unlock_inner(owner, crypt, read_only).await.context("Failed to unlock volume")?;
         } else if store.is_locked() {
             bail!(FxfsError::AccessDenied);
         }

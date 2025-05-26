@@ -299,8 +299,15 @@ impl FxVolume {
         // tasks that insert entries into the cache.
         self.dirent_cache.clear();
 
-        self.flush_all_files(true).await;
+        if self.store.filesystem().options().read_only {
+            // If the filesystem is read only, we don't need to flush/sync anything.
+            if self.store.is_unlocked() {
+                self.store.lock_read_only();
+            }
+            return;
+        }
 
+        self.flush_all_files(true).await;
         self.store.filesystem().graveyard().flush().await;
         if self.store.crypt().is_some() {
             if let Err(e) = self.store.lock().await {
@@ -817,7 +824,7 @@ mod tests {
         open_file_checked, write_at, TestFixture,
     };
     use crate::fuchsia::volume::{
-        FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
+        FxVolume, FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
     };
     use crate::fuchsia::volumes_directory::VolumesDirectory;
     use delivery_blob::CompressionMode;
@@ -825,7 +832,7 @@ mod tests {
     use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker};
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
-    use fxfs::filesystem::FxFilesystem;
+    use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder};
     use fxfs::fsck::{fsck, fsck_volume};
     use fxfs::object_handle::ObjectHandle;
     use fxfs::object_store::directory::replace_child;
@@ -2589,5 +2596,64 @@ mod tests {
         close_file_checked(f).await;
 
         fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_read_only_unencrypted_volume() {
+        // Make a new Fxfs filesystem with an unencrypted volume named "vol".
+        let fs = {
+            let device = fxfs::filesystem::mkfs_with_volume(
+                DeviceHolder::new(FakeDevice::new(8192, 512)),
+                "vol",
+                None,
+            )
+            .await
+            .unwrap();
+            // Re-open the device as read-only and mount the filesystem as read-only.
+            device.reopen(true);
+            FxFilesystemBuilder::new().read_only(true).open(device).await.unwrap()
+        };
+        // Ensure we can access the volume and gracefully terminate any tasks.
+        {
+            let root_volume = root_volume(fs.clone()).await.unwrap();
+            let store = root_volume.volume("vol", NO_OWNER, None).await.unwrap();
+            let unique_id = store.store_object_id();
+            let volume = FxVolume::new(Weak::new(), store, unique_id).unwrap();
+            volume.terminate().await;
+        }
+        // Close the filesystem, and make sure we don't have any dangling references.
+        fs.close().await.unwrap();
+        let device = fs.take_device().await;
+        device.ensure_unique();
+    }
+
+    #[fuchsia::test]
+    async fn test_read_only_encrypted_volume() {
+        let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
+        // Make a new Fxfs filesystem with an encrypted volume named "vol".
+        let fs = {
+            let device = fxfs::filesystem::mkfs_with_volume(
+                DeviceHolder::new(FakeDevice::new(8192, 512)),
+                "vol",
+                Some(crypt.clone()),
+            )
+            .await
+            .unwrap();
+            // Re-open the device as read-only and mount the filesystem as read-only.
+            device.reopen(true);
+            FxFilesystemBuilder::new().read_only(true).open(device).await.unwrap()
+        };
+        // Ensure we can access the volume and gracefully terminate any tasks.
+        {
+            let root_volume = root_volume(fs.clone()).await.unwrap();
+            let store = root_volume.volume("vol", NO_OWNER, Some(crypt)).await.unwrap();
+            let unique_id = store.store_object_id();
+            let volume = FxVolume::new(Weak::new(), store, unique_id).unwrap();
+            volume.terminate().await;
+        }
+        // Close the filesystem, and make sure we don't have any dangling references.
+        fs.close().await.unwrap();
+        let device = fs.take_device().await;
+        device.ensure_unique();
     }
 }

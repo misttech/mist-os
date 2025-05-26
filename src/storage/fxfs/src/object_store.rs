@@ -1653,6 +1653,8 @@ impl ObjectStore {
         crypt: Arc<dyn Crypt>,
         read_only: bool,
     ) -> Result<(), Error> {
+        // Unless we are unlocking the store as read-only, the filesystem must not be read-only.
+        assert!(read_only || !self.filesystem().options().read_only);
         match &*self.lock_state.lock() {
             LockState::Locked => {}
             LockState::Unencrypted => bail!(FxfsError::InvalidArgs),

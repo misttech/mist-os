@@ -930,9 +930,10 @@ impl TxnGuard<'_> {
 pub struct TruncateGuard<'a>(WriteGuard<'a>);
 
 /// Helper method for making a new filesystem.
-pub async fn mkfs(device: DeviceHolder) -> Result<(), Error> {
+pub async fn mkfs(device: DeviceHolder) -> Result<DeviceHolder, Error> {
     let fs = FxFilesystem::new_empty(device).await?;
-    fs.close().await
+    fs.close().await?;
+    Ok(fs.take_device().await)
 }
 
 /// Helper method for making a new filesystem with a single named volume.
@@ -942,7 +943,7 @@ pub async fn mkfs_with_volume(
     device: DeviceHolder,
     volume_name: &str,
     crypt: Option<Arc<dyn Crypt>>,
-) -> Result<(), Error> {
+) -> Result<DeviceHolder, Error> {
     let fs = FxFilesystem::new_empty(device).await?;
     {
         // expect instead of propagating errors here, since otherwise we could drop |fs| before
@@ -951,7 +952,7 @@ pub async fn mkfs_with_volume(
         root_volume.new_volume(volume_name, NO_OWNER, crypt).await.expect("Create volume failed");
     }
     fs.close().await?;
-    Ok(())
+    Ok(fs.take_device().await)
 }
 
 struct FsckAfterEveryTransaction {

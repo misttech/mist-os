@@ -14,7 +14,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use storage_device::fake_device::FakeDevice;
-use storage_device::{Device, DeviceHolder};
+use storage_device::DeviceHolder;
 
 const IMAGE_BLOCKS: u64 = 8192;
 // Version of first image with a verified file included in `create_image()`
@@ -53,9 +53,9 @@ fn load_device(path: &Path) -> Result<FakeDevice, Error> {
     Ok(FakeDevice::from_image(zstd::Decoder::new(std::fs::File::open(path)?)?, IMAGE_BLOCK_SIZE)?)
 }
 
-/// Compresses a RAM backed FakeDevice into a zstd compressed local image.
-async fn save_device(device: Arc<dyn Device>, path: &Path) -> Result<(), Error> {
-    device.reopen(false);
+/// Compresses contents of a device into a zstd compressed local image.
+async fn save_device(device: DeviceHolder, path: &Path) -> Result<(), Error> {
+    device.reopen(true);
     let mut writer = zstd::Encoder::new(std::fs::File::create(path)?, 6)?;
     let mut buf = device.allocate_buffer(device.block_size() as usize).await;
     let mut offset: u64 = 0;
@@ -108,15 +108,16 @@ pub async fn create_image() -> Result<(), Error> {
 
     let crypt: Arc<dyn Crypt> = Arc::new(InsecureCrypt::new());
     {
-        let device_holder = DeviceHolder::new(FakeDevice::new(IMAGE_BLOCKS, IMAGE_BLOCK_SIZE));
-        let device = device_holder.clone();
-        mkfs_with_volume(device_holder, DEFAULT_VOLUME, Some(crypt.clone())).await?;
-        device.reopen(false);
+        let device = mkfs_with_volume(
+            DeviceHolder::new(FakeDevice::new(IMAGE_BLOCKS, IMAGE_BLOCK_SIZE)),
+            DEFAULT_VOLUME,
+            Some(crypt.clone()),
+        )
+        .await?;
         save_device(device, path.as_path()).await?;
     }
-    let device_holder = DeviceHolder::new(load_device(&path)?);
-    let device = device_holder.clone();
-    let fs = FxFilesystem::open(device_holder).await?;
+    let device = DeviceHolder::new(load_device(&path)?);
+    let fs = FxFilesystem::open(device).await?;
     let default_vol = ops::open_volume(&fs, DEFAULT_VOLUME, NO_OWNER, Some(crypt.clone())).await?;
     let unencrypted_vol = ops::create_volume(&fs, UNENCRYPTED_VOLUME, None).await?;
     for (vol, msg) in [(&default_vol, "default volume"), (&unencrypted_vol, "unencrypted volume")] {
@@ -137,6 +138,7 @@ pub async fn create_image() -> Result<(), Error> {
     // Ensure that we have reclaimed the journal at least once.
     assert_ne!(before_generation, fs.super_block_header().generation);
     fs.close().await?;
+    let device = fs.take_device().await;
     save_device(device, &path).await?;
 
     let mut file = std::fs::File::create(golden_image_dir()?.join("images.gni").as_path())?;
