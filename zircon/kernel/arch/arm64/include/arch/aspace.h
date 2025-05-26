@@ -147,7 +147,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
                                   ConsistencyManager& cm) TA_REQ(lock_);
 
   void MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in, size_t size, uint index_shift,
-                             volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
+                             volatile pte_t* page_table) TA_REQ(lock_);
 
   // Splits a descriptor block into a set of next-level-down page blocks/pages.
   //

@@ -1353,8 +1353,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
 }
 
 void ArmArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in, size_t size,
-                                            const uint index_shift, volatile pte_t* page_table,
-                                            ConsistencyManager& cm) {
+                                            const uint index_shift, volatile pte_t* page_table) {
   const vaddr_t block_size = 1UL << index_shift;
   const vaddr_t block_mask = block_size - 1;
 
@@ -1384,7 +1383,7 @@ void ArmArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in,
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
       MarkAccessedPageTable(vaddr, vaddr_rem, chunk_size, index_shift - (page_size_shift_ - 3),
-                            next_page_table, cm);
+                            next_page_table);
     } else if (is_pte_valid(pte) && (pte & MMU_PTE_ATTR_AF) == 0) {
       pte |= MMU_PTE_ATTR_AF;
       update_pte(&page_table[index], pte);
@@ -1803,9 +1802,7 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
 
   LOCAL_KTRACE("mmu mark accessed", ("vaddr", vaddr), ("size", size));
 
-  ConsistencyManager cm(*this);
-
-  MarkAccessedPageTable(vaddr, vaddr_rel, size, top_index_shift_, tt_virt_, cm);
+  MarkAccessedPageTable(vaddr, vaddr_rel, size, top_index_shift_, tt_virt_);
   accessed_since_last_check_ = true;
 
   return ZX_OK;
