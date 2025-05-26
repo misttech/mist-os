@@ -83,6 +83,9 @@ class DownloadManager : public SystemObserver {
   // These servers have failed to authenticate and will never become ready.
   size_t servers_failed_auth_ = 0;
 
+  // These servers accountered repeated errors and will never becomre ready again.
+  size_t servers_unreachable_ = 0;
+
   // Downloads currently in progress or pending server availability. This holds an owning pointer to
   // the Download object so it can be persisted while we wait for servers to become ready.
   std::map<DownloadIdentifier, std::unique_ptr<Download>> downloads_;
