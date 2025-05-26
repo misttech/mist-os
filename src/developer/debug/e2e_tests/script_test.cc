@@ -90,7 +90,7 @@ void ScriptTest::OnOutput(const OutputBuffer& output) {
     output_for_debug_ += '\n';
   }
   FuzzyMatcher matcher(output.AsString());
-  while (matcher.MatchesLine(expected_output_pattern_)) {
+  while (matcher.MatchesLine(expected_output_pattern_, allow_out_of_order_output_)) {
     ProcessUntilNextOutput();
   }
 }
@@ -100,7 +100,7 @@ void ScriptTest::ProcessUntilNextOutput() {
   while (std::getline(script_file_, line)) {
     line_number_++;
 
-    if (line.empty() || debug::StringStartsWith(line, "#")) {
+    if (line.empty()) {
       continue;
     }
 
@@ -111,6 +111,17 @@ void ScriptTest::ProcessUntilNextOutput() {
       loop().PostTask(FROM_HERE,
                       [this, command]() { console().ProcessInputLine(std::string(command)); });
       output_for_debug_.clear();
+      allow_out_of_order_output_ = false;
+      continue;
+    } else if (debug::StringStartsWith(line, "##")) {
+      // Inline directives.
+      std::string directive = std::string(fxl::TrimString(line.substr(2), " "));
+      if (debug::StringStartsWith(directive, "allow-out-of-order-output")) {
+        allow_out_of_order_output_ = true;
+      }
+      continue;
+    } else if (debug::StringStartsWith(line, "#")) {
+      // Comment.
       continue;
     }
 

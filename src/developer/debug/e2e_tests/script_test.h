@@ -43,6 +43,11 @@ class ScriptTest : public E2eTest, public MockConsole::OutputObserver {
   // The pattern of a single line that |OnOutput| is expecting.
   std::string expected_output_pattern_;
 
+  // This is passed to a FuzzyMatcher object to communicate that it should not expect the order of
+  // strings to be exact. This is the case for various kinds of commands, like `async-backtrace` and
+  // `locals`, but should NOT be used for things like `frame`.
+  bool allow_out_of_order_output_ = false;
+
   // Useful for debugging when timeout.
   std::string output_for_debug_;
   int line_number_ = 0;
