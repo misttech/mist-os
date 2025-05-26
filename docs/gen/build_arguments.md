@@ -1014,7 +1014,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "lib/clang/21/lib/aarch64-unknown-linux-gnu/libclang_rt.lsan.a"
@@ -1066,7 +1066,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
@@ -1075,11 +1075,11 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   ubsan = {
@@ -1153,7 +1153,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
