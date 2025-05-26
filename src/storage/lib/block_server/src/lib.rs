@@ -240,7 +240,7 @@ impl OffsetMap {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.mapping.is_some()
+        self.mapping.is_none()
     }
 
     fn mapping(&self) -> Option<&BlockOffsetMapping> {
@@ -418,6 +418,9 @@ impl<SM: SessionManager> BlockServer<SM> {
                         };
                     if let Some(max) = info.block_count() {
                         if initial_mapping.target_block_offset + initial_mapping.length > max {
+                            log::warn!(
+                                "Invalid mapping for session: {initial_mapping:?} (max {max})"
+                            );
                             session.close_with_epitaph(zx::Status::INVALID_ARGS)?;
                             return Ok(None);
                         }
@@ -871,7 +874,7 @@ struct DecodedRequest {
 pub type WriteOptions = block_protocol::WriteOptions;
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Operation {
     // NOTE: On the C++ side, this ends up as a union and, for efficiency reasons, there is code
     // that assumes that some fields for reads and writes (and possibly trim) line-up (e.g. common
@@ -946,6 +949,7 @@ impl Operation {
             _ => None,
         };
         let (offset, length) = self.blocks_mut()?;
+        let orig_offset = *offset;
         if let Some(mapping) = mapping {
             let delta = *offset - mapping.source_block_offset;
             debug_assert!(*offset - mapping.source_block_offset < mapping.length);
@@ -962,18 +966,18 @@ impl Operation {
                 *length = max as u32;
                 return Some(match self {
                     Operation::Read {
-                        device_block_offset,
+                        device_block_offset: _,
                         block_count: _,
                         vmo_offset,
                         _unused,
                     } => Operation::Read {
-                        device_block_offset: *device_block_offset + max,
+                        device_block_offset: orig_offset + max,
                         block_count: rem,
                         vmo_offset: *vmo_offset + max * block_size as u64,
                         _unused: *_unused,
                     },
                     Operation::Write {
-                        device_block_offset,
+                        device_block_offset: _,
                         block_count: _,
                         vmo_offset,
                         options,
@@ -981,16 +985,15 @@ impl Operation {
                         // Only send the barrier flag once per write request.
                         let options = *options & !WriteOptions::PRE_BARRIER;
                         Operation::Write {
-                            device_block_offset: *device_block_offset + max,
+                            device_block_offset: orig_offset + max,
                             block_count: rem,
                             vmo_offset: *vmo_offset + max * block_size as u64,
                             options,
                         }
                     }
-                    Operation::Trim { device_block_offset, block_count: _ } => Operation::Trim {
-                        device_block_offset: *device_block_offset,
-                        block_count: rem,
-                    },
+                    Operation::Trim { device_block_offset: _, block_count: _ } => {
+                        Operation::Trim { device_block_offset: orig_offset + max, block_count: rem }
+                    }
                     _ => unreachable!(),
                 });
             }
@@ -1020,7 +1023,10 @@ impl GroupOrRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockServer, DeviceInfo, PartitionInfo, TraceFlowId, FIFO_MAX_REQUESTS};
+    use super::{
+        BlockOffsetMapping, BlockServer, DeviceInfo, Operation, PartitionInfo, TraceFlowId,
+        FIFO_MAX_REQUESTS,
+    };
     use assert_matches::assert_matches;
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
@@ -1030,6 +1036,7 @@ mod tests {
     use futures::FutureExt as _;
     use std::borrow::Cow;
     use std::future::poll_fn;
+    use std::num::NonZero;
     use std::pin::pin;
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::sync::Arc;
@@ -2502,6 +2509,166 @@ mod tests {
 
                 std::mem::drop(proxy);
             }
+        );
+    }
+
+    #[fuchsia::test]
+    fn operation_map() {
+        fn expect_map_result(
+            mut operation: Operation,
+            mapping: Option<BlockOffsetMapping>,
+            max_blocks: Option<NonZero<u32>>,
+            expected_operations: Vec<Operation>,
+        ) {
+            let mut ops = vec![];
+            while let Some(remainder) = operation.map(mapping.as_ref(), max_blocks.clone(), 512) {
+                ops.push(operation);
+                operation = remainder;
+            }
+            ops.push(operation);
+            assert_eq!(ops, expected_operations);
+        }
+
+        // No limits
+        expect_map_result(
+            Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            },
+            None,
+            None,
+            vec![Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            }],
+        );
+
+        // Max block count
+        expect_map_result(
+            Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            },
+            None,
+            NonZero::new(120),
+            vec![
+                Operation::Read {
+                    device_block_offset: 10,
+                    block_count: 120,
+                    _unused: 0,
+                    vmo_offset: 0,
+                },
+                Operation::Read {
+                    device_block_offset: 130,
+                    block_count: 80,
+                    _unused: 0,
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Write {
+                device_block_offset: 10,
+                block_count: 200,
+                options: WriteOptions::PRE_BARRIER,
+                vmo_offset: 0,
+            },
+            None,
+            NonZero::new(120),
+            vec![
+                Operation::Write {
+                    device_block_offset: 10,
+                    block_count: 120,
+                    options: WriteOptions::PRE_BARRIER,
+                    vmo_offset: 0,
+                },
+                Operation::Write {
+                    device_block_offset: 130,
+                    block_count: 80,
+                    options: WriteOptions::empty(),
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Trim { device_block_offset: 10, block_count: 200 },
+            None,
+            NonZero::new(120),
+            vec![Operation::Trim { device_block_offset: 10, block_count: 200 }],
+        );
+
+        // Remapping + Max block count
+        expect_map_result(
+            Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            },
+            Some(BlockOffsetMapping {
+                source_block_offset: 10,
+                target_block_offset: 100,
+                length: 200,
+            }),
+            NonZero::new(120),
+            vec![
+                Operation::Read {
+                    device_block_offset: 100,
+                    block_count: 120,
+                    _unused: 0,
+                    vmo_offset: 0,
+                },
+                Operation::Read {
+                    device_block_offset: 220,
+                    block_count: 80,
+                    _unused: 0,
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Write {
+                device_block_offset: 10,
+                block_count: 200,
+                options: WriteOptions::PRE_BARRIER,
+                vmo_offset: 0,
+            },
+            Some(BlockOffsetMapping {
+                source_block_offset: 10,
+                target_block_offset: 100,
+                length: 200,
+            }),
+            NonZero::new(120),
+            vec![
+                Operation::Write {
+                    device_block_offset: 100,
+                    block_count: 120,
+                    options: WriteOptions::PRE_BARRIER,
+                    vmo_offset: 0,
+                },
+                Operation::Write {
+                    device_block_offset: 220,
+                    block_count: 80,
+                    options: WriteOptions::empty(),
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Trim { device_block_offset: 10, block_count: 200 },
+            Some(BlockOffsetMapping {
+                source_block_offset: 10,
+                target_block_offset: 100,
+                length: 200,
+            }),
+            NonZero::new(120),
+            vec![Operation::Trim { device_block_offset: 100, block_count: 200 }],
         );
     }
 }

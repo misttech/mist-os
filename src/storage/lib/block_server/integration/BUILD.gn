@@ -10,15 +10,22 @@ rustc_test("block_server_integration_tests") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component/client",
+    "//src/storage/gpt/component:lib",
+    "//src/storage/gpt/rust",
+    "//src/storage/lib/block_client/rust",
     "//src/storage/lib/block_protocol",
     "//src/storage/lib/block_server:fake_block_server",
     "//src/storage/lib/ramdevice_client/rust",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:test-case",
   ]
