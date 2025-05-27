@@ -211,7 +211,7 @@
     <project name="third_party/github.com/google/googletest"
              path="third_party/googletest/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/googletest"
-             revision="9756ee7cbaef1b6652065616ab832810a6032bbf"/>
+             revision="e39786088138f2749d64e9e90e0f9902daa77c40"/>
     <project name="third_party/github.com/gperftools/gperftools"
              path="third_party/gperftools"
              remote="https://fuchsia.googlesource.com/third_party/github.com/gperftools/gperftools"
