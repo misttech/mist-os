@@ -8,7 +8,7 @@ use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_fxfs::{
     CryptCreateKeyResult, CryptCreateKeyWithIdResult, CryptRequest, CryptRequestStream,
-    CryptUnwrapKeyResult, KeyPurpose,
+    CryptUnwrapKeyResult, FxfsWrapped, KeyPurpose, WrappedKey,
 };
 use futures::stream::StreamExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
@@ -119,22 +119,25 @@ impl CryptService {
         Ok((wrapped.into(), key.into()))
     }
 
-    fn unwrap_key(
-        &self,
-        wrapping_key_id: EncryptionKeyId,
-        owner: u64,
-        key: Vec<u8>,
-    ) -> CryptUnwrapKeyResult {
-        let inner = self.inner.lock().unwrap();
-        let cipher = inner
-            .ciphers
-            .get(&wrapping_key_id)
-            .ok_or_else(|| zx::Status::NOT_FOUND.into_raw())?
-            .clone()
-            .cipher;
-        let nonce = zero_extended_nonce(owner);
+    fn unwrap_key(&self, owner: u64, key: WrappedKey) -> CryptUnwrapKeyResult {
+        match key {
+            WrappedKey::FxfsWrapped(FxfsWrapped { wrapping_key_id, wrapped_key }) => {
+                let wrapping_key_id = EncryptionKeyId::from(wrapping_key_id);
+                let inner = self.inner.lock().unwrap();
+                let cipher = inner
+                    .ciphers
+                    .get(&wrapping_key_id)
+                    .ok_or_else(|| zx::Status::NOT_FOUND.into_raw())?
+                    .clone()
+                    .cipher;
+                let nonce = zero_extended_nonce(owner);
 
-        cipher.decrypt(&nonce, &key[..]).map_err(|_| zx::Status::IO_DATA_INTEGRITY.into_raw())
+                Ok(cipher
+                    .decrypt(&nonce, &wrapped_key[..])
+                    .map_err(|_| zx::Status::IO_DATA_INTEGRITY.into_raw())?)
+            }
+            _ => Err(zx::Status::NOT_SUPPORTED.into_raw()),
+        }
     }
 
     pub fn add_wrapping_key(
@@ -235,18 +238,12 @@ impl CryptService {
                             log_error!("Failed to send CreateKeyWithId response {:?}", e)
                         });
                 }
-                Ok(CryptRequest::UnwrapKey { wrapping_key_id, owner, key, responder }) => {
+                Ok(CryptRequest::UnwrapKey { owner, wrapped_key, responder }) => {
                     responder
-                        .send(
-                            match self.unwrap_key(
-                                EncryptionKeyId::from(wrapping_key_id),
-                                owner,
-                                key,
-                            ) {
-                                Ok(ref unwrapped) => Ok(unwrapped),
-                                Err(e) => Err(e),
-                            },
-                        )
+                        .send(match self.unwrap_key(owner, wrapped_key) {
+                            Ok(ref unwrapped) => Ok(unwrapped),
+                            Err(e) => Err(e),
+                        })
                         .unwrap_or_else(|e| {
                             log_error!("Failed to send UnwrapKey response {:?}", e)
                         });
@@ -266,7 +263,7 @@ mod tests {
     use crate::task::EncryptionKeyId;
 
     use super::CryptService;
-    use fidl_fuchsia_fxfs::KeyPurpose;
+    use fidl_fuchsia_fxfs::{FxfsWrapped, KeyPurpose, WrappedKey};
     use starnix_uapi::errno;
 
     #[test]
@@ -354,20 +351,32 @@ mod tests {
             .set_active_key(u128::to_le_bytes(0), KeyPurpose::Data)
             .expect("set active key failed for data");
 
-        let (wrapping_key_id, wrapped, unwrapped) =
+        let (wrapping_key_id, wrapped_key, unwrapped_key) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");
         let unwrap_result = service
-            .unwrap_key(EncryptionKeyId::from(wrapping_key_id), 0, wrapped)
+            .unwrap_key(
+                0,
+                WrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id,
+                    wrapped_key: wrapped_key.try_into().unwrap(),
+                }),
+            )
             .expect("unwrap_key failed");
-        assert_eq!(unwrap_result, unwrapped);
+        assert_eq!(unwrap_result, unwrapped_key);
 
         // Do it twice to make sure the service can use the same key repeatedly.
-        let (wrapping_key_id, wrapped, unwrapped) =
+        let (wrapping_key_id, wrapped_key, unwrapped_key) =
             service.create_key(1, KeyPurpose::Data).expect("create_key failed");
         let unwrap_result = service
-            .unwrap_key(EncryptionKeyId::from(wrapping_key_id), 1, wrapped)
+            .unwrap_key(
+                1,
+                WrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id,
+                    wrapped_key: wrapped_key.try_into().unwrap(),
+                }),
+            )
             .expect("unwrap_key failed");
-        assert_eq!(unwrap_result, unwrapped);
+        assert_eq!(unwrap_result, unwrapped_key);
     }
 
     #[test]
@@ -378,20 +387,35 @@ mod tests {
             .add_wrapping_key(u128::to_le_bytes(1), key.clone(), 0)
             .expect("add wrapping key failed");
 
-        let (wrapped, unwrapped) = service
+        let (wrapped_key, unwrapped_key) = service
             .create_key_with_id(0, u128::to_le_bytes(1).into())
             .expect("create_key_with_id failed");
-        let unwrap_result =
-            service.unwrap_key(u128::to_le_bytes(1).into(), 0, wrapped).expect("unwrap_key failed");
-        assert_eq!(unwrap_result, unwrapped);
+        let wrapping_key_id = u128::to_le_bytes(1);
+        let unwrap_result = service
+            .unwrap_key(
+                0,
+                WrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id,
+                    wrapped_key: wrapped_key.try_into().unwrap(),
+                }),
+            )
+            .expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped_key);
 
         // Do it twice to make sure the service can use the same key repeatedly.
-        let (wrapped, unwrapped) = service
+        let (wrapped_key, unwrapped_key) = service
             .create_key_with_id(1, u128::to_le_bytes(1).into())
             .expect("create_key_with_id failed");
-        let unwrap_result =
-            service.unwrap_key(u128::to_le_bytes(1).into(), 1, wrapped).expect("unwrap_key failed");
-        assert_eq!(unwrap_result, unwrapped);
+        let unwrap_result = service
+            .unwrap_key(
+                1,
+                WrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id,
+                    wrapped_key: wrapped_key.try_into().unwrap(),
+                }),
+            )
+            .expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped_key);
     }
 
     #[test]
@@ -402,16 +426,24 @@ mod tests {
             .expect_err("create_key_with_id should fail if the wrapping key does not exist");
 
         let wrapping_key = vec![0xABu8; 32];
+        let wrapping_key_id = u128::to_le_bytes(1);
         service
             .add_wrapping_key(u128::to_le_bytes(1), wrapping_key.clone(), 0)
             .expect("add wrapping key failed");
 
-        let (wrapped, unwrapped) = service
+        let (wrapped_key, unwrapped_key) = service
             .create_key_with_id(0, u128::to_le_bytes(1).into())
             .expect("create_key_with_id failed");
-        let unwrap_result =
-            service.unwrap_key(u128::to_le_bytes(1).into(), 0, wrapped).expect("unwrap_key failed");
-        assert_eq!(unwrap_result, unwrapped);
+        let unwrap_result = service
+            .unwrap_key(
+                0,
+                WrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id,
+                    wrapped_key: wrapped_key.try_into().unwrap(),
+                }),
+            )
+            .expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped_key);
     }
 
     #[test]
@@ -424,13 +456,19 @@ mod tests {
         service
             .set_active_key(u128::to_le_bytes(0), KeyPurpose::Data)
             .expect("set active key failed for data");
-        let (wrapping_key_id, mut wrapped, _) =
+        let (wrapping_key_id, mut wrapped_key, _) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");
-        for byte in &mut wrapped {
+        for byte in &mut wrapped_key {
             *byte ^= 0xff;
         }
         service
-            .unwrap_key(EncryptionKeyId::from(wrapping_key_id), 0, wrapped)
+            .unwrap_key(
+                0,
+                WrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id,
+                    wrapped_key: wrapped_key.try_into().unwrap(),
+                }),
+            )
             .expect_err("unwrap_key should fail");
     }
 
@@ -445,10 +483,16 @@ mod tests {
             .set_active_key(u128::to_le_bytes(0), KeyPurpose::Data)
             .expect("set active key failed for data");
 
-        let (wrapping_key_id, wrapped, _) =
+        let (wrapping_key_id, wrapped_key, _) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");
         service
-            .unwrap_key(EncryptionKeyId::from(wrapping_key_id), 1, wrapped)
+            .unwrap_key(
+                1,
+                WrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id,
+                    wrapped_key: wrapped_key.try_into().unwrap(),
+                }),
+            )
             .expect_err("unwrap_key should fail");
     }
 }

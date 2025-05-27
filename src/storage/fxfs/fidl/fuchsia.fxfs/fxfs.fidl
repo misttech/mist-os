@@ -7,12 +7,54 @@ library fuchsia.fxfs;
 using fuchsia.io;
 using zx;
 
+type EmptyStruct = struct {};
+
 /// Designates the purpose of a key.
 type KeyPurpose = flexible enum {
     /// The key will be used to encrypt metadata.
     METADATA = 1;
     /// The key will be used to encrypt data.
     DATA = 2;
+};
+
+type FscryptInoLblk32DirKey = struct {
+    key_identifier array<uint8, 16>;
+    filesystem_uuid array<uint8, 16>;
+    nonce array<uint8, 16>;
+};
+type FscryptInoLblk32FileKey = struct {
+    key_identifier array<uint8, 16>;
+    filesystem_uuid array<uint8, 16>;
+};
+
+type WrappedKey = flexible union {
+    /// Fxfs's default crypto.
+    ///   In: 16-byte wrapping_key_id + 48-byte wrapped key.
+    ///   Out: 32-byte unwrapped key.
+    1: fxfs_wrapped struct {
+        wrapping_key_id array<uint8, 16>;
+        wrapped_key array<uint8, 48>;
+    };
+
+    /// Zxcrypt (For use with FVM/Minfs only)
+    ///   In: 132-byte request blob.
+    ///   Out: 80-byte unwrapped key blob.
+    2: zxcrypt vector<uint8>:132;
+
+    /// Fscrypt INO_LBLK32 directory (For use with starnix only)
+    ///   In: 16-byte key_identifier + 16-byte UUID + 16-byte nonce.
+    ///   Out: 32-byte xts_key1, 32-byte xts_key2, 16-byte ino_hash, 16-byte dirhash.
+    3: fscrypt_ino_lblk32_dir FscryptInoLblk32DirKey;
+
+    /// Fscrypt INO_LBLK32 file (For use with starnix only)
+    ///   In: 16-byte key_identifier + 16-byte UUID.
+    ///   Out: 32-byte xts_key1, 32-byte xts_key2, 16-byte ino_hash.
+    4: fscrypt_ino_lblk32_file FscryptInoLblk32FileKey;
+
+    /// Devicemapper DefaultKey (For use with starnix only)
+    ///   In: None. This is a singleton. wrapping_key_id should be set to 0.
+    ///   Out: 32-byte xts_key1, 32-byte xts_key2.
+    5: dm_default_key EmptyStruct;
 };
 
 @discoverable
@@ -41,16 +83,14 @@ closed protocol Crypt {
         unwrapped_key vector<uint8>:80;
     }) error zx.Status;
 
-    /// Unwraps a key that is wrapped by the key identified by `wrapping_key_id`.  `owner` must be
-    /// the same as that passed to `CreateKey`.  This can fail due to permission reasons, but an
-    /// incorrect key or owner will not fail; it will just return an unwrapped key that won't
-    /// actually decrpyt the data.
+    /// Unwraps a key.  `owner` must be the same as that passed to `CreateKey`.
+    /// This can fail due to permission reasons, but an incorrect key or owner will not fail;
+    /// it will just return an unwrapped key that won't actually decrpyt the data.
     strict UnwrapKey(struct {
-        wrapping_key_id array<uint8, 16>;
         owner uint64;
-        key vector<uint8>:132;
+        wrapped_key WrappedKey;
     }) -> (struct {
-        unwrapped_key vector<uint8>:80;
+        unwrapped_key vector<uint8>:128;
     }) error zx.Status;
 };
 

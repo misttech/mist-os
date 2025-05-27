@@ -60,11 +60,10 @@ impl Key {
         // followed by the wrapped key.  The unwrapped key consists of 64 bytes for the XTS key
         // which is made up of two 32 bytes Aes256 keys, one for the data and one for the IV/tweak,
         // followed by 16 bytes which make up the IV.
-        let wrapping_key_id_0 = [0; 16];
-        let unwrapped_key = crypt
-            .unwrap_key(&wrapping_key_id_0, 0, &data[..std::mem::size_of::<ZxcryptHeaderAndKey>()])
-            .await?
-            .map_err(zx::Status::from_raw)?;
+        let key = fidl_fuchsia_fxfs::WrappedKey::Zxcrypt(
+            data[..std::mem::size_of::<ZxcryptHeaderAndKey>()].to_vec(),
+        );
+        let unwrapped_key = crypt.unwrap_key(0, &key).await?.map_err(zx::Status::from_raw)?;
 
         Ok(Self {
             data_cipher: Aes256::new(GenericArray::from_slice(&unwrapped_key[..32])),

@@ -5,7 +5,10 @@
 use super::errors::map_to_status;
 use async_trait::async_trait;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_fxfs::{CryptMarker, CryptProxy, KeyPurpose as FidlKeyPurpose};
+use fidl_fuchsia_fxfs::{
+    CryptMarker, CryptProxy, FxfsWrapped, KeyPurpose as FidlKeyPurpose,
+    WrappedKey as FidlWrappedKey,
+};
 use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, KEY_SIZE};
 use zx;
 
@@ -81,7 +84,13 @@ impl Crypt for RemoteCrypt {
     ) -> Result<UnwrappedKey, zx::Status> {
         let unwrapped = self
             .client
-            .unwrap_key(&wrapped_key.wrapping_key_id.to_le_bytes(), owner, &wrapped_key.key[..])
+            .unwrap_key(
+                owner,
+                &FidlWrappedKey::FxfsWrapped(FxfsWrapped {
+                    wrapping_key_id: wrapped_key.wrapping_key_id.to_le_bytes(),
+                    wrapped_key: wrapped_key.key.as_slice().try_into().unwrap(),
+                }),
+            )
             .await
             .map_err(|e| map_to_status(e.into()))?
             .map_err(|e| zx::Status::from_raw(e))?;

@@ -30,7 +30,6 @@ async fn unwrap_zxcrypt_key(policy: Policy, wrapped_key: &[u8]) -> Result<Vec<u8
     if wrapped_key.len() != 132 {
         return Err(zx::Status::INVALID_ARGS);
     }
-
     let sources = unseal_sources(policy);
 
     let (header, _) = ZxcryptHeader::read_from_prefix(wrapped_key).unwrap();
@@ -111,13 +110,19 @@ pub async fn run_crypt_service(
             CryptRequest::CreateKeyWithId { responder, .. } => {
                 responder.send(Err(zx::Status::BAD_PATH.into_raw()))?
             }
-            CryptRequest::UnwrapKey { responder, key, .. } => responder.send(
-                unwrap_zxcrypt_key(policy, &key)
-                    .await
-                    .as_ref()
-                    .map(|u| &u[..])
-                    .map_err(|s| s.into_raw()),
-            )?,
+            CryptRequest::UnwrapKey { responder, wrapped_key, .. } => {
+                let response;
+                responder.send(match &wrapped_key {
+                    fidl_fuchsia_fxfs::WrappedKey::Zxcrypt(key) => {
+                        response = unwrap_zxcrypt_key(policy, key).await;
+                        match &response {
+                            Ok(v) => Ok(&v[..]),
+                            Err(e) => Err(e.into_raw()),
+                        }
+                    }
+                    _ => Err(zx::Status::INTERNAL.into_raw()),
+                })?;
+            }
         }
     }
     Ok::<(), Error>(())
@@ -145,6 +150,7 @@ pub async fn with_crypt_service<R, Fut: Future<Output = Result<R, Error>>>(
 mod tests {
     use super::{with_crypt_service, ZxcryptHeader, ZXCRYPT_MAGIC, ZXCRYPT_VERSION};
     use crypt_policy::Policy;
+    use fidl_fuchsia_fxfs::WrappedKey;
     use zerocopy::FromBytes;
 
     fn entropy(data: &[u8]) -> f64 {
@@ -170,7 +176,7 @@ mod tests {
     async fn test_keys() {
         with_crypt_service(Policy::Null, |crypt| async {
             let crypt = crypt.into_proxy();
-            let (_, key, unwrapped_key) = crypt
+            let (_, wrapped_key, unwrapped_key) = crypt
                 .create_key(0, fidl_fuchsia_fxfs::KeyPurpose::Data)
                 .await
                 .unwrap()
@@ -180,7 +186,7 @@ mod tests {
             assert!(entropy(&unwrapped_key) > 0.5);
 
             // Check that key has the correct fields set.
-            let (header, _) = ZxcryptHeader::read_from_prefix(&key).unwrap();
+            let (header, _) = ZxcryptHeader::read_from_prefix(&wrapped_key).unwrap();
 
             let magic = header.magic;
             assert_eq!(magic, ZXCRYPT_MAGIC);
@@ -189,9 +195,8 @@ mod tests {
             assert_eq!(version, ZXCRYPT_VERSION);
 
             // Check that we can unwrap the returned key.
-            let wrapping_key_id_0 = [0; 16];
             let unwrapped_key2 = crypt
-                .unwrap_key(&wrapping_key_id_0, 0, &key)
+                .unwrap_key(0, &WrappedKey::Zxcrypt(wrapped_key))
                 .await
                 .unwrap()
                 .expect("unwrap_key failed");
