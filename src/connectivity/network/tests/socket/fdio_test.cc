@@ -100,26 +100,6 @@ TEST(NetStreamTest, RaceClose) {
   std::for_each(workers.begin(), workers.end(), std::mem_fn(&std::thread::join));
 }
 
-TEST(SocketTest, ZXSocketSignalNotPermitted) {
-  fbl::unique_fd fd;
-  ASSERT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))) << strerror(errno);
-
-  fidl::ClientEnd<fuchsia_posix_socket::StreamSocket> client_end;
-  ASSERT_OK(fdio_fd_transfer(fd.release(), client_end.channel().reset_and_get_address()));
-  fidl::WireSyncClient client{std::move(client_end)};
-
-  const fidl::WireResult result = client->Describe();
-  ASSERT_OK(result.status());
-  const fidl::WireResponse response = result.value();
-  ASSERT_TRUE(response.has_socket());
-  const zx::socket& socket = response.socket();
-
-  EXPECT_STATUS(socket.signal(ZX_USER_SIGNAL_0, 0), ZX_ERR_ACCESS_DENIED);
-  EXPECT_STATUS(socket.signal(0, ZX_USER_SIGNAL_0), ZX_ERR_ACCESS_DENIED);
-  EXPECT_STATUS(socket.signal_peer(ZX_USER_SIGNAL_0, 0), ZX_ERR_ACCESS_DENIED);
-  EXPECT_STATUS(socket.signal_peer(0, ZX_USER_SIGNAL_0), ZX_ERR_ACCESS_DENIED);
-}
-
 static std::optional<zx::socket> stream_handle(
     fidl::WireResponse<typename fuchsia_posix_socket::StreamSocket::Describe> response) {
   if (response.has_socket()) {

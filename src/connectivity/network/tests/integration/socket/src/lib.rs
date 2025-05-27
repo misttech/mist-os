@@ -3543,6 +3543,9 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
             | zx::sys::ZX_RIGHT_INSPECT
             | zx::sys::ZX_RIGHT_WRITE
             | zx::sys::ZX_RIGHT_READ
+            // TODO(https://fxbug.dev/417777189): Remove signal rights when no
+            // longer necessary for ffx support.
+            | zx::sys::ZX_RIGHT_SIGNAL
     );
 }
 

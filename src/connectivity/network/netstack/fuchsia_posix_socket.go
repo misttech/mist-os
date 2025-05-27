@@ -1534,8 +1534,9 @@ func (eps *endpointWithSocket) startReadWriteLoops(loopRead, loopWrite func(chan
 }
 
 func (eps *endpointWithSocket) describe() (zx.Handle, error) {
-	// TODO(https://fxbug.dev/42157659): The rights on this handle should be capped at the connection's.
-	socket, err := eps.peer.Handle().Duplicate(zx.RightTransfer | zx.RightsIO | zx.RightWait | zx.RightInspect)
+	// TODO(https://fxbug.dev/417777189): Remove signal rights when no longer
+	// necessary for ffx support.
+	socket, err := eps.peer.Handle().Duplicate(zx.RightTransfer | zx.RightsIO | zx.RightWait | zx.RightInspect | zx.RightSignal)
 	_ = syslog.DebugTf("Describe", "%p: err=%v", eps, err)
 	return socket, err
 }

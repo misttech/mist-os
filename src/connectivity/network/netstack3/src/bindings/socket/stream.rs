@@ -797,7 +797,9 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
                     .duplicate_handle(
-                        (zx::Rights::BASIC | zx::Rights::IO)
+                        // TODO(https://fxbug.dev/417777189): Remove SIGNAL
+                        // rights when no longer necessary for ffx support.
+                        (zx::Rights::BASIC | zx::Rights::IO | zx::Rights::SIGNAL)
                         // Don't allow the peer to duplicate the stream.
                         & !zx::Rights::DUPLICATE,
                     )
