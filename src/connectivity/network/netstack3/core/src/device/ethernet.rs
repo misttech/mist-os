@@ -30,7 +30,6 @@ use netstack3_device::{
     DeviceId, DeviceLayerEventDispatcher, DeviceLayerTimerId, DeviceSendFrameError,
     IpLinkDeviceState,
 };
-use netstack3_ip::device::IpAddressState;
 use netstack3_ip::icmp::{self, NdpCounters};
 use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
@@ -386,7 +385,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         device_id: &EthernetDeviceId<BC>,
         sender_addr: Ipv4Addr,
         target_addr: Ipv4Addr,
-    ) -> IpAddressState {
+        is_arp_probe: bool,
+    ) -> bool {
         let device_id = DeviceId::Ethernet(device_id.clone());
         netstack3_ip::device::on_arp_packet(
             self,
@@ -394,6 +394,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
             &device_id,
             sender_addr,
             target_addr,
+            is_arp_probe,
         )
     }
 }

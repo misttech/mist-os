@@ -876,8 +876,22 @@ fn add_ipv4_addr_with_dad(order: Ipv4DadTestOrder) {
     let _ = ctx.bindings_ctx.take_events();
 }
 
-#[test]
-fn notify_on_dad_failure_ipv4() {
+enum Ipv4DadFailureTestCase {
+    /// The received ARP packet will have the same source address as the
+    /// address undergoing DAD.
+    ConflictingSource,
+    /// The received ARP packet will be an ARP probe with the same target
+    /// address as the address undergoing DAD.
+    ConflictingProbe,
+    /// The received ARP packet will have the same target address as the
+    /// address undergoing DAD, but it will not be an ARP probe.
+    ConflictingNonProbe,
+}
+
+#[test_case(Ipv4DadFailureTestCase::ConflictingSource, true; "conflicting_source")]
+#[test_case(Ipv4DadFailureTestCase::ConflictingProbe, true; "conflicting_probe")]
+#[test_case(Ipv4DadFailureTestCase::ConflictingNonProbe, false; "conflicting_non_probe")]
+fn notify_on_dad_failure_ipv4(case: Ipv4DadFailureTestCase, expect_conflict: bool) {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
     // Install a device.
@@ -941,26 +955,44 @@ fn notify_on_dad_failure_ipv4() {
 
     let (mut core_ctx, bindings_ctx) = ctx.contexts();
 
-    // Simulate a conflicting ARP probe, and expect the address is removed.
+    // Simulate a conflicting ARP packet, and expect the address is removed.
+    const OTHER_IP: Ipv4Addr = net_ip_v4!("192.168.0.2");
+    let (sender_addr, target_addr, is_probe) = match case {
+        Ipv4DadFailureTestCase::ConflictingSource => {
+            (ipv4_addr_subnet.addr().get(), OTHER_IP, false)
+        }
+        Ipv4DadFailureTestCase::ConflictingProbe => {
+            (Ipv4::UNSPECIFIED_ADDRESS, ipv4_addr_subnet.addr().get(), true)
+        }
+        Ipv4DadFailureTestCase::ConflictingNonProbe => {
+            (Ipv4::UNSPECIFIED_ADDRESS, ipv4_addr_subnet.addr().get(), false)
+        }
+    };
+
     assert_eq!(
-        IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
+        netstack3_ip::device::on_arp_packet(
             &mut core_ctx,
             bindings_ctx,
             &device_id,
-            ipv4_addr_subnet.addr(),
-            ()
+            sender_addr,
+            target_addr,
+            is_probe,
         ),
-        IpAddressState::Tentative,
+        false
     );
 
-    assert_eq!(
-        bindings_ctx.take_events()[..],
-        [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressRemoved {
-            device: device_id.downgrade(),
-            addr: ipv4_addr_subnet.addr(),
-            reason: AddressRemovedReason::DadFailed,
-        })]
-    );
+    if expect_conflict {
+        assert_eq!(
+            bindings_ctx.take_events()[..],
+            [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressRemoved {
+                device: device_id.downgrade(),
+                addr: ipv4_addr_subnet.addr(),
+                reason: AddressRemovedReason::DadFailed,
+            })]
+        );
+    } else {
+        assert_eq!(bindings_ctx.take_events()[..], []);
+    }
 
     // Disable device and take all events to cleanup references.
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
