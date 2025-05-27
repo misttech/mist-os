@@ -902,9 +902,6 @@ impl UnixSocketInner {
         socket_type: SocketType,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        if self.peer_closed_with_unread_data {
-            return error!(ECONNRESET);
-        }
         let mut info = if socket_type == SocketType::Stream {
             if data.available() == 0 {
                 return Ok(MessageReadInfo::default());
@@ -920,8 +917,13 @@ impl UnixSocketInner {
         } else {
             self.messages.read_datagram(data)?
         };
-        if info.message_length == 0 && !self.is_shutdown {
-            return error!(EAGAIN);
+        if info.message_length == 0 {
+            if self.peer_closed_with_unread_data {
+                return error!(ECONNRESET);
+            }
+            if !self.is_shutdown {
+                return error!(EAGAIN);
+            }
         }
 
         // Remove any credentials message, so that it can be moved to the front if passcred is

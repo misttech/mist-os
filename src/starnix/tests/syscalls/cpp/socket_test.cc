@@ -99,6 +99,46 @@ TEST(UnixSocket, HupEvent) {
   close(epfd);
 }
 
+TEST(UnixSocket, ReadConnReset) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+
+  ASSERT_EQ(1, write(fds[1], "A", 1));
+  ASSERT_EQ(1, write(fds[0], "B", 1));
+  ASSERT_EQ(0, close(fds[0]));
+  char buf[1];
+  ASSERT_EQ(1, read(fds[1], buf, 1));
+  ASSERT_EQ('B', buf[0]);
+  ASSERT_EQ(-1, read(fds[1], buf, 1));
+  EXPECT_EQ(errno, ECONNRESET);
+}
+
+TEST(UnixSocket, ReadConnResetEmptyBuffer) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+
+  ASSERT_EQ(1, write(fds[1], "A", 1));
+  ASSERT_EQ(0, close(fds[0]));
+  char buf[1];
+  ASSERT_EQ(0, read(fds[1], buf, 0));
+}
+
+TEST(UnixSocket, ReadConnResetAndShutdown) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+
+  ASSERT_EQ(1, write(fds[1], "A", 1));
+  ASSERT_EQ(1, write(fds[0], "B", 1));
+  ASSERT_EQ(0, close(fds[0]));
+  ASSERT_EQ(0, shutdown(fds[1], SHUT_RD));
+
+  char buf[1];
+  ASSERT_EQ(1, read(fds[1], buf, 1));
+  ASSERT_EQ('B', buf[0]);
+  ASSERT_EQ(-1, read(fds[1], buf, 1));
+  EXPECT_EQ(errno, ECONNRESET);
+}
+
 struct read_info_spec {
   unsigned char* mem;
   size_t length;
