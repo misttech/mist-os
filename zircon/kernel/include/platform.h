@@ -67,6 +67,30 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
 /* optionally stop the current cpu in a way the platform finds appropriate */
 void platform_halt_cpu();
 
+// Suspend the calling CPU.
+//
+// On success, the CPU will enter an implementation-defined suspend state.
+//
+// Prior to calling this function, it's critical to set up some kind of
+// interrupt that will wake the CPU and resume execution.  Upon successful
+// suspend and resume, this call returns ZX_OK.
+//
+// Prior to calling, interrupts must be disabled, preemption must be disabled,
+// and the caller must be pinned to the calling CPU.
+//
+// Returns ZX_ERR_NOT_SUPPORTED if unsupported on this platform.
+//
+// Returns ZX_ERR_CANCELED if the suspend operation could not completed because
+// of a pending wake event (e.g. a pending interrupt).
+//
+// TODO(https://fxbug.dev/414456459): Currently, the caller is responsible for
+// determining if pausing/resuming the monotonic clock is necessary and then
+// actually doing it.  More thought needs to be given to where that logic should
+// live.  Right now, it's done in |IdlePowerThread::UpdateMonotonicClock|,
+// however, it might be better to move some of that logic down into the platform
+// layer (perhaps within |platform_suspend_cpu|).
+zx_status_t platform_suspend_cpu();
+
 // Returns true if this system has a debug serial port that is enabled
 bool platform_serial_enabled();
 

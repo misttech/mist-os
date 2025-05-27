@@ -139,6 +139,8 @@ void platform_halt_cpu() {
   panic("power_cpu_off returned %d\n", status);
 }
 
+zx_status_t platform_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
   DEBUG_ASSERT(cpu_id < SMP_MAX_CPUS);
   return power_get_cpu_state(arch_cpu_num_to_hart_id(cpu_id));

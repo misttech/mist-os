@@ -72,8 +72,13 @@
 
 #include <platform/ram_mappable_crashlog.h>
 
+#define LOCAL_TRACE 0
+
 static ktl::atomic<int> panic_started;
 static ktl::atomic<int> halted;
+
+// Whether this platform implementation supports CPU suspend.
+static bool cpu_suspend_supported = false;
 
 namespace {
 
@@ -132,6 +137,61 @@ void platform_halt_cpu(void) {
   uint32_t result = power_cpu_off();
   // should have never returned
   panic("power_cpu_off returned %u\n", result);
+}
+
+// TODO(https://fxbug.dev/414456459): Expand to include a deadline parameter
+// that's used to wake the CPU based on the boot time clock.
+//
+// TODO(https://fxbug.dev/414456459): Consider adding a parameter that indicates
+// how deep of a suspend state we want to enter.  Then, on platforms and CPUs
+// that support multiple PSCI power states, we can choose the state that matches
+// the request.
+zx_status_t platform_suspend_cpu() {
+  LTRACEF("platform_suspend_cpu cpu-%u current_boot_time=%ld\n", arch_curr_cpu_num(),
+          current_boot_time());
+
+  DEBUG_ASSERT(arch_ints_disabled());
+  DEBUG_ASSERT(!Thread::Current::Get()->preemption_state().PreemptIsEnabled());
+
+  if (!cpu_suspend_supported) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  // TODO(https://fxbug.dev/414456459): Plumb in the available PSCI power_state
+  // values to this point using the recently added ZBI item.
+
+  // TODO(https://fxbug.dev/414456459): Expose a PSCI function that looks at the
+  // power_state value and determines if it's considered a "power down state" in
+  // the PSCI sense of the term.  Or perhaps make that an attribute that's
+  // supplied by the PSCI driver.
+  const bool is_power_down = true;
+
+  if (is_power_down) {
+    lockup_percpu_shutdown();
+    platform_suspend_timer_curr_cpu();
+    suspend_interrupts_curr_cpu();
+  }
+
+  LTRACEF("platform_suspend_cpu for cpu-%u, current_boot_time=%ld, suspending...\n",
+          arch_curr_cpu_num(), current_boot_time());
+
+  // TODO(https://fxbug.dev/414456459): Implement psci_cpu_suspend and call it
+  // here, passing along the psci_power_state value.
+  arch::Yield();
+
+  LTRACEF("platform_suspend_cpu for cpu-%u, current_boot_time=%ld, resuming...\n",
+          arch_curr_cpu_num(), current_boot_time());
+
+  if (is_power_down) {
+    DEBUG_ASSERT(arch_ints_disabled());
+    resume_interrupts_curr_cpu();
+    platform_resume_timer_curr_cpu();
+    lockup_percpu_init();
+  }
+
+  LTRACEF("platform_suspend_cpu for cpu-%u current_boot_time=%ld, succeeded\n", arch_curr_cpu_num(),
+          current_boot_time());
+  return ZX_OK;
 }
 
 zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
@@ -368,6 +428,10 @@ void platform_init(void) {
       zx_status_t status = psci_set_suspend_mode(psci_suspend_mode::os_initiated);
       if (status == ZX_OK) {
         dprintf(INFO, "PSCI: using OS initiated suspend mode\n");
+
+        // Only enable suspend support in the platform layer if we successfully
+        // put PSCI into OS initiated suspend mode.
+        cpu_suspend_supported = true;
       } else if (status == ZX_ERR_NOT_SUPPORTED) {
         dprintf(INFO, "PSCI: OS initiated suspend mode not supported\n");
       } else {
