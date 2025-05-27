@@ -17,7 +17,6 @@ rustc_library("lib") {
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
