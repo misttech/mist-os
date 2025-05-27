@@ -66,7 +66,7 @@ impl FileOps for MemoryDirectoryFile {
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        let new_offset = default_seek(current_offset, target, |_| error!(EINVAL))?;
+        let new_offset = default_seek(current_offset, target, || error!(EINVAL))?;
         // Nothing to do.
         if current_offset == new_offset {
             return Ok(new_offset);

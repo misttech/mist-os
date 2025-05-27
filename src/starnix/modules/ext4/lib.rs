@@ -334,7 +334,7 @@ impl FileOps for ExtDirFileObject {
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        Ok(default_seek(current_offset, target, |_| error!(EINVAL))?)
+        Ok(default_seek(current_offset, target, || error!(EINVAL))?)
     }
 
     fn readdir(

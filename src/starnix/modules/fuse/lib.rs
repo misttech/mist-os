@@ -913,10 +913,7 @@ impl FileOps for FuseFileObject {
             };
         }
 
-        default_seek(current_offset, target, |offset| {
-            let eof_offset = default_eof_offset(locked, file, current_task)?;
-            offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
-        })
+        default_seek(current_offset, target, || default_eof_offset(locked, file, current_task))
     }
 
     fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {

@@ -908,7 +908,7 @@ impl FileOps for MemFile {
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        default_seek(current_offset, target, |_| error!(EINVAL))
+        default_seek(current_offset, target, || error!(EINVAL))
     }
 
     fn read(

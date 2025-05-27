@@ -178,7 +178,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        let new_offset = default_seek(current_offset, target, |_| error!(EINVAL))?;
+        let new_offset = default_seek(current_offset, target, || error!(EINVAL))?;
 
         // Call `read(0)` to ensure the data is generated now instead of later (except, when
         // seeking to the start of the file).

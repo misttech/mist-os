@@ -111,10 +111,8 @@ impl FileOps for RemoteBlockDeviceFile {
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        default_seek(current_offset, target, |offset| {
-            let eof_offset =
-                self.device.backing_memory_size.try_into().map_err(|_| errno!(EINVAL))?;
-            offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
+        default_seek(current_offset, target, || {
+            self.device.backing_memory_size.try_into().map_err(|_| errno!(EINVAL))
         })
     }
 

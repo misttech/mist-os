@@ -119,9 +119,7 @@ impl FileOps for Ashmem {
             return error!(EBADF);
         }
         let eof_offset = self.state.lock().size;
-        default_seek(current_offset, target, |offset| {
-            offset.checked_add(eof_offset.try_into().unwrap()).ok_or_else(|| errno!(EINVAL))
-        })
+        default_seek(current_offset, target, || Ok(eof_offset.try_into().unwrap()))
     }
 
     fn read(

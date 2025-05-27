@@ -652,21 +652,21 @@ pub fn default_seek<F>(
     compute_end: F,
 ) -> Result<off_t, Errno>
 where
-    F: FnOnce(off_t) -> Result<off_t, Errno>,
+    F: FnOnce() -> Result<off_t, Errno>,
 {
     let new_offset = match target {
         SeekTarget::Set(offset) => Some(offset),
         SeekTarget::Cur(offset) => current_offset.checked_add(offset),
-        SeekTarget::End(offset) => Some(compute_end(offset)?),
+        SeekTarget::End(offset) => compute_end()?.checked_add(offset),
         SeekTarget::Data(offset) => {
-            let eof = compute_end(0).unwrap_or(off_t::MAX);
+            let eof = compute_end().unwrap_or(off_t::MAX);
             if offset >= eof {
                 return error!(ENXIO);
             }
             Some(offset)
         }
         SeekTarget::Hole(offset) => {
-            let eof = compute_end(0)?;
+            let eof = compute_end()?;
             if offset >= eof {
                 return error!(ENXIO);
             }
@@ -691,7 +691,7 @@ where
 /// - `current_offset`: The current position
 /// - `target`: The location to seek to.
 pub fn unbounded_seek(current_offset: off_t, target: SeekTarget) -> Result<off_t, Errno> {
-    default_seek(current_offset, target, |_| Ok(MAX_LFS_FILESIZE as off_t))
+    default_seek(current_offset, target, || Ok(MAX_LFS_FILESIZE as off_t))
 }
 
 #[macro_export]
@@ -741,9 +741,8 @@ macro_rules! fileops_impl_seekable {
             current_offset: starnix_uapi::off_t,
             target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
-            $crate::vfs::default_seek(current_offset, target, |offset| {
-                let eof_offset = $crate::vfs::default_eof_offset(locked, file, current_task)?;
-                offset.checked_add(eof_offset).ok_or_else(|| starnix_uapi::errno!(EINVAL))
+            $crate::vfs::default_seek(current_offset, target, || {
+                $crate::vfs::default_eof_offset(locked, file, current_task)
             })
         }
     };
