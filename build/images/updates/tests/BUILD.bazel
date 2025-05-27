@@ -15,6 +15,7 @@ load(
 fuchsia_board_configuration(
     name = "board_config",
     board_name = "fake_board",
+    partitions_configuration = ":fake_partitions_config",
     version = "fake_version",
 )
 

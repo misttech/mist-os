@@ -21,7 +21,7 @@ pub struct CreateCommand {
 
     /// path to a partitions config, which lists the physical partitions of the target.
     #[argh(option)]
-    pub partitions: Utf8PathBuf,
+    pub partitions: Option<Utf8PathBuf>,
 
     /// path to an assembly manifest, which specifies images to put in slot A.
     #[argh(option)]

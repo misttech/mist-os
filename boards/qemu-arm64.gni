@@ -30,7 +30,7 @@ add_qemu_to_build_archives = true
 # Supports only virtual devices.
 board_is_emu = true
 
-partitions_config_label = "//boards/partitions:default"
+partitions_config_label = "//boards/partitions:qemu-arm64"
 
 blobfs_capacity = 10485760000  # 10000 MiB
 max_blob_contents_size =

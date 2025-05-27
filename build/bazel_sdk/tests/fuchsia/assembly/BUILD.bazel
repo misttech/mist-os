@@ -119,6 +119,7 @@ fuchsia_board_configuration(
     kernel = {
         "contiguous_physical_pages": True,
     },
+    partitions_configuration = ":my_partitions_config",
     platform = {
         "connectivity": {
             "network": {
