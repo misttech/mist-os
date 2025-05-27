@@ -22,6 +22,18 @@ antlion_host_test("connect_to_ap_test") {
   ]
 }
 
+antlion_host_test("roam_request_test") {
+  main_source = "RoamRequestTest.py"
+  libraries = [
+    "//src/connectivity/wlan/tests/core/core_testing",
+    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_host_test_data",
+    "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_host_test_data",
+  ]
+}
+
 group("tests_with_ap") {
   testonly = true
   public_deps = [ ":connect_to_ap_test" ]
