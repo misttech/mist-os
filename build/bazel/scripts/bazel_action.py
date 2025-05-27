@@ -20,6 +20,7 @@ import typing as T
 _SCRIPT_DIR = os.path.dirname(__file__)
 sys.path.insert(0, _SCRIPT_DIR)
 import build_utils
+import workspace_utils
 
 _BUILD_BAZEL_DIR = os.path.dirname(_SCRIPT_DIR)
 
@@ -62,13 +63,10 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     # Introduced by bzlmod
     "bazel_skylib",
     "bazel_skylib+",
-    "bazel_tools+cc_configure_extension+local_config_cc",
     "platforms",
-    "platforms+host_platform+host_platform",
     "rules_license",
     "rules_license+",
     "rules_python+",
-    "rules_python++internal_deps+rules_python_internal",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.
@@ -828,20 +826,12 @@ Then ensure that the GN target depends on them transitively.
     return 1
 
 
-def repository_name(label: str) -> str:
-    """Returns repository name of the input label.
-
-    Supports both canonical repository names (starts with @@) and apparent
-    repository names (starts with @).
-    """
-    repository, sep, _ = label.partition("//")
-    assert sep == "//", f"Missing // in label: {label}"
-    return repository.removeprefix("@@").removeprefix("@")
-
-
 def is_ignored_input_label(label: str) -> bool:
     """Return True if the label of a build or source file should be ignored."""
-    is_builtin = repository_name(label) in _BAZEL_BUILTIN_REPOSITORIES
+    is_builtin = (
+        workspace_utils.innermost_repository_name(label)
+        in _BAZEL_BUILTIN_REPOSITORIES
+    )
     is_ignored = label.endswith(_IGNORED_FILE_SUFFIXES)
     return is_builtin or is_ignored
 
@@ -849,7 +839,10 @@ def is_ignored_input_label(label: str) -> bool:
 def label_requires_content_hash(label: str) -> bool:
     """Return True if the label or source file belongs to a repository
     that requires a content hash file."""
-    return not (repository_name(label) in _BAZEL_NO_CONTENT_HASH_REPOSITORIES)
+    return not (
+        workspace_utils.repository_name(label)
+        in _BAZEL_NO_CONTENT_HASH_REPOSITORIES
+    )
 
 
 def list_to_pairs(l: T.Iterable[T.Any]) -> T.Iterable[tuple[T.Any, T.Any]]:

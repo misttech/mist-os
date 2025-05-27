@@ -919,5 +919,36 @@ class CheckRegeneratorInputsUpdatesTest(unittest.TestCase):
         self.assertSetEqual(updates, set())
 
 
+class RepositoryNameTest(unittest.TestCase):
+    def test_repository_name(self):
+        for label, expected_repo_name in [
+            ("@foo//path/to:target", "foo"),
+            ("@@bar//:root", "bar"),
+            ("@@rules_python+//path:to/target", "rules_python+"),
+            ("@@rules_rust+1.3//:root", "rules_rust+1.3"),
+            ("@@foo+bar+baz//extension:target", "foo+bar+baz"),
+        ]:
+            self.assertEqual(
+                workspace_utils.repository_name(label), expected_repo_name
+            )
+
+    def test_innermost_repository_name(self):
+        for label, expected_repo_name in [
+            ("@foo//path/to:target", "foo"),
+            ("@@bar//:root", "bar"),
+            ("@@rules_python+//path:to/target", "rules_python+"),
+            ("@@rules_rust+1.3//:root", "rules_rust+1.3"),
+            ("@@rules_java++toolchains+local_jdk//some:path", "local_jdk"),
+            (
+                "@@bazel_tools+remote_coverage_tools_extension+remote_coverage_tools//:root",
+                "remote_coverage_tools",
+            ),
+        ]:
+            self.assertEqual(
+                workspace_utils.innermost_repository_name(label),
+                expected_repo_name,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

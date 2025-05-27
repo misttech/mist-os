@@ -664,6 +664,7 @@ template("bazel_action") {
     inputs = [
                # Imported by bazel_action.py
                "//build/bazel/scripts/build_utils.py",
+               "//build/bazel/scripts/workspace_utils.py",
              ] + _bazel_build_files
 
     if (defined(invoker.inputs)) {
