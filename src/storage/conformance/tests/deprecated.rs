@@ -2,15 +2,92 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/324080864): Delete this module when we remove all deprecated functionality
+// from fuchsia.io.
+
 use assert_matches::assert_matches;
-use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _};
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _, ProtocolMarker};
 use fidl_fuchsia_io as fio;
 use fidl_test_placeholders::EchoMarker;
+use fuchsia_async::{DurationExt as _, TimeoutExt as _};
+use futures::StreamExt as _;
 use io_conformance_util::flags::Rights;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
 
 const TEST_STRING: &'static str = "Hello, world!";
+
+/// Asserts that no [`fio::NodeEvent::OnOpen_`] event is sent on an opened proxy.
+async fn assert_on_open_not_received(node_proxy: &fio::NodeProxy) {
+    let mut events = Clone::clone(node_proxy).take_event_stream();
+    // Wait at most 200ms for an OnOpen event to appear.
+    let event = events
+        .next()
+        .on_timeout(zx::MonotonicDuration::from_millis(200).after_now(), || Option::None)
+        .await;
+    assert!(event.is_none(), "Unexpected OnOpen event received");
+}
+
+/// Helper function to open the desired node in the root folder.
+/// Asserts that deprecated_open_node_status succeeds.
+async fn deprecated_open_node<T: ProtocolMarker>(
+    dir: &fio::DirectoryProxy,
+    flags: fio::OpenFlags,
+    path: &str,
+) -> T::Proxy {
+    deprecated_open_node_status::<T>(dir, flags, path).await.unwrap_or_else(|e| {
+        panic!("deprecated_open_node_status failed for {path} (flags={flags:?}): {e:?}")
+    })
+}
+
+/// Helper function to open the desired node in the root folder.
+async fn deprecated_open_node_status<T: ProtocolMarker>(
+    dir: &fio::DirectoryProxy,
+    flags: fio::OpenFlags,
+    path: &str,
+) -> Result<T::Proxy, zx::Status> {
+    let flags = flags | fio::OpenFlags::DESCRIBE;
+    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>();
+    dir.deprecated_open(flags, fio::ModeType::empty(), path, node_server)
+        .expect("Cannot open node");
+    let status = get_open_status(&node_proxy).await;
+
+    if status != zx::Status::OK {
+        Err(status)
+    } else {
+        Ok(convert_node_proxy(node_proxy))
+    }
+}
+
+/// Helper function to open a file with the given flags. Only use this if testing something other
+/// than the open call directly.
+async fn deprecated_open_file_with_flags(
+    parent_dir: &fio::DirectoryProxy,
+    flags: fio::OpenFlags,
+    path: &str,
+) -> fio::FileProxy {
+    deprecated_open_node::<fio::FileMarker>(
+        &parent_dir,
+        flags | fio::OpenFlags::NOT_DIRECTORY,
+        path,
+    )
+    .await
+}
+
+/// Helper function to open a sub-directory with the given flags. Only use this if testing
+/// something other than the open call directly.
+async fn deprecated_open_dir_with_flags(
+    parent_dir: &fio::DirectoryProxy,
+    flags: fio::OpenFlags,
+    path: &str,
+) -> fio::DirectoryProxy {
+    deprecated_open_node::<fio::DirectoryMarker>(
+        &parent_dir,
+        flags | fio::OpenFlags::DIRECTORY,
+        path,
+    )
+    .await
+}
 
 #[fuchsia::test]
 async fn deprecated_open_dir_without_describe_flag() {
