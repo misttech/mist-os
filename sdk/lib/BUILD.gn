@@ -11,6 +11,7 @@ group("tests") {
     "async-loop-testing:tests",
     "async-testing:tests",
     "async_patterns:tests",
+    "c:tests",
     "component:tests",
     "device-watcher:tests",
     "diagnostics:tests",
