@@ -81,4 +81,13 @@ zx_status_t psci_system_reset(power_reboot_flags flags);
 // Used when calling SYSTEM_RESET2 directly
 zx_status_t psci_system_reset2_raw(uint32_t reset_type, uint32_t cookie);
 
+enum psci_suspend_mode : uint32_t { platform_coordinated = 0, os_initiated = 1 };
+zx_status_t psci_set_suspend_mode(psci_suspend_mode mode);
+
+// Returns true iff PSCI version is 1.0 or better and SET_SUSPEND_MODE is supported.
+bool psci_is_set_suspend_mode_supported();
+
+// Returns true iff PSCI version is 1.0 or better and CPU_SUSPEND is supported.
+bool psci_is_cpu_suspend_supported();
+
 #endif  // ZIRCON_KERNEL_DEV_PSCI_INCLUDE_DEV_PSCI_H_

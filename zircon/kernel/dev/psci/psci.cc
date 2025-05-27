@@ -19,6 +19,9 @@
 
 namespace {
 
+bool psci_cpu_suspend_supported = false;
+bool psci_set_suspend_mode_supported = false;
+
 uint64_t shutdown_args[3] = {0, 0, 0};
 uint64_t reboot_args[3] = {0, 0, 0};
 uint64_t reboot_bootloader_args[3] = {0, 0, 0};
@@ -137,6 +140,14 @@ zx_status_t psci_system_reset(power_reboot_flags flags) {
   return psci_status_to_zx_status(do_psci_call(reset_command, args[0], args[1], args[2]));
 }
 
+zx_status_t psci_set_suspend_mode(psci_suspend_mode mode) {
+  return psci_status_to_zx_status(do_psci_call(PSCI64_PSCI_SET_SUSPEND_MODE, mode, 0, 0));
+}
+
+bool psci_is_set_suspend_mode_supported() { return psci_set_suspend_mode_supported; }
+
+bool psci_is_cpu_suspend_supported() { return psci_cpu_suspend_supported; }
+
 void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
   do_psci_call = config.use_hvc ? psci_hvc_call : psci_smc_call;
   memcpy(shutdown_args, config.shutdown_args, sizeof(shutdown_args));
@@ -164,7 +175,7 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
       return true;
     };
 
-    probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND");
+    psci_cpu_suspend_supported = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND");
     probe_feature(PSCI64_CPU_OFF, "CPU_OFF");
     probe_feature(PSCI64_CPU_ON, "CPU_ON");
     probe_feature(PSCI64_AFFINITY_INFO, "CPU_AFFINITY_INFO");
@@ -173,8 +184,8 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     probe_feature(PSCI64_MIGRATE_INFO_UP_CPU, "CPU_MIGRATE_INFO_UP_CPU");
     probe_feature(PSCI64_SYSTEM_OFF, "SYSTEM_OFF");
     probe_feature(PSCI64_SYSTEM_RESET, "SYSTEM_RESET");
-    bool supported = probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2");
-    if (supported) {
+    const bool system_reset2_supported = probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2");
+    if (system_reset2_supported) {
       // Prefer RESET2 if present. It explicitly supports arguments, but some vendors have
       // extended RESET to behave the same way.
       reset_command = PSCI64_SYSTEM_RESET2;
@@ -183,7 +194,8 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     probe_feature(PSCI64_CPU_DEFAULT_SUSPEND, "CPU_DEFAULT_SUSPEND");
     probe_feature(PSCI64_NODE_HW_STATE, "CPU_NODE_HW_STATE");
     probe_feature(PSCI64_SYSTEM_SUSPEND, "CPU_SYSTEM_SUSPEND");
-    probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "CPU_PSCI_SET_SUSPEND_MODE");
+    psci_set_suspend_mode_supported =
+        probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "CPU_PSCI_SET_SUSPEND_MODE");
     probe_feature(PSCI64_PSCI_STAT_RESIDENCY, "CPU_PSCI_STAT_RESIDENCY");
     probe_feature(PSCI64_PSCI_STAT_COUNT, "CPU_PSCI_STAT_COUNT");
     probe_feature(PSCI64_MEM_PROTECT, "CPU_MEM_PROTECT");

@@ -361,7 +361,23 @@ void platform_early_init(void) {
 
 void platform_prevm_init() {}
 
-void platform_init(void) { topology_cpu_init(); }
+void platform_init(void) {
+  // If this platform supports CPU_SUSPEND, and can use OS initiated mode, use it.
+  if (psci_is_cpu_suspend_supported()) {
+    if (psci_is_set_suspend_mode_supported()) {
+      zx_status_t status = psci_set_suspend_mode(psci_suspend_mode::os_initiated);
+      if (status == ZX_OK) {
+        dprintf(INFO, "PSCI: using OS initiated suspend mode\n");
+      } else if (status == ZX_ERR_NOT_SUPPORTED) {
+        dprintf(INFO, "PSCI: OS initiated suspend mode not supported\n");
+      } else {
+        panic("psci_set_suspend_mode failed with %d", status);
+      }
+    }
+  }
+
+  topology_cpu_init();
+}
 
 // after the fact create a region to reserve the peripheral map(s)
 static void platform_init_postvm(uint level) { reserve_periph_ranges(); }
