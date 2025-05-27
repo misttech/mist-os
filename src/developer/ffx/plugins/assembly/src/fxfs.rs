@@ -154,8 +154,11 @@ mod tests {
         product_config.cache.push(cache_manifest);
 
         // Construct the base package.
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         let base_package =
             construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
                 .unwrap();

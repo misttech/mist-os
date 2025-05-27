@@ -125,8 +125,11 @@ mod tests {
         let zbi_path = dir.join("fuchsia.zbi");
         std::fs::write(&zbi_path, "fake zbi").unwrap();
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         let vbmeta_path =
             construct_vbmeta(&mut assembled_system, dir, &vbmeta_config, zbi_path).unwrap();
         assert_eq!(

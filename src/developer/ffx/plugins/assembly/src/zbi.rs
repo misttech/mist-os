@@ -248,8 +248,11 @@ mod tests {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         construct_zbi(
             zbi_tool,
             &mut assembled_system,
@@ -274,8 +277,11 @@ mod tests {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         construct_zbi(
             zbi_tool,
             &mut assembled_system,
@@ -347,8 +353,11 @@ mod tests {
         // Sign the zbi.
         let tools = FakeToolProvider::default();
         let signing_tool = tools.get_tool("fake").unwrap();
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         let signed_zbi_path =
             vendor_sign_zbi(signing_tool, &mut assembled_system, dir, &zbi, &zbi_path).unwrap();
         assert_eq!(signed_zbi_path, expected_output);

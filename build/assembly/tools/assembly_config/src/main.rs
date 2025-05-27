@@ -233,6 +233,10 @@ struct BoardArgs {
     #[argh(option)]
     config: Utf8PathBuf,
 
+    /// the partitions config to add to the board.
+    #[argh(option)]
+    partitions_config: Option<Utf8PathBuf>,
+
     /// paths to board input bundles to include.
     #[argh(option)]
     board_input_bundles: Vec<Utf8PathBuf>,

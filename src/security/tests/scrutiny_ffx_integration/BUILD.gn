@@ -35,6 +35,7 @@ if (is_fuchsia) {
   board_configuration("board_config") {
     name = "test"
     version = "fake_version"
+    partitions_config = "//boards/partitions:default"
     filesystems = {
       fvm = {
         slice_size = 1048576

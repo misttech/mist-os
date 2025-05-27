@@ -204,6 +204,7 @@ impl GenerateBuildArchive {
         let images_manifest = AssembledSystem {
             images,
             board_name: product_bundle.partitions.hardware_revision.clone(),
+            partitions_config: None,
         };
         let images_manifest_path = self.out_dir.join("images.json");
         images_manifest.write_old(images_manifest_path).context("Writing images manifest")?;

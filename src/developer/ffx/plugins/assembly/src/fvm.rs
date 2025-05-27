@@ -350,8 +350,11 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
@@ -383,8 +386,11 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
@@ -434,8 +440,11 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
@@ -542,8 +551,11 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
 
         let base_package_path = dir.join("base.far");
         let mut base_package_file = File::create(&base_package_path).unwrap();
@@ -641,8 +653,11 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembled_system =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let mut assembled_system = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
 
         let base_package_path = dir.join("base.far");
         let mut base_package_file = File::create(&base_package_path).unwrap();

@@ -11,7 +11,7 @@ use anyhow::{anyhow, Context, Result};
 use assembled_system::AssembledSystem;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_constants::PackageDestination;
-use assembly_container::AssemblyContainer;
+use assembly_container::{AssemblyContainer, DirectoryPathBuf};
 use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, Image, VBMeta, Zbi};
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_util as util;
@@ -42,6 +42,10 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let mut assembled_system = AssembledSystem {
         images: Default::default(),
         board_name: image_assembly_config.board_name.clone(),
+        partitions_config: image_assembly_config
+            .partitions_config
+            .as_ref()
+            .map(|p| DirectoryPathBuf(p.clone())),
     };
     if let Some(devicetree_overlay) = &image_assembly_config.devicetree_overlay {
         assembled_system.images.push(assembled_system::Image::Dtbo(devicetree_overlay.clone()));

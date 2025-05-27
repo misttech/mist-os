@@ -60,6 +60,7 @@ class ImageAssemblyConfig:
     netboot_mode: bool = False
     board_name: None | str = None
     image_mode: None | str = None
+    partitions_config: Optional[FilePath] = None
 
     # TODO:  Flesh out the images_config with the actual types, if it's needed.
     images_config: dict[str, list[str]] = field(default_factory=dict)

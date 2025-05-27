@@ -283,6 +283,7 @@ mod tests {
                 Image::Dtbo("path/to/a/dtbo".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_b = AssembledSystem {
             images: vec![
@@ -293,6 +294,7 @@ mod tests {
                 Image::Dtbo("path/to/b/dtbo".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_r = AssembledSystem {
             images: vec![
@@ -302,6 +304,7 @@ mod tests {
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
@@ -374,6 +377,7 @@ mod tests {
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_b = AssembledSystem {
             images: vec![
@@ -384,6 +388,7 @@ mod tests {
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_r = AssembledSystem {
             images: vec![
@@ -393,6 +398,7 @@ mod tests {
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
@@ -456,6 +462,7 @@ mod tests {
                 },
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_b = AssembledSystem {
             images: vec![
@@ -468,6 +475,7 @@ mod tests {
                 },
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_r = AssembledSystem {
             images: vec![
@@ -479,6 +487,7 @@ mod tests {
                 },
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
@@ -538,6 +547,7 @@ mod tests {
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
@@ -564,6 +574,7 @@ mod tests {
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_b = AssembledSystem {
             images: vec![
@@ -574,6 +585,7 @@ mod tests {
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_r = AssembledSystem {
             images: vec![
@@ -583,6 +595,7 @@ mod tests {
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
@@ -636,6 +649,7 @@ mod tests {
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_r = AssembledSystem {
             images: vec![
@@ -645,6 +659,7 @@ mod tests {
                 Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
@@ -694,13 +709,20 @@ mod tests {
             partitions: vec![Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None }],
             ..Default::default()
         };
-        let images_one =
-            AssembledSystem { images: vec![Image::Dtbo(dtbo_one)], board_name: "my_board".into() };
-        let images_two =
-            AssembledSystem { images: vec![Image::Dtbo(dtbo_two)], board_name: "my_board".into() };
+        let images_one = AssembledSystem {
+            images: vec![Image::Dtbo(dtbo_one)],
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
+        let images_two = AssembledSystem {
+            images: vec![Image::Dtbo(dtbo_two)],
+            board_name: "my_board".into(),
+            partitions_config: None,
+        };
         let images_three = AssembledSystem {
             images: vec![Image::Dtbo(dtbo_three)],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         assert!(mapper.map_images_to_slot(&images_one.images, Slot::A).is_ok());
@@ -739,6 +761,7 @@ mod tests {
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
@@ -783,6 +806,7 @@ mod tests {
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let images_r = AssembledSystem {
             images: vec![
@@ -790,6 +814,7 @@ mod tests {
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
         };
         let mut mapper = PartitionImageMapper::new(partitions).unwrap();
         assert_eq!(RecoveryStyle::AB, mapper.recovery_style);
