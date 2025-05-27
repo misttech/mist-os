@@ -4,12 +4,11 @@
 
 use crate::{
     DataWidth, EbpfInstruction, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH,
-    BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CLS_MASK, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
-    BPF_FETCH, BPF_H, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
-    BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDDW,
-    BPF_LDX, BPF_LOAD_STORE_MASK, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR,
-    BPF_PSEUDO_MAP_IDX, BPF_RSH, BPF_SIZE_MASK, BPF_SRC_MASK, BPF_SRC_REG, BPF_ST, BPF_STX,
-    BPF_SUB, BPF_SUB_OP_MASK, BPF_TO_BE, BPF_W, BPF_XCHG, BPF_XOR,
+    BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
+    BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
+    BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_K, BPF_LD, BPF_LDDW, BPF_LDX, BPF_LSH,
+    BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_PSEUDO_MAP_IDX, BPF_RSH, BPF_ST,
+    BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_X, BPF_XCHG, BPF_XOR,
 };
 
 /// The index into the registers. 10 is the stack pointer.
@@ -22,16 +21,6 @@ pub type ProgramCounter = usize;
 pub enum Source {
     Reg(Register),
     Value(u64),
-}
-
-impl From<&EbpfInstruction> for Source {
-    fn from(instruction: &EbpfInstruction) -> Self {
-        if instruction.code() & BPF_SRC_MASK == BPF_SRC_REG {
-            Self::Reg(instruction.src_reg())
-        } else {
-            Self::Value(instruction.imm() as u64)
-        }
-    }
 }
 
 pub trait BpfVisitor {
@@ -521,661 +510,415 @@ pub trait BpfVisitor {
         if code.is_empty() {
             return Err("incomplete instruction".to_string());
         }
-        let instruction = &code[0];
-        let invalid_op_code =
-            || -> Result<(), String> { Err(format!("invalid op code {:x}", instruction.code())) };
+        let inst = &code[0];
+        let dst = inst.dst_reg();
+        let src_imm = || Source::Value(inst.imm() as u64);
+        let src_reg = || Source::Reg(inst.src_reg());
 
-        let class = instruction.code() & BPF_CLS_MASK;
-        match class {
-            BPF_ALU64 | BPF_ALU => {
-                let alu_op = instruction.code() & BPF_SUB_OP_MASK;
-                let is_64 = class == BPF_ALU64;
-                match alu_op {
-                    BPF_ADD => {
-                        if is_64 {
-                            return self.add64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.add(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_SUB => {
-                        if is_64 {
-                            return self.sub64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.sub(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_MUL => {
-                        if is_64 {
-                            return self.mul64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.mul(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_DIV => {
-                        if is_64 {
-                            return self.div64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.div(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_OR => {
-                        if is_64 {
-                            return self.or64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.or(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_AND => {
-                        if is_64 {
-                            return self.and64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.and(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_LSH => {
-                        if is_64 {
-                            return self.lsh64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.lsh(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_RSH => {
-                        if is_64 {
-                            return self.rsh64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.rsh(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_MOD => {
-                        if is_64 {
-                            return self.mod64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.r#mod(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_XOR => {
-                        if is_64 {
-                            return self.xor64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.xor(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_MOV => {
-                        if is_64 {
-                            return self.mov64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.mov(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
-                    BPF_ARSH => {
-                        if is_64 {
-                            return self.arsh64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        } else {
-                            return self.arsh(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                            );
-                        }
-                    }
+        let width_from_imm = || match inst.imm() {
+            16 => Ok(DataWidth::U16),
+            32 => Ok(DataWidth::U32),
+            64 => Ok(DataWidth::U64),
+            _ => Err(format!("invalid byte swap width: {}", inst.imm())),
+        };
 
-                    BPF_NEG => {
-                        if is_64 {
-                            return self.neg64(context, instruction.dst_reg());
-                        } else {
-                            return self.neg(context, instruction.dst_reg());
-                        }
-                    }
-                    BPF_END => {
-                        let is_be = instruction.code() & BPF_TO_BE == BPF_TO_BE;
-                        let width = match instruction.imm() {
-                            16 => DataWidth::U16,
-                            32 => DataWidth::U32,
-                            64 => DataWidth::U64,
-                            _ => {
-                                return Err(format!(
-                                    "invalid width for endianness operation: {}",
-                                    instruction.imm()
-                                ))
-                            }
-                        };
-                        if is_be {
-                            return self.be(context, instruction.dst_reg(), width);
-                        } else {
-                            return self.le(context, instruction.dst_reg(), width);
-                        }
-                    }
-                    _ => return invalid_op_code(),
+        const BPF_ALU_ADD_K: u8 = BPF_ALU | BPF_ADD | BPF_K;
+        const BPF_ALU_ADD_X: u8 = BPF_ALU | BPF_ADD | BPF_X;
+        const BPF_ALU_SUB_K: u8 = BPF_ALU | BPF_SUB | BPF_K;
+        const BPF_ALU_SUB_X: u8 = BPF_ALU | BPF_SUB | BPF_X;
+        const BPF_ALU_MUL_K: u8 = BPF_ALU | BPF_MUL | BPF_K;
+        const BPF_ALU_MUL_X: u8 = BPF_ALU | BPF_MUL | BPF_X;
+        const BPF_ALU_DIV_K: u8 = BPF_ALU | BPF_DIV | BPF_K;
+        const BPF_ALU_DIV_X: u8 = BPF_ALU | BPF_DIV | BPF_X;
+        const BPF_ALU_OR_K: u8 = BPF_ALU | BPF_OR | BPF_K;
+        const BPF_ALU_OR_X: u8 = BPF_ALU | BPF_OR | BPF_X;
+        const BPF_ALU_AND_K: u8 = BPF_ALU | BPF_AND | BPF_K;
+        const BPF_ALU_AND_X: u8 = BPF_ALU | BPF_AND | BPF_X;
+        const BPF_ALU_LSH_K: u8 = BPF_ALU | BPF_LSH | BPF_K;
+        const BPF_ALU_LSH_X: u8 = BPF_ALU | BPF_LSH | BPF_X;
+        const BPF_ALU_RSH_K: u8 = BPF_ALU | BPF_RSH | BPF_K;
+        const BPF_ALU_RSH_X: u8 = BPF_ALU | BPF_RSH | BPF_X;
+        const BPF_ALU_MOD_K: u8 = BPF_ALU | BPF_MOD | BPF_K;
+        const BPF_ALU_MOD_X: u8 = BPF_ALU | BPF_MOD | BPF_X;
+        const BPF_ALU_XOR_K: u8 = BPF_ALU | BPF_XOR | BPF_K;
+        const BPF_ALU_XOR_X: u8 = BPF_ALU | BPF_XOR | BPF_X;
+        const BPF_ALU_MOV_K: u8 = BPF_ALU | BPF_MOV | BPF_K;
+        const BPF_ALU_MOV_X: u8 = BPF_ALU | BPF_MOV | BPF_X;
+        const BPF_ALU_ARSH_K: u8 = BPF_ALU | BPF_ARSH | BPF_K;
+        const BPF_ALU_ARSH_X: u8 = BPF_ALU | BPF_ARSH | BPF_X;
+        const BPF_ALU_NEG: u8 = BPF_ALU | BPF_NEG;
+
+        const BPF_ALU64_ADD_K: u8 = BPF_ALU64 | BPF_ADD | BPF_K;
+        const BPF_ALU64_ADD_X: u8 = BPF_ALU64 | BPF_ADD | BPF_X;
+        const BPF_ALU64_SUB_K: u8 = BPF_ALU64 | BPF_SUB | BPF_K;
+        const BPF_ALU64_SUB_X: u8 = BPF_ALU64 | BPF_SUB | BPF_X;
+        const BPF_ALU64_MUL_K: u8 = BPF_ALU64 | BPF_MUL | BPF_K;
+        const BPF_ALU64_MUL_X: u8 = BPF_ALU64 | BPF_MUL | BPF_X;
+        const BPF_ALU64_DIV_K: u8 = BPF_ALU64 | BPF_DIV | BPF_K;
+        const BPF_ALU64_DIV_X: u8 = BPF_ALU64 | BPF_DIV | BPF_X;
+        const BPF_ALU64_OR_K: u8 = BPF_ALU64 | BPF_OR | BPF_K;
+        const BPF_ALU64_OR_X: u8 = BPF_ALU64 | BPF_OR | BPF_X;
+        const BPF_ALU64_AND_K: u8 = BPF_ALU64 | BPF_AND | BPF_K;
+        const BPF_ALU64_AND_X: u8 = BPF_ALU64 | BPF_AND | BPF_X;
+        const BPF_ALU64_LSH_K: u8 = BPF_ALU64 | BPF_LSH | BPF_K;
+        const BPF_ALU64_LSH_X: u8 = BPF_ALU64 | BPF_LSH | BPF_X;
+        const BPF_ALU64_RSH_K: u8 = BPF_ALU64 | BPF_RSH | BPF_K;
+        const BPF_ALU64_RSH_X: u8 = BPF_ALU64 | BPF_RSH | BPF_X;
+        const BPF_ALU64_MOD_K: u8 = BPF_ALU64 | BPF_MOD | BPF_K;
+        const BPF_ALU64_MOD_X: u8 = BPF_ALU64 | BPF_MOD | BPF_X;
+        const BPF_ALU64_XOR_K: u8 = BPF_ALU64 | BPF_XOR | BPF_K;
+        const BPF_ALU64_XOR_X: u8 = BPF_ALU64 | BPF_XOR | BPF_X;
+        const BPF_ALU64_MOV_K: u8 = BPF_ALU64 | BPF_MOV | BPF_K;
+        const BPF_ALU64_MOV_X: u8 = BPF_ALU64 | BPF_MOV | BPF_X;
+        const BPF_ALU64_ARSH_K: u8 = BPF_ALU64 | BPF_ARSH | BPF_K;
+        const BPF_ALU64_ARSH_X: u8 = BPF_ALU64 | BPF_ARSH | BPF_X;
+        const BPF_ALU64_NEG: u8 = BPF_ALU64 | BPF_NEG;
+
+        const BPF_ALU_END_TO_BE: u8 = BPF_ALU | BPF_END | BPF_TO_BE;
+        const BPF_ALU_END_TO_LE: u8 = BPF_ALU | BPF_END | BPF_TO_LE;
+        const BPF_JMP32_JEQ_K: u8 = BPF_JMP32 | BPF_JEQ | BPF_K;
+        const BPF_JMP32_JEQ_X: u8 = BPF_JMP32 | BPF_JEQ | BPF_X;
+        const BPF_JMP32_JGT_K: u8 = BPF_JMP32 | BPF_JGT | BPF_K;
+        const BPF_JMP32_JGT_X: u8 = BPF_JMP32 | BPF_JGT | BPF_X;
+        const BPF_JMP32_JGE_K: u8 = BPF_JMP32 | BPF_JGE | BPF_K;
+        const BPF_JMP32_JGE_X: u8 = BPF_JMP32 | BPF_JGE | BPF_X;
+        const BPF_JMP32_JSET_K: u8 = BPF_JMP32 | BPF_JSET | BPF_K;
+        const BPF_JMP32_JSET_X: u8 = BPF_JMP32 | BPF_JSET | BPF_X;
+        const BPF_JMP32_JNE_K: u8 = BPF_JMP32 | BPF_JNE | BPF_K;
+        const BPF_JMP32_JNE_X: u8 = BPF_JMP32 | BPF_JNE | BPF_X;
+        const BPF_JMP32_JSGT_K: u8 = BPF_JMP32 | BPF_JSGT | BPF_K;
+        const BPF_JMP32_JSGT_X: u8 = BPF_JMP32 | BPF_JSGT | BPF_X;
+        const BPF_JMP32_JSGE_K: u8 = BPF_JMP32 | BPF_JSGE | BPF_K;
+        const BPF_JMP32_JSGE_X: u8 = BPF_JMP32 | BPF_JSGE | BPF_X;
+        const BPF_JMP32_JLT_K: u8 = BPF_JMP32 | BPF_JLT | BPF_K;
+        const BPF_JMP32_JLT_X: u8 = BPF_JMP32 | BPF_JLT | BPF_X;
+        const BPF_JMP32_JLE_K: u8 = BPF_JMP32 | BPF_JLE | BPF_K;
+        const BPF_JMP32_JLE_X: u8 = BPF_JMP32 | BPF_JLE | BPF_X;
+        const BPF_JMP32_JSLT_K: u8 = BPF_JMP32 | BPF_JSLT | BPF_K;
+        const BPF_JMP32_JSLT_X: u8 = BPF_JMP32 | BPF_JSLT | BPF_X;
+        const BPF_JMP32_JSLE_K: u8 = BPF_JMP32 | BPF_JSLE | BPF_K;
+        const BPF_JMP32_JSLE_X: u8 = BPF_JMP32 | BPF_JSLE | BPF_X;
+        const BPF_JMP_JEQ_K: u8 = BPF_JMP | BPF_JEQ | BPF_K;
+        const BPF_JMP_JEQ_X: u8 = BPF_JMP | BPF_JEQ | BPF_X;
+        const BPF_JMP_JGT_K: u8 = BPF_JMP | BPF_JGT | BPF_K;
+        const BPF_JMP_JGT_X: u8 = BPF_JMP | BPF_JGT | BPF_X;
+        const BPF_JMP_JGE_K: u8 = BPF_JMP | BPF_JGE | BPF_K;
+        const BPF_JMP_JGE_X: u8 = BPF_JMP | BPF_JGE | BPF_X;
+        const BPF_JMP_JSET_K: u8 = BPF_JMP | BPF_JSET | BPF_K;
+        const BPF_JMP_JSET_X: u8 = BPF_JMP | BPF_JSET | BPF_X;
+        const BPF_JMP_JNE_K: u8 = BPF_JMP | BPF_JNE | BPF_K;
+        const BPF_JMP_JNE_X: u8 = BPF_JMP | BPF_JNE | BPF_X;
+        const BPF_JMP_JSGT_K: u8 = BPF_JMP | BPF_JSGT | BPF_K;
+        const BPF_JMP_JSGT_X: u8 = BPF_JMP | BPF_JSGT | BPF_X;
+        const BPF_JMP_JSGE_K: u8 = BPF_JMP | BPF_JSGE | BPF_K;
+        const BPF_JMP_JSGE_X: u8 = BPF_JMP | BPF_JSGE | BPF_X;
+        const BPF_JMP_JLT_K: u8 = BPF_JMP | BPF_JLT | BPF_K;
+        const BPF_JMP_JLT_X: u8 = BPF_JMP | BPF_JLT | BPF_X;
+        const BPF_JMP_JLE_K: u8 = BPF_JMP | BPF_JLE | BPF_K;
+        const BPF_JMP_JLE_X: u8 = BPF_JMP | BPF_JLE | BPF_X;
+        const BPF_JMP_JSLT_K: u8 = BPF_JMP | BPF_JSLT | BPF_K;
+        const BPF_JMP_JSLT_X: u8 = BPF_JMP | BPF_JSLT | BPF_X;
+        const BPF_JMP_JSLE_K: u8 = BPF_JMP | BPF_JSLE | BPF_K;
+        const BPF_JMP_JSLE_X: u8 = BPF_JMP | BPF_JSLE | BPF_X;
+        const BPF_JMP_JA: u8 = BPF_JMP | BPF_JA;
+        const BPF_JMP_CALL: u8 = BPF_JMP | BPF_CALL;
+        const BPF_JMP_EXIT: u8 = BPF_JMP | BPF_EXIT;
+
+        const BPF_LD_B_ABS: u8 = BPF_LD | BPF_B | BPF_ABS;
+        const BPF_LD_B_IND: u8 = BPF_LD | BPF_B | BPF_IND;
+        const BPF_LD_H_ABS: u8 = BPF_LD | BPF_H | BPF_ABS;
+        const BPF_LD_H_IND: u8 = BPF_LD | BPF_H | BPF_IND;
+        const BPF_LD_W_ABS: u8 = BPF_LD | BPF_W | BPF_ABS;
+        const BPF_LD_W_IND: u8 = BPF_LD | BPF_W | BPF_IND;
+        const BPF_LD_DW_ABS: u8 = BPF_LD | BPF_DW | BPF_ABS;
+        const BPF_LD_DW_IND: u8 = BPF_LD | BPF_DW | BPF_IND;
+        const BPF_LDX_B_MEM: u8 = BPF_LDX | BPF_B | BPF_MEM;
+        const BPF_LDX_H_MEM: u8 = BPF_LDX | BPF_H | BPF_MEM;
+        const BPF_LDX_W_MEM: u8 = BPF_LDX | BPF_W | BPF_MEM;
+        const BPF_LDX_DW_MEM: u8 = BPF_LDX | BPF_DW | BPF_MEM;
+        const BPF_STX_B_MEM: u8 = BPF_STX | BPF_B | BPF_MEM;
+        const BPF_STX_H_MEM: u8 = BPF_STX | BPF_H | BPF_MEM;
+        const BPF_STX_W_MEM: u8 = BPF_STX | BPF_W | BPF_MEM;
+        const BPF_STX_DW_MEM: u8 = BPF_STX | BPF_DW | BPF_MEM;
+        const BPF_ST_B_MEM: u8 = BPF_ST | BPF_B | BPF_MEM;
+        const BPF_ST_H_MEM: u8 = BPF_ST | BPF_H | BPF_MEM;
+        const BPF_ST_W_MEM: u8 = BPF_ST | BPF_W | BPF_MEM;
+        const BPF_ST_DW_MEM: u8 = BPF_ST | BPF_DW | BPF_MEM;
+        const BPF_STX_ATOMIC_W: u8 = BPF_STX | BPF_ATOMIC | BPF_W;
+        const BPF_STX_ATOMIC_DW: u8 = BPF_STX | BPF_ATOMIC | BPF_DW;
+
+        const BPF_ADD_FETCH: u8 = BPF_ADD | BPF_FETCH;
+        const BPF_AND_FETCH: u8 = BPF_AND | BPF_FETCH;
+        const BPF_OR_FETCH: u8 = BPF_OR | BPF_FETCH;
+        const BPF_XOR_FETCH: u8 = BPF_XOR | BPF_FETCH;
+
+        match inst.code() {
+            // 32-bit ALU instructions.
+            BPF_ALU_ADD_K => self.add(context, dst, src_imm()),
+            BPF_ALU_ADD_X => self.add(context, dst, src_reg()),
+            BPF_ALU_SUB_K => self.sub(context, dst, src_imm()),
+            BPF_ALU_SUB_X => self.sub(context, dst, src_reg()),
+            BPF_ALU_MUL_K => self.mul(context, dst, src_imm()),
+            BPF_ALU_MUL_X => self.mul(context, dst, src_reg()),
+            BPF_ALU_DIV_K => self.div(context, dst, src_imm()),
+            BPF_ALU_DIV_X => self.div(context, dst, src_reg()),
+            BPF_ALU_OR_K => self.or(context, dst, src_imm()),
+            BPF_ALU_OR_X => self.or(context, dst, src_reg()),
+            BPF_ALU_AND_K => self.and(context, dst, src_imm()),
+            BPF_ALU_AND_X => self.and(context, dst, src_reg()),
+            BPF_ALU_LSH_K => self.lsh(context, dst, src_imm()),
+            BPF_ALU_LSH_X => self.lsh(context, dst, src_reg()),
+            BPF_ALU_RSH_K => self.rsh(context, dst, src_imm()),
+            BPF_ALU_RSH_X => self.rsh(context, dst, src_reg()),
+            BPF_ALU_MOD_K => self.r#mod(context, dst, src_imm()),
+            BPF_ALU_MOD_X => self.r#mod(context, dst, src_reg()),
+            BPF_ALU_XOR_K => self.xor(context, dst, src_imm()),
+            BPF_ALU_XOR_X => self.xor(context, dst, src_reg()),
+            BPF_ALU_MOV_K => self.mov(context, dst, src_imm()),
+            BPF_ALU_MOV_X => self.mov(context, dst, src_reg()),
+            BPF_ALU_ARSH_K => self.arsh(context, dst, src_imm()),
+            BPF_ALU_ARSH_X => self.arsh(context, dst, src_reg()),
+            BPF_ALU_NEG => self.neg(context, dst),
+
+            // 64-bit ALU instructions.
+            BPF_ALU64_ADD_K => self.add64(context, dst, src_imm()),
+            BPF_ALU64_ADD_X => self.add64(context, dst, src_reg()),
+            BPF_ALU64_SUB_K => self.sub64(context, dst, src_imm()),
+            BPF_ALU64_SUB_X => self.sub64(context, dst, src_reg()),
+            BPF_ALU64_MUL_K => self.mul64(context, dst, src_imm()),
+            BPF_ALU64_MUL_X => self.mul64(context, dst, src_reg()),
+            BPF_ALU64_DIV_K => self.div64(context, dst, src_imm()),
+            BPF_ALU64_DIV_X => self.div64(context, dst, src_reg()),
+            BPF_ALU64_OR_K => self.or64(context, dst, src_imm()),
+            BPF_ALU64_OR_X => self.or64(context, dst, src_reg()),
+            BPF_ALU64_AND_K => self.and64(context, dst, src_imm()),
+            BPF_ALU64_AND_X => self.and64(context, dst, src_reg()),
+            BPF_ALU64_LSH_K => self.lsh64(context, dst, src_imm()),
+            BPF_ALU64_LSH_X => self.lsh64(context, dst, src_reg()),
+            BPF_ALU64_RSH_K => self.rsh64(context, dst, src_imm()),
+            BPF_ALU64_RSH_X => self.rsh64(context, dst, src_reg()),
+            BPF_ALU64_MOD_K => self.mod64(context, dst, src_imm()),
+            BPF_ALU64_MOD_X => self.mod64(context, dst, src_reg()),
+            BPF_ALU64_XOR_K => self.xor64(context, dst, src_imm()),
+            BPF_ALU64_XOR_X => self.xor64(context, dst, src_reg()),
+            BPF_ALU64_MOV_K => self.mov64(context, dst, src_imm()),
+            BPF_ALU64_MOV_X => self.mov64(context, dst, src_reg()),
+            BPF_ALU64_ARSH_K => self.arsh64(context, dst, src_imm()),
+            BPF_ALU64_ARSH_X => self.arsh64(context, dst, src_reg()),
+            BPF_ALU64_NEG => self.neg64(context, dst),
+
+            // Byte swap instruction.
+            BPF_ALU_END_TO_BE => self.be(context, dst, width_from_imm()?),
+            BPF_ALU_END_TO_LE => self.le(context, dst, width_from_imm()?),
+
+            // 32-bit conditional jump.
+            BPF_JMP32_JEQ_K => self.jeq(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JEQ_X => self.jeq(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JGT_K => self.jgt(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JGT_X => self.jgt(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JGE_K => self.jge(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JGE_X => self.jge(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JSET_K => self.jset(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JSET_X => self.jset(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JNE_K => self.jne(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JNE_X => self.jne(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JSGT_K => self.jsgt(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JSGT_X => self.jsgt(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JSGE_K => self.jsge(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JSGE_X => self.jsge(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JLT_K => self.jlt(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JLT_X => self.jlt(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JLE_K => self.jle(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JLE_X => self.jle(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JSLT_K => self.jslt(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JSLT_X => self.jslt(context, dst, src_reg(), inst.offset()),
+            BPF_JMP32_JSLE_K => self.jsle(context, dst, src_imm(), inst.offset()),
+            BPF_JMP32_JSLE_X => self.jsle(context, dst, src_reg(), inst.offset()),
+
+            // 64-bit conditional jump.
+            BPF_JMP_JEQ_K => self.jeq64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JEQ_X => self.jeq64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JGT_K => self.jgt64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JGT_X => self.jgt64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JGE_K => self.jge64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JGE_X => self.jge64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JSET_K => self.jset64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JSET_X => self.jset64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JNE_K => self.jne64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JNE_X => self.jne64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JSGT_K => self.jsgt64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JSGT_X => self.jsgt64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JSGE_K => self.jsge64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JSGE_X => self.jsge64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JLT_K => self.jlt64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JLT_X => self.jlt64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JLE_K => self.jle64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JLE_X => self.jle64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JSLT_K => self.jslt64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JSLT_X => self.jslt64(context, dst, src_reg(), inst.offset()),
+            BPF_JMP_JSLE_K => self.jsle64(context, dst, src_imm(), inst.offset()),
+            BPF_JMP_JSLE_X => self.jsle64(context, dst, src_reg(), inst.offset()),
+
+            // Unconditional jump
+            BPF_JMP_JA => self.jump(context, inst.offset()),
+
+            // Function call.
+            BPF_JMP_CALL => match inst.src_reg() {
+                0 => self.call_external(context, inst.imm() as u32),
+                _ => Err(format!("unsupported call with src = {}", inst.src_reg())),
+            },
+
+            // Return.
+            BPF_JMP_EXIT => self.exit(context),
+
+            // 64-bit load.
+            BPF_LDDW => {
+                if code.len() < 2 {
+                    return Err(format!("incomplete lddw"));
                 }
-            }
-            BPF_JMP | BPF_JMP32 => {
-                let jmp_op = instruction.code() & BPF_SUB_OP_MASK;
-                let is_64 = class == BPF_JMP;
-                match jmp_op {
-                    BPF_JEQ => {
-                        if is_64 {
-                            return self.jeq64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jeq(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JGT => {
-                        if is_64 {
-                            return self.jgt64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jgt(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JGE => {
-                        if is_64 {
-                            return self.jge64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jge(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JSET => {
-                        if is_64 {
-                            return self.jset64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jset(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JNE => {
-                        if is_64 {
-                            return self.jne64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jne(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JSGT => {
-                        if is_64 {
-                            return self.jsgt64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jsgt(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JSGE => {
-                        if is_64 {
-                            return self.jsge64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jsge(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JLT => {
-                        if is_64 {
-                            return self.jlt64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jlt(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JLE => {
-                        if is_64 {
-                            return self.jle64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jle(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JSLT => {
-                        if is_64 {
-                            return self.jslt64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jslt(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
-                    BPF_JSLE => {
-                        if is_64 {
-                            return self.jsle64(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        } else {
-                            return self.jsle(
-                                context,
-                                instruction.dst_reg(),
-                                Source::from(instruction),
-                                instruction.offset(),
-                            );
-                        }
-                    }
 
-                    BPF_JA => {
-                        return self.jump(context, instruction.offset());
-                    }
-                    BPF_CALL => {
-                        if instruction.src_reg() == 0 {
-                            // Call to external function
-                            return self.call_external(context, instruction.imm() as u32);
-                        }
-                        // Unhandled call
-                        return Err(format!(
-                            "unsupported call with src = {}",
-                            instruction.src_reg()
-                        ));
-                    }
-                    BPF_EXIT => {
-                        return self.exit(context);
-                    }
-                    _ => return invalid_op_code(),
+                let next_inst = &code[1];
+                if next_inst.src_reg() != 0 || next_inst.dst_reg() != 0 {
+                    return Err(format!("invalid lddw"));
                 }
-            }
-            BPF_LD => {
-                if instruction.code() == BPF_LDDW {
-                    if code.len() < 2 {
-                        return Err(format!("incomplete lddw"));
-                    }
 
-                    let next_instruction = &code[1];
-                    if next_instruction.src_reg() != 0 || next_instruction.dst_reg() != 0 {
+                match inst.src_reg() {
+                    0 => {
+                        let value: u64 = ((inst.imm() as u32) as u64)
+                            | (((next_inst.imm() as u32) as u64) << 32);
+                        return self.load64(context, inst.dst_reg(), value, 1);
+                    }
+                    BPF_PSEUDO_MAP_IDX => {
+                        return self.load_map_ptr(context, inst.dst_reg(), inst.imm() as u32, 1);
+                    }
+                    _ => {
                         return Err(format!("invalid lddw"));
                     }
+                }
+            }
 
-                    match instruction.src_reg() {
-                        0 => {
-                            let value: u64 = ((instruction.imm() as u32) as u64)
-                                | (((next_instruction.imm() as u32) as u64) << 32);
-                            return self.load64(context, instruction.dst_reg(), value, 1);
-                        }
-                        BPF_PSEUDO_MAP_IDX => {
-                            return self.load_map_ptr(
-                                context,
-                                instruction.dst_reg(),
-                                instruction.imm() as u32,
-                                1,
-                            );
-                        }
-                        _ => {
-                            return Err(format!("invalid lddw"));
-                        }
-                    }
-                }
-                let width = match instruction.code() & BPF_SIZE_MASK {
-                    BPF_B => DataWidth::U8,
-                    BPF_H => DataWidth::U16,
-                    BPF_W => DataWidth::U32,
-                    BPF_DW => DataWidth::U64,
-                    _ => unreachable!(),
-                };
-                let register_offset = match instruction.code() & BPF_LOAD_STORE_MASK {
-                    BPF_ABS => None,
-                    BPF_IND => Some(instruction.src_reg()),
-                    _ => return invalid_op_code(),
-                };
-                return self.load_from_packet(
-                    context,
-                    // Store the result in r0
-                    0,
-                    // Read the packet from r6
-                    6,
-                    instruction.imm(),
-                    register_offset,
-                    width,
-                );
+            // Legacy packet access instructions.
+            // All read the packet from R6, storing the result in R0.
+            BPF_LD_B_ABS => self.load_from_packet(context, 0, 6, inst.imm(), None, DataWidth::U8),
+            BPF_LD_B_IND => self.load_from_packet(
+                context,
+                0,
+                6,
+                inst.imm(),
+                Some(inst.src_reg()),
+                DataWidth::U8,
+            ),
+            BPF_LD_H_ABS => self.load_from_packet(context, 0, 6, inst.imm(), None, DataWidth::U16),
+            BPF_LD_H_IND => self.load_from_packet(
+                context,
+                0,
+                6,
+                inst.imm(),
+                Some(inst.src_reg()),
+                DataWidth::U16,
+            ),
+            BPF_LD_W_ABS => self.load_from_packet(context, 0, 6, inst.imm(), None, DataWidth::U32),
+            BPF_LD_W_IND => self.load_from_packet(
+                context,
+                0,
+                6,
+                inst.imm(),
+                Some(inst.src_reg()),
+                DataWidth::U32,
+            ),
+            BPF_LD_DW_ABS => self.load_from_packet(context, 0, 6, inst.imm(), None, DataWidth::U64),
+            BPF_LD_DW_IND => self.load_from_packet(
+                context,
+                0,
+                6,
+                inst.imm(),
+                Some(inst.src_reg()),
+                DataWidth::U64,
+            ),
+
+            // Memory Load.
+            BPF_LDX_B_MEM => self.load(context, dst, inst.offset(), inst.src_reg(), DataWidth::U8),
+            BPF_LDX_H_MEM => self.load(context, dst, inst.offset(), inst.src_reg(), DataWidth::U16),
+            BPF_LDX_W_MEM => self.load(context, dst, inst.offset(), inst.src_reg(), DataWidth::U32),
+            BPF_LDX_DW_MEM => {
+                self.load(context, dst, inst.offset(), inst.src_reg(), DataWidth::U64)
             }
-            BPF_STX | BPF_ST | BPF_LDX => {
-                let width = match instruction.code() & BPF_SIZE_MASK {
-                    BPF_B => DataWidth::U8,
-                    BPF_H => DataWidth::U16,
-                    BPF_W => DataWidth::U32,
-                    BPF_DW => DataWidth::U64,
-                    _ => unreachable!(),
-                };
-                if class == BPF_LDX {
-                    if instruction.code() & BPF_LOAD_STORE_MASK != BPF_MEM {
-                        // Unsupported instruction.
-                        return invalid_op_code();
+
+            // Memory Store register.
+            BPF_STX_B_MEM => self.store(context, dst, inst.offset(), src_reg(), DataWidth::U8),
+            BPF_STX_H_MEM => self.store(context, dst, inst.offset(), src_reg(), DataWidth::U16),
+            BPF_STX_W_MEM => self.store(context, dst, inst.offset(), src_reg(), DataWidth::U32),
+            BPF_STX_DW_MEM => self.store(context, dst, inst.offset(), src_reg(), DataWidth::U64),
+
+            // Memory Store constant.
+            BPF_ST_B_MEM => self.store(context, dst, inst.offset(), src_imm(), DataWidth::U8),
+            BPF_ST_H_MEM => self.store(context, dst, inst.offset(), src_imm(), DataWidth::U16),
+            BPF_ST_W_MEM => self.store(context, dst, inst.offset(), src_imm(), DataWidth::U32),
+            BPF_ST_DW_MEM => self.store(context, dst, inst.offset(), src_imm(), DataWidth::U64),
+
+            // 32-bit atomic ops.
+            BPF_STX_ATOMIC_W => {
+                let operation = inst.imm() as u8;
+                match operation {
+                    BPF_ADD => self.atomic_add(context, false, dst, inst.offset(), inst.src_reg()),
+                    BPF_ADD_FETCH => {
+                        self.atomic_add(context, true, dst, inst.offset(), inst.src_reg())
                     }
-                    return self.load(
-                        context,
-                        instruction.dst_reg(),
-                        instruction.offset(),
-                        instruction.src_reg(),
-                        width,
-                    );
-                } else {
-                    if instruction.code() & BPF_LOAD_STORE_MASK == BPF_MEM {
-                        let src = if class == BPF_ST {
-                            Source::Value(instruction.imm() as u64)
-                        } else {
-                            Source::Reg(instruction.src_reg())
-                        };
-                        return self.store(
-                            context,
-                            instruction.dst_reg(),
-                            instruction.offset(),
-                            src,
-                            width,
-                        );
-                    } else if instruction.code() & BPF_LOAD_STORE_MASK == BPF_ATOMIC {
-                        if !matches!(width, DataWidth::U32 | DataWidth::U64) {
-                            return Err(format!(
-                                "unsupported atomic operation of width {}",
-                                width.bytes()
-                            ));
-                        }
-                        let operation = instruction.imm() as u8;
-                        let fetch = operation & BPF_FETCH == BPF_FETCH;
-                        let is_64 = width == DataWidth::U64;
-                        const BPF_ADD_AND_FETCH: u8 = BPF_ADD | BPF_FETCH;
-                        const BPF_AND_AND_FETCH: u8 = BPF_AND | BPF_FETCH;
-                        const BPF_OR_AND_FETCH: u8 = BPF_OR | BPF_FETCH;
-                        const BPF_XOR_AND_FETCH: u8 = BPF_XOR | BPF_FETCH;
-                        return match operation {
-                            BPF_ADD | BPF_ADD_AND_FETCH => {
-                                if is_64 {
-                                    self.atomic_add64(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                } else {
-                                    self.atomic_add(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                }
-                            }
-                            BPF_AND | BPF_AND_AND_FETCH => {
-                                if is_64 {
-                                    self.atomic_and64(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                } else {
-                                    self.atomic_and(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                }
-                            }
-                            BPF_OR | BPF_OR_AND_FETCH => {
-                                if is_64 {
-                                    self.atomic_or64(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                } else {
-                                    self.atomic_or(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                }
-                            }
-                            BPF_XOR | BPF_XOR_AND_FETCH => {
-                                if is_64 {
-                                    self.atomic_xor64(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                } else {
-                                    self.atomic_xor(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                }
-                            }
-                            BPF_XCHG => {
-                                if is_64 {
-                                    self.atomic_xchg64(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                } else {
-                                    self.atomic_xchg(
-                                        context,
-                                        fetch,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                }
-                            }
-                            BPF_CMPXCHG => {
-                                if is_64 {
-                                    self.atomic_cmpxchg64(
-                                        context,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                } else {
-                                    self.atomic_cmpxchg(
-                                        context,
-                                        instruction.dst_reg(),
-                                        instruction.offset(),
-                                        instruction.src_reg(),
-                                    )
-                                }
-                            }
-                            _ => Err(format!("invalid atomic operation {:x}", operation)),
-                        };
-                    } else {
-                        // Unsupported instruction.
-                        return invalid_op_code();
+                    BPF_AND => self.atomic_and(context, false, dst, inst.offset(), inst.src_reg()),
+                    BPF_AND_FETCH => {
+                        self.atomic_and(context, true, dst, inst.offset(), inst.src_reg())
                     }
+                    BPF_OR => self.atomic_or(context, false, dst, inst.offset(), inst.src_reg()),
+                    BPF_OR_FETCH => {
+                        self.atomic_or(context, true, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_XOR => self.atomic_xor(context, false, dst, inst.offset(), inst.src_reg()),
+                    BPF_XOR_FETCH => {
+                        self.atomic_xor(context, true, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_XCHG => self.atomic_xchg(context, true, dst, inst.offset(), inst.src_reg()),
+                    BPF_CMPXCHG => self.atomic_cmpxchg(context, dst, inst.offset(), inst.src_reg()),
+                    _ => Err(format!("invalid atomic operation {:x}", operation)),
                 }
             }
-            _ => unreachable!(),
+
+            // 64-bit atomic ops.
+            BPF_STX_ATOMIC_DW => {
+                let operation = inst.imm() as u8;
+                match operation {
+                    BPF_ADD => {
+                        self.atomic_add64(context, false, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_ADD_FETCH => {
+                        self.atomic_add64(context, true, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_AND => {
+                        self.atomic_and64(context, false, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_AND_FETCH => {
+                        self.atomic_and64(context, true, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_OR => self.atomic_or64(context, false, dst, inst.offset(), inst.src_reg()),
+                    BPF_OR_FETCH => {
+                        self.atomic_or64(context, true, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_XOR => {
+                        self.atomic_xor64(context, false, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_XOR_FETCH => {
+                        self.atomic_xor64(context, true, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_XCHG => {
+                        self.atomic_xchg64(context, true, dst, inst.offset(), inst.src_reg())
+                    }
+                    BPF_CMPXCHG => {
+                        self.atomic_cmpxchg64(context, dst, inst.offset(), inst.src_reg())
+                    }
+                    _ => Err(format!("invalid atomic operation {:x}", operation)),
+                }
+            }
+
+            _ => Err(format!("invalid op code {:x}", inst.code())),
         }
     }
 }
