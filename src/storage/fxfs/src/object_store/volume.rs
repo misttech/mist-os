@@ -100,27 +100,27 @@ impl RootVolume {
         owner: Weak<dyn StoreOwner>,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<Arc<ObjectStore>, Error> {
-        self.volume_from_id(
-            match self.volume_directory().lookup(volume_name).await?.ok_or(FxfsError::NotFound)? {
-                (object_id, ObjectDescriptor::Volume, _) => object_id,
-                _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
-            },
-            owner,
-            crypt,
-        )
-        .await
-    }
-
-    /// Returns the volume with the given id.  This is not thread-safe.
-    async fn volume_from_id(
-        &self,
-        store_object_id: u64,
-        owner: Weak<dyn StoreOwner>,
-        crypt: Option<Arc<dyn Crypt>>,
-    ) -> Result<Arc<ObjectStore>, Error> {
-        let store =
-            self.filesystem.object_manager().store(store_object_id).ok_or(FxfsError::NotFound)?;
+        // Lookup the volume object in the volume directory.
+        let (store_object_id, descriptor, _) = self
+            .volume_directory()
+            .lookup(volume_name)
+            .await
+            .context("Volume lookup failed")?
+            .ok_or(FxfsError::NotFound)
+            .context("Volume missing in volume directory")?;
+        match descriptor {
+            ObjectDescriptor::Volume => (),
+            _ => bail!(anyhow!(FxfsError::Inconsistent).context("Expected volume")),
+        }
+        // Lookup the object store corresponding to the volume.
+        let store = self
+            .filesystem
+            .object_manager()
+            .store(store_object_id)
+            .ok_or(FxfsError::NotFound)
+            .context("Missing volume store")?;
         store.set_trace(self.filesystem.trace());
+        // Unlock the volume if required.
         if let Some(crypt) = crypt {
             let read_only = self.filesystem.options().read_only;
             store.unlock_inner(owner, crypt, read_only).await.context("Failed to unlock volume")?;
