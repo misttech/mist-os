@@ -51,3 +51,5 @@ per-file run-script = claytonmccray@google.com,crjohns@google.com
 
 per-file lib/bazel_utils.sh = file:/build/OWNERS
 per-file build = file:/build/OWNERS
+
+per-file atomic-commit = lijiaming@google.com, olivernewman@google.com
