@@ -881,6 +881,8 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
     bool post = false;
     {
       Guard<SpinLock, IrqSave> guard{&lock_};
+      // Fill in the lru action now that the lock is held.
+      deferred_list.SetLruAction(lru_action_);
       const uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
       if (lru >= target_gen) {
         break;
