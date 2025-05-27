@@ -1775,15 +1775,18 @@ void MsdArmDevice::AppendInspectEvent(InspectEvent event) {
 
 magma_status_t MsdArmDevice::MsdQuery(uint64_t id, zx::vmo* result_buffer_out,
                                       uint64_t* result_out) {
-  uint32_t result_buffer;
-  magma_status_t status = QueryReturnsBuffer(id, &result_buffer);
-  *result_buffer_out = zx::vmo(result_buffer);
+  zx::vmo result_buffer;
+  magma_status_t status = QueryReturnsBuffer(id, result_buffer.reset_and_get_address());
 
   if (status == MAGMA_STATUS_INVALID_ARGS) {
     status = QueryInfo(id, result_out);
 
-    if (status == MAGMA_STATUS_OK && result_buffer_out)
-      result_buffer_out->reset();
+    if (status == MAGMA_STATUS_OK) {
+      result_buffer.reset();
+    }
+  }
+  if (result_buffer_out) {
+    *result_buffer_out = std::move(result_buffer);
   }
 
   if (status == MAGMA_STATUS_INVALID_ARGS) {
