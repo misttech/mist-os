@@ -102,6 +102,7 @@ pub mod ref_counted_hash_map {
 pub mod socket {
     mod address;
     mod base;
+    mod cookie;
     pub(crate) mod sndbuf;
 
     pub use address::{
@@ -118,6 +119,7 @@ pub mod socket {
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
     };
+    pub use cookie::SocketCookie;
     pub use sndbuf::{
         SendBufferFullError, SendBufferSpace, SendBufferTracking, SocketWritableListener,
     };
@@ -139,7 +141,8 @@ pub mod sync {
     // Exclusively re-exports from the sync crate.
     pub use netstack3_sync::rc::{
         DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier, Notifier as RcNotifier,
-        Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
+        Primary as PrimaryRc, ResourceToken, ResourceTokenValue, Strong as StrongRc,
+        Weak as WeakRc,
     };
     pub use netstack3_sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 }

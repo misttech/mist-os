@@ -103,6 +103,13 @@ pub struct TxMetadata<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> 
     space: ManuallyDrop<SendBufferSpace>,
 }
 
+impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> TxMetadata<I, D, S> {
+    /// Gets the socket from which the packet originates.
+    pub fn socket(&self) -> &S::WeakSocketId<I, D> {
+        &self.socket
+    }
+}
+
 impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> Drop for TxMetadata<I, D, S> {
     fn drop(&mut self) {
         let Self { socket, space } = self;

@@ -20,7 +20,6 @@ use core::panic::Location;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use derivative::Derivative;
-use netstack3_trace::TraceResourceId;
 
 mod caller {
     //! Provides tracking of instances via tracked caller location.
@@ -121,30 +120,80 @@ mod caller {
     }
 }
 
-mod debug_id {
+mod resource_token {
     use core::fmt::Debug;
     use core::sync::atomic::{AtomicU64, Ordering};
-    use netstack3_trace::TraceResourceId;
+    use std::marker::PhantomData;
 
-    /// An opaque token to be used for debugging.
+    /// An opaque token associated with a resource.
     ///
-    /// The [`Debug`] implementation is guaranteed to produce a unique
-    /// representation for all instances of [`DebugToken`]. When paired with the
-    /// various RC types exposed in the parent module, this ensures that each
-    /// underlying value can be differentiated from one another. This is an
-    /// improvement over, say, using the underlying value's address, which may
-    /// be reused when the underlying value has been dropped.
-    #[derive(Clone)]
-    pub(super) struct DebugToken(u64);
+    /// It can be used to create debug and trace identifiers for the resource,
+    /// but it should not be used as a unique identifier of the resource inside
+    /// the netstack.
+    ///
+    /// By default the lifetime of a token is bound the resource that token
+    /// belongs to, but it can be extended by calling
+    /// [`ResourceToken::extend_lifetime`].
+    pub struct ResourceToken<'a> {
+        value: u64,
+        _marker: PhantomData<&'a ()>,
+    }
 
-    impl Debug for DebugToken {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
-            let DebugToken(inner) = self;
-            write!(f, "{}", inner)
+    impl<'a> ResourceToken<'a> {
+        /// Extends lifetime of the token.
+        ///
+        /// # Discussion
+        ///
+        /// It's generally okay to extend the lifetime of the token, but prefer
+        /// to use tokens bound to the resource's lifetime whenever possible,
+        /// since it provides guardrails against identifiers that outlive the
+        /// resource itself.
+        pub fn extend_lifetime(self) -> ResourceToken<'static> {
+            ResourceToken { value: self.value, _marker: PhantomData }
+        }
+
+        /// Returns internal value. Consumes `self`.
+        ///
+        /// # Discussion
+        ///
+        /// Export to `u64` when a representation is needed for interaction with
+        /// other processes or components such as trace identifiers and eBPF
+        /// socket cookies.
+        ///
+        /// Refrain from using the returned value within the netstack otherwise.
+        pub fn export_value(self) -> u64 {
+            self.value
         }
     }
 
-    impl Default for DebugToken {
+    impl<'a> Debug for ResourceToken<'a> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+            write!(f, "{}", self.value)
+        }
+    }
+
+    /// Holder of a value for `ResourceToken`. Vends `ResourceToken` instances
+    /// with the same value and the lifetime bound to the lifetime of the holder.
+    ///
+    /// The [`Default`] implementation generates a new unique value.
+    pub struct ResourceTokenValue(u64);
+
+    impl ResourceTokenValue {
+        /// Creates a new token.
+        pub fn token(&self) -> ResourceToken<'_> {
+            let ResourceTokenValue(value) = self;
+            ResourceToken { value: *value, _marker: PhantomData }
+        }
+    }
+
+    impl core::fmt::Debug for ResourceTokenValue {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+            let ResourceTokenValue(value) = self;
+            write!(f, "{}", value)
+        }
+    }
+
+    impl Default for ResourceTokenValue {
         fn default() -> Self {
             static NEXT_TOKEN: AtomicU64 = AtomicU64::new(0);
             // NB: Fetch add will cause the counter to rollback to 0 if we
@@ -152,26 +201,26 @@ mod debug_id {
             // an impossibility (at 1 billion instantiations per second, the
             // counter is valid for > 500 years). Spare the CPU cycles and don't
             // bother attempting to detect/handle overflow.
-            DebugToken(NEXT_TOKEN.fetch_add(1, Ordering::Relaxed))
+            Self(NEXT_TOKEN.fetch_add(1, Ordering::Relaxed))
         }
     }
+}
 
-    impl DebugToken {
-        pub(super) fn trace_id(&self) -> TraceResourceId<'_> {
-            let Self(inner) = self;
-            TraceResourceId::new(*inner)
-        }
-    }
+pub use resource_token::{ResourceToken, ResourceTokenValue};
+
+mod debug_id {
+    use super::ResourceToken;
+    use core::fmt::Debug;
 
     /// A debug identifier for the RC types exposed in the parent module.
     ///
     /// Encompasses the underlying pointer for the RC type, as well as
-    /// (optionally) the globally unique [`DebugToken`].
+    /// (optionally) the globally unique [`ResourceToken`].
     pub(super) enum DebugId<T> {
-        /// Used in contexts that have access to the [`DebugToken`], e.g.
+        /// Used in contexts that have access to the [`ResourceToken`], e.g.
         /// [`Primary`], [`Strong`], and sometimes [`Weak`] RC types.
-        WithToken { ptr: *const T, token: DebugToken },
-        /// Used in contexts that don't have access to the [`DebugToken`], e.g.
+        WithToken { ptr: *const T, token: ResourceToken<'static> },
+        /// Used in contexts that don't have access to the [`ResourceToken`], e.g.
         /// [`Weak`] RC types that cannot be upgraded.
         WithoutToken { ptr: *const T },
     }
@@ -197,7 +246,7 @@ struct Inner<T> {
     // (i.e. atomicbox) or write unsafe code.
     #[derivative(Debug = "ignore")]
     notifier: crate::Mutex<Option<Box<dyn Notifier<T>>>>,
-    debug_token: debug_id::DebugToken,
+    resource_token: ResourceTokenValue,
 }
 
 impl<T> Inner<T> {
@@ -213,7 +262,7 @@ impl<T> Inner<T> {
         // We cannot destructure `self` by value since `Inner` implements
         // `Drop`. So we must manually drop all the fields but data and then
         // forget self.
-        let Inner { marked_for_destruction, data, callers: holders, notifier, debug_token } =
+        let Inner { marked_for_destruction, data, callers: holders, notifier, resource_token } =
             &mut self;
 
         // Make sure that `inner` is in a valid state for destruction.
@@ -231,7 +280,7 @@ impl<T> Inner<T> {
             core::ptr::drop_in_place(marked_for_destruction);
             core::ptr::drop_in_place(holders);
             core::ptr::drop_in_place(notifier);
-            core::ptr::drop_in_place(debug_token);
+            core::ptr::drop_in_place(resource_token);
 
             core::mem::ManuallyDrop::take(data)
         };
@@ -263,7 +312,7 @@ impl<T> Inner<T> {
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        let Inner { marked_for_destruction, data, callers: _, notifier, debug_token: _ } = self;
+        let Inner { marked_for_destruction, data, callers: _, notifier, resource_token: _ } = self;
         // Take data out of ManuallyDrop in case we panic in pre_drop_check.
         // That'll ensure data is dropped if we hit the panic.
         //
@@ -307,8 +356,13 @@ impl<T> Drop for Primary<T> {
         if !std::thread::panicking() {
             assert_eq!(was_marked, false, "Must not be marked for destruction yet");
 
-            let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
-                &*inner;
+            let Inner {
+                marked_for_destruction: _,
+                callers,
+                data: _,
+                notifier: _,
+                resource_token: _,
+            } = &*inner;
 
             // Make sure that this `Primary` is the last thing to hold a strong
             // reference to the underlying data when it is being dropped.
@@ -333,7 +387,7 @@ impl<T> Deref for Primary<T> {
 
     fn deref(&self) -> &T {
         let Self { inner } = self;
-        let Inner { marked_for_destruction: _, data, callers: _, notifier: _, debug_token: _ } =
+        let Inner { marked_for_destruction: _, data, callers: _, notifier: _, resource_token: _ } =
             &***inner;
         data
     }
@@ -360,7 +414,7 @@ impl<T> Primary<T> {
                 callers: caller::Callers::default(),
                 data: core::mem::ManuallyDrop::new(data),
                 notifier: crate::Mutex::new(None),
-                debug_token: debug_id::DebugToken::default(),
+                resource_token: ResourceTokenValue::default(),
             })),
         }
     }
@@ -378,7 +432,7 @@ impl<T> Primary<T> {
                 callers: caller::Callers::default(),
                 data: core::mem::ManuallyDrop::new(data_fn(Weak(weak.clone()))),
                 notifier: crate::Mutex::new(None),
-                debug_token: debug_id::DebugToken::default(),
+                resource_token: ResourceTokenValue::default(),
             })),
         }
     }
@@ -386,7 +440,7 @@ impl<T> Primary<T> {
     /// Clones a strongly-held reference.
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
     pub fn clone_strong(Self { inner }: &Self) -> Strong<T> {
-        let Inner { data: _, callers, marked_for_destruction: _, notifier: _, debug_token: _ } =
+        let Inner { data: _, callers, marked_for_destruction: _, notifier: _, resource_token: _ } =
             &***inner;
         let caller = callers.insert(Location::caller());
         Strong { inner: alloc::sync::Arc::clone(inner), caller }
@@ -409,10 +463,12 @@ impl<T> Primary<T> {
     /// for the data held behind this [`Primary`].
     pub fn debug_id(&self) -> impl Debug + '_ {
         let Self { inner } = self;
-        debug_id::DebugId::WithToken {
-            ptr: alloc::sync::Arc::as_ptr(inner),
-            token: inner.debug_token.clone(),
-        }
+
+        // The lifetime of the returned `DebugId` is bound to the lifetime
+        // of `self`.
+        let token = inner.resource_token.token().extend_lifetime();
+
+        debug_id::DebugId::WithToken { ptr: alloc::sync::Arc::as_ptr(inner), token }
     }
 
     fn mark_for_destruction_and_take_inner(mut this: Self) -> alloc::sync::Arc<Inner<T>> {
@@ -497,7 +553,7 @@ pub struct Strong<T> {
 impl<T> Drop for Strong<T> {
     fn drop(&mut self) {
         let Self { inner, caller } = self;
-        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, resource_token: _ } =
             &**inner;
         caller.release(callers);
     }
@@ -514,7 +570,7 @@ impl<T> Deref for Strong<T> {
 
     fn deref(&self) -> &T {
         let Self { inner, caller: _ } = self;
-        let Inner { marked_for_destruction: _, data, callers: _, notifier: _, debug_token: _ } =
+        let Inner { marked_for_destruction: _, data, callers: _, notifier: _, resource_token: _ } =
             inner.deref();
         data
     }
@@ -539,7 +595,7 @@ impl<T> Clone for Strong<T> {
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
     fn clone(&self) -> Self {
         let Self { inner, caller: _ } = self;
-        let Inner { data: _, marked_for_destruction: _, callers, notifier: _, debug_token: _ } =
+        let Inner { data: _, marked_for_destruction: _, callers, notifier: _, resource_token: _ } =
             &**inner;
         let caller = callers.insert(Location::caller());
         Self { inner: alloc::sync::Arc::clone(inner), caller }
@@ -556,21 +612,22 @@ impl<T> Strong<T> {
     /// for the data held behind this [`Strong`].
     pub fn debug_id(&self) -> impl Debug + '_ {
         let Self { inner, caller: _ } = self;
-        debug_id::DebugId::WithToken {
-            ptr: alloc::sync::Arc::as_ptr(inner),
-            token: inner.debug_token.clone(),
-        }
+
+        // The lifetime of the returned `DebugId` is bound to the lifetime
+        // of `self`.
+        let token = inner.resource_token.token().extend_lifetime();
+
+        debug_id::DebugId::WithToken { ptr: alloc::sync::Arc::as_ptr(inner), token }
     }
 
-    /// Returns a [`TraceResourceId`] that can be used to identify this
-    /// reference in tracing events.
-    pub fn trace_id(&self) -> TraceResourceId<'_> {
-        self.inner.debug_token.trace_id()
+    /// Returns a [`ResourceToken`] that corresponds to this object.
+    pub fn resource_token(&self) -> ResourceToken<'_> {
+        self.inner.resource_token.token()
     }
 
     /// Returns true if the inner value has since been marked for destruction.
     pub fn marked_for_destruction(Self { inner, caller: _ }: &Self) -> bool {
-        let Inner { marked_for_destruction, data: _, callers: _, notifier: _, debug_token: _ } =
+        let Inner { marked_for_destruction, data: _, callers: _, notifier: _, resource_token: _ } =
             inner.as_ref();
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
@@ -657,10 +714,12 @@ impl<T> Weak<T> {
         match self.upgrade() {
             Some(strong) => {
                 let Strong { inner, caller: _ } = &strong;
-                debug_id::DebugId::WithToken {
-                    ptr: alloc::sync::Arc::as_ptr(&inner),
-                    token: inner.debug_token.clone(),
-                }
+
+                // The lifetime of the returned `DebugId` is still bound to the
+                // lifetime of `self`.
+                let token = inner.resource_token.token().extend_lifetime();
+
+                debug_id::DebugId::WithToken { ptr: alloc::sync::Arc::as_ptr(&inner), token }
             }
             None => {
                 let Self(this) = self;
@@ -677,7 +736,7 @@ impl<T> Weak<T> {
     pub fn upgrade(&self) -> Option<Strong<T>> {
         let Self(weak) = self;
         let arc = weak.upgrade()?;
-        let Inner { marked_for_destruction, data: _, callers, notifier: _, debug_token: _ } =
+        let Inner { marked_for_destruction, data: _, callers, notifier: _, resource_token: _ } =
             arc.deref();
 
         // `Ordering::Acquire` because we want to synchronize with with the
@@ -928,7 +987,7 @@ mod tests {
         let strong3 = weak.upgrade().unwrap();
 
         let Primary { inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, resource_token: _ } =
             &***inner;
 
         let strongs = [strong1, strong2, strong3];
@@ -965,7 +1024,7 @@ mod tests {
         assert_eq!(strong1.caller.location, strong2.caller.location);
 
         let Primary { inner } = &primary;
-        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, debug_token: _ } =
+        let Inner { marked_for_destruction: _, callers, data: _, notifier: _, resource_token: _ } =
             &***inner;
 
         {

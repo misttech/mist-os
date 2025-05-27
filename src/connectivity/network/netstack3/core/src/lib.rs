@@ -194,7 +194,7 @@ pub mod socket {
 
     pub use netstack3_base::socket::{
         AddrIsMappedError, NotDualStackCapableError, SetDualStackEnabledError, ShutdownType,
-        SocketWritableListener, StrictlyZonedAddr,
+        SocketCookie, SocketWritableListener, StrictlyZonedAddr,
     };
 }
 
@@ -208,7 +208,7 @@ pub mod sync {
 
     pub use netstack3_base::sync::{
         DebugReferences, DynDebugReferences, LockGuard, MapRcNotifier, Mutex, PrimaryRc,
-        RcNotifier, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
+        RcNotifier, ResourceToken, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
     };
     pub use netstack3_base::{RemoveResourceResult, RemoveResourceResultWithContext};
 }

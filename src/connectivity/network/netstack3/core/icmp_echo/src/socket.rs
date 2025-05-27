@@ -20,9 +20,9 @@ use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use net_types::{SpecifiedAddr, Witness as _, ZonedAddr};
 use netstack3_base::socket::{
     self, AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnInfoAddr, ConnIpAddr,
-    IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketIpAddr,
-    SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-    SocketWritableListener,
+    IncompatibleError, InsertError, ListenerAddrInfo, MaybeDualStack, ShutdownType, SocketCookie,
+    SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapConflictPolicy,
+    SocketMapStateSpec, SocketWritableListener,
 };
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::{RwLock, StrongRc};
@@ -88,6 +88,14 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>
 pub struct IcmpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes>(
     datagram::StrongRc<I, D, Icmp<BT>>,
 );
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> IcmpSocketId<I, D, BT> {
+    /// Returns a `SocketCookie` for this socket.
+    pub fn socket_cookie(&self) -> SocketCookie {
+        let Self(inner) = self;
+        SocketCookie::new(inner.resource_token())
+    }
+}
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: IcmpEchoBindingsTypes> Clone
     for IcmpSocketId<I, D, BT>

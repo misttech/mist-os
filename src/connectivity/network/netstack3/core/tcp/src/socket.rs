@@ -41,7 +41,7 @@ use netstack3_base::socket::{
     self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
     DualStackLocalIp, DualStackRemoteIp, DualStackTuple, EitherStack, IncompatibleError,
     InsertError, Inserter, ListenerAddr, ListenerAddrInfo, ListenerIpAddr, MaybeDualStack,
-    NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, ShutdownType,
+    NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, ShutdownType, SocketCookie,
     SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpAddr, SocketIpExt,
     SocketMapAddrSpec, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
     SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
@@ -1910,7 +1910,13 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpSocket
 
     pub(crate) fn trace_id(&self) -> TraceResourceId<'_> {
         let Self(inner) = self;
-        inner.trace_id()
+        TraceResourceId::new(inner.resource_token())
+    }
+
+    /// Returns `SocketCookie` for the socket.
+    pub fn socket_cookie(&self) -> SocketCookie {
+        let Self(inner) = self;
+        SocketCookie::new(inner.resource_token())
     }
 
     pub(crate) fn either(&self) -> EitherTcpSocketId<'_, D, BT> {
@@ -1962,8 +1968,9 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
 }
 
 impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> WeakTcpSocketId<I, D, BT> {
+    /// Tries to upgrade to a strong reference.
     #[cfg_attr(feature = "instrumented", track_caller)]
-    pub(crate) fn upgrade(&self) -> Option<TcpSocketId<I, D, BT>> {
+    pub fn upgrade(&self) -> Option<TcpSocketId<I, D, BT>> {
         let Self(this) = self;
         this.upgrade().map(TcpSocketId)
     }

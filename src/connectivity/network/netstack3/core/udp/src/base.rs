@@ -24,7 +24,7 @@ use netstack3_base::socket::{
     AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr, FoundSockets,
     IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo, ListenerIpAddr,
     MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, ShutdownType,
-    SocketAddrType, SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec,
+    SocketAddrType, SocketCookie, SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec,
     SocketMapConflictPolicy, SocketMapStateSpec, SocketWritableListener,
 };
 use netstack3_base::socketmap::{IterShadows as _, SocketMap, Tagged};
@@ -909,6 +909,14 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> PortAllocImpl
 pub struct UdpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
     datagram::StrongRc<I, D, Udp<BT>>,
 );
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, BT> {
+    /// Returns `SocketCookie` for the socket.
+    pub fn socket_cookie(&self) -> SocketCookie {
+        let Self(inner) = self;
+        SocketCookie::new(inner.resource_token())
+    }
+}
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Clone for UdpSocketId<I, D, BT> {
     #[cfg_attr(feature = "instrumented", track_caller)]

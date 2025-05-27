@@ -20,7 +20,6 @@ rustc_library_with_features("netstack3-udp") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
@@ -39,6 +38,7 @@ rustc_library_with_features("netstack3-udp") {
         "//src/connectivity/network/netstack3/core/base:netstack3-base",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
       ]
     },
 
@@ -53,6 +53,7 @@ rustc_library_with_features("netstack3-udp") {
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-testutils",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-testutils",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace-instrumented",
       ]
     },
     {
@@ -63,6 +64,7 @@ rustc_library_with_features("netstack3-udp") {
         "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-benchmarks",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-benchmarks",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
       ]
       configs += [ "//src/connectivity/network/netstack3/core:benchmark" ]
     },
@@ -74,6 +76,7 @@ rustc_library_with_features("netstack3-udp") {
         "//src/connectivity/network/netstack3/core/base:netstack3-base-instrumented",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-instrumented",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-instrumented",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace-instrumented",
       ]
       test_deps = [
         "//src/connectivity/lib/ip-test-macro",
@@ -81,6 +84,7 @@ rustc_library_with_features("netstack3-udp") {
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-testutils",
         "//src/connectivity/network/netstack3/core/ip:netstack3-ip-testutils",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace-instrumented",
         "//third_party/rust_crates:assert_matches",
         "//third_party/rust_crates:itertools",
         "//third_party/rust_crates:test-case",
@@ -100,6 +104,7 @@ rustc_library_with_features("netstack3-udp") {
           "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
           "//src/connectivity/network/netstack3/core/datagram:netstack3-datagram-loom",
           "//src/connectivity/network/netstack3/core/ip:netstack3-ip-loom",
+          "//src/connectivity/network/netstack3/core/trace:netstack3-trace-loom",
         ]
         configs += [ "//src/connectivity/network/netstack3/core:loom" ]
       },

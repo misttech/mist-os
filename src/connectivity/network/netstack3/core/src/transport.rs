@@ -59,6 +59,7 @@ mod integration;
 
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
+use netstack3_base::socket::SocketCookie;
 use netstack3_base::{CoreTxMetadataContext, HandleableTimer, TimerHandler};
 use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
@@ -236,5 +237,36 @@ impl<I: IpExt, L, BT: BindingsTypes>
         tx_meta: TcpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
     ) -> TxMetadata<BT> {
         TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Tcpv4, TxMetadataInner::Tcpv6))
+    }
+}
+
+impl<BT: BindingsTypes> TxMetadata<BT> {
+    /// Returns [`SocketCookie`] for the socket associate with the packet.
+    /// `None` is returned if the packet is not associated with a local socket
+    /// or the socket has been destroyed.
+    pub fn socket_cookie(&self) -> Option<SocketCookie> {
+        let TxMetadata(inner) = self;
+        match inner {
+            // TODO(https://fxbug.dev/417224088): Handle Raw and Packet sockets.
+            TxMetadataInner::None => None,
+            TxMetadataInner::Tcpv4(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Tcpv6(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Udpv4(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Udpv6(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Icmpv4(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Icmpv6(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+        }
     }
 }

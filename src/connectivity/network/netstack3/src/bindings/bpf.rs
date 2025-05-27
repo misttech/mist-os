@@ -19,6 +19,7 @@ use netstack3_core::device::DeviceId;
 use netstack3_core::device_socket::Frame;
 use netstack3_core::filter::{FilterIpExt, IpPacket, SocketEgressFilterResult, SocketOpsFilter};
 use netstack3_core::routes::Marks;
+use netstack3_core::socket::SocketCookie;
 use netstack3_core::sync::{Mutex, RwLock};
 use netstack3_core::TxMetadata;
 use packet::PartialSerializer;
@@ -362,7 +363,7 @@ impl CgroupSkbProgram {
         &self,
         _packet: &P,
         _device: &DeviceId<BindingsCtx>,
-        _tx_metadata: &TxMetadata<BindingsCtx>,
+        _socket_cookie: SocketCookie,
         _marks: &Marks,
     ) -> u64 {
         // TODO(https://fxbug.dev/407809292): Actually run the programs.
@@ -533,12 +534,17 @@ impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfMa
         tx_metadata: &TxMetadata<BindingsCtx>,
         marks: &Marks,
     ) -> SocketEgressFilterResult {
+        let Some(socket_cookie) = tx_metadata.socket_cookie() else {
+            // There is no socket associated with the packet.
+            return SocketEgressFilterResult::Pass { congestion: false };
+        };
+
         let state = self.state.read();
         let Some(prog) = state.root_cgroup_egress.as_ref() else {
             return SocketEgressFilterResult::Pass { congestion: false };
         };
 
-        let result = prog.run(packet, device, tx_metadata, marks);
+        let result = prog.run(packet, device, socket_cookie, marks);
         if result > CgroupSkbProgram::EGRESS_MAX_RESULT {
             // TODO(https://fxbug.dev/413490751): Change this to panic once
             // result validation is implemented in the verifier.
