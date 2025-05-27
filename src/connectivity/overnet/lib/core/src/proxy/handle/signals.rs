@@ -61,7 +61,9 @@ impl<'h> Collector<'h> {
                         if signals.is_empty() {
                             Poll::Ready(Err(zx_status::Status::PEER_CLOSED))
                         } else {
-                            hdl.signal(signals, Signals::empty())?;
+                            hdl.signal(signals & POLLED_SIGNALS, Signals::empty()).inspect_err(
+                                |e| log::warn!("failed to clear signals in handle {e:?}"),
+                            )?;
                             Poll::Ready(Ok(ReadValue::SignalUpdate(SignalUpdate {
                                 assert_signals: Some(to_wire_signals(signals)),
                                 ..Default::default()
