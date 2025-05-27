@@ -21,19 +21,11 @@ assert(current_toolchain == default_toolchain,
 files = {
   # Outputs of assembly.
   outdir = target_out_dir + "/bringup"
-  zbi = "${outdir}/bringup.zbi"
-  zbi_signed = "${outdir}/bringup.zbi.signed"
-  vbmeta = "${outdir}/bringup.vbmeta"
 
   # Outputs of recovery.
   recovery_name = get_label_info(recovery_label, "name")
   recovery_outdir =
       get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
-  recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
-  recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
-  recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
-
-  qemu_kernel = qemu_boot_shim.path
 }
 
 _partitions_config = "//boards/partitions:default"
@@ -82,22 +74,6 @@ product_bundle("product_bundle") {
   partitions = _partitions_config
   system_a = files.outdir
   system_r = files.recovery_outdir
-
-  # Create lists of the files that are referenced by the assembly manifests.
-  _assembly_contents = [ files.qemu_kernel ]
-  _recovery_contents = [ files.qemu_kernel ]
-
-  _assembly_contents += [ files.zbi ]
-  _recovery_contents += [ files.recovery_zbi ]
-
-  if (use_vbmeta) {
-    _assembly_contents += [ files.vbmeta ]
-    _recovery_contents += [ files.recovery_vbmeta ]
-  }
-
-  # List the contents of each input so that the outputs can be calculated.
-  system_a_contents = _assembly_contents
-  system_r_contents = _recovery_contents
 }
 
 group("bringup") {
