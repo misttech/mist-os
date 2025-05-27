@@ -155,6 +155,7 @@ group("non_hermetic_deps") {
   # will not be resolved except by moving to Bazel.
   visibility += [
     "//build/images/*",
+    "//sdk/lib/c/*",
     "//src/bringup/lib/mexec/tests/*",
     "//src/developer/ffx/lib/profiler/tests:*",
     "//src/developer/ffx/lib/symbolize/tests:*",
