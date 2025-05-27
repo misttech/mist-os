@@ -36,7 +36,7 @@ class ZirconPlatformSemaphore : public PlatformSemaphore {
     TRACE_FLOW_END("magma:sync", "semaphore signal", koid_);
     TRACE_FLOW_END("magma:sync", "semaphore wait async", koid_);
     if (!is_one_shot()) {
-      event_.signal(zx_signal(), 0);
+      event_.signal(GetZxSignal(), 0);
     }
   }
 
@@ -47,7 +47,7 @@ class ZirconPlatformSemaphore : public PlatformSemaphore {
 
     TRACE_DURATION("magma:sync", "semaphore signal", "id", koid_);
     TRACE_FLOW_BEGIN("magma:sync", "semaphore signal", koid_);
-    zx_status_t status = event_.signal(0u, zx_signal());
+    zx_status_t status = event_.signal(0u, GetZxSignal());
     DASSERT(status == ZX_OK);
   }
 
@@ -56,11 +56,7 @@ class ZirconPlatformSemaphore : public PlatformSemaphore {
 
   bool WaitAsync(PlatformPort* port, uint64_t key) override;
 
-  zx_handle_t zx_handle() const { return event_.get(); }
-
-  static zx_signals_t zx_signal() { return ZX_EVENT_SIGNALED; }
-
-  zx_signals_t GetZxSignal() const override { return zx_signal(); }
+  zx_signals_t GetZxSignal() const override { return ZX_EVENT_SIGNALED; }
 
  private:
   zx::event event_;
