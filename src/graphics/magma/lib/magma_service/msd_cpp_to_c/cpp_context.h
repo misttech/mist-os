@@ -16,11 +16,11 @@ class CppContext : public msd::Context {
 
   ~CppContext() override;
 
-  magma_status_t ExecuteCommandBuffers(std::vector<magma_exec_command_buffer>& command_buffers,
-                                       std::vector<magma_exec_resource>& resources,
-                                       std::vector<msd::Buffer*>& buffers,
-                                       std::vector<msd::Semaphore*>& wait_semaphores,
-                                       std::vector<msd::Semaphore*>& signal_semaphores) override;
+  magma_status_t MsdExecuteCommandBuffers(std::vector<magma_exec_command_buffer>& command_buffers,
+                                          std::vector<magma_exec_resource>& resources,
+                                          std::vector<msd::Buffer*>& buffers,
+                                          std::vector<msd::Semaphore*>& wait_semaphores,
+                                          std::vector<msd::Semaphore*>& signal_semaphores) override;
 
  private:
   struct MsdContext* context_;

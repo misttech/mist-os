@@ -288,16 +288,16 @@ class Test {
 
  private:
   msd::MagmaSystemContext* InitializeContext() {
-    msd_drv_ = msd::Driver::Create();
+    msd_drv_ = msd::Driver::MsdCreate();
     if (!msd_drv_)
       return DRETP(nullptr, "failed to create msd driver");
 
-    msd_drv_->Configure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
+    msd_drv_->MsdConfigure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
 
-    auto msd_dev = msd_drv_->CreateDevice(GetTestDeviceHandle());
+    auto msd_dev = msd_drv_->MsdCreateDevice(GetTestDeviceHandle());
     if (!msd_dev)
       return DRETP(nullptr, "failed to create msd device");
-    auto msd_connection_t = msd_dev->Open(0);
+    auto msd_connection_t = msd_dev->MsdOpen(0);
     if (!msd_connection_t)
       return DRETP(nullptr, "msd_device_open failed");
     system_dev_ = msd::MagmaSystemDevice::Create(msd_drv_.get(), std::move(msd_dev));

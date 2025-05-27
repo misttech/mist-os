@@ -78,7 +78,7 @@ magma::Status MagmaSystemContext::ExecuteCommandBuffers(
     msd_signal_semaphores.push_back(semaphore->msd_semaphore());
   }
 
-  magma_status_t status = msd_ctx()->ExecuteCommandBuffers(
+  magma_status_t status = msd_ctx()->MsdExecuteCommandBuffers(
       command_buffers, resources, msd_buffers, msd_wait_semaphores, msd_signal_semaphores);
 
   if (status == MAGMA_STATUS_UNIMPLEMENTED) {
@@ -96,7 +96,7 @@ magma::Status MagmaSystemContext::ExecuteCommandBuffers(
         .signal_semaphore_count = static_cast<uint32_t>(msd_signal_semaphores.size()),
         .flags = flags,
     };
-    return msd_ctx()->ExecuteCommandBufferWithResources(
+    return msd_ctx()->MsdExecuteCommandBufferWithResources(
         &magma_command_buffer, resources.data(), msd_buffers.data(), msd_wait_semaphores.data(),
         msd_signal_semaphores.data());
   }
@@ -123,7 +123,7 @@ magma::Status MagmaSystemContext::ExecuteInlineCommands(
       TRACE_FLOW_END("gfx", "semaphore", semaphore->global_id());
     }
 
-    magma_status_t result = msd_ctx()->ExecuteInlineCommand(&command, msd_semaphores.data());
+    magma_status_t result = msd_ctx()->MsdExecuteInlineCommand(&command, msd_semaphores.data());
     if (result != MAGMA_STATUS_OK) {
       return MAGMA_DRET_MSG(result, "ExecuteInlineCommand failed: %d", result);
     }

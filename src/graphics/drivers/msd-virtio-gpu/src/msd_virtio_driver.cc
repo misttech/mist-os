@@ -8,9 +8,11 @@
 
 #include "msd_virtio_device.h"
 
-std::unique_ptr<msd::Device> MsdVirtioDriver::CreateDevice(msd::DeviceHandle* device_handle) {
+std::unique_ptr<msd::Device> MsdVirtioDriver::MsdCreateDevice(msd::DeviceHandle* device_handle) {
   return std::make_unique<MsdVirtioDevice>(static_cast<VirtioGpuControl*>(device_handle));
 }
 
 // static
-std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdVirtioDriver>(); }
+std::unique_ptr<msd::Driver> msd::Driver::MsdCreate() {
+  return std::make_unique<MsdVirtioDriver>();
+}

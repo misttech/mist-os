@@ -17,7 +17,7 @@ CppContext::CppContext(struct MsdContext* context) : context_(context) { MAGMA_D
 
 CppContext::~CppContext() { msd_context_release(context_); }
 
-magma_status_t CppContext::ExecuteCommandBuffers(
+magma_status_t CppContext::MsdExecuteCommandBuffers(
     std::vector<magma_exec_command_buffer>& command_buffers,
     std::vector<magma_exec_resource>& resources, std::vector<msd::Buffer*>& buffers,
     std::vector<msd::Semaphore*>& wait_semaphores,

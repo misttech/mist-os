@@ -425,15 +425,15 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void Inspect() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     auto parent = std::make_unique<FakeParentDevice>();
     auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
 
     constexpr uint64_t kClientId = 123456;
-    auto connection = device->Open(kClientId);
+    auto connection = device->MsdOpen(kClientId);
     ASSERT_TRUE(connection);
-    auto hierarchy = inspect::ReadFromVmo(driver->DuplicateInspector()->DuplicateVmo());
+    auto hierarchy = inspect::ReadFromVmo(driver->MsdDuplicateInspector()->DuplicateVmo());
     auto* dev_node = hierarchy.value().GetByPath({"msd-arm-mali", "device"});
     ASSERT_TRUE(dev_node);
     const auto& children = dev_node->children();
@@ -452,7 +452,7 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void MaliProtocol() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     auto parent = std::make_unique<FakeParentDevice>();
     auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
@@ -475,7 +475,7 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void ResetOnStart() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     auto parent = std::make_unique<FakeParentDevice>();
     auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
@@ -485,7 +485,7 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void ProtectedCallbacks() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     ArmMaliServer server;
     server.use_protected_mode_callbacks_ = true;
     libsync::Completion server_completion;

@@ -15,13 +15,13 @@ class CppConnection : public msd::Connection {
 
   ~CppConnection() override;
 
-  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
-                           uint64_t flags) override;
+  magma_status_t MsdMapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset,
+                              uint64_t length, uint64_t flags) override;
 
-  void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
+  void MsdReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
 
-  std::unique_ptr<msd::Context> CreateContext() override;
-  std::unique_ptr<msd::Context> CreateContext2(uint64_t priority) override;
+  std::unique_ptr<msd::Context> MsdCreateContext() override;
+  std::unique_ptr<msd::Context> MsdCreateContext2(uint64_t priority) override;
 
  private:
   struct MsdConnection* connection_;

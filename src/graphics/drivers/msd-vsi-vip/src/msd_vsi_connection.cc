@@ -8,7 +8,7 @@
 #include "msd_vsi_buffer.h"
 #include "msd_vsi_context.h"
 
-std::unique_ptr<msd::Context> MsdVsiAbiConnection::CreateContext() {
+std::unique_ptr<msd::Context> MsdVsiAbiConnection::MsdCreateContext() {
   auto connection = ptr();
 
   auto context =
@@ -20,8 +20,8 @@ std::unique_ptr<msd::Context> MsdVsiAbiConnection::CreateContext() {
   return std::make_unique<MsdVsiAbiContext>(MsdVsiAbiContext(context));
 }
 
-magma_status_t MsdVsiAbiConnection::MapBuffer(msd::Buffer& buff, uint64_t gpu_va, uint64_t offset,
-                                              uint64_t length, uint64_t flags) {
+magma_status_t MsdVsiAbiConnection::MsdMapBuffer(msd::Buffer& buff, uint64_t gpu_va,
+                                                 uint64_t offset, uint64_t length, uint64_t flags) {
   if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length))
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset or length not page aligned");
 
@@ -36,14 +36,14 @@ magma_status_t MsdVsiAbiConnection::MapBuffer(msd::Buffer& buff, uint64_t gpu_va
   return status.get();
 }
 
-void MsdVsiAbiConnection::ReleaseBuffer(msd::Buffer& buff, bool shutting_down) {
+void MsdVsiAbiConnection::MsdReleaseBuffer(msd::Buffer& buff, bool shutting_down) {
   auto connection = ptr().get();
   auto buffer = MsdVsiAbiBuffer::cast(&buff)->ptr();
 
   connection->ReleaseBuffer(buffer->platform_buffer());
 }
 
-magma_status_t MsdVsiAbiConnection::UnmapBuffer(msd::Buffer& buff, uint64_t gpu_va) {
+magma_status_t MsdVsiAbiConnection::MsdUnmapBuffer(msd::Buffer& buff, uint64_t gpu_va) {
   auto connection = ptr().get();
   auto buffer = MsdVsiAbiBuffer::cast(&buff)->ptr();
 
@@ -53,7 +53,7 @@ magma_status_t MsdVsiAbiConnection::UnmapBuffer(msd::Buffer& buff, uint64_t gpu_
   return MAGMA_STATUS_OK;
 }
 
-void MsdVsiAbiConnection::SetNotificationCallback(msd::NotificationHandler* handler) {
+void MsdVsiAbiConnection::MsdSetNotificationCallback(msd::NotificationHandler* handler) {
   ptr()->SetNotificationCallback(handler);
 }
 

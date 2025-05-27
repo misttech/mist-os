@@ -50,11 +50,11 @@ class MsdMockContext : public msd::Context {
   }
   ~MsdMockContext() override;
 
-  magma_status_t ExecuteCommandBufferWithResources(msd::magma_command_buffer* command_buffer,
-                                                   magma_exec_resource* exec_resources,
-                                                   msd::Buffer** buffers,
-                                                   msd::Semaphore** wait_semaphores,
-                                                   msd::Semaphore** signal_semaphores) override {
+  magma_status_t MsdExecuteCommandBufferWithResources(msd::magma_command_buffer* command_buffer,
+                                                      magma_exec_resource* exec_resources,
+                                                      msd::Buffer** buffers,
+                                                      msd::Semaphore** wait_semaphores,
+                                                      msd::Semaphore** signal_semaphores) override {
     last_submitted_exec_resources_.clear();
     for (uint32_t i = 0; i < command_buffer->resource_count; i++) {
       last_submitted_exec_resources_.push_back(MsdMockBuffer::cast(buffers[i]));
@@ -86,42 +86,43 @@ class MsdMockConnection : public msd::Connection {
   MsdMockConnection() { magic_ = kMagic; }
   ~MsdMockConnection() override {}
 
-  std::unique_ptr<msd::Context> CreateContext() override {
+  std::unique_ptr<msd::Context> MsdCreateContext() override {
     return std::make_unique<MsdMockContext>(this);
   }
 
   virtual void DestroyContext(MsdMockContext* ctx) {}
 
-  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
-                           uint64_t flags) override {
+  magma_status_t MsdMapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset,
+                              uint64_t length, uint64_t flags) override {
     return MAGMA_STATUS_OK;
   }
-  magma_status_t UnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override {
+  magma_status_t MsdUnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override {
     return MAGMA_STATUS_OK;
   }
-  magma_status_t BufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
-                               uint64_t length) override {
+  magma_status_t MsdBufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
+                                  uint64_t length) override {
     return MAGMA_STATUS_OK;
   }
-  magma_status_t CreatePerformanceCounterBufferPool(
+  magma_status_t MsdCreatePerformanceCounterBufferPool(
       uint64_t pool_id, std::unique_ptr<msd::PerfCountPool>* pool_out) override;
 
-  magma_status_t ReleasePerformanceCounterBufferPool(
+  magma_status_t MsdReleasePerformanceCounterBufferPool(
       std::unique_ptr<msd::PerfCountPool> pool) override;
 
-  magma_status_t AddPerformanceCounterBufferOffsetToPool(msd::PerfCountPool& pool,
-                                                         msd::Buffer& buffer, uint64_t buffer_id,
-                                                         uint64_t buffer_offset,
-                                                         uint64_t buffer_size) override {
+  magma_status_t MsdAddPerformanceCounterBufferOffsetToPool(msd::PerfCountPool& pool,
+                                                            msd::Buffer& buffer, uint64_t buffer_id,
+                                                            uint64_t buffer_offset,
+                                                            uint64_t buffer_size) override {
     return MAGMA_STATUS_OK;
   }
 
-  magma_status_t RemovePerformanceCounterBufferFromPool(msd::PerfCountPool& pool,
-                                                        msd::Buffer& buffer) override {
+  magma_status_t MsdRemovePerformanceCounterBufferFromPool(msd::PerfCountPool& pool,
+                                                           msd::Buffer& buffer) override {
     return MAGMA_STATUS_OK;
   }
 
-  magma_status_t DumpPerformanceCounters(msd::PerfCountPool& pool, uint32_t trigger_id) override {
+  magma_status_t MsdDumpPerformanceCounters(msd::PerfCountPool& pool,
+                                            uint32_t trigger_id) override {
     return MAGMA_STATUS_OK;
   }
 
@@ -146,10 +147,10 @@ class MsdMockDevice : public msd::Device {
   MsdMockDevice() { magic_ = kMagic; }
   ~MsdMockDevice() override = default;
 
-  void SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) override;
-  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) override;
-  std::unique_ptr<msd::Connection> Open(msd::msd_client_id_t client_id) override {
+  void MsdSetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) override;
+  magma_status_t MsdQuery(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
+  magma_status_t MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) override;
+  std::unique_ptr<msd::Connection> MsdOpen(msd::msd_client_id_t client_id) override {
     return std::make_unique<MsdMockConnection>();
   }
 
@@ -175,13 +176,14 @@ class MsdMockDriver : public msd::Driver {
   MsdMockDriver() { magic_ = kMagic; }
   ~MsdMockDriver() override = default;
 
-  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_data) override {
+  std::unique_ptr<msd::Device> MsdCreateDevice(msd::DeviceHandle* device_data) override {
     return std::make_unique<MsdMockDevice>();
   }
 
-  std::unique_ptr<msd::Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) override;
-  magma_status_t ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                 std::unique_ptr<msd::Semaphore>* out) override;
+  std::unique_ptr<msd::Buffer> MsdImportBuffer(zx::vmo vmo, uint64_t client_id) override;
+
+  magma_status_t MsdImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
+                                    std::unique_ptr<msd::Semaphore>* out) override;
 
   static MsdMockDriver* cast(Driver* drv) {
     MAGMA_DASSERT(drv);

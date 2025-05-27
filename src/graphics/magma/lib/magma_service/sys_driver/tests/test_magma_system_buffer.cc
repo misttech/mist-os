@@ -38,10 +38,10 @@ TEST(MagmaSystemBuffer, Create) {
   auto bufmgr = static_cast<MsdMockBufferManager_Create*>(scoped_bufmgr.get());
 
   auto msd_drv = std::make_unique<MsdMockDriver>();
-  auto msd_dev = msd_drv->CreateDevice(nullptr);
+  auto msd_dev = msd_drv->MsdCreateDevice(nullptr);
   auto msd_dev_ptr = msd_dev.get();
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
-  auto msd_connection = msd_dev_ptr->Open(0);
+  auto msd_connection = msd_dev_ptr->MsdOpen(0);
   ASSERT_NE(msd_connection, nullptr);
   auto connection = std::unique_ptr<MagmaSystemConnection>(
       new MagmaSystemConnection(dev.get(), std::move(msd_connection)));

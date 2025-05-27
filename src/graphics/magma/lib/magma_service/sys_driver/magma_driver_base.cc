@@ -215,7 +215,7 @@ zx::result<> MagmaDriverBase::CreateDevfsNode() {
 
 void MagmaDriverBase::InitializeInspector() {
   std::lock_guard lock(magma_->magma_mutex);
-  auto inspector = magma_driver()->DuplicateInspector();
+  auto inspector = magma_driver()->MsdDuplicateInspector();
   if (inspector) {
     InitInspectorExactlyOnce(inspector.value());
   }

@@ -149,7 +149,7 @@ void MsdIntelDevice::Destroy() {
   interrupt_manager_.reset();
 }
 
-std::unique_ptr<msd::Connection> MsdIntelDevice::Open(msd::msd_client_id_t client_id) {
+std::unique_ptr<msd::Connection> MsdIntelDevice::MsdOpen(msd::msd_client_id_t client_id) {
   return std::make_unique<MsdIntelAbiConnection>(MsdIntelConnection::Create(this, client_id));
 }
 
@@ -1169,8 +1169,8 @@ magma::Status MsdIntelDevice::ProcessTimestampRequest(
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-magma_status_t MsdIntelDevice::Query(uint64_t id, zx::vmo* result_buffer_out,
-                                     uint64_t* result_out) {
+magma_status_t MsdIntelDevice::MsdQuery(uint64_t id, zx::vmo* result_buffer_out,
+                                        uint64_t* result_out) {
   switch (id) {
     case MAGMA_QUERY_VENDOR_ID:
       *result_out = MAGMA_VENDOR_ID_INTEL;
@@ -1279,9 +1279,9 @@ void MsdIntelDevice::CheckEngines() {
   }
 }
 
-void MsdIntelDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
+void MsdIntelDevice::MsdDumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
-magma_status_t MsdIntelDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
+magma_status_t MsdIntelDevice::MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   const char* kSuffixes[] = {"_test", ""};
   constexpr uint32_t kMediaIcdCount = 1;
   constexpr uint32_t kTotalIcdCount = std::size(kSuffixes) + kMediaIcdCount;

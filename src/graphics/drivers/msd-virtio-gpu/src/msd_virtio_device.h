@@ -16,8 +16,8 @@ class MsdVirtioDevice : public msd::Device {
  public:
   explicit MsdVirtioDevice(VirtioGpuControl* control);
 
-  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) override;
+  magma_status_t MsdQuery(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
+  magma_status_t MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) override;
 
   zx::result<zx::vmo> GetCapset(uint32_t capset_id, uint32_t capset_version);
 

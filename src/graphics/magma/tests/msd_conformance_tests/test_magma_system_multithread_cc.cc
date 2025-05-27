@@ -49,12 +49,12 @@ class TestMultithread {
 
   void ConnectionThreadLoop(uint32_t num_iterations) {
     auto connection =
-        std::make_unique<MagmaSystemConnection>(device_.get(), device_->msd_dev()->Open(0));
+        std::make_unique<MagmaSystemConnection>(device_.get(), device_->msd_dev()->MsdOpen(0));
     ASSERT_NE(connection, nullptr);
 
     uint64_t extra_page_count;
-    EXPECT_EQ(MAGMA_STATUS_OK, device_->msd_dev()->Query(kMagmaIntelGenQueryExtraPageCount, nullptr,
-                                                         &extra_page_count));
+    EXPECT_EQ(MAGMA_STATUS_OK, device_->msd_dev()->MsdQuery(kMagmaIntelGenQueryExtraPageCount,
+                                                            nullptr, &extra_page_count));
 
     uint32_t context_id = ++context_id_;
     EXPECT_TRUE(connection->CreateContext(context_id));
@@ -117,11 +117,11 @@ class TestMultithread {
 };
 
 TEST(MagmaSystem, Multithread) {
-  auto driver = msd::Driver::Create();
+  auto driver = msd::Driver::MsdCreate();
   ASSERT_TRUE(driver);
 
   auto device =
-      msd::MagmaSystemDevice::Create(driver.get(), driver->CreateDevice(GetTestDeviceHandle()));
+      msd::MagmaSystemDevice::Create(driver.get(), driver->MsdCreateDevice(GetTestDeviceHandle()));
   ASSERT_TRUE(device);
 
   uint64_t vendor_id;

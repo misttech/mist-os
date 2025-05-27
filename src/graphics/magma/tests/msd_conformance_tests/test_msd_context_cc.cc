@@ -8,16 +8,16 @@
 #include <gtest/gtest.h>
 
 TEST(MsdContext, CreateAndDestroy) {
-  auto msd_driver = msd::Driver::Create();
+  auto msd_driver = msd::Driver::MsdCreate();
   ASSERT_NE(msd_driver, nullptr);
 
-  auto msd_device = msd_driver->CreateDevice(GetTestDeviceHandle());
+  auto msd_device = msd_driver->MsdCreateDevice(GetTestDeviceHandle());
   ASSERT_NE(msd_device, nullptr);
 
-  auto msd_connection = msd_device->Open(0);
+  auto msd_connection = msd_device->MsdOpen(0);
   ASSERT_NE(msd_connection, nullptr);
 
-  auto msd_context = msd_connection->CreateContext();
+  auto msd_context = msd_connection->MsdCreateContext();
   EXPECT_NE(msd_context, nullptr);
 
   msd_context.reset();

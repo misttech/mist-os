@@ -11,7 +11,7 @@ namespace msd {
 class TestMagmaDriver {
  public:
   static void CreateAndDestroy() {
-    auto driver = msd::Driver::Create();
+    auto driver = msd::Driver::MsdCreate();
     EXPECT_NE(nullptr, driver);
   }
 };

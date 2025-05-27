@@ -17,26 +17,31 @@
 class CommandBufferHelper final : public msd::NotificationHandler {
  public:
   static std::unique_ptr<CommandBufferHelper> Create() {
-    auto msd_drv = msd::Driver::Create();
+    auto msd_drv = msd::Driver::MsdCreate();
     if (!msd_drv)
       return MAGMA_DRETP(nullptr, "failed to create msd driver");
 
-    msd_drv->Configure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
+    msd_drv->MsdConfigure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
 
-    auto msd_dev = msd_drv->CreateDevice(GetTestDeviceHandle());
+    auto msd_dev = msd_drv->MsdCreateDevice(GetTestDeviceHandle());
     if (!msd_dev)
       return MAGMA_DRETP(nullptr, "failed to create msd device");
+
     auto dev = std::unique_ptr<msd::MagmaSystemDevice>(
         msd::MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev)));
+
     uint32_t ctx_id = 0;
-    auto msd_connection = dev->msd_dev()->Open(0);
+    auto msd_connection = dev->msd_dev()->MsdOpen(0);
     if (!msd_connection)
       return MAGMA_DRETP(nullptr, "msd_device_open failed");
+
     auto connection = std::unique_ptr<msd::MagmaSystemConnection>(
         new msd::MagmaSystemConnection(dev.get(), std::move(msd_connection)));
     if (!connection)
       return MAGMA_DRETP(nullptr, "failed to connect to msd device");
+
     connection->CreateContext(ctx_id);
+
     auto ctx = connection->LookupContext(ctx_id);
     if (!ctx)
       return MAGMA_DRETP(nullptr, "failed to create context");

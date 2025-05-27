@@ -50,7 +50,7 @@ class NpuDevice : public msd::MagmaDriverBase {
 
 zx::result<> NpuDevice::MagmaStart() {
   std::lock_guard lock(magma_mutex());
-  set_magma_driver(msd::Driver::Create());
+  set_magma_driver(msd::Driver::MsdCreate());
   if (!magma_driver()) {
     DMESSAGE("Failed to create MagmaDriver");
     return zx::error(ZX_ERR_INTERNAL);
@@ -69,7 +69,7 @@ zx::result<> NpuDevice::MagmaStart() {
 
   set_magma_system_device(msd::MagmaSystemDevice::Create(
       magma_driver(),
-      magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&parent_))));
+      magma_driver()->MsdCreateDevice(reinterpret_cast<msd::DeviceHandle*>(&parent_))));
   if (!magma_system_device()) {
     MAGMA_LOG(ERROR, "Failed to create device");
     return zx::error(ZX_ERR_NO_RESOURCES);

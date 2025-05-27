@@ -55,11 +55,18 @@ class MsdArmDevice : public msd::Device,
   virtual ~MsdArmDevice();
 
   // msd::Device impl.
-  void SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) override;
-  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) override;
-  void DumpStatus(uint32_t dump_flags) override;
-  std::unique_ptr<msd::Connection> Open(msd::msd_client_id_t client_id) override;
+  void MsdSetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) override;
+  magma_status_t MsdQuery(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
+  magma_status_t MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) override;
+  void MsdDumpStatus(uint32_t dump_flags) override;
+  std::unique_ptr<msd::Connection> MsdOpen(msd::msd_client_id_t client_id) override;
+  void MsdSetPowerState(int64_t power_state,
+                        fit::callback<void(magma_status_t)> completer) override {
+    auto power_state_callback = [completer = std::move(completer)](bool) mutable {
+      completer(MAGMA_STATUS_OK);
+    };
+    PostPowerStateChange(power_state != 0, std::move(power_state_callback));
+  }
 
   void set_inspect(inspect::Node node) { inspect_ = std::move(node); }
 
@@ -167,15 +174,8 @@ class MsdArmDevice : public msd::Device,
   // PowerManager::Owner implementation
   void ReportPowerChangeComplete(bool powered_on, bool success) override;
 
-  // msd::Device implementation.
   magma_status_t QueryInfo(uint64_t id, uint64_t* value_out);
   magma_status_t QueryReturnsBuffer(uint64_t id, uint32_t* buffer_out);
-  void SetPowerState(int64_t power_state, fit::callback<void(magma_status_t)> completer) override {
-    auto power_state_callback = [completer = std::move(completer)](bool) mutable {
-      completer(MAGMA_STATUS_OK);
-    };
-    PostPowerStateChange(power_state != 0, std::move(power_state_callback));
-  }
 
   // PerformanceCounters::Owner implementation.
   AddressManager* address_manager() override { return address_manager_.get(); }

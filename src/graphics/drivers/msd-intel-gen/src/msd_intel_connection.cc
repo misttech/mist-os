@@ -227,8 +227,9 @@ std::unique_ptr<MsdIntelConnection> MsdIntelConnection::Create(Owner* owner,
       new MsdIntelConnection(owner, PerProcessGtt::Create(owner), client_id));
 }
 
-magma_status_t MsdIntelAbiConnection::MapBuffer(msd::Buffer& msd_buffer, uint64_t gpu_addr,
-                                                uint64_t offset, uint64_t length, uint64_t flags) {
+magma_status_t MsdIntelAbiConnection::MsdMapBuffer(msd::Buffer& msd_buffer, uint64_t gpu_addr,
+                                                   uint64_t offset, uint64_t length,
+                                                   uint64_t flags) {
   if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length))
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset or length not page aligned");
 
@@ -241,14 +242,14 @@ magma_status_t MsdIntelAbiConnection::MapBuffer(msd::Buffer& msd_buffer, uint64_
   return status.get();
 }
 
-void MsdIntelAbiConnection::ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) {
+void MsdIntelAbiConnection::MsdReleaseBuffer(msd::Buffer& buffer, bool shutting_down) {
   ptr()->ReleaseBuffer(static_cast<MsdIntelAbiBuffer*>(&buffer)->ptr()->platform_buffer());
 }
 
-void MsdIntelAbiConnection::SetNotificationCallback(msd::NotificationHandler* handler) {
+void MsdIntelAbiConnection::MsdSetNotificationCallback(msd::NotificationHandler* handler) {
   ptr()->SetNotificationCallback(handler);
 }
 
-std::unique_ptr<msd::Context> MsdIntelAbiConnection::CreateContext() {
+std::unique_ptr<msd::Context> MsdIntelAbiConnection::MsdCreateContext() {
   return std::make_unique<MsdIntelAbiContext>(MsdIntelConnection::CreateContext(ptr()));
 }

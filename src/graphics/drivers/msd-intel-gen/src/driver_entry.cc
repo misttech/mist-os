@@ -56,7 +56,7 @@ zx::result<> IntelDevice::MagmaStart() {
   }
 
   std::lock_guard lock(magma_mutex());
-  set_magma_driver(msd::Driver::Create());
+  set_magma_driver(msd::Driver::MsdCreate());
   if (!magma_driver()) {
     DMESSAGE("Failed to create MagmaDriver");
     return zx::error(ZX_ERR_INTERNAL);
@@ -85,7 +85,7 @@ zx::result<> IntelDevice::MagmaStart() {
 
   set_magma_system_device(msd::MagmaSystemDevice::Create(
       magma_driver(),
-      magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&gpu_core_protocol_))));
+      magma_driver()->MsdCreateDevice(reinterpret_cast<msd::DeviceHandle*>(&gpu_core_protocol_))));
   if (!magma_system_device()) {
     MAGMA_LOG(ERROR, "Failed to create device");
     return zx::error(ZX_ERR_NO_RESOURCES);

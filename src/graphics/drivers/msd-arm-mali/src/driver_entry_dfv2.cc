@@ -47,7 +47,7 @@ class MaliDriver : public msd::MagmaDriverBase {
 
     std::lock_guard lock(magma_mutex());
 
-    set_magma_driver(msd::Driver::Create());
+    set_magma_driver(msd::Driver::MsdCreate());
     if (!magma_driver()) {
       DMESSAGE("Failed to create MagmaDriver");
       return zx::error(ZX_ERR_INTERNAL);
@@ -65,7 +65,7 @@ class MaliDriver : public msd::MagmaDriverBase {
 #endif
 
     set_magma_system_device(msd::MagmaSystemDevice::Create(
-        magma_driver(), magma_driver()->CreateDevice(parent_device_->ToDeviceHandle())));
+        magma_driver(), magma_driver()->MsdCreateDevice(parent_device_->ToDeviceHandle())));
     if (!magma_system_device()) {
       DMESSAGE("Failed to create MagmaSystemDevice");
       return zx::error(ZX_ERR_INTERNAL);

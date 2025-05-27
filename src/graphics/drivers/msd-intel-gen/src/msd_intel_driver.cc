@@ -11,7 +11,7 @@
 #include "msd_intel_device.h"
 #include "msd_intel_semaphore.h"
 
-std::unique_ptr<msd::Device> MsdIntelDriver::CreateDevice(msd::DeviceHandle* device_handle) {
+std::unique_ptr<msd::Device> MsdIntelDriver::MsdCreateDevice(msd::DeviceHandle* device_handle) {
   bool start_device_thread = (configure_flags() & MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD) == 0;
 
   std::unique_ptr<MsdIntelDevice> device =
@@ -23,7 +23,7 @@ std::unique_ptr<msd::Device> MsdIntelDriver::CreateDevice(msd::DeviceHandle* dev
   return device;
 }
 
-std::unique_ptr<msd::Buffer> MsdIntelDriver::ImportBuffer(zx::vmo vmo, uint64_t client_id) {
+std::unique_ptr<msd::Buffer> MsdIntelDriver::MsdImportBuffer(zx::vmo vmo, uint64_t client_id) {
   auto buffer = MsdIntelBuffer::Import(std::move(vmo), client_id);
   if (!buffer)
     return DRETP(nullptr, "MsdIntelBuffer::Import failed");
@@ -31,9 +31,9 @@ std::unique_ptr<msd::Buffer> MsdIntelDriver::ImportBuffer(zx::vmo vmo, uint64_t 
   return std::make_unique<MsdIntelAbiBuffer>(std::move(buffer));
 }
 
-magma_status_t MsdIntelDriver::ImportSemaphore(zx::handle handle, uint64_t client_id,
-                                               uint64_t flags,
-                                               std::unique_ptr<msd::Semaphore>* semaphore_out) {
+magma_status_t MsdIntelDriver::MsdImportSemaphore(zx::handle handle, uint64_t client_id,
+                                                  uint64_t flags,
+                                                  std::unique_ptr<msd::Semaphore>* semaphore_out) {
   auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
   if (!semaphore)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import handle");
@@ -47,4 +47,4 @@ magma_status_t MsdIntelDriver::ImportSemaphore(zx::handle handle, uint64_t clien
 }
 
 // static
-std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdIntelDriver>(); }
+std::unique_ptr<msd::Driver> msd::Driver::MsdCreate() { return std::make_unique<MsdIntelDriver>(); }

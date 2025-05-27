@@ -44,5 +44,6 @@ TEST(TestQuery, CapabilitySet) {
 
   zx::vmo buffer;
   uint64_t* simple_result_ptr = nullptr;
-  EXPECT_EQ(MAGMA_STATUS_OK, device.Query(kMagmaVirtioGpuQueryCapset, &buffer, simple_result_ptr));
+  EXPECT_EQ(MAGMA_STATUS_OK,
+            device.MsdQuery(kMagmaVirtioGpuQueryCapset, &buffer, simple_result_ptr));
 }

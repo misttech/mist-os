@@ -25,9 +25,9 @@ class MsdMockConnection_ContextManagement : public MsdMockConnection {
  public:
   MsdMockConnection_ContextManagement() {}
 
-  std::unique_ptr<msd::Context> CreateContext() override {
+  std::unique_ptr<msd::Context> MsdCreateContext() override {
     active_context_count_++;
-    return MsdMockConnection::CreateContext();
+    return MsdMockConnection::MsdCreateContext();
   }
 
   void DestroyContext(MsdMockContext* ctx) override {
@@ -49,9 +49,9 @@ class MsdMockConnection_BufferManagement : public MsdMockConnection {
       : active_context_count_(std::move(active_context_count)),
         buffer_release_tracker_(std::move(buffer_release_tracker)) {}
 
-  std::unique_ptr<msd::Context> CreateContext() override {
+  std::unique_ptr<msd::Context> MsdCreateContext() override {
     (*active_context_count_)++;
-    return MsdMockConnection::CreateContext();
+    return MsdMockConnection::MsdCreateContext();
   }
 
   void DestroyContext(MsdMockContext* ctx) override {
@@ -59,9 +59,9 @@ class MsdMockConnection_BufferManagement : public MsdMockConnection {
     MsdMockConnection::DestroyContext(ctx);
   }
 
-  void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override {
+  void MsdReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override {
     buffer_release_tracker_->push_back(shutting_down);
-    MsdMockConnection::ReleaseBuffer(buffer, shutting_down);
+    MsdMockConnection::MsdReleaseBuffer(buffer, shutting_down);
   }
 
  private:
@@ -117,7 +117,7 @@ TEST(MagmaSystemConnection, ContextManagement) {
 TEST(MagmaSystemConnection, BufferManagement) {
   auto msd_drv = std::make_unique<MsdMockDriver>();
   auto msd_dev = std::make_unique<MsdMockDevice>();
-  auto msd_connection = msd_dev->Open(0);
+  auto msd_connection = msd_dev->MsdOpen(0);
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
   ASSERT_NE(msd_connection, nullptr);
   MagmaSystemConnection connection(dev.get(), std::move(msd_connection));
@@ -199,7 +199,7 @@ TEST(MagmaSystemConnection, Shutdown) {
 TEST(MagmaSystemConnection, Semaphores) {
   auto msd_drv = std::make_unique<MsdMockDriver>();
   auto msd_dev = std::make_unique<MsdMockDevice>();
-  auto msd_connection = msd_dev->Open(0);
+  auto msd_connection = msd_dev->MsdOpen(0);
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
   ASSERT_TRUE(msd_connection);
   MagmaSystemConnection connection(dev.get(), std::move(msd_connection));
@@ -242,7 +242,7 @@ TEST(MagmaSystemConnection, Semaphores) {
 TEST(MagmaSystemConnection, BadSemaphoreImport) {
   auto msd_drv = std::make_unique<MsdMockDriver>();
   auto msd_dev = std::make_unique<MsdMockDevice>();
-  auto msd_connection = msd_dev->Open(0);
+  auto msd_connection = msd_dev->MsdOpen(0);
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
   ASSERT_NE(msd_connection, nullptr);
   MagmaSystemConnection connection(dev.get(), std::move(msd_connection));
@@ -255,8 +255,8 @@ TEST(MagmaSystemConnection, BadSemaphoreImport) {
 TEST(MagmaSystemConnection, BufferSharing) {
   auto msd_drv = std::make_unique<MsdMockDriver>();
   auto msd_dev = std::make_unique<MsdMockDevice>();
-  auto msd_connection_0 = msd_dev->Open(0);
-  auto msd_connection_1 = msd_dev->Open(1);
+  auto msd_connection_0 = msd_dev->MsdOpen(0);
+  auto msd_connection_1 = msd_dev->MsdOpen(1);
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
   ASSERT_NE(msd_connection_0, nullptr);
   MagmaSystemConnection connection_0(dev.get(), std::move(msd_connection_0));
@@ -300,7 +300,7 @@ TEST(MagmaSystemConnection, BufferSharing) {
 TEST(MagmaSystemConnection, BadBufferImport) {
   auto msd_drv = std::make_unique<MsdMockDriver>();
   auto msd_dev = std::make_unique<MsdMockDevice>();
-  auto msd_connection = msd_dev->Open(0);
+  auto msd_connection = msd_dev->MsdOpen(0);
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
   ASSERT_NE(msd_connection, nullptr);
   MagmaSystemConnection connection(dev.get(), std::move(msd_connection));
@@ -325,7 +325,7 @@ TEST(MagmaSystemConnection, BadBufferImport) {
 TEST(MagmaSystemConnection, MapBufferGpu) {
   auto msd_drv = std::make_unique<MsdMockDriver>();
   auto msd_dev = std::make_unique<MsdMockDevice>();
-  auto msd_connection = msd_dev->Open(0);
+  auto msd_connection = msd_dev->MsdOpen(0);
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
   ASSERT_NE(msd_connection, nullptr);
   MagmaSystemConnection connection(dev.get(), std::move(msd_connection));
@@ -368,7 +368,7 @@ TEST(MagmaSystemConnection, MapBufferGpu) {
 TEST(MagmaSystemConnection, PerformanceCounters) {
   auto msd_drv = std::make_unique<MsdMockDriver>();
   auto msd_dev = std::make_unique<MsdMockDevice>();
-  auto msd_connection = msd_dev->Open(0);
+  auto msd_connection = msd_dev->MsdOpen(0);
   auto dev = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
   ASSERT_NE(msd_connection, nullptr);
   MagmaSystemConnection connection(dev.get(), std::move(msd_connection));

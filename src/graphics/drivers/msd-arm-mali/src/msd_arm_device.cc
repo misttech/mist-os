@@ -434,7 +434,7 @@ std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd::msd_clien
   return connection;
 }
 
-std::unique_ptr<msd::Connection> MsdArmDevice::Open(msd::msd_client_id_t client_id) {
+std::unique_ptr<msd::Connection> MsdArmDevice::MsdOpen(msd::msd_client_id_t client_id) {
   return std::make_unique<MsdArmAbiConnection>(OpenArmConnection(client_id));
 }
 
@@ -445,7 +445,7 @@ void MsdArmDevice::DeregisterConnection() {
                          connection_list_.end());
 }
 
-void MsdArmDevice::SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) {
+void MsdArmDevice::MsdSetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) {
   {
     std::lock_guard<std::mutex> lock(connection_list_mutex_);
     current_memory_pressure_level_ = level;
@@ -1773,7 +1773,8 @@ void MsdArmDevice::AppendInspectEvent(InspectEvent event) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
+magma_status_t MsdArmDevice::MsdQuery(uint64_t id, zx::vmo* result_buffer_out,
+                                      uint64_t* result_out) {
   uint32_t result_buffer;
   magma_status_t status = QueryReturnsBuffer(id, &result_buffer);
   *result_buffer_out = zx::vmo(result_buffer);
@@ -1818,9 +1819,9 @@ void MsdArmDevice::PostPowerStateChange(bool enabled, PowerStateCallback complet
       });
 }
 
-void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
+void MsdArmDevice::MsdDumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
-magma_status_t MsdArmDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
+magma_status_t MsdArmDevice::MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   struct variant {
     const char* suffix;
     const char* url;

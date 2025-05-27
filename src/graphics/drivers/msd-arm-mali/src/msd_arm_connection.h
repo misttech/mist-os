@@ -241,34 +241,34 @@ class MsdArmAbiConnection : public msd::Connection {
     magic_ = kMagic;
   }
 
-  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
-                           uint64_t flags) override;
-  magma_status_t UnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override;
-  magma_status_t BufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
-                               uint64_t length) override;
-  void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
+  magma_status_t MsdMapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset,
+                              uint64_t length, uint64_t flags) override;
+  magma_status_t MsdUnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override;
+  magma_status_t MsdBufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
+                                  uint64_t length) override;
+  void MsdReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
 
-  void SetNotificationCallback(msd::NotificationHandler* handler) override;
-  std::unique_ptr<msd::Context> CreateContext() override;
+  void MsdSetNotificationCallback(msd::NotificationHandler* handler) override;
+  std::unique_ptr<msd::Context> MsdCreateContext() override;
 
-  magma_status_t EnablePerformanceCounters(cpp20::span<const uint64_t> counters) override;
+  magma_status_t MsdEnablePerformanceCounters(cpp20::span<const uint64_t> counters) override;
 
-  magma_status_t CreatePerformanceCounterBufferPool(
+  magma_status_t MsdCreatePerformanceCounterBufferPool(
       uint64_t pool_id, std::unique_ptr<msd::PerfCountPool>* pool_out) override;
-  magma_status_t ReleasePerformanceCounterBufferPool(
+  magma_status_t MsdReleasePerformanceCounterBufferPool(
       std::unique_ptr<msd::PerfCountPool> pool) override;
 
-  magma_status_t AddPerformanceCounterBufferOffsetToPool(msd::PerfCountPool& pool,
-                                                         msd::Buffer& buffer, uint64_t buffer_id,
-                                                         uint64_t buffer_offset,
-                                                         uint64_t buffer_size) override;
+  magma_status_t MsdAddPerformanceCounterBufferOffsetToPool(msd::PerfCountPool& pool,
+                                                            msd::Buffer& buffer, uint64_t buffer_id,
+                                                            uint64_t buffer_offset,
+                                                            uint64_t buffer_size) override;
 
-  magma_status_t RemovePerformanceCounterBufferFromPool(msd::PerfCountPool& pool,
-                                                        msd::Buffer& buffer) override;
+  magma_status_t MsdRemovePerformanceCounterBufferFromPool(msd::PerfCountPool& pool,
+                                                           msd::Buffer& buffer) override;
 
-  magma_status_t DumpPerformanceCounters(msd::PerfCountPool& pool, uint32_t trigger_id) override;
+  magma_status_t MsdDumpPerformanceCounters(msd::PerfCountPool& pool, uint32_t trigger_id) override;
 
-  magma_status_t ClearPerformanceCounters(cpp20::span<const uint64_t> counters) override;
+  magma_status_t MsdClearPerformanceCounters(cpp20::span<const uint64_t> counters) override;
 
   std::shared_ptr<MsdArmConnection> ptr() { return ptr_; }
 
