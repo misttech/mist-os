@@ -502,6 +502,7 @@ pub trait BpfVisitor {
         width: DataWidth,
     ) -> Result<(), String>;
 
+    #[inline(always)]
     fn visit<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
