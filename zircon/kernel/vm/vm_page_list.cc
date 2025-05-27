@@ -1260,16 +1260,20 @@ VmPageSpliceList& VmPageSpliceList::operator=(VmPageSpliceList&& other) {
 VmPageSpliceList::~VmPageSpliceList() { FreeAllPages(); }
 
 // static
-VmPageSpliceList VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t length,
-                                                      list_node* pages) {
+zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
+                                                 VmPageSpliceList* splice) {
   // TODO(https://fxbug.dev/42170136): This method needs coverage in vmpl_unittests.
   DEBUG_ASSERT(pages);
   DEBUG_ASSERT(list_length(pages) == length / PAGE_SIZE);
-  VmPageSpliceList res(offset, length, 0);
-  DEBUG_ASSERT(list_is_empty(&res.raw_pages_));
-  list_move(pages, &res.raw_pages_);
-  res.Finalize();
-  return res;
+  *splice = VmPageSpliceList(offset, length, 0);
+  while (vm_page_t* page = list_remove_head_type(pages, vm_page_t, queue_node)) {
+    zx_status_t status = splice->Append(VmPageOrMarker::Page(page));
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+  splice->Finalize();
+  return ZX_OK;
 }
 
 void VmPageSpliceList::FreeAllPages() {
@@ -1293,14 +1297,13 @@ void VmPageSpliceList::Finalize() {
 }
 
 bool VmPageSpliceList::IsEmpty() const {
-  return head_.IsEmpty() && tail_.IsEmpty() && middle_.is_empty() && list_is_empty(&raw_pages_);
+  return head_.IsEmpty() && tail_.IsEmpty() && middle_.is_empty();
 }
 
 zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
   ASSERT(pos_ < length_);
   ASSERT(!IsFinalized());
   ASSERT(!content.IsInterval());
-  ASSERT(list_is_empty(&raw_pages_));
 
   const uint64_t cur_offset = offset_ + pos_;
   const uint64_t node_idx = NodeIndex(cur_offset);
@@ -1354,9 +1357,6 @@ VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
     DEBUG_ASSERT_MSG(false, "peeked at fully processed splice list");
     return VmPageOrMarkerRef(nullptr);
   }
-  if (!list_is_empty(&raw_pages_)) {
-    return VmPageOrMarkerRef(nullptr);
-  }
 
   const uint64_t cur_offset = offset_ + pos_;
   const auto cur_node_idx = NodeIndex(cur_offset);
@@ -1396,31 +1396,24 @@ VmPageOrMarker VmPageSpliceList::Pop() {
   }
 
   VmPageOrMarker res;
-  if (!list_is_empty(&raw_pages_)) {
-    // TODO(https://fxbug.dev/42170136): This path and CreateFromPageList() need coverage in
-    // vmpl_unittests.
-    vm_page_t* head = list_remove_head_type(&raw_pages_, vm_page, queue_node);
-    res = VmPageOrMarker::Page(head);
-  } else {
-    const uint64_t cur_offset = offset_ + pos_;
-    const auto cur_node_idx = NodeIndex(cur_offset);
-    const auto cur_node_offset = NodeOffset(cur_offset);
+  const uint64_t cur_offset = offset_ + pos_;
+  const auto cur_node_idx = NodeIndex(cur_offset);
+  const auto cur_node_offset = NodeOffset(cur_offset);
 
-    if (NodeIndex(offset_) != 0 && NodeOffset(offset_) == cur_node_offset) {
-      // If the original offset means that pages were placed in head_
-      // and the current offset points to the same node, look there.
-      res = ktl::move(head_.Lookup(cur_node_idx));
-    } else if (cur_node_offset != NodeOffset(offset_ + length_)) {
-      // If the current offset isn't pointing to the tail node,
-      // look in the middle tree.
-      auto middle_node = middle_.find(cur_node_offset);
-      if (middle_node.IsValid()) {
-        res = ktl::move(middle_node->Lookup(cur_node_idx));
-      }
-    } else {
-      // If none of the other cases, we're in the tail_.
-      res = ktl::move(tail_.Lookup(cur_node_idx));
+  if (NodeIndex(offset_) != 0 && NodeOffset(offset_) == cur_node_offset) {
+    // If the original offset means that pages were placed in head_
+    // and the current offset points to the same node, look there.
+    res = ktl::move(head_.Lookup(cur_node_idx));
+  } else if (cur_node_offset != NodeOffset(offset_ + length_)) {
+    // If the current offset isn't pointing to the tail node,
+    // look in the middle tree.
+    auto middle_node = middle_.find(cur_node_offset);
+    if (middle_node.IsValid()) {
+      res = ktl::move(middle_node->Lookup(cur_node_idx));
     }
+  } else {
+    // If none of the other cases, we're in the tail_.
+    res = ktl::move(tail_.Lookup(cur_node_idx));
   }
   DEBUG_ASSERT(!res.IsInterval());
 

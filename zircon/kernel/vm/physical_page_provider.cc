@@ -379,10 +379,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
       uint64_t supply_offset =
           list_peek_head_type(&contiguous_pages, vm_page_t, queue_node)->paddr() - phys_base_;
 
-      auto splice_list =
-          VmPageSpliceList::CreateFromPageList(supply_offset, supply_length, &contiguous_pages);
-      DEBUG_ASSERT(list_is_empty(&contiguous_pages));
-      uint64_t supplied_len = 0;
+      VmPageSpliceList splice_list;
 
       // Any pages that do not get supplied for any reason, due to failures from supply or because
       // we got detached, should be re-loaned.
@@ -399,6 +396,19 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
           Pmm::Node().BeginLoan(&contiguous_pages);
         }
       });
+
+      zx_status_t status = VmPageSpliceList::CreateFromPageList(supply_offset, supply_length,
+                                                                &contiguous_pages, &splice_list);
+      if (status != ZX_OK) {
+        // Only possible error is out of memory.
+        ASSERT(status == ZX_ERR_NO_MEMORY);
+        DEBUG_ASSERT(PageSource::IsValidInternalFailureCode(status));
+        page_source_->OnPagesFailed(supply_offset, supply_length, status);
+        // Do not attempt to then supply the pages, move to the next range.
+        continue;
+      }
+      DEBUG_ASSERT(list_is_empty(&contiguous_pages));
+      uint64_t supplied_len = 0;
 
       // First take the VMO lock before taking our lock to ensure lock ordering is correct. As we
       // hold a RefPtr we know that even if racing with OnClose this is a valid object.

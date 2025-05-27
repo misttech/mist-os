@@ -801,7 +801,8 @@ class VmPageSpliceList final {
 
   // For use by PhysicalPageProvider.  The user-pager path doesn't use this. This returns a
   // finalized list.
-  static VmPageSpliceList CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages);
+  static zx_status_t CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
+                                        VmPageSpliceList* splice);
 
   // Pops the next page off of the splice list. It is invalid to pop a page from a non-finalized
   // splice list.
@@ -813,7 +814,6 @@ class VmPageSpliceList final {
 
   // Appends `content` to the end of the splice list.
   // The splice list takes ownership of `content` after this call.
-  // Note that this method does not work when raw_pages_ is in use.
   // It is invalid to append to a finalized splice list.
   zx_status_t Append(VmPageOrMarker content);
 
@@ -856,11 +856,6 @@ class VmPageSpliceList final {
   VmPageListNode head_ = VmPageListNode(0);
   fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>> middle_;
   VmPageListNode tail_ = VmPageListNode(0);
-
-  // To avoid the possibility of allocation failure, we don't use head_, middle_, tail_ for
-  // CreateFromPageList().  With CreateFromPageList() we know that all the pages are present, so
-  // we can just keep a list of pages, and create VmPageListNode on the stack as pages are Pop()ed.
-  list_node raw_pages_ = LIST_INITIAL_VALUE(raw_pages_);
 
   friend VmPageList;
 };
