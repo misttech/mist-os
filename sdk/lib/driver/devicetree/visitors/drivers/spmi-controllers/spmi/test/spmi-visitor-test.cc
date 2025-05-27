@@ -116,7 +116,12 @@ TEST(SpmiVisitorTest, TwoControllers) {
   ASSERT_TRUE(pbus_node_0);
 
   ASSERT_TRUE(pbus_node_0->metadata());
-  ASSERT_EQ(pbus_node_0->metadata()->size(), 1u);
+  ASSERT_EQ(pbus_node_0->metadata()->size(), 2u);
+
+  ASSERT_TRUE((*pbus_node_0->metadata())[1].id());
+  EXPECT_EQ(*(*pbus_node_0->metadata())[1].id(),
+            fuchsia_hardware_spmi::ControllerInfo::kSerializableName);
+  ASSERT_EQ((*pbus_node_0->metadata())[0].data(), (*pbus_node_0->metadata())[1].data());
 
   ASSERT_TRUE((*pbus_node_0->metadata())[0].id());
   EXPECT_EQ(*(*pbus_node_0->metadata())[0].id(),
@@ -226,7 +231,12 @@ TEST(SpmiVisitorTest, TwoControllers) {
   ASSERT_TRUE(pbus_node_1);
 
   ASSERT_TRUE(pbus_node_1->metadata());
-  ASSERT_EQ(pbus_node_1->metadata()->size(), 1u);
+  ASSERT_EQ(pbus_node_1->metadata()->size(), 2u);
+
+  ASSERT_TRUE((*pbus_node_1->metadata())[1].id());
+  EXPECT_EQ(*(*pbus_node_1->metadata())[1].id(),
+            fuchsia_hardware_spmi::ControllerInfo::kSerializableName);
+  ASSERT_EQ((*pbus_node_1->metadata())[0].data(), (*pbus_node_1->metadata())[1].data());
 
   ASSERT_TRUE((*pbus_node_1->metadata())[0].id());
   EXPECT_EQ(*(*pbus_node_1->metadata())[0].id(),
