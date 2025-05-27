@@ -2282,7 +2282,8 @@ mod tests {
             }
 
             fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
-                default_page_in(self, range);
+                let read_ahead_size = self.handle.owner().read_ahead_size();
+                default_page_in(self, range, read_ahead_size);
             }
 
             fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>) {
@@ -2290,10 +2291,6 @@ mod tests {
             }
 
             fn on_zero_children(self: Arc<Self>) {}
-
-            fn read_alignment(&self) -> u64 {
-                self.handle.block_size()
-            }
 
             fn byte_size(&self) -> u64 {
                 self.handle.uncached_size()

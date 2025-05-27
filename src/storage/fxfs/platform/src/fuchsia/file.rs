@@ -714,7 +714,8 @@ impl PagerBacked for FxFile {
     }
 
     fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
-        default_page_in(self, range)
+        let read_ahead_size = self.handle.owner().read_ahead_size();
+        default_page_in(self, range, read_ahead_size);
     }
 
     #[trace]
@@ -740,10 +741,6 @@ impl PagerBacked for FxFile {
     fn on_zero_children(self: Arc<Self>) {
         // Drop the open count that we took in `get_backing_memory`.
         self.open_count_sub_one();
-    }
-
-    fn read_alignment(&self) -> u64 {
-        self.handle.block_size()
     }
 
     fn byte_size(&self) -> u64 {

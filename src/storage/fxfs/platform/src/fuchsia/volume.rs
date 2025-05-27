@@ -33,7 +33,8 @@ use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectSto
 use std::future::Future;
 use std::pin::pin;
 #[cfg(any(test, feature = "testing"))]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
@@ -47,6 +48,11 @@ use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 const DIRENT_CACHE_LIMIT: usize = 2000;
 // LINT.ThenChange(//src/storage/stressor/src/aggressive.rs)
 
+/// The smallest read-ahead size. All other read-ahead sizes will be a multiple of this read-ahead
+/// size. Having this property allows for chunking metadata at this granularity.
+pub const BASE_READ_AHEAD_SIZE: u64 = 32 * 1024;
+pub const MAX_READ_AHEAD_SIZE: u64 = BASE_READ_AHEAD_SIZE * 4;
+
 const PROFILE_DIRECTORY: &str = "profiles";
 
 #[derive(Clone)]
@@ -54,12 +60,29 @@ pub struct MemoryPressureLevelConfig {
     /// The period to wait between flushes, as well as perform other background maintenance tasks
     /// (e.g. purging caches).
     pub background_task_period: Duration,
+
     /// The limit of cached nodes.
     pub cache_size_limit: usize,
 
-    // The initial delay before the background task runs. The background task has a longer initial
-    // delay to avoid running the task during boot.
+    /// The initial delay before the background task runs. The background task has a longer initial
+    /// delay to avoid running the task during boot.
     pub background_task_initial_delay: Duration,
+
+    /// The amount of read-ahead to do. The read-ahead size is reduce when under memory pressure.
+    /// The kernel starts evicting pages when under memory pressure so over supplied pages are less
+    /// likely to be used before being evicted.
+    pub read_ahead_size: u64,
+}
+
+impl Default for MemoryPressureLevelConfig {
+    fn default() -> Self {
+        Self {
+            background_task_period: Duration::from_secs(20),
+            cache_size_limit: DIRENT_CACHE_LIMIT,
+            background_task_initial_delay: Duration::from_secs(70),
+            read_ahead_size: MAX_READ_AHEAD_SIZE,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -93,16 +116,19 @@ impl Default for MemoryPressureConfig {
                 background_task_period: Duration::from_secs(20),
                 cache_size_limit: DIRENT_CACHE_LIMIT,
                 background_task_initial_delay: Duration::from_secs(70),
+                read_ahead_size: MAX_READ_AHEAD_SIZE,
             },
             mem_warning: MemoryPressureLevelConfig {
                 background_task_period: Duration::from_secs(5),
                 cache_size_limit: 100,
                 background_task_initial_delay: Duration::from_secs(5),
+                read_ahead_size: BASE_READ_AHEAD_SIZE * 2,
             },
             mem_critical: MemoryPressureLevelConfig {
                 background_task_period: Duration::from_millis(1500),
                 cache_size_limit: 20,
                 background_task_initial_delay: Duration::from_millis(1500),
+                read_ahead_size: BASE_READ_AHEAD_SIZE,
             },
         }
     }
@@ -130,6 +156,9 @@ pub struct FxVolume {
 
     profile_state: Mutex<Option<Box<dyn ProfileState>>>,
 
+    /// This is updated based on the memory-pressure level.
+    read_ahead_size: AtomicU64,
+
     #[cfg(any(test, feature = "testing"))]
     poisoned: AtomicBool,
 }
@@ -153,6 +182,9 @@ impl FxVolume {
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
             profile_state: Mutex::new(None),
+            read_ahead_size: AtomicU64::new(
+                MemoryPressureConfig::default().mem_normal.read_ahead_size,
+            ),
             #[cfg(any(test, feature = "testing"))]
             poisoned: AtomicBool::new(false),
         })
@@ -453,8 +485,10 @@ impl FxVolume {
                     if new_level != level {
                         level = new_level;
                         should_update_cache_limit = true;
+                        let level_config = config.for_level(&level);
+                        self.read_ahead_size.store(level_config.read_ahead_size, Ordering::Relaxed);
                         timer.as_mut().reset(fasync::MonotonicInstant::after(
-                            config.for_level(&level).background_task_period.into())
+                            level_config.background_task_period.into())
                         );
                         debug!(
                             "Background task period changed to {:?} due to new memory pressure \
@@ -543,6 +577,12 @@ impl FxVolume {
         if let Some(guard) = self.scope.try_active_guard() {
             self.executor.spawn_detached(FutureWithGuard::new(guard, task));
         }
+    }
+
+    /// Returns the current read-ahead size that should be used based on the current memory-pressure
+    /// level.
+    pub fn read_ahead_size(&self) -> u64 {
+        self.read_ahead_size.load(Ordering::Relaxed)
     }
 
     /// Tries to unwrap this volume.  If it fails, it will poison the volume so that when it is
@@ -825,8 +865,10 @@ mod tests {
     };
     use crate::fuchsia::volume::{
         FxVolume, FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
+        BASE_READ_AHEAD_SIZE,
     };
     use crate::fuchsia::volumes_directory::VolumesDirectory;
+    use crate::volume::MAX_READ_AHEAD_SIZE;
     use delivery_blob::CompressionMode;
     use fidl_fuchsia_fs_startup::VolumeMarker;
     use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker};
@@ -1185,19 +1227,11 @@ mod tests {
                 MemoryPressureConfig {
                     mem_normal: MemoryPressureLevelConfig {
                         background_task_period: Duration::from_millis(100),
-                        cache_size_limit: 100,
                         background_task_initial_delay: Duration::from_millis(100),
+                        ..Default::default()
                     },
-                    mem_warning: MemoryPressureLevelConfig {
-                        background_task_period: Duration::from_millis(100),
-                        cache_size_limit: 100,
-                        background_task_initial_delay: Duration::from_millis(100),
-                    },
-                    mem_critical: MemoryPressureLevelConfig {
-                        background_task_period: Duration::from_millis(100),
-                        cache_size_limit: 100,
-                        background_task_initial_delay: Duration::from_millis(100),
-                    },
+                    mem_warning: Default::default(),
+                    mem_critical: Default::default(),
                 },
                 None,
             );
@@ -1286,17 +1320,18 @@ mod tests {
                 mem_normal: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
                 mem_warning: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_millis(100),
                     cache_size_limit: 100,
                     background_task_initial_delay: Duration::from_millis(100),
+                    ..Default::default()
                 },
                 mem_critical: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
             };
             vol.volume().start_background_task(flush_config, Some(&mem_pressure));
@@ -1395,22 +1430,18 @@ mod tests {
             let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
                 .expect("Failed to create MemoryPressureMonitor");
 
-            // Configure the flush task to only flush quickly on warning.
             let flush_config = MemoryPressureConfig {
                 mem_normal: MemoryPressureLevelConfig {
-                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
                 mem_warning: MemoryPressureLevelConfig {
-                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: 100,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
                 mem_critical: MemoryPressureLevelConfig {
-                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
             };
             vol.volume().start_background_task(flush_config, Some(&mem_pressure));
@@ -1445,6 +1476,56 @@ mod tests {
         filesystem.close().await.expect("close filesystem failed");
         let device = filesystem.take_device().await;
         device.ensure_unique();
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_memory_pressure_signal_updates_read_ahead_size() {
+        let fixture = TestFixture::new().await;
+        {
+            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
+            let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
+                .expect("Failed to create MemoryPressureMonitor");
+
+            let flush_config = MemoryPressureConfig {
+                mem_normal: MemoryPressureLevelConfig {
+                    read_ahead_size: 12 * 1024,
+                    ..Default::default()
+                },
+                mem_warning: MemoryPressureLevelConfig {
+                    read_ahead_size: 8 * 1024,
+                    ..Default::default()
+                },
+                mem_critical: MemoryPressureLevelConfig {
+                    read_ahead_size: 4 * 1024,
+                    ..Default::default()
+                },
+            };
+            let volume = fixture.volume().volume().clone();
+            volume.start_background_task(flush_config, Some(&mem_pressure));
+            let wait_for_read_ahead_to_change =
+                async move |level: MemoryPressureLevel, expected: u64| {
+                    watcher_proxy
+                        .on_level_changed(level)
+                        .await
+                        .expect("Failed to send memory pressure level change");
+                    const MAX_WAIT: Duration = Duration::from_secs(2);
+                    let wait_increments = Duration::from_millis(400);
+                    let mut total_waited = Duration::ZERO;
+                    while total_waited < MAX_WAIT {
+                        if volume.read_ahead_size() == expected {
+                            break;
+                        }
+                        fasync::Timer::new(wait_increments).await;
+                        total_waited += wait_increments;
+                    }
+                    assert_eq!(volume.read_ahead_size(), expected);
+                };
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Critical, 4 * 1024).await;
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Warning, 8 * 1024).await;
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Normal, 12 * 1024).await;
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Critical, 4 * 1024).await;
+        }
+        fixture.close().await;
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -2655,5 +2736,16 @@ mod tests {
         fs.close().await.unwrap();
         let device = fs.take_device().await;
         device.ensure_unique();
+    }
+
+    #[fuchsia::test]
+    fn test_read_ahead_sizes() {
+        let config = MemoryPressureConfig::default();
+        assert!(config.mem_normal.read_ahead_size % BASE_READ_AHEAD_SIZE == 0);
+        assert_eq!(config.mem_normal.read_ahead_size, MAX_READ_AHEAD_SIZE);
+
+        assert!(config.mem_warning.read_ahead_size % BASE_READ_AHEAD_SIZE == 0);
+
+        assert_eq!(config.mem_critical.read_ahead_size, BASE_READ_AHEAD_SIZE);
     }
 }
