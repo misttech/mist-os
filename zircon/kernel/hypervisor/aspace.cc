@@ -208,8 +208,8 @@ zx::result<DirectPhysicalAspace> DirectPhysicalAspace::Create() {
   if (!physical_aspace) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  zx_status_t status = physical_aspace->arch_aspace().MapContiguous(0, 0, kNumPhysmapPages,
-                                                                    kContiguousMmuFlags, nullptr);
+  zx_status_t status =
+      physical_aspace->arch_aspace().MapContiguous(0, 0, kNumPhysmapPages, kContiguousMmuFlags);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -221,7 +221,7 @@ zx::result<DirectPhysicalAspace> DirectPhysicalAspace::Create() {
 DirectPhysicalAspace::~DirectPhysicalAspace() {
   if (physical_aspace_ != nullptr) {
     zx_status_t status = physical_aspace_->arch_aspace().Unmap(
-        0, kNumPhysmapPages, ArchVmAspaceInterface::ArchUnmapOptions::Enlarge, nullptr);
+        0, kNumPhysmapPages, ArchVmAspaceInterface::ArchUnmapOptions::Enlarge);
     DEBUG_ASSERT(status == ZX_OK);
     physical_aspace_->Destroy();
   }

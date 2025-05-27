@@ -1076,7 +1076,7 @@ zx_status_t Riscv64ArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t 
 }
 
 zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count,
-                                               uint mmu_flags, size_t* mapped) {
+                                               uint mmu_flags) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " paddr %#" PRIxPTR " count %zu flags %#x\n", vaddr, paddr, count,
           mmu_flags);
@@ -1097,10 +1097,6 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
   if (!IS_PAGE_ALIGNED(vaddr) || !IS_PAGE_ALIGNED(paddr)) {
     return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (count == 0) {
-    return ZX_OK;
   }
 
   Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
@@ -1129,15 +1125,11 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   }
   DEBUG_ASSERT(cursor.size() == 0);
 
-  if (mapped) {
-    *mapped = count;
-  }
-
   return ZX_OK;
 }
 
 zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                                     ExistingEntryAction existing_action, size_t* mapped) {
+                                     ExistingEntryAction existing_action) {
   canary_.Assert();
 
   DEBUG_ASSERT(tt_virt_);
@@ -1195,19 +1187,11 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     }
   }
 
-  if (mapped) {
-    // For ExistingEntryAction::Error, we should have mapped all the addresses we were asked to.
-    // For ExistingEntryAction::Skip, we might have mapped less if we encountered existing entries,
-    // but skipped entries contribute towards the total as well.
-    *mapped = count;
-  }
-
   return ZX_OK;
 }
 
 // TODO(https://fxbug.dev/412464435): Implement ArchUnmapOptions::Harvest for riscv.
-zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
-                                       size_t* unmapped) {
+zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
@@ -1228,11 +1212,6 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOpt
 
   ConsistencyManager cm(*this);
   zx::result<size_t> result = UnmapPages(vaddr, count * PAGE_SIZE, enlarge, cm);
-
-  if (unmapped) {
-    *unmapped = result.is_ok() ? result.value() / PAGE_SIZE : 0u;
-    DEBUG_ASSERT(*unmapped <= count);
-  }
 
   return result.status_value();
 }

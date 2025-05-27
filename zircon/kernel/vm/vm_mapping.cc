@@ -65,7 +65,7 @@ class VmMapping::CurrentlyFaulting {
       ASSERT(valid_range);
       ASSERT(new_len == len_);
       zx_status_t status = mapping_->aspace_->arch_aspace().Unmap(
-          base, new_len / PAGE_SIZE, mapping_->aspace_->EnlargeArchUnmap(), nullptr);
+          base, new_len / PAGE_SIZE, mapping_->aspace_->EnlargeArchUnmap());
       ASSERT(status == ZX_OK);
     }
     mapping_->currently_faulting_ = nullptr;
@@ -224,7 +224,7 @@ zx_status_t VmMapping::ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr
     }
   }
 
-  return aspace->arch_aspace().Unmap(base, size / PAGE_SIZE, aspace->EnlargeArchUnmap(), nullptr);
+  return aspace->arch_aspace().Unmap(base, size / PAGE_SIZE, aspace->EnlargeArchUnmap());
 }
 
 zx_status_t VmMapping::ProtectLocked(vaddr_t base, size_t size, uint new_arch_mmu_flags) {
@@ -340,7 +340,7 @@ zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
   if (base_ == base || base + size == base_ + size_) {
     LTRACEF("unmapping base %#lx size %#zx\n", base, size);
     zx_status_t status =
-        aspace_->arch_aspace().Unmap(base, size / PAGE_SIZE, aspace_->EnlargeArchUnmap(), nullptr);
+        aspace_->arch_aspace().Unmap(base, size / PAGE_SIZE, aspace_->EnlargeArchUnmap());
     if (status != ZX_OK) {
       return status;
     }
@@ -395,7 +395,7 @@ zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
   // Unmap the middle segment
   LTRACEF("unmapping base %#lx size %#zx\n", base, size);
   zx_status_t status =
-      aspace_->arch_aspace().Unmap(base, size / PAGE_SIZE, aspace_->EnlargeArchUnmap(), nullptr);
+      aspace_->arch_aspace().Unmap(base, size / PAGE_SIZE, aspace_->EnlargeArchUnmap());
   if (status != ZX_OK) {
     return status;
   }
@@ -501,7 +501,7 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len, UnmapOpti
     aspace_op |= ArchUnmapOptions::Harvest;
   }
 
-  zx_status_t status = aspace_->arch_aspace().Unmap(base, new_len / PAGE_SIZE, aspace_op, nullptr);
+  zx_status_t status = aspace_->arch_aspace().Unmap(base, new_len / PAGE_SIZE, aspace_op);
   ASSERT(status == ZX_OK);
 }
 
@@ -714,13 +714,11 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
       ktl::all_of(phys_, &phys_[count_], [](paddr_t p) { return p != vm_get_zero_page_paddr(); }) ||
       !mapping_->aspace()->is_user());
 
-  size_t mapped;
   zx_status_t ret = mapping_->aspace()->arch_aspace().Map(base_, phys_, count_, mmu_flags_,
-                                                          existing_entry_action_, &mapped);
+                                                          existing_entry_action_);
   if (ret != ZX_OK) {
     TRACEF("error %d mapping %zu pages starting at va %#" PRIxPTR "\n", ret, count_, base_);
   }
-  DEBUG_ASSERT_MSG(ret != ZX_OK || mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
   base_ += count_ * PAGE_SIZE;
   total_mapped_ += count_;
   count_ = 0;
@@ -940,8 +938,7 @@ zx_status_t VmMapping::DestroyLocked() {
   {
     Guard<VmoLockType> guard{object_->lock()};
     // Perform unmap holding the object lock to prevent mappings being modified in between.
-    status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap(),
-                                          nullptr);
+    status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap());
     if (status != ZX_OK) {
       return status;
     }
@@ -1468,8 +1465,7 @@ zx_status_t VmMapping::ForceWritableLocked() {
     Guard<VmoLockType> guard{object_->lock()};
     // Clear out all mappings from the previous object, Must be done the object lock to prevent
     // mappings being modified in between.
-    status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap(),
-                                          nullptr);
+    status = aspace_->arch_aspace().Unmap(base_, size_ / PAGE_SIZE, aspace_->EnlargeArchUnmap());
     if (status != ZX_OK) {
       return status;
     }

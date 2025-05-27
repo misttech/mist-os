@@ -259,13 +259,11 @@ void VirtualAlloc::UnmapFreePages(vaddr_t vaddr, size_t pages) {
     ZX_ASSERT(page);
     list_add_tail(&free_list, &page->queue_node);
   }
-  size_t unmapped = 0;
   // As this is the kernel aspace we cannot tolerate enlarging the operation, as other CPUs may be
   // accessing the nearby portions and we cannot trigger faults.
   zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-      vaddr, pages, ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
+      vaddr, pages, ArchVmAspaceInterface::ArchUnmapOptions::None);
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to unmap %zu pages at %" PRIxPTR "", pages, vaddr);
-  ZX_ASSERT(unmapped == pages);
   pmm_free(&free_list);
 #else
   int result = mprotect(reinterpret_cast<void *>(vaddr), pages * PAGE_SIZE, PROT_NONE);
@@ -286,11 +284,9 @@ zx_status_t VirtualAlloc::AllocMapPages(vaddr_t vaddr, size_t num_pages) {
 
   auto cleanup = fit::defer([&mapped_count, &alloc_pages, vaddr]() {
     if (mapped_count > 0) {
-      size_t unmapped = 0;
       zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-          vaddr, mapped_count, ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
+          vaddr, mapped_count, ArchVmAspaceInterface::ArchUnmapOptions::None);
       ZX_ASSERT(status == ZX_OK);
-      ZX_ASSERT(unmapped == mapped_count);
     }
     ZX_ASSERT(!list_is_empty(&alloc_pages));
     pmm_free(&alloc_pages);
@@ -318,13 +314,11 @@ zx_status_t VirtualAlloc::AllocMapPages(vaddr_t vaddr, size_t num_pages) {
           p->set_state(allocated_page_state_);
         }
         list_splice_after(&contiguous_pages, &alloc_pages);
-        size_t mapped = 0;
         status = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
-            vaddr + mapped_count * PAGE_SIZE, paddr, align_pages, kMmuFlags, &mapped);
+            vaddr + mapped_count * PAGE_SIZE, paddr, align_pages, kMmuFlags);
         if (status != ZX_OK) {
           return status;
         }
-        ZX_ASSERT(mapped == align_pages);
         mapped_count += align_pages;
       }
       if (mapped_count == num_pages) {
@@ -366,14 +360,12 @@ zx_status_t VirtualAlloc::AllocMapPages(vaddr_t vaddr, size_t num_pages) {
       current_page = list_next_type(&alloc_pages, &current_page->queue_node, vm_page_t, queue_node);
     }
 
-    size_t mapped = 0;
-    status = VmAspace::kernel_aspace()->arch_aspace().Map(
-        vaddr + mapped_count * PAGE_SIZE, paddrs, map_pages, kMmuFlags,
-        ArchVmAspace::ExistingEntryAction::Error, &mapped);
+    status = VmAspace::kernel_aspace()->arch_aspace().Map(vaddr + mapped_count * PAGE_SIZE, paddrs,
+                                                          map_pages, kMmuFlags,
+                                                          ArchVmAspace::ExistingEntryAction::Error);
     if (status != ZX_OK) {
       return status;
     }
-    ZX_ASSERT(mapped == map_pages);
     mapped_count += map_pages;
   }
   // If we successfully mapped everything we should have iterated all the way to the end of the

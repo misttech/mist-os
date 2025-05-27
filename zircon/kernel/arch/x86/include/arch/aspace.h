@@ -97,13 +97,11 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t Destroy() override;
 
   // main methods
-  zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
-                            size_t* mapped) override;
+  zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags) override;
   using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
   zx_status_t Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                  ExistingEntryAction existing_action, size_t* mapped) override;
-  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
-                    size_t* unmapped) override;
+                  ExistingEntryAction existing_action) override;
+  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge) override;
   // x86 may generate duplicate TLB entries if changing the translation size of mapping, but this
   // does not lead to any incorrectness as long as the we invalidate the TLB (which we do),
   // therefore unmap is safe to split large pages without enlarging.

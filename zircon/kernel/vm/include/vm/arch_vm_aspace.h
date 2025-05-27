@@ -103,8 +103,7 @@ class ArchVmAspaceInterface {
   // main methods
   // Map a physically contiguous region into the virtual address space. This is allowed to use any
   // page size the architecture allows given the from the input parameters.
-  virtual zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
-                                    size_t* mapped) = 0;
+  virtual zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags) = 0;
 
   // Map the given array of pages into the virtual address space starting at
   // |vaddr|, in the order they appear in |phys|.
@@ -117,15 +116,15 @@ class ArchVmAspaceInterface {
   //                can be converted to read-write, or the mapping can have its
   //                paddr changed.
   //
-  // Skipped pages are still counted in |mapped|. On failure some pages may
-  // still be mapped, the number of which will be reported in |mapped|.
+  // On error none of the provided pages will be mapped. In the case of |Upgrade| the state of any
+  // previous mappings is undefined, and could either still be present or be unmapped.
   enum class ExistingEntryAction : uint8_t {
     Skip,
     Error,
     Upgrade,
   };
   virtual zx_status_t Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                          ExistingEntryAction existing_action, size_t* mapped) = 0;
+                          ExistingEntryAction existing_action) = 0;
 
   // Options for unmapping the given virtual address range.
   // ArchUnmapOptions::Enlarge controls whether the unmap region can be extended to be larger, or if
@@ -140,8 +139,7 @@ class ArchVmAspaceInterface {
     Harvest = (1u << 1),
   };
 
-  virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
-                            size_t* unmapped) = 0;
+  virtual zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge) = 0;
 
   // Returns whether or not an unmap might need to enlarge an operation for reasons other than being
   // out of memory. If this returns true, then unmapping a partial large page will fail always

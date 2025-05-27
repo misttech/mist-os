@@ -32,8 +32,8 @@ constexpr size_t kEl2PhysAddressSize = (1ul << MMU_IDENT_SIZE_SHIFT);
 // Unmap all mappings everything in the given address space, releasing all resources.
 void UnmapAll(ArchVmAspace& aspace) {
   size_t page_count = kEl2PhysAddressSize / PAGE_SIZE;
-  zx_status_t result = aspace.Unmap(/*vaddr=*/0, page_count,
-                                    ArchVmAspaceInterface::ArchUnmapOptions::Enlarge, nullptr);
+  zx_status_t result =
+      aspace.Unmap(/*vaddr=*/0, page_count, ArchVmAspaceInterface::ArchUnmapOptions::Enlarge);
   DEBUG_ASSERT(result == ZX_OK);
 }
 
@@ -88,7 +88,7 @@ zx::result<> El2TranslationTable::Init() {
     size_t page_count = arena.size / PAGE_SIZE;
     status = el2_aspace_->MapContiguous(
         /*vaddr=*/arena_paddr, /*paddr=*/arena_paddr, page_count,
-        ARCH_MMU_FLAG_CACHED | ARCH_MMU_FLAG_PERM_WRITE | ARCH_MMU_FLAG_PERM_READ, nullptr);
+        ARCH_MMU_FLAG_CACHED | ARCH_MMU_FLAG_PERM_WRITE | ARCH_MMU_FLAG_PERM_READ);
     if (status != ZX_OK) {
       Reset();
       return zx::error(status);

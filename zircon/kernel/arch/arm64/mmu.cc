@@ -1439,7 +1439,7 @@ pte_t ArmArchVmAspace::MmuParamsFromFlags(uint mmu_flags) {
 }
 
 zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count,
-                                           uint mmu_flags, size_t* mapped) {
+                                           uint mmu_flags) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " paddr %#" PRIxPTR " count %zu flags %#x\n", vaddr, paddr, count,
           mmu_flags);
@@ -1511,10 +1511,6 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     DEBUG_ASSERT(cursor.size() == 0);
   }
 
-  if (mapped) {
-    *mapped = count;
-  }
-
 #if __has_feature(address_sanitizer)
   if (type_ == ArmAspaceType::kKernel) {
     asan_map_shadow_for(vaddr, count * PAGE_SIZE);
@@ -1525,7 +1521,7 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
 }
 
 zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                                 ExistingEntryAction existing_action, size_t* mapped) {
+                                 ExistingEntryAction existing_action) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu flags %#x\n", vaddr, count, mmu_flags);
 
@@ -1599,13 +1595,6 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     DEBUG_ASSERT(cursor.size() == 0);
   }
 
-  if (mapped) {
-    // For ExistingEntryAction::Error, we should have mapped all the addresses we were asked to.
-    // For ExistingEntryAction::Skip, we might have mapped less if we encountered existing entries,
-    // but skipped entries contribute towards the total as well.
-    *mapped = count;
-  }
-
 #if __has_feature(address_sanitizer)
   if (type_ == ArmAspaceType::kKernel) {
     asan_map_shadow_for(vaddr, count * PAGE_SIZE);
@@ -1615,8 +1604,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   return ZX_OK;
 }
 
-zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions unmap_options,
-                                   size_t* unmapped) {
+zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions unmap_options) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
@@ -1647,10 +1635,6 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions
 
   DEBUG_ASSERT(cursor.size() == 0 || ret != ZX_OK);
 
-  if (unmapped) {
-    *unmapped = (ret == ZX_OK) ? count : 0u;
-  }
-
   return ret;
 }
 
@@ -1678,7 +1662,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
   // safely perform protections and instead upgrade any protect to a complete unmap, therefore
   // causing a regular translation fault that we can handle to repopulate the correct mapping.
   if (type_ == ArmAspaceType::kGuest) {
-    return Unmap(vaddr, count, ArchUnmapOptions::Enlarge, nullptr);
+    return Unmap(vaddr, count, ArchUnmapOptions::Enlarge);
   }
 
   Guard<CriticalMutex> a{&lock_};

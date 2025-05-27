@@ -924,34 +924,33 @@ zx_status_t X86ArchVmAspace::Destroy() {
 }
 
 // TODO(https://fxbug.dev/412464435): Implement ArchUnmapOptions::Harvest for x86.
-zx_status_t X86ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
-                                   size_t* unmapped) {
+zx_status_t X86ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge) {
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
     return ZX_ERR_INVALID_ARGS;
 
-  zx_status_t result = pt_->UnmapPages(vaddr, count, enlarge, unmapped);
+  zx_status_t result = pt_->UnmapPages(vaddr, count, enlarge);
   return result;
 }
 
 zx_status_t X86ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count,
-                                           uint mmu_flags, size_t* mapped) {
+                                           uint mmu_flags) {
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
     return ZX_ERR_INVALID_ARGS;
 
-  zx_status_t result = pt_->MapPagesContiguous(vaddr, paddr, count, mmu_flags, mapped);
+  zx_status_t result = pt_->MapPagesContiguous(vaddr, paddr, count, mmu_flags);
   accessed_since_last_check_ = true;
   return result;
 }
 
 zx_status_t X86ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                                 ExistingEntryAction existing_action, size_t* mapped) {
+                                 ExistingEntryAction existing_action) {
   DEBUG_ASSERT(!pt_->IsUnified());
   if (!IsValidVaddr(vaddr))
     return ZX_ERR_INVALID_ARGS;
 
-  zx_status_t result = pt_->MapPages(vaddr, phys, count, mmu_flags, existing_action, mapped);
+  zx_status_t result = pt_->MapPages(vaddr, phys, count, mmu_flags, existing_action);
   accessed_since_last_check_ = true;
   return result;
 }

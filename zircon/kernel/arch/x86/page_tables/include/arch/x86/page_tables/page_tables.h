@@ -180,11 +180,10 @@ class X86PageTableBase {
   bool IsUnified() const { return role_ == PageTableRole::kUnified; }
 
   virtual zx_status_t MapPages(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                               ExistingEntryAction existing_action, size_t* mapped) = 0;
+                               ExistingEntryAction existing_action) = 0;
   virtual zx_status_t MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, const size_t count,
-                                         uint mmu_flags, size_t* mapped) = 0;
-  virtual zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, ArchUnmapOptions enlarge,
-                                 size_t* unmapped) = 0;
+                                         uint mmu_flags) = 0;
+  virtual zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, ArchUnmapOptions enlarge) = 0;
   virtual zx_status_t ProtectPages(vaddr_t vaddr, size_t count, uint mmu_flags) = 0;
   virtual zx_status_t QueryVaddr(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) = 0;
 
@@ -344,7 +343,7 @@ class X86PageTableImpl : public X86PageTableBase {
   }
 
   zx_status_t MapPages(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                       ExistingEntryAction existing_action, size_t* mapped) override final {
+                       ExistingEntryAction existing_action) override final {
     canary_.Assert();
 
     if (!static_cast<T*>(this)->check_vaddr(vaddr))
@@ -387,13 +386,10 @@ class X86PageTableImpl : public X86PageTableBase {
       DEBUG_ASSERT(cursor.size() == 0);
     }
 
-    if (mapped) {
-      *mapped = count;
-    }
     return ZX_OK;
   }
-  zx_status_t MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, const size_t count, uint mmu_flags,
-                                 size_t* mapped) override final {
+  zx_status_t MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, const size_t count,
+                                 uint mmu_flags) override final {
     canary_.Assert();
 
     if (!static_cast<T*>(this)->check_paddr(paddr))
@@ -433,13 +429,10 @@ class X86PageTableImpl : public X86PageTableBase {
     }
     DEBUG_ASSERT(cursor.size() == 0);
 
-    if (mapped)
-      *mapped = count;
-
     return ZX_OK;
   }
-  zx_status_t UnmapPages(vaddr_t vaddr, const size_t count, ArchUnmapOptions enlarge,
-                         size_t* unmapped) override final {
+  zx_status_t UnmapPages(vaddr_t vaddr, const size_t count,
+                         ArchUnmapOptions enlarge) override final {
     canary_.Assert();
 
     if (!static_cast<T*>(this)->check_vaddr(vaddr))
@@ -457,9 +450,6 @@ class X86PageTableImpl : public X86PageTableBase {
     page_->mmu.num_mappings -= lower_unmapped;
     cm.Finish();
     DEBUG_ASSERT(cursor.size() == 0 || status != ZX_OK);
-
-    if (unmapped)
-      *unmapped = count;
 
     return status;
   }

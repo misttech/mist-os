@@ -242,10 +242,9 @@ static int cmd_vm(int argc, const cmd_args* argv, uint32_t) {
       return -1;
     }
 
-    size_t mapped;
     auto err = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
-        argv[3].u, argv[2].u, (uint)argv[4].u, (uint)argv[5].u, &mapped);
-    printf("arch_mmu_map returns %d, mapped %zu\n", err, mapped);
+        argv[3].u, argv[2].u, (uint)argv[4].u, (uint)argv[5].u);
+    printf("arch_mmu_map returns %d\n", err);
   } else if (!strcmp(argv[1].str, "unmap")) {
     if (argc < 4) {
       goto notenoughargs;
@@ -256,12 +255,11 @@ static int cmd_vm(int argc, const cmd_args* argv, uint32_t) {
       return -1;
     }
 
-    size_t unmapped;
     // Strictly only attempt to unmap exactly what the user requested, they can deal with any
     // failure that might result.
     auto err = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-        argv[2].u, (uint)argv[3].u, ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
-    printf("arch_mmu_unmap returns %d, unmapped %zu\n", err, unmapped);
+        argv[2].u, (uint)argv[3].u, ArchVmAspaceInterface::ArchUnmapOptions::None);
+    printf("arch_mmu_unmap returns %d\n", err);
   } else {
     printf("unknown command\n");
     goto usage;
