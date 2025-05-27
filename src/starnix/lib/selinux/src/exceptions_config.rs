@@ -4,7 +4,7 @@
 
 use crate::policy::parser::ByValue;
 use crate::policy::{Policy, TypeId};
-use crate::KernelClass;
+use crate::{KernelClass, ObjectClass};
 
 use anyhow::{anyhow, bail};
 use std::collections::HashMap;
@@ -42,7 +42,7 @@ impl ExceptionsConfig {
         &self,
         source: TypeId,
         target: TypeId,
-        class: KernelClass,
+        class: ObjectClass,
     ) -> Option<NonZeroU64> {
         self.todo_deny_entries
             .get(&ExceptionsEntry { source, target, class })
@@ -76,18 +76,46 @@ impl ExceptionsConfig {
                         parts.next().ok_or_else(|| anyhow!("Expected target type"))?,
                     );
 
+                    let class_name = parts.next().ok_or_else(|| anyhow!("Target class missing"))?;
+
+                    // Parse the object class name to the corresponding policy-specific Id.
+                    // This allows non-kernel classes, and userspace queries against kernel classes,
+                    // to have exceptions applied to them.
+                    let policy_class = policy
+                        .classes()
+                        .iter()
+                        .find(|x| x.class_name == class_name.as_bytes())
+                        .map(|x| x.class_id);
+
                     // Parse the kernel object class. This must correspond to a known kernel object
                     // class, regardless of whether the policy actually defines the class.
-                    let class = parts
-                        .next()
-                        .and_then(object_class_by_name)
-                        .ok_or_else(|| anyhow!("Target class missing or unrecognized"))?;
+                    let kernel_class = object_class_by_name(class_name);
 
-                    if let (Some(source), Some(target)) = (stype, ttype) {
-                        self.todo_deny_entries
-                            .insert(ExceptionsEntry { source, target, class }, bug_id);
-                    } else {
-                        println!("Ignoring statement: {}", line);
+                    // If the class isn't defined by policy, or used by the kernel, then there is
+                    // no way to apply the exception.
+                    if policy_class.is_none() && kernel_class.is_none() {
+                        println!("Ignoring statement: {} (unknown class)", line);
+                        return Ok(());
+                    }
+
+                    // If the source or target domains are unrecognized then there is no way to
+                    // apply the exception.
+                    let (Some(source), Some(target)) = (stype, ttype) else {
+                        println!("Ignoring statement: {} (unknown source or target)", line);
+                        return Ok(());
+                    };
+
+                    if let Some(policy_class) = policy_class {
+                        self.todo_deny_entries.insert(
+                            ExceptionsEntry { source, target, class: policy_class.into() },
+                            bug_id,
+                        );
+                    }
+                    if let Some(kernel_class) = kernel_class {
+                        self.todo_deny_entries.insert(
+                            ExceptionsEntry { source, target, class: kernel_class.into() },
+                            bug_id,
+                        );
                     }
                 }
                 "todo_permissive" => {
@@ -122,7 +150,7 @@ impl ExceptionsConfig {
 struct ExceptionsEntry {
     source: TypeId,
     target: TypeId,
-    class: KernelClass,
+    class: ObjectClass,
 }
 
 /// Returns the numeric bug Id parsed from a bug URL reference.
@@ -156,14 +184,22 @@ mod tests {
     const _EXCEPTION_OTHER_TYPE: &str = "test_exception_other_t";
     const UNMATCHED_TYPE: &str = "test_exception_unmatched_t";
 
+    const NON_KERNEL_CLASS: &str = "test_exception_non_kernel_class";
+
     const TEST_CONFIG: &[&str] = &[
-        // These statement should all be resolved.
+        // These statements should resolve into both kernel-Id and policy-Id indexed entries.
         "todo_deny b/001 test_exception_source_t test_exception_target_t file",
         "todo_deny b/002 test_exception_other_t test_exception_target_t chr_file",
+        // This statement should resolve into a kernel-Id indexed entry, because neither the "base"
+        // policy fragment, nor the exceptions test fragment, define the `anon_inode` class.
         "todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode",
+        // This statement should resolve into a policy-Id indexed entry, because the class is not
+        // one known to the kernel.
+        "todo_deny b/004 test_exception_source_t test_exception_target_t test_exception_non_kernel_class",
         // These statements should not be resolved.
         "todo_deny b/101 test_undefined_source_t test_exception_target_t file",
         "todo_deny b/102 test_exception_source_t test_undefined_target_t file",
+        "todo_deny b/103 test_exception_source_t test_exception_target_t test_exception_non_existent_class",
     ];
 
     struct TestData {
@@ -173,6 +209,17 @@ mod tests {
         unmatched_type: TypeId,
     }
 
+    impl TestData {
+        fn expect_policy_class(&self, name: &str) -> ObjectClass {
+            self.policy
+                .classes()
+                .iter()
+                .find(|x| x.class_name == name.as_bytes())
+                .map(|x| x.class_id)
+                .expect("Unable to resolve policy class Id")
+                .into()
+        }
+    }
     fn test_data() -> TestData {
         let (parsed, _) = parse_policy_by_value(TEST_POLICY.to_vec()).unwrap();
         let policy = Arc::new(parsed.validate().unwrap());
@@ -210,7 +257,7 @@ mod tests {
         let config = ExceptionsConfig::new(&test_data.policy, TEST_CONFIG)
             .expect("Config with unresolved types is valid");
 
-        assert_eq!(config.todo_deny_entries.len(), 3);
+        assert_eq!(config.todo_deny_entries.len(), 6);
     }
 
     #[test]
@@ -220,23 +267,60 @@ mod tests {
         let config = ExceptionsConfig::new(&test_data.policy, TEST_CONFIG)
             .expect("Config with unresolved types is valid");
 
-        // Matching source, target & class will resolve to the corresponding bug Id.
+        // Matching source, target & kernel class will resolve to the corresponding bug Id.
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.defined_target, KernelClass::File),
+            config.lookup(
+                test_data.defined_source,
+                test_data.defined_target,
+                KernelClass::File.into()
+            ),
             Some(NonZeroU64::new(1).unwrap())
+        );
+
+        // Matching source, target and kernel class identified via policy-defined Id will resolve to
+        // the same bug Id as if looked up via the kernel enum.
+        assert_eq!(
+            config.lookup(
+                test_data.defined_source,
+                test_data.defined_target,
+                test_data.expect_policy_class("file")
+            ),
+            Some(NonZeroU64::new(1).unwrap())
+        );
+
+        // Matching source, target and non-kernel class will resolve.
+        assert_eq!(
+            config.lookup(
+                test_data.defined_source,
+                test_data.defined_target,
+                test_data.expect_policy_class(NON_KERNEL_CLASS),
+            ),
+            Some(NonZeroU64::new(4).unwrap())
         );
 
         // Mismatched class, source or target returns no Id.
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.defined_target, KernelClass::Dir),
+            config.lookup(
+                test_data.defined_source,
+                test_data.defined_target,
+                KernelClass::Dir.into()
+            ),
             None
         );
         assert_eq!(
-            config.lookup(test_data.unmatched_type, test_data.defined_target, KernelClass::File),
+            config.lookup(
+                test_data.unmatched_type,
+                test_data.defined_target,
+                KernelClass::File.into()
+            ),
             None
         );
         assert_eq!(
-            config.lookup(test_data.defined_source, test_data.unmatched_type, KernelClass::File),
+            config.lookup(
+                test_data.defined_source,
+                test_data.unmatched_type,
+                KernelClass::File.into()
+            ),
             None
         );
     }

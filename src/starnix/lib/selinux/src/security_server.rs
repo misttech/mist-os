@@ -531,14 +531,13 @@ impl Query for SecurityServer {
             &target_context,
             target_class,
         );
-        // TODO: Update the exceptions mechanism to support non-kernel classes.
-        if let ObjectClass::Kernel(kernel_class) = target_class {
-            decision.todo_bug = active_policy.exceptions.lookup(
-                source_context.type_(),
-                target_context.type_(),
-                kernel_class,
-            );
-        }
+
+        decision.todo_bug = active_policy.exceptions.lookup(
+            source_context.type_(),
+            target_context.type_(),
+            target_class,
+        );
+
         decision
     }
 
