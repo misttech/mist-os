@@ -5,7 +5,7 @@
 import("//build/testing/host_test_data.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/zircon/c_utils.gni")
-import("//zircon/system/ulib/c/libc_toolchain.gni")
+import("//sdk/lib/c/libc_toolchain.gni")
 
 # Produces a directory of debug symbols for the given deps wrapped in host_test_data().
 #
