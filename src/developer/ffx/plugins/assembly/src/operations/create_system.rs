@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::base_package::{construct_base_package, BasePackage};
+use crate::base_package::construct_base_package;
 use crate::fvm::construct_fvm;
 use crate::fxfs::{construct_fxfs, ConstructedFxfs};
 use crate::{vbmeta, zbi};
@@ -14,14 +14,10 @@ use assembly_constants::PackageDestination;
 use assembly_container::AssemblyContainer;
 use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, Image, VBMeta, Zbi};
 use assembly_tool::{SdkToolProvider, ToolProvider};
-use assembly_update_packages_manifest::UpdatePackagesManifest;
 use assembly_util as util;
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use ffx_assembly_args::CreateSystemArgs;
-use fuchsia_pkg::{PackageManifest, PackagePath};
 use log::info;
-use serde_json::ser;
-use std::collections::BTreeSet;
 use std::fs::File;
 
 pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
@@ -195,54 +191,12 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         .write_to_dir(&outdir, None::<Utf8PathBuf>)
         .context("Creating the assembly manifest")?;
 
-    // Write the packages manifest.
-    create_package_manifest(
-        &gendir,
-        base_package_name,
-        &image_assembly_config,
-        base_package.as_ref(),
-    )
-    .context("Creating the packages manifest")?;
-
     // Write the tool command log.
     let command_log_path = gendir.join("command_log.json");
     let command_log = File::create(command_log_path).context("Creating command log")?;
     serde_json::to_writer(&command_log, tools.log()).context("Writing command log")?;
 
     Ok(())
-}
-
-fn create_package_manifest(
-    gendir: impl AsRef<Utf8Path>,
-    base_package_name: impl AsRef<str>,
-    assembly_config: &ImageAssemblyConfig,
-    base_package: Option<&BasePackage>,
-) -> Result<()> {
-    let packages_path = gendir.as_ref().join("packages.json");
-    let packages_file = File::create(packages_path).context("Creating the packages manifest")?;
-    let mut packages_manifest = UpdatePackagesManifest::V1(BTreeSet::new());
-    let mut add_packages_to_update = |packages: &Vec<Utf8PathBuf>| -> Result<()> {
-        for package_path in packages {
-            let manifest = PackageManifest::try_load_from(package_path)?;
-            packages_manifest
-                .add_by_manifest(&manifest)
-                .with_context(|| format!("Adding manifest: {package_path}"))?;
-        }
-        Ok(())
-    };
-    add_packages_to_update(&assembly_config.base)?;
-    add_packages_to_update(&assembly_config.cache)?;
-    if let Some(base_package) = &base_package {
-        packages_manifest.add(
-            PackagePath::from_name_and_variant(
-                base_package_name.as_ref().parse().context("parse package name")?,
-                "0".parse().context("parse package variant")?,
-            ),
-            base_package.merkle,
-            None,
-        )?;
-    }
-    ser::to_writer(packages_file, &packages_manifest).context("Writing packages manifest")
 }
 
 fn has_base_package(image_assembly_config: &ImageAssemblyConfig) -> bool {

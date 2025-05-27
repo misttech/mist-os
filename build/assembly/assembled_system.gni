@@ -379,7 +379,6 @@ template("assembled_system") {
     base_package_manifest = "${gendir}/system_image/package_manifest.json"
     base_package_merkle = "${gendir}/base.merkle"
 
-    packages = "${gendir}/packages.json"
     zbi_manifest = "${gendir}/zbi.json"
     blobfs_manifest = "${gendir}/blob.manifest"
     blobs_json = "${gendir}/blobs.json"
@@ -647,7 +646,6 @@ template("assembled_system") {
       files.additional_boot_args,
       files.zbi,
       files.zbi_manifest,
-      files.packages,
       files.bootfs_packages,
       files.image_command_log,
       files.assembly_manifest,
