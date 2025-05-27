@@ -263,7 +263,9 @@ impl Metadata {
 
 #[cfg(test)]
 mod tests {
-    use crate::format::{PartitionAttributes, RESERVED_AND_GEOMETRIES_SIZE, SECTOR_SIZE};
+    use crate::format::{
+        MetadataHeaderFlags, PartitionAttributes, RESERVED_AND_GEOMETRIES_SIZE, SECTOR_SIZE,
+    };
 
     use super::*;
     use std::path::Path;
@@ -296,8 +298,10 @@ mod tests {
         let header = metadata.header;
         let num_partition_entries = header.partitions.num_entries;
         let num_extent_entries = header.extents.num_entries;
+        let flags = header.flags;
         assert_eq!(num_partition_entries, 2);
         assert_eq!(num_extent_entries, 2);
+        assert!(flags.contains(MetadataHeaderFlags::VIRTUAL_AB_DEVICE));
         Ok(())
     }
 

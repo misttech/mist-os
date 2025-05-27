@@ -174,11 +174,23 @@ pub struct MetadataHeader {
     /// Block device table descriptor.
     pub block_devices: MetadataTableDescriptor,
     /// Flags are informational. See `HEADER_FLAG_*` constants for possible values. This field is
-    /// only found in metadata header version 1.2+.
-    // TODO(https://fxbug.dev/404952286): Add `HEADER_FLAG_*` constants.
-    pub flags: u32,
+    /// only found in metadata header version 1.2+. New flags may be added without bumping the
+    /// version.
+    pub flags: MetadataHeaderFlags,
     /// Reserved zero, pad to 256 bytes. This is only included in metadata header version 1.2+.
     pub reserved: [u8; 124],
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Immutable, FromBytes, IntoBytes)]
+pub struct MetadataHeaderFlags(u32);
+bitflags! {
+    impl MetadataHeaderFlags: u32 {
+        /// This device uses Virtual A/B. Note that on retrofit devices, the expanded header (and
+        /// hence this flag) may not be present.
+        const VIRTUAL_AB_DEVICE = 0x1;
+        /// This device has overlays activated via "adb remount".
+        const OVERLAYS_ACTIVE = 0x2;
+    }
 }
 
 /// Size of the older compatible version of metadata header which includes all but `flags` and
@@ -209,7 +221,7 @@ impl MetadataHeader {
                 "Incompatible metadata header struct size."
             );
             // If metadata header is the previous version, zero the fields that did not exist.
-            self.flags = 0;
+            self.flags = MetadataHeaderFlags::empty();
             self.reserved = [0; 124];
         } else {
             ensure!(
@@ -697,7 +709,7 @@ mod tests {
         extents: MetadataTableDescriptor { offset: 52, num_entries: 1, entry_size: 24 },
         groups: MetadataTableDescriptor { offset: 76, num_entries: 1, entry_size: 48 },
         block_devices: MetadataTableDescriptor { offset: 124, num_entries: 1, entry_size: 64 },
-        flags: 1,
+        flags: MetadataHeaderFlags::VIRTUAL_AB_DEVICE,
         reserved: [0; 124],
     };
 
@@ -722,7 +734,7 @@ mod tests {
 
         // Zero the fields that does not exist in the older version of the metadata header before
         // calculating its checksum.
-        header.flags = 0;
+        header.flags = MetadataHeaderFlags::empty();
         header.reserved = [0; 124];
         let checksum = header.compute_checksum();
         header.header_checksum = checksum;
