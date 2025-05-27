@@ -61,14 +61,14 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "rules_python_internal",
     # Introduced by bzlmod
     "bazel_skylib",
-    "bazel_skylib~",
-    "bazel_tools~cc_configure_extension~local_config_cc",
+    "bazel_skylib+",
+    "bazel_tools+cc_configure_extension+local_config_cc",
     "platforms",
-    "platforms~host_platform~host_platform",
+    "platforms+host_platform+host_platform",
     "rules_license",
-    "rules_license~",
-    "rules_python~",
-    "rules_python~~internal_deps~rules_python_internal",
+    "rules_license+",
+    "rules_python+",
+    "rules_python++internal_deps+rules_python_internal",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.
