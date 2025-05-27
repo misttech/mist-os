@@ -5,3 +5,8 @@
 group("tests") {  # placeholder pending move from //zircon/system/ulib/c
   testonly = true
 }
+
+group("bootfs-tests") {
+  testonly = true
+  public_deps = [ "//zircon/system/ulib/c:bootfs-tests" ]
+}
