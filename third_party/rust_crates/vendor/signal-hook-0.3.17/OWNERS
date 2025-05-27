@@ -10,5 +10,4 @@ include /src/developer/ffx/plugins/repository/OWNERS
 include /src/developer/ffx/plugins/session/OWNERS
 include /src/developer/ffx/plugins/test/OWNERS
 include /src/developer/ffx/tools/starnix/OWNERS
-include /src/devices/lib/OWNERS
 include /tools/funnel/OWNERS

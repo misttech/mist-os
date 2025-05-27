@@ -7,4 +7,3 @@ include /src/security/bin/kms/OWNERS
 include /src/security/lib/scrutiny/OWNERS
 include /src/storage/OWNERS
 include /src/storage/lib/sparse/rust/OWNERS
-include /third_party/rust_crates/forks/fuse3/OWNERS

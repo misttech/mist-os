@@ -20,4 +20,3 @@ include /src/sys/lib/cm_fidl_validator/OWNERS
 include /src/sys/lib/component_id_index/OWNERS
 include /src/sys/lib/fidl-fuchsia-pkg-ext/OWNERS
 include /src/sys/pkg/OWNERS
-include /third_party/rust_crates/vendor/camino-1.1.9/OWNERS

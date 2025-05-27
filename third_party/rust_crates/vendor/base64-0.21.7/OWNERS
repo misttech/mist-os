@@ -15,4 +15,3 @@ include /src/storage/OWNERS
 include /src/sys/time/OWNERS
 include /src/tee/OWNERS
 include /src/testing/sl4f/OWNERS
-include /third_party/rust_crates/vendor/rustls-pemfile-1.0.4/OWNERS

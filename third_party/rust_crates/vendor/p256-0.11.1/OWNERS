@@ -5,5 +5,3 @@
 include /src/connectivity/bluetooth/OWNERS
 include /src/sys/pkg/OWNERS
 include /src/tee/OWNERS
-include /third_party/rust_crates/vendor/mock-omaha-server-0.3.4/OWNERS
-include /third_party/rust_crates/vendor/omaha_client-0.2.2/OWNERS

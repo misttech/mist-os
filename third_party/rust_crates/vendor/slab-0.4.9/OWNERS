@@ -8,5 +8,3 @@ include /src/lib/async-utils/OWNERS
 include /src/lib/fidl/OWNERS
 include /src/starnix/OWNERS
 include /src/storage/OWNERS
-include /third_party/rust_crates/forks/fuse3/OWNERS
-include /third_party/rust_crates/vendor/futures-util-0.3.30/OWNERS

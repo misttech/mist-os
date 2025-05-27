@@ -19,4 +19,3 @@ include /src/lib/fuchsia-async/OWNERS
 include /src/lib/fuchsia-hyper/OWNERS
 include /src/lib/network/OWNERS
 include /src/lib/tcp-stream-ext/OWNERS
-include /third_party/rust_crates/vendor/tokio-1.38.1/OWNERS

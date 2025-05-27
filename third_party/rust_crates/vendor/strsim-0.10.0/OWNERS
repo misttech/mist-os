@@ -3,5 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /scripts/fxtest/OWNERS
-include /third_party/rust_crates/vendor/darling_core-0.12.4/OWNERS
 include /tools/cmc/OWNERS

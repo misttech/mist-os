@@ -12,11 +12,4 @@ include /src/storage/OWNERS
 include /src/sys/lib/elf_runner/OWNERS
 include /src/testing/sl4f/OWNERS
 include /src/ui/testing/OWNERS
-include /third_party/rust_crates/forks/tracing-core/OWNERS
-include /third_party/rust_crates/vendor/ahash-0.8.11/OWNERS
-include /third_party/rust_crates/vendor/pem-0.8.3/OWNERS
-include /third_party/rust_crates/vendor/pest_meta-2.7.8/OWNERS
-include /third_party/rust_crates/vendor/thread_local-1.1.7/OWNERS
-include /third_party/rust_crates/vendor/tracing-log-0.2.0/OWNERS
-include /third_party/rust_crates/vendor/tracing-subscriber-0.3.18/OWNERS
 include /tools/shush/OWNERS

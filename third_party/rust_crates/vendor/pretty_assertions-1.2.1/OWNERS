@@ -38,7 +38,6 @@ include /src/sys/test_runners/OWNERS
 include /src/ui/lib/input_pipeline/OWNERS
 include /src/ui/testing/input_helper/OWNERS
 include /src/virtualization/OWNERS
-include /third_party/rust_crates/vendor/omaha_client-0.2.2/OWNERS
 include /tools/auto_owners/OWNERS
 include /tools/cargo-gnaw/OWNERS
 include /tools/component_id_index/OWNERS

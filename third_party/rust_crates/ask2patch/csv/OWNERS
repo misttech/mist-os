@@ -4,6 +4,4 @@
 
 include /src/developer/ffx/plugins/profile/memory/OWNERS
 include /src/developer/fuchsia-criterion/OWNERS
-include /third_party/rust_crates/forks/prettytable-rs/OWNERS
-include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
 include /tools/zedmon/OWNERS

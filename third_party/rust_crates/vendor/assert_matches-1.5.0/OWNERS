@@ -101,7 +101,6 @@ include /src/starnix/tools/OWNERS
 include /src/storage/OWNERS
 include /src/sys/OWNERS
 include /src/sys/component_manager/OWNERS
-include /src/sys/full-resolver/OWNERS
 include /src/sys/lib/cm_config/OWNERS
 include /src/sys/lib/cm_rust/testing/OWNERS
 include /src/sys/lib/cm_types/OWNERS

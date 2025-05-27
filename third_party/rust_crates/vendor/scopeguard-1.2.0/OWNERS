@@ -10,5 +10,4 @@ include /src/storage/OWNERS
 include /src/sys/component_manager/OWNERS
 include /src/sys/time/OWNERS
 include /src/virtualization/OWNERS
-include /third_party/rust_crates/vendor/lock_api-0.4.11/OWNERS
 include /tools/update_crates/OWNERS

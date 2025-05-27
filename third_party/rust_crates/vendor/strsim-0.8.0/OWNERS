@@ -3,5 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /scripts/fxtest/OWNERS
-include /third_party/rust_crates/vendor/clap-2.34.0/OWNERS
 include /tools/cmc/OWNERS

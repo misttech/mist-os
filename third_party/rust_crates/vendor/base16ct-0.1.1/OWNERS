@@ -2,6 +2,3 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/elliptic-curve-0.12.3/OWNERS
-include /third_party/rust_crates/vendor/sec1-0.3.0/OWNERS
-include /third_party/rust_crates/vendor/serdect-0.1.0/OWNERS

@@ -13,6 +13,7 @@ include /src/developer/ffx/plugins/log/OWNERS
 include /src/developer/ffx/plugins/package/OWNERS
 include /src/developer/ffx/plugins/product/OWNERS
 include /src/developer/ffx/plugins/repository/OWNERS
+include /src/developer/ffx/plugins/target/package/OWNERS
 include /src/developer/ffx/plugins/target/repository/OWNERS
 include /src/developer/ffx/plugins/target/screenshot/OWNERS
 include /src/developer/ffx/plugins/target/snapshot/OWNERS

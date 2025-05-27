@@ -4,4 +4,3 @@
 
 include /src/connectivity/network/dns/OWNERS
 include /src/connectivity/network/tests/integration/OWNERS
-include /third_party/rust_crates/vendor/trust-dns-resolver-0.22.0/OWNERS

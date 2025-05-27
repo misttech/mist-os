@@ -11,4 +11,3 @@ include /src/lib/analytics/OWNERS
 include /src/lib/fuchsia-lockfile/OWNERS
 include /src/lib/fuchsia_nix/OWNERS
 include /src/lib/usb_rs/OWNERS
-include /third_party/rust_crates/forks/rustyline/OWNERS

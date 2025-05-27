@@ -22,12 +22,3 @@ include /src/sys/component_manager/OWNERS
 include /src/sys/lib/component-events/OWNERS
 include /src/sys/lib/runner/OWNERS
 include /src/sys/test_runners/OWNERS
-include /third_party/rust_crates/vendor/macro_rules_attribute-0.1.3/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_sys-5.0.0/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_ucal-5.0.0/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_udat-5.0.0/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_udata-5.0.0/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_uenum-5.0.0/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_uloc-5.0.0/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_unorm2-5.0.0/OWNERS
-include /third_party/rust_crates/vendor/rust_icu_ustring-5.0.0/OWNERS

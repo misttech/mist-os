@@ -28,7 +28,6 @@ include /src/developer/ffx/tools/efi/OWNERS
 include /src/developer/ffx/tools/profiler/OWNERS
 include /src/developer/ffx/tools/triage/OWNERS
 include /src/developer/fuchsia-criterion/OWNERS
-include /src/devices/lib/OWNERS
 include /src/diagnostics/OWNERS
 include /src/fonts/OWNERS
 include /src/intl/OWNERS
@@ -65,10 +64,6 @@ include /src/sys/test_manager/OWNERS
 include /src/sys/time/OWNERS
 include /src/testing/sl4f/OWNERS
 include /src/virtualization/OWNERS
-include /third_party/rust_crates/vendor/proptest-1.5.0/OWNERS
-include /third_party/rust_crates/vendor/prost-build-0.11.1/OWNERS
-include /third_party/rust_crates/vendor/rusty-fork-0.3.0/OWNERS
-include /third_party/rust_crates/vendor/tuf-0.3.0-beta13/OWNERS
 include /tools/OWNERS
 include /tools/auto_owners/OWNERS
 include /tools/cargo-gnaw/OWNERS

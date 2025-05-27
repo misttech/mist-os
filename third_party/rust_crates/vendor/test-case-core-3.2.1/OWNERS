@@ -2,4 +2,3 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/test-case-macros-3.2.1/OWNERS

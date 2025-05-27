@@ -30,8 +30,6 @@ include /src/sys/lib/component_id_index/OWNERS
 include /src/sys/lib/routing/OWNERS
 include /src/sys/pkg/OWNERS
 include /src/sysmem/OWNERS
-include /third_party/rust_crates/vendor/cargo_metadata-0.18.1/OWNERS
-include /third_party/rust_crates/vendor/pathdiff-0.2.1/OWNERS
 include /tools/OWNERS
 include /tools/auto_owners/OWNERS
 include /tools/cargo-gnaw/OWNERS

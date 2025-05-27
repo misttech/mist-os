@@ -15,5 +15,3 @@ include /src/lib/fidl_codec/OWNERS
 include /src/performance/OWNERS
 include /src/starnix/OWNERS
 include /src/ui/lib/input_pipeline/OWNERS
-include /third_party/rust_crates/forks/nom-language-0.1.0/OWNERS
-include /third_party/rust_crates/vendor/nom_locate-5.0.0/OWNERS

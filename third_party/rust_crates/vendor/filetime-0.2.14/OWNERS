@@ -2,5 +2,3 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/forks/notify/OWNERS
-include /third_party/rust_crates/vendor/tar-0.4.25/OWNERS
