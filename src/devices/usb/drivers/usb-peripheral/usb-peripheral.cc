@@ -399,10 +399,12 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
   }
   lock.release();
 
-  if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
-    // If you expected a call here, the listener_ might have been closed before it got called. This
-    // shouldn't crash the driver though.
-    fdf::debug("Failed to send FunctionRegistered request: {}", status.status_string());
+  if (listener_.is_valid()) {
+    if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
+      // If you expected a call here, the listener_ might have been closed before it got called.
+      // This shouldn't crash the driver though.
+      fdf::debug("Failed to send FunctionRegistered request: {}", status);
+    }
   }
   return ZX_OK;
 }
