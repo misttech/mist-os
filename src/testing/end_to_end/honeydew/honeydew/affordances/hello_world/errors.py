@@ -6,5 +6,5 @@
 from honeydew import errors
 
 
-class HelloWorldAffordanceError(errors.HoneydewError):
+class HelloWorldAffordanceError(errors.AffordanceError):
     """Raised by HelloWorld affordance."""

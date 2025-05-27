@@ -6,5 +6,5 @@
 from honeydew import errors
 
 
-class HoneydewLocationError(errors.HoneydewError):
+class HoneydewLocationError(errors.AffordanceError):
     """Raised by location affordance."""

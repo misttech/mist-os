@@ -6,5 +6,5 @@
 from honeydew import errors
 
 
-class HoneydewRtcError(errors.HoneydewError):
+class HoneydewRtcError(errors.AffordanceError):
     """Raised by RTC affordance."""

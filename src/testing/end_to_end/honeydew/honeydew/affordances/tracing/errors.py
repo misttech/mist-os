@@ -6,7 +6,7 @@
 from honeydew import errors
 
 
-class TracingError(errors.HoneydewError):
+class TracingError(errors.AffordanceError):
     """Raised by tracing affordance."""
 
 

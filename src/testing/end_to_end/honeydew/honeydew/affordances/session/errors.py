@@ -6,5 +6,5 @@
 from honeydew import errors
 
 
-class SessionError(errors.HoneydewError):
+class SessionError(errors.AffordanceError):
     """Exception for errors raised by Session."""
