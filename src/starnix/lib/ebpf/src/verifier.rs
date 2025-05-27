@@ -7,8 +7,8 @@
 use crate::scalar_value::{ScalarValueData, U32Range, U32ScalarValueData, U64Range};
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
-    DataWidth, EbpfError, EbpfInstruction, MapSchema, BPF_MAX_INSTS, BPF_STACK_SIZE,
-    GENERAL_REGISTER_COUNT, REGISTER_COUNT,
+    DataWidth, EbpfError, EbpfInstruction, MapSchema, BPF_MAX_INSTS, BPF_PSEUDO_MAP_IDX,
+    BPF_STACK_SIZE, GENERAL_REGISTER_COUNT, REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use fuchsia_sync::Mutex;
@@ -845,10 +845,10 @@ pub fn verify_program(
         if verification_context.iteration > 10 * BPF_MAX_INSTS {
             return error_and_log(verification_context.logger, "bpf byte code does not terminate");
         }
-        if context.pc >= verification_context.code.len() {
+        if context.pc >= code.len() {
             return error_and_log(verification_context.logger, "pc out of bounds");
         }
-        let visit_result = context.visit(&mut verification_context, &code[context.pc..]);
+        let visit_result = context.visit(&mut verification_context, code[context.pc]);
         match visit_result {
             Err(message) => {
                 return error_and_log(verification_context.logger, message);
@@ -1948,7 +1948,7 @@ impl ComputationContext {
                     calling_context: &verification_context.calling_context,
                     computation_context: &current,
                 },
-                &verification_context.code[current.pc..],
+                verification_context.code[current.pc],
             )?;
 
             // 2. Clear the state depending on the dependencies states
@@ -2747,19 +2747,8 @@ impl BpfVisitor for DataDependencies {
         &mut self,
         _context: &mut Self::Context<'a>,
         dst: Register,
-        _value: u64,
-        _jump_offset: i16,
-    ) -> Result<(), String> {
-        self.registers.remove(&dst);
-        Ok(())
-    }
-
-    fn load_map_ptr<'a>(
-        &mut self,
-        _context: &mut Self::Context<'a>,
-        dst: Register,
-        _map_index: u32,
-        _jump_offset: i16,
+        _src: u8,
+        _lower: u32,
     ) -> Result<(), String> {
         self.registers.remove(&dst);
         Ok(())
@@ -4023,35 +4012,47 @@ impl BpfVisitor for ComputationContext {
         &mut self,
         context: &mut Self::Context<'a>,
         dst: Register,
-        value: u64,
-        jump_offset: i16,
+        src: u8,
+        lower: u32,
     ) -> Result<(), String> {
-        bpf_log!(self, context, "lddw {}, 0x{:x}", display_register(dst), value);
-        let value = Type::from(value);
-        let parent = Some(Arc::new(self.clone()));
-        let mut next = self.jump_with_offset(jump_offset, parent)?;
-        next.set_reg(dst, value.into())?;
-        context.states.push(next);
-        Ok(())
-    }
+        let Some(next_instruction) = context.code.get(self.pc + 1) else {
+            return Err(format!("incomplete lddw"));
+        };
+        if next_instruction.src_reg() != 0 || next_instruction.dst_reg() != 0 {
+            return Err(format!("invalid lddw"));
+        }
 
-    fn load_map_ptr<'a>(
-        &mut self,
-        context: &mut Self::Context<'a>,
-        dst: Register,
-        map_index: u32,
-        jump_offset: i16,
-    ) -> Result<(), String> {
-        bpf_log!(self, context, "lddw {}, map_by_index({:x})", display_register(dst), map_index);
-        let value = context
-            .calling_context
-            .maps
-            .get(usize::try_from(map_index).unwrap())
-            .map(|schema| Type::ConstPtrToMap { id: map_index.into(), schema: *schema })
-            .ok_or_else(|| format!("lddw with invalid map index: {}", map_index))?;
+        let value = match src {
+            0 => {
+                let value = (lower as u64) | (((next_instruction.imm() as u32) as u64) << 32);
+                bpf_log!(self, context, "lddw {}, 0x{:x}", display_register(dst), value);
+                Type::from(value)
+            }
+            BPF_PSEUDO_MAP_IDX => {
+                let map_index = lower;
+                bpf_log!(
+                    self,
+                    context,
+                    "lddw {}, map_by_index({:x})",
+                    display_register(dst),
+                    map_index
+                );
+                context
+                    .calling_context
+                    .maps
+                    .get(usize::try_from(map_index).unwrap())
+                    .map(|schema| Type::ConstPtrToMap { id: map_index.into(), schema: *schema })
+                    .ok_or_else(|| format!("lddw with invalid map index: {}", map_index))?
+            }
+            _ => {
+                return Err(format!("invalid lddw"));
+            }
+        };
+
         let parent = Some(Arc::new(self.clone()));
-        let mut next = self.jump_with_offset(jump_offset, parent)?;
+        let mut next = self.jump_with_offset(1, parent)?;
         next.set_reg(dst, value.into())?;
+
         context.states.push(next);
         Ok(())
     }

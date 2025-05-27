@@ -7,8 +7,8 @@ use crate::{
     BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
     BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE,
     BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_K, BPF_LD, BPF_LDDW, BPF_LDX, BPF_LSH,
-    BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_PSEUDO_MAP_IDX, BPF_RSH, BPF_ST,
-    BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_X, BPF_XCHG, BPF_XOR,
+    BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_ST, BPF_STX, BPF_SUB,
+    BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_X, BPF_XCHG, BPF_XOR,
 };
 
 /// The index into the registers. 10 is the stack pointer.
@@ -471,16 +471,8 @@ pub trait BpfVisitor {
         &mut self,
         context: &mut Self::Context<'a>,
         dst: Register,
-        value: u64,
-        jump_offset: i16,
-    ) -> Result<(), String>;
-
-    fn load_map_ptr<'a>(
-        &mut self,
-        context: &mut Self::Context<'a>,
-        dst: Register,
-        map_index: u32,
-        jump_offset: i16,
+        src: u8,
+        lower: u32,
     ) -> Result<(), String>;
 
     fn load_from_packet<'a>(
@@ -506,12 +498,8 @@ pub trait BpfVisitor {
     fn visit<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
-        code: &[EbpfInstruction],
+        inst: EbpfInstruction,
     ) -> Result<(), String> {
-        if code.is_empty() {
-            return Err("incomplete instruction".to_string());
-        }
-        let inst = &code[0];
         let dst = inst.dst_reg();
         let src_imm = || Source::Value(inst.imm() as u64);
         let src_reg = || Source::Reg(inst.src_reg());
@@ -773,30 +761,7 @@ pub trait BpfVisitor {
             BPF_JMP_EXIT => self.exit(context),
 
             // 64-bit load.
-            BPF_LDDW => {
-                if code.len() < 2 {
-                    return Err(format!("incomplete lddw"));
-                }
-
-                let next_inst = &code[1];
-                if next_inst.src_reg() != 0 || next_inst.dst_reg() != 0 {
-                    return Err(format!("invalid lddw"));
-                }
-
-                match inst.src_reg() {
-                    0 => {
-                        let value: u64 = ((inst.imm() as u32) as u64)
-                            | (((next_inst.imm() as u32) as u64) << 32);
-                        return self.load64(context, inst.dst_reg(), value, 1);
-                    }
-                    BPF_PSEUDO_MAP_IDX => {
-                        return self.load_map_ptr(context, inst.dst_reg(), inst.imm() as u32, 1);
-                    }
-                    _ => {
-                        return Err(format!("invalid lddw"));
-                    }
-                }
-            }
+            BPF_LDDW => self.load64(context, dst, inst.src_reg(), inst.imm() as u32),
 
             // Legacy packet access instructions.
             // All read the packet from R6, storing the result in R0.

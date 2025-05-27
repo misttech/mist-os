@@ -22,6 +22,7 @@ pub fn execute<C: EbpfProgramContext>(
 ) -> u64 {
     assert!(arguments.len() < 5);
     let mut context = ComputationContext {
+        code,
         helpers,
         registers: Default::default(),
         stack: vec![MaybeUninit::uninit(); BPF_STACK_SIZE / std::mem::size_of::<BpfValue>()]
@@ -38,9 +39,7 @@ pub fn execute<C: EbpfProgramContext>(
         if let Some(result) = context.result {
             return result;
         }
-        context
-            .visit(run_context, &code[context.pc..])
-            .expect("verifier should have found an issue");
+        context.visit(run_context, code[context.pc]).expect("verifier should have found an issue");
     }
 }
 
@@ -53,7 +52,9 @@ impl BpfValue {
 
 /// The state of the computation as known by the interpreter at a given point in time.
 struct ComputationContext<'a, C: EbpfProgramContext> {
-    /// The program to execute.
+    /// The program being executed.
+    code: &'a [EbpfInstruction],
+    /// Helpers.
     helpers: &'a HashMap<u32, EbpfHelperImpl<C>>,
     /// Register 0 to 9.
     registers: [BpfValue; GENERAL_REGISTER_COUNT as usize],
@@ -944,25 +945,13 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         &mut self,
         _context: &mut Self::Context<'a>,
         dst: Register,
-        value: u64,
-        jump_offset: i16,
+        _src: u8,
+        lower: u32,
     ) -> Result<(), String> {
-        self.jump_with_offset(jump_offset);
+        let value = (lower as u64) | (((self.code[self.pc + 1].imm() as u32) as u64) << 32);
         self.set_reg(dst, value.into());
+        self.jump_with_offset(1);
         Ok(())
-    }
-
-    #[inline(always)]
-    fn load_map_ptr<'a>(
-        &mut self,
-        _context: &mut Self::Context<'a>,
-        _dst: Register,
-        _map_index: u32,
-        _jump_offset: i16,
-    ) -> Result<(), String> {
-        // ldimm64 instructions with src=BPF_PSEUDO_MAP_IDX should be replaced when the program is
-        // linked.
-        panic!("executing program with BPF_PSEUDO_MAP_IDX")
     }
 
     #[inline(always)]
