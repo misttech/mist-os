@@ -44,7 +44,7 @@ filegroup(
         "@rules_license//rules_gathering:standard_package",
         "@rules_license//rules:standard_package",
         "@platforms//:srcs",
-        "@host_platform//:constraints.bzl",
+        "@platforms//host:constraints_lib",
 
         # We cannot depend on @bazel_tools//tools:bzl_srcs since it will pull in
         # rules_java which we do not want to depend on. Depend on the specific
