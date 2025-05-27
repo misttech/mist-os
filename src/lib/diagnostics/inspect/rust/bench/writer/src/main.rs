@@ -526,6 +526,25 @@ fn bench_write_after_tree_cow_read(mut bench: criterion::Benchmark) -> criterion
     bench
 }
 
+fn bench_drop_string_reference(bench: criterion::Benchmark, size: usize) -> criterion::Benchmark {
+    bench.with_function(format!("StringRefs/drop_with_string_ref_cache/{size}"), move |b| {
+        let inspector = Inspector::default();
+        let root = inspector.root();
+        b.iter_with_large_setup(
+            || {
+                for i in 0..size {
+                    // store `size` unique entries in the reference cache
+                    root.record_int(format!("{i}"), 0);
+                }
+                // the point is just to get string references in the cache that don't
+                // match any of the extra ones stored above
+                root.create_string(NAME, NAME)
+            },
+            |p| drop(criterion::black_box(p)),
+        );
+    })
+}
+
 bench_numeric_property_fn!(int, i64, "IntProperty");
 bench_numeric_property_fn!(uint, u64, "UintProperty");
 bench_numeric_property_fn!(double, f64, "DoubleProperty");
@@ -561,6 +580,7 @@ fn main() {
     for prop_size in &[4, 8, 100, 2000, 2048, 10000] {
         bench = string_property_benchmarks(bench, *prop_size);
         bench = bytes_property_benchmarks(bench, *prop_size);
+        bench = bench_drop_string_reference(bench, *prop_size);
     }
     for array_size in &[32, 128, 240] {
         bench = int_array_property_benchmarks(bench, *array_size);

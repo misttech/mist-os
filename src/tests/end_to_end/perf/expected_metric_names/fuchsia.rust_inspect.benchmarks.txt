@@ -202,6 +202,12 @@ fuchsia.rust_inspect.benchmarks: StringProperty/set_again/2000
 fuchsia.rust_inspect.benchmarks: StringProperty/set_again/2048
 fuchsia.rust_inspect.benchmarks: StringProperty/set_again/4
 fuchsia.rust_inspect.benchmarks: StringProperty/set_again/8
+fuchsia.rust_inspect.benchmarks: StringRefs/drop_with_string_ref_cache/100
+fuchsia.rust_inspect.benchmarks: StringRefs/drop_with_string_ref_cache/10000
+fuchsia.rust_inspect.benchmarks: StringRefs/drop_with_string_ref_cache/2000
+fuchsia.rust_inspect.benchmarks: StringRefs/drop_with_string_ref_cache/2048
+fuchsia.rust_inspect.benchmarks: StringRefs/drop_with_string_ref_cache/4
+fuchsia.rust_inspect.benchmarks: StringRefs/drop_with_string_ref_cache/8
 fuchsia.rust_inspect.benchmarks: UintArrayProperty/add/128
 fuchsia.rust_inspect.benchmarks: UintArrayProperty/add/240
 fuchsia.rust_inspect.benchmarks: UintArrayProperty/add/32
