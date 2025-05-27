@@ -107,7 +107,10 @@ config("libmagma_lib") {
 # --localize-hidden to hide all the unwanted symbols.
 hermetic_static_library("magma_client") {
   deps = [ ":libmagma_static" ]
-  localize_symbols = [ "trace_generate_nonce" ]
+  localize_symbols = [
+    "trace_generate_nonce",
+    "trace_time_based_id",
+  ]
 }
 
 # Targets can depend on this to link in the hermetic magma client library.

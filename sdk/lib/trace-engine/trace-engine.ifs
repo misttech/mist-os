@@ -60,5 +60,6 @@ Symbols:
   - { Name: trace_release_context, Type: Func }
   - { Name: trace_release_prolonged_context, Type: Func }
   - { Name: trace_state, Type: Func }
+  - { Name: trace_time_based_id, Type: Func }
   - { Name: trace_unregister_observer, Type: Func }
 ...

@@ -42,6 +42,21 @@ __BEGIN_CDECLS
 // This function is thread-safe and lock-free.
 uint64_t trace_generate_nonce(void);
 
+// Creates a new `id` based on the current time from boot (48 bit), thread id (8 bit) and
+// self increasing number (8 bit), with high probability, avoid the bug where UIs group
+// async durations with the same trace id but different process ids.
+// `trace_generate_nonce` is likely to hit the UI bug because it (per process) generates
+// trace ids consecutively starting from 1.
+// TODO(https://fxbug.dev/42054669) Delete this and migrate clients to `trace_generate_nonce`
+// when:
+// 1. UIs stop grouping async durations with the same trace id but different process ids.
+// 2. input events tracing cross components has uid for flow id.
+//
+// This function is thread-safe and lock-free.
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+uint64_t trace_time_based_id(zx_koid_t thread_id) ZX_AVAILABLE_SINCE(NEXT);
+#endif
+
 // Describes the state of the trace engine.
 typedef enum {
   // Trace instrumentation is inactive.

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/trace/event.h>
+#include <zircon/availability.h>
 #include <zircon/syscalls.h>
 
 namespace {
@@ -243,3 +244,17 @@ void trace_internal_send_alert_and_release_context(trace_context_t* context,
   trace_context_send_alert(context, alert_name);
   trace_release_context(context);
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+uint64_t trace_internal_time_based_id(void) {
+  trace_context_t* ctx = trace_acquire_context();
+  if (unlikely(ctx)) {
+    trace_thread_ref_t thread_ref;
+    trace_context_register_current_thread(ctx, &thread_ref);
+
+    return trace_time_based_id(thread_ref.inline_thread_koid);
+  }
+
+  return 0;
+}
+#endif
