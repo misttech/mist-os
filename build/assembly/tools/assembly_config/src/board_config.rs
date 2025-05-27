@@ -100,6 +100,11 @@ pub fn hybrid(args: &HybridBoardArgs) -> Result<()> {
         }
     }
 
+    // Replace the partitions config.
+    if let Some(partitions_config) = &args.replace_partitions_config {
+        config.partitions_config = Some(DirectoryPathBuf(partitions_config.clone()));
+    }
+
     config.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
 }
@@ -143,6 +148,7 @@ impl ToString for BibReference {
 mod tests {
     use super::*;
     use assembly_config_schema::{BoardInputBundle, BoardInputBundleEntry};
+    use assembly_partitions_config::{Partition, Slot};
     use camino::Utf8PathBuf;
     use std::collections::BTreeSet;
     use std::fs::File;
@@ -415,6 +421,14 @@ mod tests {
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 
+        // Write a new partitions config.
+        let partitions =
+            vec![Partition::ZBI { name: "my_zbi_part".into(), slot: Slot::A, size: None }];
+        let partitions_path = tmp_path.join("my_partitions");
+        let partitions_config =
+            PartitionsConfig { partitions: partitions.clone(), ..Default::default() };
+        partitions_config.write_to_dir(&partitions_path, None::<Utf8PathBuf>).unwrap();
+
         // Create a hybrid board and replace the BIB using the set.
         let hybrid_board_path = tmp_path.join("my_hybrid_board");
         let args = HybridBoardArgs {
@@ -422,6 +436,7 @@ mod tests {
             output: hybrid_board_path.clone(),
             replace_bibs_from_board: None,
             replace_bib_sets: vec![bib_set_path],
+            replace_partitions_config: Some(partitions_path),
             depfile: None,
         };
         hybrid(&args).unwrap();
@@ -434,5 +449,10 @@ mod tests {
         let bib = BoardInputBundle::from_dir(bib_path).unwrap();
         let expected = BTreeSet::<String>::from(["after".to_string()]);
         assert_eq!(expected, bib.kernel_boot_args);
+
+        // Ensure the board contains the correct partitions config.
+        let new_partitions_path = board.partitions_config.unwrap().0;
+        let new_partitions = PartitionsConfig::from_dir(new_partitions_path).unwrap();
+        assert_eq!(partitions, new_partitions.partitions);
     }
 }

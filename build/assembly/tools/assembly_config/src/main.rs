@@ -327,6 +327,10 @@ struct HybridBoardArgs {
     #[argh(option)]
     replace_bib_sets: Vec<Utf8PathBuf>,
 
+    /// a partitions config to insert into `config`.
+    #[argh(option)]
+    replace_partitions_config: Option<Utf8PathBuf>,
+
     /// a depfile to write.
     #[argh(option)]
     depfile: Option<Utf8PathBuf>,

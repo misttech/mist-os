@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/hybrid_board_configuration.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/test_spec.gni")
@@ -376,6 +377,21 @@ template("boot_test") {
       deps = [ ":$rebased_image_manifest_target" ]
     }
   } else if (current_toolchain == default_toolchain) {
+    if (!has_board) {
+      # Configurations that don't declare a board would fail to generate
+      # a hybrid board below. Passing an invalid board to assembled_system
+      # is alright for GN as long as it isn't built.
+      _board_config_label = board_configuration_label
+    } else {
+      # Take the existing board, and shove the new partitions config in.
+      board_config_target = "_boot_test.${target_name}.create_board_config"
+      hybrid_board_configuration(board_config_target) {
+        board_config = board_configuration_label
+        replace_partitions_config = _partition_config_label
+      }
+      _board_config_label = ":${board_config_target}"
+    }
+
     assembled_system_target = "_$main_target.assembled_system"
     assembled_system_kernel_zbi = invoker.zbi
     assembled_system_kernel_image_name = get_label_info(invoker.zbi, "name")
@@ -385,7 +401,7 @@ template("boot_test") {
       testonly = true
       image_name = "fuchsia"
       namespace = assembled_system_target
-      board_config_label = board_configuration_label
+      board_config_label = _board_config_label
       product_assembly_config_label =
           "//build/testing/boot_tests:product_config"
       kernel_zbi = assembled_system_kernel_zbi
