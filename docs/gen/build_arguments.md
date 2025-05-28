@@ -392,6 +392,15 @@ Valid options:
 
 From //build/bazel/remote_services.gni:48
 
+### blob_refault_tracking
+
+Enables the tracking of refaults within blobs. A refault is when a page within a blob that was
+previously supplied got evicted by the kernel and needs to supplied again.
+
+**Current value (from the default):** `false`
+
+From //src/storage/fxfs/platform/BUILD.gn:10
+
 ### blobfs_capacity
 
 Maximum allowable contents for the /blob in a release mode build for
@@ -2179,7 +2188,7 @@ From //build/toolchain/rbe.gni:169
 
 ### data_filesystem_format
 
-Set to one of "minfs", "fxfs", "f2fs" (unstable).
+Set to one of "minfs", "fxfs", "f2fs".
 If set to anything other than "minfs", any existing minfs partition will be
 migrated in-place to the specified format when fshost mounts it.
 
