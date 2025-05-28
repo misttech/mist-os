@@ -7963,19 +7963,19 @@ rustc_library("httparse-v1_9_4") {
   applicable_licenses = [ ":httparse-v1_9_4.license" ]
 }
 
-license("httpdate-v1_0_2.license") {
+license("httpdate-v1_0_3.license") {
   public_package_name = "httpdate"
   license_files = [
-    "//third_party/rust_crates/vendor/httpdate-1.0.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/httpdate-1.0.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/httpdate-1.0.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/httpdate-1.0.3/LICENSE-MIT",
   ]
 }
 
-rustc_library("httpdate-v1_0_2") {
+rustc_library("httpdate-v1_0_3") {
   crate_name = "httpdate"
-  source_root = "//third_party/rust_crates/vendor/httpdate-1.0.2/src/lib.rs"
-  output_name = "httpdate-cbaf0261c4491eb6"
-  edition = "2018"
+  source_root = "//third_party/rust_crates/vendor/httpdate-1.0.3/src/lib.rs"
+  output_name = "httpdate-ea90f40428a8f083"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -7986,13 +7986,13 @@ rustc_library("httpdate-v1_0_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=cbaf0261c4491eb6",
-    "-Cextra-filename=-cbaf0261c4491eb6",
+    "-Cmetadata=ea90f40428a8f083",
+    "-Cextra-filename=-ea90f40428a8f083",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":httpdate-v1_0_2.license" ]
+  applicable_licenses = [ ":httpdate-v1_0_3.license" ]
 }
 
 license("humansize-v1_1_1.license") {
@@ -8049,7 +8049,7 @@ rustc_library("hyper-v0_14_19") {
   deps += [ ":http-body-v0_4_4" ]
   deps += [ ":http-v0_2_4" ]
   deps += [ ":httparse-v1_9_4" ]
-  deps += [ ":httpdate-v1_0_2" ]
+  deps += [ ":httpdate-v1_0_3" ]
   deps += [ ":itoa-v1_0_14" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
   deps += [ ":tokio-v1_38_1" ]
