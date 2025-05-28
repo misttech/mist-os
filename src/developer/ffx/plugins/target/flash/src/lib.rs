@@ -123,13 +123,13 @@ impl FfxMain for FlashTool {
 }
 
 fn preflight_checks<W: Write>(cmd: &FlashCommand, mut writer: W) -> Result<()> {
-    if cmd.product_bundle_path.is_some() {
+    if cmd.manifest_path.is_some() {
         // TODO(https://fxbug.dev/42076631)
         writeln!(writer, "{}WARNING:{} specifying the flash manifest via a positional argument is deprecated. Use the --manifest flag instead (https://fxbug.dev/42076631)", color::Fg(color::Red), style::Reset)
 .with_context(||"writing warning to users")
 .map_err(fho::Error::from)?;
     }
-    if cmd.product_bundle_path.is_some() && cmd.manifest.is_some() {
+    if cmd.manifest_path.is_some() && cmd.manifest.is_some() {
         ffx_bail!("Error: the manifest must be specified either by positional argument or the --manifest flag")
     }
     Ok(())
@@ -188,16 +188,16 @@ async fn preprocess_flash_cmd(
         }
     };
 
-    if cmd.product_bundle_path.is_some() {
-        if !std::path::Path::exists(cmd.product_bundle_path.clone().unwrap().as_path()) {
+    if cmd.manifest_path.is_some() {
+        if !std::path::Path::exists(cmd.manifest_path.clone().unwrap().as_path()) {
             ffx_bail!(
                 "Manifest path: {} does not exist",
-                cmd.product_bundle_path.clone().unwrap().display()
+                cmd.manifest_path.clone().unwrap().display()
             )
         }
     }
 
-    if cmd.product_bundle.is_none() && cmd.product_bundle_path.is_none() && cmd.manifest.is_none() {
+    if cmd.product_bundle.is_none() && cmd.manifest_path.is_none() && cmd.manifest.is_none() {
         let product_path: String = ffx_config::get("product.path")?;
         let message = format!(
             "No product bundle or manifest passed. Inferring product bundle path from config: {}",
@@ -720,7 +720,7 @@ mod test {
         assert!(preprocess_flash_cmd(
             &mut writer,
             &FlashCommand {
-                product_bundle_path: Some(PathBuf::from("ffx_test_does_not_exist")),
+                manifest_path: Some(PathBuf::from("ffx_test_does_not_exist")),
                 ..Default::default()
             }
         )
@@ -765,7 +765,7 @@ mod test {
         assert!(preprocess_flash_cmd(
             &mut writer,
             &FlashCommand {
-                product_bundle_path: Some(PathBuf::from(tmp_file_name)),
+                manifest_path: Some(PathBuf::from(tmp_file_name)),
                 authorized_keys: Some("ssh_does_not_exist".to_string()),
                 ..Default::default()
             },
@@ -784,7 +784,7 @@ mod test {
         assert!(preflight_checks(
             &FlashCommand {
                 manifest: Some(PathBuf::from(tmp_file_name.clone())),
-                product_bundle_path: Some(PathBuf::from(tmp_file_name)),
+                manifest_path: Some(PathBuf::from(tmp_file_name)),
                 ..Default::default()
             },
             &mut writer

@@ -2,7 +2,7 @@
   "name": "flash",
   "description": "Flash an image to a target device",
   "examples": [
-    "To flash a specific image:\n\n    With a Product Bundle\n\n    $ ffx target flash /path/to/product_bundle\n\n    With a flash manifest:\n\n    $ ffx target flash --manifest $(fx get-build-dir)/flash.json --product fuchsia\n\nTo include SSH keys as well:\n\n    $ ffx target flash\n    --authorized-keys ~/fuchsia/.ssh/authorized_keys\n    -- manifest\n    $(fx get-build-dir)/flash.json\n    --product fuchsia"
+    "To flash a specific image:\n\n    $ ffx target flash --manifest $(fx get-build-dir)/flash.json --product fuchsia\n\nTo include SSH keys as well:\n\n    $ ffx target flash\n    --authorized-keys ~/fuchsia/.ssh/authorized_keys\n    $(fx get-build-dir)/flash.json\n    --product fuchsia"
   ],
   "flags": [
     {
@@ -128,8 +128,8 @@
   "commands": [],
   "positionals": [
     {
-      "name": "product_bundle_path",
-      "description": "path to the product bundle to flash",
+      "name": "manifest_path",
+      "description": "path to flashing manifest or zip file containing images and manifest",
       "optionality": "optional",
       "hidden": false
     }
