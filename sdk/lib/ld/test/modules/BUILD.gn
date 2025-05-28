@@ -81,6 +81,10 @@ per_test_suffices = [
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
   "RtldNoLoadBasic",
+  "RtldNoDeleteBasic",
+  "RtldNoDeletePromotion",
+  "RtldNoDeleteDep",
+  "RtldNoDeleteDepPromotion",
   "DlIteratePhdrBasic",
   "ModuleNameOwnership",
 ]

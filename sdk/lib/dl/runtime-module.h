@@ -138,7 +138,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // the abi and TLS information onto the RuntimeModule.
   void SetStartupModule(const AbiModule& abi_module, const ld::abi::Abi<>& abi) {
     abi_module_ = abi_module;
-    can_unload_ = false;
+    no_delete_ = true;
     initialized_ = true;
 
     size_t tls_modid = abi_module_.tls_modid;
@@ -211,6 +211,15 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr void set_global() { abi_module_.symbols_visible = true; }
   constexpr bool is_local() const { return !is_global(); }
 
+  // Prevent this module from being unloaded. Once this is set (usually by
+  // passing RTLD_NODELETE to dlopen), it cannot be unset. Setting this on a
+  // module implies that none of its dependencies can be unloaded either: since
+  // this module will live for the lifetime of the main program, so will its
+  // dependencies.
+  constexpr void set_no_delete() {
+    no_delete_ = true;
+  }
+
   // This is the list of TlsDesc objects (see tls-desc-resolver.h) that was set
   // during TLS relocation for this module. The RuntimeModule owns this list:
   // it will get destroyed with the module.
@@ -241,7 +250,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
   size_type static_tls_bias_ = 0;
-  bool can_unload_ = true;
+  bool no_delete_ = false;
   bool initialized_ = false;
   TlsdescIndirectList tls_desc_indirect_list_;
 };

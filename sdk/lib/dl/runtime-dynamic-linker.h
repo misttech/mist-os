@@ -106,6 +106,9 @@ class RuntimeDynamicLinker {
       if (mode & OpenSymbolScope::kGlobal) {
         MakeGlobal(found->module_tree());
       }
+      if (mode & OpenFlags::kNodelete) {
+        found->set_no_delete();
+      }
       return diag.ok(found);
     }
 
@@ -144,6 +147,10 @@ class RuntimeDynamicLinker {
     // ordering of all loaded modules.
     if (mode & OpenSymbolScope::kGlobal) {
       MakeGlobal(root_module.module_tree());
+    }
+
+    if (mode & OpenFlags::kNodelete) {
+      root_module.set_no_delete();
     }
 
     return diag.ok(&root_module);
