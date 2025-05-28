@@ -478,6 +478,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     {
       sdmmc_config::Config fake_config;
       fake_config.enable_suspend() = supply_power_framework;
+      fake_config.storage_power_management_enabled() = supply_power_framework;
       start_args.config(fake_config.ToVmo());
     }
 
