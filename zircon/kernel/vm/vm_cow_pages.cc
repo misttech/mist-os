@@ -2594,19 +2594,62 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
-                                                 VmCowPages* page_owner, vm_page_t* page,
-                                                 uint64_t owner_offset,
-                                                 AnonymousPageRequest* page_request) {
-  DEBUG_ASSERT(page != vm_get_zero_page());
+void VmCowPages::DecrementCowContentShareCount(VmPageOrMarkerRef content, uint64_t offset,
+                                               ScopedPageFreedList& list,
+                                               VmCompression* compression) {
+  // Only hidden nodes have content with a non-zero share count.
+  DEBUG_ASSERT(is_hidden());
+
+  // Release the reference we held to the forked page.
+  if (content->IsPage()) {
+    vm_page_t* page = content->Page();
+    if (page->object.share_count > 0) {
+      // The page is now shared one less time.
+      page->object.share_count--;
+    } else {
+      // Remove the page from the owner.
+      VmPageOrMarker removed = page_list_.RemoveContent(offset);
+      vm_page* removed_page = removed.ReleasePage();
+      DEBUG_ASSERT(removed_page == page);
+      Pmm::Node().GetPageQueues()->Remove(removed_page);
+      DEBUG_ASSERT(!page->is_loaned());
+
+      list_add_tail(list.List(), &page->queue_node);
+    }
+  } else {
+    DEBUG_ASSERT(content->IsReference());
+    uint32_t prev = compression->GetMetadata(content->Reference());
+    if (prev > 0) {
+      compression->SetMetadata(content->Reference(), prev - 1);
+    } else {
+      VmPageOrMarker removed = page_list_.RemoveContent(offset);
+      compression->Free(removed.ReleaseReference());
+    }
+  }
+}
+
+zx_status_t VmCowPages::CloneCowContentAsZeroLocked(uint64_t offset, ScopedPageFreedList& list,
+                                                    VmCowPages* content_owner,
+                                                    VmPageOrMarkerRef owner_content,
+                                                    uint64_t owner_offset) {
   DEBUG_ASSERT(parent_);
-  DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page, offset));
   // We only clone pages from hidden to visible nodes.
-  DEBUG_ASSERT(page_owner->is_hidden());
+  DEBUG_ASSERT(content_owner->is_hidden());
   DEBUG_ASSERT(!is_hidden());
   // We don't want to handle intervals here. They should only be present when this node is backed by
   // a user pager, and such nodes don't have parents so cannot be the target of a forked page.
   DEBUG_ASSERT(!is_source_preserving_page_content());
+
+  if (owner_content->IsMarker()) {
+    // Markers do not have ref counts so nothing else to do, this will already see this as zero.
+    return ZX_OK;
+  }
+  // Only other valid items should be pages or references.
+  DEBUG_ASSERT(owner_content->IsPageOrRef());
+  // Performing a cow zero of a parent content marker would require clearing a slot in |this| page
+  // list, which is a problem for our caller who might be iterating that some page list. As such
+  // this method may not be used if there might be parent content markers.
+  DEBUG_ASSERT(!node_has_parent_content_markers());
 
   // Go ahead and insert the new zero marker into the target. We don't have anything to rollback
   // if this fails so we can just bail immediately.
@@ -2618,20 +2661,8 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
     return prev_content.status_value();
   }
   DEBUG_ASSERT(prev_content->IsEmpty());
-
-  // Release the reference we held to the forked page.
-  if (page->object.share_count > 0) {
-    // The page is now shared one less time.
-    page->object.share_count--;
-  } else {
-    // Remove the page from the owner.
-    VmPageOrMarker removed = page_owner->page_list_.RemoveContent(owner_offset);
-    vm_page* removed_page = removed.ReleasePage();
-    DEBUG_ASSERT(removed_page == page);
-    pmm_page_queues()->Remove(removed_page);
-
-    list_add_tail(freed_list, &page->queue_node);
-  }
+  content_owner->DecrementCowContentShareCount(owner_content, owner_offset, list,
+                                               Pmm::Node().GetPageCompression());
 
   return ZX_OK;
 }
@@ -4325,19 +4356,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
     // perform slightly more complex cow forking.
     const InitialPageContent& content = get_initial_page_content(offset);
     if (!slot && content.page_owner.locked_or(this).is_hidden()) {
-      // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow
-      // clone, we are not going to actually need to read the target page we are cloning, and hence
-      // it does not actually need to get converted.
-      if (content.page_or_marker->IsReference()) {
-        zx_status_t result = content.page_owner.locked_or(this).ReplaceReferenceWithPageLocked(
-            content.page_or_marker, content.owner_offset, page_request->GetAnonymous());
-        if (result != ZX_OK) {
-          return result;
-        }
-      }
-      zx_status_t result = CloneCowPageAsZeroLocked(
-          offset, deferred.FreedList(this).List(), &content.page_owner.locked_or(this),
-          content.page_or_marker->Page(), content.owner_offset, page_request->GetAnonymous());
+      zx_status_t result = CloneCowContentAsZeroLocked(
+          offset, deferred.FreedList(this), &content.page_owner.locked_or(this),
+          content.page_or_marker, content.owner_offset);
       if (result != ZX_OK) {
         return result;
       }
@@ -4406,36 +4427,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
           DEBUG_ASSERT(can_see_parent(offset) && parent_has_content(offset) &&
                        !root_has_page_source());
           const InitialPageContent& content = get_initial_page_content(offset);
-          if (content.page_or_marker->IsPage()) {
-            vm_page_t* page = content.page_or_marker->Page();
-            // Release the reference we held to the forked page.
-            if (page->object.share_count > 0) {
-              // The page is now shared one less time.
-              page->object.share_count--;
-            } else {
-              // Remove the page from the owner.
-              VmPageOrMarker removed =
-                  content.page_owner.locked().page_list_.RemoveContent(content.owner_offset);
-              vm_page* removed_page = removed.ReleasePage();
-              DEBUG_ASSERT(removed_page == page);
-              pmm_page_queues()->Remove(removed_page);
-
-              list_add_tail(deferred.FreedList(this).List(), &page->queue_node);
-            }
-          } else if (content.page_or_marker->IsReference()) {
-            VmCompression* compression = Pmm::Node().GetPageCompression();
-            uint32_t prev = compression->GetMetadata(content.page_or_marker->Reference());
-            if (prev > 0) {
-              compression->SetMetadata(content.page_or_marker->Reference(), prev - 1);
-            } else {
-              VmPageOrMarker removed =
-                  content.page_owner.locked().page_list_.RemoveContent(content.owner_offset);
-              compression->Free(removed.ReleaseReference());
-            }
-          } else {
-            // Markers do not have ref counts and so we just leave it.
-            DEBUG_ASSERT(content.page_or_marker->IsMarker());
-          }
+          content.page_owner.locked_or(this).DecrementCowContentShareCount(
+              content.page_or_marker, content.owner_offset, deferred.FreedList(this),
+              Pmm::Node().GetPageCompression());
           *slot = VmPageOrMarker::Empty();
           *zeroed_len_out += PAGE_SIZE;
           return ZX_ERR_NEXT;
