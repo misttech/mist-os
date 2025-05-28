@@ -130,28 +130,19 @@ zx_status_t KTrace::Allocate() {
 }
 
 zx::result<KTrace::Reservation> KTrace::Reserve(uint64_t header) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
   // Compute the number of bytes we need to reserve from the provided fxt header.
   const uint32_t num_words = fxt::RecordFields::RecordSize::Get<uint32_t>(header);
   const uint32_t num_bytes = num_words * sizeof(uint64_t);
-
-  // Disable interrupts.
-  // We have to do this before we check if writes are enabled, otherwise a racing Stop operation
-  // may disable writes and send the IPI it uses to verify that we're done writing before we begin
-  // our write.
-  // We also have to do this before we check which CPU this thread is on, otherwise this thread
-  // could be migrated across CPUs after we check the current CPU number, leading to an invalid,
-  // cross-CPU write.
-  interrupt_saved_state_t saved_state = arch_interrupt_save();
-  auto restore_interrupt_state =
-      fit::defer([&saved_state]() { arch_interrupt_restore(saved_state); });
 
   // If writes are disabled, then return an error. We return ZX_ERR_BAD_STATE, because this means
   // that tracing was disabled.
   //
   // It is valid for writes to be disabled immediately after this check. This is ok because Stop,
   // which disables writes, will follow up with an IPI to all cores and wait for those IPIs to
-  // return. Because we disabled interrupts prior to this check, that IPI will not return until
-  // this write operation is complete.
+  // return. Because interrupts have been disabled prior to this check, that IPI will not return
+  // until this write operation is complete.
   if (!WritesEnabled()) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -163,11 +154,7 @@ zx::result<KTrace::Reservation> KTrace::Reserve(uint64_t header) {
   if (result.is_error()) {
     return result.take_error();
   }
-  Reservation res(ktl::move(result.value()), saved_state, header);
-
-  // The reservation is now responsible for restoring interrupt state.
-  restore_interrupt_state.cancel();
-
+  Reservation res(ktl::move(result.value()), header);
   return zx::ok(ktl::move(res));
 }
 
@@ -175,6 +162,8 @@ void KTrace::ReportMetadata() {
   // Emit the FXT metadata records. These must be emitted on the boot CPU to ensure that they
   // are read at the very beginning of the trace.
   auto emit_starting_records = [](void* arg) {
+    DEBUG_ASSERT(arch_ints_disabled());
+
     // Emit the magic and initialization records.
     KTrace* ktrace = static_cast<KTrace*>(arg);
     zx_status_t status = fxt::WriteMagicNumberRecord(ktrace);

@@ -825,23 +825,19 @@ class KTrace {
   // single-writer invariant of each per-CPU buffer and lead to subtle concurrency bugs that may
   // manifest as corrupt trace data. Unfortunately, there is no way for us to programmatically
   // ensure this, so we do our best by asserting that interrupts are disabled in every method of
-  // this class. It is therefore up to the caller to ensure that interrupts are never re-enabled.
+  // this class. It is therefore up to the caller to ensure that interrupts are disabled for the
+  // lifetime of this object.
   class Reservation {
    public:
-    ~Reservation() {
-      DEBUG_ASSERT(arch_ints_disabled());
-      arch_interrupt_restore(state_);
-    }
+    ~Reservation() { DEBUG_ASSERT(arch_ints_disabled()); }
 
     // Disallow copies and move assignment, but allow moves.
     // Disallowing move assignment allows the saved interrupt state to be const.
     Reservation(const Reservation&) = delete;
     Reservation& operator=(const Reservation&) = delete;
     Reservation& operator=(Reservation&&) = delete;
-    Reservation(Reservation&& other)
-        : reservation_(ktl::move(other.reservation_)), state_(other.state_) {
+    Reservation(Reservation&& other) : reservation_(ktl::move(other.reservation_)) {
       DEBUG_ASSERT(arch_ints_disabled());
-      other.state_ = kNoopInterruptSavedState;
     }
 
     void WriteWord(uint64_t word) {
@@ -872,15 +868,13 @@ class KTrace {
 
    private:
     friend class KTrace;
-    Reservation(PerCpuBuffer::Reservation reservation, interrupt_saved_state_t state,
-                uint64_t header)
-        : reservation_(ktl::move(reservation)), state_(state) {
+    Reservation(PerCpuBuffer::Reservation reservation, uint64_t header)
+        : reservation_(ktl::move(reservation)) {
       DEBUG_ASSERT(arch_ints_disabled());
       WriteWord(header);
     }
 
     PerCpuBuffer::Reservation reservation_;
-    interrupt_saved_state_t state_;
   };
 
   // Control is responsible for starting, stopping, or rewinding the ktrace buffer.
@@ -912,7 +906,14 @@ class KTrace {
   //    * On failure, a zx_status_t error code is returned.
   zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len);
 
-  // Reserve reserves a slot in the ring buffer to write a record into.
+  // Reserve reserves a slot of memory to write a record into.
+  //
+  // This is likely not the method you want to use. In fact, it is exposed as a public method only
+  // because the FXT serializer library requires it. If you're trying to write a record to the
+  // global KTrace buffer, prefer using the Emit* methods below instead.
+  //
+  // This method MUST be invoked with interrupts disabled to enforce the single-writer invariant of
+  // the per-CPU buffers.
   zx::result<Reservation> Reserve(uint64_t header);
 
   // Sentinel type for unused arguments.
@@ -940,6 +941,7 @@ class KTrace {
   // category is enabled.
   static void Probe(Context context, const fxt::InternedString& label, uint64_t a, uint64_t b) {
     if (CategoryEnabled("kernel:probe"_category)) {
+      InterruptDisableGuard guard;
       const fxt::StringRef name_ref = fxt::StringRef{label};
       fxt::WriteInstantEventRecord(
           &GetInstance(), KTrace::Timestamp(), ThreadRefFromContext(context),
@@ -954,6 +956,7 @@ class KTrace {
   static void EmitKernelObject(zx_koid_t koid, zx_obj_type_t obj_type,
                                const fxt::StringRef<name_type>& name,
                                const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(koid), obj_type, name,
@@ -966,6 +969,7 @@ class KTrace {
   static void EmitComplete(const fxt::InternedCategory& category,
                            const fxt::StringRef<name_type>& label, uint64_t start_time,
                            uint64_t end_time, Context context, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationCompleteEventRecord(
@@ -979,6 +983,7 @@ class KTrace {
   static void EmitInstant(const fxt::InternedCategory& category,
                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
                           Context context, Unused, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteInstantEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -991,6 +996,7 @@ class KTrace {
   static void EmitDurationBegin(const fxt::InternedCategory& category,
                                 const fxt::StringRef<name_type>& label, uint64_t timestamp,
                                 Context context, Unused, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationBeginEventRecord(
@@ -1004,6 +1010,7 @@ class KTrace {
   static void EmitDurationEnd(const fxt::InternedCategory& category,
                               const fxt::StringRef<name_type>& label, uint64_t timestamp,
                               Context context, Unused, const ktl::tuple<Ts...> args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1017,6 +1024,7 @@ class KTrace {
   static void EmitCounter(const fxt::InternedCategory& category,
                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
                           Context context, uint64_t counter_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteCounterEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1030,6 +1038,7 @@ class KTrace {
   static void EmitFlowBegin(const fxt::InternedCategory& category,
                             const fxt::StringRef<name_type>& label, uint64_t timestamp,
                             Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteFlowBeginEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1043,6 +1052,7 @@ class KTrace {
   static void EmitFlowStep(const fxt::InternedCategory& category,
                            const fxt::StringRef<name_type>& label, uint64_t timestamp,
                            Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteFlowStepEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1056,6 +1066,7 @@ class KTrace {
   static void EmitFlowEnd(const fxt::InternedCategory& category,
                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
                           Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteFlowEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1071,6 +1082,7 @@ class KTrace {
   static void EmitThreadWakeup(const cpu_num_t cpu,
                                fxt::ThreadRef<fxt::RefType::kInline> thread_ref,
                                const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteThreadWakeupRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),
@@ -1084,6 +1096,7 @@ class KTrace {
                                 const fxt::ThreadRef<fxt::RefType::kInline>& outgoing_thread,
                                 const fxt::ThreadRef<fxt::RefType::kInline>& incoming_thread,
                                 const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteContextSwitchRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),

@@ -204,26 +204,27 @@ class KTraceTests {
 
     // Verify that attempting to Reserve a slot now fails because tracing has not been started, and
     // therefore writes are disabled.
-    zx::result<TestKTrace::Reservation> failed = ktrace.Reserve(fxt_header);
-    ASSERT_EQ(ZX_ERR_BAD_STATE, failed.status_value());
+    {
+      InterruptDisableGuard guard;
+      zx::result<TestKTrace::Reservation> failed = ktrace.Reserve(fxt_header);
+      ASSERT_EQ(ZX_ERR_BAD_STATE, failed.status_value());
+    }
 
     // Start tracing.
     ASSERT_OK(ktrace.Control(KTRACE_ACTION_START, 0xfff));
 
-    // Successfully reserve a slot.
-    zx::result<TestKTrace::Reservation> res = ktrace.Reserve(fxt_header);
-    ASSERT_OK(res.status_value());
-
-    // Reserve turns off interrupts, so we can get the number of the CPU whose buffer we're writing
-    // to.
-    const cpu_num_t target_cpu = arch_curr_cpu_num();
-
-    // Write the trace record.
-    for (uint64_t word : words) {
-      res->WriteWord(word);
-    }
-    res->WriteBytes(bytes.data(), bytes.size());
-    res->Commit();
+    // Now write the record, keeping track of the CPU we wrote the record on.
+    const cpu_num_t target_cpu = [&]() {
+      InterruptDisableGuard guard;
+      zx::result<TestKTrace::Reservation> res = ktrace.Reserve(fxt_header);
+      DEBUG_ASSERT(res.is_ok());
+      for (uint64_t word : words) {
+        res->WriteWord(word);
+      }
+      res->WriteBytes(bytes.data(), bytes.size());
+      res->Commit();
+      return arch_curr_cpu_num();
+    }();
 
     // Read out the data.
     uint8_t actual[padded_record_size];
