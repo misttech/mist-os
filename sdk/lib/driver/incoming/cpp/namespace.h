@@ -221,7 +221,7 @@ class Namespace final {
       }
 #endif
 
-      return component::ConnectAt<ServiceMember>(svc_dir(), std::move(server_end), instance);
+      return component::ConnectAtMember<ServiceMember>(svc_dir(), std::move(server_end), instance);
     } else if constexpr (std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                         fidl::internal::DriverTransport>) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
