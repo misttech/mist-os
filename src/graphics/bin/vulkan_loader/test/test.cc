@@ -128,8 +128,8 @@ TEST_F(VulkanLoader, VmosIndependent) {
   EXPECT_EQ(original_value, *static_cast<uint8_t*>(mapper2.start()));
 }
 
-// Test that the DeviceFs returned from `ConnectToDeviceFs` looks as expected.
-TEST_F(VulkanLoader, DeviceFs) {
+// TODO(b/419087951) - remove
+TEST_F(VulkanLoader, DeprecatedDeviceFs) {
   auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
     auto response = loader()->ConnectToDeviceFs(dev_fs.server.TakeChannel());
@@ -141,6 +141,30 @@ TEST_F(VulkanLoader, DeviceFs) {
   ASSERT_TRUE(device.is_ok()) << device.status_string();
   zx_status_t status = fdio_service_connect_at(dev_fs.client.channel().get(), "class/gpu/000",
                                                device->server.TakeChannel().release());
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  auto response =
+      fidl::WireCall(device->client)->Query(fuchsia_gpu_magma::wire::QueryId::kVendorId);
+  ASSERT_TRUE(response.ok()) << response;
+  ASSERT_TRUE(response->is_ok()) << zx_status_get_string(response->error_value());
+  ASSERT_TRUE((*response)->is_simple_result());
+  EXPECT_EQ((*response)->simple_result(), 5u);
+}
+
+// Test that the DeviceFs returned from `ConnectToDeviceFs` looks as expected.
+TEST_F(VulkanLoader, DeviceFs) {
+  auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  {
+    auto response = loader()->ConnectToDeviceFs(dev_fs.server.TakeChannel());
+    ASSERT_TRUE(response.ok()) << response;
+  }
+  ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
+
+  auto device = fidl::CreateEndpoints<fuchsia_gpu_magma::Device>();
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
+  zx_status_t status =
+      fdio_service_connect_at(dev_fs.client.channel().get(), "svc/magma/some-instance-name/device",
+                              device->server.TakeChannel().release());
   ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
 
   auto response =

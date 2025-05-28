@@ -58,11 +58,33 @@ LoaderApp::LoaderApp(component::OutgoingDirectory* outgoing_dir, async_dispatche
 LoaderApp::~LoaderApp() = default;
 
 zx_status_t LoaderApp::InitDeviceFs() {
-  const char* kDevClassList[] = {"gpu", "goldfish-pipe", "goldfish-control",
-                                 "goldfish-address-space", "goldfish-sync"};
+  auto service_node = fbl::MakeRefCounted<fs::PseudoDir>();
+  ZX_ASSERT(device_root_node_->AddEntry("svc", service_node) == ZX_OK);
 
+  // Devices using services
+  {
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+    std::string input_path = "/svc/fuchsia.gpu.magma.Service";
+
+    zx_status_t status =
+        fdio_open3(input_path.c_str(), static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                   endpoints.server.TakeChannel().release());
+    if (status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to open " << input_path;
+      return status;
+    }
+
+    ZX_ASSERT(service_node->AddEntry("magma", fbl::MakeRefCounted<fs::RemoteDir>(
+                                                  std::move(endpoints.client))) == ZX_OK);
+  }
+
+  // Devices using devfs
   auto class_node = fbl::MakeRefCounted<fs::PseudoDir>();
   ZX_ASSERT(device_root_node_->AddEntry("class", class_node) == ZX_OK);
+
+  const char* kDevClassList[] = {"gpu", "goldfish-pipe", "goldfish-control",
+                                 "goldfish-address-space", "goldfish-sync"};
 
   for (const char* dev_class : kDevClassList) {
     auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
@@ -123,12 +145,9 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
   if (allow_magma_icds_) {
     auto gpu_watcher_token = GetPendingActionToken();
     gpu_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
-        "/dev/class/gpu",
+        "/svc/fuchsia.gpu.magma.Service",
         [this](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
-          if (filename == ".") {
-            return;
-          }
-          zx::result device = MagmaDevice::Create(this, dir, filename, &devices_node_);
+          zx::result device = MagmaDevice::Create(this, dir, filename + "/device", &devices_node_);
           if (device.is_ok()) {
             devices_.emplace_back(std::move(*device));
           } else {
