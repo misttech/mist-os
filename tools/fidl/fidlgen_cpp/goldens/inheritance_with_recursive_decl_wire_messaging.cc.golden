@@ -28,7 +28,7 @@ static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstReq
 ::fidl::WireResult<::test_inheritancewithrecursivedecl::Parent::First>::WireResult(
     ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Parent> client,
     ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -62,7 +62,7 @@ static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstReq
 ::fidl::WireUnownedResult<::test_inheritancewithrecursivedecl::Parent::First>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Parent::First>(result) {}
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_inheritancewithrecursivedecl::Parent>::First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First> _request_object{std::move(request)};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
@@ -213,7 +213,7 @@ static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ChildSecondReq
 ::fidl::WireResult<::test_inheritancewithrecursivedecl::Child::First>::WireResult(
     ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client,
     ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -249,7 +249,7 @@ static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ChildSecondReq
 ::fidl::WireResult<::test_inheritancewithrecursivedecl::Child::Second>::WireResult(
     ::fidl::UnownedClientEnd<::test_inheritancewithrecursivedecl::Child> client,
     ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -283,14 +283,14 @@ static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ChildSecondReq
 ::fidl::WireUnownedResult<::test_inheritancewithrecursivedecl::Child::Second>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_inheritancewithrecursivedecl::Child::Second>(result) {}
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_inheritancewithrecursivedecl::Child>::First(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First> _request_object{std::move(request)};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
   return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
 }
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_inheritancewithrecursivedecl::Child>::Second(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent>&& request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second> _request_object{std::move(request)};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);

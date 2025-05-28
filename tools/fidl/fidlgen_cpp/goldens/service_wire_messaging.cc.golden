@@ -22,7 +22,7 @@ constexpr ::fidl::MessageDynamicFlags kFirstProtocol_MethodOnFirst_DynamicFlags 
 ::fidl::WireResult<::test_service::FirstProtocol::MethodOnFirst>::WireResult(
     ::fidl::UnownedClientEnd<::test_service::FirstProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -56,7 +56,7 @@ constexpr ::fidl::MessageDynamicFlags kFirstProtocol_MethodOnFirst_DynamicFlags 
 ::fidl::WireUnownedResult<::test_service::FirstProtocol::MethodOnFirst>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_service::FirstProtocol::MethodOnFirst>(result) {}
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_service::FirstProtocol>::MethodOnFirst() {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst> _request_object{};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
@@ -176,7 +176,7 @@ constexpr ::fidl::MessageDynamicFlags kSecondProtocol_MethodOnSecond_DynamicFlag
 ::fidl::WireResult<::test_service::SecondProtocol::MethodOnSecond>::WireResult(
     ::fidl::UnownedClientEnd<::test_service::SecondProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -210,7 +210,7 @@ constexpr ::fidl::MessageDynamicFlags kSecondProtocol_MethodOnSecond_DynamicFlag
 ::fidl::WireUnownedResult<::test_service::SecondProtocol::MethodOnSecond>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_service::SecondProtocol::MethodOnSecond>(result) {}
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_service::SecondProtocol>::MethodOnSecond() {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond> _request_object{};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);

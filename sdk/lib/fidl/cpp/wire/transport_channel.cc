@@ -192,10 +192,9 @@ void ChannelWaiter::HandleWaitFinished(async_dispatcher_t* dispatcher, zx_status
     return failure_handler_(fidl::UnbindInfo::PeerClosed(ZX_ERR_PEER_CLOSED));
   }
 
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT InlineMessageBuffer<ZX_CHANNEL_MAX_MSG_BYTES> bytes;
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT zx_handle_t handles[ZX_CHANNEL_MAX_MSG_HANDLES];
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT fidl_channel_handle_metadata_t
-      handle_metadata[ZX_CHANNEL_MAX_MSG_HANDLES];
+  __UNINITIALIZED InlineMessageBuffer<ZX_CHANNEL_MAX_MSG_BYTES> bytes;
+  __UNINITIALIZED zx_handle_t handles[ZX_CHANNEL_MAX_MSG_HANDLES];
+  __UNINITIALIZED fidl_channel_handle_metadata_t handle_metadata[ZX_CHANNEL_MAX_MSG_HANDLES];
   ChannelMessageStorageView storage_view{
       .bytes = bytes.view(),
       .handles = handles,

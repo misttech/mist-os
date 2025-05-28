@@ -44,7 +44,7 @@ static_assert(offsetof(::test_driveroneway::wire::OneWaySendRequest, payload) ==
 }
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_driveroneway::OneWay>::Send(const ::test_driveroneway::wire::Payload& payload) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send> _request_object{payload};
 
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_driveroneway::OneWay::Send>();

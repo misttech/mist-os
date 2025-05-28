@@ -48,7 +48,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_errorsynta
 ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>::WireResult(
     ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client,
     ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -112,7 +112,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_errorsynta
 ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>::WireResult(
     ::fidl::UnownedClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax> client,
     ::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -297,7 +297,7 @@ void fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSynt
 
 void fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>::MakeReply(::test_errorsyntax_parent::wire::ParentUsesErrorSyntaxComposedCallWhichMayFailResult ParentUsesErrorSyntaxComposedCallWhichMayFailResult) {
   ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> _response{ParentUsesErrorSyntaxComposedCallWhichMayFailResult};
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, ::fidl::internal::ChannelTransport>
       _response_message{
@@ -371,7 +371,7 @@ void fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSynt
 
 void fidl::internal::WireCompleterImpl<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>::MakeReply(::test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResult ExampleUseOfErrorSyntaxCallWhichMayFailResult) {
   ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> _response{ExampleUseOfErrorSyntaxCallWhichMayFailResult};
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>, ::fidl::internal::ChannelTransport>
       _response_message{

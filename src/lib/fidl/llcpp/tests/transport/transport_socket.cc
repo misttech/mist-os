@@ -85,7 +85,7 @@ void SocketWaiter::HandleWaitFinished(async_dispatcher_t* dispatcher, zx_status_
     return failure_handler_(fidl::UnbindInfo::PeerClosed(ZX_ERR_PEER_CLOSED));
   }
 
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT InlineMessageBuffer<ZX_CHANNEL_MAX_MSG_BYTES> bytes;
+  __UNINITIALIZED InlineMessageBuffer<ZX_CHANNEL_MAX_MSG_BYTES> bytes;
   IncomingHeaderAndMessage msg =
       fidl::MessageRead(zx::unowned_socket(async_wait_t::object),
                         fidl::internal::SocketMessageStorageView{.bytes = bytes.view()});

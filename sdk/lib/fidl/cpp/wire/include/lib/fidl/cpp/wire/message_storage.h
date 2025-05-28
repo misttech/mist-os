@@ -8,25 +8,13 @@
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
+#include <zircon/compiler.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <type_traits>
-
-#if defined(__clang__) && __has_attribute(uninitialized)
-// Attribute "uninitialized" disables -ftrivial-auto-var-init=pattern
-// (automatic variable initialization) for the specified variable.
-// This is a security measure to better reveal memory corruptions and
-// reduce leaking sensitive bits, but FIDL generated code/runtime can
-// sometimes prove that a buffer is always overwritten. In those cases
-// we can use this attribute to disable the compiler-inserted initialization
-// and avoid the performance hit of writing to a large buffer.
-#define FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT __attribute__((uninitialized))
-#else
-#define FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
-#endif
 
 namespace fidl {
 
@@ -76,7 +64,7 @@ static constexpr size_t kMaxMessageSizeOnStack = 512;
 // FIDL alignment.
 //
 // To properly ensure uninitialization, always declare objects of this type with
-// FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT.
+// __UNINITIALIZED.
 template <size_t kSize>
 struct InlineMessageBuffer {
   static_assert(kSize % FIDL_ALIGNMENT == 0, "kSize must be FIDL-aligned");
