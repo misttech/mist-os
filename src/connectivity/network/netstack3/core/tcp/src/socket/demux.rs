@@ -28,7 +28,7 @@ use netstack3_ip::{
     TransportIpContext, TransportReceiveError,
 };
 use netstack3_trace::trace_duration;
-use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
+use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, PacketBuilder};
 use packet_formats::error::ParseError;
 use packet_formats::ip::IpProto;
 use packet_formats::tcp::{
@@ -1164,20 +1164,18 @@ where
         Some(Control::FIN) => builder.fin(true),
         Some(Control::RST) => builder.rst(true),
     }
-    data.into_serializer().encapsulate(
-        TcpSegmentBuilderWithOptions::new(builder, options.iter()).unwrap_or_else(
-            |TcpOptionsTooLongError| {
-                panic!("Too many TCP options");
-            },
-        ),
-    )
+    TcpSegmentBuilderWithOptions::new(builder, options.iter())
+        .unwrap_or_else(|TcpOptionsTooLongError| {
+            panic!("Too many TCP options");
+        })
+        .wrap_body(data.into_serializer())
 }
 
 #[cfg(test)]
 mod test {
     use ip_test_macro::ip_test;
     use netstack3_base::{HandshakeOptions, UnscaledWindowSize};
-    use packet::ParseBuffer as _;
+    use packet::{ParseBuffer as _, Serializer as _};
     use test_case::test_case;
 
     use super::*;

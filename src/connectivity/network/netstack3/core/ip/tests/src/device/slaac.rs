@@ -52,13 +52,13 @@ fn build_slaac_ra_packet(
     let options = &[NdpOptionBuilder::PrefixInformation(p)];
     OptionSequenceBuilder::new(options.iter())
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+        .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
             IcmpZeroCode,
             RouterAdvertisement::new(0, false, false, 0, 0, 0),
         ))
-        .encapsulate(Ipv6PacketBuilder::new(
+        .wrap_in(Ipv6PacketBuilder::new(
             src_ip,
             dst_ip,
             REQUIRED_NDP_IP_PACKET_HOP_LIMIT,

@@ -41,19 +41,19 @@ const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(44444).unwrap();
 
 fn make_udp_reply_packet<I: TestIpExt>() -> Buf<Vec<u8>> {
     Buf::new([1], ..)
-        .encapsulate(UdpPacketBuilder::new(
+        .wrap_in(UdpPacketBuilder::new(
             *I::TEST_ADDRS.remote_ip,
             *I::TEST_ADDRS.local_ip,
             Some(REMOTE_PORT),
             LOCAL_PORT,
         ))
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             *I::TEST_ADDRS.remote_ip,
             *I::TEST_ADDRS.local_ip,
             u8::MAX, /* ttl */
             IpProto::Udp.into(),
         ))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(EthernetFrameBuilder::new(
             *I::TEST_ADDRS.remote_mac,
             *I::TEST_ADDRS.local_mac,
             EtherType::from_ip_version(I::VERSION),
@@ -231,14 +231,14 @@ fn tcp_accepted_mark<I: TestDualStackIpExt + IpExt>() {
             );
             tcp_seg.syn(true);
             Buf::new([], ..)
-                .encapsulate(tcp_seg)
-                .encapsulate(I::PacketBuilder::new(
+                .wrap_in(tcp_seg)
+                .wrap_in(I::PacketBuilder::new(
                     *I::TEST_ADDRS.remote_ip,
                     *I::TEST_ADDRS.local_ip,
                     u8::MAX, /* ttl */
                     IpProto::Tcp.into(),
                 ))
-                .encapsulate(EthernetFrameBuilder::new(
+                .wrap_in(EthernetFrameBuilder::new(
                     *I::TEST_ADDRS.remote_mac,
                     *I::TEST_ADDRS.local_mac,
                     EtherType::from_ip_version(I::VERSION),
@@ -293,7 +293,7 @@ fn tcp_accepted_mark<I: TestDualStackIpExt + IpExt>() {
 
     let ack_frame = {
         Buf::new([], ..)
-            .encapsulate(TcpSegmentBuilder::new(
+            .wrap_in(TcpSegmentBuilder::new(
                 *I::TEST_ADDRS.remote_ip,
                 *I::TEST_ADDRS.local_ip,
                 REMOTE_PORT,
@@ -302,13 +302,13 @@ fn tcp_accepted_mark<I: TestDualStackIpExt + IpExt>() {
                 Some(parsed_synack.seq_num() + 1),
                 u16::MAX,
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 *I::TEST_ADDRS.remote_ip,
                 *I::TEST_ADDRS.local_ip,
                 u8::MAX, /* ttl */
                 IpProto::Tcp.into(),
             ))
-            .encapsulate(EthernetFrameBuilder::new(
+            .wrap_in(EthernetFrameBuilder::new(
                 *I::TEST_ADDRS.remote_mac,
                 *I::TEST_ADDRS.local_mac,
                 EtherType::from_ip_version(I::VERSION),

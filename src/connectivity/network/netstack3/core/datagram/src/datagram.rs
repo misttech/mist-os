@@ -5530,7 +5530,7 @@ mod test {
                 <FakeAddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
             >,
         ) -> Result<Self::Serializer<I, B>, Never> {
-            Ok(body.encapsulate(()))
+            Ok(body.wrap_in(()))
         }
         fn try_alloc_listen_identifier<I: Ip, D: WeakDeviceIdentifier>(
             _bindings_ctx: &mut impl RngContext,

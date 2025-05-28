@@ -563,7 +563,7 @@ impl<'a, I: FragmentationIpExt, S: FragmentableIpSerializer<I>> IpFragmenter<'a,
         let has_more = body.len() > take;
         let fragment_body = &body[..take];
         *consumed = end;
-        Some((fragment_body.into_serializer().encapsulate(fragment_builder), has_more))
+        Some((fragment_builder.wrap_body(fragment_body.into_serializer()), has_more))
     }
 }
 
@@ -733,7 +733,7 @@ mod tests {
             body: &'a [u8],
         ) -> impl FragmentableIpSerializer<Ipv4, Buffer: Buffer> + 'a {
             let Self { dont_frag } = self;
-            body.into_serializer().encapsulate(new_ipv4_packet_builder(*dont_frag))
+            new_ipv4_packet_builder(*dont_frag).wrap_body(body.into_serializer())
         }
 
         fn check_fragment(
@@ -761,22 +761,22 @@ mod tests {
             body: &'a [u8],
         ) -> impl FragmentableIpSerializer<Ipv4, Buffer: Buffer> + 'a {
             let Self(Ipv4TestEnv { dont_frag }) = self;
-            body.into_serializer().encapsulate(
-                Ipv4PacketBuilderWithOptions::new(
-                    new_ipv4_packet_builder(*dont_frag),
-                    [
-                        Ipv4Option::Unrecognized {
-                            kind: FAKE_OPTION_COPIED_KIND,
-                            data: &FAKE_OPTION_COPIED[..],
-                        },
-                        Ipv4Option::Unrecognized {
-                            kind: FAKE_OPTION_NOT_COPIED_KIND,
-                            data: &FAKE_OPTION_NOT_COPIED[..],
-                        },
-                    ],
-                )
-                .unwrap(),
+
+            Ipv4PacketBuilderWithOptions::new(
+                new_ipv4_packet_builder(*dont_frag),
+                [
+                    Ipv4Option::Unrecognized {
+                        kind: FAKE_OPTION_COPIED_KIND,
+                        data: &FAKE_OPTION_COPIED[..],
+                    },
+                    Ipv4Option::Unrecognized {
+                        kind: FAKE_OPTION_NOT_COPIED_KIND,
+                        data: &FAKE_OPTION_NOT_COPIED[..],
+                    },
+                ],
             )
+            .unwrap()
+            .wrap_body(body.into_serializer())
         }
 
         fn check_fragment(
@@ -856,12 +856,13 @@ mod tests {
             &self,
             body: &'a [u8],
         ) -> impl FragmentableIpSerializer<Ipv6, Buffer: Buffer> + 'a {
-            body.into_serializer().encapsulate(Ipv6PacketBuilder::new(
+            Ipv6PacketBuilder::new(
                 TEST_ADDRS_V6.local_ip,
                 TEST_ADDRS_V6.remote_ip,
                 1,
                 IpProto::Udp.into(),
-            ))
+            )
+            .wrap_body(body.into_serializer())
         }
 
         fn check_fragment(

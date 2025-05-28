@@ -617,7 +617,7 @@ mod tests {
     use netstack3_core::ip::Mark;
     use netstack3_core::sync::ResourceTokenValue;
     use netstack3_core::testutil::{self, TestIpExt};
-    use packet::{InnerPacketBuilder, ParsablePacket, Serializer};
+    use packet::{InnerPacketBuilder, PacketBuilder, ParsablePacket};
     use packet_formats::ethernet::EthernetFrameLengthCheck;
     use packet_formats::ip::IpProto;
     use packet_formats::udp::UdpPacketBuilder;
@@ -854,12 +854,13 @@ mod tests {
         const DST_PORT: NonZeroU16 = NonZeroU16::new(5678).unwrap();
 
         let data = b"PACKET";
-        let mut udp_packet = data.into_serializer().encapsulate(UdpPacketBuilder::new(
+        let mut udp_packet = UdpPacketBuilder::new(
             I::TEST_ADDRS.local_ip.get(),
             I::TEST_ADDRS.remote_ip.get(),
             Some(SRC_PORT),
             DST_PORT,
-        ));
+        )
+        .wrap_body(data.into_serializer());
         let packet = testutil::new_filter_egress_ip_packet::<I, _>(
             I::TEST_ADDRS.local_ip.get(),
             I::TEST_ADDRS.remote_ip.get(),

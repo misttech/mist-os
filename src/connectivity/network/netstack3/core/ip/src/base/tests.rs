@@ -110,12 +110,13 @@ impl<I: IpLayerIpExt, BC: TxMetadataBindingsTypes> IpDeviceSendContext<I, BC> fo
 fn no_loopback_addrs_on_the_wire<I: IpLayerIpExt + TestIpExt>() {
     let mut ctx = FakeCtx::default();
     const TTL: u8 = 1;
-    let frame = [].into_serializer().encapsulate(I::PacketBuilder::new(
+    let frame = I::PacketBuilder::new(
         I::TEST_ADDRS.local_ip.get(),
         I::LOOPBACK_ADDRESS.get(),
         TTL,
         IpProto::Udp.into(),
-    ));
+    )
+    .wrap_body([].into_serializer());
     let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
     let result = send_ip_frame(
         core_ctx,
@@ -430,7 +431,7 @@ fn send_respects_device_mtu<I: IpLayerIpExt + TestIpExt>() {
     let mut core_ctx = FakeCoreCtx::<I>::default();
     let mut bindings_ctx = FakeBindingsCtx::default();
 
-    let body = Buf::new(vec![1, 2, 3, 4, 5, 6], ..).encapsulate(());
+    let body = Buf::new(vec![1, 2, 3, 4, 5, 6], ..).wrap_in(());
     let meta = SendIpPacketMeta {
         device: &MultipleDevicesId::A,
         src_ip: Some(I::TEST_ADDRS.local_ip),

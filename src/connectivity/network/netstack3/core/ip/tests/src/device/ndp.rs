@@ -16,7 +16,7 @@ use net_declare::net::{mac, subnet_v6};
 use net_types::ethernet::Mac;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Mtu, Subnet};
 use net_types::{NonMappedAddr, ScopeableAddress as _, UnicastAddr, Witness as _};
-use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
+use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, PacketBuilder as _, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder, PrefixInformation};
 use packet_formats::icmp::ndp::{
@@ -222,12 +222,8 @@ fn test_address_resolution() {
     // Let's try to ping the remote device from the local device:
     let req = IcmpEchoRequest::new(0, 0);
     let req_body = &[1, 2, 3, 4];
-    let body = Buf::new(req_body.to_vec(), ..).encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
-        local_ip(),
-        remote_ip(),
-        IcmpZeroCode,
-        req,
-    ));
+    let body = IcmpPacketBuilder::<Ipv6, _>::new(local_ip(), remote_ip(), IcmpZeroCode, req)
+        .wrap_body(Buf::new(req_body.to_vec(), ..));
     // Manually assigning the addresses.
     net.with_context("remote", |ctx| {
         ctx.core_api()
@@ -910,13 +906,13 @@ fn test_receiving_router_solicitation_validity_check() {
 
     let icmpv6_packet_buf = OptionSequenceBuilder::new(options.iter())
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+        .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
             IcmpZeroCode,
             RouterSolicitation::default(),
         ))
-        .encapsulate(Ipv6PacketBuilder::new(
+        .wrap_in(Ipv6PacketBuilder::new(
             src_ip,
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
             REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -940,7 +936,7 @@ fn test_receiving_router_advertisement_validity_check() {
         hop_limit: u8,
     ) -> Buf<Vec<u8>> {
         EmptyBuf
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
@@ -953,7 +949,7 @@ fn test_receiving_router_advertisement_validity_check() {
                     0,     /* retransmit_timer */
                 ),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, hop_limit, Ipv6Proto::Icmpv6))
+            .wrap_in(Ipv6PacketBuilder::new(src_ip, dst_ip, hop_limit, Ipv6Proto::Icmpv6))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_b()
@@ -1008,13 +1004,13 @@ fn test_receiving_neighbor_solicitation_validity_check() {
         let dst_ip = Ipv6::TEST_ADDRS.local_ip.get();
         let target_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 11]);
         EmptyBuf
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
                 NeighborSolicitation::new(target_ip),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, hop_limit, Ipv6Proto::Icmpv6))
+            .wrap_in(Ipv6PacketBuilder::new(src_ip, dst_ip, hop_limit, Ipv6Proto::Icmpv6))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_b()
@@ -1052,7 +1048,7 @@ fn test_receiving_neighbor_advertisement_validity_check() {
         let dst_ip = Ipv6::TEST_ADDRS.local_ip.get();
         let target_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 11]);
         EmptyBuf
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
@@ -1061,7 +1057,7 @@ fn test_receiving_neighbor_advertisement_validity_check() {
                     /* override_flag */ target_ip,
                 ),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, hop_limit, Ipv6Proto::Icmpv6))
+            .wrap_in(Ipv6PacketBuilder::new(src_ip, dst_ip, hop_limit, Ipv6Proto::Icmpv6))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_b()
@@ -1102,13 +1098,13 @@ fn test_sending_ipv6_packet_after_hop_limit_change() {
         let src_ip: Ipv6Addr = src_ip.get();
 
         let icmpv6_packet_buf = EmptyBuf
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
                 IcmpZeroCode,
                 RouterAdvertisement::new(hop_limit, false, false, 0, 0, 0),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(
+            .wrap_in(Ipv6PacketBuilder::new(
                 src_ip,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
                 REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -1164,13 +1160,13 @@ fn test_receiving_router_advertisement_mtu_option() {
         let options = &[NdpOptionBuilder::Mtu(mtu)];
         OptionSequenceBuilder::new(options.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
                 RouterAdvertisement::new(0, false, false, 0, 0, 0),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(
+            .wrap_in(Ipv6PacketBuilder::new(
                 src_ip,
                 dst_ip,
                 REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -1591,13 +1587,13 @@ fn slaac_packet_buf(
     let options = &[NdpOptionBuilder::PrefixInformation(p)];
     OptionSequenceBuilder::new(options.iter())
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+        .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
             IcmpZeroCode,
             RouterAdvertisement::new(0, false, false, 0, 0, 0),
         ))
-        .encapsulate(Ipv6PacketBuilder::new(
+        .wrap_in(Ipv6PacketBuilder::new(
             src_ip,
             dst_ip,
             REQUIRED_NDP_IP_PACKET_HOP_LIMIT,

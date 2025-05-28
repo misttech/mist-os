@@ -94,13 +94,13 @@ fn router_advertisement_with_source_link_layer_option_should_add_neighbor() {
     let ra_packet_buf = |options: &[NdpOptionBuilder<'_>]| {
         OptionSequenceBuilder::new(options.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
                 RouterAdvertisement::new(0, false, false, 0, 0, 0),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(
+            .wrap_in(Ipv6PacketBuilder::new(
                 src_ip,
                 dst_ip,
                 REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -747,13 +747,13 @@ fn icmp_error_fragment_offset(fragment_offset: u16) {
         Ipv4PacketBuilder::new(FROM_ADDR, to, 255 /* ttl */, Ipv4Proto::Proto(IpProto::Udp));
     ipv4_packet_builder.fragment_offset(FragmentOffset::new(fragment_offset).unwrap());
     let non_initial_fragment_packet_buf = packet::Buf::new(&mut [], ..)
-        .encapsulate(UdpPacketBuilder::new(
+        .wrap_in(UdpPacketBuilder::new(
             FROM_ADDR.get(),
             to.get(),
             None,
             NonZeroU16::new(12345).unwrap(),
         ))
-        .encapsulate(ipv4_packet_builder)
+        .wrap_in(ipv4_packet_builder)
         .serialize_vec_outer()
         .unwrap()
         .unwrap_b();

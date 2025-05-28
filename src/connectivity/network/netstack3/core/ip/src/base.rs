@@ -44,8 +44,8 @@ use netstack3_filter::{
     TransportPacketSerializer, Tuple, WeakConnectionError, WeakConntrackConnection,
 };
 use packet::{
-    Buf, BufferAlloc, BufferMut, GrowBuffer, PacketConstraints, ParseBufferMut, ParseMetadata,
-    SerializeError, Serializer as _,
+    Buf, BufferAlloc, BufferMut, GrowBuffer, PacketBuilder as _, PacketConstraints, ParseBufferMut,
+    ParseMetadata, SerializeError, Serializer as _,
 };
 use packet_formats::error::IpParseError;
 use packet_formats::ip::{DscpAndEcn, IpPacket as _, IpPacketBuilder as _};
@@ -4576,7 +4576,7 @@ where
 
     builder.set_dscp_and_ecn(dscp_and_ecn);
 
-    let ip_frame = body.encapsulate(builder);
+    let ip_frame = builder.wrap_body(body);
     send_ip_frame(core_ctx, bindings_ctx, device, destination, ip_frame, packet_metadata, mtu)
         .map_err(|ser| ser.map_serializer(|s| s.into_inner()))
 }

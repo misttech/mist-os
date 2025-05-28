@@ -483,8 +483,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         for report in reports {
             self.increment_both(device, |counters: &MldCounters| &counters.tx_mldv2_report);
             let destination = IpPacketDestination::Multicast(dst_ip);
-            let ip_frame =
-                report.into_serializer().encapsulate(icmp.clone()).encapsulate(ipv6.clone());
+            let ip_frame = report.into_serializer().wrap_in(icmp.clone()).wrap_in(ipv6.clone());
             IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
                     self.increment_both(device, |counters: &MldCounters| &counters.tx_err);
@@ -741,9 +740,8 @@ fn send_mld_v1_packet<BC: MldBindingsContext, CC: MldSendContext<BC>>(
 
             let body = Mldv1MessageBuilder::<$type>::new_with_max_resp_delay($group_addr, ())
                 .into_serializer()
-                .encapsulate(icmp)
-                .encapsulate(ipv6);
-
+                .wrap_in(icmp)
+                .wrap_in(ipv6);
             let destination = IpPacketDestination::Multicast(dst_ip);
             IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
                 .map_err(|_| MldError::SendFailure { addr: $group_addr.into() })
@@ -1178,17 +1176,19 @@ mod tests {
 
     fn new_v1_query(resp_time: Duration, group_addr: MulticastAddr<Ipv6Addr>) -> Buf<Vec<u8>> {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
-        Mldv1MessageBuilder::<MulticastListenerQuery>::new_with_max_resp_delay(
-            group_addr.get(),
-            resp_time.try_into().unwrap(),
-        )
-        .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, _>::new(
+        IcmpPacketBuilder::<_, _>::new(
             router_addr,
             MY_IP,
             IcmpSenderZeroCode,
             MulticastListenerQuery,
-        ))
+        )
+        .wrap_body(
+            Mldv1MessageBuilder::<MulticastListenerQuery>::new_with_max_resp_delay(
+                group_addr.get(),
+                resp_time.try_into().unwrap(),
+            )
+            .into_serializer(),
+        )
         .serialize_vec_outer()
         .unwrap()
         .unwrap_b()
@@ -1196,36 +1196,39 @@ mod tests {
 
     fn new_v1_report(group_addr: MulticastAddr<Ipv6Addr>) -> Buf<Vec<u8>> {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
-        Mldv1MessageBuilder::<MulticastListenerReport>::new(group_addr)
-            .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<_, _>::new(
-                router_addr,
-                MY_IP,
-                IcmpSenderZeroCode,
-                MulticastListenerReport,
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .unwrap_b()
+        IcmpPacketBuilder::<_, _>::new(
+            router_addr,
+            MY_IP,
+            IcmpSenderZeroCode,
+            MulticastListenerReport,
+        )
+        .wrap_body(
+            Mldv1MessageBuilder::<MulticastListenerReport>::new(group_addr).into_serializer(),
+        )
+        .serialize_vec_outer()
+        .unwrap()
+        .unwrap_b()
     }
 
     fn new_v2_general_query() -> Buf<Vec<u8>> {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
-        Mldv2QueryMessageBuilder::new(
-            Default::default(),
-            None,
-            false,
-            Default::default(),
-            Default::default(),
-            core::iter::empty::<Ipv6Addr>(),
-        )
-        .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, _>::new(
+        IcmpPacketBuilder::<_, _>::new(
             router_addr,
             MY_IP,
             IcmpSenderZeroCode,
             MulticastListenerQueryV2,
-        ))
+        )
+        .wrap_body(
+            Mldv2QueryMessageBuilder::new(
+                Default::default(),
+                None,
+                false,
+                Default::default(),
+                Default::default(),
+                core::iter::empty::<Ipv6Addr>(),
+            )
+            .into_serializer(),
+        )
         .serialize_vec_outer()
         .unwrap()
         .unwrap_b()

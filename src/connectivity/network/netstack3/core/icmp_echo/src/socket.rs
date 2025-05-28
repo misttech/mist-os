@@ -44,7 +44,7 @@ use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, MulticastMembershipHandler,
     ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
 };
-use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
+use packet::{BufferMut, PacketBuilder, ParsablePacket as _, ParseBuffer as _};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
 use packet_formats::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
 
@@ -413,7 +413,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
             packet_formats::icmp::IcmpZeroCode,
             IcmpEchoRequest::new(id.get(), icmp_echo.message().seq()),
         );
-        Ok(body.encapsulate(icmp_builder))
+        Ok(icmp_builder.wrap_body(body))
     }
 
     fn try_alloc_listen_identifier<I: datagram::IpExt, D: WeakDeviceIdentifier>(
@@ -1230,7 +1230,7 @@ mod tests {
     use netstack3_base::CtxPair;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx};
     use netstack3_ip::{LocalDeliveryPacketInfo, SendIpPacketMeta};
-    use packet::Buf;
+    use packet::{Buf, EmptyBuf, Serializer};
     use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpZeroCode};
 
     use super::*;
@@ -1459,16 +1459,14 @@ mod tests {
         let conn = api.create();
         api.connect(&conn, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_ID).unwrap();
 
-        let buf = Buf::new(Vec::new(), ..)
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                I::TEST_ADDRS.local_ip.get(),
-                I::TEST_ADDRS.remote_ip.get(),
-                IcmpZeroCode,
-                packet_formats::icmp::IcmpEchoReply::new(0, 1),
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .into_inner();
+        let pb = IcmpPacketBuilder::<I, _>::new(
+            I::TEST_ADDRS.local_ip.get(),
+            I::TEST_ADDRS.remote_ip.get(),
+            IcmpZeroCode,
+            packet_formats::icmp::IcmpEchoReply::new(0, 1),
+        );
+        let buf =
+            pb.wrap_body(Buf::new(Vec::new(), ..)).serialize_vec_outer().unwrap().into_inner();
         assert_matches!(
             api.send(&conn, buf),
             Err(datagram::SendError::SerializeError(
@@ -1516,7 +1514,7 @@ mod tests {
         api.connect(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_ID).unwrap();
 
         let packet = Buf::new([1u8, 2, 3, 4], ..)
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+            .wrap_in(IcmpPacketBuilder::<I, _>::new(
                 I::UNSPECIFIED_ADDRESS,
                 I::UNSPECIFIED_ADDRESS,
                 IcmpZeroCode,
@@ -1547,16 +1545,16 @@ mod tests {
 
         api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(ICMP_ID)).unwrap();
 
-        let reply = Buf::new([1u8, 2, 3, 4], ..)
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                // Use whatever here this is not validated by this module.
-                I::UNSPECIFIED_ADDRESS,
-                I::UNSPECIFIED_ADDRESS,
-                IcmpZeroCode,
-                IcmpEchoReply::new(ICMP_ID.get(), SEQ_NUM),
-            ))
-            .serialize_vec_outer()
-            .unwrap();
+        let reply = IcmpPacketBuilder::<I, _>::new(
+            // Use whatever here this is not validated by this module.
+            I::UNSPECIFIED_ADDRESS,
+            I::UNSPECIFIED_ADDRESS,
+            IcmpZeroCode,
+            IcmpEchoReply::new(ICMP_ID.get(), SEQ_NUM),
+        )
+        .wrap_body(Buf::new([1u8, 2, 3, 4], ..))
+        .serialize_vec_outer()
+        .unwrap();
 
         let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         let src_ip = I::TEST_ADDRS.remote_ip;
@@ -1599,16 +1597,16 @@ mod tests {
         api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(BIND_ICMP_ID))
             .unwrap();
 
-        let reply = Buf::new(&mut [], ..)
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                // Use whatever here this is not validated by this module.
-                I::UNSPECIFIED_ADDRESS,
-                I::UNSPECIFIED_ADDRESS,
-                IcmpZeroCode,
-                IcmpEchoReply::new(OTHER_ICMP_ID.get(), SEQ_NUM),
-            ))
-            .serialize_vec_outer()
-            .unwrap();
+        let reply = IcmpPacketBuilder::<I, _>::new(
+            // Use whatever here this is not validated by this module.
+            I::UNSPECIFIED_ADDRESS,
+            I::UNSPECIFIED_ADDRESS,
+            IcmpZeroCode,
+            IcmpEchoReply::new(OTHER_ICMP_ID.get(), SEQ_NUM),
+        )
+        .wrap_body(EmptyBuf)
+        .serialize_vec_outer()
+        .unwrap();
 
         let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         <IcmpEchoIpTransportContext as IpTransportContext<I, _, _>>::receive_ip_packet(

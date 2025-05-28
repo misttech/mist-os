@@ -1315,7 +1315,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_types::ip::{AddrSubnet, Ipv4};
     use netstack3_base::IntoCoreTimerCtx;
-    use packet::{InnerPacketBuilder, Serializer};
+    use packet::{EmptyBuf, PacketBuilder, Serializer};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
     use packet_formats::udp::UdpPacketBuilder;
     use test_case::{test_case, test_matrix};
@@ -2538,15 +2538,14 @@ mod tests {
         )]);
 
         // Create a packet and get the corresponding connection from conntrack.
-        let mut packet = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let mut packet = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 Some(NonZeroU16::new(11111).unwrap()),
                 NonZeroU16::new(22222).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 u8::MAX,
@@ -2595,15 +2594,14 @@ mod tests {
         assert_eq!(redirect_addr, I::NETSTACK);
 
         // The destination address and port were updated.
-        let expected = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let expected = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_SRC,
                 redirect_addr,
                 packet.inner().outer().src_port(),
                 LOCAL_PORT,
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_SRC,
                 redirect_addr,
                 u8::MAX,
@@ -2629,7 +2627,7 @@ mod tests {
             I::ULTIMATE_SRC,
             packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
         )
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             redirect_addr,
             I::ULTIMATE_SRC,
             u8::MAX,
@@ -2654,9 +2652,9 @@ mod tests {
             // shouldn't end up in the packet destined to the other host.
             I::ULTIMATE_DST,
             I::ULTIMATE_SRC,
-            packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+            packet_pre_nat.serialize_vec_outer().unwrap().unwrap_b().into_inner(),
         )
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             I::ULTIMATE_DST,
             I::ULTIMATE_SRC,
             u8::MAX,
@@ -2688,15 +2686,14 @@ mod tests {
         )]);
 
         // Create a packet and get the corresponding connection from conntrack.
-        let mut packet = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let mut packet = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 Some(NonZeroU16::new(11111).unwrap()),
                 NonZeroU16::new(22222).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 u8::MAX,
@@ -2747,15 +2744,14 @@ mod tests {
         assert_eq!(redirect_addr, I::NETSTACK);
 
         // The destination address and port were updated.
-        let expected = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let expected = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_SRC,
                 redirect_addr,
                 packet.inner().outer().src_port(),
                 LOCAL_PORT,
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_SRC,
                 redirect_addr,
                 u8::MAX,
@@ -2775,15 +2771,14 @@ mod tests {
         };
         assert_eq!(conn.reply_tuple(), &reply_tuple);
 
-        let mut reply_packet = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let mut reply_packet = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 reply_tuple.src_addr,
                 reply_tuple.dst_addr,
                 Some(NonZeroU16::new(reply_tuple.src_port_or_id).unwrap()),
                 NonZeroU16::new(reply_tuple.dst_port_or_id).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 reply_tuple.src_addr,
                 reply_tuple.dst_addr,
                 u8::MAX,
@@ -2804,15 +2799,14 @@ mod tests {
         );
         assert_eq!(verdict, Verdict::Accept(()));
 
-        let reply_packet_expected = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let reply_packet_expected = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_DST,
                 I::ULTIMATE_SRC,
                 Some(NonZeroU16::new(22222).unwrap()),
                 NonZeroU16::new(11111).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_DST,
                 I::ULTIMATE_SRC,
                 u8::MAX,
@@ -2832,7 +2826,7 @@ mod tests {
             I::ULTIMATE_DST,
             reply_packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
         )
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             error_src_addr,
             I::ULTIMATE_DST,
             u8::MAX,
@@ -2857,9 +2851,9 @@ mod tests {
             // rewritten since it's not one configured for NAT.
             error_src_addr,
             redirect_addr,
-            reply_packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+            reply_packet_pre_nat.serialize_vec_outer().unwrap().unwrap_b().into_inner(),
         )
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             error_src_addr,
             redirect_addr,
             u8::MAX,
@@ -2916,15 +2910,14 @@ mod tests {
         let mut core_ctx = FakeNatCtx::new([(ethernet_interface(), assigned_addr)]);
 
         // Create a packet and get the corresponding connection from conntrack.
-        let mut packet = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let mut packet = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 Some(NonZeroU16::new(11111).unwrap()),
                 NonZeroU16::new(22222).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 u8::MAX,
@@ -2962,15 +2955,14 @@ mod tests {
         // The packet's source address should be rewritten, and SNAT should be
         // configured for the packet; the reply tuple's destination should be rewritten
         // to match the new source.
-        let expected = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let expected = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::NETSTACK,
                 I::ULTIMATE_DST,
                 Some(LOCAL_PORT),
                 packet.inner().outer().dst_port().unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::NETSTACK,
                 I::ULTIMATE_DST,
                 u8::MAX,
@@ -3002,12 +2994,7 @@ mod tests {
             I::NETSTACK,
             packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
         )
-        .encapsulate(I::PacketBuilder::new(
-            error_src_addr,
-            I::NETSTACK,
-            u8::MAX,
-            IE::proto(),
-        ));
+        .wrap_in(I::PacketBuilder::new(error_src_addr, I::NETSTACK, u8::MAX, IE::proto()));
 
         let verdict = perform_nat::<IngressHook, _, _, _, _>(
             &mut core_ctx,
@@ -3027,9 +3014,9 @@ mod tests {
             // shouldn't end up in the packet destined to the other host.
             error_src_addr,
             I::ULTIMATE_SRC,
-            packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+            packet_pre_nat.serialize_vec_outer().unwrap().unwrap_b().into_inner(),
         )
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             error_src_addr,
             I::ULTIMATE_SRC,
             u8::MAX,
@@ -3059,15 +3046,14 @@ mod tests {
         let mut core_ctx = FakeNatCtx::new([(ethernet_interface(), assigned_addr)]);
 
         // Create a packet and get the corresponding connection from conntrack.
-        let mut packet = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let mut packet = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 Some(NonZeroU16::new(11111).unwrap()),
                 NonZeroU16::new(22222).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_SRC,
                 I::ULTIMATE_DST,
                 u8::MAX,
@@ -3104,15 +3090,14 @@ mod tests {
         // The packet's source address should be rewritten, and SNAT should be
         // configured for the packet; the reply tuple's destination should be rewritten
         // to match the new source.
-        let expected = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let expected = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::NETSTACK,
                 I::ULTIMATE_DST,
                 Some(LOCAL_PORT),
                 packet.inner().outer().dst_port().unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::NETSTACK,
                 I::ULTIMATE_DST,
                 u8::MAX,
@@ -3135,15 +3120,14 @@ mod tests {
         // When a reply to the original packet arrives at INGRESS, it should
         // have reverse SNAT applied, i.e. its destination should be rewritten
         // to match the original source of the connection.
-        let mut reply_packet = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let mut reply_packet = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 reply_tuple.src_addr,
                 reply_tuple.dst_addr,
                 Some(NonZeroU16::new(reply_tuple.src_port_or_id).unwrap()),
                 NonZeroU16::new(reply_tuple.dst_port_or_id).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 reply_tuple.src_addr,
                 reply_tuple.dst_addr,
                 u8::MAX,
@@ -3164,15 +3148,14 @@ mod tests {
         );
         assert_eq!(verdict, Verdict::Accept(()).into());
 
-        let reply_packet_expected = []
-            .into_serializer()
-            .encapsulate(UdpPacketBuilder::new(
+        let reply_packet_expected = EmptyBuf
+            .wrap_in(UdpPacketBuilder::new(
                 I::ULTIMATE_DST,
                 I::ULTIMATE_SRC,
                 Some(NonZeroU16::new(22222).unwrap()),
                 NonZeroU16::new(11111).unwrap(),
             ))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(I::PacketBuilder::new(
                 I::ULTIMATE_DST,
                 I::ULTIMATE_SRC,
                 u8::MAX,
@@ -3190,7 +3173,7 @@ mod tests {
             I::ULTIMATE_DST,
             reply_packet.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
         )
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             error_src_addr,
             I::ULTIMATE_DST,
             u8::MAX,
@@ -3210,19 +3193,16 @@ mod tests {
         );
         assert_eq!(verdict, Verdict::Accept(()));
 
-        let error_packet_expected = IE::make_serializer(
-            // We expect this address to be rewritten since `redirect_addr`
-            // shouldn't end up in the packet destined to the other host.
-            I::NETSTACK,
-            I::ULTIMATE_DST,
-            reply_packet_pre_nat.clone().serialize_vec_outer().unwrap().unwrap_b().into_inner(),
-        )
-        .encapsulate(I::PacketBuilder::new(
-            I::NETSTACK,
-            I::ULTIMATE_DST,
-            u8::MAX,
-            IE::proto(),
-        ));
+        let error_packet_expected =
+            I::PacketBuilder::new(I::NETSTACK, I::ULTIMATE_DST, u8::MAX, IE::proto()).wrap_body(
+                IE::make_serializer(
+                    // We expect this address to be rewritten since `redirect_addr`
+                    // shouldn't end up in the packet destined to the other host.
+                    I::NETSTACK,
+                    I::ULTIMATE_DST,
+                    reply_packet_pre_nat.serialize_vec_outer().unwrap().unwrap_b().into_inner(),
+                ),
+            );
 
         assert_eq!(error_packet, error_packet_expected);
     }

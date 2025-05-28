@@ -2691,7 +2691,7 @@ mod tests {
     use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use packet::Serializer as _;
+    use packet::{PacketBuilder as _, Serializer as _};
     use packet_formats::icmp::IcmpIpExt;
     use zx::{self as zx, AsHandleRef};
 
@@ -2986,8 +2986,8 @@ mod tests {
     {
         match proto {
             fposix_socket::DatagramSocketProtocol::Udp => buf,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho => Buf::new(buf, ..)
-                .encapsulate(packet_formats::icmp::IcmpPacketBuilder::<
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                packet_formats::icmp::IcmpPacketBuilder::<
                     <A::AddrType as IpAddress>::Version,
                     _,
                 >::new(
@@ -2995,11 +2995,13 @@ mod tests {
                     <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
                     packet_formats::icmp::IcmpZeroCode,
                     packet_formats::icmp::IcmpEchoRequest::new(0, 1),
-                ))
+                )
+                .wrap_body(Buf::new(buf, ..))
                 .serialize_vec_outer()
                 .unwrap()
                 .into_inner()
-                .into_inner(),
+                .into_inner()
+            }
         }
     }
 
@@ -3018,8 +3020,8 @@ mod tests {
     {
         match proto {
             fposix_socket::DatagramSocketProtocol::Udp => buf,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho => Buf::new(buf, ..)
-                .encapsulate(packet_formats::icmp::IcmpPacketBuilder::<
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                packet_formats::icmp::IcmpPacketBuilder::<
                     <A::AddrType as IpAddress>::Version,
                     _,
                 >::new(
@@ -3027,11 +3029,13 @@ mod tests {
                     dst_ip,
                     packet_formats::icmp::IcmpZeroCode,
                     packet_formats::icmp::IcmpEchoReply::new(id, 1),
-                ))
+                )
+                .wrap_body(Buf::new(buf, ..))
                 .serialize_vec_outer()
                 .unwrap()
                 .into_inner()
-                .into_inner(),
+                .into_inner()
+            }
         }
     }
 

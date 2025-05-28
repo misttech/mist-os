@@ -59,7 +59,7 @@ use netstack3_ip::{
     TransportReceiveError,
 };
 use netstack3_trace::trace_duration;
-use packet::{BufferMut, Nested, ParsablePacket, Serializer};
+use packet::{BufferMut, Nested, PacketBuilder, ParsablePacket};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
@@ -520,12 +520,8 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
             UdpRemotePort::Unset => return Err(UdpSerializeError::RemotePortUnset),
             UdpRemotePort::Set(remote_port) => *remote_port,
         };
-        Ok(body.encapsulate(UdpPacketBuilder::new(
-            local_ip.addr(),
-            remote_ip.addr(),
-            Some(*local_port),
-            remote_port,
-        )))
+        Ok(UdpPacketBuilder::new(local_ip.addr(), remote_ip.addr(), Some(*local_port), remote_port)
+            .wrap_body(body))
     }
 
     fn try_alloc_listen_identifier<I: IpExt, D: WeakDeviceIdentifier>(
@@ -2749,7 +2745,7 @@ mod tests {
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
     use netstack3_ip::testutil::{DualStackSendIpPacketMeta, FakeIpHeaderInfo};
     use netstack3_ip::{IpPacketDestination, ResolveRouteError, SendIpPacketMeta};
-    use packet::Buf;
+    use packet::{Buf, Serializer};
     use test_case::test_case;
 
     use crate::internal::counters::testutil::{
@@ -3322,8 +3318,8 @@ mod tests {
         let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, dscp_and_ecn } = meta;
         let builder = UdpPacketBuilder::new(src_ip, dst_ip, src_port, dst_port);
 
-        let buffer = Buf::new(body.to_owned(), ..)
-            .encapsulate(builder)
+        let buffer = builder
+            .wrap_body(Buf::new(body.to_owned(), ..))
             .serialize_vec_outer()
             .unwrap()
             .into_inner();

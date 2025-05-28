@@ -861,7 +861,9 @@ mod test {
         FakeStrongDeviceId, FakeTxMetadata, FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
     };
     use netstack3_base::{ContextProvider, CounterContext, CtxPair};
-    use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
+    use packet::{
+        Buf, InnerPacketBuilder as _, PacketBuilder as _, ParseBuffer as _, Serializer as _,
+    };
     use packet_formats::icmp::{
         IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpZeroCode, Icmpv6MessageType,
     };
@@ -1073,14 +1075,8 @@ mod test {
         proto: I::Proto,
     ) -> impl AsRef<[u8]> {
         const TTL: u8 = 255;
-        ip_body
-            .into_serializer()
-            .encapsulate(I::PacketBuilder::new(
-                *I::TEST_ADDRS.local_ip,
-                *I::TEST_ADDRS.remote_ip,
-                TTL,
-                proto,
-            ))
+        I::PacketBuilder::new(*I::TEST_ADDRS.local_ip, *I::TEST_ADDRS.remote_ip, TTL, proto)
+            .wrap_body(ip_body.into_serializer())
             .serialize_vec_outer()
             .unwrap()
     }
@@ -1090,13 +1086,8 @@ mod test {
         message: M,
         code: M::Code,
     ) -> impl AsRef<[u8]> {
-        [].into_serializer()
-            .encapsulate(IcmpPacketBuilder::new(
-                *I::TEST_ADDRS.local_ip,
-                *I::TEST_ADDRS.remote_ip,
-                code,
-                message,
-            ))
+        IcmpPacketBuilder::new(*I::TEST_ADDRS.local_ip, *I::TEST_ADDRS.remote_ip, code, message)
+            .wrap_body([].into_serializer())
             .serialize_vec_outer()
             .unwrap()
     }

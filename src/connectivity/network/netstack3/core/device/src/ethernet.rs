@@ -26,7 +26,7 @@ use netstack3_ip::nud::{
 };
 use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
 use netstack3_trace::trace_duration;
-use packet::{Buf, BufferMut, Serializer};
+use packet::{Buf, BufferMut, PacketBuilder, Serializer};
 use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
@@ -125,8 +125,8 @@ where
 
     let local_mac = get_mac(core_ctx, device_id);
     let max_frame_size = get_max_frame_size(core_ctx, device_id);
-    let frame = body
-        .encapsulate(EthernetFrameBuilder::new(local_mac.get(), dst_mac, ether_type, MIN_BODY_LEN))
+    let frame = EthernetFrameBuilder::new(local_mac.get(), dst_mac, ether_type, MIN_BODY_LEN)
+        .wrap_body(body)
         .with_size_limit(max_frame_size.into());
     send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame, meta)
         .map_err(|err| err.into_inner().into_inner())

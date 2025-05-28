@@ -14,9 +14,9 @@ use netstack3_base::{Options, PayloadLen, SegmentHeader};
 use packet::records::options::OptionSequenceBuilder;
 use packet::{
     Buf, Buffer, BufferAlloc, BufferMut, BufferProvider, BufferViewMut, EitherSerializer, EmptyBuf,
-    GrowBufferMut, InnerSerializer, Nested, PacketConstraints, ParsablePacket, ParseBuffer,
-    ParseMetadata, PartialSerializeResult, PartialSerializer, ReusableBuffer, SerializeError,
-    Serializer, SliceBufViewMut, TruncatingSerializer,
+    GrowBufferMut, InnerSerializer, Nested, PacketBuilder, PacketConstraints, ParsablePacket,
+    ParseBuffer, ParseMetadata, PartialSerializeResult, PartialSerializer, ReusableBuffer,
+    SerializeError, Serializer, SliceBufViewMut, TruncatingSerializer,
 };
 use packet_formats::icmp::mld::{
     MulticastListenerDone, MulticastListenerQuery, MulticastListenerQueryV2,
@@ -1024,7 +1024,8 @@ impl<I: FilterIpExt, S: TransportPacketSerializer<I> + PartialSerializer> Partia
     ) -> Result<PartialSerializeResult, SerializeError<Never>> {
         let packet_builder =
             I::PacketBuilder::new(self.src_addr, self.dst_addr, TX_PACKET_NO_TTL, self.protocol);
-        Nested::new(PartialSerializeRef { reference: self.serializer }, packet_builder)
+        packet_builder
+            .wrap_body(PartialSerializeRef { reference: self.serializer })
             .partial_serialize(outer, buffer)
     }
 }
@@ -2740,7 +2741,7 @@ pub mod testutil {
         use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
         use net_types::ip::Subnet;
         use netstack3_base::{SeqNum, UnscaledWindowSize};
-        use packet::TruncateDirection;
+        use packet::{PacketBuilder as _, TruncateDirection};
         use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
 
         use super::*;
@@ -3187,14 +3188,13 @@ pub mod testutil {
                 dst_ip: Ipv4Addr,
                 payload: Vec<u8>,
             ) -> Self::Serializer {
-                Buf::new(payload, ..).encapsulate(
-                    IcmpPacketBuilder::<Ipv4, IcmpDestUnreachable>::new(
-                        src_ip,
-                        dst_ip,
-                        Icmpv4DestUnreachableCode::DestHostUnreachable,
-                        IcmpDestUnreachable::default(),
-                    ),
+                IcmpPacketBuilder::<Ipv4, IcmpDestUnreachable>::new(
+                    src_ip,
+                    dst_ip,
+                    Icmpv4DestUnreachableCode::DestHostUnreachable,
+                    IcmpDestUnreachable::default(),
                 )
+                .wrap_body(Buf::new(payload, ..))
             }
         }
 
@@ -3211,13 +3211,16 @@ pub mod testutil {
                 dst_ip: Ipv6Addr,
                 payload: Vec<u8>,
             ) -> Self::Serializer {
-                TruncatingSerializer::new(Buf::new(payload, ..), TruncateDirection::DiscardBack)
-                    .encapsulate(IcmpPacketBuilder::<Ipv6, IcmpDestUnreachable>::new(
-                        src_ip,
-                        dst_ip,
-                        Icmpv6DestUnreachableCode::AddrUnreachable,
-                        IcmpDestUnreachable::default(),
-                    ))
+                IcmpPacketBuilder::<Ipv6, IcmpDestUnreachable>::new(
+                    src_ip,
+                    dst_ip,
+                    Icmpv6DestUnreachableCode::AddrUnreachable,
+                    IcmpDestUnreachable::default(),
+                )
+                .wrap_body(TruncatingSerializer::new(
+                    Buf::new(payload, ..),
+                    TruncateDirection::DiscardBack,
+                ))
             }
         }
     }
@@ -3242,7 +3245,9 @@ mod tests {
 
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
-    use packet::{InnerPacketBuilder as _, ParseBufferMut, PartialSerializer};
+    use packet::{
+        EmptyBuf, InnerPacketBuilder as _, PacketBuilder as _, ParseBufferMut, PartialSerializer,
+    };
     use packet_formats::icmp::IcmpZeroCode;
     use packet_formats::tcp::TcpSegmentBuilder;
     use test_case::{test_case, test_matrix};
@@ -3321,8 +3326,10 @@ mod tests {
             dst_port: NonZeroU16,
             data: &[u8],
         ) -> Vec<u8> {
-            Self::make_serializer_with_ports_data::<I>(src_ip, dst_ip, src_port, dst_port, data)
-                .encapsulate(I::PacketBuilder::new(src_ip, dst_ip, u8::MAX, Self::proto::<I>()))
+            I::PacketBuilder::new(src_ip, dst_ip, u8::MAX, Self::proto::<I>())
+                .wrap_body(Self::make_serializer_with_ports_data::<I>(
+                    src_ip, dst_ip, src_port, dst_port, data,
+                ))
                 .serialize_vec_outer()
                 .expect("serialize packet")
                 .unwrap_b()
@@ -3349,12 +3356,8 @@ mod tests {
             dst_port: NonZeroU16,
             data: &'a [u8],
         ) -> Self::Serializer<'a, I> {
-            data.into_serializer().encapsulate(UdpPacketBuilder::new(
-                src_ip,
-                dst_ip,
-                Some(src_port),
-                dst_port,
-            ))
+            UdpPacketBuilder::new(src_ip, dst_ip, Some(src_port), dst_port)
+                .wrap_body(data.into_serializer())
         }
     }
 
@@ -3445,7 +3448,7 @@ mod tests {
             dst_port: NonZeroU16,
             data: &'a [u8],
         ) -> Self::Serializer<'a, I> {
-            data.into_serializer().encapsulate(TcpSegmentBuilder::new(
+            TcpSegmentBuilder::new(
                 src_ip,
                 dst_ip,
                 src_port,
@@ -3453,7 +3456,8 @@ mod tests {
                 SEQ_NUM,
                 ACK_NUM,
                 WINDOW_SIZE,
-            ))
+            )
+            .wrap_body(data.into_serializer())
         }
     }
 
@@ -3478,12 +3482,13 @@ mod tests {
             _dst_port: NonZeroU16,
             data: &'a [u8],
         ) -> Self::Serializer<'a, I> {
-            data.into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
+            IcmpPacketBuilder::<I, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
                 icmp::IcmpEchoRequest::new(/* id */ src_port.get(), /* seq */ 0),
-            ))
+            )
+            .wrap_body(data.into_serializer())
         }
     }
 
@@ -3506,12 +3511,13 @@ mod tests {
             dst_port: NonZeroU16,
             data: &'a [u8],
         ) -> Self::Serializer<'a, I> {
-            data.into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
+            IcmpPacketBuilder::<I, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
                 icmp::IcmpEchoReply::new(/* id */ dst_port.get(), /* seq */ 0),
-            ))
+            )
+            .wrap_body(data.into_serializer())
         }
     }
 
@@ -3760,53 +3766,57 @@ mod tests {
 
     #[ip_test(I)]
     fn icmp_echo_request_update_id_port_updates_checksum<I: TestIpExt>() {
-        let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
+        let mut serializer = IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
             IcmpZeroCode,
             icmp::IcmpEchoRequest::new(SRC_PORT.get(), /* seq */ 0),
-        ));
+        )
+        .wrap_body(EmptyBuf);
         serializer
             .transport_packet_mut()
             .expect("packet should support rewriting")
             .set_src_port(SRC_PORT_2);
 
-        let equivalent = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
+        let equivalent = IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
             IcmpZeroCode,
             icmp::IcmpEchoRequest::new(SRC_PORT_2.get(), /* seq */ 0),
-        ));
+        )
+        .wrap_body(EmptyBuf);
 
         assert_eq!(equivalent, serializer);
     }
 
     #[ip_test(I)]
     fn icmp_echo_reply_update_id_port_updates_checksum<I: TestIpExt>() {
-        let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
+        let mut serializer = IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
             IcmpZeroCode,
             icmp::IcmpEchoReply::new(SRC_PORT.get(), /* seq */ 0),
-        ));
+        )
+        .wrap_body(EmptyBuf);
         serializer
             .transport_packet_mut()
             .expect("packet should support rewriting")
             .set_dst_port(SRC_PORT_2);
 
-        let equivalent = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
+        let equivalent = IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
             IcmpZeroCode,
             icmp::IcmpEchoReply::new(SRC_PORT_2.get(), /* seq */ 0),
-        ));
+        )
+        .wrap_body(EmptyBuf);
 
         assert_eq!(equivalent, serializer);
     }
 
     fn ip_packet<I: FilterIpExt, P: Protocol>(src: I::Addr, dst: I::Addr) -> Buf<Vec<u8>> {
         Buf::new(P::make_packet::<I>(src, dst), ..)
-            .encapsulate(I::PacketBuilder::new(src, dst, /* ttl */ u8::MAX, P::proto::<I>()))
+            .wrap_in(I::PacketBuilder::new(src, dst, /* ttl */ u8::MAX, P::proto::<I>()))
             .serialize_vec_outer()
             .expect("serialize IP packet")
             .unwrap_b()
@@ -3895,14 +3905,14 @@ mod tests {
     #[test_case(Tcp)]
     #[test_case(IcmpEchoRequest)]
     fn nested_serializer_set_src_dst_addr_updates_checksums<I: TestIpExt, P: Protocol>(_proto: P) {
-        let mut packet = P::make_serializer::<I>(I::SRC_IP, I::DST_IP).encapsulate(
-            I::PacketBuilder::new(I::SRC_IP, I::DST_IP, /* ttl */ u8::MAX, P::proto::<I>()),
-        );
+        let mut packet =
+            I::PacketBuilder::new(I::SRC_IP, I::DST_IP, /* ttl */ u8::MAX, P::proto::<I>())
+                .wrap_body(P::make_serializer::<I>(I::SRC_IP, I::DST_IP));
         packet.set_src_addr(I::SRC_IP_2);
         packet.set_dst_addr(I::DST_IP_2);
 
         let equivalent =
-            P::make_serializer::<I>(I::SRC_IP_2, I::DST_IP_2).encapsulate(I::PacketBuilder::new(
+            P::make_serializer::<I>(I::SRC_IP_2, I::DST_IP_2).wrap_in(I::PacketBuilder::new(
                 I::SRC_IP_2,
                 I::DST_IP_2,
                 /* ttl */ u8::MAX,
@@ -4081,7 +4091,7 @@ mod tests {
             // it's updated as if it were correct.
             truncate_message.then_some(1280),
         )
-        .encapsulate(I::PacketBuilder::new(I::DST_IP_2, I::SRC_IP, u8::MAX, IE::proto()));
+        .wrap_in(I::PacketBuilder::new(I::DST_IP_2, I::SRC_IP, u8::MAX, IE::proto()));
 
         let mut bytes: Buf<Vec<u8>> = serializer.serialize_vec_outer().unwrap().unwrap_b();
         let icmp_payload = match packet_type {
@@ -4233,7 +4243,7 @@ mod tests {
             // it's updated as if it were correct.
             truncate_message.then_some(1280),
         )
-        .encapsulate(I::PacketBuilder::new(I::DST_IP_2, I::SRC_IP, u8::MAX, IE::proto()));
+        .wrap_in(I::PacketBuilder::new(I::DST_IP_2, I::SRC_IP, u8::MAX, IE::proto()));
 
         let mut bytes: Buf<Vec<u8>> = serializer.serialize_vec_outer().unwrap().unwrap_b();
 
@@ -4324,7 +4334,7 @@ mod tests {
             // it's updated as if it were correct.
             truncate_message.then_some(1280),
         )
-        .encapsulate(I::PacketBuilder::new(I::DST_IP_2, I::SRC_IP_2, u8::MAX, IE::proto()));
+        .wrap_in(I::PacketBuilder::new(I::DST_IP_2, I::SRC_IP_2, u8::MAX, IE::proto()));
 
         let mut bytes: Buf<Vec<u8>> = serializer.serialize_vec_outer().unwrap().unwrap_b();
 
@@ -4384,7 +4394,7 @@ mod tests {
         }
 
         let mut serializer = IE::make_serializer(I::SRC_IP, I::DST_IP, payload_bytes)
-            .encapsulate(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
+            .wrap_in(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
 
         {
             let mut icmp_packet = serializer
@@ -4421,7 +4431,7 @@ mod tests {
         let expected_serializer = IE::make_serializer(I::SRC_IP, I::DST_IP, expected_payload_bytes)
             // We never updated the outer IPs, so they should still be
             // their original values.
-            .encapsulate(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
+            .wrap_in(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
 
         let actual_bytes = serializer.serialize_vec_outer().unwrap().unwrap_b();
         let expected_bytes = expected_serializer.serialize_vec_outer().unwrap().unwrap_b();
@@ -4473,7 +4483,7 @@ mod tests {
         }
 
         let serializer = IE::make_serializer(I::SRC_IP, I::DST_IP, payload_bytes)
-            .encapsulate(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
+            .wrap_in(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
 
         let mut bytes = serializer.serialize_vec_outer().unwrap().unwrap_b().into_inner();
 
@@ -4525,7 +4535,7 @@ mod tests {
         let expected_serializer = IE::make_serializer(I::SRC_IP, I::DST_IP, expected_payload_bytes)
             // We never updated the outer IPs, so they should still be
             // their original values.
-            .encapsulate(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
+            .wrap_in(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, u8::MAX, IE::proto()));
 
         let expected_bytes =
             expected_serializer.serialize_vec_outer().unwrap().unwrap_b().into_inner();
@@ -4553,7 +4563,7 @@ mod tests {
 
         let whole_packet =
             P::make_serializer_with_ports_data::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, DATA)
-                .encapsulate(I::PacketBuilder::new(
+                .wrap_in(I::PacketBuilder::new(
                     I::SRC_IP,
                     I::DST_IP,
                     TX_PACKET_NO_TTL,

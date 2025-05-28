@@ -304,7 +304,7 @@ mod testutil {
         CoreTimerContext, CounterContext, CtxPair, FrameDestination, Marks, ResourceCounterContext,
     };
     use netstack3_filter::ProofOfEgressCheck;
-    use packet::{BufferMut, InnerPacketBuilder, Serializer};
+    use packet::{BufferMut, InnerPacketBuilder, PacketBuilder, Serializer};
     use packet_formats::ip::{IpPacketBuilder, IpProto};
 
     use crate::device::IpDeviceSendContext;
@@ -347,9 +347,8 @@ mod testutil {
         const TTL: u8 = 255;
         /// Arbitrary data to put inside of an IP packet.
         const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-        IP_BODY
-            .into_serializer()
-            .encapsulate(I::PacketBuilder::new(src_addr, dst_addr, TTL, IpProto::Udp.into()))
+        I::PacketBuilder::new(src_addr, dst_addr, TTL, IpProto::Udp.into())
+            .wrap_body(IP_BODY.into_serializer())
             .serialize_vec_outer()
             .unwrap()
     }

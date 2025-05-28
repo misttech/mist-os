@@ -8,7 +8,7 @@ use core::num::NonZeroU16;
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use net_types::ZonedAddr;
-use packet::{Buf, Serializer};
+use packet::{Buf, PacketBuilder, Serializer};
 use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpZeroCode};
 use test_case::test_case;
 
@@ -72,17 +72,15 @@ fn test_icmp_connection<I: TestIpExt + IpExt>(
 
     let _loopback_device_id = net.with_context(LOCAL_CTX_NAME, |ctx| ctx.test_api().add_loopback());
 
+    let pb = IcmpPacketBuilder::<I, _>::new(
+        *config.local_ip,
+        *remote_addr,
+        IcmpZeroCode,
+        IcmpEchoRequest::new(0, 1),
+    );
     let echo_body = vec![1, 2, 3, 4];
-    let buf = Buf::new(echo_body.clone(), ..)
-        .encapsulate(IcmpPacketBuilder::<I, _>::new(
-            *config.local_ip,
-            *remote_addr,
-            IcmpZeroCode,
-            IcmpEchoRequest::new(0, 1),
-        ))
-        .serialize_vec_outer()
-        .unwrap()
-        .into_inner();
+    let buf =
+        pb.wrap_body(Buf::new(echo_body.clone(), ..)).serialize_vec_outer().unwrap().into_inner();
     let conn = net.with_context(LOCAL_CTX_NAME, |ctx| {
         let mut socket_api = ctx.core_api().icmp_echo::<I>();
         let conn = socket_api.create();
@@ -122,16 +120,16 @@ fn test_icmp_connection<I: TestIpExt + IpExt>(
         1
     );
     let replies = net.context(LOCAL_CTX_NAME).bindings_ctx.take_icmp_replies(&conn);
-    let expected = Buf::new(echo_body, ..)
-        .encapsulate(IcmpPacketBuilder::<I, _>::new(
-            *config.local_ip,
-            *remote_addr,
-            IcmpZeroCode,
-            packet_formats::icmp::IcmpEchoReply::new(icmp_id, 1),
-        ))
-        .serialize_vec_outer()
-        .unwrap()
-        .into_inner()
-        .into_inner();
+    let expected = IcmpPacketBuilder::<I, _>::new(
+        *config.local_ip,
+        *remote_addr,
+        IcmpZeroCode,
+        packet_formats::icmp::IcmpEchoReply::new(icmp_id, 1),
+    )
+    .wrap_body(Buf::new(echo_body, ..))
+    .serialize_vec_outer()
+    .unwrap()
+    .into_inner()
+    .into_inner();
     assert_matches!(&replies[..], [body] if *body == expected);
 }

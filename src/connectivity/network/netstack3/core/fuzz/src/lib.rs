@@ -299,7 +299,8 @@ impl<B: PacketBuilder> FuzzablePacket for (B,) {
     }
 
     fn serialize(self, buf: Buf<Vec<u8>>) -> Result<Buf<Vec<u8>>, SerializeError<Never>> {
-        buf.encapsulate(self.0)
+        self.0
+            .wrap_body(buf)
             .serialize_vec_outer()
             .map(Either::into_inner)
             .map_err(|(err, _ser)| err)
@@ -316,9 +317,9 @@ impl<BA: PacketBuilder, BB: PacketBuilder, BC: PacketBuilder> FuzzablePacket for
 
     fn serialize(self, buf: Buf<Vec<u8>>) -> Result<Buf<Vec<u8>>, SerializeError<Never>> {
         let (a, b, c) = self;
-        buf.encapsulate(a)
-            .encapsulate(b)
-            .encapsulate(c)
+        buf.wrap_in(a)
+            .wrap_in(b)
+            .wrap_in(c)
             .serialize_vec_outer()
             .map(Either::into_inner)
             .map_err(|(err, _ser)| err)

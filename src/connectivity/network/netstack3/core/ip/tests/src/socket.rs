@@ -10,7 +10,7 @@ use ip_test_macro::ip_test;
 
 use net_types::ip::{AddrSubnet, GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{SpecifiedAddr, Witness};
-use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
+use packet::{Buf, InnerPacketBuilder, PacketBuilder as _, ParseBuffer, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::{IcmpIpExt, IcmpZeroCode};
 use packet_formats::ip::IpPacket;
@@ -403,15 +403,11 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
 
     let reply = IcmpEchoRequest::new(0, 0).reply();
     let body = &[1, 2, 3, 4];
-    let buffer = Buf::new(body.to_vec(), ..)
-        .encapsulate(IcmpPacketBuilder::<I, _>::new(
-            expected_from_ip.get(),
-            to_ip.get(),
-            IcmpZeroCode,
-            reply,
-        ))
-        .serialize_vec_outer()
-        .unwrap();
+    let buffer =
+        IcmpPacketBuilder::<I, _>::new(expected_from_ip.get(), to_ip.get(), IcmpZeroCode, reply)
+            .wrap_body(Buf::new(body.to_vec(), ..))
+            .serialize_vec_outer()
+            .unwrap();
 
     // Send an echo packet on the socket and validate that the packet is
     // delivered locally.

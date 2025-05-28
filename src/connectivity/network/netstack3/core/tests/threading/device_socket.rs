@@ -13,7 +13,7 @@ use netstack3_core::device_socket::{Protocol, TargetDevice};
 use netstack3_core::sync::Mutex;
 use netstack3_core::testutil::{CtxPairExt, FakeCtx, FakeCtxBuilder};
 use netstack3_core::CtxPair;
-use packet::{Buf, Serializer};
+use packet::{Buf, PacketBuilder, Serializer};
 use packet_formats::ethernet::{EtherType, EthernetFrameBuilder};
 use std::num::NonZeroU16;
 
@@ -23,8 +23,8 @@ fn packet_socket_change_device_and_protocol_atomic() {
     const SRC_MAC: Mac = net_mac!("88:88:88:88:88:88");
 
     let make_ethernet_frame = |ethertype| {
-        Buf::new(vec![1; 10], ..)
-            .encapsulate(EthernetFrameBuilder::new(SRC_MAC, DEVICE_MAC, ethertype, 0))
+        EthernetFrameBuilder::new(SRC_MAC, DEVICE_MAC, ethertype, 0)
+            .wrap_body(Buf::new(vec![1; 10], ..))
             .serialize_vec_outer()
             .unwrap()
             .into_inner()
