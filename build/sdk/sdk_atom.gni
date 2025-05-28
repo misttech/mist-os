@@ -259,8 +259,6 @@ template("sdk_atom") {
   # For support unstable atoms, ensure that `meta.stable`is always
   # specified and either it is true and an `api` file was specified or the
   # category supports unstable atoms.
-  # `add_stable_true_to_meta_json` represents whether the meta.json
-  # generation script would have written "stable" to the file.
   is_type_supporting_unstable = _types_supporting_unstable_atoms + [ type ] -
                                 [ type ] != _types_supporting_unstable_atoms
   assert(
@@ -280,7 +278,6 @@ template("sdk_atom") {
       assert(category != "internal",
              "Atoms in SDK category '${category}' cannot be `stable`.")
       is_stable = true
-      add_stable_true_to_meta_json = true
 
       # For types that specify stable, ensure the `api` file was specified for stable atoms.
       assert(defined(invoker.api))
@@ -294,13 +291,11 @@ template("sdk_atom") {
               category == "internal",
           "`meta.stable` must be true unless the SDK category ('${category}') is 'partner'.")
       is_stable = false
-      add_stable_true_to_meta_json = false
     }
   } else {
     # Atom types that do not support unstable are always stable, but this is not
     # reported in their `meta.json` file.
     is_stable = true
-    add_stable_true_to_meta_json = false
   }
 
   # Handle types that are not in _types_not_requiring_compatibility. Their
@@ -409,7 +404,6 @@ template("sdk_atom") {
       ]
     }
     is_stable = is_stable
-    write_stable_true_to_meta_json = add_stable_true_to_meta_json
   }
 
   assert(defined(meta.source) != defined(meta.value),

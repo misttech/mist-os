@@ -236,7 +236,7 @@ class PrebuildMap(object):
             "name": prebuild["library_name"],
             "root": prebuild["file_base"],
             "sources": fidl_sources,
-            "stable": info["write_stable_true_to_meta_json"],
+            "stable": info["is_stable"],
             "type": info["atom_type"],
             "deps": [self.label_to_library_name(d) for d in fidl_deps],
         }, []
@@ -292,7 +292,7 @@ class PrebuildMap(object):
             "headers": prebuild["headers"],
             "include_dir": prebuild["include_dir"],
             "sources": prebuild["sources"],
-            "stable": info["write_stable_true_to_meta_json"],
+            "stable": info["is_stable"],
             "type": info["atom_type"],
         }, []
 

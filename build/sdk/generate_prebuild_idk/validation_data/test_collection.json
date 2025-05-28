@@ -139,7 +139,6 @@
     },
     "atom_meta_json_file": "gen/sdk/lib/stdcompat/stdcompat_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": true,
     "atom_type": "cc_source_library",
     "prebuild_info": {
       "deps": [
@@ -255,7 +254,6 @@
     },
     "atom_meta_json_file": "gen/sdk/lib/fit/fit_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": true,
     "atom_type": "cc_source_library",
     "prebuild_info": {
       "deps": [
@@ -296,7 +294,6 @@
     },
     "atom_meta_json_file": "gen/src/zircon/lib/zircon/zircon_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "none"
   },
   {
@@ -366,7 +363,6 @@
     },
     "atom_meta_json_file": "gen/sdk/lib/fdio/fdio_sdk_manifest.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "cc_prebuilt_library",
     "prebuild_info": {
       "atom_label": "//sdk/lib/fdio:fdio",
@@ -427,7 +423,6 @@
     },
     "atom_meta_json_file": "fidling/gen/zircon/vdso/zx/zx_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": true,
     "atom_type": "fidl_library",
     "prebuild_info": {
       "deps": [
@@ -453,7 +448,6 @@
     },
     "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.unknown/fuchsia.unknown_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": true,
     "atom_type": "fidl_library",
     "prebuild_info": {
       "deps": [
@@ -507,7 +501,6 @@
     },
     "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": true,
     "atom_type": "fidl_library",
     "prebuild_info": {
       "deps": [
@@ -541,7 +534,6 @@
     },
     "atom_meta_json_file": "host_x64/gen/zircon/tools/zbi/zbi_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "host_tool"
   },
   {
@@ -580,7 +572,6 @@
     },
     "atom_meta_json_file": "host_x64/gen/src/developer/ffx/plugins/emulator/sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "ffx_tool"
   },
   {
@@ -595,7 +586,6 @@
     },
     "atom_meta_json_file": "host_x64/gen/src/developer/ffx/plugins/emulator/aemu_internal.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "companion_host_tool",
     "prebuild_info": {
       "binary": "../../prebuilt/third_party/android/aemu/release/linux-x64/emulator",
@@ -619,7 +609,6 @@
     },
     "atom_meta_json_file": "gen/src/devices/bind/fuchsia.serial/fuchsia.serial_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "bind_library",
     "prebuild_info": {
       "deps": [
@@ -661,7 +650,6 @@
     },
     "atom_meta_json_file": "gen/sdk/lib/syslog/shards/syslog_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "data"
   },
   {
@@ -677,7 +665,6 @@
     },
     "atom_meta_json_file": "gen/sdk/version_history_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "version_history",
     "prebuild_info": {
       "daily_commit_hash_file": "../../build/info/jiri_generated/integration_daily_commit_hash.txt",
@@ -876,7 +863,6 @@
     },
     "atom_meta_json_file": "dartlang/gen/sdk/testing/sl4f/client/client_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "dart_library",
     "prebuild_info": {
       "deps": [
@@ -968,7 +954,6 @@
     },
     "atom_meta_json_file": "gen/sdk/sdk_notice.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "documentation"
   },
   {
@@ -983,7 +968,6 @@
     },
     "atom_meta_json_file": "host_x64/gen/src/tests/end_to_end/rtc/rtc_conformance_test_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "experimental_python_e2e_test",
     "prebuild_info": {
       "api_level": "unversioned",
@@ -2114,7 +2098,6 @@
     },
     "atom_meta_json_file": "gen/zircon/public/sysroot_sdk/sysroot_sdk.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "sysroot"
   },
   {
@@ -2159,7 +2142,6 @@
     },
     "atom_meta_json_file": "gen/src/lib/vulkan/vulkan_layers.meta.json",
     "is_stable": true,
-    "write_stable_true_to_meta_json": false,
     "atom_type": "loadable_module"
   },
   {
