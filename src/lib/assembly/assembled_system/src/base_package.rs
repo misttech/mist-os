@@ -6,11 +6,11 @@ use crate::{AssembledSystem, Image};
 
 use anyhow::{Context, Result};
 use assembly_base_package::BasePackageBuilder;
-use assembly_config_schema::ImageAssemblyConfig;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
 use fuchsia_pkg::PackageManifest;
+use image_assembly_config::ImageAssemblyConfig;
 use log::info;
 use std::fs::File;
 use utf8_path::path_relative_from_current_dir;

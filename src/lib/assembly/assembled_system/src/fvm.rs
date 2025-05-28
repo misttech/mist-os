@@ -7,11 +7,11 @@ use crate::blobfs::construct_blobfs;
 use crate::{AssembledSystem, Image};
 
 use anyhow::{Context, Result};
-use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fvm::{Filesystem, FilesystemAttributes, FvmBuilder, FvmType, NandFvmBuilder};
 use assembly_images_config::{Fvm, FvmFilesystem, FvmOutput, SparseFvm};
 use assembly_tool::ToolProvider;
 use camino::{Utf8Path, Utf8PathBuf};
+use image_assembly_config::ImageAssemblyConfig;
 use log::info;
 use std::collections::HashMap;
 use utf8_path::path_relative_from_current_dir;
@@ -330,7 +330,6 @@ mod tests {
 
     use crate::base_package::BasePackage;
     use crate::AssembledSystem;
-    use assembly_config_schema::image_assembly_config::ImageAssemblyConfig;
     use assembly_images_config::{
         BlobFS, BlobfsLayout, EmptyData, FvmFilesystem, FvmOutput, NandFvm, Reserved, SparseFvm,
         StandardFvm,
@@ -338,6 +337,7 @@ mod tests {
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
+    use image_assembly_config::ImageAssemblyConfig;
     use serde_json::json;
     use std::fs::File;
     use std::io::Write;

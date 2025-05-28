@@ -11,14 +11,12 @@ use assembly_config_schema::assembly_config::{
 use assembly_config_schema::board_config::{BoardInputBundle, HardwareInfo};
 use assembly_config_schema::common::PackagedDriverDetails;
 use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
-use assembly_config_schema::image_assembly_config::{BoardDriverArguments, KernelConfig};
 use assembly_config_schema::platform_config::BuildType;
 use assembly_config_schema::product_config::{
     ProductConfigData, ProductPackageDetails, ProductPackagesConfig,
 };
 use assembly_config_schema::{
-    BoardInformation, DriverDetails, FeatureSetLevel, ImageAssemblyConfig, PackageDetails,
-    PackageSet,
+    BoardInformation, DriverDetails, FeatureSetLevel, PackageDetails, PackageSet,
 };
 use assembly_constants::{
     BootfsDestination, BootfsPackageDestination, FileEntry, PackageDestination,
@@ -43,6 +41,7 @@ use assembly_validate_package::{validate_component, validate_package, PackageVal
 use assembly_validate_util::{BootfsContents, PkgNamespace};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
+use image_assembly_config::{BoardDriverArguments, ImageAssemblyConfig, KernelConfig};
 use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use serde::Serialize;
@@ -831,7 +830,7 @@ impl ImageAssemblyConfigBuilder {
         outdir: impl AsRef<Utf8Path>,
         tools: &impl ToolProvider,
         warn_only: bool,
-    ) -> Result<(assembly_config_schema::ImageAssemblyConfig, Option<ProductValidationError>)> {
+    ) -> Result<(ImageAssemblyConfig, Option<ProductValidationError>)> {
         let (config, validator) = self.build(outdir, tools)?;
         let error = validator.validate_product(&config, warn_only);
         Ok((config, error.err()))
@@ -841,7 +840,7 @@ impl ImageAssemblyConfigBuilder {
         mut self,
         outdir: impl AsRef<Utf8Path>,
         tools: &impl ToolProvider,
-    ) -> Result<(assembly_config_schema::ImageAssemblyConfig, Validator)> {
+    ) -> Result<(ImageAssemblyConfig, Validator)> {
         let outdir = outdir.as_ref();
 
         // Merge the memory buckets into a single file and make it available
@@ -1111,7 +1110,7 @@ impl ImageAssemblyConfigBuilder {
         // Construct a single "partial" config from the combined fields, and
         // then pass this to the ImageAssemblyConfig::try_from_partials() to get the
         // final validation that it's complete.
-        let image_assembly_config = assembly_config_schema::ImageAssemblyConfig {
+        let image_assembly_config = ImageAssemblyConfig {
             base: packages.package_manifest_paths(PackageSet::Base),
             cache: packages.package_manifest_paths(PackageSet::Cache),
             system: packages.package_manifest_paths(PackageSet::System),
@@ -1486,7 +1485,6 @@ mod tests {
     use super::*;
     use assembly_config_schema::assembly_config::CompiledComponentDefinition;
     use assembly_config_schema::developer_overrides::KernelOptions;
-    use assembly_config_schema::image_assembly_config::PartialKernelConfig;
     use assembly_constants::CompiledPackageDestination;
     use assembly_constants::TestCompiledPackageDestination::ForTest;
     use assembly_file_relative_path::FileRelativePathBuf;
@@ -1497,6 +1495,7 @@ mod tests {
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::ToolCommandLog;
     use fuchsia_pkg::{BlobInfo, MetaPackage, PackageBuilder, PackageManifestBuilder};
+    use image_assembly_config::PartialKernelConfig;
     use serde_json::json;
     use std::fs::File;
     use std::io::Write;
@@ -2188,7 +2187,7 @@ mod tests {
         };
 
         let builder = setup_builder(&vars, vec![bundle1, bundle2]);
-        let _: assembly_config_schema::ImageAssemblyConfig =
+        let _: ImageAssemblyConfig =
             builder.build_and_validate(&vars.outdir, &tools, false).unwrap().0;
 
         // Make sure all the components and CML shards from the separate bundles

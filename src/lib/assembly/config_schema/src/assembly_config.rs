@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::image_assembly_config::PartialKernelConfig;
 use crate::platform_config::PlatformConfig;
 use crate::PackageDetails;
 use anyhow::Result;
@@ -12,6 +11,7 @@ use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths
 use assembly_package_utils::PackageInternalPathBuf;
 use camino::Utf8PathBuf;
 use fuchsia_pkg::PackageManifest;
+use image_assembly_config::PartialKernelConfig;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -23,8 +23,7 @@ use crate::product_config::{ProductConfig, ProductPackageDetails};
 ///
 /// This is a high-level operation that takes a more abstract description of
 /// what is desired in the assembled product images, and then generates the
-/// complete Image Assembly configuration (`crate::config::ImageAssemblyConfig`)
-/// from that.
+/// complete Image Assembly configuration (`ImageAssemblyConfig`) from that.
 #[derive(Debug, Deserialize, Serialize, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
 #[assembly_container(product_configuration.json)]

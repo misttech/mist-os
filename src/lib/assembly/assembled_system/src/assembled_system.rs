@@ -9,7 +9,6 @@ use crate::image::Image;
 use crate::{vbmeta, zbi};
 
 use anyhow::{anyhow, Context, Result};
-use assembly_config_schema::ImageAssemblyConfig;
 use assembly_constants::PackageDestination;
 use assembly_container::{
     assembly_container, AssemblyContainer, DirectoryPathBuf, FileType, WalkPaths,
@@ -17,6 +16,7 @@ use assembly_container::{
 use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, VBMeta, Zbi};
 use assembly_tool::ToolProvider;
 use camino::{Utf8Path, Utf8PathBuf};
+use image_assembly_config::ImageAssemblyConfig;
 use log::info;
 use pathdiff::diff_paths;
 use serde::{Deserialize, Serialize};

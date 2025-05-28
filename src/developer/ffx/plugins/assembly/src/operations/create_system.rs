@@ -4,13 +4,13 @@
 
 use anyhow::{Context, Result};
 use assembled_system::AssembledSystem;
-use assembly_config_schema::ImageAssemblyConfig;
 use assembly_container::AssemblyContainer;
 use assembly_sdk::SdkToolProvider;
 use assembly_tool::ToolProvider;
 use assembly_util as util;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::CreateSystemArgs;
+use image_assembly_config::ImageAssemblyConfig;
 use std::fs::File;
 
 pub async fn create_system(args: CreateSystemArgs) -> Result<()> {

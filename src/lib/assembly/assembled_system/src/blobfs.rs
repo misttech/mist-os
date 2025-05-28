@@ -7,10 +7,10 @@ use crate::BlobfsContents;
 
 use anyhow::{Context, Result};
 use assembly_blobfs::BlobFSBuilder;
-use assembly_config_schema::ImageAssemblyConfig;
 use assembly_images_config::BlobFS;
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
+use image_assembly_config::ImageAssemblyConfig;
 use std::collections::HashMap;
 
 pub fn construct_blobfs(
@@ -61,12 +61,12 @@ pub fn construct_blobfs(
 mod tests {
     use super::construct_blobfs;
     use crate::base_package::BasePackage;
-    use assembly_config_schema::ImageAssemblyConfig;
     use assembly_images_config::{BlobFS, BlobfsLayout};
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::Utf8Path;
     use fuchsia_hash::Hash;
+    use image_assembly_config::ImageAssemblyConfig;
     use serde_json::json;
     use std::fs::File;
     use std::io::Write;

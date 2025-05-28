@@ -6,10 +6,10 @@ use crate::base_package::BasePackage;
 use crate::BlobfsContents;
 
 use anyhow::{Context, Result};
-use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fxfs::FxfsBuilder;
 use assembly_images_config::Fxfs;
 use camino::{Utf8Path, Utf8PathBuf};
+use image_assembly_config::ImageAssemblyConfig;
 use std::collections::HashMap;
 
 pub struct ConstructedFxfs {
@@ -82,9 +82,9 @@ mod tests {
     use super::{construct_fxfs, ConstructedFxfs};
     use crate::base_package::construct_base_package;
     use crate::AssembledSystem;
-    use assembly_config_schema::ImageAssemblyConfig;
     use assembly_images_config::Fxfs;
     use camino::{Utf8Path, Utf8PathBuf};
+    use image_assembly_config::ImageAssemblyConfig;
     use serde_json::json;
     use std::fs::File;
     use std::io::Write;

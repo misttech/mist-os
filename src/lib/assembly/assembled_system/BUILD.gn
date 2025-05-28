@@ -15,11 +15,11 @@ rustc_library("assembled_system") {
   deps = [
     "//src/lib/assembly/base_package",
     "//src/lib/assembly/blobfs",
-    "//src/lib/assembly/config_schema",
     "//src/lib/assembly/constants",
     "//src/lib/assembly/container",
     "//src/lib/assembly/fvm",
     "//src/lib/assembly/fxfs",
+    "//src/lib/assembly/image_assembly_config",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/package_list",
     "//src/lib/assembly/tool",

@@ -79,6 +79,7 @@ rustc_library("ffx_assembly") {
     "//src/lib/assembly/domain_config",
     "//src/lib/assembly/driver_manifest",
     "//src/lib/assembly/file_relative_path",
+    "//src/lib/assembly/image_assembly_config",
     "//src/lib/assembly/images_config",
     "//src/lib/assembly/memory_buckets",
     "//src/lib/assembly/named_file_map",
