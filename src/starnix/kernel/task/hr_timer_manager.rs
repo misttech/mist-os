@@ -481,7 +481,7 @@ impl HrTimerManager {
             // the message counter is decremented.
             let set_and_wait = device_async_proxy.set_and_wait(
                 new_deadline,
-                duplicate_event,
+                fta::SetAndWaitMode::NotifySetupDone(duplicate_event),
                 &TEMPORARY_STARNIX_TIMER_ID,
             );
             fuchsia_trace::instant!(
@@ -974,12 +974,16 @@ mod tests {
                     };
                     responder.send(&response).expect("send success");
                 }
-                fta::WakeRequest::SetAndWait { deadline, responder, setup_done, .. } => {
+                fta::WakeRequest::SetAndWait { deadline, responder, mode, .. } => {
                     log_debug!("set_and_wait: new timer: deadline: {deadline:?}, {emulate:?}");
                     open_requests += 1;
-                    setup_done
-                        .signal_handle(zx::Signals::empty(), zx::Signals::EVENT_SIGNALED)
-                        .expect("infallible");
+
+                    if let fta::SetAndWaitMode::NotifySetupDone(setup_done) = mode {
+                        setup_done
+                            .signal_handle(zx::Signals::empty(), zx::Signals::EVENT_SIGNALED)
+                            .expect("infallible");
+                    }
+
                     if emulate.is_some() {
                         select! {
                             _ = fasync::Timer::new(deadline) => {

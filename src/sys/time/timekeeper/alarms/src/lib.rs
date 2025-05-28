@@ -261,12 +261,8 @@ enum Cmd {
         cid: zx::Koid,
         /// A timestamp (presumably in the future), at which to expire the timer.
         deadline: fasync::BootInstant,
-        /// A wake lease token. Hold onto this value while we must prevent the
-        /// system from going to sleep.
-        ///
-        /// This is important so that wake alarms can be scheduled before we
-        /// allow the system to go to sleep.
-        setup_done: zx::Event,
+        // The API supports several modes. See fuchsia.time.alarms/Wake.fidl.
+        mode: fta::SetAndWaitMode,
         /// An alarm identifier, chosen by the caller.
         alarm_id: String,
         /// A responder that will be called when the timer expires. The
@@ -409,7 +405,7 @@ async fn handle_cancel(alarm_id: String, cid: zx::Koid, cmd: &mut mpsc::Sender<C
 /// - `request`: a single inbound Wake FIDL API request.
 async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta::WakeRequest) {
     match request {
-        fta::WakeRequest::SetAndWait { deadline, setup_done, alarm_id, responder } => {
+        fta::WakeRequest::SetAndWait { deadline, mode, alarm_id, responder } => {
             // Since responder is consumed by the happy path and the error path, but not both,
             // and because the responder does not implement Default, this is a way to
             // send it in two mutually exclusive directions.  Each direction will reverse
@@ -434,7 +430,7 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
                 .send(Cmd::Start {
                     cid,
                     deadline: deadline.into(),
-                    setup_done,
+                    mode,
                     alarm_id: alarm_id.clone(),
                     responder: responder.clone(),
                 })
@@ -1108,7 +1104,7 @@ async fn wake_timer_loop(
         now_prop.set(now.into_nanos());
         trace::instant!(c"alarms", c"wake_timer_loop", trace::Scope::Process, "now" => now.into_nanos());
         match cmd {
-            Cmd::Start { cid, deadline, setup_done, alarm_id, responder } => {
+            Cmd::Start { cid, deadline, mode, alarm_id, responder } => {
                 trace::duration!(c"alarms", c"Cmd::Start");
                 let responder = responder.borrow_mut().take().expect("responder is always present");
                 // NOTE: hold keep_alive until all work is done.
@@ -1119,11 +1115,15 @@ async fn wake_timer_loop(
                     format_timer(deadline.into()),
                     format_timer(now.into()),
                 );
-                defer! {
-                    // Must signal once the setup is completed.
-                    signal(&setup_done);
-                    debug!("wake_timer_loop: START: setup_done signaled");
-                };
+
+                // This is the only option that requires further action.
+                if let fta::SetAndWaitMode::NotifySetupDone(setup_done) = mode {
+                    defer! {
+                        // Must signal once the setup is completed.
+                        signal(&setup_done);
+                        debug!("wake_timer_loop: START: setup_done signaled");
+                    };
+                }
                 deadline_histogram_prop.insert((deadline - now).into_nanos());
                 if Timers::expired(now, deadline) {
                     trace::duration!(c"alarms", c"Cmd::Start:immediate");
@@ -1648,6 +1648,11 @@ mod tests {
         );
     }
 
+    fn create_fake_wake_lease() -> fidl_fuchsia_power_system::LeaseToken {
+        let (_lease, peer) = zx::EventPair::create();
+        peer
+    }
+
     #[test_case(
         TimerDuration::new(zx::BootDuration::from_nanos(1), 1),
         TimerDuration::new(zx::BootDuration::from_nanos(1), 1)
@@ -1947,15 +1952,27 @@ mod tests {
         let deadline = zx::BootInstant::from_nanos(100);
         let test_duration = zx::MonotonicDuration::from_nanos(110);
         run_in_fake_time_and_test_context(test_duration, |wake_proxy, _| async move {
-            let keep_alive = zx::Event::create();
+            let setup_done = zx::Event::create();
+            let duplicate = clone_handle(&setup_done);
 
             wake_proxy
-                .set_and_wait(deadline.into(), keep_alive, "Hello".into())
+                .set_and_wait(
+                    deadline.into(),
+                    fta::SetAndWaitMode::NotifySetupDone(setup_done),
+                    "Hello".into(),
+                )
                 .await
                 .unwrap()
                 .unwrap();
 
             assert_gt!(fasync::BootInstant::now().into_nanos(), deadline.into_nanos());
+
+            // Ideally this would test that the event was signaled as soon as the alarm was set, and
+            // before it was signaled, but at least it verifies that it was signaled.
+            let signals = duplicate
+                .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE_PAST)
+                .unwrap();
+            assert_eq!(signals, zx::Signals::EVENT_SIGNALED);
         });
     }
 
@@ -1988,10 +2005,10 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = zx::Event::create();
+            let lease1 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
             let fut1 = wake_proxy.set_and_wait(first_deadline.into(), lease1, "Hello1".into());
 
-            let lease2 = zx::Event::create();
+            let lease2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
             let fut2 = wake_proxy.set_and_wait(second_deadline.into(), lease2, "Hello2".into());
 
             let (result1, result2) = futures::join!(fut1, fut2);
@@ -2034,14 +2051,14 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = zx::Event::create();
+            let lease1 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
 
             wake_proxy
                 .set_and_wait(first_deadline.into(), lease1, "Hello".into())
                 .await
                 .unwrap()
                 .unwrap();
-            let lease2 = zx::Event::create();
+            let lease2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
             wake_proxy
                 .set_and_wait(second_deadline.into(), lease2, "Hello2".into())
                 .await
@@ -2062,7 +2079,7 @@ mod tests {
             |wake_proxy, _| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let keep_alive = zx::Event::create();
+                let keep_alive = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -2089,7 +2106,7 @@ mod tests {
                     // Wait until we know that the long deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let keep_alive2 = zx::Event::create();
+                    let keep_alive2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(
@@ -2122,7 +2139,7 @@ mod tests {
             |wake_proxy, inspector| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let keep_alive = zx::Event::create();
+                let keep_alive = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -2155,7 +2172,7 @@ mod tests {
                     // Wait until we know that the other deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let keep_alive2 = zx::Event::create();
+                    let keep_alive2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(

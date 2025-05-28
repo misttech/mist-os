@@ -38,6 +38,7 @@ rustc_library("alarms") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
