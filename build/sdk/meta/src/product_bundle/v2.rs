@@ -421,6 +421,35 @@ mod tests {
     use std::io::Write;
     use tempfile::TempDir;
 
+    // This tests backwards compatibility with the old format where a full fxfs
+    // image has a 'contents' field.
+    #[test]
+    fn test_fxfs_has_contents() {
+        let value = serde_json::json!({
+            "product_name": "name",
+            "product_version": "version",
+            "partitions": {
+                "hardware_revision": "hw",
+            },
+            "sdk_version": "sdk_version",
+            "system_a": [
+                {
+                    "type": "fxfs-blk",
+                    "name": "storage-full",
+                    "path": "path",
+                    "contents": {
+                        "packages": {
+                            "base": [],
+                            "cache": [],
+                        },
+                    },
+                },
+            ],
+        });
+        let pb: ProductBundleV2 = serde_json::from_value(value).unwrap();
+        assert_eq!(pb.system_a, Some(vec![Image::Fxfs("path".into())]));
+    }
+
     #[test]
     fn test_canonicalize_no_paths() {
         let mut pb = ProductBundleV2 {
