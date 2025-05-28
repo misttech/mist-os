@@ -74,7 +74,7 @@ pub const LOG_BASENAME: &str = "ffx";
 static LOG_ENABLED_FLAG: AtomicBool = AtomicBool::new(true);
 
 lazy_static::lazy_static! {
-    static ref LOGGING_ID: u64 = generate_id();
+    pub static ref LOGGING_ID: u64 = generate_id();
 }
 
 pub fn disable_stdio_logging() {
@@ -396,7 +396,7 @@ pub fn init(
     Ok(())
 }
 
-struct DisableableFilter;
+pub struct DisableableFilter;
 
 fn level_filter(ctx: &EnvironmentContext) -> log::LevelFilter {
     ctx.query(LOG_LEVEL)

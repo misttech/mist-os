@@ -24,6 +24,7 @@ mod commands;
 mod env_context;
 mod ext_buffer;
 mod lib_context;
+mod logging;
 mod waker;
 
 // LINT.IfChange
