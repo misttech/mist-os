@@ -211,7 +211,7 @@ zx::result<std::unique_ptr<async::Wait>> start_crashsvc(
       });
 
   if (const zx_status_t status = wait->Begin(dispatcher); status != ZX_OK) {
-    LogError("Failed to being wait, crashsvc won't start", status);
+    LogError("Failed to begin wait, crashsvc won't start", status);
     return zx::error(status);
   }
 
