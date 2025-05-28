@@ -112,7 +112,8 @@ impl SuperBlock {
         let mut block = device.allocate_buffer(BLOCK_SIZE).await;
         device.read(0, block.as_mut()).await?;
         let buffer = &block.as_slice()[offset as usize..];
-        let superblock = Self::read_from_bytes(buffer).unwrap();
+        let superblock =
+            Self::read_from_bytes(buffer).map_err(|e| anyhow!("Failed to read superblock {e}"))?;
         ensure!(superblock.magic == F2FS_MAGIC, "Invalid F2fs magic number");
 
         // We only support 4kB block size so we can make some simplifying assumptions.
