@@ -73,6 +73,13 @@ class PmmNode {
   //       and bit manipulation.
   vm_page_t* IndexToPage(uint32_t index) TA_NO_THREAD_SAFETY_ANALYSIS;
 
+  // Converts the number returned by PageToIndex() back to a paddr_t.
+  // It does not check for invalid indexes such as 0 or kIndexReserved0.
+  //
+  // Note: This method is faster than IndexToPage()->paddr() as the vm_page_t itself does not have
+  //       to be de-referenced, saving a memory load.
+  paddr_t IndexToPaddr(uint32_t index) TA_NO_THREAD_SAFETY_ANALYSIS;
+
   // main allocator routines
   zx::result<vm_page_t*> AllocPage(uint alloc_flags);
   zx_status_t AllocPages(size_t count, uint alloc_flags, list_node* list);
@@ -515,6 +522,14 @@ inline vm_page_t* PmmNode::IndexToPage(uint32_t index) TA_NO_THREAD_SAFETY_ANALY
   uint32_t arena_ix = index & kArenaMask;
   uint32_t page_ix = (index >> kArenaBits);
   return active_arenas()[arena_ix].get_page(page_ix - 1);
+}
+
+// Same locking requirements as PaddrToPage().
+inline paddr_t PmmNode::IndexToPaddr(uint32_t index) TA_NO_THREAD_SAFETY_ANALYSIS {
+  index = index >> kIndexZeroBits;
+  uint32_t arena_ix = index & kArenaMask;
+  uint32_t page_ix = (index >> kArenaBits);
+  return active_arenas()[arena_ix].base() + (static_cast<uint64_t>(page_ix - 1) * PAGE_SIZE);
 }
 
 // Same locking requirements as PaddrToPage().

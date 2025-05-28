@@ -1282,6 +1282,7 @@ static bool pmm_page_to_from_index_test() {
   ASSERT_EQ(0u, index0 & zero_bits_mask);
   vm_page_t* same_page = Pmm::Node().IndexToPage(index0);
   ASSERT_EQ(page0, same_page);
+  ASSERT_EQ(page0->paddr(), Pmm::Node().IndexToPaddr(index0));
 
   vm_page_t* page1;
   status = pmm_alloc_page(0, &page1, &pa);

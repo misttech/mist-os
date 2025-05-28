@@ -104,6 +104,16 @@ class VmPageOrMarker {
     static_assert(kPageType == 0);
     return Pmm::Node().IndexToPage(raw_);
   }
+
+  // Returns the paddr_t of the underlying vm_page*. Is only valid to call if `IsPage` is true. Can
+  // be more efficient than performing |Page()->paddr()| as it saves a memory de-reference.
+  paddr_t PageAsPaddr() const {
+    DEBUG_ASSERT(IsPage());
+    // Do not need to mask any bits out of raw_, since Page has 0's for the type anyway.
+    static_assert(kPageType == 0);
+    return Pmm::Node().IndexToPaddr(raw_);
+  }
+
   ReferenceValue Reference() const {
     DEBUG_ASSERT(IsReference());
     return ReferenceValue(raw_ & ~BIT_MASK32(ReferenceValue::kAlignBits));

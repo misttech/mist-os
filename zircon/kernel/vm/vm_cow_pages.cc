@@ -3498,7 +3498,7 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
   uint pages = 0;
   owner_info_.cursor.ForEveryContiguous([&](VmPageOrMarkerRef page) {
     if (page->IsPage()) {
-      paddrs[pages] = page->Page()->paddr();
+      paddrs[pages] = page->PageAsPaddr();
       pages++;
       return pages == max_pages ? ZX_ERR_STOP : ZX_ERR_NEXT;
     }
