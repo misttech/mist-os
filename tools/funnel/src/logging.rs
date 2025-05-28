@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use log::LevelFilter;
-use logging::log_based::{FfxLog, FfxLogSink, FormatOpts, LogSinkTrait, TargetsFilter};
+use logging::{FfxLog, FfxLogSink, FormatOpts, LogSinkTrait, TargetsFilter};
 use rand::Rng;
 use std::sync::{Arc, Mutex};
 
@@ -24,7 +24,7 @@ pub fn init(level: LevelFilter) -> Result<()> {
 
 struct OnFilter;
 
-impl logging::log_based::Filter for OnFilter {
+impl logging::Filter for OnFilter {
     fn should_emit(&self, _record: &log::Metadata<'_>) -> bool {
         true
     }
