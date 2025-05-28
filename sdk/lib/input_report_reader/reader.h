@@ -242,7 +242,11 @@ InputReportReaderManager<Report, kMaxUnreadReports>::InputReportReader::ReplyWit
     auto input_report = fuchsia_input_report::wire::InputReport::Builder(report_allocator_);
 
     // Add some common fields. Will be overwritten if set.
+#ifdef TRACE_RANDOM_ID
+    input_report.trace_id(TRACE_RANDOM_ID());
+#else
     input_report.trace_id(TRACE_NONCE());
+#endif
     input_report.event_time(zx_clock_get_monotonic());
 
     reports_data_.front().ToFidlInputReport(input_report, report_allocator_);
