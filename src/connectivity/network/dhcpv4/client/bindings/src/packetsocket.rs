@@ -31,11 +31,13 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
                 e
             ),
             E::Efault => panic!("passed invalid memory address to socket call"),
-            E::Enobufs => panic!("out of memory: {:?}", e),
             E::Enodev => dhcp_client_core::deps::SocketError::NoInterface,
             E::Einval
             | E::Emsgsize
             | E::Enetdown
+            // Enobufs is returned when the tx queue is full, given packet
+            // sockets can write straight into the tx queue.
+            | E::Enobufs
             | E::Enoent
             | E::Enotconn
             | E::Enxio
