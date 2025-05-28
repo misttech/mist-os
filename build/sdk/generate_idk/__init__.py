@@ -31,7 +31,12 @@ VERSION_HISTORY_PATH = pathlib.Path("version_history.json")
 
 
 # These atom types include a "stable" field because they support unstable atoms.
-TYPES_SUPPORTING_UNSTABLE_ATOMS = ["cc_source_library", "fidl_library"]
+TYPES_SUPPORTING_UNSTABLE_ATOMS = [
+    # LINT.IfChange(unstable_atom_types)
+    "cc_source_library",
+    "fidl_library"
+    # LINT.ThenChange(//build/sdk/sdk_atom.gni:unstable_atom_types, //build/sdk/generate_prebuild_idk/generate_prebuild_idk.py)
+]
 
 
 class BuildManifestJson(TypedDict):
