@@ -152,7 +152,6 @@ bool ScriptTest::ProcessScriptLines() {
 }
 
 void ScriptTest::DispatchNextCommandWhenReady(const std::string& command) {
-
   if (processing_) {
     loop().PostTask(FROM_HERE, [this, command]() { DispatchNextCommandWhenReady(command); });
     return;
@@ -160,13 +159,14 @@ void ScriptTest::DispatchNextCommandWhenReady(const std::string& command) {
 
   // Always defer ProcessInputLine because it could trigger OnOutput synchronously.
   loop().PostTask(FROM_HERE, [this, command]() {
-    // Fetch the first line of expected output.
-    ProcessScriptLines();
-
     // Make sure we update all of our state before issuing the command.
     output_for_debug_.clear();
     allow_out_of_order_output_ = false;
     processing_ = true;
+
+    // Fetch the first line of expected output, we may process directives here so it's important to
+    // do this after resetting our internal state above.
+    ProcessScriptLines();
 
     console().ProcessInputLine(command);
   });
