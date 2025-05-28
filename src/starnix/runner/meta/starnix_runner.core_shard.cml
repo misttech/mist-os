@@ -219,6 +219,11 @@
             to: "#starnix_runner",
         },
         {
+            config: "fuchsia.starnix.config.container.ExtraFeatures",
+            from: "parent",
+            to: "#starnix_runner",
+        },
+        {
             config: "fuchsia.starnix.runner.EnableDataCollection",
             from: "parent",
             to: "#starnix_runner",

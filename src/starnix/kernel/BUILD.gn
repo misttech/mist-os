@@ -43,6 +43,7 @@ rustc_binary("starnix_kernel_bin") {
     ":android_5.10_kernel_config",
     ":starnix_core",
     ":starnix_kernel_runner",
+    ":starnix_kernel_structured_config",
     ":starnix_logging",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
@@ -517,6 +518,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/ui/fuchsia-scenic",
     "//src/performance/memory/attribution/server",
     "//src/starnix/lib/bootreason",
+    "//src/starnix/lib/features:starnix_features",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_types",
     "//src/starnix/lib/starnix_uapi",
@@ -720,6 +722,10 @@ fuchsia_component_manifest("empty_container_manifest") {
 
 fuchsia_structured_config_rust_lib("starnix_container_structured_config") {
   cm_label = ":empty_container_manifest"
+}
+
+fuchsia_structured_config_rust_lib("starnix_kernel_structured_config") {
+  cm_label = ":starnix_kernel_manifest"
 }
 
 fuchsia_component("starnix_kernel") {

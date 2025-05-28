@@ -182,6 +182,7 @@
         },
         {
             config: [
+                "fuchsia.starnix.config.container.ExtraFeatures",
                 "fuchsia.time.config.WritableUTCTime",
                 "fuchsia.ui.VisualDebuggingLevel",
             ],

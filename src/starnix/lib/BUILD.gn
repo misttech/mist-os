@@ -26,6 +26,7 @@ group("tests") {
     "ebpf_loader:tests",
     "expando:tests",
     "extended_pstate:tests",
+    "features:tests",
     "kernel_manager:tests",
     "range_map:tests",
     "selinux:tests",

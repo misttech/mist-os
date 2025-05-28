@@ -93,6 +93,23 @@
             path: "/container_config",
             availability: "optional",
         },
+
+        // LINT.IfChange
+        {
+            config: "fuchsia.starnix.config.container.ExtraFeatures",
+            from: "parent",
+            key: "extra_features",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 1024,
+            },
+            max_count: 1024,
+            default: [],
+            availability: "transitional",
+        },
+
+        // LINT.ThenChange(//src/starnix/containers/container_config.shard.cml)
         {
             protocol: [
                 "fuchsia.buildinfo.Provider",

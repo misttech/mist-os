@@ -461,6 +461,7 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
+    kernel_extra_features: Vec<String>,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
@@ -468,8 +469,9 @@ pub async fn create_component_from_stream(
                 let request_stream = controller.into_stream();
                 let mut start_info = ContainerStartInfo::new(start_info)?;
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container =
-                    create_container(&mut start_info, sender).await.with_source_context(|| {
+                let container = create_container(&mut start_info, &kernel_extra_features, sender)
+                    .await
+                    .with_source_context(|| {
                         format!("creating container \"{}\"", start_info.program.name)
                     })?;
                 let service_config =
@@ -501,6 +503,7 @@ pub async fn create_component_from_stream(
 
 async fn create_container(
     start_info: &mut ContainerStartInfo,
+    kernel_extra_features: &[String],
     task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
@@ -510,7 +513,7 @@ async fn create_container(
     let pkg_channel = start_info.container_namespace.get_namespace_channel("/pkg").unwrap();
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
-    let features = parse_features(&start_info)?;
+    let features = parse_features(&start_info, kernel_extra_features)?;
     log_debug!("Creating container with {:#?}", features);
     let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
     if features.android_serialno {
