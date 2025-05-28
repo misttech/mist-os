@@ -3221,6 +3221,16 @@ pub mod testutil {
             }
         }
     }
+
+    /// Creates a new `IpPacket` with the specified addresses and body.
+    pub fn new_filter_egress_ip_packet<I: FilterIpExt, S: TransportPacketSerializer<I>>(
+        src_addr: I::Addr,
+        dst_addr: I::Addr,
+        protocol: I::Proto,
+        body: &'_ mut S,
+    ) -> impl IpPacket<I> + PartialSerializer + use<'_, I, S> {
+        TxPacket::new(src_addr, dst_addr, protocol, body)
+    }
 }
 
 #[cfg(test)]
@@ -4543,7 +4553,12 @@ mod tests {
 
         let whole_packet =
             P::make_serializer_with_ports_data::<I>(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, DATA)
-                .encapsulate(I::PacketBuilder::new(I::SRC_IP, I::DST_IP, TX_PACKET_NO_TTL, P::proto::<I>()))
+                .encapsulate(I::PacketBuilder::new(
+                    I::SRC_IP,
+                    I::DST_IP,
+                    TX_PACKET_NO_TTL,
+                    P::proto::<I>(),
+                ))
                 .serialize_vec_outer()
                 .expect("serialize packet")
                 .unwrap_b()
