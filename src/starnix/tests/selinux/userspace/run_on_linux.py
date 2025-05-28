@@ -105,6 +105,8 @@ def run_test(
             "none",
             "-serial",
             "stdio",
+            "-m",
+            "1G",
             "-enable-kvm",
             "-append",
             "console=ttyS0 security=selinux debug=all panic=-1 -- data/tests/"
