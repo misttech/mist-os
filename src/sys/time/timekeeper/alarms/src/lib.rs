@@ -813,8 +813,14 @@ impl std::cmp::Ord for TimerDuration {
     /// Two [TimerDuration]s compare equal if they model exactly the same duration of time,
     /// no matter the resolutions.
     fn cmp(&self, other: &TimerDuration) -> std::cmp::Ordering {
-        let self_nanos = self.resolution_as_nanos() * self.ticks;
-        let other_nanos = other.resolution_as_nanos() * other.ticks;
+        let self_ticks_128: i128 = self.ticks as i128;
+        let self_resolution: i128 = self.resolution_as_nanos() as i128;
+        let self_nanos = self_resolution * self_ticks_128;
+
+        let other_ticks_128: i128 = other.ticks as i128;
+        let other_resolution: i128 = other.resolution_as_nanos() as i128;
+        let other_nanos = other_resolution * other_ticks_128;
+
         self_nanos.cmp(&other_nanos)
     }
 }
@@ -1651,6 +1657,23 @@ mod tests {
     fn create_fake_wake_lease() -> fidl_fuchsia_power_system::LeaseToken {
         let (_lease, peer) = zx::EventPair::create();
         peer
+    }
+
+    #[test]
+    fn timer_duration_no_overflow() {
+        let duration1 = TimerDuration {
+            resolution: zx::BootDuration::from_seconds(100_000_000),
+            ticks: u64::MAX,
+        };
+        let duration2 = TimerDuration {
+            resolution: zx::BootDuration::from_seconds(110_000_000),
+            ticks: u64::MAX,
+        };
+        assert_eq!(duration1, duration1);
+        assert_eq!(duration2, duration2);
+
+        assert_lt!(duration1, duration2);
+        assert_gt!(duration2, duration1);
     }
 
     #[test_case(
