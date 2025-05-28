@@ -466,7 +466,7 @@ class UsbBanjoServer : public ddk::UsbProtocol<UsbBanjoServer> {
             fbl::Array<unsigned char> reply(new unsigned char[cmd.allocation_length],
                                             cmd.allocation_length);
             scsi::FixedFormatSenseDataHeader sense_data;
-            sense_data.set_response_code(0x70);  // Current information
+            sense_data.set_response_code(scsi::SenseDataResponseCodes::kFixedCurrentInformation);
             sense_data.set_valid(0);
             sense_data.set_sense_key(scsi::SenseKey::NO_SENSE);
             memcpy(reply.data(), &sense_data, sizeof(sense_data));

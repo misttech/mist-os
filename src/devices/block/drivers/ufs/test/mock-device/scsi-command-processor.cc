@@ -93,7 +93,7 @@ void ScsiCommandProcessor::BuildSenseData(ResponseUpiuData &response_upiu,
   response_upiu.header.data_segment_length = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
   response_upiu.sense_data_len = htobe16(sizeof(scsi::FixedFormatSenseDataHeader));
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response_upiu.sense_data);
-  sense_data->set_response_code(0x70);
+  sense_data->set_response_code(scsi::SenseDataResponseCodes::kFixedCurrentInformation);
   sense_data->set_valid(0);
   sense_data->set_sense_key(sense_key);
 }
@@ -178,7 +178,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultRequestSenseHandle
 
   std::vector<uint8_t> data_buffer(scsi_cdb->allocation_length);
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(data_buffer.data());
-  sense_data->set_response_code(0x70);
+  sense_data->set_response_code(scsi::SenseDataResponseCodes::kFixedCurrentInformation);
   sense_data->set_valid(0);
   sense_data->set_sense_key(scsi::SenseKey::NO_SENSE);
 

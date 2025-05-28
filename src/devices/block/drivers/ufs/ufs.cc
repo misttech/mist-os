@@ -611,18 +611,7 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
                        safemath::checked_cast<uint32_t>(data.iov_len));
   if (auto response = transfer_request_processor_->SendScsiUpiu(upiu, lun_id.value(), vmo_optional);
       response.is_error()) {
-    // Get the previous response from the admin slot.
-    auto response_upiu = std::make_unique<ResponseUpiu>(
-        transfer_request_processor_->GetRequestList().GetDescriptorBuffer(
-            kAdminCommandSlotNumber, ScsiCommandUpiu::GetResponseOffset()));
-    auto* response_data =
-        reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(response_upiu->GetSenseData());
-    if (response_data->sense_key() != scsi::SenseKey::UNIT_ATTENTION) {
-      FDF_LOG(ERROR, "Failed to send SCSI command: %s", response.status_string());
-      return response.error_value();
-    }
-    // Returns ZX_ERR_UNAVAILABLE if a unit attention error.
-    return ZX_ERR_UNAVAILABLE;
+    return response.error_value();
   }
 
   if (data_direction == DataDirection::kDeviceToHost) {

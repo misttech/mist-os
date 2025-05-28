@@ -308,31 +308,22 @@ zx_status_t TransferRequestProcessor::UpiuCompletion(uint8_t slot_num, RequestSl
   ResponseUpiu response(
       request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, request_slot.response_upiu_offset));
 
-  zx::result host_status = CheckResponseAndGetHostStatus(slot_num, response);
-  if (host_status.is_error()) {
-    return host_status.error_value();
-  }
+  zx::result request_result = CheckResponse(slot_num, response);
 
-  zx_status_t request_result;
-  if (!request_slot.is_scsi_command) {
-    request_result = host_status.status_value();
-  } else {
-    if (!host_status.value().has_value()) {
-      FDF_LOG(ERROR, "Bad SCSI command response status");
-      return ZX_ERR_BAD_STATE;
-    }
-    scsi::HostStatusCode scsi_host_status = host_status.value().value();
-    zx_status_t io_status =
-        scsi_host_status == scsi::HostStatusCode::kOk ? ZX_OK : ZX_ERR_BAD_STATE;
+  if (request_result.is_ok() && request_slot.is_scsi_command) {
+    scsi::StatusMessage status_message = CheckScsiAndGetStatusMessage(slot_num, response);
+    auto *sense_data =
+        reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response.GetSenseData());
 
     // Until native UFS IO commands are defined by the UFS specification, we assume that only SCSI
     // commands can be IO commands.
+    request_result = controller_.ScsiComplete(status_message, *sense_data);
+
     IoCommand *io_cmd = request_slot.io_cmd;
     if (io_cmd) {
       io_cmd->data_vmo.reset();
-      io_cmd->device_op.Complete(io_status);
+      io_cmd->device_op.Complete(request_result.status_value());
     }
-    request_result = ZX_OK;
   }
 
   if (response.GetHeader().event_alert()) {
@@ -343,7 +334,7 @@ zx_status_t TransferRequestProcessor::UpiuCompletion(uint8_t slot_num, RequestSl
     }
   }
 
-  return request_result;
+  return request_result.status_value();
 }
 
 bool TransferRequestProcessor::ProcessSlotCompletion(uint8_t slot_num) {
@@ -431,10 +422,18 @@ zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
 }
 
 scsi::HostStatusCode TransferRequestProcessor::ScsiStatusToHostStatus(
-    scsi::StatusCode command_status) {
+    scsi::StatusCode scsi_status) {
   scsi::HostStatusCode host_status;
-  switch (command_status) {
+  switch (scsi_status) {
     case scsi::StatusCode::GOOD:
+    case scsi::StatusCode::CHECK_CONDITION:
+      host_status = scsi::HostStatusCode::kOk;
+      break;
+    case scsi::StatusCode::BUSY:
+    case scsi::StatusCode::TASK_SET_FULL:
+      host_status = scsi::HostStatusCode::kRequeue;
+      break;
+    case scsi::StatusCode::RESERVATION_CONFILCT:  // optional
       host_status = scsi::HostStatusCode::kOk;
       break;
     default:
@@ -446,12 +445,12 @@ scsi::HostStatusCode TransferRequestProcessor::ScsiStatusToHostStatus(
 
 scsi::HostStatusCode TransferRequestProcessor::GetScsiCommandHostStatus(
     OverallCommandStatus ocs, UpiuHeaderResponseCode header_response,
-    scsi::StatusCode response_status) {
+    scsi::StatusCode scsi_status) {
   scsi::HostStatusCode host_status;
   switch (ocs) {
     case kSuccess:
       if (header_response == UpiuHeaderResponseCode::kTargetSuccess) {
-        host_status = ScsiStatusToHostStatus(static_cast<scsi::StatusCode>(response_status));
+        host_status = ScsiStatusToHostStatus(static_cast<scsi::StatusCode>(scsi_status));
       } else {
         host_status = scsi::HostStatusCode::kError;
       }
@@ -469,18 +468,26 @@ scsi::HostStatusCode TransferRequestProcessor::GetScsiCommandHostStatus(
   return host_status;
 }
 
-zx::result<std::optional<scsi::HostStatusCode>>
-TransferRequestProcessor::CheckResponseAndGetHostStatus(uint8_t slot_num,
-                                                        AbstractResponseUpiu &response) {
-  auto transaction_type = static_cast<UpiuTransactionCodes>(response.GetHeader().trans_type);
-
+scsi::StatusMessage TransferRequestProcessor::CheckScsiAndGetStatusMessage(
+    uint8_t slot_num, AbstractResponseUpiu &response) {
   auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
   OverallCommandStatus ocs = descriptor->overall_command_status();
   auto header_response = static_cast<UpiuHeaderResponseCode>(response.GetHeader().response);
-  auto response_status = static_cast<scsi::StatusCode>(response.GetHeader().status);
+  auto scsi_status = static_cast<scsi::StatusCode>(response.GetHeader().status);
 
-  // Check for errors in the following order: OCS -> response -> scsi_status
-  std::optional<scsi::HostStatusCode> host_status = std::nullopt;
+  scsi::StatusMessage message;
+  message.host_status_code = GetScsiCommandHostStatus(ocs, header_response, scsi_status);
+  message.scsi_status_code = scsi_status;
+  return message;
+}
+
+zx::result<> TransferRequestProcessor::CheckResponse(uint8_t slot_num,
+                                                     AbstractResponseUpiu &response) {
+  auto transaction_type = static_cast<UpiuTransactionCodes>(response.GetHeader().trans_type);
+  auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
+  OverallCommandStatus ocs = descriptor->overall_command_status();
+  auto header_response = static_cast<UpiuHeaderResponseCode>(response.GetHeader().response);
+
   switch (transaction_type) {
     case UpiuTransactionCodes::kResponse:
       if (response.GetHeader().command_set_type() != UpiuCommandSetType::kScsi) {
@@ -488,8 +495,7 @@ TransferRequestProcessor::CheckResponseAndGetHostStatus(uint8_t slot_num,
                 response.GetHeader().command_set_type(), ocs, header_response);
         return zx::error(ZX_ERR_BAD_STATE);
       }
-      // SCSI command set
-      host_status = GetScsiCommandHostStatus(ocs, header_response, response_status);
+      // For SCSI commands, check ocs and header_response in CheckScsiAndGetStatusMessage().
       break;
     case UpiuTransactionCodes::kQueryResponse:
       if (ocs != OverallCommandStatus::kSuccess ||
@@ -508,8 +514,7 @@ TransferRequestProcessor::CheckResponseAndGetHostStatus(uint8_t slot_num,
       }
       break;
   }
-
-  return zx::ok(host_status);
+  return zx::ok();
 }
 
 }  // namespace ufs

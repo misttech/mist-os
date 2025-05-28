@@ -110,8 +110,10 @@ class TransferRequestProcessor : public RequestProcessor {
                                             uint16_t response_offset, uint16_t response_length,
                                             uint16_t prdt_offset, uint32_t prdt_entry_count);
 
-  zx::result<std::optional<scsi::HostStatusCode>> CheckResponseAndGetHostStatus(
-      uint8_t slot_num, AbstractResponseUpiu &response);
+  zx::result<> CheckResponse(uint8_t slot_num, AbstractResponseUpiu &response);
+  // Check for errors in the following order: OCS -> header_response -> scsi_status
+  scsi::StatusMessage CheckScsiAndGetStatusMessage(uint8_t slot_num,
+                                                   AbstractResponseUpiu &response);
   scsi::HostStatusCode GetScsiCommandHostStatus(OverallCommandStatus ocs,
                                                 UpiuHeaderResponseCode header_response,
                                                 scsi::StatusCode response_status);
