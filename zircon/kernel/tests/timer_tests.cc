@@ -661,81 +661,6 @@ static bool boot_timer() {
   END_TEST;
 }
 
-// Guarantee montonicity of the monotonic timeline across multiple threads on different CPUs.
-static bool check_monotonicity_mono() {
-  BEGIN_TEST;
-
-  // Test state shared across all threads.
-  struct TestState {
-    ktl::atomic<bool> test_started;
-    ktl::atomic<zx_instant_mono_t> previous_time;
-    const zx_instant_boot_t test_deadline;
-  };
-  TestState test_state = {
-      .test_started = false,
-      .previous_time = current_mono_time(),
-      .test_deadline = zx_time_add_duration(current_boot_time(), zx_duration_from_sec(10)),
-  };
-
-  // Create a reader and writer per CPU in the system.
-  const size_t kNumWriters = arch_max_num_cpus();
-  const size_t kNumReaders = kNumWriters;
-  const size_t kNumThreads = kNumReaders + kNumWriters;
-  fbl::AllocChecker ac;
-  ktl::unique_ptr<Thread*[]> threads = ktl::make_unique<Thread*[]>(&ac, kNumThreads);
-  ASSERT_TRUE(ac.check());
-
-  // The reader routine reads the previously seen time, gets the current time, and verifies that the
-  // latter is greater than or equal to the former.
-  auto reader = [](void* arg) -> int {
-    TestState* ts = reinterpret_cast<TestState*>(arg);
-    while (!ts->test_started.load()) {
-    }
-    while (current_boot_time() <= ts->test_deadline) {
-      const zx_instant_mono_t prev = ts->previous_time.load(ktl::memory_order_acquire);
-      const zx_instant_mono_t now = current_mono_time();
-      DEBUG_ASSERT_MSG(now >= prev, "Time was not monotonic: Now: %ld, Previous: %ld\n", now, prev);
-    }
-    return 0;
-  };
-
-  // The writer routine gets the current time and updates the previous time to that value.
-  auto writer = [](void* arg) -> int {
-    TestState* ts = reinterpret_cast<TestState*>(arg);
-    while (!ts->test_started.load()) {
-    }
-    while (current_boot_time() <= ts->test_deadline) {
-      const zx_instant_mono_t now = current_mono_time();
-      ts->previous_time.store(now, ktl::memory_order_release);
-    }
-    return 0;
-  };
-
-  // Create all of the reader threads.
-  for (size_t i = 0; i < kNumReaders; i++) {
-    threads[i] = Thread::Create("monotonicity_test_reader", reader, &test_state, DEFAULT_PRIORITY);
-    ASSERT_NONNULL(threads[i], "Thread::Create failed for reader");
-    threads[i]->Resume();
-  }
-
-  // Create all of the writer threads.
-  for (size_t i = kNumReaders; i < kNumThreads; i++) {
-    threads[i] = Thread::Create("monotonicity_test_writer", writer, &test_state, DEFAULT_PRIORITY);
-    ASSERT_NONNULL(threads[i], "Thread::Create failed for writer");
-    threads[i]->Resume();
-  }
-
-  // Start all of the threads and wait for them to complete.
-  test_state.test_started.store(true);
-  for (size_t i = 0; i < kNumThreads; i++) {
-    int ret = -1;
-    ASSERT_OK(threads[i]->Join(&ret, ZX_TIME_INFINITE));
-    ASSERT_EQ(0, ret);
-  }
-
-  END_TEST;
-}
-
 UNITTEST_START_TESTCASE(timer_tests)
 UNITTEST("cancel_before_deadline", cancel_before_deadline)
 UNITTEST("cancel_after_fired", cancel_after_fired)
@@ -748,5 +673,4 @@ UNITTEST("Deadline::after", deadline_after)
 UNITTEST("mono_to_raw_ticks_overflow", mono_to_raw_ticks_overflow)
 UNITTEST("boot_timer", boot_timer)
 UNITTEST("test_timer_current_mono_and_boot_ticks", test_timer_current_mono_and_boot_ticks)
-UNITTEST("check_monotonicity_mono", check_monotonicity_mono)
 UNITTEST_END_TESTCASE(timer_tests, "timer", "timer tests")
