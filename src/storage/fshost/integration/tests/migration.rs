@@ -32,16 +32,10 @@
 //! all the goal states, so we just need one test for each original state.
 
 pub mod config;
-use config::{data_fs_name, data_fs_type, new_builder, volumes_spec};
-use fshost_test_fixture::disk_builder::{DataSpec, FVM_SLICE_SIZE};
-use fshost_test_fixture::{round_down, DATA_MAX_BYTES};
-
-fn data_max_bytes() -> u64 {
-    round_down(DATA_MAX_BYTES, FVM_SLICE_SIZE)
-}
-fn disk_size_bytes() -> u64 {
-    data_max_bytes() * 2 + 4 * 1024 * 1024
-}
+use config::{
+    data_fs_name, data_fs_type, data_max_bytes, disk_size_bytes, new_builder, volumes_spec,
+};
+use fshost_test_fixture::disk_builder::DataSpec;
 
 // Original state - unknown/blank
 

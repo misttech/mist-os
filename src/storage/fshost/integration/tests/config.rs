@@ -6,7 +6,10 @@
 //! runs. It must live in the binary directly, instead of in the fixture crate, which is why it
 //! lives here and is recompiled into each separate test.
 
-use fshost_test_fixture::disk_builder::{DataSpec, VolumesSpec};
+use fshost_test_fixture::disk_builder::{
+    DataSpec, VolumesSpec, DEFAULT_DATA_VOLUME_SIZE, DEFAULT_DISK_SIZE, FVM_F2FS_SLICE_SIZE,
+    FVM_SLICE_SIZE,
+};
 use fshost_test_fixture::{
     TestFixtureBuilder, VFS_TYPE_BLOBFS, VFS_TYPE_F2FS, VFS_TYPE_FXFS, VFS_TYPE_MINFS,
 };
@@ -55,4 +58,20 @@ pub fn volumes_spec() -> VolumesSpec {
 
 pub fn data_fs_spec() -> DataSpec {
     DataSpec { format: Some(data_fs_name()), zxcrypt: data_fs_zxcrypt() }
+}
+
+pub fn fvm_slice_size() -> u64 {
+    if data_fs_name() == "f2fs" {
+        FVM_F2FS_SLICE_SIZE
+    } else {
+        FVM_SLICE_SIZE
+    }
+}
+
+pub fn data_max_bytes() -> u64 {
+    DEFAULT_DATA_VOLUME_SIZE - (DEFAULT_DATA_VOLUME_SIZE % fvm_slice_size())
+}
+
+pub fn disk_size_bytes() -> u64 {
+    DEFAULT_DISK_SIZE
 }

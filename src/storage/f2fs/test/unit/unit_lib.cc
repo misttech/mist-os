@@ -64,8 +64,7 @@ void FileTester::MkfsOnFakeDev(std::unique_ptr<BcacheMapper> *bc, uint64_t block
                                uint32_t block_size, bool btrim) {
   auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
       .block_count = block_count, .block_size = block_size, .supports_trim = btrim});
-  bool readonly_device = false;
-  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), true);
   ASSERT_TRUE(bc_or.is_ok());
 
   MkfsOptions options;
@@ -80,8 +79,7 @@ void FileTester::MkfsOnFakeDevWithOptions(std::unique_ptr<BcacheMapper> *bc,
                                           uint32_t block_size, bool btrim) {
   auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
       .block_count = block_count, .block_size = block_size, .supports_trim = btrim});
-  bool readonly_device = false;
-  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), true);
   ASSERT_TRUE(bc_or.is_ok());
 
   MkfsWorker mkfs(std::move(*bc_or), options);

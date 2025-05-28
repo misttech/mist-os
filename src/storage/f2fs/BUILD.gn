@@ -123,6 +123,7 @@ static_library("f2fs") {
       "//sdk/lib/fdio",
       "//sdk/lib/fidl",
       "//src/lib/fuchsia-component",
+      "//src/storage/fvm",
       "//src/storage/lib/vfs/cpp/inspect",
       "//zircon/system/ulib/fdio-caller",
       "//zircon/system/ulib/inspect",

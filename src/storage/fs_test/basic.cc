@@ -14,7 +14,6 @@
 #include <numeric>
 
 #include "src/storage/fs_test/fs_test_fixture.h"
-#include "src/storage/minfs/format.h"
 
 namespace fs_test {
 namespace {
@@ -85,7 +84,7 @@ TEST_P(BasicTest, UncleanClose) {
 TEST_P(BasicTest, GrowingVolumeWithFileCount) {
   // Minfs will start with 1 slice worth of inodes.  Write enough files to cause that to grow and
   // make sure fsck (which runs automatically at the end as part of the test fixture) passes.
-  for (unsigned i = 0; i < fs().options().fvm_slice_size / minfs::kMinfsInodeSize + 1; ++i) {
+  for (unsigned i = 0; i < fs().options().fvm_slice_size / fs().GetTraits().inode_size + 1; ++i) {
     fbl::unique_fd fd(open(GetPath(std::to_string(i)).c_str(), O_CREAT, 0666));
     EXPECT_TRUE(fd);
   }

@@ -29,6 +29,7 @@ use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fa
 
 pub const TEST_DISK_BLOCK_SIZE: u32 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
+pub const FVM_F2FS_SLICE_SIZE: u64 = 2 * 1024 * 1024;
 
 // The default disk size is about 55MiB, with about 51MiB dedicated to the data volume. This size
 // is chosen because the data volume has to be big enough to support f2fs (>= DEFAULT_F2FS_MIN_BYTES
@@ -40,11 +41,11 @@ pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
 // used in specific circumstances and are never formatted. The remaining volume size is just used
 // for calculation.
 pub const DEFAULT_F2FS_MIN_BYTES: u64 = 50 * 1024 * 1024;
-pub const DEFAULT_DATA_VOLUME_SIZE: u64 = DEFAULT_F2FS_MIN_BYTES + 1024 * 1024;
-pub const DEFAULT_REMAINING_VOLUME_SIZE: u64 = 4 * 1024 * 1024;
+pub const DEFAULT_DATA_VOLUME_SIZE: u64 = DEFAULT_F2FS_MIN_BYTES;
+pub const BLOBFS_MAX_BYTES: u64 = 8765432;
 // For migration tests, we make sure that the default disk size is twice the data volume size to
 // allow a second full data partition.
-pub const DEFAULT_DISK_SIZE: u64 = DEFAULT_DATA_VOLUME_SIZE + DEFAULT_REMAINING_VOLUME_SIZE;
+pub const DEFAULT_DISK_SIZE: u64 = DEFAULT_DATA_VOLUME_SIZE * 2 + BLOBFS_MAX_BYTES;
 
 // We use a static key-bag so that the crypt instance can be shared across test executions safely.
 // These keys match the DATA_KEY and METADATA_KEY respectively, when wrapped with the "zxcrypt"
@@ -205,6 +206,7 @@ pub struct DiskBuilder {
     uninitialized: bool,
     blob_hash: Option<Hash>,
     data_volume_size: u64,
+    fvm_slice_size: u64,
     data_spec: DataSpec,
     volumes_spec: VolumesSpec,
     // Only used if `format` is Some.
@@ -231,6 +233,7 @@ impl DiskBuilder {
             uninitialized: false,
             blob_hash: None,
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
+            fvm_slice_size: FVM_SLICE_SIZE,
             data_spec: DataSpec { format: None, zxcrypt: false },
             volumes_spec: VolumesSpec { fxfs_blob: false, create_data_partition: true },
             corrupt_data: false,
@@ -254,18 +257,11 @@ impl DiskBuilder {
     }
 
     pub fn data_volume_size(&mut self, data_volume_size: u64) -> &mut Self {
-        assert_eq!(
-            data_volume_size % FVM_SLICE_SIZE,
-            0,
-            "data_volume_size {} needs to be a multiple of fvm slice size {}",
-            data_volume_size,
-            FVM_SLICE_SIZE
-        );
         self.data_volume_size = data_volume_size;
         // Increase the size of the disk if required. NB: We don't decrease the size of the disk
         // because some tests set a lower initial size and expect to be able to resize to a larger
         // one.
-        self.size = self.size.max(self.data_volume_size + DEFAULT_REMAINING_VOLUME_SIZE);
+        self.size = self.size.max(self.data_volume_size + BLOBFS_MAX_BYTES);
         self
     }
 
@@ -282,6 +278,9 @@ impl DiskBuilder {
             if let Some(format) = data_spec.format {
                 assert_eq!(format, "fxfs");
             }
+        }
+        if data_spec.format == Some("f2fs") {
+            self.fvm_slice_size = FVM_F2FS_SLICE_SIZE;
         }
         self.data_spec = data_spec;
         self
@@ -323,6 +322,13 @@ impl DiskBuilder {
 
     pub async fn build(mut self) -> (zx::Vmo, Option<[u8; 16]>) {
         log::info!("building disk: {:?}", self);
+        assert_eq!(
+            self.data_volume_size % self.fvm_slice_size,
+            0,
+            "data_volume_size {} needs to be a multiple of fvm slice size {}",
+            self.data_volume_size,
+            self.fvm_slice_size
+        );
         if self.data_spec.format == Some("f2fs") {
             assert!(self.data_volume_size >= DEFAULT_F2FS_MIN_BYTES);
         }
@@ -421,7 +427,8 @@ impl DiskBuilder {
 
     async fn build_fvm_as_volume_manager(&mut self, connector: Box<dyn BlockConnector>) {
         let block_device = connector.connect_block().unwrap().into_proxy();
-        fasync::unblock(move || format_for_fvm(&block_device, FVM_SLICE_SIZE as usize))
+        let fvm_slice_size = self.fvm_slice_size;
+        fasync::unblock(move || format_for_fvm(&block_device, fvm_slice_size as usize))
             .await
             .unwrap();
         let mut fvm_fs = Filesystem::from_boxed_config(connector, Box::new(Fvm::dynamic_child()));

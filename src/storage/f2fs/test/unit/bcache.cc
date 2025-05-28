@@ -18,13 +18,12 @@ using block_client::FakeBlockDevice;
 
 TEST(BCacheTest, Trim) {
   {
-    bool readonly_device = false;
     auto device = std::make_unique<FakeBlockDevice>(
         FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
                                 .block_size = kDefaultSectorSize,
                                 .supports_trim = false});
     ASSERT_TRUE(device);
-    auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(device), true);
     ASSERT_TRUE(bc_or.is_ok());
 
     fuchsia_hardware_block::wire::BlockInfo info;
@@ -33,13 +32,12 @@ TEST(BCacheTest, Trim) {
     ASSERT_EQ(bc_or->Trim(0, end_blk), ZX_ERR_NOT_SUPPORTED);
   }
   {
-    bool readonly_device = false;
     auto device = std::make_unique<FakeBlockDevice>(
         FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
                                 .block_size = kDefaultSectorSize,
                                 .supports_trim = true});
     ASSERT_TRUE(device);
-    auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(device), true);
     ASSERT_TRUE(bc_or.is_ok());
 
     fuchsia_hardware_block::wire::BlockInfo info;
@@ -53,24 +51,22 @@ TEST(BCacheTest, Exception) {
   // Test zero block_size exception case
   {
     std::unique_ptr<f2fs::BcacheMapper> bc;
-    bool readonly_device = false;
     auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
         .block_count = kDefaultSectorCount, .block_size = 0, .supports_trim = false});
     ASSERT_TRUE(device);
-    auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(device));
     ASSERT_TRUE(bc_or.is_error());
-    ASSERT_EQ(bc_or.status_value(), ZX_ERR_BAD_STATE);
+    ASSERT_EQ(bc_or.status_value(), ZX_ERR_INVALID_ARGS);
   }
   // Test block_count overflow exception case
   {
     std::unique_ptr<f2fs::BcacheMapper> bc;
-    bool readonly_device = false;
     auto device = std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{
         .block_count = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) * 8,
         .block_size = kDefaultSectorSize,
         .supports_trim = true});
     ASSERT_TRUE(device);
-    auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(device));
     ASSERT_TRUE(bc_or.is_error());
     ASSERT_EQ(bc_or.status_value(), ZX_ERR_OUT_OF_RANGE);
   }
@@ -78,14 +74,13 @@ TEST(BCacheTest, Exception) {
 
 TEST(BCacheTest, VmoidReuse) {
   std::unique_ptr<f2fs::BcacheMapper> bc;
-  bool readonly_device = false;
   auto device =
       std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
                                                                 .block_size = kDefaultSectorSize,
                                                                 .supports_trim = false});
   ASSERT_TRUE(device);
 
-  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device));
   ASSERT_FALSE(bc_or.is_error());
 
   zx::vmo vmo;
@@ -108,7 +103,6 @@ TEST(BCacheTest, VmoidReuse) {
 
 TEST(BCacheTest, Flag) {
   std::unique_ptr<f2fs::BcacheMapper> bc;
-  bool readonly_device = false;
   auto device =
       std::make_unique<FakeBlockDevice>(FakeBlockDevice::Config{.block_count = kDefaultSectorCount,
                                                                 .block_size = kDefaultSectorSize,
@@ -122,7 +116,7 @@ TEST(BCacheTest, Flag) {
 
   device->SetInfoFlags(test_flag);
 
-  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device));
   ASSERT_FALSE(bc_or.is_error());
 
   fuchsia_hardware_block::wire::BlockInfo info;
@@ -144,10 +138,8 @@ class BcacheMapperTest
           .block_count = block_counts_[i], .block_size = block_sizes_[i], .supports_trim = true}));
     }
 
-    bool readonly_device = false;
-    auto bc_or = CreateBcacheMapper(std::move(fake_block_devices_), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(fake_block_devices_), true);
     ASSERT_TRUE(bc_or.is_ok());
-    ASSERT_FALSE(readonly_device);
 
     bcache_ = std::move(bc_or.value());
   }
@@ -363,8 +355,7 @@ class F2fsMountedBcacheMapperTest : public BcacheMapperTest {
           .block_count = block_counts[i], .block_size = block_sizes[i], .supports_trim = btrim}));
     }
 
-    bool readonly_device = false;
-    auto bc_or = CreateBcacheMapper(std::move(devices), &readonly_device);
+    auto bc_or = CreateBcacheMapper(std::move(devices), true);
     ASSERT_TRUE(bc_or.is_ok());
 
     MkfsWorker mkfs(std::move(*bc_or), options);

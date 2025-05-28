@@ -18,15 +18,16 @@
 namespace f2fs {
 
 class BcacheMapper;
-// This function is called at startup to serve the actual working f2fs.
+// It actually creates BcacheMapper on underlying |devices|.
+// It tries to allocate slices on fvm If |allocate| is set.
 zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device, bool* out_readonly = nullptr);
-// This function is used to create a f2fs instance for test.
+    std::vector<std::unique_ptr<block_client::BlockDevice>> devices, bool allocate = false);
+// for the startup service
 zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
-    std::unique_ptr<block_client::BlockDevice> device, bool* out_readonly = nullptr);
-// This function is used to test the multi device support of f2fs.
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device, bool allocate = false);
+// for test
 zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
-    std::vector<std::unique_ptr<block_client::BlockDevice>> devices, bool* out_readonly = nullptr);
+    std::unique_ptr<block_client::BlockDevice> device, bool allocate = false);
 
 class Bcache : public fs::DeviceTransactionHandler, public storage::VmoidRegistry {
  public:
@@ -60,9 +61,6 @@ class Bcache : public fs::DeviceTransactionHandler, public storage::VmoidRegistr
   Bcache(std::unique_ptr<block_client::BlockDevice> device, uint64_t max_blocks,
          block_t block_size);
 
-  // Used during initialization of this object.
-  zx_status_t VerifyDeviceInfo();
-
   const uint64_t max_blocks_;
   const block_t block_size_;
   fuchsia_hardware_block::wire::BlockInfo info_ = {};
@@ -94,6 +92,7 @@ class BcacheMapper : public storage::VmoidRegistry {
   zx_status_t BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) override;
   zx_status_t BlockDetachVmo(storage::Vmoid vmoid) override;
 
+  bool IsWritable() const { return !read_only_; }
   // This function is only used for test and InspectTree purposes.
   void ForEachBcache(fit::function<void(Bcache*)> func) {
     for (auto& bcache : bcaches_) {
@@ -106,11 +105,6 @@ class BcacheMapper : public storage::VmoidRegistry {
                         block_t block_size);
 
   zx::result<vmoid_t> FindFreeVmoId();
-
-  zx_status_t CreateVmoBuffer() __TA_EXCLUDES(buffer_mutex_) {
-    std::lock_guard lock(buffer_mutex_);
-    return buffer_.Initialize(this, 1, info_.block_size, "scratch-block");
-  }
 
   const std::vector<std::unique_ptr<Bcache>> bcaches_;
 
@@ -126,6 +120,7 @@ class BcacheMapper : public storage::VmoidRegistry {
   fuchsia_hardware_block::wire::BlockInfo info_ = {};
   const block_t block_size_;
   const uint64_t max_blocks_;
+  bool read_only_ = false;
 };
 
 }  // namespace f2fs

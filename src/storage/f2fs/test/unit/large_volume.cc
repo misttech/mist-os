@@ -88,8 +88,7 @@ class LargeFakeDevice : public FakeBlockDevice {
 
 void MkfsOnLargeFakeDev(std::unique_ptr<BcacheMapper>* bc) {
   auto device = std::make_unique<LargeFakeDevice>();
-  bool readonly_device = false;
-  auto bc_or = CreateBcacheMapper(std::move(device), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(device), true);
   ASSERT_TRUE(bc_or.is_ok());
 
   MkfsOptions options;

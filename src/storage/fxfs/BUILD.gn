@@ -275,12 +275,12 @@ fs_test_config("fxfs") {
   timestamp_granularity = 1
   disk_format = 12  # See //src/storage/lib/fs_management/cpp/format.h
   uses_crypt = true
+  has_min_volume_size = true
 
   options = [
     {
       description = "Fxfs"
       use_fvm = false
-      has_min_volume_size = true
 
       device_block_count = 24576
       device_block_size = 512

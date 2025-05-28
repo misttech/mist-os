@@ -125,31 +125,6 @@ struct CursegInfo {
   uint8_t alloc_type = 0;          // current allocation type
 };
 
-// For SIT manager
-//
-// By default, there are 6 active log areas across the whole main area.
-// When considering hot and cold data separation to reduce cleaning overhead,
-// we split 3 for data logs and 3 for node logs as hot, warm, and cold types,
-// respectively.
-// In the current design, you should not change the numbers intentionally.
-// Instead, as a mount option such as active_logs=x, you can use 2, 4, and 6
-// logs individually according to the underlying devices. (default: 6)
-// Just in case, on-disk layout covers maximum 16 logs that consist of 8 for
-// data and 8 for node logs.
-constexpr int kNrCursegDataType = 3;
-constexpr int kNrCursegNodeType = 3;
-constexpr int kNrCursegType = kNrCursegDataType + kNrCursegNodeType;
-
-enum class CursegType {
-  kCursegHotData = 0,  // directory entry blocks
-  kCursegWarmData,     // data blocks
-  kCursegColdData,     // multimedia or GCed data blocks
-  kCursegHotNode,      // direct node blocks of directory files
-  kCursegWarmNode,     // direct node blocks of normal files
-  kCursegColdNode,     // indirect node blocks
-  kNoCheckType
-};
-
 using SummaryCallback = fit::function<zx_status_t(SummaryBlock &sum)>;
 
 CursegType GetSegmentType(Page &page, PageType p_type, size_t num_logs);

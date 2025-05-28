@@ -13,12 +13,9 @@ use fs_management::format::constants::DATA_PARTITION_LABEL;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fs_management::DATA_TYPE_GUID;
 use fshost_test_fixture::disk_builder::{
-    DataSpec, VolumesSpec, FVM_SLICE_SIZE, TEST_DISK_BLOCK_SIZE,
+    DataSpec, VolumesSpec, BLOBFS_MAX_BYTES, TEST_DISK_BLOCK_SIZE,
 };
-use fshost_test_fixture::{
-    round_down, TestFixture, BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS,
-    VFS_TYPE_MINFS,
-};
+use fshost_test_fixture::{round_down, TestFixture, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::FutureExt as _;
 use regex::Regex;
@@ -42,8 +39,8 @@ use {
 pub mod config;
 
 use config::{
-    blob_fs_type, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder, volumes_spec,
-    DATA_FILESYSTEM_VARIANT,
+    blob_fs_type, data_fs_spec, data_fs_type, data_fs_zxcrypt, data_max_bytes, fvm_slice_size,
+    new_builder, volumes_spec, DATA_FILESYSTEM_VARIANT,
 };
 
 #[fuchsia::test]
@@ -134,7 +131,7 @@ async fn data_formatted_no_fuchsia_boot() {
 #[fuchsia::test]
 async fn data_formatted_with_small_initial_volume() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(FVM_SLICE_SIZE);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(fvm_slice_size());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -148,11 +145,8 @@ async fn data_formatted_with_small_initial_volume_big_target() {
     let mut builder = new_builder();
     // The formatting uses the max bytes argument as the initial target to resize to. If this
     // target is larger than the disk, the resize should still succeed.
-    builder.fshost().set_config_value(
-        "data_max_bytes",
-        fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2,
-    );
-    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(FVM_SLICE_SIZE);
+    builder.fshost().set_config_value("data_max_bytes", data_max_bytes() * 2);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(fvm_slice_size());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -260,9 +254,9 @@ async fn partition_max_size_set() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -311,7 +305,7 @@ async fn partition_max_size_set() {
     let (status, blobfs_slice_count) =
         fvm_proxy.get_partition_limit(blobfs_instance_guid.as_mut()).await.unwrap();
     zx::Status::ok(status).unwrap();
-    assert_eq!(blobfs_slice_count, (BLOBFS_MAX_BYTES + FVM_SLICE_SIZE - 1) / FVM_SLICE_SIZE);
+    assert_eq!(blobfs_slice_count, (BLOBFS_MAX_BYTES + fvm_slice_size() - 1) / fvm_slice_size());
 
     // data max size check
     let (status, data_slice_count) =
@@ -320,7 +314,7 @@ async fn partition_max_size_set() {
     // The expected size depends on whether we are using zxcrypt or not.
     // When wrapping in zxcrypt the data partition size is the same, but the physical disk
     // commitment is one slice bigger.
-    let mut expected_slices = (DATA_MAX_BYTES + FVM_SLICE_SIZE - 1) / FVM_SLICE_SIZE;
+    let mut expected_slices = (data_max_bytes() + fvm_slice_size() - 1) / fvm_slice_size();
     if data_fs_zxcrypt() && data_fs_type() != VFS_TYPE_FXFS {
         log::info!("Adding an extra expected data slice for zxcrypt");
         expected_slices += 1;
@@ -338,9 +332,9 @@ async fn set_volume_limit() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -359,7 +353,7 @@ async fn set_volume_limit() {
         BLOBFS_MAX_BYTES
     } else {
         // The fvm component rounds the max bytes down to the nearest slice size.
-        (BLOBFS_MAX_BYTES / FVM_SLICE_SIZE) * FVM_SLICE_SIZE
+        round_down(BLOBFS_MAX_BYTES, fvm_slice_size())
     };
     assert_eq!(blobfs_limit, expected_blobfs_limit);
     let data_volume_proxy =
@@ -368,10 +362,10 @@ async fn set_volume_limit() {
     let data_limit =
         data_volume_proxy.get_limit().await.unwrap().map_err(zx::Status::from_raw).unwrap();
     let expected_data_limit = if cfg!(feature = "fxblob") {
-        DATA_MAX_BYTES
+        data_max_bytes()
     } else {
         // The fvm component rounds the max bytes down to the nearest slice size.
-        (DATA_MAX_BYTES / FVM_SLICE_SIZE) * FVM_SLICE_SIZE
+        round_down(data_max_bytes(), fvm_slice_size())
     };
     assert_eq!(data_limit, expected_data_limit);
 
@@ -623,7 +617,7 @@ async fn set_volume_bytes_limit() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
@@ -643,7 +637,7 @@ async fn set_volume_bytes_limit() {
             .unwrap();
     let data_volume_bytes_limit = data_volume_proxy.get_limit().await.unwrap().unwrap();
     assert_eq!(blob_volume_bytes_limit, BLOBFS_MAX_BYTES);
-    assert_eq!(data_volume_bytes_limit, DATA_MAX_BYTES);
+    assert_eq!(data_volume_bytes_limit, data_max_bytes());
     fixture.tear_down().await;
 }
 
@@ -1154,11 +1148,11 @@ async fn migration_toggle() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
+        .data_volume_size(data_max_bytes())
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
         .set_fs_switch("toggle");
@@ -1170,7 +1164,7 @@ async fn migration_toggle() {
     let disk = fixture.tear_down().await.unwrap();
 
     let mut builder = new_builder().with_disk_from(disk);
-    builder.fshost().set_config_value("data_max_bytes", DATA_MAX_BYTES / 2);
+    builder.fshost().set_config_value("data_max_bytes", data_max_bytes());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", VFS_TYPE_MINFS).await;
@@ -1185,11 +1179,11 @@ async fn migration_to_fxfs() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES / 2)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
+        .data_volume_size(round_down(data_max_bytes(), fvm_slice_size()))
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
         .set_fs_switch("fxfs");
@@ -1207,11 +1201,11 @@ async fn migration_to_minfs() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES / 2)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
+        .data_volume_size(round_down(data_max_bytes(), fvm_slice_size()))
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("fxfs"), zxcrypt: false, ..Default::default() })
         .set_fs_switch("minfs");

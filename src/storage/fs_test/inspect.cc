@@ -305,8 +305,11 @@ TEST_P(InspectTest, ValidateFvmNode) {
   EXPECT_GE(fvm_data.size_info.size_bytes, init_fvm_size);
   EXPECT_LT(fvm_data.size_info.size_bytes, device_size);
 
-  // We should have some amount of free space, but not more than the size of the block device.
-  EXPECT_GT(fvm_data.size_info.available_space_bytes, 0u);
+  // There should be some free space if |size_limit_bytes| is smaller than the device size.
+  // Otherwise, the filesystem may utilize all or part of the available slices. However, the amount
+  // of free space should not exceed the size of the block device."
+  uint64_t min = fvm_data.size_info.size_limit_bytes ? 1 : 0;
+  EXPECT_GE(fvm_data.size_info.available_space_bytes, min);
   EXPECT_LT(fvm_data.size_info.available_space_bytes, device_size);
 
   // We do not set a volume size limit in fs_test currently, so this should always be zero.

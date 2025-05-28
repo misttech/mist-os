@@ -80,9 +80,6 @@ struct TestFilesystemOptions {
   // partition under test to be at a different offset on the underlying device.
   uint64_t dummy_fvm_partition_size = 0;
 
-  // If true, tests will avoid creating volumes smaller than the size given by
-  // device_block_size * device_block_count.
-  bool has_min_volume_size = false;
   uint64_t device_block_size = 0;
   uint64_t device_block_count = 0;
   uint64_t fvm_slice_size = 0;
@@ -194,6 +191,10 @@ class [[clang::lto_visibility_public]] Filesystem {
     bool supports_watch_event_deleted = true;
     zx::duration timestamp_granularity = zx::nsec(1);
     bool uses_crypt = false;
+    // If true, tests will avoid creating volumes smaller than the size given by
+    // TestFilesystemOptions::device_block_size * TestFilesystemOptions::device_block_count.
+    bool has_min_volume_size = false;
+    uint64_t inode_size = 256;
   };
 
   virtual ~Filesystem() = default;

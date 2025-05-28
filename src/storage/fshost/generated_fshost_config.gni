@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/images/args.gni")
 
 declare_args() {
-  # Set to one of "minfs", "fxfs", "f2fs" (unstable).
+  # Set to one of "minfs", "fxfs", "f2fs".
   # If set to anything other than "minfs", any existing minfs partition will be
   # migrated in-place to the specified format when fshost mounts it.
   data_filesystem_format = "fxfs"

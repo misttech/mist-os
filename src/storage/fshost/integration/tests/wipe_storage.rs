@@ -325,13 +325,12 @@ async fn blobfs_formatted() {
 }
 
 // Verify that the data partition is wiped and remains unformatted.
-// TODO(https://fxbug.dev/416145492): this test doesn't work on f2fs.
 // This test is very specific to fvm, so we don't run it against fxblob. Since both volumes are in
 // fxfs anyway with fxblob, this test is somewhat redundant with the basic tests.
 #[fuchsia::test]
-#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+#[cfg_attr(any(feature = "fxblob"), ignore)]
 async fn data_unformatted() {
-    const BUFF_LEN: usize = 512;
+    const BUFF_LEN: usize = 4096;
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();

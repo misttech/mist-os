@@ -58,6 +58,8 @@ zx::result<std::unique_ptr<JsonFilesystem>> JsonFilesystem::NewFilesystem(
               ConfigGetOrDefault<bool>(config, "supports_watch_event_deleted", true),
           .timestamp_granularity = zx::nsec(config["timestamp_granularity"].GetInt64()),
           .uses_crypt = ConfigGetOrDefault<bool>(config, "uses_crypt", false),
+          .has_min_volume_size = ConfigGetOrDefault<bool>(config, "has_min_volume_size", false),
+          .inode_size = ConfigGetOrDefault<uint64_t>(config, "inode_size", 256),
       },
       format, sectors_per_cluster));
 }

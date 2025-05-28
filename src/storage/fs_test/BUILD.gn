@@ -94,7 +94,6 @@ test("basic_tests") {
   deps = [
     ":fs_test",
     "//src/lib/fxl/test:gtest_main",
-    "//src/storage/minfs",
   ]
 }
 

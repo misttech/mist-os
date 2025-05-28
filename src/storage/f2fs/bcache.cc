@@ -16,14 +16,16 @@
 #include <storage/operation/operation.h>
 
 #include "src/storage/f2fs/layout.h"
+#include "src/storage/f2fs/segment.h"
+#include "src/storage/fvm/client.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace f2fs {
 
 zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
-    std::vector<std::unique_ptr<block_client::BlockDevice>> devices, bool* out_readonly) {
+    std::vector<std::unique_ptr<block_client::BlockDevice>> devices, bool allocate) {
   uint64_t total_block_count = 0;
-  bool readonly = false;
+  constexpr uint32_t kMinVolumeSize = kMinVolumeSegments * kDefaultSegmentSize;
 
   std::vector<std::unique_ptr<Bcache>> bcaches;
   for (auto& device : devices) {
@@ -33,17 +35,61 @@ zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
       return zx::error(status);
     }
 
-    if (info.block_size == 0 || kBlockSize % info.block_size != 0) {
-      FX_LOGS(WARNING) << "f2fs block size must be multiple of underlying block size: "
-                       << info.block_size;
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-
-    if (info.flags & fuchsia_hardware_block::wire::Flag::kReadonly) {
-      readonly = true;
+    if (info.block_size == 0 || kBlockSize % info.block_size != 0 ||
+        info.block_size < kDefaultSectorSize || info.block_size > kBlockSize) {
+      FX_LOGS(ERROR) << info.block_size << " of block size is not supported";
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
 
     uint64_t block_count = info.block_size * info.block_count / kBlockSize;
+    fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info;
+    fuchsia_hardware_block_volume::wire::VolumeInfo volume_info;
+    bool use_fvm = device->VolumeGetInfo(&manager_info, &volume_info) == ZX_OK;
+    if (use_fvm) {
+      size_t slice_size = manager_info.slice_size;
+      size_t slices_per_segment = kDefaultSegmentSize <= manager_info.slice_size
+                                      ? 1
+                                      : kDefaultSegmentSize / manager_info.slice_size;
+      size_t slice_count = volume_info.partition_slice_count;
+      ZX_ASSERT_MSG(kDefaultSegmentSize % manager_info.slice_size == 0 ||
+                        manager_info.slice_size % kDefaultSegmentSize == 0,
+                    " slice_size is not aligned with segment boundaries %lu",
+                    manager_info.slice_size);
+
+      if (allocate) {
+        slice_count = fbl::round_down(slice_count, slices_per_segment);
+        if (zx_status_t status = fvm::ResetAllSlices(device.get()); status != ZX_OK) {
+          FX_LOGS(ERROR) << "failed to reset FVM slices: " << zx_status_get_string(status);
+          return zx::error(status);
+        }
+        device->VolumeGetInfo(&manager_info, &volume_info);
+
+        size_t free = manager_info.slice_count - manager_info.assigned_slice_count;
+        size_t max_allowable =
+            std::min(free + volume_info.partition_slice_count, manager_info.maximum_slice_count);
+        if (volume_info.slice_limit) {
+          max_allowable = std::min(volume_info.slice_limit, max_allowable);
+        }
+        max_allowable = fbl::round_down(max_allowable, slices_per_segment);
+
+        if (slice_count > max_allowable || slice_count < kMinVolumeSize / slice_size) {
+          FX_LOGS(WARNING) << "reset slice_count to " << max_allowable;
+          slice_count = max_allowable;
+        }
+
+        size_t offset = volume_info.partition_slice_count;
+        size_t length = slice_count - volume_info.partition_slice_count;
+
+        if (zx_status_t status = device->VolumeExtend(offset, length); status != ZX_OK) {
+          FX_LOGS(ERROR) << "failed to extend volume to (" << offset << ", " << length << ") "
+                         << zx_status_get_string(status);
+          return zx::error(status);
+        }
+      }
+      FX_LOGS(INFO) << "slice_size: " << slice_size << ", slice_count: " << slice_count;
+      block_count = slice_size * slice_count / kBlockSize;
+    }
+
     auto bcache_or = Bcache::Create(std::move(device), block_count, kBlockSize);
     if (bcache_or.is_error()) {
       return bcache_or.take_error();
@@ -51,34 +97,28 @@ zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
     bcaches.push_back(std::move(bcache_or.value()));
     total_block_count += block_count;
   }
-
-  if (total_block_count <= kMinMetaSegments * kDefaultBlocksPerSegment) {
+  if (total_block_count < kMinVolumeSize / kBlockSize) {
     FX_LOGS(ERROR) << "block device is too small";
     return zx::error(ZX_ERR_NO_SPACE);
   }
-
   // The maximum volume size of f2fs is 16TiB
   if (total_block_count >= std::numeric_limits<uint32_t>::max()) {
     FX_LOGS(ERROR) << "block device is too large (> 16TiB)";
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  if (out_readonly) {
-    *out_readonly = readonly;
-  }
-
   return BcacheMapper::Create(std::move(bcaches));
 }
 
 zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
-    std::unique_ptr<block_client::BlockDevice> device, bool* out_readonly) {
+    std::unique_ptr<block_client::BlockDevice> device, bool allocate) {
   std::vector<std::unique_ptr<block_client::BlockDevice>> devices;
   devices.push_back(std::move(device));
-  return CreateBcacheMapper(std::move(devices), out_readonly);
+  return CreateBcacheMapper(std::move(devices), allocate);
 }
 
 zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
-    fidl::ClientEnd<fuchsia_hardware_block::Block> device_channel, bool* out_readonly) {
+    fidl::ClientEnd<fuchsia_hardware_block::Block> device_channel, bool allocate) {
   auto device_or = block_client::RemoteBlockDevice::Create(
       fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{device_channel.TakeChannel()});
   if (device_or.is_error()) {
@@ -86,8 +126,7 @@ zx::result<std::unique_ptr<BcacheMapper>> CreateBcacheMapper(
     return device_or.take_error();
   }
 
-  bool readonly_device = false;
-  auto bc_or = CreateBcacheMapper(std::move(*device_or), &readonly_device);
+  auto bc_or = CreateBcacheMapper(std::move(*device_or), allocate);
   if (bc_or.is_error()) {
     FX_LOGS(ERROR) << "could not create block cache";
     return bc_or.take_error();
@@ -110,23 +149,11 @@ zx_status_t Bcache::BlockDetachVmo(storage::Vmoid vmoid) {
 zx::result<std::unique_ptr<Bcache>> Bcache::Create(
     std::unique_ptr<block_client::BlockDevice> device, uint64_t max_blocks, block_t block_size) {
   std::unique_ptr<Bcache> bcache(new Bcache(std::move(device), max_blocks, block_size));
-
-  zx_status_t status = bcache->VerifyDeviceInfo();
-  if (status != ZX_OK) {
+  if (zx_status_t status = bcache->GetDevice()->BlockGetInfo(&bcache->info_); status != ZX_OK) {
+    FX_LOGS(ERROR) << "cannot get block device information: " << status;
     return zx::error(status);
   }
-
   return zx::ok(std::move(bcache));
-}
-
-zx_status_t Bcache::VerifyDeviceInfo() {
-  zx_status_t status = device_->BlockGetInfo(&info_);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "cannot get block device information: " << status;
-    return status;
-  }
-
-  return ZX_OK;
 }
 
 zx_status_t BcacheMapper::Readblk(block_t bno, void* data) {
@@ -189,17 +216,11 @@ zx::result<std::unique_ptr<BcacheMapper>> BcacheMapper::Create(
     std::vector<std::unique_ptr<Bcache>> bcaches) {
   uint64_t total_block_count = 0;
   for (auto& bcache : bcaches) {
-    ZX_ASSERT(bcache->BlockSize() == kBlockSize);
     total_block_count += bcache->Maxblk();
   }
 
   auto bcache = std::unique_ptr<BcacheMapper>(
       new BcacheMapper(std::move(bcaches), total_block_count, kBlockSize));
-
-  zx_status_t status = bcache->CreateVmoBuffer();
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
   return zx::ok(std::move(bcache));
 }
 
@@ -350,6 +371,7 @@ BcacheMapper::BcacheMapper(std::vector<std::unique_ptr<Bcache>> bcaches, uint64_
 
     if (info.flags & fuchsia_hardware_block::wire::Flag::kReadonly) {
       flag |= fuchsia_hardware_block::wire::Flag::kReadonly;
+      read_only_ = true;
     }
     if (!(info.flags & fuchsia_hardware_block::wire::Flag::kRemovable)) {
       flag &= (~fuchsia_hardware_block::wire::Flag::kRemovable);
@@ -369,6 +391,7 @@ BcacheMapper::BcacheMapper(std::vector<std::unique_ptr<Bcache>> bcaches, uint64_
       .max_transfer_size = transfer_size,
       .flags = flag,
   };
+  buffer_.Initialize(this, 1, info_.block_size, "scratch-block");
 }
 
 zx_status_t BcacheMapper::BlockGetInfo(fuchsia_hardware_block::wire::BlockInfo* out_info) const {

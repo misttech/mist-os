@@ -34,6 +34,8 @@ constexpr uint32_t kDefaultSectorsPerBlock = 8;
 constexpr uint32_t kDefaultLogBlocksPerSegment = 9;
 constexpr uint32_t kDefaultBlocksPerSegment = 1 << kDefaultLogBlocksPerSegment;
 constexpr uint32_t kDefaultSegmentsPerSection = 1;
+constexpr uint32_t kDefaultSegmentSize =
+    kDefaultSectorsPerBlock * kDefaultSectorSize * kDefaultBlocksPerSegment;
 constexpr uint32_t kCpBlockSize = (kDefaultSectorSize * kDefaultSectorsPerBlock);
 constexpr uint32_t kVolumeLabelLength = 16;
 // At least, it requires six reserved sections to preallocate the next sections of all levels of
@@ -50,6 +52,32 @@ constexpr uint32_t kDefaultOpRatio = 4;
 constexpr int kMaxActiveLogs = 16;
 constexpr int kMaxActiveNodeLogs = 8;
 constexpr int kMaxActiveDataLogs = 8;
+
+// By default, there are 6 active log areas across the whole main area.
+// When considering hot and cold data separation to reduce cleaning overhead,
+// we split 3 for data logs and 3 for node logs as hot, warm, and cold types,
+// respectively.
+// In the current design, you should not change the numbers intentionally.
+// Instead, as a mount option such as active_logs=x, you can use 2, 4, and 6
+// logs individually according to the underlying devices. (default: 6)
+// Just in case, on-disk layout covers maximum 16 logs that consist of 8 for
+// data and 8 for node logs.
+constexpr int kNrCursegDataType = 3;
+constexpr int kNrCursegNodeType = 3;
+constexpr int kNrCursegType = kNrCursegDataType + kNrCursegNodeType;
+
+enum class CursegType {
+  kCursegHotData = 0,  // directory entry blocks
+  kCursegWarmData,     // data blocks
+  kCursegColdData,     // multimedia or GCed data blocks
+  kCursegHotNode,      // direct node blocks of directory files
+  kCursegWarmNode,     // direct node blocks of normal files
+  kCursegColdNode,     // indirect node blocks
+  kNoCheckType
+};
+
+constexpr uint32_t kMinVolumeSegments =
+    kMinMetaSegments + kMinReservedSectionsForGc + kNrCursegType;
 
 struct Superblock {
   uint32_t magic = 0;                  // Magic Number

@@ -26,7 +26,7 @@ std::vector<LargeTruncateTestParamType> GetTestCombinations(
       }
       constexpr int64_t kBlockCount = 3 * (1LL << 16);
       constexpr int64_t kBlockSize = 1LL << 9;
-      if (!options.has_min_volume_size ||
+      if (!options.filesystem->GetTraits().has_min_volume_size ||
           options.device_block_count * options.device_block_size < kBlockCount * kBlockSize) {
         options.device_block_count = kBlockCount;
         options.device_block_size = kBlockSize;
