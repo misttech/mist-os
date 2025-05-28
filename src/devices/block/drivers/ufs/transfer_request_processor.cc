@@ -6,6 +6,8 @@
 
 #include <lib/trace/event.h>
 
+#include <optional>
+
 #include <safemath/checked_math.h>
 #include <safemath/safe_conversions.h>
 
@@ -300,15 +302,48 @@ template zx::result<void *> TransferRequestProcessor::SendRequestUsingSlot<NopOu
     NopOutUpiu &request, uint8_t lun, uint8_t slot, std::optional<zx::unowned_vmo> data_vmo,
     IoCommand *io_cmd, bool is_sync);
 
-zx::result<> TransferRequestProcessor::ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
-                                                      TransferRequestDescriptor *descriptor) {
-  TRACE_DURATION("ufs", "ScsiCompletion", "slot", slot_num);
+zx_status_t TransferRequestProcessor::UpiuCompletion(uint8_t slot_num, RequestSlot &request_slot) {
+  TRACE_DURATION("ufs", "UpiuCompletion", "slot", slot_num);
 
   ResponseUpiu response(
-      request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, sizeof(CommandUpiuData)));
+      request_list_.GetDescriptorBuffer<ResponseUpiu>(slot_num, request_slot.response_upiu_offset));
 
-  // TODO(https://fxbug.dev/42075643): Need to check if response.header.trans_code() is a kCommnad.
-  return GetResponseStatus(descriptor, response, UpiuTransactionCodes::kCommand);
+  zx::result host_status = CheckResponseAndGetHostStatus(slot_num, response);
+  if (host_status.is_error()) {
+    return host_status.error_value();
+  }
+
+  zx_status_t request_result;
+  if (!request_slot.is_scsi_command) {
+    request_result = host_status.status_value();
+  } else {
+    if (!host_status.value().has_value()) {
+      FDF_LOG(ERROR, "Bad SCSI command response status");
+      return ZX_ERR_BAD_STATE;
+    }
+    scsi::HostStatusCode scsi_host_status = host_status.value().value();
+    zx_status_t io_status =
+        scsi_host_status == scsi::HostStatusCode::kOk ? ZX_OK : ZX_ERR_BAD_STATE;
+
+    // Until native UFS IO commands are defined by the UFS specification, we assume that only SCSI
+    // commands can be IO commands.
+    IoCommand *io_cmd = request_slot.io_cmd;
+    if (io_cmd) {
+      io_cmd->data_vmo.reset();
+      io_cmd->device_op.Complete(io_status);
+    }
+    request_result = ZX_OK;
+  }
+
+  if (response.GetHeader().event_alert()) {
+    if (zx::result result = controller_.GetDeviceManager().PostExceptionEventsTask();
+        result.is_error()) {
+      FDF_LOG(ERROR, "Failed to handle Exception Event slot[%u]: %s", slot_num,
+              result.status_string());
+    }
+  }
+
+  return request_result;
 }
 
 bool TransferRequestProcessor::ProcessSlotCompletion(uint8_t slot_num) {
@@ -317,35 +352,13 @@ bool TransferRequestProcessor::ProcessSlotCompletion(uint8_t slot_num) {
   RequestSlot &request_slot = request_list_.GetSlot(slot_num);
   if (request_slot.state == SlotState::kScheduled) {
     if (!(UtrListDoorBellReg::Get().ReadFrom(&register_).door_bell() & (1 << slot_num))) {
-      zx::result<> result = zx::ok();
-      ResponseUpiu response(request_list_.GetDescriptorBuffer<ResponseUpiu>(
-          slot_num, request_slot.response_upiu_offset));
-
-      if (request_slot.is_scsi_command) {
-        // Check SCSI command response.
-        auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
-        result = ScsiCompletion(slot_num, request_slot, descriptor);
-      } else {
-        // Check request command response.
-        if (response.GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
-          FDF_LOG(ERROR, "Transfer Request command failure: response=%x",
-                  response.GetHeader().response);
-          result = zx::error(ZX_ERR_BAD_STATE);
-        }
+      // Check request response.
+      zx_status_t status = UpiuCompletion(slot_num, request_slot);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to complete request, slot[%u]: %s", slot_num,
+                zx_status_get_string(status));
       }
-      if (request_slot.io_cmd) {
-        request_slot.io_cmd->data_vmo.reset();
-        request_slot.io_cmd->device_op.Complete(result.status_value());
-      } else {
-        request_slot.result = result.status_value();
-      }
-
-      if (response.GetHeader().event_alert()) {
-        if (result = controller_.GetDeviceManager().PostExceptionEventsTask(); result.is_error()) {
-          FDF_LOG(ERROR, "Failed to handle Exception Event slot[%u]: %s", slot_num,
-                  result.status_string());
-        }
-      }
+      request_slot.result = status;
 
       if (request_slot.is_sync) {
         sync_completion_signal(&request_slot.complete);
@@ -355,7 +368,7 @@ bool TransferRequestProcessor::ProcessSlotCompletion(uint8_t slot_num) {
             .set_notification(1 << slot_num)
             .WriteTo(&register_);
 
-        if (result = ClearSlot(request_slot); result.is_error()) {
+        if (zx::result result = ClearSlot(request_slot); result.is_error()) {
           FDF_LOG(ERROR, "Failed to clear slot[%u]: %s", slot_num, result.status_string());
         }
       }
@@ -417,46 +430,86 @@ zx::result<> TransferRequestProcessor::FillDescriptorAndSendRequest(
   return zx::ok();
 }
 
-zx::result<> TransferRequestProcessor::GetResponseStatus(TransferRequestDescriptor *descriptor,
-                                                         AbstractResponseUpiu &response,
-                                                         UpiuTransactionCodes transaction_code) {
-  uint8_t status = response.GetHeader().status;
-  uint8_t header_response = response.GetHeader().response;
+scsi::HostStatusCode TransferRequestProcessor::ScsiStatusToHostStatus(
+    scsi::StatusCode command_status) {
+  scsi::HostStatusCode host_status;
+  switch (command_status) {
+    case scsi::StatusCode::GOOD:
+      host_status = scsi::HostStatusCode::kOk;
+      break;
+    default:
+      host_status = scsi::HostStatusCode::kError;
+      break;
+  }
+  return host_status;
+}
 
-  switch (transaction_code) {
-    case UpiuTransactionCodes::kCommand:
-      if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
-          status != static_cast<uint8_t>(scsi::StatusCode::GOOD) ||
-          header_response != UpiuHeaderResponse::kTargetSuccess) {
-        auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(
-            static_cast<ResponseUpiu &>(response).GetSenseData());
-
-        FDF_LOG(ERROR,
-                "SCSI failure: ocs=0x%x, status=0x%x, header_response=0x%x, "
-                "sense_key=0x%x, asc=0x%x, ascq=0x%x",
-                descriptor->overall_command_status(), status, header_response,
-                static_cast<uint8_t>(sense_data->sense_key()), sense_data->additional_sense_code,
-                sense_data->additional_sense_code_qualifier);
-        return zx::error(ZX_ERR_BAD_STATE);
+scsi::HostStatusCode TransferRequestProcessor::GetScsiCommandHostStatus(
+    OverallCommandStatus ocs, UpiuHeaderResponseCode header_response,
+    scsi::StatusCode response_status) {
+  scsi::HostStatusCode host_status;
+  switch (ocs) {
+    case kSuccess:
+      if (header_response == UpiuHeaderResponseCode::kTargetSuccess) {
+        host_status = ScsiStatusToHostStatus(static_cast<scsi::StatusCode>(response_status));
+      } else {
+        host_status = scsi::HostStatusCode::kError;
       }
       break;
-    case UpiuTransactionCodes::kQueryRequest:
-      if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess ||
-          header_response != UpiuHeaderResponse::kTargetSuccess) {
-        FDF_LOG(ERROR, "Query failure: ocs=0x%x, status=0x%x, header_response=0x%x",
-                descriptor->overall_command_status(), status, header_response);
+    case kAborted:
+      host_status = scsi::HostStatusCode::kAbort;
+      break;
+    case kInvalid:
+      host_status = scsi::HostStatusCode::kRequeue;
+      break;
+    default:
+      host_status = scsi::HostStatusCode::kError;
+      break;
+  }
+  return host_status;
+}
+
+zx::result<std::optional<scsi::HostStatusCode>>
+TransferRequestProcessor::CheckResponseAndGetHostStatus(uint8_t slot_num,
+                                                        AbstractResponseUpiu &response) {
+  auto transaction_type = static_cast<UpiuTransactionCodes>(response.GetHeader().trans_type);
+
+  auto descriptor = request_list_.GetRequestDescriptor<TransferRequestDescriptor>(slot_num);
+  OverallCommandStatus ocs = descriptor->overall_command_status();
+  auto header_response = static_cast<UpiuHeaderResponseCode>(response.GetHeader().response);
+  auto response_status = static_cast<scsi::StatusCode>(response.GetHeader().status);
+
+  // Check for errors in the following order: OCS -> response -> scsi_status
+  std::optional<scsi::HostStatusCode> host_status = std::nullopt;
+  switch (transaction_type) {
+    case UpiuTransactionCodes::kResponse:
+      if (response.GetHeader().command_set_type() != UpiuCommandSetType::kScsi) {
+        FDF_LOG(ERROR, "Unknown command(set type = 0x%x) response: ocs=0x%x, header_response=0x%x",
+                response.GetHeader().command_set_type(), ocs, header_response);
+        return zx::error(ZX_ERR_BAD_STATE);
+      }
+      // SCSI command set
+      host_status = GetScsiCommandHostStatus(ocs, header_response, response_status);
+      break;
+    case UpiuTransactionCodes::kQueryResponse:
+      if (ocs != OverallCommandStatus::kSuccess ||
+          header_response != static_cast<uint8_t>(QueryResponseCode::kSuccess)) {
+        FDF_LOG(ERROR, "Query request failure: ocs=0x%x, header_response=0x%x", ocs,
+                header_response);
         return zx::error(ZX_ERR_BAD_STATE);
       }
       break;
     default:
-      if (descriptor->overall_command_status() != OverallCommandStatus::kSuccess) {
-        FDF_LOG(ERROR, "Generic failure: ocs=0x%x", descriptor->overall_command_status());
+      if (ocs != OverallCommandStatus::kSuccess ||
+          header_response != UpiuHeaderResponseCode::kTargetSuccess) {
+        FDF_LOG(ERROR, "Generic request(transaction type = 0x%x) failure: ocs=0x%x",
+                transaction_type, ocs);
         return zx::error(ZX_ERR_BAD_STATE);
       }
       break;
   }
 
-  return zx::ok();
+  return zx::ok(host_status);
 }
 
 }  // namespace ufs

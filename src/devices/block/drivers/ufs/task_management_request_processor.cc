@@ -50,7 +50,7 @@ uint32_t TaskManagementRequestProcessor::IoRequestCompletion() {
         auto descriptor =
             request_list_.GetRequestDescriptor<TaskManagementRequestDescriptor>(slot_num);
         TaskManagementResponseUpiu response(descriptor->GetResponseData());
-        if (response.GetHeader().response != UpiuHeaderResponse::kTargetSuccess) {
+        if (response.GetHeader().response != UpiuHeaderResponseCode::kTargetSuccess) {
           FDF_LOG(ERROR, "UTP task management request command failure: response=%x",
                   response.GetHeader().response);
           result = zx::error(ZX_ERR_BAD_STATE);

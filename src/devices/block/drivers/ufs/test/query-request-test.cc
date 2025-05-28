@@ -103,7 +103,7 @@ TEST_F(QueryRequestTest, ReadAttributeExcpetion) {
       QueryOpcode::kReadAttribute,
       [](ufs_mock_device::UfsMockDevice& mock_device, QueryRequestUpiuData& req_upiu,
          QueryResponseUpiuData& rsp_upiu) {
-        rsp_upiu.header.response = UpiuHeaderResponse::kTargetFailure;  // Error injection
+        rsp_upiu.header.response = UpiuHeaderResponseCode::kTargetFailure;  // Error injection
         return ZX_OK;
       });
   auto attribute = ReadAttribute(Attributes::bCurrentPowerMode);

@@ -900,6 +900,16 @@ struct SendDiagnosticCDB {
 
 static_assert(sizeof(SendDiagnosticCDB) == 6, "Send Diagnostic CDB must be 6 bytes");
 
+// The HostStatusCode is used by the device driver to communicate the desired behavior to the SCSI
+// library.
+enum class HostStatusCode {
+  kOk = 0,
+  kAbort,
+  kTimeout,
+  kError,
+  kRequeue,
+};
+
 struct DeviceOp;
 struct DeviceOptions;
 

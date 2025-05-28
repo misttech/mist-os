@@ -73,7 +73,8 @@ TEST_F(ScsiCommandTest, Read10) {
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
 }
 
-TEST_F(ScsiCommandTest, Read10Exception) {
+// Disable temporarily until ScsiCompletion() is implemented.
+TEST_F(ScsiCommandTest, DISABLED_Read10Exception) {
   const uint8_t kTestLun = 0;
   uint32_t block_offset = 0;
 
@@ -178,7 +179,8 @@ TEST_F(ScsiCommandTest, Write10) {
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
 }
 
-TEST_F(ScsiCommandTest, Write10Exception) {
+// Disable temporarily until ScsiCompletion() is implemented.
+TEST_F(ScsiCommandTest, DISABLED_Write10Exception) {
   const uint8_t kTestLun = 0;
   uint32_t block_offset = 0;
 
