@@ -17,12 +17,19 @@ use std::path::PathBuf;
     description = "Flash an image to a target device",
     example = "To flash a specific image:
 
+    With a Product Bundle
+
+    $ ffx target flash /path/to/product_bundle
+
+    With a flash manifest:
+
     $ ffx target flash --manifest $(fx get-build-dir)/flash.json --product fuchsia
 
 To include SSH keys as well:
 
     $ ffx target flash
     --authorized-keys ~/fuchsia/.ssh/authorized_keys
+    -- manifest
     $(fx get-build-dir)/flash.json
     --product fuchsia",
     note = "Flashes an image to a target device using the fastboot protocol.
@@ -43,11 +50,8 @@ The format for the `--oem-stage` parameter is a comma separated pair:
 '<OEM_COMMAND>,<FILE_TO_STAGE>'"
 )]
 pub struct FlashCommand {
-    #[argh(
-        positional,
-        description = "path to flashing manifest or zip file containing images and manifest"
-    )]
-    pub manifest_path: Option<PathBuf>,
+    #[argh(positional, description = "path to the product bundle to flash")]
+    pub product_bundle_path: Option<PathBuf>,
 
     #[argh(
         option,
@@ -108,7 +112,7 @@ impl Into<ManifestParams> for FlashCommand {
     fn into(self) -> ManifestParams {
         let flash_min_timeout_seconds = self.min_timeout_secs().ok().unwrap();
         let flash_timeout_rate_mb_per_second = self.timeout_rate().ok().unwrap();
-        let manifest = self.manifest.or(self.manifest_path);
+        let manifest = self.manifest.or(self.product_bundle_path);
         ManifestParams {
             manifest,
             product: self.product,
@@ -169,7 +173,7 @@ mod test {
         let tmp_file_name = tmp_file.path().to_string_lossy().to_string();
         let test_staged_file = format!("{},{}", test_oem_cmd, tmp_file_name).parse::<OemFile>()?;
         let cmd = FlashCommand {
-            manifest_path: None,
+            product_bundle_path: None,
             manifest: None,
             product: "fuchsia".to_string(),
             product_bundle: None,
