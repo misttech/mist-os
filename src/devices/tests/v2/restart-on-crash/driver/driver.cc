@@ -43,8 +43,8 @@ class RestartOnCrashDriver : public fdf::DriverBase,
   }
 
   void Crash(CrashCompleter::Sync& completer) override {
-    // Crash the process.
-    ZX_ASSERT_MSG(false, "Crash requested");
+    // Crash the process by triggering bad handle policy.
+    zx_object_signal(0x534343, 0, 0);
   }
 
   void Ping(PingCompleter::Sync& completer) override {
