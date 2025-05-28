@@ -534,14 +534,14 @@ fn may_create(
     let fs = parent.fs();
 
     let audit_context =
-        [current_task.into(), parent.into(), fs.as_ref().into(), Auditable::Name(name)];
+        &[current_task.into(), parent.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
         &permission_check,
         current_task.kernel(),
         current_sid,
         parent_sid,
         DirPermission::Search,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
     check_permission(
         &permission_check,
@@ -549,7 +549,7 @@ fn may_create(
         current_sid,
         parent_sid,
         DirPermission::AddName,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     // Verify that the caller has permission to create new nodes of the desired type.
@@ -565,14 +565,14 @@ fn may_create(
     .map(|(sid, _)| sid)
     .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
 
-    let audit_context = [current_task.into(), fs.as_ref().into(), Auditable::Name(name)];
+    let audit_context = &[current_task.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
         &permission_check,
         current_task.kernel(),
         current_sid,
         new_file_sid,
         CommonFsNodePermission::Create.for_class(new_file_class),
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     // Verify that the new node's label is permitted to be created in the target filesystem.
@@ -592,7 +592,7 @@ fn may_create(
         new_file_sid,
         filesystem_sid,
         FileSystemPermission::Associate,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     Ok(())
@@ -664,7 +664,7 @@ fn may_unlink_or_rmdir(
     assert!(!Anon::is_private(parent));
     assert!(!Anon::is_private(fs_node));
 
-    let audit_context = [current_task.into(), Auditable::Name(name)];
+    let audit_context = &[current_task.into(), Auditable::Name(name)];
 
     let permission_check = security_server.as_permission_check();
     let current_sid = task_effective_sid(current_task);
@@ -676,7 +676,7 @@ fn may_unlink_or_rmdir(
         current_sid,
         parent_sid,
         DirPermission::Search,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
     check_permission(
         &permission_check,
@@ -684,7 +684,7 @@ fn may_unlink_or_rmdir(
         current_sid,
         parent_sid,
         DirPermission::RemoveName,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
@@ -700,7 +700,7 @@ fn may_unlink_or_rmdir(
             current_sid,
             file_sid,
             CommonFilePermission::Unlink.for_class(file_class),
-            (&audit_context).into(),
+            audit_context.into(),
         ),
         UnlinkKind::Directory => check_permission(
             &permission_check,
@@ -708,7 +708,7 @@ fn may_unlink_or_rmdir(
             current_sid,
             file_sid,
             DirPermission::RemoveDir,
-            (&audit_context).into(),
+            audit_context.into(),
         ),
     }
 }
@@ -833,14 +833,14 @@ pub(in crate::security) fn check_fs_node_rename_access(
         current_task.into(),
     )?;
 
-    let audit_context_old_name = [current_task.into(), Auditable::Name(old_basename)];
+    let audit_context_old_name = &[current_task.into(), Auditable::Name(old_basename)];
     check_permission(
         &permission_check,
         current_task.kernel(),
         current_sid,
         old_parent_sid,
         DirPermission::RemoveName,
-        (&audit_context_old_name).into(),
+        audit_context_old_name.into(),
     )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
@@ -855,10 +855,10 @@ pub(in crate::security) fn check_fs_node_rename_access(
         current_sid,
         file_sid,
         CommonFilePermission::Rename.for_class(file_class),
-        (&audit_context_old_name).into(),
+        audit_context_old_name.into(),
     )?;
 
-    let audit_context_new_name = [current_task.into(), Auditable::Name(new_basename)];
+    let audit_context_new_name = &[current_task.into(), Auditable::Name(new_basename)];
     let new_parent_sid = fs_node_effective_sid_and_class(new_parent).sid;
     check_permission(
         &permission_check,
@@ -866,7 +866,7 @@ pub(in crate::security) fn check_fs_node_rename_access(
         current_sid,
         new_parent_sid,
         DirPermission::AddName,
-        (&audit_context_new_name).into(),
+        audit_context_new_name.into(),
     )?;
 
     // If a file already exists with the new name, then verify that the existing file can be
@@ -1197,8 +1197,8 @@ where
     // Verify that the requested modification is permitted by the loaded policy.
     let new_sid = security_server.security_context_to_sid(value.into()).ok();
     if security_server.is_enforcing() {
-        let audit_context = [current_task.into(), fs_node.into(), fs.as_ref().into()];
-        let audit_context = (&audit_context).into();
+        let audit_context = &[current_task.into(), fs_node.into(), fs.as_ref().into()];
+        let audit_context = audit_context.into();
 
         let new_sid = new_sid.ok_or_else(|| errno!(EINVAL))?;
         let task_sid = task_effective_sid(current_task);
