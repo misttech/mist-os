@@ -4,7 +4,7 @@
 
 use crate::boot_args::BootArgs;
 use crate::config::apply_boot_args_to_config;
-use crate::environment::{Environment, FshostEnvironment};
+use crate::environment::{DevicePublisher, Environment, FshostEnvironment};
 use crate::inspect::register_stats;
 use crate::watcher::{DirSource, PathSource, PathSourceType, WatchSource, Watcher};
 use anyhow::{format_err, Error};
@@ -13,7 +13,6 @@ use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{stream, StreamExt};
-use manager::DevicePublisher;
 use std::collections::HashSet;
 use std::sync::Arc;
 use vfs::directory::helper::DirectlyMutable;
@@ -106,8 +105,16 @@ async fn main() -> Result<(), Error> {
     // matcher_lock is used to block matching temporarily and inject
     // paths to be ignored.
     let matcher_lock = Arc::new(Mutex::new(HashSet::new()));
-    let mut env =
-        FshostEnvironment::new(config.clone(), matcher_lock.clone(), inspector.clone(), watcher);
+    let device_publisher = DevicePublisher::new();
+    let publisher_block_dir = device_publisher.block_dir();
+    let publisher_debug_block_dir = device_publisher.debug_block_dir();
+    let mut env = FshostEnvironment::new(
+        config.clone(),
+        matcher_lock.clone(),
+        inspector.clone(),
+        watcher,
+        device_publisher,
+    );
 
     let launcher = env.launcher();
     // Records inspect metrics. Too expensive to build the tree data in newer fxfs environments.
@@ -115,10 +122,9 @@ async fn main() -> Result<(), Error> {
         .await;
     let blob_exposed_dir = env.blobfs_exposed_dir()?;
     let data_exposed_dir = env.data_exposed_dir()?;
-    let device_publisher = DevicePublisher::new();
     let export = vfs::pseudo_directory! {
-        "block" => device_publisher.block_dir(),
-        "debug_block" => device_publisher.debug_block_dir(),
+        "block" => publisher_block_dir,
+        "debug_block" => publisher_debug_block_dir,
         "fs" => vfs::pseudo_directory! {
             "blob" => remote_dir(blob_exposed_dir),
             "data" => remote_dir(data_exposed_dir),
@@ -185,7 +191,7 @@ async fn main() -> Result<(), Error> {
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let mut fs_manager = manager::Manager::new(&config, env, matcher_lock, device_publisher);
+    let mut fs_manager = manager::Manager::new(&config, env, matcher_lock);
     let shutdown_responder = if config.disable_block_watcher {
         // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of
         // processing devices.

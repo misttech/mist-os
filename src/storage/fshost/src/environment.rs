@@ -4,8 +4,10 @@
 
 mod fvm_container;
 mod fxfs_container;
+mod publisher;
 pub use fvm_container::FvmContainer;
 pub use fxfs_container::FxfsContainer;
+pub use publisher::DevicePublisher;
 
 use crate::copier::recursive_copy;
 use crate::crypt::fxfs::{self, CryptService};
@@ -134,6 +136,16 @@ pub trait Environment: Send + Sync {
     /// to exist for the lifetime of fshost, and the environment will shut it down cleanly at the
     /// right time.
     fn register_filesystem(&mut self, filesystem: Filesystem);
+
+    /// Publish a device in the block directory.
+    fn publish_device(&mut self, device: &mut dyn Device, name: &str) -> Result<(), Error>;
+
+    /// Publish a device in the debug block directory.
+    fn publish_device_to_debug_block(
+        &mut self,
+        device: &dyn Device,
+        name: &str,
+    ) -> Result<(), Error>;
 }
 
 pub enum Filesystem {
@@ -344,6 +356,7 @@ pub struct FshostEnvironment {
     watcher: Watcher,
     registered_devices: Arc<RegisteredDevices>,
     other_filesystems: Vec<Filesystem>,
+    device_publisher: DevicePublisher,
 }
 
 impl FshostEnvironment {
@@ -352,6 +365,7 @@ impl FshostEnvironment {
         matcher_lock: Arc<Mutex<HashSet<String>>>,
         inspector: fuchsia_inspect::Inspector,
         watcher: Watcher,
+        device_publisher: DevicePublisher,
     ) -> Self {
         let corruption_events = inspector.root().create_child("corruption_events");
         Self {
@@ -367,6 +381,7 @@ impl FshostEnvironment {
             watcher,
             registered_devices: Arc::new(RegisteredDevices::default()),
             other_filesystems: Vec::new(),
+            device_publisher,
         }
     }
 
@@ -1084,6 +1099,18 @@ impl Environment for FshostEnvironment {
 
     fn register_filesystem(&mut self, filesystem: Filesystem) {
         self.other_filesystems.push(filesystem);
+    }
+
+    fn publish_device(&mut self, device: &mut dyn Device, name: &str) -> Result<(), Error> {
+        self.device_publisher.publish(device.block_connector()?, name)
+    }
+
+    fn publish_device_to_debug_block(
+        &mut self,
+        device: &dyn Device,
+        name: &str,
+    ) -> Result<(), Error> {
+        self.device_publisher.publish_to_debug_block_dir(device, name)
     }
 }
 
