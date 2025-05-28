@@ -140,6 +140,7 @@ rustc_library("starnix_core") {
     "fs/fuchsia/timer.rs",
     "fs/fuchsia/zxio.rs",
     "fs/mod.rs",
+    "fs/pseudo_directory.rs",
     "fs/sysfs/bus_collection_directory.rs",
     "fs/sysfs/cpu_class_directory.rs",
     "fs/sysfs/device_directory.rs",

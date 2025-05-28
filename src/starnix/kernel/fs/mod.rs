@@ -5,5 +5,6 @@
 pub mod devpts;
 pub mod devtmpfs;
 pub mod fuchsia;
+pub mod pseudo_directory;
 pub mod sysfs;
 pub mod tmpfs;

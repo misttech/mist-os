@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::KObjectHandle;
+use crate::fs::pseudo_directory::PseudoDirectoryBuilder;
 use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
     VulnerabilitiesClassDirectory,
@@ -11,7 +12,7 @@ use crate::task::CurrentTask;
 use crate::vfs::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
     BytesFile, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, SymlinkNode,
+    FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, SymlinkNode,
 };
 use ebpf_api::BPF_PROG_TYPE_FUSE;
 use starnix_logging::bug_ref;
@@ -19,7 +20,7 @@ use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::mode;
+use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::{ino_t, statfs, SYSFS_MAGIC};
 
 pub const SYSFS_DEVICES: &str = "devices";
@@ -45,64 +46,68 @@ impl FileSystemOps for SysFs {
 
 impl SysFs {
     pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
-        let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options)
-            .expect("sysfs constructed with valid options");
-        let mut dir = StaticDirectoryBuilder::new(&fs);
-        let dir_mode = mode!(IFDIR, 0o755);
-        dir.subdir(current_task, "fs", 0o755, |dir| {
-            dir.subdir(current_task, "selinux", 0o755, |_| ());
-            dir.subdir(current_task, "bpf", 0o755, |_| ());
-            dir.subdir(current_task, "cgroup", 0o755, |_| ());
-            dir.subdir(current_task, "fuse", 0o755, |dir| {
-                dir.subdir(current_task, "connections", 0o755, |_| ());
-                dir.subdir(current_task, "features", 0o755, |dir| {
-                    dir.node(
-                        "fuse_bpf",
-                        fs.create_node(
-                            current_task,
-                            BytesFile::new_node(b"supported\n".to_vec()),
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-                        ),
-                    );
+        const DIR_MODE: FileMode = mode!(IFDIR, 0o755);
+        const REG_MODE: FileMode = mode!(IFREG, 0o444);
+        const CREDS: FsCred = FsCred::root();
+
+        let mut dir = PseudoDirectoryBuilder::default();
+        {
+            let dir = dir.subdir(b"fs");
+            dir.subdir(b"selinux");
+            dir.subdir(b"bpf");
+            dir.subdir(b"cgroup");
+            {
+                let dir = dir.subdir(b"fuse");
+                dir.subdir(b"connections");
+                {
+                    let dir = dir.subdir(b"features");
+                    dir.node(b"fuse_bpf", REG_MODE, CREDS, || {
+                        BytesFile::new_node(b"supported\n".to_vec())
+                    });
+                }
+                dir.node(b"bpf_prog_type_fuse", REG_MODE, CREDS, || {
+                    BytesFile::new_node(format!("{}\n", BPF_PROG_TYPE_FUSE).into_bytes())
                 });
-                dir.node(
-                    "bpf_prog_type_fuse",
-                    fs.create_node(
-                        current_task,
-                        BytesFile::new_node(format!("{}\n", BPF_PROG_TYPE_FUSE).into_bytes()),
-                        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-                    ),
-                );
-            });
-            dir.subdir(current_task, "pstore", 0o755, |_| ());
-        });
+            }
+            dir.subdir(b"pstore");
+        }
 
+        let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
-        dir.entry(current_task, SYSFS_DEVICES, registry.objects.devices.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BUS, registry.objects.bus.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BLOCK, registry.objects.block.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
 
-        sysfs_kernel_directory(current_task, &mut dir);
-        sysfs_power_directory(current_task, &mut dir);
+        let devices = registry.objects.devices.clone();
+        dir.node_ops(SYSFS_DEVICES, DIR_MODE, CREDS, move || devices.ops());
 
-        dir.subdir(current_task, "module", 0o755, |dir| {
-            dir.subdir(current_task, "dm_verity", 0o755, |dir| {
-                dir.subdir(current_task, "parameters", 0o755, |dir| {
-                    dir.entry(
-                        current_task,
-                        "prefetch_cluster",
+        let bus = registry.objects.bus.clone();
+        dir.node_ops(SYSFS_BUS, DIR_MODE, CREDS, move || bus.ops());
+
+        let block = registry.objects.block.clone();
+        dir.node_ops(SYSFS_BLOCK, DIR_MODE, CREDS, move || block.ops());
+
+        let class = registry.objects.class.clone();
+        dir.node_ops(SYSFS_CLASS, DIR_MODE, CREDS, move || class.ops());
+
+        let dev = registry.objects.dev.clone();
+        dir.node_ops(SYSFS_DEV, DIR_MODE, CREDS, move || dev.ops());
+
+        sysfs_kernel_directory(kernel, &mut dir.subdir(b"kernel"));
+        sysfs_power_directory(kernel, &mut dir.subdir(b"power"));
+
+        {
+            let dir = dir.subdir(b"module");
+            {
+                let dir = dir.subdir(b"dm_verity");
+                {
+                    let dir = dir.subdir(b"parameters");
+                    dir.node(b"prefetch_cluster", mode!(IFREG, 0o644), CREDS, || {
                         StubEmptyFile::new_node(
                             "/sys/module/dm_verity/paramters/prefetch_cluster",
                             bug_ref!("https://fxbug.dev/322893670"),
-                        ),
-                        mode!(IFREG, 0o644),
-                    );
-                });
-            });
-        });
+                        )
+                    });
+                }
+            }
+        }
 
         // TODO(https://fxbug.dev/42072346): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.
@@ -113,7 +118,9 @@ impl SysFs {
             .get_or_create_child("cpu".into(), CpuClassDirectory::new)
             .get_or_create_child("vulnerabilities".into(), VulnerabilitiesClassDirectory::new);
 
-        dir.build_root();
+        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options)
+            .expect("sysfs constructed with valid options");
+        dir.build_root(&fs, mode!(IFDIR, 0o777), CREDS);
         fs
     }
 }
