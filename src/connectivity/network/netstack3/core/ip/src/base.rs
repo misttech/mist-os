@@ -5,7 +5,6 @@
 use alloc::boxed::Box;
 use alloc::collections::HashMap;
 use alloc::vec::Vec;
-use core::cmp::Ordering;
 use core::convert::Infallible as Never;
 use core::fmt::Debug;
 use core::hash::Hash;
@@ -60,7 +59,9 @@ use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
     IpAddressData, IpAddressFlags, IpDeviceStateBindingsTypes, IpDeviceStateIpExt, WeakAddressId,
 };
-use crate::internal::device::{self, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext};
+use crate::internal::device::{
+    self, IpDeviceAddressContext, IpDeviceBindingsContext, IpDeviceIpExt, IpDeviceSendContext,
+};
 use crate::internal::fragmentation::{FragmentableIpSerializer, FragmentationIpExt, IpFragmenter};
 use crate::internal::gmp::igmp::IgmpCounters;
 use crate::internal::gmp::mld::MldCounters;
@@ -649,14 +650,26 @@ impl AddressStatus<Ipv4PresentAddressStatus> {
             return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
         }
 
-        core_ctx.with_address_ids(device, |mut addrs, _core_ctx| {
+        core_ctx.with_address_ids(device, |mut addrs, core_ctx| {
             addrs
                 .find_map(|addr_id| {
                     let dev_addr = addr_id.addr_sub();
                     let (dev_addr, subnet) = dev_addr.addr_subnet();
 
                     if **dev_addr == addr {
-                        Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
+                        let assigned = core_ctx.with_ip_address_data(
+                            device,
+                            &addr_id,
+                            |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| {
+                                *assigned
+                            },
+                        );
+
+                        if assigned {
+                            Some(AddressStatus::Present(Ipv4PresentAddressStatus::UnicastAssigned))
+                        } else {
+                            Some(AddressStatus::Present(Ipv4PresentAddressStatus::UnicastTentative))
+                        }
                     } else if addr.get() == subnet.broadcast() {
                         Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
                     } else if device.is_loopback() && subnet.contains(addr.as_ref()) {
@@ -716,7 +729,8 @@ pub enum Ipv4PresentAddressStatus {
     LimitedBroadcast,
     SubnetBroadcast,
     Multicast,
-    Unicast,
+    UnicastAssigned,
+    UnicastTentative,
     /// This status indicates that the queried device was Loopback. The address
     /// belongs to a subnet that is assigned to the interface. This status
     /// takes lower precedence than `Unicast` and `SubnetBroadcast``, E.g. if
@@ -734,7 +748,10 @@ impl Ipv4PresentAddressStatus {
     fn to_broadcast_marker(&self) -> Option<<Ipv4 as BroadcastIpExt>::BroadcastMarker> {
         match self {
             Self::LimitedBroadcast | Self::SubnetBroadcast => Some(()),
-            Self::Multicast | Self::Unicast | Self::LoopbackSubnet => None,
+            Self::Multicast
+            | Self::UnicastAssigned
+            | Self::UnicastTentative
+            | Self::LoopbackSubnet => None,
         }
     }
 }
@@ -1141,8 +1158,10 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
     I::map_ip(
         WrapAddressStatus(status),
         |WrapAddressStatus(status)| match status {
-            Ipv4PresentAddressStatus::Unicast | Ipv4PresentAddressStatus::LoopbackSubnet => true,
-            Ipv4PresentAddressStatus::LimitedBroadcast
+            Ipv4PresentAddressStatus::UnicastAssigned
+            | Ipv4PresentAddressStatus::LoopbackSubnet => true,
+            Ipv4PresentAddressStatus::UnicastTentative
+            | Ipv4PresentAddressStatus::LimitedBroadcast
             | Ipv4PresentAddressStatus::SubnetBroadcast
             | Ipv4PresentAddressStatus::Multicast => false,
         },
@@ -3945,6 +3964,29 @@ pub enum ReceivePacketAction<I: BroadcastIpExt + IpLayerIpExt, DeviceId: StrongD
     Drop { reason: DropReason },
 }
 
+// It's possible that there is more than one device with the address
+// present. Prefer any address status over `UnicastTentative`.
+fn choose_highest_priority_address_status<I: IpLayerIpExt>(
+    address_statuses: impl Iterator<Item = I::AddressStatus>,
+) -> Option<I::AddressStatus> {
+    address_statuses.max_by_key(|status| {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<'a, I: IpLayerIpExt>(&'a I::AddressStatus);
+        I::map_ip_in(
+            Wrap(status),
+            |Wrap(v4_status)| match v4_status {
+                Ipv4PresentAddressStatus::UnicastTentative => 0,
+                _ => 1,
+            },
+            |Wrap(v6_status)| match v6_status {
+                Ipv6PresentAddressStatus::UnicastTentative => 0,
+                _ => 1,
+            },
+        )
+    })
+}
+
 /// The reason a received IP packet is dropped.
 #[derive(Debug, PartialEq)]
 pub enum DropReason {
@@ -3996,17 +4038,17 @@ where
     // TODO(https://fxbug.dev/42175703): This should instead be controlled by the
     // routing table.
 
-    // Since we treat all addresses identically, it doesn't matter whether one
-    // or more than one device has the address assigned. That means we can just
-    // take the first status and ignore the rest.
-    let first_status = if device.is_loopback() {
-        core_ctx.with_address_statuses(dst_ip, |it| it.map(|(_device, status)| status).next())
+    let highest_priority = if device.is_loopback() {
+        core_ctx.with_address_statuses(dst_ip, |it| {
+            let it = it.map(|(_device, status)| status);
+            choose_highest_priority_address_status::<Ipv4>(it)
+        })
     } else {
         core_ctx.address_status_for_device(dst_ip, device).into_present()
     };
-    match first_status {
+    match highest_priority {
         Some(
-            address_status @ (Ipv4PresentAddressStatus::Unicast
+            address_status @ (Ipv4PresentAddressStatus::UnicastAssigned
             | Ipv4PresentAddressStatus::LoopbackSubnet),
         ) => {
             core_ctx.increment_both(device, |c| &c.deliver_unicast);
@@ -4015,6 +4057,16 @@ where
                 internal_forwarding: InternalForwarding::NotUsed,
             }
         }
+        Some(Ipv4PresentAddressStatus::UnicastTentative) => {
+            // If the destination address is tentative (which implies that
+            // we are still performing Duplicate Address Detection on
+            // it), then we don't consider the address "assigned to an
+            // interface", and so we drop packets instead of delivering them
+            // locally.
+            core_ctx.increment_both(device, |c| &c.drop_for_tentative);
+            ReceivePacketAction::Drop { reason: DropReason::Tentative }
+        }
+
         Some(address_status @ Ipv4PresentAddressStatus::Multicast) => {
             receive_ip_multicast_packet_action(
                 core_ctx,
@@ -4079,36 +4131,10 @@ where
     // TODO(https://fxbug.dev/42175703): This should instead be controlled by the
     // routing table.
 
-    // It's possible that there is more than one device with the address
-    // assigned. Since IPv6 addresses are either multicast or unicast, we
-    // don't expect to see one device with `UnicastAssigned` or
-    // `UnicastTentative` and another with `Multicast`. We might see one
-    // assigned and one tentative status, though, in which case we should
-    // prefer the former.
-    fn choose_highest_priority(
-        address_statuses: impl Iterator<Item = Ipv6PresentAddressStatus>,
-        dst_ip: SpecifiedAddr<Ipv6Addr>,
-    ) -> Option<Ipv6PresentAddressStatus> {
-        address_statuses.max_by(|lhs, rhs| {
-            use Ipv6PresentAddressStatus::*;
-            match (lhs, rhs) {
-                (UnicastAssigned | UnicastTentative, Multicast)
-                | (Multicast, UnicastAssigned | UnicastTentative) => {
-                    unreachable!("the IPv6 address {:?} is not both unicast and multicast", dst_ip)
-                }
-                (UnicastAssigned, UnicastTentative) => Ordering::Greater,
-                (UnicastTentative, UnicastAssigned) => Ordering::Less,
-                (UnicastTentative, UnicastTentative)
-                | (UnicastAssigned, UnicastAssigned)
-                | (Multicast, Multicast) => Ordering::Equal,
-            }
-        })
-    }
-
     let highest_priority = if device.is_loopback() {
         core_ctx.with_address_statuses(dst_ip, |it| {
             let it = it.map(|(_device, status)| status);
-            choose_highest_priority(it, dst_ip)
+            choose_highest_priority_address_status::<Ipv6>(it)
         })
     } else {
         core_ctx.address_status_for_device(dst_ip, device).into_present()
@@ -4163,7 +4189,7 @@ where
             // address. NS and NA packets should be addressed to a multicast
             // address that we would have joined during DAD so that we can
             // receive those packets.
-            core_ctx.increment_both(device, |c| &c.version_rx.drop_for_tentative);
+            core_ctx.increment_both(device, |c| &c.drop_for_tentative);
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
         None => receive_ip_packet_action_common::<Ipv6, _, _, _>(
@@ -4700,5 +4726,40 @@ pub(crate) mod testutil {
         fn filter_handler(&mut self) -> Self::Handler<'_> {
             filter::testutil::NoopImpl::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn highest_priority_address_status_v4() {
+        // Prefer assigned addresses over tentative addresses.
+        assert_eq!(
+            choose_highest_priority_address_status::<Ipv4>(
+                [
+                    Ipv4PresentAddressStatus::UnicastAssigned,
+                    Ipv4PresentAddressStatus::UnicastTentative
+                ]
+                .into_iter()
+            ),
+            Some(Ipv4PresentAddressStatus::UnicastAssigned)
+        )
+    }
+
+    #[test]
+    fn highest_priority_address_status_v6() {
+        // Prefer assigned addresses over tentative addresses.
+        assert_eq!(
+            choose_highest_priority_address_status::<Ipv6>(
+                [
+                    Ipv6PresentAddressStatus::UnicastAssigned,
+                    Ipv6PresentAddressStatus::UnicastTentative
+                ]
+                .into_iter()
+            ),
+            Some(Ipv6PresentAddressStatus::UnicastAssigned)
+        )
     }
 }

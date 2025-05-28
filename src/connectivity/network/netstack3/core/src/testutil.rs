@@ -260,7 +260,8 @@ where
                 Ipv4PresentAddressStatus::LimitedBroadcast
                 | Ipv4PresentAddressStatus::SubnetBroadcast
                 | Ipv4PresentAddressStatus::LoopbackSubnet
-                | Ipv4PresentAddressStatus::Unicast => false,
+                | Ipv4PresentAddressStatus::UnicastAssigned
+                | Ipv4PresentAddressStatus::UnicastTentative => false,
             },
             |Wrap(v6)| match v6 {
                 Ipv6PresentAddressStatus::Multicast => true,

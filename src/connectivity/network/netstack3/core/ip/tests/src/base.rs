@@ -72,8 +72,8 @@ use netstack3_ip::testutil::IpCounterExpectations;
 use netstack3_ip::{
     self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
     FragmentTimerId, FragmentationCounters, InternalForwarding, IpDeviceIngressStateContext,
-    IpLayerTimerId, Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, Ipv6RxCounters, NextHop,
-    RawMetric, ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    IpLayerTimerId, Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, NextHop, RawMetric,
+    ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
 
 // Some helper functions
@@ -1432,7 +1432,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 1,
         dropped: 1,
         send_ip_packet: 1,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 1, ..Default::default() },
+        drop_for_tentative: 1,
         ..Default::default()
     }
     .assert_counters(&ctx.core_ctx(), &device);
@@ -1453,7 +1453,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 2,
         dropped: 1,
         send_ip_packet: 1,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 1, ..Default::default() },
+        drop_for_tentative: 1,
         dispatch_receive_ip_packet: 1,
         deliver_unicast: 1,
         ..Default::default()
@@ -1479,7 +1479,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 3,
         dropped: 2,
         send_ip_packet: 2,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 2, ..Default::default() },
+        drop_for_tentative: 2,
         dispatch_receive_ip_packet: 1,
         deliver_unicast: 1,
         ..Default::default()
@@ -1499,7 +1499,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 4,
         dropped: 2,
         send_ip_packet: 2,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 2, ..Default::default() },
+        drop_for_tentative: 2,
         dispatch_receive_ip_packet: 2,
         deliver_unicast: 2,
         ..Default::default()
@@ -1660,7 +1660,7 @@ fn test_receive_ip_packet_action() {
             v4_config.local_ip.get()
         ),
         ReceivePacketAction::Deliver {
-            address_status: Ipv4PresentAddressStatus::Unicast,
+            address_status: Ipv4PresentAddressStatus::UnicastAssigned,
             internal_forwarding: InternalForwarding::NotUsed
         }
     );
@@ -1681,7 +1681,7 @@ fn test_receive_ip_packet_action() {
     assert_eq!(
         receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.local_ip),
         ReceivePacketAction::Deliver {
-            address_status: Ipv4PresentAddressStatus::Unicast,
+            address_status: Ipv4PresentAddressStatus::UnicastAssigned,
             internal_forwarding: InternalForwarding::NotUsed
         }
     );
@@ -2391,7 +2391,7 @@ fn lookup_route_v6only(
     assert_eq!(result, expected_result);
 }
 
-#[test_case(net_ip_v4!("127.0.0.1"), Ipv4PresentAddressStatus::Unicast)]
+#[test_case(net_ip_v4!("127.0.0.1"), Ipv4PresentAddressStatus::UnicastAssigned)]
 #[test_case(net_ip_v4!("127.0.0.2"), Ipv4PresentAddressStatus::LoopbackSubnet)]
 #[test_case(net_ip_v4!("127.255.255.255"), Ipv4PresentAddressStatus::SubnetBroadcast)]
 fn loopback_assignment_state_v4(addr: Ipv4Addr, status: Ipv4PresentAddressStatus) {

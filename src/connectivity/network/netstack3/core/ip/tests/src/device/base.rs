@@ -9,16 +9,19 @@ use core::num::{NonZeroU16, NonZeroU8};
 use core::time::Duration;
 
 use assert_matches::assert_matches;
+use either::Either;
 use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac};
 use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet};
-use net_types::{LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness};
+use net_types::{LinkLocalAddr, SpecifiedAddr, UnicastAddr, Witness, ZonedAddr};
 use test_case::test_case;
 
 use netstack3_base::testutil::{
     assert_empty, FakeInstant, FakeTimerCtxExt, TestIpExt, WithFakeFrameContext,
 };
-use netstack3_base::{InstantContext as _, IpAddressId as _};
+use netstack3_base::{
+    FrameDestination, InstantContext as _, IpAddressId as _, IpDeviceAddr, LocalAddressError,
+};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, LoopbackCreationProperties,
     LoopbackDevice, MaxEthernetFrameSize,
@@ -42,9 +45,13 @@ use netstack3_ip::device::{
 };
 use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode, MldTimerId};
 use netstack3_ip::nud::{self, LinkResolutionResult};
+use netstack3_ip::testutil::IpCounterExpectations;
 use netstack3_ip::{
     AddableEntry, AddableEntryEither, AddableMetric, ResolveRouteError, RouteResolveOptions,
 };
+use packet::{Buf, Serializer};
+use packet_formats::ip::IpProto;
+use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::testutil::ArpPacketInfo;
 use packet_formats::utils::NonZeroDuration;
 
@@ -999,10 +1006,42 @@ fn notify_on_dad_failure_ipv4(case: Ipv4DadFailureTestCase, expect_conflict: boo
     let _ = ctx.bindings_ctx.take_events();
 }
 
-/// Verify that the Source Address Selection algorithm won't select an IPv4
-/// address until it becomes assigned.
-#[test]
-fn ipv4_sas_ignores_tentative_addresses() {
+fn receive_ipv4_packet(ctx: &mut FakeCtx, device_id: &DeviceId<FakeBindingsCtx>) {
+    let buf = Buf::new(vec![0; 10], ..)
+        .encapsulate(Ipv4PacketBuilder::new(
+            Ipv4::TEST_ADDRS.remote_ip,
+            Ipv4::TEST_ADDRS.local_ip,
+            64,
+            IpProto::Udp.into(),
+        ))
+        .serialize_vec_outer()
+        .unwrap()
+        .into_inner();
+
+    ctx.test_api().receive_ip_packet::<Ipv4, _>(
+        &device_id,
+        Some(FrameDestination::Individual { local: true }),
+        buf,
+    );
+}
+
+enum Ipv4TentativeAddrTestCase {
+    /// Source Address Selection should ignore tentative addresses.
+    SourceAddressSelection,
+    /// Resolving routes with the tentative address should fail.
+    ResolveRoute,
+    /// Received IPv4 packets destined to tentative addresses should be dropped.
+    ReceivePacket,
+    /// Sockets should fail to listen on tentative addresses.
+    SocketListen,
+}
+
+/// Verify that an IPv4 address isn't used while tentative.
+#[test_case(Ipv4TentativeAddrTestCase::SourceAddressSelection; "source_address_selection")]
+#[test_case(Ipv4TentativeAddrTestCase::ResolveRoute; "resolve_route")]
+#[test_case(Ipv4TentativeAddrTestCase::ReceivePacket; "receive_packet")]
+#[test_case(Ipv4TentativeAddrTestCase::SocketListen; "socket_listen")]
+fn ipv4_ignores_tentative_addresses(case: Ipv4TentativeAddrTestCase) {
     let mut ctx = FakeCtx::new_with_builder(StackStateBuilder::default());
 
     // Install a device.
@@ -1043,18 +1082,24 @@ fn ipv4_sas_ignores_tentative_addresses() {
         })]
     );
 
-    // Add a default route via the device. Later we use route resolution to
-    // verify source address selection.
-    ctx.test_api()
-        .add_route(AddableEntryEither::from(AddableEntry::without_gateway(
-            Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
-            device_id.clone(),
-            AddableMetric::MetricTracksInterface,
-        )))
-        .expect("add default route should succeed");
+    // Run setup code based on the test case.
+    match case {
+        Ipv4TentativeAddrTestCase::SourceAddressSelection
+        | Ipv4TentativeAddrTestCase::ResolveRoute => {
+            // Add a default route via the device.
+            ctx.test_api()
+                .add_route(AddableEntryEither::from(AddableEntry::without_gateway(
+                    Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
+                    device_id.clone(),
+                    AddableMetric::MetricTracksInterface,
+                )))
+                .expect("add default route should succeed");
+        }
+        Ipv4TentativeAddrTestCase::ReceivePacket | Ipv4TentativeAddrTestCase::SocketListen => {}
+    }
 
     // Add the address, and assert that it's tentative.
-    let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
+    let ipv4_addr_subnet = AddrSubnet::new(Ipv4::TEST_ADDRS.local_ip.get(), 24).unwrap();
     let config = Ipv4AddrConfig {
         config: CommonAddressConfig { should_perform_dad: Some(true) },
         ..Default::default()
@@ -1075,11 +1120,47 @@ fn ipv4_sas_ignores_tentative_addresses() {
         })]
     );
 
-    // Verify that Source Address Selection fails on the device.
-    assert_matches!(
-        ctx.core_api().routes::<Ipv4>().resolve_route(None, &RouteResolveOptions::default()),
-        Err(ResolveRouteError::NoSrcAddr)
-    );
+    // Verify the tentative address is ignored for each test case.
+    match case {
+        Ipv4TentativeAddrTestCase::SourceAddressSelection => {
+            // Route lookup should fail. `resolve_route` will use SAS to select
+            // the source address for traffic using this route.
+            assert_matches!(
+                ctx.core_api()
+                    .routes::<Ipv4>()
+                    .resolve_route(None, &RouteResolveOptions::default()),
+                Err(ResolveRouteError::NoSrcAddr)
+            );
+        }
+        Ipv4TentativeAddrTestCase::ResolveRoute => {
+            // Route lookup should fail. `resolve_route_with_src_addr` skips SAS
+            // because we've provided the source address we'd like to use.
+            let src_ip = IpDeviceAddr::new(ipv4_addr_subnet.addr().get()).unwrap();
+            assert_matches!(
+                ctx.test_api().resolve_route_with_src_addr::<Ipv4>(src_ip, None),
+                Err(ResolveRouteError::NoSrcAddr)
+            );
+        }
+        Ipv4TentativeAddrTestCase::ReceivePacket => {
+            // Received packets should be dropped.
+            receive_ipv4_packet(&mut ctx, &device_id);
+            IpCounterExpectations::<Ipv4> {
+                receive_ip_packet: 1,
+                dropped: 1,
+                drop_for_tentative: 1,
+                ..Default::default()
+            }
+            .assert_counters(&ctx.core_ctx(), &device_id);
+        }
+        Ipv4TentativeAddrTestCase::SocketListen => {
+            // Sockets should be unable to listen.
+            let sock = ctx.core_api().udp::<Ipv4>().create();
+            let addr = ZonedAddr::new(ipv4_addr_subnet.addr(), None)
+                .expect("ipv4 addresses don't have zones");
+            let result = ctx.core_api().udp::<Ipv4>().listen(&sock, Some(addr), None);
+            assert_matches!(result, Err(Either::Right(LocalAddressError::CannotBindToAddress)));
+        }
+    }
 
     // Trigger the DAD timer and verify the address becomes assigned.
     let expected_timer_id = TimerId::from(
@@ -1111,11 +1192,49 @@ fn ipv4_sas_ignores_tentative_addresses() {
         })]
     );
 
-    // Verify that Source Address Selection now succeeds on the device.
-    assert_matches!(
-        ctx.core_api().routes::<Ipv4>().resolve_route(None, &RouteResolveOptions::default()),
-        Ok(_)
-    );
+    // Verify the address is no longer ignored, now that it's assigned.
+    match case {
+        Ipv4TentativeAddrTestCase::SourceAddressSelection => {
+            // Route lookup (with SAS) should succeed.
+            assert_matches!(
+                ctx.core_api()
+                    .routes::<Ipv4>()
+                    .resolve_route(None, &RouteResolveOptions::default()),
+                Ok(_)
+            );
+        }
+        Ipv4TentativeAddrTestCase::ResolveRoute => {
+            // Route lookup (without SAS) should succeed.
+            let src_ip = IpDeviceAddr::new(ipv4_addr_subnet.addr().get()).unwrap();
+            assert_matches!(
+                ctx.test_api().resolve_route_with_src_addr::<Ipv4>(src_ip, None),
+                Ok(_)
+            );
+        }
+        Ipv4TentativeAddrTestCase::ReceivePacket => {
+            // Received packets should be dispatched.
+            receive_ipv4_packet(&mut ctx, &device_id);
+            IpCounterExpectations::<Ipv4> {
+                receive_ip_packet: 2,
+                deliver_unicast: 1,
+                dispatch_receive_ip_packet: 1,
+                dropped: 1,
+                drop_for_tentative: 1,
+                ..Default::default()
+            }
+            .assert_counters(&ctx.core_ctx(), &device_id);
+        }
+        Ipv4TentativeAddrTestCase::SocketListen => {
+            // Sockets should be able to listen.
+            let sock = ctx.core_api().udp::<Ipv4>().create();
+            let addr = ZonedAddr::new(ipv4_addr_subnet.addr(), None)
+                .expect("ipv4 addresses don't have zones");
+            ctx.core_api()
+                .udp::<Ipv4>()
+                .listen(&sock, Some(addr), None)
+                .expect("listen should succeed");
+        }
+    }
 
     // Disable device and take all events to cleanup references.
     assert_eq!(ctx.test_api().set_ip_device_enabled::<Ipv4>(&device_id, false), true);
