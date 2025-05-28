@@ -21,6 +21,7 @@ standardized_test_groups("tests") {
     "//src/lib/assembly/domain_config:domain_config_test",
     "//src/lib/assembly/driver_manifest:driver_manifest_test",
     "//src/lib/assembly/image_assembly_config:image_assembly_config_test",
+    "//src/lib/assembly/image_assembly_config_builder:image_assembly_config_builder_test",
     "//src/lib/assembly/file_relative_path:file_relative_path_derive_test",
     "//src/lib/assembly/file_relative_path:file_relative_path_test",
     "//src/lib/assembly/fvm:fvm_test",

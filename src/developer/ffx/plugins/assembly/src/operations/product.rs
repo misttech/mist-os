@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
@@ -18,9 +17,8 @@ use assembly_util::read_config;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use fuchsia_pkg::PackageManifest;
+use image_assembly_config_builder::ImageAssemblyConfigBuilder;
 use log::info;
-
-mod assembly_builder;
 
 pub fn assemble(args: ProductArgs) -> Result<()> {
     let ProductArgs {

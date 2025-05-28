@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use ffx_assembly_args::*;
 use ffx_writer::SimpleWriter;
 use fho::{FfxMain, FfxTool, Result};
-mod compiled_package;
 mod operations;
 mod subpackage_blobs_package;
 use assembly_components as _;

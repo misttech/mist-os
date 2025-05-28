@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::compiled_package::CompiledPackageBuilder;
+
 use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_data::ConfigDataBuilder;
 use assembly_config_schema::assembly_config::{
@@ -1483,6 +1484,7 @@ impl std::fmt::Display for BootfsValidationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use assembly_config_schema::assembly_config::CompiledComponentDefinition;
     use assembly_config_schema::developer_overrides::KernelOptions;
     use assembly_constants::CompiledPackageDestination;
