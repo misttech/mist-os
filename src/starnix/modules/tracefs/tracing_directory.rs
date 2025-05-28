@@ -55,14 +55,24 @@ impl FileOps for TraceMarkerFile {
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let bytes = data.read_all()?;
-        if let Some(atrace_event) = ATraceEvent::parse(&String::from_utf8_lossy(&bytes)) {
+        let mut bytes = data.read_all()?;
+        // The TraceEvent struct appends a new line to the trace data unconditionally, so
+        // remove the trailing newline if here to avoid generating empty events when reading.
+        if bytes.ends_with(&['\n' as u8]) {
+            bytes.truncate(bytes.len() - 1);
+        }
+        let input_data = String::from_utf8_lossy(&bytes);
+        if let Some(atrace_event) = ATraceEvent::parse(&input_data) {
             if self.queue.is_enabled() {
                 let timestamp = zx::BootInstant::get();
                 let trace_event = TraceEvent::new(
                     self.queue.prev_timestamp(),
                     timestamp,
-                    current_task.get_pid(),
+                    // This pid is a Kernel pid (do not confuse with userspace pid aka tgid), so we use
+                    // the task thread id, the pid and tid are equal when the thread is the "main thread"
+                    // of the thread group/process.
+                    // It is used when CPU scheduling information is not available.
+                    current_task.get_tid(),
                     &bytes,
                 );
                 self.queue.push_event(trace_event, timestamp)?;
@@ -175,7 +185,7 @@ impl<'a> ATraceEvent<'a> {
     // function returns an Option rather than a Result. If we did return a Result, this could be
     // put in a TryFrom impl, if desired.
     fn parse(s: &'a str) -> Option<Self> {
-        let mut chunks = s.split('|');
+        let mut chunks = s.trim().split('|');
         let event_type = chunks.next()?;
 
         // event_type matches the systrace phase. See systrace_parser.h in perfetto.
