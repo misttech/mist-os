@@ -77,7 +77,7 @@ impl AssembledSystem {
             partitions_config: image_assembly_config
                 .partitions_config
                 .as_ref()
-                .map(|p| DirectoryPathBuf(p.clone())),
+                .map(|p| DirectoryPathBuf::new(p.clone())),
         };
 
         let base_package_name =

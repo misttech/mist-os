@@ -39,7 +39,7 @@ impl ProductAssembly {
         let builder = ImageAssemblyConfigBuilder::new(
             product_config.platform.build_type,
             board_config.name.clone(),
-            board_config.partitions_config.clone().map(|p| p.0),
+            board_config.partitions_config.as_ref().map(|p| p.as_utf8_path_buf().clone()),
             image_mode,
             product_config.platform.feature_set_level,
         );

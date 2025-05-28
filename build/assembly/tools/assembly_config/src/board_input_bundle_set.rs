@@ -16,7 +16,7 @@ pub fn new(args: &BoardInputBundleSetArgs) -> Result<()> {
         .iter()
         .map(|path| {
             let bib = BoardInputBundle::from_dir(&path)?;
-            let directory = DirectoryPathBuf(path.clone());
+            let directory = DirectoryPathBuf::new(path.clone());
             let entry = BoardInputBundleEntry { path: directory };
             Ok((bib.name, entry))
         })

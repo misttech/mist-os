@@ -319,7 +319,7 @@ where
 /// A path to a directory that should be copied wholesale inside an
 /// AssemblyContainer.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, Hash)]
-pub struct DirectoryPathBuf(pub Utf8PathBuf);
+pub struct DirectoryPathBuf(Utf8PathBuf);
 
 impl WalkPaths for DirectoryPathBuf {
     fn walk_paths_with_dest<F: WalkPathsFn>(
@@ -334,6 +334,18 @@ impl WalkPaths for DirectoryPathBuf {
 impl std::fmt::Display for DirectoryPathBuf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl DirectoryPathBuf {
+    /// Construct a new DirectoryPathBuf from a Utf8PathBuf.
+    pub fn new(path: Utf8PathBuf) -> Self {
+        Self(path)
+    }
+
+    /// Get the inner Utf8PathBuf.
+    pub fn as_utf8_path_buf(&self) -> &Utf8PathBuf {
+        &self.0
     }
 }
 

@@ -62,7 +62,7 @@ impl FfxMain for ProductCreateTool {
 }
 
 fn partitions_from_system<'a>(system: Option<&'a AssembledSystem>) -> Option<&'a Utf8PathBuf> {
-    system.map(|a| a.partitions_config.as_ref().map(|p| &p.0)).flatten()
+    system.map(|a| a.partitions_config.as_ref().map(|p| p.as_utf8_path_buf())).flatten()
 }
 
 /// Create a product bundle using the provided sdk.

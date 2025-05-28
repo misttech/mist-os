@@ -17,11 +17,11 @@ pub fn new(args: &BoardArgs) -> Result<()> {
         let _ = PartitionsConfig::from_dir(partitions_config)
             .context("Validating partitions config")?;
     }
-    config.partitions_config = args.partitions_config.clone().map(|p| DirectoryPathBuf(p));
+    config.partitions_config = args.partitions_config.clone().map(DirectoryPathBuf::new);
 
     for (i, board_input_bundle) in args.board_input_bundles.iter().enumerate() {
         let key = format!("tmp{}", i);
-        let directory = DirectoryPathBuf(board_input_bundle.clone());
+        let directory = DirectoryPathBuf::new(board_input_bundle.clone());
         config.input_bundles.insert(key, directory);
     }
 
@@ -102,7 +102,7 @@ pub fn hybrid(args: &HybridBoardArgs) -> Result<()> {
 
     // Replace the partitions config.
     if let Some(partitions_config) = &args.replace_partitions_config {
-        config.partitions_config = Some(DirectoryPathBuf(partitions_config.clone()));
+        config.partitions_config = Some(DirectoryPathBuf::new(partitions_config.clone()));
     }
 
     config.write_to_dir(&args.output, args.depfile.as_ref())?;
@@ -182,7 +182,7 @@ mod tests {
             name: "my_bib_set".to_string(),
             board_input_bundles: [(
                 "my_bib".to_string(),
-                BoardInputBundleEntry { path: DirectoryPathBuf(bib_path) },
+                BoardInputBundleEntry { path: DirectoryPathBuf::new(bib_path) },
             )]
             .into(),
             release_version: None,
@@ -241,7 +241,7 @@ mod tests {
             name: "my_bib_set".to_string(),
             board_input_bundles: [(
                 "my_bib".to_string(),
-                BoardInputBundleEntry { path: DirectoryPathBuf(bib_path) },
+                BoardInputBundleEntry { path: DirectoryPathBuf::new(bib_path) },
             )]
             .into(),
             release_version: None,
@@ -389,7 +389,8 @@ mod tests {
             devicetree: Default::default(),
             devicetree_overlay: Default::default(),
             filesystems: Default::default(),
-            input_bundles: [("my_bib_set::my_bib".to_string(), DirectoryPathBuf(bib_path))].into(),
+            input_bundles: [("my_bib_set::my_bib".to_string(), DirectoryPathBuf::new(bib_path))]
+                .into(),
             configuration: Default::default(),
             kernel: Default::default(),
             platform: Default::default(),
@@ -413,7 +414,7 @@ mod tests {
             name: "my_bib_set".to_string(),
             board_input_bundles: [(
                 "my_bib".to_string(),
-                BoardInputBundleEntry { path: DirectoryPathBuf(new_bib_path) },
+                BoardInputBundleEntry { path: DirectoryPathBuf::new(new_bib_path) },
             )]
             .into(),
             release_version: None,
@@ -451,7 +452,7 @@ mod tests {
         assert_eq!(expected, bib.kernel_boot_args);
 
         // Ensure the board contains the correct partitions config.
-        let new_partitions_path = board.partitions_config.unwrap().0;
+        let new_partitions_path = board.partitions_config.unwrap().as_utf8_path_buf().clone();
         let new_partitions = PartitionsConfig::from_dir(new_partitions_path).unwrap();
         assert_eq!(partitions, new_partitions.partitions);
     }
