@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::base_package::BasePackage;
+use crate::BlobfsContents;
 
 use anyhow::{Context, Result};
-use assembled_system::BlobfsContents;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_fxfs::FxfsBuilder;
 use assembly_images_config::Fxfs;
@@ -29,8 +29,10 @@ pub async fn construct_fxfs(
     base_package: &BasePackage,
     fxfs_config: &Fxfs,
 ) -> Result<ConstructedFxfs> {
-    let mut contents = BlobfsContents::default();
-    contents.maximum_contents_size = fxfs_config.maximum_contents_size;
+    let mut contents = BlobfsContents {
+        maximum_contents_size: fxfs_config.maximum_contents_size,
+        ..Default::default()
+    };
     let mut fxfs_builder = FxfsBuilder::new();
     if let Some(size) = fxfs_config.size_bytes {
         fxfs_builder.set_size(size);
@@ -79,7 +81,7 @@ pub async fn construct_fxfs(
 mod tests {
     use super::{construct_fxfs, ConstructedFxfs};
     use crate::base_package::construct_base_package;
-    use assembled_system::AssembledSystem;
+    use crate::AssembledSystem;
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_images_config::Fxfs;
     use camino::{Utf8Path, Utf8PathBuf};

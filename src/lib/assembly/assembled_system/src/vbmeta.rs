@@ -2,16 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! A helper for constructing the vbmeta image.
+
 use crate::extra_hash_descriptor::ExtraHashDescriptor;
 use crate::vfs::{FilesystemProvider, RealFilesystemProvider};
+use crate::{AssembledSystem, Image};
 use anyhow::{Context, Result};
-use assembled_system::{AssembledSystem, Image};
 use assembly_images_config::{VBMeta, VBMetaDescriptor};
 use camino::{Utf8Path, Utf8PathBuf};
 use std::path::Path;
 use utf8_path::path_relative_from_current_dir;
 use vbmeta::{HashDescriptor, Key, Salt, VBMeta as VBMetaImage};
 
+/// Construct the vbmeta image.
 pub fn construct_vbmeta(
     assembled_system: &mut AssembledSystem,
     outdir: impl AsRef<Utf8Path>,
@@ -44,7 +47,7 @@ pub fn construct_vbmeta(
 }
 
 #[allow(clippy::ptr_arg)]
-pub fn sign<FSP: FilesystemProvider>(
+fn sign<FSP: FilesystemProvider>(
     name: impl AsRef<str>,
     image_path: impl AsRef<Path>,
     key: impl AsRef<Path>,
@@ -95,14 +98,14 @@ pub fn sign<FSP: FilesystemProvider>(
 mod tests {
     use super::{construct_vbmeta, sign};
 
+    use crate::vbmeta::{Key, Salt};
     use crate::vfs::mock::MockFilesystemProvider;
+    use crate::AssembledSystem;
 
-    use assembled_system::AssembledSystem;
     use assembly_images_config::VBMeta;
     use camino::Utf8Path;
     use tempfile::tempdir;
     use utf8_path::path_relative_from_current_dir;
-    use vbmeta::{Key, Salt};
 
     #[test]
     fn construct() {

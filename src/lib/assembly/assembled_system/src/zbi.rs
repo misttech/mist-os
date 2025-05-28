@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::base_package::BasePackage;
+use crate::{AssembledSystem, Image};
 
 use anyhow::{anyhow, Context, Result};
-use assembled_system::{AssembledSystem, Image};
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_constants::BootfsDestination;
 use assembly_images_config::Zbi;
@@ -185,7 +185,8 @@ mod tests {
     use super::{construct_zbi, vendor_sign_zbi};
 
     use crate::base_package::BasePackage;
-    use assembled_system::AssembledSystem;
+    use crate::AssembledSystem;
+
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_constants::BootfsDestination;
     use assembly_file_relative_path::FileRelativePathBuf;

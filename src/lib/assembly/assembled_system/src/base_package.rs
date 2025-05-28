@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{AssembledSystem, Image};
+
 use anyhow::{Context, Result};
-use assembled_system::{AssembledSystem, Image};
 use assembly_base_package::BasePackageBuilder;
 use assembly_config_schema::ImageAssemblyConfig;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -28,7 +29,7 @@ pub fn construct_base_package(
 ) -> Result<BasePackage> {
     let gendir = gendir.as_ref();
     if !gendir.exists() {
-        std::fs::create_dir_all(&gendir)?;
+        std::fs::create_dir_all(gendir)?;
     }
 
     let mut base_pkg_builder = BasePackageBuilder::default();
@@ -53,7 +54,7 @@ pub fn construct_base_package(
 
     let base_package_path = gendir.join("meta.far");
     let build_results = base_pkg_builder
-        .build(&gendir, name, &base_package_path)
+        .build(gendir, name, &base_package_path)
         .context("Failed to build the base package")?;
 
     let base_package = File::open(&base_package_path).context("Failed to open the base package")?;

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::base_package::BasePackage;
+use crate::BlobfsContents;
 
 use anyhow::{Context, Result};
-use assembled_system::BlobfsContents;
 use assembly_blobfs::BlobFSBuilder;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_images_config::BlobFS;
