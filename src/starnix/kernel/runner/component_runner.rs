@@ -372,7 +372,7 @@ async fn serve_component_controller(
 
 /// Returns /container/component/{random} that doesn't already exist
 fn generate_component_path<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     system_task: &CurrentTask,
 ) -> Result<String, Error>
 where
@@ -464,7 +464,7 @@ impl MountRecord {
 
     fn mount_remote<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,

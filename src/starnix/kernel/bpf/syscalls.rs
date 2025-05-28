@@ -135,7 +135,7 @@ fn map_error_to_errno(e: MapError) -> Errno {
 }
 
 pub fn sys_bpf(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     cmd: bpf_cmd,
     attr_addr: UserAddress,

@@ -86,7 +86,7 @@ impl ProcessGroup {
 
     ordered_state_accessor!(ProcessGroup, mutable_state, ProcessGroupState);
 
-    pub fn insert<L>(&self, locked: &mut Locked<'_, L>, thread_group: &ThreadGroup)
+    pub fn insert<L>(&self, locked: &mut Locked<L>, thread_group: &ThreadGroup)
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -96,14 +96,14 @@ impl ProcessGroup {
     }
 
     /// Removes the thread group from the process group. Returns whether the process group is empty.
-    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, thread_group: &ThreadGroup) -> bool
+    pub fn remove<L>(&self, locked: &mut Locked<L>, thread_group: &ThreadGroup) -> bool
     where
         L: LockBefore<ProcessGroupState>,
     {
         self.write(locked).remove(thread_group)
     }
 
-    pub fn send_signals<L>(&self, locked: &mut Locked<'_, L>, signals: &[Signal])
+    pub fn send_signals<L>(&self, locked: &mut Locked<L>, signals: &[Signal])
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -114,7 +114,7 @@ impl ProcessGroup {
 
     /// Check whether the process group became orphaned. If this is the case, send signals to its
     /// members if at least one is stopped.
-    pub fn check_orphaned<L>(&self, locked: &mut Locked<'_, L>)
+    pub fn check_orphaned<L>(&self, locked: &mut Locked<L>)
     where
         L: LockBefore<ProcessGroupState>,
     {

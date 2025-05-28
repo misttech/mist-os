@@ -19,7 +19,7 @@ use starnix_uapi::open_flags::OpenFlags;
 const FILE_MODE: FileMode = mode!(IFREG, 0o644);
 
 fn netstack_devices_readdir(
-    _locked: &mut Locked<'_, FileOpsCore>,
+    _locked: &mut Locked<FileOpsCore>,
     file: &FileObject,
     current_task: &CurrentTask,
     sink: &mut dyn DirentSink,
@@ -80,7 +80,7 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -90,7 +90,7 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -120,7 +120,7 @@ impl FileOps for ProcSysNetIpv4Conf {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -137,7 +137,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -147,7 +147,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -204,7 +204,7 @@ impl FileOps for ProcSysNetIpv4Neigh {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -221,7 +221,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -231,7 +231,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -387,7 +387,7 @@ impl FileOps for ProcSysNetIpv6Conf {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -404,7 +404,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -414,7 +414,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -471,7 +471,7 @@ impl FileOps for ProcSysNetIpv6Neigh {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,

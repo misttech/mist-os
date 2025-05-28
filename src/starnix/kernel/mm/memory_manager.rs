@@ -3465,7 +3465,7 @@ impl MemoryManager {
 
     pub fn snapshot_to<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         target: &Arc<MemoryManager>,
     ) -> Result<(), Errno>
     where
@@ -5688,7 +5688,7 @@ mod tests {
     }
 
     fn map_memory_growsdown<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         length: u64,
     ) -> UserAddress

@@ -145,7 +145,7 @@ impl Deref for BinderDevice {
 impl DeviceOps for BinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -199,7 +199,7 @@ impl FileOps for BinderConnection {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -208,7 +208,7 @@ impl FileOps for BinderConnection {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -235,7 +235,7 @@ impl FileOps for BinderConnection {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -269,7 +269,7 @@ impl FileOps for BinderConnection {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -283,7 +283,7 @@ impl FileOps for BinderConnection {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -294,7 +294,7 @@ impl FileOps for BinderConnection {
 
     fn mmap(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -320,7 +320,7 @@ impl FileOps for BinderConnection {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -332,7 +332,7 @@ impl FileOps for BinderConnection {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -344,7 +344,7 @@ impl FileOps for BinderConnection {
 
     fn flush(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -377,7 +377,7 @@ impl RemoteBinderConnection {
 
     pub fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -3173,7 +3173,7 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno>;
     fn add_files_with_flags(
         &self,
-        locked: &mut Locked<'_, ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorAddFile>,
         current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3376,7 +3376,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<'_, ResourceAccessorAddFile>,
+        _locked: &mut Locked<ResourceAccessorAddFile>,
         current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3443,7 +3443,7 @@ impl ResourceAccessor for CurrentTask {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<'_, ResourceAccessorAddFile>,
+        _locked: &mut Locked<ResourceAccessorAddFile>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3489,7 +3489,7 @@ impl ResourceAccessor for Task {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<'_, ResourceAccessorAddFile>,
+        _locked: &mut Locked<ResourceAccessorAddFile>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3527,7 +3527,7 @@ pub struct BinderDriver {
 }
 
 impl Releasable for BinderDriver {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
 
     fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         let (_locked, current_task) = context;
@@ -3660,7 +3660,7 @@ impl BinderDriver {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         request: u32,
@@ -3920,7 +3920,7 @@ impl BinderDriver {
     /// This method will never block.
     fn handle_thread_write<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
@@ -4056,7 +4056,7 @@ impl BinderDriver {
     /// A binder thread is starting a transaction on a remote binder object.
     fn handle_transaction<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
@@ -4256,7 +4256,7 @@ impl BinderDriver {
     /// A binder thread is sending a reply to a transaction.
     fn handle_reply<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
         binder_thread: &BinderThread,
@@ -4486,7 +4486,7 @@ impl BinderDriver {
     /// If `security_context` is present, it must be null terminated.
     fn copy_transaction_buffers<'a, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &BinderProcess,
@@ -4556,7 +4556,7 @@ impl BinderDriver {
 
     /// Translates file descriptors from the sending process to the receiving process.
     fn translate_files<'a, L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
         target_resource_accessor: &'a dyn ResourceAccessor,
@@ -4595,7 +4595,7 @@ impl BinderDriver {
     /// `BC_FREE_BUFFER` command.
     fn translate_objects<'a, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &BinderProcess,
@@ -5180,7 +5180,7 @@ pub struct BinderFs;
 impl FileSystemOps for BinderFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -5200,7 +5200,7 @@ struct BinderFsDir {
 }
 
 impl BinderFsDir {
-    fn new(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) -> Result<Self, Errno> {
+    fn new(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) -> Result<Self, Errno> {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let mut devices = BTreeMap::<FsString, DeviceType>::default();
@@ -5232,7 +5232,7 @@ impl FsNodeOps for BinderFsDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -5256,7 +5256,7 @@ impl FsNodeOps for BinderFsDir {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -5280,7 +5280,7 @@ impl FsNodeOps for BinderFsDir {
 
 impl BinderFs {
     pub fn new_fs(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -5306,7 +5306,7 @@ impl FsNodeOps for BinderFeaturesDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -5325,7 +5325,7 @@ impl FsNodeOps for BinderFeaturesDir {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -5387,7 +5387,7 @@ pub mod tests {
         }
         fn add_files_with_flags(
             &self,
-            locked: &mut Locked<'_, ResourceAccessorAddFile>,
+            locked: &mut Locked<ResourceAccessorAddFile>,
             current_task: &CurrentTask,
             files: Vec<(FileHandle, FdFlags)>,
             add_action: &mut dyn FnMut(FdNumber),
@@ -5409,7 +5409,7 @@ pub mod tests {
 
     impl BinderProcessFixture {
         fn new(
-            locked: &mut Locked<'_, Unlocked>,
+            locked: &mut Locked<Unlocked>,
             current_task: &CurrentTask,
             device: &BinderDevice,
         ) -> Self {
@@ -5427,7 +5427,7 @@ pub mod tests {
         }
 
         fn new_current(
-            _locked: &mut Locked<'_, Unlocked>,
+            _locked: &mut Locked<Unlocked>,
             current_task: &CurrentTask,
             device: &BinderDevice,
         ) -> Self {
@@ -7856,7 +7856,7 @@ pub mod tests {
     // Open the binder device, which creates an instance of the binder device associated with
     // the process.
     fn open_binder_fd(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         binder_driver: &BinderDevice,
     ) -> FileHandle {

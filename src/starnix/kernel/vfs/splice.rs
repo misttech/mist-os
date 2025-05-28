@@ -67,7 +67,7 @@ impl CopyOperand {
 }
 
 fn copy_data(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     operand_in: CopyOperand,
     operand_out: CopyOperand,
@@ -76,7 +76,7 @@ fn copy_data(
     let mut remaining = length;
     let mut transferred = 0;
 
-    let read = |locked: &mut Locked<'_, Unlocked>, progress: usize, data: &mut VecOutputBuffer| {
+    let read = |locked: &mut Locked<Unlocked>, progress: usize, data: &mut VecOutputBuffer| {
         if let Some(offset) = operand_in.maybe_offset {
             operand_in.file.read_at(locked, current_task, offset + progress, data)
         } else {
@@ -84,7 +84,7 @@ fn copy_data(
         }
     };
 
-    let write = |locked: &mut Locked<'_, Unlocked>, progress: usize, data: &mut VecInputBuffer| {
+    let write = |locked: &mut Locked<Unlocked>, progress: usize, data: &mut VecInputBuffer| {
         if let Some(offset) = operand_out.maybe_offset {
             operand_out.file.write_at(locked, current_task, offset + progress, data)
         } else {
@@ -129,7 +129,7 @@ fn copy_data(
 }
 
 pub fn sendfile(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd_out: FdNumber,
     fd_in: FdNumber,
@@ -168,7 +168,7 @@ pub fn sendfile(
 }
 
 pub fn splice(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     off_in: OffsetPtr,
@@ -249,7 +249,7 @@ pub fn splice(
 }
 
 pub fn vmsplice(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -286,7 +286,7 @@ pub fn vmsplice(
 }
 
 pub fn copy_file_range(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     user_offset_in: OffsetPtr,
@@ -341,7 +341,7 @@ pub fn copy_file_range(
 }
 
 pub fn tee<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     fd_out: FdNumber,

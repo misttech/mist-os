@@ -26,7 +26,7 @@ use zerocopy::FromBytes;
 pub type BpfAttachAttr = bpf_attr__bindgen_ty_6;
 
 fn check_root_cgroup_fd(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     cgroup_fd: FdNumber,
 ) -> Result<(), Errno> {
@@ -58,7 +58,7 @@ fn check_root_cgroup_fd(
 }
 
 pub fn bpf_prog_attach(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     attr: BpfAttachAttr,
 ) -> Result<SyscallResult, Errno> {
@@ -105,7 +105,7 @@ pub fn bpf_prog_attach(
 }
 
 pub fn bpf_prog_detach(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     attr: BpfAttachAttr,
 ) -> Result<SyscallResult, Errno> {
@@ -211,7 +211,7 @@ impl CgroupEbpfProgramSet {
 
     pub fn run_sock_addr_prog(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         op: SockAddrOp,
         domain: SocketDomain,
         socket_type: SocketType,
@@ -386,7 +386,7 @@ impl EbpfAttachments {
 
     fn attach_prog(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         attach_type: AttachType,
         target_fd: FdNumber,
@@ -416,7 +416,7 @@ impl EbpfAttachments {
 
     fn detach_prog(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         attach_type: AttachType,
         target_fd: FdNumber,

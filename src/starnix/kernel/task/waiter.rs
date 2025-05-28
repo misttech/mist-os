@@ -491,7 +491,7 @@ impl PortWaiter {
 
     fn wait_until<L>(
         self: &Arc<Self>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         run_state: RunState,
         deadline: zx::MonotonicInstant,
@@ -668,7 +668,7 @@ impl Waiter {
     /// Freeze the task until the waiter is woken up.
     ///
     /// No signal, e.g. EINTR (interrupt), should be received.
-    pub fn freeze<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+    pub fn freeze<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -691,7 +691,7 @@ impl Waiter {
     /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
     pub fn wait<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), Errno>
     where
@@ -729,7 +729,7 @@ impl Waiter {
     /// [`EventHandler::EnqueueOnce`]).
     pub fn wait_until<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno>
@@ -1332,7 +1332,7 @@ mod tests {
             queue.wait_async(w);
         });
 
-        let woken = |locked: &mut Locked<'_, Unlocked>| {
+        let woken = |locked: &mut Locked<Unlocked>| {
             waiters
                 .iter()
                 .filter(|w| w.wait_until(locked, &current_task, zx::MonotonicInstant::ZERO).is_ok())

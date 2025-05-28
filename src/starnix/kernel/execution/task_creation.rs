@@ -44,7 +44,7 @@ impl Releasable for TaskInfo {
 }
 
 pub fn create_zircon_process<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     parent: Option<ThreadGroupWriteGuard<'_>>,
     pid: pid_t,
@@ -143,7 +143,7 @@ fn create_shared(
 ///
 /// This function creates an underlying Zircon process to host the new task.
 pub fn create_init_child_process<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     initial_name: &CString,
     seclabel: Option<&CString>,
@@ -218,7 +218,7 @@ where
 /// pass the `pid` as an argument to clarify that it's the callers responsibility to determine
 /// the pid for the process.
 pub fn create_init_process<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     pid: pid_t,
     initial_name: CString,
@@ -270,7 +270,7 @@ where
 /// Rather than calling this function directly, consider using `kthreads`, which provides both
 /// a system task and a threadpool on which the task can do work.
 pub fn create_system_task<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     fs: Arc<FsContext>,
 ) -> Result<CurrentTask, Errno>
@@ -303,7 +303,7 @@ where
 }
 
 pub fn create_task<F, L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     initial_name: CString,
     root_fs: Arc<FsContext>,
@@ -311,7 +311,7 @@ pub fn create_task<F, L>(
     security_state: security::TaskState,
 ) -> Result<TaskBuilder, Errno>
 where
-    F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
+    F: FnOnce(&mut Locked<L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
     L: LockBefore<TaskRelease>,
     L: LockBefore<ProcessGroupState>,
 {
@@ -332,7 +332,7 @@ where
 }
 
 fn create_task_with_pid<F, L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     mut pids: RwLockWriteGuard<'_, PidTable>,
     pid: pid_t,
@@ -344,7 +344,7 @@ fn create_task_with_pid<F, L>(
     security_state: security::TaskState,
 ) -> Result<TaskBuilder, Errno>
 where
-    F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
+    F: FnOnce(&mut Locked<L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
     L: LockBefore<TaskRelease>,
     L: LockBefore<ProcessGroupState>,
 {
@@ -411,7 +411,7 @@ where
 ///
 /// There is no underlying Zircon thread to host the task.
 pub fn create_kernel_thread<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     system_task: &Task,
     initial_name: CString,
 ) -> Result<CurrentTask, Errno>

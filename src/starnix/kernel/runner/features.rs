@@ -401,7 +401,7 @@ pub fn parse_features(
 
 /// Runs all the features that are enabled in `system_task.kernel()`.
 pub fn run_container_features(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     features: &Features,
 ) -> Result<(), Error> {

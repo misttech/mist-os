@@ -70,7 +70,7 @@ const FUCHSIA_NETWORK_MONITOR_FS_MAGIC: u32 = u32::from_be_bytes(*b"nmfs");
 impl FileSystemOps for FuchsiaNetworkMonitorFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -83,7 +83,7 @@ impl FileSystemOps for FuchsiaNetworkMonitorFs {
 }
 
 pub fn fuchsia_network_monitor_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -111,7 +111,7 @@ impl NetworkDirectoryNode {
 impl FsNodeOps for NetworkDirectoryNode {
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -121,7 +121,7 @@ impl FsNodeOps for NetworkDirectoryNode {
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -133,7 +133,7 @@ impl FsNodeOps for NetworkDirectoryNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -170,7 +170,7 @@ impl FsNodeOps for NetworkDirectoryNode {
 
     fn unlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -194,7 +194,7 @@ impl FsNodeOps for NetworkDirectoryNode {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,

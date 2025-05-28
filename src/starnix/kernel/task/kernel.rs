@@ -600,7 +600,7 @@ impl Kernel {
     /// Opens a device file (driver) identified by `dev`.
     pub fn open_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         node: &FsNode,
         flags: OpenFlags,

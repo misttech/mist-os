@@ -430,7 +430,7 @@ impl SeccompState {
     // NB: Allow warning below so that it is clear what we are doing on KILL_PROCESS
     #[allow(clippy::wildcard_in_or_patterns)]
     pub fn do_user_defined(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         result: SeccompFilterResult,
         current_task: &mut CurrentTask,
         syscall: &Syscall,
@@ -905,7 +905,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -928,7 +928,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -939,7 +939,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -950,7 +950,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1036,7 +1036,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -1049,7 +1049,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

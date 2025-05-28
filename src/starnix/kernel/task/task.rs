@@ -1484,7 +1484,7 @@ impl Task {
 
 impl Releasable for Task {
     type Context<'a: 'b, 'b> =
-        (ThreadState, &'b mut Locked<'a, TaskRelease>, RwLockWriteGuard<'b, PidTable>);
+        (ThreadState, &'a mut Locked<TaskRelease>, RwLockWriteGuard<'a, PidTable>);
 
     fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         let (thread_state, locked, mut pids) = context;

@@ -93,7 +93,7 @@ impl LoopDeviceState {
 
     fn set_backing_file(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         backing_file: FileHandle,
     ) -> Result<(), Errno> {
@@ -117,7 +117,7 @@ impl LoopDeviceState {
 
     fn update_size_limit(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<(), Errno> {
         if let Some(backing_file) = &self.backing_file {
@@ -139,7 +139,7 @@ struct LoopDevice {
 }
 
 impl LoopDevice {
-    fn new<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
+    fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -289,7 +289,7 @@ impl FileOps for LoopDeviceFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -309,7 +309,7 @@ impl FileOps for LoopDeviceFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -346,7 +346,7 @@ impl FileOps for LoopDeviceFile {
 
     fn get_memory(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         requested_length: Option<usize>,
@@ -415,7 +415,7 @@ impl FileOps for LoopDeviceFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -591,7 +591,7 @@ impl FileOps for LoopDeviceFile {
     }
 }
 
-pub fn loop_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
+pub fn loop_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     let kernel = current_task.kernel();
 
     // Device registry.
@@ -611,7 +611,7 @@ pub struct LoopDeviceRegistry {
 
 impl LoopDeviceRegistry {
     /// Ensure initial loop devices.
-    fn ensure_initial_devices<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+    fn ensure_initial_devices<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask)
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -629,7 +629,7 @@ impl LoopDeviceRegistry {
 
     fn get_or_create<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         minor: u32,
     ) -> Arc<LoopDevice>
@@ -643,7 +643,7 @@ impl LoopDeviceRegistry {
             .clone()
     }
 
-    fn find<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> Result<u32, Errno>
+    fn find<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask) -> Result<u32, Errno>
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -666,7 +666,7 @@ impl LoopDeviceRegistry {
 
     fn add<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         minor: u32,
     ) -> Result<(), Errno>
@@ -686,7 +686,7 @@ impl LoopDeviceRegistry {
 
     fn remove<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         k_device: Option<Device>,
         minor: u32,
@@ -715,7 +715,7 @@ impl LoopDeviceRegistry {
 }
 
 pub fn create_loop_control_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -741,7 +741,7 @@ impl FileOps for LoopControlDevice {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -774,7 +774,7 @@ impl FileOps for LoopControlDevice {
 }
 
 fn get_or_create_loop_device(
-    locked: &mut Locked<'_, DeviceOpen>,
+    locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,
@@ -815,7 +815,7 @@ mod tests {
     }
 
     fn bind_simple_loop_device(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         backing_file: FileHandle,
         open_flags: OpenFlags,

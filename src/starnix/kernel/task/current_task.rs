@@ -76,7 +76,7 @@ impl TaskBuilder {
     }
 
     #[inline(always)]
-    pub fn release<L>(self, locked: &mut Locked<'_, L>)
+    pub fn release<L>(self, locked: &mut Locked<L>)
     where
         L: LockBefore<TaskRelease>,
     {
@@ -92,7 +92,7 @@ impl From<TaskBuilder> for CurrentTask {
 }
 
 impl Releasable for TaskBuilder {
-    type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
+    type Context<'a: 'b, 'b> = &'a mut Locked<TaskRelease>;
 
     fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
         let kernel = Arc::clone(self.kernel());
@@ -209,12 +209,12 @@ impl ArchSpecific for ThreadState {
     }
 }
 
-type SyscallRestartFunc = dyn FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<SyscallResult, Errno>
+type SyscallRestartFunc = dyn FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<SyscallResult, Errno>
     + Send
     + Sync;
 
 impl Releasable for CurrentTask {
-    type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
+    type Context<'a: 'b, 'b> = &'a mut Locked<TaskRelease>;
 
     fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
         self.notify_robust_list();
@@ -253,7 +253,7 @@ impl CurrentTask {
         Self { task, thread_state, _local_marker: Default::default() }
     }
 
-    pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<'_, L>)
+    pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<L>)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -286,7 +286,7 @@ impl CurrentTask {
     }
 
     #[inline(always)]
-    pub fn release<L>(self, locked: &mut Locked<'_, L>)
+    pub fn release<L>(self, locked: &mut Locked<L>)
     where
         L: LockBefore<TaskRelease>,
     {
@@ -296,7 +296,7 @@ impl CurrentTask {
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(
         &mut self,
-        f: impl FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<R, Errno>
+        f: impl FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<R, Errno>
             + Send
             + Sync
             + 'static,
@@ -313,13 +313,13 @@ impl CurrentTask {
     /// The returned result is the result returned from the wait function.
     pub fn wait_with_temporary_mask<F, T, L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         signal_mask: SigSet,
         wait_function: F,
     ) -> Result<T, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
-        F: FnOnce(&mut Locked<'_, L>, &CurrentTask) -> Result<T, Errno>,
+        F: FnOnce(&mut Locked<L>, &CurrentTask) -> Result<T, Errno>,
     {
         {
             let mut state = self.write();
@@ -465,7 +465,7 @@ impl CurrentTask {
     /// Returns the namespace node and the path to use relative to that node.
     pub fn resolve_dir_fd<'a, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         dir_fd: FdNumber,
         mut path: &'a FsStr,
         flags: ResolveFlags,
@@ -519,7 +519,7 @@ impl CurrentTask {
     /// for this task.
     pub fn open_file(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         path: &FsStr,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
@@ -551,7 +551,7 @@ impl CurrentTask {
     /// This returns the resolved node, and a boolean indicating whether the node has been created.
     fn resolve_open_path<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         context: &mut LookupContext,
         dir: &NamespaceNode,
         path: &FsStr,
@@ -671,7 +671,7 @@ impl CurrentTask {
     /// for this task.
     pub fn open_file_at(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         dir_fd: FdNumber,
         path: &FsStr,
         flags: OpenFlags,
@@ -689,7 +689,7 @@ impl CurrentTask {
 
     pub fn open_namespace_node_at(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         dir: NamespaceNode,
         path: &FsStr,
         flags: OpenFlags,
@@ -827,7 +827,7 @@ impl CurrentTask {
     /// dir_fd.
     pub fn lookup_parent_at<'a, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         context: &mut LookupContext,
         dir_fd: FdNumber,
         path: &'a FsStr,
@@ -855,7 +855,7 @@ impl CurrentTask {
     /// The returned parent might not be a directory.
     pub fn lookup_parent<'a, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         context: &mut LookupContext,
         dir: &NamespaceNode,
         path: &'a FsStr,
@@ -884,7 +884,7 @@ impl CurrentTask {
     /// This function resolves the component of the given path.
     pub fn lookup_path<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         context: &mut LookupContext,
         dir: NamespaceNode,
         path: &FsStr,
@@ -901,7 +901,7 @@ impl CurrentTask {
     /// Resolves symlinks.
     pub fn lookup_path_from_root<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         path: &FsStr,
     ) -> Result<NamespaceNode, Errno>
     where
@@ -913,7 +913,7 @@ impl CurrentTask {
 
     pub fn exec(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         executable: FileHandle,
         path: CString,
         argv: Vec<CString>,
@@ -978,7 +978,7 @@ impl CurrentTask {
     /// function will be considered unrecoverable.
     fn finish_exec<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         path: CString,
         resolved_elf: ResolvedElf,
         mut maybe_set_id: UserAndOrGroupId,
@@ -1174,7 +1174,7 @@ impl CurrentTask {
 
     pub fn run_seccomp_filters(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         syscall: &Syscall,
     ) -> Option<Result<SyscallResult, Errno>> {
         profile_duration!("RunSeccompFilters");
@@ -1326,7 +1326,7 @@ impl CurrentTask {
     /// bitwise-ORed like clone().
     pub fn clone_task<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         flags: u64,
         child_exit_signal: Option<Signal>,
         user_parent_tid: UserRef<pid_t>,
@@ -1716,7 +1716,7 @@ impl CurrentTask {
 
     /// Block the execution of `current_task` as long as the task is stopped and
     /// not terminated.
-    pub fn block_while_stopped(&mut self, locked: &mut Locked<'_, Unlocked>) {
+    pub fn block_while_stopped(&mut self, locked: &mut Locked<Unlocked>) {
         // Upgrade the state from stopping to stopped if needed. Return if the task
         // should not be stopped.
         if !self.finalize_stop_state() {
@@ -1769,7 +1769,7 @@ impl CurrentTask {
     /// behavior.
     pub fn ptrace_event(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         trace_kind: PtraceOptions,
         msg: u64,
     ) {
@@ -1808,7 +1808,7 @@ impl CurrentTask {
     /// of this task first.
     pub fn thread_group_exit(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         exit_status: ExitStatus,
     ) {
         self.ptrace_event(
@@ -1823,7 +1823,7 @@ impl CurrentTask {
     /// exit signal as in clone().
     pub fn clone_task_for_test<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         flags: u64,
         exit_signal: Option<Signal>,
     ) -> crate::testing::AutoReleasableTask
@@ -1842,7 +1842,7 @@ impl CurrentTask {
     // See "Ptrace access mode checking" in https://man7.org/linux/man-pages/man2/ptrace.2.html
     pub fn check_ptrace_access_mode<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         mode: PtraceAccessMode,
         target: &Task,
     ) -> Result<(), Errno>

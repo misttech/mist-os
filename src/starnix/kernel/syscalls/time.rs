@@ -58,7 +58,7 @@ fn get_clock_res(current_task: &CurrentTask, which_clock: i32) -> Result<timespe
 }
 
 pub fn sys_clock_getres(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
     tp_addr: TimeSpecPtr,
@@ -107,7 +107,7 @@ fn get_clock_gettime(current_task: &CurrentTask, which_clock: i32) -> Result<tim
 }
 
 pub fn sys_clock_gettime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
     tp_addr: TimeSpecPtr,
@@ -118,7 +118,7 @@ pub fn sys_clock_gettime(
 }
 
 pub fn sys_gettimeofday(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_tv: TimeValPtr,
     user_tz: TimeZonePtr,
@@ -139,7 +139,7 @@ pub fn sys_gettimeofday(
 }
 
 pub fn sys_settimeofday(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tv: TimeValPtr,
     _tz: TimeZonePtr,
@@ -192,7 +192,7 @@ pub fn sys_settimeofday(
 }
 
 pub fn sys_clock_nanosleep(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     which_clock: ClockId,
     flags: u32,
@@ -264,7 +264,7 @@ pub fn sys_clock_nanosleep(
 /// Sleep until we've satisfied |request| relative to the UTC clock which may advance at
 /// a different rate from the boot clock by repeatdly computing a boot target and sleeping.
 fn clock_nanosleep_relative_to_utc(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     request: timespec,
     is_absolute: bool,
@@ -302,7 +302,7 @@ fn clock_nanosleep_relative_to_utc(
 }
 
 fn clock_nanosleep_boot_with_deadline(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     is_absolute: bool,
     deadline: zx::BootInstant,
@@ -354,7 +354,7 @@ fn clock_nanosleep_boot_with_deadline(
 }
 
 pub fn sys_nanosleep(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_request: TimeSpecPtr,
     user_remaining: TimeSpecPtr,
@@ -444,7 +444,7 @@ fn get_dynamic_clock(current_task: &CurrentTask, which_clock: i32) -> Result<i64
 }
 
 pub fn sys_timer_create(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     clock_id: ClockId,
     event: MultiArchUserRef<uapi::sigevent, uapi::arch32::sigevent>,
@@ -505,7 +505,7 @@ pub fn sys_timer_create(
 }
 
 pub fn sys_timer_delete(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<(), Errno> {
@@ -514,7 +514,7 @@ pub fn sys_timer_delete(
 }
 
 pub fn sys_timer_gettime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
     curr_value: ITimerSpecPtr,
@@ -525,7 +525,7 @@ pub fn sys_timer_gettime(
 }
 
 pub fn sys_timer_getoverrun(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<i32, Errno> {
@@ -534,7 +534,7 @@ pub fn sys_timer_getoverrun(
 }
 
 pub fn sys_timer_settime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
     flags: i32,
@@ -562,7 +562,7 @@ pub fn sys_timer_settime(
 }
 
 pub fn sys_getitimer(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     user_curr_value: ITimerValPtr,
@@ -573,7 +573,7 @@ pub fn sys_getitimer(
 }
 
 pub fn sys_setitimer(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     user_new_value: ITimerValPtr,
@@ -591,7 +591,7 @@ pub fn sys_setitimer(
 }
 
 pub fn sys_times(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     buf: UserRef<tms>,
 ) -> Result<i64, Errno> {
@@ -622,7 +622,7 @@ mod arch32 {
     use static_assertions::const_assert;
 
     pub fn sys_arch32_clock_gettime64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         which_clock: i32,
         tp_addr: UserRef<uapi::timespec>,
@@ -635,7 +635,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_timer_gettime64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         id: TimerId,
         curr_value: UserRef<uapi::itimerspec>,

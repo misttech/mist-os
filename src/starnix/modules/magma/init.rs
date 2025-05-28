@@ -20,7 +20,7 @@ struct MagmaDeviceBuilder {
 impl DeviceOps for MagmaDeviceBuilder {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,
@@ -31,7 +31,7 @@ impl DeviceOps for MagmaDeviceBuilder {
 }
 
 pub fn magma_device_init<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     supported_vendors: Vec<u16>,
 ) where

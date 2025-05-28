@@ -60,7 +60,7 @@ use {
 };
 
 pub fn new_remote_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -134,7 +134,7 @@ const SYNC_IOC_MERGE: u8 = 3;
 impl FileSystemOps for RemoteFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -196,7 +196,7 @@ impl FileSystemOps for RemoteFs {
 
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -551,7 +551,7 @@ impl FsNodeOps for RemoteNode {
 
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -593,7 +593,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -668,7 +668,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -729,7 +729,7 @@ impl FsNodeOps for RemoteNode {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -849,7 +849,7 @@ impl FsNodeOps for RemoteNode {
 
     fn truncate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
@@ -861,7 +861,7 @@ impl FsNodeOps for RemoteNode {
 
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
@@ -883,7 +883,7 @@ impl FsNodeOps for RemoteNode {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -893,7 +893,7 @@ impl FsNodeOps for RemoteNode {
 
     fn update_attributes(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         info: &FsNodeInfo,
         has: zxio_node_attr_has_t,
@@ -920,7 +920,7 @@ impl FsNodeOps for RemoteNode {
 
     fn unlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -937,7 +937,7 @@ impl FsNodeOps for RemoteNode {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1047,7 +1047,7 @@ impl FsNodeOps for RemoteNode {
 
     fn link(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -1075,7 +1075,7 @@ impl FsNodeOps for RemoteNode {
 
     fn forget(
         self: Box<Self>,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         info: FsNodeInfo,
     ) -> Result<(), Errno> {
@@ -1138,7 +1138,7 @@ impl FsNodeOps for RemoteSpecialNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -1349,7 +1349,7 @@ impl FileOps for RemoteDirectoryObject {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -1392,7 +1392,7 @@ impl FileOps for RemoteDirectoryObject {
 
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -1501,7 +1501,7 @@ impl FileOps for RemoteFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1512,7 +1512,7 @@ impl FileOps for RemoteFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1523,7 +1523,7 @@ impl FileOps for RemoteFileObject {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -1570,7 +1570,7 @@ impl FileOps for RemoteFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1596,7 +1596,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn readlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -1607,7 +1607,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -1617,7 +1617,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn forget(
         self: Box<Self>,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         info: FsNodeInfo,
     ) -> Result<(), Errno> {
@@ -1651,7 +1651,7 @@ impl FileOps for RemoteCounter {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -1662,7 +1662,7 @@ impl FileOps for RemoteCounter {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -1673,7 +1673,7 @@ impl FileOps for RemoteCounter {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

@@ -64,7 +64,7 @@ impl FsNodeOps for MemoryRegularNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -91,7 +91,7 @@ impl FsNodeOps for MemoryRegularNode {
 
     fn truncate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         _current_task: &CurrentTask,
@@ -133,7 +133,7 @@ impl FsNodeOps for MemoryRegularNode {
 
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         _current_task: &CurrentTask,
@@ -353,7 +353,7 @@ macro_rules! fileops_impl_memory {
 
         fn read(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             offset: usize,
@@ -364,7 +364,7 @@ macro_rules! fileops_impl_memory {
 
         fn write(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             current_task: &$crate::task::CurrentTask,
             offset: usize,
@@ -375,7 +375,7 @@ macro_rules! fileops_impl_memory {
 
         fn get_memory(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             current_task: &$crate::task::CurrentTask,
             _length: Option<usize>,
@@ -404,7 +404,7 @@ impl FileOps for MemoryRegularFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -426,7 +426,7 @@ impl FileOps for MemoryRegularFile {
 }
 
 pub fn new_memfd(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     mut name: FsString,
     seals: SealFlags,

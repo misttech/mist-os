@@ -82,7 +82,7 @@ pub(in crate::security) fn fs_node_notify_security_context(
 /// `dir_entry`. If `locked_or_no_xattr` is `None`, xattrs will not be read - this makes sense
 /// for entries containing anonymous nodes, that will not have an associated filesystem entry.
 pub(in crate::security) fn fs_node_init_with_dentry(
-    locked_or_no_xattr: Option<&mut Locked<'_, FileOpsCore>>,
+    locked_or_no_xattr: Option<&mut Locked<FileOpsCore>>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     dir_entry: &DirEntryHandle,
@@ -1094,7 +1094,7 @@ pub(in crate::security) fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsSt
 /// Returns the Security Context corresponding to the SID with which `FsNode`
 /// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
 pub(in crate::security) fn fs_node_getsecurity<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -1144,7 +1144,7 @@ where
 /// Sets the `name`d security attribute on `fs_node` and updates internal
 /// kernel state.
 pub(in crate::security) fn fs_node_setsecurity<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,

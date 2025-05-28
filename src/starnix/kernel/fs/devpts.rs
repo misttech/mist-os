@@ -58,7 +58,7 @@ const PTMX_NODE_ID: ino_t = 2;
 const FIRST_PTS_NODE_ID: ino_t = 3;
 
 pub fn dev_pts_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -88,7 +88,7 @@ fn ensure_devpts(
 /// is mounted at `/dev/pts`. These assumptions are necessary so that the
 /// `FileHandle` objects returned have appropriate `NamespaceNode` objects.
 pub fn create_main_and_replica(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     window_size: uapi::winsize,
 ) -> Result<(FileHandle, FileHandle), Errno> {
@@ -125,7 +125,7 @@ fn init_devpts(
     Ok(fs)
 }
 
-pub fn tty_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+pub fn tty_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {
@@ -183,7 +183,7 @@ struct DevPtsFs {
 impl FileSystemOps for DevPtsFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -212,7 +212,7 @@ impl FsNodeOps for DevPtsRootDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -239,7 +239,7 @@ impl FsNodeOps for DevPtsRootDir {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -291,7 +291,7 @@ impl DevPtsDevice {
 impl DeviceOps for Arc<DevPtsDevice> {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         _node: &FsNode,
@@ -383,7 +383,7 @@ impl FileOps for DevPtmxFile {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -394,7 +394,7 @@ impl FileOps for DevPtmxFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -412,7 +412,7 @@ impl FileOps for DevPtmxFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -430,7 +430,7 @@ impl FileOps for DevPtmxFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -442,7 +442,7 @@ impl FileOps for DevPtmxFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -451,7 +451,7 @@ impl FileOps for DevPtmxFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -499,7 +499,7 @@ impl FileOps for TtyFile {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -508,7 +508,7 @@ impl FileOps for TtyFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -526,7 +526,7 @@ impl FileOps for TtyFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -544,7 +544,7 @@ impl FileOps for TtyFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -556,7 +556,7 @@ impl FileOps for TtyFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -565,7 +565,7 @@ impl FileOps for TtyFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -604,7 +604,7 @@ fn into_termio(value: uapi::termios) -> uapi::termio {
 
 /// The ioctl behaviour common to main and replica terminal file descriptors.
 fn shared_ioctl<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     terminal: &Arc<Terminal>,
     is_main: bool,
     file: &FileObject,
@@ -961,7 +961,7 @@ mod tests {
     use starnix_uapi::signals::{SIGCHLD, SIGTTOU};
 
     fn ioctl<T: zerocopy::IntoBytes + zerocopy::FromBytes + zerocopy::Immutable + Copy>(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,
         command: u32,
@@ -980,7 +980,7 @@ mod tests {
     }
 
     fn set_controlling_terminal(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,
         steal: bool,
@@ -990,7 +990,7 @@ mod tests {
     }
 
     fn lookup_node<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
@@ -1003,7 +1003,7 @@ mod tests {
     }
 
     fn open_file_with_flags(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
@@ -1014,7 +1014,7 @@ mod tests {
     }
 
     fn open_file(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
@@ -1023,7 +1023,7 @@ mod tests {
     }
 
     fn open_ptmx_and_unlock(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
     ) -> Result<FileHandle, Errno> {
@@ -1521,18 +1521,18 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
 
-        let has_data_ready_to_read = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle| {
+        let has_data_ready_to_read = |locked: &mut Locked<Unlocked>, fd: &FileHandle| {
             fd.query_events(locked, &task).expect("query_events").contains(FdEvents::POLLIN)
         };
 
-        let write_and_assert = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
+        let write_and_assert = |locked: &mut Locked<Unlocked>, fd: &FileHandle, data: &[u8]| {
             assert_eq!(
                 fd.write(locked, &task, &mut VecInputBuffer::new(data)).expect("write"),
                 data.len()
             );
         };
 
-        let read_and_check = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
+        let read_and_check = |locked: &mut Locked<Unlocked>, fd: &FileHandle, data: &[u8]| {
             assert!(has_data_ready_to_read(locked, fd));
             let mut buffer = VecOutputBuffer::new(data.len() + 1);
             assert_eq!(fd.read(locked, &task, &mut buffer).expect("read"), data.len());

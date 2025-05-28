@@ -39,7 +39,7 @@ impl SocketFile {
     /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
     ///   therefore not be security labeled nor access-checked.
     pub fn from_socket<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         socket: SocketHandle,
         open_flags: OpenFlags,
@@ -73,7 +73,7 @@ impl SocketFile {
 
     /// Shortcut for Socket::new plus SocketFile::from_socket.
     pub fn new_socket<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
@@ -100,7 +100,7 @@ impl FileOps for SocketFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -119,7 +119,7 @@ impl FileOps for SocketFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -131,7 +131,7 @@ impl FileOps for SocketFile {
 
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -143,7 +143,7 @@ impl FileOps for SocketFile {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -152,7 +152,7 @@ impl FileOps for SocketFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -163,7 +163,7 @@ impl FileOps for SocketFile {
 
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -202,7 +202,7 @@ impl SocketFile {
     /// - `control_bytes`: Control message bytes to write to the socket.
     pub fn sendmsg<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileObject,
         data: &mut dyn InputBuffer,
@@ -216,7 +216,7 @@ impl SocketFile {
         debug_assert!(data.bytes_read() == 0);
 
         // TODO: Implement more `flags`.
-        let mut op = |locked: &mut Locked<'_, L>| {
+        let mut op = |locked: &mut Locked<L>| {
             let offset_before = data.bytes_read();
             let sent_bytes = self.socket.write(
                 locked,
@@ -264,7 +264,7 @@ impl SocketFile {
     /// Returns the number of bytes read, as well as any control message that was encountered.
     pub fn recvmsg<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileObject,
         data: &mut dyn OutputBuffer,
@@ -277,7 +277,7 @@ impl SocketFile {
         // TODO: Implement more `flags`.
         let mut read_info = MessageReadInfo::default();
 
-        let mut op = |locked: &mut Locked<'_, L>| {
+        let mut op = |locked: &mut Locked<L>| {
             let mut info = self.socket.read(locked, current_task, data, flags)?;
             read_info.append(&mut info);
             read_info.address = info.address;

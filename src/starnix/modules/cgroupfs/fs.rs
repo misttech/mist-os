@@ -27,7 +27,7 @@ pub struct CgroupV1Fs {
 
 impl CgroupV1Fs {
     pub fn new_fs(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -51,7 +51,7 @@ impl FileSystemOps for CgroupV1Fs {
     }
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -66,7 +66,7 @@ pub struct CgroupV2Fs {
 
 struct CgroupV2FsHandle(FileSystemHandle);
 pub fn cgroup2_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -104,7 +104,7 @@ impl FileSystemOps for CgroupV2Fs {
     }
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {

@@ -42,7 +42,7 @@ impl ZramDevice {
 impl DeviceOps for ZramDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -81,7 +81,7 @@ impl FsNodeOps for ZramDeviceDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -102,7 +102,7 @@ impl FsNodeOps for ZramDeviceDirectory {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -164,7 +164,7 @@ impl DynamicFileSource for MmStatFile {
     }
 }
 
-pub fn zram_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
+pub fn zram_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {

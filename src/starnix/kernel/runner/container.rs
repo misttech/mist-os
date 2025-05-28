@@ -754,7 +754,7 @@ async fn create_container(
 }
 
 fn create_fs_context(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     kernel: &Arc<Kernel>,
     features: &Features,
     start_info: &ContainerStartInfo,
@@ -851,7 +851,7 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
 }
 
 fn mount_filesystems(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
@@ -877,7 +877,7 @@ fn mount_filesystems(
 }
 
 fn init_remote_block_devices(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     start_info: &ContainerStartInfo,
 ) -> Result<(), Error> {
@@ -909,7 +909,7 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
 }
 
 fn create_remote_block_device_from_spec<'a>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     spec: &'a str,
 ) -> Result<(), Error> {

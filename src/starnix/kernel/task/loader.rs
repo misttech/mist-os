@@ -366,7 +366,7 @@ const MAX_RECURSION_DEPTH: usize = 5;
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth. `argv` may change due to script interpreter logic.
 pub fn resolve_executable(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
@@ -380,7 +380,7 @@ pub fn resolve_executable(
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth.
 fn resolve_executable_impl(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
@@ -420,7 +420,7 @@ fn resolve_executable_impl(
 
 /// Resolves a #! script file into a validated executable ELF.
 fn resolve_script(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     memory: Arc<MemoryObject>,
     path: CString,
@@ -508,7 +508,7 @@ fn parse_interpreter_line(line: &[u8]) -> Result<Vec<CString>, Errno> {
 
 /// Resolves a file handle into a validated executable ELF.
 fn resolve_elf(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     memory: Arc<MemoryObject>,
@@ -899,7 +899,7 @@ mod tests {
     }
 
     fn exec_hello_starnix(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &mut CurrentTask,
     ) -> Result<(), Errno> {
         let argv = vec![CString::new("data/tests/hello_starnix").unwrap()];

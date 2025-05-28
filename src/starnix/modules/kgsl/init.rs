@@ -18,7 +18,7 @@ struct KgslDeviceBuilder {}
 impl DeviceOps for KgslDeviceBuilder {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,
@@ -28,7 +28,7 @@ impl DeviceOps for KgslDeviceBuilder {
     }
 }
 
-pub fn kgsl_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+pub fn kgsl_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {

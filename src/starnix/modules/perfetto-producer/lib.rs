@@ -41,7 +41,7 @@ struct FuchsiaDataSource {
 impl FuchsiaDataSource {
     fn new<L>(
         mut connection: perfetto::Producer,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<FuchsiaDataSource, DataSourceError>
     where
@@ -122,7 +122,7 @@ impl FuchsiaDataSource {
 
     fn handle_command<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), DataSourceError>
     where
@@ -175,7 +175,7 @@ impl FuchsiaDataSource {
 // ipc messages. Usually this is located at /dev/socket/traced_producer, but it is
 // configurable.
 fn wait_for_perfetto_ready<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     socket_path: FsString,
 ) -> perfetto::Producer

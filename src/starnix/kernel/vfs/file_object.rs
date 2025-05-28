@@ -158,7 +158,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Called when the FileObject is closed.
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -168,7 +168,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// released.
     fn flush(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -194,7 +194,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the number of bytes read.
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -206,7 +206,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the number of bytes written.
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -216,7 +216,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Adjust the `current_offset` if the file is seekable.
     fn seek(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -244,7 +244,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// This method is typically called by [`Self::mmap`].
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -259,7 +259,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// a VMO gets mapped.
     fn mmap(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -349,7 +349,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// at `sink.offset()` to read the current offset into the file.
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _sink: &mut dyn DirentSink,
@@ -367,7 +367,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// If your file does not support blocking waits, leave this as the default implementation.
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -386,7 +386,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// See https://linux.die.net/man/2/poll
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -395,7 +395,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -446,7 +446,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -455,7 +455,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn flush(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -476,7 +476,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -487,7 +487,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -498,7 +498,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn seek(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -517,7 +517,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn get_memory(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
@@ -528,7 +528,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn mmap(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -553,7 +553,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -563,7 +563,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -575,7 +575,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -584,7 +584,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -627,7 +627,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 }
 
 pub fn default_eof_offset<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     file: &FileObject,
     current_task: &CurrentTask,
 ) -> Result<off_t, Errno>
@@ -703,7 +703,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
 
         fn read(
             &$self,
-            locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             file: &FileObject,
             current_task: &$crate::task::CurrentTask,
             offset: usize,
@@ -714,7 +714,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
 
         fn seek(
             &$self,
-        locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+        locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             file: &FileObject,
             current_task: &$crate::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
@@ -735,7 +735,7 @@ macro_rules! fileops_impl_seekable {
 
         fn seek(
             &self,
-            locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             current_task: &$crate::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
@@ -758,7 +758,7 @@ macro_rules! fileops_impl_nonseekable {
 
         fn seek(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
@@ -784,7 +784,7 @@ macro_rules! fileops_impl_seekless {
 
         fn seek(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
@@ -800,7 +800,7 @@ macro_rules! fileops_impl_dataless {
     () => {
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             _offset: usize,
@@ -811,7 +811,7 @@ macro_rules! fileops_impl_dataless {
 
         fn read(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             _offset: usize,
@@ -833,7 +833,7 @@ macro_rules! fileops_impl_directory {
 
         fn read(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             _offset: usize,
@@ -844,7 +844,7 @@ macro_rules! fileops_impl_directory {
 
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             _offset: usize,
@@ -860,7 +860,7 @@ macro_rules! fileops_impl_unbounded_seek {
     () => {
         fn seek(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _file: &$crate::vfs::FileObject,
             _current_task: &$crate::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
@@ -910,7 +910,7 @@ pub fn canonicalize_ioctl_request(current_task: &CurrentTask, request: u32) -> u
 
 pub fn default_ioctl(
     file: &FileObject,
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     request: u32,
     arg: SyscallArg,
@@ -1172,7 +1172,7 @@ impl FileOps for OPathOps {
     }
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -1182,7 +1182,7 @@ impl FileOps for OPathOps {
     }
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -1192,7 +1192,7 @@ impl FileOps for OPathOps {
     }
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _current_offset: off_t,
@@ -1202,7 +1202,7 @@ impl FileOps for OPathOps {
     }
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -1212,7 +1212,7 @@ impl FileOps for OPathOps {
     }
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _sink: &mut dyn DirentSink,
@@ -1222,7 +1222,7 @@ impl FileOps for OPathOps {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _request: u32,
@@ -1271,10 +1271,10 @@ impl FileOps for ProxyFileOps {
     fn is_seekable(&self) -> bool {
         self.0.ops().is_seekable()
     }
-    // These take &mut Locked<'_, L> as a second argument
+    // These take &mut Locked<L> as a second argument
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -1282,7 +1282,7 @@ impl FileOps for ProxyFileOps {
     }
     fn flush(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -1290,7 +1290,7 @@ impl FileOps for ProxyFileOps {
     }
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -1301,7 +1301,7 @@ impl FileOps for ProxyFileOps {
     }
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1309,7 +1309,7 @@ impl FileOps for ProxyFileOps {
     }
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1319,7 +1319,7 @@ impl FileOps for ProxyFileOps {
     }
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1329,7 +1329,7 @@ impl FileOps for ProxyFileOps {
     }
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1339,7 +1339,7 @@ impl FileOps for ProxyFileOps {
     }
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -1348,7 +1348,7 @@ impl FileOps for ProxyFileOps {
     }
     fn get_memory(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
@@ -1358,7 +1358,7 @@ impl FileOps for ProxyFileOps {
     }
     fn mmap(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -1382,7 +1382,7 @@ impl FileOps for ProxyFileOps {
     }
     fn seek(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: off_t,
@@ -1586,7 +1586,7 @@ impl FileObject {
 
     pub fn blocking_op<L, T, Op>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         events: FdEvents,
         deadline: Option<zx::MonotonicInstant>,
@@ -1594,7 +1594,7 @@ impl FileObject {
     ) -> Result<T, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
-        Op: FnMut(&mut Locked<'_, L>) -> Result<T, Errno>,
+        Op: FnMut(&mut Locked<L>) -> Result<T, Errno>,
     {
         // Run the operation a first time without registering a waiter in case no wait is needed.
         match op(locked) {
@@ -1653,7 +1653,7 @@ impl FileObject {
 
     pub fn read<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
@@ -1680,7 +1680,7 @@ impl FileObject {
 
     pub fn read_at<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
@@ -1701,7 +1701,7 @@ impl FileObject {
     /// Common checks before calling ops().write.
     fn write_common<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
@@ -1725,13 +1725,13 @@ impl FileObject {
     /// Common wrapper work for `write` and `write_at`.
     fn write_fn<W, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         write: W,
     ) -> Result<usize, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
-        W: FnOnce(&mut Locked<'_, L>) -> Result<usize, Errno>,
+        W: FnOnce(&mut Locked<L>) -> Result<usize, Errno>,
     {
         if !self.can_write() {
             return error!(EBADF);
@@ -1749,7 +1749,7 @@ impl FileObject {
 
     pub fn write<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
@@ -1789,7 +1789,7 @@ impl FileObject {
 
     pub fn write_at<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mut offset: usize,
         data: &mut dyn InputBuffer,
@@ -1823,7 +1823,7 @@ impl FileObject {
 
     pub fn seek<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         target: SeekTarget,
     ) -> Result<off_t, Errno>
@@ -1857,7 +1857,7 @@ impl FileObject {
 
     pub fn get_memory<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
@@ -1883,7 +1883,7 @@ impl FileObject {
 
     pub fn mmap<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         addr: DesiredAddress,
         memory_offset: u64,
@@ -1921,7 +1921,7 @@ impl FileObject {
 
     pub fn readdir<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno>
@@ -1941,7 +1941,7 @@ impl FileObject {
 
     pub fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -1974,7 +1974,7 @@ impl FileObject {
 
     pub fn ftruncate<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno>
@@ -1993,7 +1993,7 @@ impl FileObject {
 
     pub fn fallocate<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
@@ -2082,7 +2082,7 @@ impl FileObject {
     /// Wait on the specified events and call the EventHandler when ready
     pub fn wait_async<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
@@ -2105,7 +2105,7 @@ impl FileObject {
     /// The events currently active on this file.
     pub fn query_events<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno>
     where
@@ -2118,7 +2118,7 @@ impl FileObject {
 
     pub fn record_lock(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         cmd: RecordLockCommand,
         flock: uapi::flock,
@@ -2126,7 +2126,7 @@ impl FileObject {
         self.node().record_lock(locked, current_task, self, cmd, flock)
     }
 
-    pub fn flush<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask, id: FdTableId)
+    pub fn flush<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask, id: FdTableId)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -2171,7 +2171,7 @@ impl FileObject {
 }
 
 impl Releasable for FileObject {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
 
     fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;

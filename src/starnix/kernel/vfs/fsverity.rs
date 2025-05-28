@@ -148,7 +148,7 @@ pub mod ioctl {
 
     /// ioctl handler for FS_IOC_ENABLE_VERITY.
     pub fn enable<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         task: &CurrentTask,
         arg: UserAddress,
         file: &FileObject,
@@ -181,7 +181,7 @@ pub mod ioctl {
 
     /// ioctl handler for FS_IOC_MEASURE_VERITY.
     pub fn measure<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         task: &CurrentTask,
         arg: UserAddress,
         file: &FileObject,

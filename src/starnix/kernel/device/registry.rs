@@ -61,7 +61,7 @@ pub trait DeviceOps: DynClone + Send + Sync + AsAny + 'static {
     /// assigned to this device.
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
         _node: &FsNode,
@@ -72,7 +72,7 @@ pub trait DeviceOps: DynClone + Send + Sync + AsAny + 'static {
 impl<T: DeviceOps> DeviceOps for Arc<T> {
     fn open(
         &self,
-        locked: &mut Locked<'_, DeviceOpen>,
+        locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         device_type: DeviceType,
         node: &FsNode,
@@ -93,7 +93,7 @@ where
         + Sync
         + Clone
         + Fn(
-            &mut Locked<'_, DeviceOpen>,
+            &mut Locked<DeviceOpen>,
             &CurrentTask,
             DeviceType,
             &FsNode,
@@ -103,7 +103,7 @@ where
 {
     fn open(
         &self,
-        locked: &mut Locked<'_, DeviceOpen>,
+        locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,
@@ -115,7 +115,7 @@ where
 
 /// A simple `DeviceOps` function for any device that implements `FileOps + Default`.
 pub fn simple_device_ops<T: Default + FileOps + 'static>(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     _current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -273,7 +273,7 @@ impl DeviceRegistry {
     /// Notify devfs and listeners that a device has been added to the registry.
     fn notify_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         device: Device,
     ) where
@@ -335,7 +335,7 @@ impl DeviceRegistry {
     /// your device.
     pub fn register_device<F, N, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
@@ -365,7 +365,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn register_misc_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         dev_ops: impl DeviceOps,
@@ -398,7 +398,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn register_dyn_device<F, N, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         class: Class,
@@ -432,7 +432,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn add_device<F, N, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
@@ -486,7 +486,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn add_numberless_device<F, N, L>(
         &self,
-        _locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<L>,
         _current_task: &CurrentTask,
         name: &FsStr,
         class: Class,
@@ -506,7 +506,7 @@ impl DeviceRegistry {
     /// number. Individually registered minor device cannot be removed at this time.
     pub fn remove_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         device: Device,
     ) where
@@ -603,7 +603,7 @@ impl DeviceRegistry {
     /// The device will be looked up in the device registry by `DeviceMode` and `DeviceType`.
     pub fn open_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         node: &FsNode,
         flags: OpenFlags,
@@ -759,7 +759,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         fn create_test_device(
-            _locked: &mut Locked<'_, DeviceOpen>,
+            _locked: &mut Locked<DeviceOpen>,
             _current_task: &CurrentTask,
             _id: DeviceType,
             _node: &FsNode,

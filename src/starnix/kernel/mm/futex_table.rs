@@ -42,7 +42,7 @@ impl<Key: FutexKey> FutexTable<Key> {
     /// See FUTEX_WAIT when passed a deadline in CLOCK_REALTIME.
     pub fn wait_boot(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         addr: UserAddress,
         value: u32,

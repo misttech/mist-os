@@ -17,7 +17,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 
 pub fn dev_tmp_fs(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -27,7 +27,7 @@ pub fn dev_tmp_fs(
 pub struct DevTmpFs(());
 
 impl DevTmpFs {
-    pub fn from_task<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> FileSystemHandle
+    pub fn from_task<L>(locked: &mut Locked<L>, current_task: &CurrentTask) -> FileSystemHandle
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -41,7 +41,7 @@ impl DevTmpFs {
             .clone()
     }
 
-    fn init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> FileSystemHandle
+    fn init<L>(locked: &mut Locked<L>, current_task: &CurrentTask) -> FileSystemHandle
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -79,7 +79,7 @@ impl DevTmpFs {
 }
 
 pub fn devtmpfs_create_device<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     device_metadata: DeviceMetadata,
 ) -> Result<DirEntryHandle, Errno>
@@ -117,7 +117,7 @@ where
 }
 
 pub fn devtmpfs_get_or_create_directory_at<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     parent_dir: DirEntryHandle,
     dir_name: &FsStr,
@@ -145,7 +145,7 @@ where
 }
 
 fn devtmpfs_create_device_node<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     parent_dir: DirEntryHandle,
     device_name: &FsStr,
@@ -173,7 +173,7 @@ where
 }
 
 pub fn devtmpfs_mkdir<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     name: &FsStr,
 ) -> Result<DirEntryHandle, Errno>
@@ -202,7 +202,7 @@ where
 }
 
 pub fn devtmpfs_remove_node<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     path: &FsStr,
 ) -> Result<(), Errno>
@@ -219,7 +219,7 @@ where
 }
 
 pub fn devtmpfs_create_symlink<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     name: &FsStr,
     target: &FsStr,
@@ -233,7 +233,7 @@ where
 }
 
 fn create_symlink<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     entry: &DirEntryHandle,
     name: &FsStr,

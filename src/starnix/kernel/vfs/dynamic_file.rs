@@ -150,7 +150,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -161,7 +161,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -172,7 +172,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -363,7 +363,7 @@ impl FileOps for ConstFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -399,9 +399,9 @@ mod tests {
         }
     }
 
-    fn create_test_file<'l, T: SequenceFileSource>(
+    fn create_test_file<T: SequenceFileSource>(
         source: T,
-    ) -> (AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
+    ) -> (AutoReleasableTask, FileHandle, Locked<Unlocked>) {
         let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let file =
             anon_test_file(&current_task, Box::new(DynamicFile::new(source)), OpenFlags::RDONLY);
@@ -412,7 +412,7 @@ mod tests {
     async fn test_sequence() -> Result<(), Errno> {
         let (current_task, file, mut locked) = create_test_file(TestSequenceFileSource {});
 
-        let read_at = |locked: &mut Locked<'_, Unlocked>,
+        let read_at = |locked: &mut Locked<Unlocked>,
                        offset: usize,
                        length: usize|
          -> Result<Vec<u8>, Errno> {
@@ -449,7 +449,7 @@ mod tests {
     async fn test_read() -> Result<(), Errno> {
         let counter = Arc::new(Counter { value: Mutex::new(0) });
         let (current_task, file, mut locked) = create_test_file(TestFileSource { counter });
-        let read_at = |locked: &mut Locked<'_, Unlocked>,
+        let read_at = |locked: &mut Locked<Unlocked>,
                        offset: usize,
                        length: usize|
          -> Result<Vec<u8>, Errno> {
@@ -478,7 +478,7 @@ mod tests {
         let counter = Arc::new(Counter { value: Mutex::new(0) });
         let (current_task, file, mut locked) =
             create_test_file(TestFileSource { counter: counter.clone() });
-        let read = |locked: &mut Locked<'_, Unlocked>, length: usize| -> Result<Vec<u8>, Errno> {
+        let read = |locked: &mut Locked<Unlocked>, length: usize| -> Result<Vec<u8>, Errno> {
             let mut buffer = VecOutputBuffer::new(length);
             let bytes_read = file.read(locked, &current_task, &mut buffer)?;
             Ok(buffer.data()[0..bytes_read].to_vec())

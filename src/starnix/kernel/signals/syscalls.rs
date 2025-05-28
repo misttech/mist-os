@@ -45,7 +45,7 @@ type SigAction64Ptr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigactio
 type SigActionPtr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction_t>;
 
 pub fn sys_rt_sigaction(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     signum: UncheckedSignal,
     user_action: SigAction64Ptr,
@@ -105,7 +105,7 @@ where
 }
 
 pub fn sys_rt_sigpending(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     set: UserRef<SigSet>,
     sigset_size: usize,
@@ -120,7 +120,7 @@ pub fn sys_rt_sigpending(
 }
 
 pub fn sys_rt_sigprocmask(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     how: u32,
     user_set: UserRef<SigSet>,
@@ -169,7 +169,7 @@ pub fn sys_rt_sigprocmask(
 type SigAltStackPtr = MultiArchUserRef<uapi::sigaltstack, uapi::arch32::sigaltstack>;
 
 pub fn sys_sigaltstack(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_ss: SigAltStackPtr,
     user_old_ss: SigAltStackPtr,
@@ -217,7 +217,7 @@ pub fn sys_sigaltstack(
 }
 
 pub fn sys_rt_sigsuspend(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_mask: UserRef<SigSet>,
     sigset_size: usize,
@@ -239,7 +239,7 @@ pub fn sys_rt_sigsuspend(
 }
 
 pub fn sys_rt_sigtimedwait(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     set_addr: UserRef<SigSet>,
     siginfo_addr: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
@@ -311,7 +311,7 @@ pub fn sys_rt_sigtimedwait(
 }
 
 pub fn sys_signalfd4(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     mask_addr: UserRef<SigSet>,
@@ -396,7 +396,7 @@ fn send_unchecked_signal_info(
 }
 
 pub fn sys_kill(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     unchecked_signal: UncheckedSignal,
@@ -489,7 +489,7 @@ fn verify_tgid_for_task(
 }
 
 pub fn sys_tkill(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tid: tid_t,
     unchecked_signal: UncheckedSignal,
@@ -504,7 +504,7 @@ pub fn sys_tkill(
 }
 
 pub fn sys_tgkill(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tgid: pid_t,
     tid: tid_t,
@@ -524,7 +524,7 @@ pub fn sys_tgkill(
 }
 
 pub fn sys_rt_sigreturn(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
 ) -> Result<SyscallResult, Errno> {
     restore_from_signal_handler(current_task)?;
@@ -551,7 +551,7 @@ pub fn read_siginfo(
 }
 
 pub fn sys_rt_sigqueueinfo(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tgid: pid_t,
     unchecked_signal: UncheckedSignal,
@@ -563,7 +563,7 @@ pub fn sys_rt_sigqueueinfo(
 }
 
 pub fn sys_rt_tgsigqueueinfo(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tgid: pid_t,
     tid: tid_t,
@@ -580,7 +580,7 @@ pub fn sys_rt_tgsigqueueinfo(
 }
 
 pub fn sys_pidfd_send_signal(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pidfd: FdNumber,
     unchecked_signal: UncheckedSignal,
@@ -701,7 +701,7 @@ impl WaitingOptions {
 /// - `pid`: The id of the task to wait on.
 /// - `options`: The options passed to the wait syscall.
 fn wait_on_pid(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     selector: &ProcessSelector,
     options: &WaitingOptions,
@@ -773,7 +773,7 @@ fn wait_on_pid(
 }
 
 pub fn sys_waitid(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id_type: u32,
     id: i32,
@@ -838,7 +838,7 @@ pub fn sys_waitid(
 }
 
 pub fn sys_wait4(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     raw_selector: pid_t,
     user_wstatus: UserRef<i32>,
@@ -904,7 +904,7 @@ mod arch32 {
     use starnix_uapi::user_address::UserRef;
 
     pub fn sys_arch32_signalfd(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         mask_addr: UserRef<SigSet>,

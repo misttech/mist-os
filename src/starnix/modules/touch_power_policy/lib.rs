@@ -31,7 +31,7 @@ impl TouchPowerPolicyDevice {
         })
     }
 
-    pub fn register<L>(self: Arc<Self>, locked: &mut Locked<'_, L>, system_task: &CurrentTask)
+    pub fn register<L>(self: Arc<Self>, locked: &mut Locked<L>, system_task: &CurrentTask)
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -72,7 +72,7 @@ impl TouchPowerPolicyDevice {
 impl DeviceOps for TouchPowerPolicyDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
         _node: &FsNode,
@@ -102,7 +102,7 @@ impl FileOps for TouchPowerPolicyFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -115,7 +115,7 @@ impl FileOps for TouchPowerPolicyFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

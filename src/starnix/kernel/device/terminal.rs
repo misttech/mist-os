@@ -178,7 +178,7 @@ impl Terminal {
     }
 
     /// Sets the terminal configuration.
-    pub fn set_termios<L>(&self, locked: &mut Locked<'_, L>, termios: uapi::termios)
+    pub fn set_termios<L>(&self, locked: &mut Locked<L>, termios: uapi::termios)
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -214,7 +214,7 @@ impl Terminal {
     /// `read` implementation of the main side of the terminal.
     pub fn main_read<L>(
         &self,
-        _locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<L>,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
@@ -226,7 +226,7 @@ impl Terminal {
     /// `write` implementation of the main side of the terminal.
     pub fn main_write<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
@@ -265,7 +265,7 @@ impl Terminal {
     /// `read` implementation of the replica side of the terminal.
     pub fn replica_read<L>(
         &self,
-        _locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<L>,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
@@ -277,7 +277,7 @@ impl Terminal {
     /// `write` implementation of the replica side of the terminal.
     pub fn replica_write<L>(
         &self,
-        _locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<L>,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
@@ -287,7 +287,7 @@ impl Terminal {
     }
 
     /// Send the pending signals to the associated foreground process groups if they exist.
-    fn send_signals<L>(&self, locked: &mut Locked<'_, L>, signals: PendingSignals)
+    fn send_signals<L>(&self, locked: &mut Locked<L>, signals: PendingSignals)
     where
         L: LockBefore<ProcessGroupState>,
     {

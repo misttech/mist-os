@@ -70,7 +70,7 @@ macro_rules! arch32_syscall_match {
 }
 
 pub fn dispatch_syscall(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     syscall: &Syscall,
 ) -> Result<SyscallResult, Errno> {

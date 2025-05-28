@@ -13,7 +13,7 @@ use starnix_uapi::{clone_args, tid_t, CSIGNAL};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     flags: u64,
     user_stack: UserAddress,
@@ -39,7 +39,7 @@ pub fn sys_clone(
 }
 
 pub fn sys_renameat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,
     old_user_path: UserCString,
@@ -64,7 +64,7 @@ mod arch32 {
 
     #[allow(non_snake_case)]
     pub fn sys_arch32_ARM_set_tls(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &mut CurrentTask,
         addr: UserAddress,
     ) -> Result<(), Errno> {
@@ -74,7 +74,7 @@ mod arch32 {
 
     #[allow(non_snake_case)]
     pub fn sys_arch32_ARM_cacheflush(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _current_task: &mut CurrentTask,
         _start_addr: UserAddress,
         _end_addr: UserAddress,
@@ -85,7 +85,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_vfork(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &mut CurrentTask,
     ) -> Result<tid_t, Errno> {
         do_clone(

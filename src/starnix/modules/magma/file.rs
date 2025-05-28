@@ -288,7 +288,7 @@ impl MagmaFile {
     ///
     /// Returns an error if the file does not contain a buffer.
     fn get_memory_and_magma_buffer<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         fd: FdNumber,
     ) -> Result<(MemoryObject, BufferInfo), Errno>
@@ -451,7 +451,7 @@ impl FileOps for MagmaFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _request: u32,
@@ -1254,7 +1254,7 @@ impl FileOps for MagmaFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1266,7 +1266,7 @@ impl FileOps for MagmaFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

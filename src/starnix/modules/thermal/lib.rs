@@ -50,7 +50,7 @@ impl FsNodeOps for ThermalZoneDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -81,7 +81,7 @@ impl FsNodeOps for ThermalZoneDirectory {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -140,7 +140,7 @@ impl BytesFileOps for TemperatureFile {
 }
 
 pub fn thermal_device_init(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     devices: Vec<String>,
 ) {

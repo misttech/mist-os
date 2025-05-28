@@ -565,7 +565,7 @@ impl Releasable for ZombieProcess {
 
 impl ThreadGroup {
     pub fn new<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         kernel: Arc<Kernel>,
         process: zx::Process,
         parent: Option<ThreadGroupWriteGuard<'_>>,
@@ -648,7 +648,7 @@ impl ThreadGroup {
     // callers should use CurrentTask::thread_group_exit instead.
     pub fn exit(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         exit_status: ExitStatus,
         mut current_task: Option<&mut CurrentTask>,
     ) {
@@ -732,7 +732,7 @@ impl ThreadGroup {
     ///
     /// It is important that the task is taken as an `OwnedRef`. It ensures the tasks of the
     /// ThreadGroup are always valid as they are still valid when removed.
-    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, pids: &mut PidTable, task: &OwnedRef<Task>)
+    pub fn remove<L>(&self, locked: &mut Locked<L>, pids: &mut PidTable, task: &OwnedRef<Task>)
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -937,7 +937,7 @@ impl ThreadGroup {
         Some(weak_parent)
     }
 
-    pub fn setsid<L>(&self, locked: &mut Locked<'_, L>) -> Result<(), Errno>
+    pub fn setsid<L>(&self, locked: &mut Locked<L>) -> Result<(), Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -957,7 +957,7 @@ impl ThreadGroup {
 
     pub fn setpgid<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         target: &Task,
         pgid: pid_t,
@@ -1151,7 +1151,7 @@ impl ThreadGroup {
 
     pub fn set_foreground_process_group<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         terminal: &Arc<Terminal>,
         pgid: pid_t,
@@ -1256,7 +1256,7 @@ impl ThreadGroup {
 
     pub fn release_controlling_terminal<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         _current_task: &CurrentTask,
         terminal: &Arc<Terminal>,
         is_main: bool,
@@ -1300,7 +1300,7 @@ impl ThreadGroup {
         Ok(())
     }
 
-    fn check_orphans<L>(&self, locked: &mut Locked<'_, L>)
+    fn check_orphans<L>(&self, locked: &mut Locked<L>)
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -1753,7 +1753,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
 
     fn set_process_group<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         process_group: Arc<ProcessGroup>,
         pids: &mut PidTable,
     ) where
@@ -1767,7 +1767,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
         self.process_group.insert(locked, self.base);
     }
 
-    fn leave_process_group<L>(&mut self, locked: &mut Locked<'_, L>, pids: &mut PidTable)
+    fn leave_process_group<L>(&mut self, locked: &mut Locked<L>, pids: &mut PidTable)
     where
         L: LockBefore<ProcessGroupState>,
     {

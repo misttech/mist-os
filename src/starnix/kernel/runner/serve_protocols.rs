@@ -37,7 +37,7 @@ use {
 use super::start_component;
 
 pub fn expose_root(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {

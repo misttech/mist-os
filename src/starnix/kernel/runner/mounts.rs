@@ -23,7 +23,7 @@ pub struct MountAction {
 
 impl MountAction {
     pub fn new_for_root(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         kernel: &Arc<Kernel>,
         pkg: &fio::DirectorySynchronousProxy,
         spec: &str,
@@ -46,7 +46,7 @@ impl MountAction {
     }
 
     pub fn from_spec(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         start_info: Option<&ContainerStartInfo>,
         pkg: &fio::DirectorySynchronousProxy,

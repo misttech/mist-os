@@ -77,7 +77,7 @@ uapi::arch_map_data! {
 pub type CMsgHdrPtr = MultiArchUserRef<uapi::cmsghdr, uapi::arch32::cmsghdr>;
 
 pub fn sys_socket(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -197,7 +197,7 @@ fn generate_autobind_address() -> FsString {
 }
 
 pub fn sys_bind(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -278,7 +278,7 @@ pub fn sys_bind(
 }
 
 pub fn sys_listen(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     backlog: i32,
@@ -290,7 +290,7 @@ pub fn sys_listen(
 }
 
 pub fn sys_accept(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -300,7 +300,7 @@ pub fn sys_accept(
 }
 
 pub fn sys_accept4(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -341,7 +341,7 @@ pub fn sys_accept4(
 }
 
 pub fn sys_connect(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -421,7 +421,7 @@ fn write_socket_address(
 }
 
 pub fn sys_getsockname(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -437,7 +437,7 @@ pub fn sys_getsockname(
 }
 
 pub fn sys_getpeername(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -453,7 +453,7 @@ pub fn sys_getpeername(
 }
 
 pub fn sys_socketpair(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     domain: u32,
     socket_type: u32,
@@ -506,7 +506,7 @@ fn read_iovec_from_msghdr(
 }
 
 fn recvmsg_internal<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     file: &FileHandle,
     user_message_header: MsgHdrPtr,
@@ -530,7 +530,7 @@ where
 }
 
 fn recvmsg_internal_with_header<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     file: &FileHandle,
     message_header: &mut MsgHdr,
@@ -623,7 +623,7 @@ where
 }
 
 pub fn sys_recvmsg(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_message_header: MsgHdrPtr,
@@ -637,7 +637,7 @@ pub fn sys_recvmsg(
 }
 
 pub fn sys_recvmmsg(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_mmsgvec: MMsgHdrPtr,
@@ -693,7 +693,7 @@ pub fn sys_recvmmsg(
 }
 
 pub fn sys_recvfrom(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -731,7 +731,7 @@ pub fn sys_recvfrom(
 }
 
 fn sendmsg_internal<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     file: &FileHandle,
     user_message_header: MsgHdrPtr,
@@ -745,7 +745,7 @@ where
 }
 
 fn sendmsg_internal_with_header<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     file: &FileHandle,
     message_header: &MsgHdr,
@@ -810,7 +810,7 @@ where
 }
 
 pub fn sys_sendmsg(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_message_header: MsgHdrPtr,
@@ -824,7 +824,7 @@ pub fn sys_sendmsg(
 }
 
 pub fn sys_sendmmsg(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_mmsgvec: MMsgHdrPtr,
@@ -864,7 +864,7 @@ pub fn sys_sendmmsg(
 }
 
 pub fn sys_sendto(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -892,7 +892,7 @@ pub fn sys_sendto(
 }
 
 pub fn sys_getsockopt(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     level: u32,
@@ -923,7 +923,7 @@ pub fn sys_getsockopt(
 }
 
 pub fn sys_setsockopt(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     level: u32,
@@ -948,7 +948,7 @@ pub fn sys_setsockopt(
 }
 
 pub fn sys_shutdown(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     how: u32,
@@ -990,7 +990,7 @@ mod arch32 {
     };
 
     pub fn sys_arch32_send(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         user_buffer: UserAddress,
@@ -1010,7 +1010,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_recv(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         user_buffer: UserAddress,

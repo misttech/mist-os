@@ -74,10 +74,10 @@ pub trait AppendLockStrategy<L> {
     /// Helper method for acquiring append lock in `truncate`/`allocate`. Acquires the lock when it's not already acquired.
     fn lock<'a>(
         &'a self,
-        locked: &'a mut Locked<'a, L>,
+        locked: &'a mut Locked<L>,
         current_task: &CurrentTask,
         node: &'a FsNode,
-    ) -> Result<(AppendLockGuard<'a>, Locked<'a, FileOpsCore>), Errno>;
+    ) -> Result<(AppendLockGuard<'a>, &'a mut Locked<FileOpsCore>), Errno>;
 }
 
 struct RealAppendLockStrategy {}
@@ -85,12 +85,12 @@ struct RealAppendLockStrategy {}
 impl AppendLockStrategy<BeforeFsNodeAppend> for RealAppendLockStrategy {
     fn lock<'a>(
         &'a self,
-        locked: &'a mut Locked<'a, BeforeFsNodeAppend>,
+        locked: &'a mut Locked<BeforeFsNodeAppend>,
         current_task: &CurrentTask,
         node: &'a FsNode,
-    ) -> Result<(AppendLockGuard<'a>, Locked<'a, FileOpsCore>), Errno> {
+    ) -> Result<(AppendLockGuard<'a>, &'a mut Locked<FileOpsCore>), Errno> {
         let (guard, new_locked) = node.ops().append_lock_read(locked, node, current_task)?;
-        Ok((AppendLockGuard::Read(guard), Locked::cast_locked_by_value::<FileOpsCore>(new_locked)))
+        Ok((AppendLockGuard::Read(guard), new_locked.cast_locked()))
     }
 }
 
@@ -108,10 +108,10 @@ impl<'a> AlreadyLockedAppendLockStrategy<'a> {
 impl AppendLockStrategy<FileOpsCore> for AlreadyLockedAppendLockStrategy<'_> {
     fn lock<'a>(
         &'a self,
-        locked: &'a mut Locked<'a, FileOpsCore>,
+        locked: &'a mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _node: &'a FsNode,
-    ) -> Result<(AppendLockGuard<'a>, Locked<'a, FileOpsCore>), Errno> {
+    ) -> Result<(AppendLockGuard<'a>, &'a mut Locked<FileOpsCore>), Errno> {
         Ok((AppendLockGuard::AlreadyLocked(self.guard), locked.cast_locked::<FileOpsCore>()))
     }
 }
@@ -375,7 +375,7 @@ impl FileObject {
     /// See flock(2).
     pub fn flock(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         operation: FlockOperation,
     ) -> Result<(), Errno> {
@@ -585,7 +585,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Delegate the access check to the node.
     fn check_access(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
@@ -607,7 +607,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// be assigned an FdNumber.
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         flags: OpenFlags,
@@ -619,7 +619,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// initialize is called.
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -638,7 +638,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// is used to create directories instead.
     fn mknod(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -650,7 +650,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Create and return the given child node as a subdirectory.
     fn mkdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -661,7 +661,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Creates a symlink with the given `target` path.
     fn create_symlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -687,7 +687,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Reads the symlink from this node.
     fn readlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -697,7 +697,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Create a hard link with the given name to the given child.
     fn link(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -712,7 +712,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// a directory or a non-directory child.
     fn unlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -723,17 +723,17 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Should be done before calling `allocate` or `truncate` to avoid lock ordering issues.
     fn append_lock_read<'a>(
         &'a self,
-        locked: &'a mut Locked<'a, BeforeFsNodeAppend>,
+        locked: &'a mut Locked<BeforeFsNodeAppend>,
         node: &'a FsNode,
         current_task: &CurrentTask,
-    ) -> Result<(RwQueueReadGuard<'a, FsNodeAppend>, Locked<'a, FsNodeAppend>), Errno> {
+    ) -> Result<(RwQueueReadGuard<'a, FsNodeAppend>, &'a mut Locked<FsNodeAppend>), Errno> {
         return node.append_lock.read_and(locked, current_task);
     }
 
     /// Change the length of the file.
     fn truncate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -745,7 +745,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Manipulate allocated disk space for the file.
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -774,7 +774,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Return a read guard for the updated information.
     fn fetch_and_refresh_info<'a>(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -785,7 +785,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Update node attributes persistently.
     fn update_attributes(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _info: &FsNodeInfo,
         _has: zxio_node_attr_has_t,
@@ -805,7 +805,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// 0, and lesser than the required size.
     fn get_xattr(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -817,7 +817,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Set an extended attribute on the node.
     fn set_xattr(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -829,7 +829,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
 
     fn remove_xattr(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -842,7 +842,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// return an ERANGE error if max_size is not 0, and lesser than the required size.
     fn list_xattrs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _max_size: usize,
@@ -853,7 +853,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Called when the FsNode is freed by the Kernel.
     fn forget(
         self: Box<Self>,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         _info: FsNodeInfo,
     ) -> Result<(), Errno> {
@@ -902,7 +902,7 @@ macro_rules! fs_node_impl_symlink {
 
         fn create_file_ops(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             node: &$crate::vfs::FsNode,
             _current_task: &CurrentTask,
             _flags: starnix_uapi::open_flags::OpenFlags,
@@ -918,7 +918,7 @@ macro_rules! fs_node_impl_dir_readonly {
     () => {
         fn check_access(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             node: &$crate::vfs::FsNode,
             current_task: &$crate::task::CurrentTask,
             access: starnix_uapi::file_mode::Access,
@@ -936,7 +936,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn mkdir(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -948,7 +948,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn mknod(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -961,7 +961,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn create_symlink(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -973,7 +973,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn link(
             &self,
-            _locked: &mut Locked<'_, FileOpsCore>,
+            _locked: &mut Locked<FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -984,7 +984,7 @@ macro_rules! fs_node_impl_dir_readonly {
 
         fn unlink(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -1039,7 +1039,7 @@ macro_rules! fs_node_impl_xattr_delegate {
     ($self:ident, $delegate:expr) => {
         fn get_xattr(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -1050,7 +1050,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn set_xattr(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -1062,7 +1062,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn remove_xattr(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &$crate::vfs::FsStr,
@@ -1072,7 +1072,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn list_xattrs(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             _size: usize,
@@ -1088,7 +1088,7 @@ macro_rules! fs_node_impl_not_dir {
     () => {
         fn lookup(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             _name: &$crate::vfs::FsStr,
@@ -1098,7 +1098,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn mknod(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             _name: &$crate::vfs::FsStr,
@@ -1111,7 +1111,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn mkdir(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             _name: &$crate::vfs::FsStr,
@@ -1123,7 +1123,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn create_symlink(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             _name: &$crate::vfs::FsStr,
@@ -1135,7 +1135,7 @@ macro_rules! fs_node_impl_not_dir {
 
         fn unlink(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &$crate::vfs::FsNode,
             _current_task: &$crate::task::CurrentTask,
             _name: &$crate::vfs::FsStr,
@@ -1166,7 +1166,7 @@ impl FsNodeOps for SpecialNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -1344,7 +1344,7 @@ impl FsNode {
 
     pub fn record_lock(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: &FileObject,
         cmd: RecordLockCommand,
@@ -1366,7 +1366,7 @@ impl FsNode {
 
     pub fn create_file_ops<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno>
@@ -1379,7 +1379,7 @@ impl FsNode {
 
     pub fn open(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         flags: OpenFlags,
@@ -1459,7 +1459,7 @@ impl FsNode {
 
     pub fn lookup<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -1480,7 +1480,7 @@ impl FsNode {
 
     pub fn mknod<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -1540,7 +1540,7 @@ impl FsNode {
 
     pub fn create_symlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -1574,7 +1574,7 @@ impl FsNode {
     /// returns success. All other failure modes return an `Errno` that should be early-returned.
     fn init_new_node_security_on_create<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         new_node: &FsNode,
         name: &FsStr,
@@ -1610,7 +1610,7 @@ impl FsNode {
 
     pub fn create_tmpfile<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mut mode: FileMode,
@@ -1640,7 +1640,7 @@ impl FsNode {
     // Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
     pub fn readlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno>
     where
@@ -1653,7 +1653,7 @@ impl FsNode {
 
     pub fn link<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -1737,7 +1737,7 @@ impl FsNode {
 
     pub fn unlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -1768,7 +1768,7 @@ impl FsNode {
 
     pub fn truncate<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         length: u64,
@@ -1781,7 +1781,7 @@ impl FsNode {
 
     pub fn truncate_with_strategy<L, M>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         strategy: impl AppendLockStrategy<M>,
         current_task: &CurrentTask,
         mount: &MountInfo,
@@ -1813,7 +1813,7 @@ impl FsNode {
     /// which will also perform all file-descriptor based verifications.
     pub fn ftruncate<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno>
@@ -1849,7 +1849,7 @@ impl FsNode {
     // Called by `truncate` and `ftruncate` above.
     fn truncate_common<L, M>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         strategy: impl AppendLockStrategy<M>,
         current_task: &CurrentTask,
         length: u64,
@@ -1879,7 +1879,7 @@ impl FsNode {
     /// which will also perform additional verifications.
     pub fn fallocate<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mode: FallocMode,
         offset: u64,
@@ -1900,7 +1900,7 @@ impl FsNode {
 
     pub fn fallocate_with_strategy<L, M>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         strategy: impl AppendLockStrategy<M>,
         current_task: &CurrentTask,
         mode: FallocMode,
@@ -2022,7 +2022,7 @@ impl FsNode {
     /// owner or is in the file's group.
     pub fn check_access<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         access: Access,
@@ -2088,7 +2088,7 @@ impl FsNode {
 
     pub fn update_attributes<L, F>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mutator: F,
     ) -> Result<(), Errno>
@@ -2140,7 +2140,7 @@ impl FsNode {
     /// Does not change the IFMT of the node.
     pub fn chmod<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mut mode: FileMode,
@@ -2168,7 +2168,7 @@ impl FsNode {
     /// Sets the owner and/or group on this FsNode.
     pub fn chown<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         owner: Option<uid_t>,
@@ -2271,7 +2271,7 @@ impl FsNode {
 
     pub fn stat<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<uapi::stat, Errno>
     where
@@ -2324,7 +2324,7 @@ impl FsNode {
 
     pub fn statx<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         flags: StatxFlags,
         mask: u32,
@@ -2414,7 +2414,7 @@ impl FsNode {
 
     pub fn get_xattr<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -2448,7 +2448,7 @@ impl FsNode {
 
     pub fn set_xattr<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -2485,7 +2485,7 @@ impl FsNode {
 
     pub fn remove_xattr<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -2508,7 +2508,7 @@ impl FsNode {
 
     pub fn list_xattrs<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         max_size: usize,
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno>
@@ -2538,7 +2538,7 @@ impl FsNode {
     /// Refreshes the `FsNodeInfo` if necessary and returns a read guard.
     pub fn fetch_and_refresh_info<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<RwLockReadGuard<'_, FsNodeInfo>, Errno>
     where
@@ -2563,7 +2563,7 @@ impl FsNode {
     /// Clear the SUID and SGID bits unless the `current_task` has `CAP_FSETID`
     pub fn clear_suid_and_sgid_bits<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), Errno>
     where
@@ -2605,7 +2605,7 @@ impl FsNode {
     /// holds either the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
     pub fn update_atime_mtime<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         atime: TimeUpdateType,
@@ -2711,7 +2711,7 @@ impl std::fmt::Debug for FsNode {
 }
 
 impl Releasable for FsNode {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
 
     fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;
@@ -2895,7 +2895,7 @@ mod tests {
             .expect("create_node")
             .entry
             .node;
-        let check_access = |locked: &mut Locked<'_, Unlocked>,
+        let check_access = |locked: &mut Locked<Unlocked>,
                             uid: uid_t,
                             gid: gid_t,
                             perm: u32,

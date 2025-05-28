@@ -142,7 +142,7 @@ impl DeviceMapperRegistry {
 
     fn get_or_create_by_minor<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         minor: u32,
     ) -> Arc<DmDevice>
@@ -160,7 +160,7 @@ impl DeviceMapperRegistry {
     /// a new DmDevice associated with that minor number.
     fn find<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<Arc<DmDevice>, Errno>
     where
@@ -183,7 +183,7 @@ impl DeviceMapperRegistry {
     /// Removes `device` from both the Device and DeviceMapper registries.
     fn remove<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         devices: &mut BTreeMap<u32, Arc<DmDevice>>,
         minor: u32,
@@ -215,7 +215,7 @@ pub struct DmDevice {
 }
 
 impl DmDevice {
-    fn new<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
+    fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
     where
         L: LockBefore<FileOpsCore>,
     {
@@ -319,7 +319,7 @@ impl FileOps for DmDeviceFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -330,7 +330,7 @@ impl FileOps for DmDeviceFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -387,7 +387,7 @@ impl FileOps for DmDeviceFile {
 
     fn get_memory(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
@@ -419,7 +419,7 @@ impl FileOps for DmDeviceFile {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -633,7 +633,7 @@ struct VerityTargetBaseArgs {
 // Returns the FileHandle and minor number of the device found at `device path` formatted as
 // either /dev/loop# of MAJOR:MINOR
 fn open_device(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     device_path: String,
 ) -> Result<(u64, FileHandle), Errno> {
@@ -673,7 +673,7 @@ fn size_of_merkle_tree_preceding_leaf_nodes(
 
 // Parse the parameter string into a TargetType.
 fn parse_parameter_string(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     target_type: &str,
     parameter_str: String,
@@ -775,7 +775,7 @@ impl FileOps for DeviceMapper {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1197,7 +1197,7 @@ impl FileOps for DeviceMapper {
 }
 
 pub fn create_device_mapper(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -1207,7 +1207,7 @@ pub fn create_device_mapper(
 }
 
 fn get_or_create_dm_device(
-    locked: &mut Locked<'_, DeviceOpen>,
+    locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,

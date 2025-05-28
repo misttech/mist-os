@@ -57,7 +57,7 @@ struct LayeredFileSystemOps {
 impl FileSystemOps for LayeredFileSystemOps {
     fn statfs(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -77,7 +77,7 @@ impl FsNodeOps for LayeredNodeOps {
 
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -90,7 +90,7 @@ impl FsNodeOps for LayeredNodeOps {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -104,7 +104,7 @@ impl FsNodeOps for LayeredNodeOps {
 
     fn get_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -122,7 +122,7 @@ impl FsNodeOps for LayeredNodeOps {
     /// Set an extended attribute on the node.
     fn set_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -141,7 +141,7 @@ impl FsNodeOps for LayeredNodeOps {
 
     fn remove_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -151,7 +151,7 @@ impl FsNodeOps for LayeredNodeOps {
 
     fn list_xattrs(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         max_size: usize,
@@ -171,7 +171,7 @@ impl FileOps for LayeredFileOps {
 
     fn seek(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -194,7 +194,7 @@ impl FileOps for LayeredFileOps {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -254,7 +254,7 @@ mod test {
     use starnix_sync::Unlocked;
 
     fn get_root_entry_names(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystem,
     ) -> Vec<Vec<u8>> {

@@ -22,7 +22,7 @@ impl FsNodeOps for SelfSymlink {
 
     fn readlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {

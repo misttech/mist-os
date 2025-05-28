@@ -15,7 +15,7 @@ use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 
-pub fn hvdcp_opti_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+pub fn hvdcp_opti_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {

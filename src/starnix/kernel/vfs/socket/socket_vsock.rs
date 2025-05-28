@@ -77,7 +77,7 @@ impl SocketOps for VsockSocket {
     // we only connect from the enclosing OK.
     fn connect(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &SocketHandle,
         _current_task: &CurrentTask,
         _peer: SocketPeer,
@@ -87,7 +87,7 @@ impl SocketOps for VsockSocket {
 
     fn listen(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         backlog: i32,
         _credentials: ucred,
@@ -110,7 +110,7 @@ impl SocketOps for VsockSocket {
 
     fn accept(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketHandle, Errno> {
         match socket.socket_type {
@@ -128,7 +128,7 @@ impl SocketOps for VsockSocket {
 
     fn bind(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -147,7 +147,7 @@ impl SocketOps for VsockSocket {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -173,7 +173,7 @@ impl SocketOps for VsockSocket {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -192,7 +192,7 @@ impl SocketOps for VsockSocket {
 
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -210,7 +210,7 @@ impl SocketOps for VsockSocket {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -219,7 +219,7 @@ impl SocketOps for VsockSocket {
 
     fn shutdown(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _how: SocketShutdownFlags,
     ) -> Result<(), Errno> {
@@ -227,7 +227,7 @@ impl SocketOps for VsockSocket {
         Ok(())
     }
 
-    fn close(&self, locked: &mut Locked<'_, FileOpsCore>, socket: &Socket) {
+    fn close(&self, locked: &mut Locked<FileOpsCore>, socket: &Socket) {
         // Call to shutdown should never fail, so unwrap is OK
         self.shutdown(locked, socket, SocketShutdownFlags::READ | SocketShutdownFlags::WRITE)
             .unwrap();
@@ -235,7 +235,7 @@ impl SocketOps for VsockSocket {
 
     fn getsockname(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
@@ -248,7 +248,7 @@ impl SocketOps for VsockSocket {
 
     fn getpeername(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
@@ -308,7 +308,7 @@ impl VsockSocket {
 impl VsockSocketInner {
     fn query_events<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno>
     where

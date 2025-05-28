@@ -17,7 +17,7 @@ use std::sync::mpsc::{sync_channel, SendError, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-type BoxedClosure = Box<dyn FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static>;
+type BoxedClosure = Box<dyn FnOnce(&mut Locked<Unlocked>, &CurrentTask) + Send + 'static>;
 
 const DEFAULT_THREAD_ROLE: &str = "fuchsia.starnix.fair.16";
 
@@ -62,7 +62,7 @@ impl DynamicThreadSpawner {
     pub fn spawn_and_get_result<R, F>(&self, f: F) -> impl Future<Output = Result<R, Errno>>
     where
         R: Send + 'static,
-        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) -> R + Send + 'static,
+        F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) -> R + Send + 'static,
     {
         let (sender, receiver) = oneshot::channel::<R>();
         self.spawn(move |locked, current_task| {
@@ -78,7 +78,7 @@ impl DynamicThreadSpawner {
     pub fn spawn_and_get_result_sync<R, F>(&self, f: F) -> Result<R, Errno>
     where
         R: Send + 'static,
-        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) -> R + Send + 'static,
+        F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) -> R + Send + 'static,
     {
         let (sender, receiver) = sync_channel::<R>(1);
         self.spawn(move |locked, current_task| {
@@ -94,7 +94,7 @@ impl DynamicThreadSpawner {
     /// responsible to start running the closure.
     pub fn spawn_with_role<F>(&self, role: &'static str, f: F)
     where
-        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
+        F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) + Send + 'static,
     {
         self.spawn(move |locked, current_task| {
             if let Err(e) = fuchsia_scheduler::set_role_for_this_thread(role) {
@@ -114,7 +114,7 @@ impl DynamicThreadSpawner {
     /// responsible to start running the closure.
     pub fn spawn<F>(&self, f: F)
     where
-        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
+        F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) + Send + 'static,
     {
         // Check whether a thread already exists to handle the request.
         let mut function: BoxedClosure = Box::new(f);

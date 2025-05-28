@@ -33,7 +33,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use std::sync::Arc;
 
-fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
+fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.objects.misc_class();
@@ -90,7 +90,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
 /// Adding device nodes to devtmpfs requires the current running task. The `Kernel` constructor does
 /// not create an initial task, so this function should be triggered after a `CurrentTask` has been
 /// initialized.
-pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &CurrentTask) {
+pub fn init_common_devices(locked: &mut Locked<Unlocked>, system_task: &CurrentTask) {
     misc_device_init(locked, system_task);
     mem_device_init(locked, system_task);
     tty_device_init(locked, system_task);
@@ -99,7 +99,7 @@ pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &Curr
     zram_device_init(locked, system_task);
 }
 
-pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: &Arc<Kernel>) {
+pub fn register_common_file_systems(_locked: &mut Locked<Unlocked>, kernel: &Arc<Kernel>) {
     let registry = kernel.expando.get::<FsRegistry>();
     registry.register(b"binder".into(), BinderFs::new_fs);
     registry.register(b"bpf".into(), BpfFs::new_fs);

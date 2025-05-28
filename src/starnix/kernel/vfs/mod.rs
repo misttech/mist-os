@@ -123,7 +123,7 @@ macro_rules! register {
 // where
 //    for<'b, 'a> T: Releasable<Context<'a, 'b> = CurrentTaskAndLocked<'a, 'b>>,
 // {
-//     fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>) {
+//     fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_>) {
 //         if let Some(this) = self.take() {
 //             <T as Releasable>::release(this, context);
 //         }
@@ -133,7 +133,7 @@ macro_rules! register {
 macro_rules! impl_ctr_for_option {
     ($arg:ty) => {
         impl CurrentTaskAndLockedReleasable for Option<$arg> {
-            fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>) {
+            fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_>) {
                 if let Some(this) = self.take() {
                     <$arg as Releasable>::release(this, context);
                 }
@@ -160,11 +160,11 @@ impl ReleaserAction<FsNode> for FsNodeReleaserAction {
 pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
 impl_ctr_for_option!(ReleaseGuard<FsNode>);
 
-pub type CurrentTaskAndLocked<'a, 'b> = (&'b mut Locked<'a, FileOpsCore>, &'b CurrentTask);
+pub type CurrentTaskAndLocked<'a> = (&'a mut Locked<FileOpsCore>, &'a CurrentTask);
 
 /// An object-safe/dyn-compatible trait to wrap `Releasable` types.
 pub trait CurrentTaskAndLockedReleasable {
-    fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>);
+    fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_>);
 }
 
 thread_local! {
@@ -185,7 +185,7 @@ impl LocalReleasers {
 }
 
 impl Releasable for LocalReleasers {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
 
     fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;
@@ -210,7 +210,7 @@ impl DelayedReleaser {
     /// Run all current delayed releases for the current thread.
     pub fn apply<'a>(
         &self,
-        locked: &'a mut Locked<'a, FileOpsCore>,
+        locked: &'a mut Locked<FileOpsCore>,
         current_task: &'a CurrentTask,
     ) {
         loop {
@@ -249,7 +249,7 @@ impl DelayedReleaser {
 struct FlushedFile(FileHandle, FdTableId);
 
 impl Releasable for FlushedFile {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
     fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;
         self.0.flush(locked, current_task, self.1);

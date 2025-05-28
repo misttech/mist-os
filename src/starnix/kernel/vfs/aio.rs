@@ -166,7 +166,7 @@ impl AioContextInner {
 
     fn perform_next_action(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         worker_type: WorkerType,
     ) {
@@ -312,7 +312,7 @@ impl IoOperation {
 
     fn execute(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> Option<Result<SyscallResult, Errno>> {
         let Some(file) = self.file.upgrade() else {
@@ -343,7 +343,7 @@ impl IoOperation {
 
     fn do_read(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: FileHandle,
     ) -> Result<usize, Errno> {
@@ -361,7 +361,7 @@ impl IoOperation {
 
     fn do_write(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: FileHandle,
     ) -> Result<usize, Errno> {

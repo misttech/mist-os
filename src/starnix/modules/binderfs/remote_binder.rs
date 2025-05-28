@@ -86,7 +86,7 @@ pub struct RemoteBinderDevice {}
 impl DeviceOps for RemoteBinderDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -110,7 +110,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -119,7 +119,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -128,7 +128,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -139,7 +139,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -150,7 +150,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn mmap(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _addr: DesiredAddress,
@@ -165,7 +165,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -177,7 +177,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -485,7 +485,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
     fn ioctl(
         self: &Arc<Self>,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -918,7 +918,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Returns the next TaskRequest that `current_task` must handle, waiting if none is available.
     fn get_next_task(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<TaskRequest, Errno> {
         loop {
@@ -960,7 +960,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Open a remote connection with the binder device at `path`.
     fn open(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         path: FsString,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
@@ -1067,7 +1067,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Implementation of the REMOTE_BINDER_WAIT ioctl.
     fn wait(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         wait_command_ref: UserRef<uapi::remote_binder_wait_command>,
     ) -> Result<(), Errno> {

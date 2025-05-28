@@ -92,7 +92,7 @@ struct DevFuse {
 }
 
 pub fn open_fuse_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -118,7 +118,7 @@ impl FileOps for DevFuse {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -127,7 +127,7 @@ impl FileOps for DevFuse {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -141,7 +141,7 @@ impl FileOps for DevFuse {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -153,7 +153,7 @@ impl FileOps for DevFuse {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -165,7 +165,7 @@ impl FileOps for DevFuse {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -174,7 +174,7 @@ impl FileOps for DevFuse {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -205,7 +205,7 @@ impl FileOps for DevFuse {
 }
 
 pub fn new_fuse_fs(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -251,7 +251,7 @@ fn fuse_connections(kernel: &Arc<Kernel>) -> Arc<FuseConnections> {
 }
 
 pub fn new_fusectl_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -283,7 +283,7 @@ impl FuseFs {
 impl FileSystemOps for FuseFs {
     fn rename(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -312,7 +312,7 @@ impl FileSystemOps for FuseFs {
 
     fn statfs(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         fs: &FileSystem,
         current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -386,7 +386,7 @@ struct FuseCtlFs;
 impl FileSystemOps for FuseCtlFs {
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,
@@ -401,7 +401,7 @@ impl FileSystemOps for FuseCtlFs {
 
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -423,7 +423,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -442,7 +442,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -501,7 +501,7 @@ impl FileOps for AbortFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -512,7 +512,7 @@ impl FileOps for AbortFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -585,7 +585,7 @@ impl FuseNode {
 
     fn default_check_access_with_valid_node_attributes(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
@@ -598,7 +598,7 @@ impl FuseNode {
 
     fn refresh_expired_node_attributes<'a>(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
@@ -632,7 +632,7 @@ impl FuseNode {
 
     fn fetch_and_refresh_info_impl<'a>(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
@@ -748,7 +748,7 @@ impl FuseFileObject {
 impl FileOps for FuseFileObject {
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -774,7 +774,7 @@ impl FileOps for FuseFileObject {
 
     fn flush(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -795,7 +795,7 @@ impl FileOps for FuseFileObject {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -832,7 +832,7 @@ impl FileOps for FuseFileObject {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -877,7 +877,7 @@ impl FileOps for FuseFileObject {
 
     fn seek(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -923,7 +923,7 @@ impl FileOps for FuseFileObject {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -935,7 +935,7 @@ impl FileOps for FuseFileObject {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -961,7 +961,7 @@ impl FileOps for FuseFileObject {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -1043,7 +1043,7 @@ impl FileOps for FuseFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1078,7 +1078,7 @@ impl Default for FuseDirEntry {
 impl DirEntryOps for FuseDirEntry {
     fn revalidate(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         dir_entry: &DirEntry,
     ) -> Result<bool, Errno> {
@@ -1163,7 +1163,7 @@ const DEFAULT_PERMISSIONS_ATOMIC_ORDERING: Ordering = Ordering::Relaxed;
 impl FsNodeOps for FuseNode {
     fn check_access(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
@@ -1220,7 +1220,7 @@ impl FsNodeOps for FuseNode {
 
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -1258,7 +1258,7 @@ impl FsNodeOps for FuseNode {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1279,7 +1279,7 @@ impl FsNodeOps for FuseNode {
 
     fn mknod(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1287,7 +1287,7 @@ impl FsNodeOps for FuseNode {
         dev: DeviceType,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let get_entry = |locked: &mut Locked<'_, FileOpsCore>| {
+        let get_entry = |locked: &mut Locked<FileOpsCore>| {
             let umask = current_task.fs().umask().bits();
             let mut connection = self.connection.lock();
 
@@ -1367,7 +1367,7 @@ impl FsNodeOps for FuseNode {
 
     fn mkdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1396,7 +1396,7 @@ impl FsNodeOps for FuseNode {
 
     fn create_symlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1419,7 +1419,7 @@ impl FsNodeOps for FuseNode {
 
     fn readlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -1439,7 +1439,7 @@ impl FsNodeOps for FuseNode {
 
     fn link(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1462,7 +1462,7 @@ impl FsNodeOps for FuseNode {
 
     fn unlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1486,7 +1486,7 @@ impl FsNodeOps for FuseNode {
 
     fn truncate(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
@@ -1524,7 +1524,7 @@ impl FsNodeOps for FuseNode {
 
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -1538,7 +1538,7 @@ impl FsNodeOps for FuseNode {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -1551,7 +1551,7 @@ impl FsNodeOps for FuseNode {
 
     fn update_attributes(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         info: &FsNodeInfo,
         has: zxio_node_attr_has_t,
@@ -1603,7 +1603,7 @@ impl FsNodeOps for FuseNode {
 
     fn get_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1630,7 +1630,7 @@ impl FsNodeOps for FuseNode {
 
     fn set_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1660,7 +1660,7 @@ impl FsNodeOps for FuseNode {
 
     fn remove_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1676,7 +1676,7 @@ impl FsNodeOps for FuseNode {
 
     fn list_xattrs(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         max_size: usize,
@@ -1705,7 +1705,7 @@ impl FsNodeOps for FuseNode {
 
     fn forget(
         self: Box<Self>,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _info: FsNodeInfo,
     ) -> Result<(), Errno> {
@@ -1835,7 +1835,7 @@ struct FuseMutableState {
 impl<'a> FuseMutableStateGuard<'a> {
     fn wait_for_configuration<L, T>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         f: impl Fn(&FuseConfiguration) -> T,
     ) -> Result<T, Errno>
@@ -1862,7 +1862,7 @@ impl<'a> FuseMutableStateGuard<'a> {
 
     fn get_configuration<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<FuseConfiguration, Errno>
     where
@@ -1873,7 +1873,7 @@ impl<'a> FuseMutableStateGuard<'a> {
 
     fn wait_for_configuration_ready<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), Errno>
     where
@@ -1889,7 +1889,7 @@ impl<'a> FuseMutableStateGuard<'a> {
     /// being unmounted.
     fn execute_operation<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         node: &FuseNode,
         operation: FuseOperation,

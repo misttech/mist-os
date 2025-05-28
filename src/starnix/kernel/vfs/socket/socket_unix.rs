@@ -167,7 +167,7 @@ impl UnixSocket {
     /// - `domain`: The domain of the socket (e.g., `AF_UNIX`).
     /// - `socket_type`: The type of the socket (e.g., `SOCK_STREAM`).
     pub fn new_pair<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
@@ -436,7 +436,7 @@ impl UnixSocket {
 impl SocketOps for UnixSocket {
     fn connect(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: SocketPeer,
@@ -456,7 +456,7 @@ impl SocketOps for UnixSocket {
 
     fn listen(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         backlog: i32,
         credentials: ucred,
@@ -484,7 +484,7 @@ impl SocketOps for UnixSocket {
 
     fn accept(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketHandle, Errno> {
         match socket.socket_type {
@@ -501,7 +501,7 @@ impl SocketOps for UnixSocket {
 
     fn bind(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -515,7 +515,7 @@ impl SocketOps for UnixSocket {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -539,7 +539,7 @@ impl SocketOps for UnixSocket {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -578,7 +578,7 @@ impl SocketOps for UnixSocket {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -590,7 +590,7 @@ impl SocketOps for UnixSocket {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -644,7 +644,7 @@ impl SocketOps for UnixSocket {
     /// Used by the shutdown syscalls.
     fn shutdown(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         how: SocketShutdownFlags,
     ) -> Result<(), Errno> {
@@ -673,7 +673,7 @@ impl SocketOps for UnixSocket {
     /// which changes how read() behaves on that socket. Second, close
     /// transitions the internal state of this socket to Closed, which breaks
     /// the reference cycle that exists in the connected state.
-    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, socket: &Socket) {
+    fn close(&self, _locked: &mut Locked<FileOpsCore>, socket: &Socket) {
         let (maybe_peer, has_unread) = {
             let mut inner = self.lock();
             let maybe_peer = inner.peer().map(Arc::clone);
@@ -701,7 +701,7 @@ impl SocketOps for UnixSocket {
     /// will always have a name, even if it is not bound to an address.
     fn getsockname(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
@@ -717,7 +717,7 @@ impl SocketOps for UnixSocket {
     /// Returns an error if the socket is not connected.
     fn getpeername(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         let peer = self.lock().peer().ok_or_else(|| errno!(ENOTCONN))?.clone();
@@ -726,7 +726,7 @@ impl SocketOps for UnixSocket {
 
     fn setsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         level: u32,
@@ -800,7 +800,7 @@ impl SocketOps for UnixSocket {
 
     fn getsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         level: u32,
@@ -841,7 +841,7 @@ impl SocketOps for UnixSocket {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         socket: &Socket,
         file: &FileObject,
         current_task: &CurrentTask,
@@ -957,7 +957,7 @@ impl UnixSocketInner {
     /// Returns the number of bytes that were written to the socket.
     fn write(
         &mut self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
@@ -1002,7 +1002,7 @@ impl UnixSocketInner {
 }
 
 pub fn resolve_unix_socket_address<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     name: &FsStr,
 ) -> Result<SocketHandle, Errno>

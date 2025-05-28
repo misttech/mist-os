@@ -425,7 +425,7 @@ impl RecordLocks {
     /// overwrite the content of the flock struct passed by the user.
     pub fn lock(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: &FileObject,
         cmd: RecordLockCommand,

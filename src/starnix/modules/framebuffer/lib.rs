@@ -67,7 +67,7 @@ impl Framebuffer {
 
     /// Initialize the framebuffer device. Should only be called once per kernel.
     pub fn device_init<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         system_task: &CurrentTask,
         aspect_ratio: Option<AspectRatio>,
         enable_visual_debugging: bool,
@@ -228,7 +228,7 @@ struct FramebufferDevice {
 impl DeviceOps for FramebufferDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         dev: DeviceType,
         node: &FsNode,
@@ -252,7 +252,7 @@ impl FileOps for Framebuffer {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

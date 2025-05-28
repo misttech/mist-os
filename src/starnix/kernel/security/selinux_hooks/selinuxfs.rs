@@ -30,7 +30,7 @@ pub(in crate::security) fn selinuxfs_init_null(
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
 /// initialization to be completed.
 pub(in crate::security) fn selinuxfs_policy_loaded<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
 ) where

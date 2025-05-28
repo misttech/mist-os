@@ -316,7 +316,7 @@ impl FileSystem {
     /// directory and that |replaced| is empty.
     pub fn rename<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
         old_name: &FsStr,
@@ -372,7 +372,7 @@ impl FileSystem {
     /// Returns `ENOSYS` if the `FileSystemOps` don't implement `stat`.
     pub fn statfs<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<statfs, Errno>
     where
@@ -467,7 +467,7 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     /// ```
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno>;
@@ -495,7 +495,7 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     /// not in the DirEntry cache).
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,

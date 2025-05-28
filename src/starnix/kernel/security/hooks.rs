@@ -240,7 +240,7 @@ pub fn file_system_post_init_security(kernel: &Kernel, file_system: &FileSystemH
 /// labeled when a policy is first loaded.
 /// If the `file_system` was already labeled then no further work is done.
 pub fn file_system_resolve_security<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     file_system: &FileSystemHandle,
 ) -> Result<(), Errno>
@@ -318,7 +318,7 @@ pub fn file_permission(
 /// this is a no-op.
 /// Corresponds to the `d_instantiate()` LSM hook.
 pub fn fs_node_init_with_dentry<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     dir_entry: &DirEntryHandle,
 ) -> Result<(), Errno>
@@ -1506,7 +1506,7 @@ pub fn fs_node_listsecurity(current_task: &CurrentTask, fs_node: &FsNode) -> Opt
 /// the [`crate::vfs::FsNodeOps`], so the returned value may not be a valid Security Context.
 /// Corresponds to the `inode_getsecurity()` LSM hook.
 pub fn fs_node_getsecurity<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     fs_node: &FsNode,
     name: &FsStr,
@@ -1557,7 +1557,7 @@ where
 ///
 /// This is consistent with the way the `*_getsecurity()` hook is used in both Linux and SEStarnix.
 pub fn fs_node_setsecurity<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     fs_node: &FsNode,
     name: &FsStr,
@@ -1707,7 +1707,7 @@ pub fn selinuxfs_init_null(current_task: &CurrentTask, null_fs_node: &FileHandle
 /// file-systems mounted prior to policy load (e.g. the "selinuxfs" itself), and initializing
 /// security state for any file nodes they may already contain.
 // TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
-pub fn selinuxfs_policy_loaded<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+pub fn selinuxfs_policy_loaded<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {

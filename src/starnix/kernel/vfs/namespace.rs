@@ -105,7 +105,7 @@ impl FsNodeOps for Arc<Namespace> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -704,7 +704,7 @@ impl Kernel {
 impl CurrentTask {
     pub fn create_filesystem(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -777,7 +777,7 @@ impl FileOps for ProcMountsFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -788,7 +788,7 @@ impl FileOps for ProcMountsFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -802,7 +802,7 @@ impl FileOps for ProcMountsFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1044,7 +1044,7 @@ impl NamespaceNode {
     /// remember its path in the Namespace.
     pub fn open(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         flags: OpenFlags,
         access_check: AccessCheck,
@@ -1064,7 +1064,7 @@ impl NamespaceNode {
     /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
     pub fn open_create_node<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
@@ -1077,7 +1077,7 @@ impl NamespaceNode {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         let create_fn =
-            |locked: &mut Locked<'_, L>, dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
+            |locked: &mut Locked<L>, dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
                 dir.mknod(locked, current_task, mount, name, mode, dev, owner)
             };
         let entry = if flags.contains(OpenFlags::EXCL) {
@@ -1099,7 +1099,7 @@ impl NamespaceNode {
     /// Does not return an existing node.
     pub fn create_node<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
@@ -1127,7 +1127,7 @@ impl NamespaceNode {
     /// To create another type of node, use `create_node`.
     pub fn create_symlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
@@ -1155,7 +1155,7 @@ impl NamespaceNode {
     /// Used by O_TMPFILE.
     pub fn create_tmpfile<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mode: FileMode,
         flags: OpenFlags,
@@ -1177,7 +1177,7 @@ impl NamespaceNode {
 
     pub fn link<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
@@ -1197,7 +1197,7 @@ impl NamespaceNode {
 
     pub fn bind_socket<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         socket: SocketHandle,
@@ -1235,7 +1235,7 @@ impl NamespaceNode {
 
     pub fn unlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         kind: UnlinkKind,
@@ -1266,7 +1266,7 @@ impl NamespaceNode {
     /// Traverse down a parent-to-child link in the namespace.
     pub fn lookup_child<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         context: &mut LookupContext,
         basename: &FsStr,
@@ -1519,7 +1519,7 @@ impl NamespaceNode {
     }
 
     pub fn rename<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         old_parent: &NamespaceNode,
         old_name: &FsStr,
@@ -1572,7 +1572,7 @@ impl NamespaceNode {
 
     pub fn readlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno>
     where
@@ -1593,7 +1593,7 @@ impl NamespaceNode {
     /// owner or is in the file's group.
     pub fn check_access<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         access: Access,
         reason: CheckAccessReason,
@@ -1611,7 +1611,7 @@ impl NamespaceNode {
 
     pub fn truncate<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno>

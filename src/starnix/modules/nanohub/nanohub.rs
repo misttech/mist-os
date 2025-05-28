@@ -34,7 +34,7 @@ pub fn nanohub_procfs_builder(
     });
 }
 
-pub fn nanohub_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
+pub fn nanohub_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     struct Descriptor {
         socket_label: FsString,
         dev_node_name: FsString,

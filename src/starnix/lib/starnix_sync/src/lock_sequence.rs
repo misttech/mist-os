@@ -195,7 +195,7 @@ pub use crate::{LockBefore, LockEqualOrBefore, LockFor, RwLockFor};
 /// (with a different lock level) that mutably borrows from the original
 /// instance. This means the original instance can't be used to acquire
 /// new locks until the new instance leaves scope.
-pub struct Locked<'a, L>(PhantomData<&'a L>);
+pub struct Locked<L>(PhantomData<L>);
 
 /// "Highest" lock level
 ///
@@ -204,7 +204,7 @@ pub struct Locked<'a, L>(PhantomData<&'a L>);
 /// trees.
 pub enum Unlocked {}
 
-const_assert_eq!(std::mem::size_of::<Locked<'static, Unlocked>>(), 0);
+const_assert_eq!(std::mem::size_of::<Locked<Unlocked>>(), 0);
 
 impl Unlocked {
     /// Entry point for locked access.
@@ -214,16 +214,13 @@ impl Unlocked {
     /// # Safety
     /// `Unlocked` should only be used before any lock in the program has been acquired.
     #[inline(always)]
-    pub unsafe fn new() -> Locked<'static, Unlocked> {
-        Locked::<'static, Unlocked>(Default::default())
+    pub unsafe fn new() -> Locked<Unlocked> {
+        Locked::<Unlocked>(Default::default())
     }
 }
 impl LockEqualOrBefore<Unlocked> for Unlocked {}
 
-// It's important that the lifetime on `Locked` here be anonymous. That means
-// that the lifetimes in the returned `Locked` objects below are inferred to
-// be the lifetimes of the references to self (mutable or immutable).
-impl<L> Locked<'_, L> {
+impl<L> Locked<L> {
     /// Acquire the given lock.
     ///
     /// This requires that `M` can be locked after `L`.
@@ -242,14 +239,14 @@ impl<L> Locked<'_, L> {
     ///
     /// This requires that `M` can be locked after `L`.
     #[inline(always)]
-    pub fn lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::Guard<'a>, Locked<'a, M>)
+    pub fn lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::Guard<'a>, &'a mut Locked<M>)
     where
         M: 'a,
         S: LockFor<M>,
         L: LockBefore<M>,
     {
         let data = S::lock(source);
-        (data, Locked::<'a, M>(PhantomData::default()))
+        (data, Locked::fabricate())
     }
 
     /// Acquire two locks that are on the same level, in a consistent order (sorted by memory address) and return both guards
@@ -261,7 +258,7 @@ impl<L> Locked<'_, L> {
         &'a mut self,
         source1: &'a S,
         source2: &'a S,
-    ) -> (S::Guard<'a>, S::Guard<'a>, Locked<'a, M>)
+    ) -> (S::Guard<'a>, S::Guard<'a>, &mut Locked<M>)
     where
         M: 'a,
         S: LockFor<M>,
@@ -272,11 +269,11 @@ impl<L> Locked<'_, L> {
         if ptr1 < ptr2 {
             let data1 = S::lock(source1);
             let data2 = S::lock(source2);
-            (data1, data2, Locked::<'a, M>(PhantomData::default()))
+            (data1, data2, Locked::fabricate())
         } else {
             let data2 = S::lock(source2);
             let data1 = S::lock(source1);
-            (data1, data2, Locked::<'a, M>(PhantomData::default()))
+            (data1, data2, Locked::fabricate())
         }
     }
     /// Acquire two locks that are on the same level, in a consistent order (sorted by memory address) and return both guards.
@@ -302,14 +299,14 @@ impl<L> Locked<'_, L> {
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
     #[inline(always)]
-    pub fn read_lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::ReadGuard<'a>, Locked<'a, M>)
+    pub fn read_lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::ReadGuard<'a>, &mut Locked<M>)
     where
         M: 'a,
         S: RwLockFor<M>,
         L: LockBefore<M>,
     {
         let data = S::read_lock(source);
-        (data, Locked::<'a, M>(PhantomData::default()))
+        (data, Locked::fabricate())
     }
 
     /// Attempt to acquire the given read lock.
@@ -335,14 +332,14 @@ impl<L> Locked<'_, L> {
     pub fn write_lock_and<'a, M, S>(
         &'a mut self,
         source: &'a S,
-    ) -> (S::WriteGuard<'a>, Locked<'a, M>)
+    ) -> (S::WriteGuard<'a>, &mut Locked<M>)
     where
         M: 'a,
         S: RwLockFor<M>,
         L: LockBefore<M>,
     {
         let data = S::write_lock(source);
-        (data, Locked::<'a, M>(PhantomData::default()))
+        (data, Locked::fabricate())
     }
 
     /// Attempt to acquire the given write lock.
@@ -366,21 +363,29 @@ impl<L> Locked<'_, L> {
     /// safe because any locks that could be acquired with the lock `M` held can
     /// also be acquired without `M` being held.
     #[inline(always)]
-    pub fn cast_locked<'a, M>(&'a mut self) -> Locked<'a, M>
+    pub fn cast_locked<M>(&mut self) -> &mut Locked<M>
     where
-        M: 'a,
         L: LockEqualOrBefore<M>,
     {
-        Locked::<'a, M>(PhantomData::default())
+        Locked::fabricate()
     }
 
-    #[inline(always)]
-    pub fn cast_locked_by_value<'a, M>(_locked: Locked<'a, L>) -> Locked<'a, M>
-    where
-        M: 'a,
-        L: LockEqualOrBefore<M>,
-    {
-        Locked::<'a, M>(PhantomData::default())
+    const CHECK_ZST: () = assert!(std::mem::size_of::<Self>() == 0, "Locked<T> must be a ZST");
+    fn fabricate<'a>() -> &'a mut Self {
+        let _ = Self::CHECK_ZST;
+        // SAFETY: As confirmed by the preceding assert, `Self`
+        // is a ZST. `NonNull::as_mut` requires that the pointer is convertible
+        // to a reference [1], which in turn requires the following [2]:
+        // - The pointer is properly aligned (guaranteed by `NonNull::dangling`)
+        // - Non-null (guaranteed by invariant on `NonNull`)
+        // - Dereferenceable (guaranteed for all zero-sized pointers [3])
+        // - Points to a valid referent (trivially true for any zero-sized referent)
+        // - Satisfies Rust's aliasing rules (trivially true for any zero-sized referent)
+        //
+        // [1] https://doc.rust-lang.org/1.87.0/std/ptr/struct.NonNull.html#method.as_mut
+        // [2] https://doc.rust-lang.org/1.87.0/std/ptr/index.html#pointer-to-reference-conversion
+        // [3] https://doc.rust-lang.org/1.87.0/std/ptr/index.html#safety
+        unsafe { std::ptr::NonNull::dangling().as_mut() }
     }
 }
 
@@ -433,7 +438,7 @@ mod test {
         // Create a new lock session with the "root" lock level (empty tuple).
         let mut locked = unsafe { Unlocked::new() };
         // Access locked state.
-        let (_a, mut locked_a) = locked.lock_and::<LockA, _>(&state);
+        let (_a, locked_a) = locked.lock_and::<LockA, _>(&state);
         let _b = locked_a.lock::<LockB, _>(&state);
     }
 
@@ -546,7 +551,7 @@ mod test {
         let data = Data::default();
 
         let mut w = unsafe { Unlocked::new() };
-        let (_a, mut wa) = w.lock_and::<A, _>(&data);
+        let (_a, wa) = w.lock_and::<A, _>(&data);
         let (_c, _wc) = wa.lock_and::<C, _>(&data);
         // This won't compile!
         // let _b = _wc.lock::<B, _>(&data);
@@ -557,7 +562,7 @@ mod test {
         let data = Data::default();
 
         let mut w = unsafe { Unlocked::new() };
-        let mut wa = w.cast_locked::<A>();
+        let wa = w.cast_locked::<A>();
         let (_c, _wc) = wa.lock_and::<C, _>(&data);
         // This should not compile:
         // let _b = w.lock::<B, _>(&data);
@@ -582,7 +587,7 @@ mod test {
         let data = Data { e: Mutex::new(Mutex::new(1)), ..Data::default() };
 
         let mut locked = unsafe { Unlocked::new() };
-        let (e, mut next_locked) = locked.lock_and::<E, _>(&data);
+        let (e, next_locked) = locked.lock_and::<E, _>(&data);
         let v = next_locked.lock::<F, _>(&*e);
         assert_eq!(*v, 1);
     }
@@ -605,7 +610,7 @@ mod test {
         let data = Data { g: Mutex::new(vec![Mutex::new(0), Mutex::new(1)]), ..Data::default() };
 
         let mut locked = unsafe { Unlocked::new() };
-        let (g, mut next_locked) = locked.lock_and::<G, _>(&data);
+        let (g, next_locked) = locked.lock_and::<G, _>(&data);
         let v = next_locked.lock::<H, _>(&g[1]);
         assert_eq!(*v, 1);
     }
@@ -616,7 +621,7 @@ mod test {
         let data2 = Data { a: Mutex::new(10), b: Mutex::new(20), ..Data::default() };
         let mut locked = unsafe { Unlocked::new() };
         {
-            let (a1, a2, mut new_locked) = locked.lock_both_and::<A, _>(&data1, &data2);
+            let (a1, a2, new_locked) = locked.lock_both_and::<A, _>(&data1, &data2);
             assert_eq!(*a1, 5);
             assert_eq!(*a2, 10);
             let (b1, b2) = new_locked.lock_both::<B, _>(&data1, &data2);

@@ -1144,7 +1144,7 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
 }
 
 pub fn ptrace_attach<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &mut CurrentTask,
     pid: pid_t,
     attach_type: PtraceAttachType,
@@ -1312,7 +1312,7 @@ pub fn ptrace_get_scope(kernel: &Arc<Kernel>) -> Vec<u8> {
 }
 
 #[inline(never)]
-pub fn ptrace_syscall_enter(locked: &mut Locked<'_, Unlocked>, current_task: &mut CurrentTask) {
+pub fn ptrace_syscall_enter(locked: &mut Locked<Unlocked>, current_task: &mut CurrentTask) {
     let block = {
         let mut state = current_task.write();
         if state.ptrace.is_some() {
@@ -1339,7 +1339,7 @@ pub fn ptrace_syscall_enter(locked: &mut Locked<'_, Unlocked>, current_task: &mu
 
 #[inline(never)]
 pub fn ptrace_syscall_exit(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     is_error: bool,
 ) {

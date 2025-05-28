@@ -44,7 +44,7 @@ struct CallbackState {
 impl CallbackState {
     fn connection(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<&mut perfetto::Consumer, anyhow::Error> {
         match self.connection {
@@ -59,7 +59,7 @@ impl CallbackState {
 
     fn on_state_change(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         new_state: TraceState,
         current_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {

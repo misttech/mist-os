@@ -87,7 +87,7 @@ uapi::check_arch_independent_layout! {
 }
 
 pub fn do_clone(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     args: &clone_args,
 ) -> Result<pid_t, Errno> {
@@ -138,7 +138,7 @@ pub fn do_clone(
 }
 
 pub fn sys_clone3(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_clone_args: UserRef<clone_args>,
     user_clone_args_size: usize,
@@ -192,7 +192,7 @@ fn read_c_string_vector(
 }
 
 pub fn sys_execve(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_path: UserCString,
     user_argv: UserCStringPtr,
@@ -202,7 +202,7 @@ pub fn sys_execve(
 }
 
 pub fn sys_execveat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -329,7 +329,7 @@ pub fn sys_execveat(
 }
 
 pub fn sys_getcpu(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     cpu_out: UserRef<u32>,
     node_out: UserRef<u32>,
@@ -356,21 +356,21 @@ pub fn sys_getcpu(
 }
 
 pub fn sys_getpid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
     Ok(current_task.get_pid())
 }
 
 pub fn sys_gettid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
     Ok(current_task.get_tid())
 }
 
 pub fn sys_getppid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
     Ok(current_task.thread_group().read().get_ppid())
@@ -400,7 +400,7 @@ fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> WeakRef<Task> 
 }
 
 pub fn sys_getsid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
 ) -> Result<pid_t, Errno> {
@@ -412,7 +412,7 @@ pub fn sys_getsid(
 }
 
 pub fn sys_getpgid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
 ) -> Result<pid_t, Errno> {
@@ -425,7 +425,7 @@ pub fn sys_getpgid(
 }
 
 pub fn sys_setpgid(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     pgid: pid_t,
@@ -455,21 +455,21 @@ fn new_gid_allowed(current_task: &CurrentTask, gid: gid_t) -> bool {
 }
 
 pub fn sys_getuid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<uid_t, Errno> {
     Ok(current_task.creds().uid)
 }
 
 pub fn sys_getgid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<gid_t, Errno> {
     Ok(current_task.creds().gid)
 }
 
 pub fn sys_setuid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     uid: uid_t,
 ) -> Result<(), Errno> {
@@ -494,7 +494,7 @@ pub fn sys_setuid(
 }
 
 pub fn sys_setgid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     gid: gid_t,
 ) -> Result<(), Errno> {
@@ -516,21 +516,21 @@ pub fn sys_setgid(
 }
 
 pub fn sys_geteuid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<uid_t, Errno> {
     Ok(current_task.creds().euid)
 }
 
 pub fn sys_getegid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<gid_t, Errno> {
     Ok(current_task.creds().egid)
 }
 
 pub fn sys_setfsuid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fsuid: uid_t,
 ) -> Result<uid_t, Errno> {
@@ -546,7 +546,7 @@ pub fn sys_setfsuid(
 }
 
 pub fn sys_setfsgid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fsgid: gid_t,
 ) -> Result<gid_t, Errno> {
@@ -564,7 +564,7 @@ pub fn sys_setfsgid(
 }
 
 pub fn sys_getresuid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ruid_addr: UserRef<uid_t>,
     euid_addr: UserRef<uid_t>,
@@ -578,7 +578,7 @@ pub fn sys_getresuid(
 }
 
 pub fn sys_getresgid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     rgid_addr: UserRef<gid_t>,
     egid_addr: UserRef<gid_t>,
@@ -592,7 +592,7 @@ pub fn sys_getresgid(
 }
 
 pub fn sys_setreuid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ruid: uid_t,
     euid: uid_t,
@@ -624,7 +624,7 @@ pub fn sys_setreuid(
 }
 
 pub fn sys_setregid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     rgid: gid_t,
     egid: gid_t,
@@ -654,7 +654,7 @@ pub fn sys_setregid(
 }
 
 pub fn sys_setresuid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ruid: uid_t,
     euid: uid_t,
@@ -683,7 +683,7 @@ pub fn sys_setresuid(
 }
 
 pub fn sys_setresgid(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     rgid: gid_t,
     egid: gid_t,
@@ -709,7 +709,7 @@ pub fn sys_setresgid(
 }
 
 pub fn sys_exit(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     code: i32,
 ) -> Result<(), Errno> {
@@ -720,7 +720,7 @@ pub fn sys_exit(
 }
 
 pub fn sys_exit_group(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     code: i32,
 ) -> Result<(), Errno> {
@@ -729,7 +729,7 @@ pub fn sys_exit_group(
 }
 
 pub fn sys_sched_getscheduler(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
 ) -> Result<u32, Errno> {
@@ -745,7 +745,7 @@ pub fn sys_sched_getscheduler(
 }
 
 pub fn sys_sched_setscheduler(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     policy: u32,
@@ -810,7 +810,7 @@ fn get_default_cpu_set() -> CpuSet {
 }
 
 pub fn sys_sched_getaffinity(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     cpusetsize: u32,
@@ -834,7 +834,7 @@ pub fn sys_sched_getaffinity(
 }
 
 pub fn sys_sched_setaffinity(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     cpusetsize: u32,
@@ -875,7 +875,7 @@ pub fn sys_sched_setaffinity(
 }
 
 pub fn sys_sched_getparam(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     param: UserRef<sched_param>,
@@ -892,7 +892,7 @@ pub fn sys_sched_getparam(
 }
 
 pub fn sys_sched_setparam(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     param: UserRef<sched_param>,
@@ -916,7 +916,7 @@ pub fn sys_sched_setparam(
 }
 
 pub fn sys_sched_get_priority_min(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _ctx: &CurrentTask,
     policy: u32,
 ) -> Result<u8, Errno> {
@@ -924,7 +924,7 @@ pub fn sys_sched_get_priority_min(
 }
 
 pub fn sys_sched_get_priority_max(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _ctx: &CurrentTask,
     policy: u32,
 ) -> Result<u8, Errno> {
@@ -932,7 +932,7 @@ pub fn sys_sched_get_priority_max(
 }
 
 pub fn sys_ioprio_set(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &mut CurrentTask,
     _which: i32,
     _who: i32,
@@ -943,7 +943,7 @@ pub fn sys_ioprio_set(
 }
 
 pub fn sys_prctl(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     option: u32,
     arg2: u64,
@@ -1212,7 +1212,7 @@ pub fn sys_prctl(
 }
 
 pub fn sys_ptrace(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     request: u32,
     pid: pid_t,
@@ -1228,7 +1228,7 @@ pub fn sys_ptrace(
 }
 
 pub fn sys_set_tid_address(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_tid: UserRef<pid_t>,
 ) -> Result<pid_t, Errno> {
@@ -1237,7 +1237,7 @@ pub fn sys_set_tid_address(
 }
 
 pub fn sys_getrusage(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     who: i32,
     user_usage: RUsagePtr,
@@ -1265,7 +1265,7 @@ pub fn sys_getrusage(
 type PrLimitRef = MultiArchUserRef<uapi::rlimit, uapi::arch32::rlimit>;
 
 pub fn sys_getrlimit(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     resource: u32,
     user_rlimit: PrLimitRef,
@@ -1274,7 +1274,7 @@ pub fn sys_getrlimit(
 }
 
 pub fn sys_setrlimit(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     resource: u32,
     user_rlimit: PrLimitRef,
@@ -1283,7 +1283,7 @@ pub fn sys_setrlimit(
 }
 
 pub fn sys_prlimit64(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
@@ -1301,7 +1301,7 @@ pub fn sys_prlimit64(
 }
 
 pub fn do_prlimit64<T>(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
@@ -1375,7 +1375,7 @@ where
 }
 
 pub fn sys_quotactl(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _cmd: i32,
     _special: UserRef<c_char>,
@@ -1387,7 +1387,7 @@ pub fn sys_quotactl(
 }
 
 pub fn sys_capget(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_header: UserRef<__user_cap_header_struct>,
     user_data: UserRef<__user_cap_data_struct>,
@@ -1449,7 +1449,7 @@ pub fn sys_capget(
 }
 
 pub fn sys_capset(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_header: UserRef<__user_cap_header_struct>,
     user_data: UserRef<__user_cap_data_struct>,
@@ -1513,7 +1513,7 @@ pub fn sys_capset(
 }
 
 pub fn sys_seccomp(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     operation: u32,
     flags: u32,
@@ -1580,7 +1580,7 @@ pub fn sys_seccomp(
 }
 
 pub fn sys_setgroups(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     size: usize,
     groups_addr: UserAddress,
@@ -1599,7 +1599,7 @@ pub fn sys_setgroups(
 }
 
 pub fn sys_getgroups(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     size: usize,
     groups_addr: UserAddress,
@@ -1618,7 +1618,7 @@ pub fn sys_getgroups(
 }
 
 pub fn sys_setsid(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
     current_task.thread_group().setsid(locked)?;
@@ -1628,7 +1628,7 @@ pub fn sys_setsid(
 // Note the asymmetry with sys_setpriority: this returns what Starnix calls a "raw" priority, which
 // ranges from 1 (weakest) to 40 (strongest).
 pub fn sys_getpriority(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     who: i32,
@@ -1648,7 +1648,7 @@ pub fn sys_getpriority(
 // "user space" priority, which ranges from -20 (strongest) to 19 (weakest) (other values can be
 // passed and are clamped to that range and interpretation).
 pub fn sys_setpriority(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     who: i32,
@@ -1686,7 +1686,7 @@ pub fn sys_setpriority(
 }
 
 pub fn sys_setns(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ns_fd: FdNumber,
     ns_type: c_int,
@@ -1720,7 +1720,7 @@ pub fn sys_setns(
 }
 
 pub fn sys_unshare(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<(), Errno> {
@@ -1755,7 +1755,7 @@ pub fn sys_unshare(
 }
 
 pub fn sys_swapon(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     _flags: i32,
@@ -1802,7 +1802,7 @@ pub fn sys_swapon(
 }
 
 pub fn sys_swapoff(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
@@ -1849,7 +1849,7 @@ fn obfuscate_arc<T>(arc: &Arc<T>) -> usize {
 }
 
 pub fn sys_kcmp(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid1: pid_t,
     pid2: pid_t,
@@ -1910,7 +1910,7 @@ pub fn sys_kcmp(
 }
 
 pub fn sys_syslog(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     action_type: i32,
     address: UserAddress,
@@ -1966,7 +1966,7 @@ pub fn sys_syslog(
 }
 
 pub fn sys_vhangup(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
     security::check_task_capable(current_task, CAP_SYS_TTY_CONFIG)?;

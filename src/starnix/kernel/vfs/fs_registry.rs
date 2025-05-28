@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 type CreateFs = Arc<
     dyn Fn(
-            &mut Locked<'_, Unlocked>,
+            &mut Locked<Unlocked>,
             &CurrentTask,
             FileSystemOptions,
         ) -> Result<FileSystemHandle, Errno>
@@ -30,7 +30,7 @@ impl FsRegistry {
     pub fn register<F>(&self, fs_type: &FsStr, create_fs: F)
     where
         F: Fn(
-                &mut Locked<'_, Unlocked>,
+                &mut Locked<Unlocked>,
                 &CurrentTask,
                 FileSystemOptions,
             ) -> Result<FileSystemHandle, Errno>
@@ -44,7 +44,7 @@ impl FsRegistry {
 
     pub fn create(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs_type: &FsStr,
         options: FileSystemOptions,

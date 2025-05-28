@@ -62,7 +62,7 @@ fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 pub fn create_kernel_task_and_unlocked_with_pkgfs<'l>(
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(create_pkgfs)
 }
 
@@ -86,7 +86,7 @@ pub fn create_kernel_and_task() -> (Arc<Kernel>, AutoReleasableTask) {
 /// your callback is called with the init process as the CurrentTask.
 pub fn spawn_kernel_and_run<F>(callback: F)
 where
-    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
 {
     spawn_kernel_and_run_internal(callback, None)
 }
@@ -98,7 +98,7 @@ where
 // must generally exercise hooks via public entrypoints.
 pub fn spawn_kernel_with_selinux_and_run<F>(callback: F)
 where
-    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask, &Arc<SecurityServer>)
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask, &Arc<SecurityServer>)
         + Send
         + Sync
         + 'static,
@@ -121,7 +121,7 @@ where
 /// callback in the init process for that kernel.
 fn spawn_kernel_and_run_internal<F>(callback: F, security_server: Option<Arc<SecurityServer>>)
 where
-    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
 {
     let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, security_server);
@@ -154,12 +154,12 @@ where
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 pub fn create_kernel_task_and_unlocked<'l>(
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
 }
 
 fn create_test_kernel(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     security_server: Option<Arc<SecurityServer>>,
 ) -> Arc<Kernel> {
     Kernel::new(
@@ -177,7 +177,7 @@ fn create_test_kernel(
 }
 
 fn create_test_fs_context(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     kernel: &Arc<Kernel>,
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> Arc<FsContext> {
@@ -185,7 +185,7 @@ fn create_test_fs_context(
 }
 
 fn create_test_init_task(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     kernel: &Arc<Kernel>,
     fs: Arc<FsContext>,
 ) -> TaskBuilder {
@@ -226,7 +226,7 @@ fn create_test_init_task(
 
 fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
     let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, None);
     let fs = create_fs(&kernel);
@@ -245,7 +245,7 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 pub fn create_task(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     kernel: &Arc<Kernel>,
     task_name: &str,
 ) -> AutoReleasableTask {
@@ -271,7 +271,7 @@ pub fn create_task(
 /// Maps a region of mery at least `len` bytes long with `PROT_READ | PROT_WRITE`,
 /// `MAP_ANONYMOUS | MAP_PRIVATE`, returning the mapped address.
 pub fn map_memory_anywhere<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     len: u64,
 ) -> UserAddress
@@ -286,7 +286,7 @@ where
 ///
 /// Useful for syscall in-pointer parameters.
 pub fn map_object_anywhere<L, T>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     object: &T,
 ) -> UserAddress
@@ -303,7 +303,7 @@ where
 ///
 /// Returns the address returned by `sys_mmap`.
 pub fn map_memory<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     address: UserAddress,
     length: u64,
@@ -318,7 +318,7 @@ where
 ///
 /// Returns the address returned by `sys_mmap`.
 pub fn map_memory_with_flags<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     address: UserAddress,
     length: u64,
@@ -343,7 +343,7 @@ where
 /// Convenience wrapper around [`sys_mremap`] which extracts the returned [`UserAddress`] from
 /// the generic [`SyscallResult`].
 pub fn remap_memory(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     old_addr: UserAddress,
     old_length: u64,
@@ -434,7 +434,7 @@ impl FsNodeOps for PanickingFsNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -459,7 +459,7 @@ impl FileOps for PanickingFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -470,7 +470,7 @@ impl FileOps for PanickingFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -481,7 +481,7 @@ impl FileOps for PanickingFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _request: u32,
@@ -641,7 +641,7 @@ struct TestFs;
 impl FileSystemOps for TestFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {

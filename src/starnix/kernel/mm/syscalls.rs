@@ -53,7 +53,7 @@ fn get_valid_platform_mmap_flags() -> u32 {
 
 /// sys_mmap takes a mutable reference to current_task because it may modify the IP register.
 pub fn sys_mmap(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -73,7 +73,7 @@ pub fn sys_mmap(
 }
 
 pub fn do_mmap<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -190,7 +190,7 @@ where
 }
 
 pub fn sys_mprotect(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -210,7 +210,7 @@ pub fn sys_mprotect(
 }
 
 pub fn sys_mremap(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     old_length: usize,
@@ -231,7 +231,7 @@ pub fn sys_mremap(
 }
 
 pub fn sys_munmap(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -241,7 +241,7 @@ pub fn sys_munmap(
 }
 
 pub fn sys_msync(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -265,7 +265,7 @@ pub fn sys_msync(
 }
 
 pub fn sys_madvise(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -276,7 +276,7 @@ pub fn sys_madvise(
 }
 
 pub fn sys_process_madvise(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _pidfd: FdNumber,
     _iovec_addr: IOVecPtr,
@@ -289,7 +289,7 @@ pub fn sys_process_madvise(
 }
 
 pub fn sys_brk(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
 ) -> Result<UserAddress, Errno> {
@@ -297,7 +297,7 @@ pub fn sys_brk(
 }
 
 pub fn sys_process_vm_readv(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tid: tid_t,
     local_iov_addr: IOVecPtr,
@@ -348,7 +348,7 @@ pub fn sys_process_vm_readv(
 }
 
 pub fn sys_process_vm_writev(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tid: tid_t,
     local_iov_addr: IOVecPtr,
@@ -399,7 +399,7 @@ pub fn sys_process_vm_writev(
 }
 
 pub fn sys_process_mrelease(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _pidfd: FdNumber,
     _flags: u32,
@@ -409,7 +409,7 @@ pub fn sys_process_mrelease(
 }
 
 pub fn sys_membarrier(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     cmd: uapi::membarrier_cmd,
     _flags: u32,
@@ -425,7 +425,7 @@ pub fn sys_membarrier(
 }
 
 pub fn sys_userfaultfd(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     raw_flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -454,7 +454,7 @@ pub fn sys_userfaultfd(
 }
 
 pub fn sys_futex(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     op: u32,
@@ -489,7 +489,7 @@ pub fn sys_futex(
 }
 
 fn do_futex<Key: FutexKey>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     op: u32,
@@ -613,7 +613,7 @@ fn do_futex<Key: FutexKey>(
 }
 
 fn do_futex_wait_with_restart<Key: FutexKey>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     value: u32,
@@ -650,7 +650,7 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
 }
 
 pub fn sys_get_robust_list(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tid: tid_t,
     user_head_ptr: UserRef<UserAddress>,
@@ -673,7 +673,7 @@ pub fn sys_get_robust_list(
 }
 
 pub fn sys_set_robust_list(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_head: UserRef<robust_list_head>,
     len: usize,
@@ -686,7 +686,7 @@ pub fn sys_set_robust_list(
 }
 
 pub fn sys_mlock(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -696,7 +696,7 @@ pub fn sys_mlock(
 }
 
 pub fn sys_mlock2(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -714,7 +714,7 @@ pub fn sys_mlock2(
 }
 
 pub fn sys_munlock(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -724,7 +724,7 @@ pub fn sys_munlock(
 }
 
 pub fn sys_mlockall(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _flags: u64,
 ) -> Result<(), Errno> {
@@ -733,7 +733,7 @@ pub fn sys_mlockall(
 }
 
 pub fn sys_munlockall(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _flags: u64,
 ) -> Result<(), Errno> {
@@ -742,7 +742,7 @@ pub fn sys_munlockall(
 }
 
 pub fn sys_mincore(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _addr: UserAddress,
     _length: usize,
@@ -765,7 +765,7 @@ mod arch32 {
     use starnix_uapi::{errno, error, uapi};
 
     pub fn sys_arch32_set_robust_list(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_head: UserRef<uapi::arch32::robust_list_head>,
         len: usize,
@@ -778,7 +778,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_mmap2(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &mut CurrentTask,
         addr: UserAddress,
         length: usize,
@@ -791,7 +791,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_munmap(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         addr: UserAddress,
         length: usize,

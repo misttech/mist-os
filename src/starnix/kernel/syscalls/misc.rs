@@ -41,7 +41,7 @@ uapi::check_arch_independent_layout! {
 }
 
 pub fn do_uname(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     result: &mut utsname,
 ) -> Result<(), Errno> {
@@ -82,7 +82,7 @@ pub fn do_uname(
 }
 
 pub fn sys_uname(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     name: UserRef<utsname>,
 ) -> Result<(), Errno> {
@@ -100,7 +100,7 @@ pub fn sys_uname(
 }
 
 pub fn sys_sysinfo(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     info: MultiArchUserRef<uapi::sysinfo, uapi::arch32::sysinfo>,
 ) -> Result<(), Errno> {
@@ -148,7 +148,7 @@ fn read_name(current_task: &CurrentTask, name: UserCString, len: u64) -> Result<
 }
 
 pub fn sys_sethostname(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     hostname: UserCString,
     len: u64,
@@ -165,7 +165,7 @@ pub fn sys_sethostname(
 }
 
 pub fn sys_setdomainname(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     domainname: UserCString,
     len: u64,
@@ -182,7 +182,7 @@ pub fn sys_setdomainname(
 }
 
 pub fn sys_getrandom(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     start_addr: UserAddress,
     size: usize,
@@ -227,7 +227,7 @@ pub fn sys_getrandom(
 }
 
 pub fn sys_sched_yield(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
 ) -> Result<(), Errno> {
     // SAFETY: This is unsafe because it is a syscall. zx_thread_legacy_yield is always safe.
@@ -236,7 +236,7 @@ pub fn sys_sched_yield(
 }
 
 pub fn sys_unknown(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     #[allow(unused_variables)] current_task: &CurrentTask,
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
@@ -258,7 +258,7 @@ pub fn sys_unknown(
 }
 
 pub fn sys_personality(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     persona: u32,
 ) -> Result<SyscallResult, Errno> {
@@ -272,7 +272,7 @@ pub fn sys_personality(
 }
 
 pub fn sys_delete_module(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_name: UserCString,
     _flags: u32,

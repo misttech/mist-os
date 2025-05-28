@@ -90,7 +90,7 @@ impl FileOps for PerfEventFile {
     // See "Reading results" section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html.
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -159,7 +159,7 @@ impl FileOps for PerfEventFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         op: u32,
@@ -216,7 +216,7 @@ impl FileOps for PerfEventFile {
     // Gets called when mmap() is called.
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         length: Option<usize>,
@@ -288,7 +288,7 @@ impl FileOps for PerfEventFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -303,7 +303,7 @@ impl FileOps for PerfEventFile {
 }
 
 pub fn sys_perf_event_open(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     attr: UserRef<perf_event_attr>,
     tid: tid_t,

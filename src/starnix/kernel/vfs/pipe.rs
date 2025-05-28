@@ -80,7 +80,7 @@ impl Pipe {
     }
 
     pub fn open(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         pipe: &Arc<Mutex<Self>>,
         flags: OpenFlags,
@@ -302,7 +302,7 @@ impl Pipe {
     fn ioctl(
         &self,
         file: &FileObject,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -388,7 +388,7 @@ impl Pipe {
 /// write endpoint of the pipe. This order matches the order expected by
 /// sys_pipe2().
 pub fn new_pipe(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<(FileHandle, FileHandle), Errno> {
     let fs = current_task
@@ -421,7 +421,7 @@ struct PipeFs;
 impl FileSystemOps for PipeFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -433,7 +433,7 @@ impl FileSystemOps for PipeFs {
 }
 
 fn pipe_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -466,7 +466,7 @@ impl FileOps for PipeFileObject {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -475,7 +475,7 @@ impl FileOps for PipeFileObject {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -494,7 +494,7 @@ impl FileOps for PipeFileObject {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -529,7 +529,7 @@ impl FileOps for PipeFileObject {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -548,7 +548,7 @@ impl FileOps for PipeFileObject {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -567,7 +567,7 @@ impl FileOps for PipeFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -768,7 +768,7 @@ impl PipeFileObject {
     /// not blocking mode and `condition` is not realized, this will return EAGAIN.
     fn wait_for_condition<'a, L, F, G, V>(
         &'a self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         condition: F,
@@ -778,7 +778,7 @@ impl PipeFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
         F: Fn(&Pipe) -> bool,
-        G: Fn(&mut Locked<'_, L>) -> Result<V, Errno>,
+        G: Fn(&mut Locked<L>) -> Result<V, Errno>,
     {
         file.blocking_op(locked, current_task, events, None, |locked| {
             let other = pregen(locked)?;
@@ -794,7 +794,7 @@ impl PipeFileObject {
     /// Lock the pipe for reading, after having run `pregen`.
     fn lock_pipe_for_reading_with<'a, L, G, V>(
         &'a self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         pregen: G,
@@ -802,7 +802,7 @@ impl PipeFileObject {
     ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
-        G: Fn(&mut Locked<'_, L>) -> Result<V, Errno>,
+        G: Fn(&mut Locked<L>) -> Result<V, Errno>,
     {
         if non_blocking {
             let other = pregen(locked)?;
@@ -825,7 +825,7 @@ impl PipeFileObject {
 
     fn lock_pipe_for_reading<'a, L>(
         &'a self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         non_blocking: bool,
@@ -840,7 +840,7 @@ impl PipeFileObject {
     /// Lock the pipe for writing, after having run `pregen`.
     fn lock_pipe_for_writing_with<'a, L, G, V>(
         &'a self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         pregen: G,
@@ -849,7 +849,7 @@ impl PipeFileObject {
     ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
-        G: Fn(&mut Locked<'_, L>) -> Result<V, Errno>,
+        G: Fn(&mut Locked<L>) -> Result<V, Errno>,
     {
         if non_blocking {
             let other = pregen(locked)?;
@@ -872,7 +872,7 @@ impl PipeFileObject {
 
     fn lock_pipe_for_writing<'a, L>(
         &'a self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         non_blocking: bool,
@@ -891,7 +891,7 @@ impl PipeFileObject {
     /// `lock_pipes` and `Pipe::splice`.
     pub fn splice_from<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         from: &FileHandle,
@@ -922,7 +922,7 @@ impl PipeFileObject {
     /// `lock_pipes` and `Pipe::splice`.
     pub fn splice_to<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         to: &FileHandle,
@@ -951,7 +951,7 @@ impl PipeFileObject {
     /// Returns the number of bytes enqueued.
     pub fn vmsplice_from<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         mut iovec: UserBuffers,
@@ -1002,7 +1002,7 @@ impl PipeFileObject {
     /// Returns the number of bytes transferred.
     pub fn vmsplice_to<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         iovec: UserBuffers,
@@ -1025,7 +1025,7 @@ impl PipeFileObject {
     ///
     /// Obtains the locks on the pipes in the correct order to avoid deadlocks.
     pub fn lock_pipes<'a, 'b, L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file_in: &'a FileHandle,
         file_out: &'b FileHandle,

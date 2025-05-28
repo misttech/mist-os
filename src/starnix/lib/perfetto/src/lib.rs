@@ -88,7 +88,7 @@ impl IpcConnection {
     pub fn bind_service<L>(
         &mut self,
         service_name: &str,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), IpcWriteError>
     where
@@ -111,7 +111,7 @@ impl IpcConnection {
         service_id: u32,
         method_id: u32,
         arguments: Option<Vec<u8>>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), IpcWriteError>
     where
@@ -133,7 +133,7 @@ impl IpcConnection {
     fn write_frame<L>(
         &mut self,
         frame: IpcFrame,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), IpcWriteError>
     where
@@ -192,7 +192,7 @@ impl FrameReader {
     /// Repeatedly reads from the specified file until a full message is available.
     pub fn next_frame_blocking<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<IpcFrame, IpcReadError>
     where
@@ -254,7 +254,7 @@ impl Consumer {
     /// Opens a socket connection to the specified socket path and initializes the requisite
     /// bookkeeping information.
     pub fn new(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         socket_path: &FsStr,
     ) -> Result<Self, anyhow::Error> {
@@ -303,7 +303,7 @@ impl Consumer {
 
     fn send_message<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         msg: ipc_frame::Msg,
     ) -> Result<u64, anyhow::Error>
@@ -345,7 +345,7 @@ impl Consumer {
 
     pub fn enable_tracing<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         req: EnableTracingRequest,
     ) -> Result<u64, anyhow::Error>
@@ -370,7 +370,7 @@ impl Consumer {
 
     pub fn disable_tracing<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         req: DisableTracingRequest,
     ) -> Result<u64, anyhow::Error>
@@ -395,7 +395,7 @@ impl Consumer {
 
     pub fn read_buffers<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         req: ReadBuffersRequest,
     ) -> Result<u64, anyhow::Error>
@@ -420,7 +420,7 @@ impl Consumer {
 
     pub fn free_buffers<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         req: FreeBuffersRequest,
     ) -> Result<u64, anyhow::Error>
@@ -445,7 +445,7 @@ impl Consumer {
 
     pub fn next_frame_blocking<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<IpcFrame, IpcReadError>
     where
@@ -481,7 +481,7 @@ impl Producer {
     /// Opens a socket connection to the specified socket path and initializes the requisite
     /// bookkeeping information.
     pub fn new<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         socket: FileHandle,
     ) -> Result<Self, ProducerError>
@@ -542,7 +542,7 @@ impl Producer {
     pub fn initialize_connection<L>(
         &mut self,
         request: InitializeConnectionRequest,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<InitializeConnectionResponse, ProducerError>
     where
@@ -569,7 +569,7 @@ impl Producer {
     pub fn register_data_source<L>(
         &mut self,
         request: RegisterDataSourceRequest,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<RegisterDataSourceResponse, ProducerError>
     where
@@ -599,7 +599,7 @@ impl Producer {
         &mut self,
         method_name: &str,
         arguments: Option<Vec<u8>>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(Option<Vec<u8>>, bool), InvokeMethodError>
     where
@@ -635,7 +635,7 @@ impl Producer {
         &mut self,
         method_name: &str,
         arguments: Option<Vec<u8>>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), InvokeMethodError>
     where
@@ -658,7 +658,7 @@ impl Producer {
     /// from the Service.
     pub fn get_command_request<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), ProducerError>
     where
@@ -675,7 +675,7 @@ impl Producer {
     /// After calling get_command_request, block until a response can be read.
     pub fn get_command_response<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(Option<GetAsyncCommandResponse>, bool), ProducerError>
     where
