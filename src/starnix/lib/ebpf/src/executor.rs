@@ -35,11 +35,17 @@ pub fn execute<C: EbpfProgramContext>(
         // Arguments are in registers r1 to r5.
         context.set_reg((i as u8) + 1, *v);
     }
+
+    // R10 points at the stack.
+    context.registers[10] =
+        BpfValue::from((context.stack.as_mut_ptr() as u64) + (BPF_STACK_SIZE as u64));
+
     loop {
         if let Some(result) = context.result {
             return result;
         }
         context.visit(run_context, code[context.pc]).expect("verifier should have found an issue");
+        context.next();
     }
 }
 
@@ -56,8 +62,8 @@ struct ComputationContext<'a, C: EbpfProgramContext> {
     code: &'a [EbpfInstruction],
     /// Helpers.
     helpers: &'a HashMap<u32, EbpfHelperImpl<C>>,
-    /// Register 0 to 9.
-    registers: [BpfValue; GENERAL_REGISTER_COUNT as usize],
+    /// Registers.
+    registers: [BpfValue; GENERAL_REGISTER_COUNT as usize + 1],
     /// The state of the stack.
     stack: Pin<Box<[MaybeUninit<BpfValue>]>>,
     /// The program counter.
@@ -69,12 +75,7 @@ struct ComputationContext<'a, C: EbpfProgramContext> {
 impl<C: EbpfProgramContext> ComputationContext<'_, C> {
     #[inline(always)]
     fn reg(&mut self, index: Register) -> BpfValue {
-        if index < GENERAL_REGISTER_COUNT {
-            self.registers[index as usize]
-        } else {
-            debug_assert!(index == GENERAL_REGISTER_COUNT);
-            BpfValue::from((self.stack.as_mut_ptr() as u64) + (BPF_STACK_SIZE as u64))
-        }
+        self.registers[index as usize]
     }
 
     #[inline(always)]
@@ -84,15 +85,14 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
 
     #[inline(always)]
     fn next(&mut self) {
-        self.jump_with_offset(0)
+        self.advance_pc(1)
     }
 
-    /// Update the `ComputationContext` `pc` to `pc + offset + 1`. In particular, the next
-    /// instruction is reached with `jump_with_offset(0)`.
+    /// Adds `offset` to the program counter in `ComputationContext`.
     #[inline(always)]
-    fn jump_with_offset(&mut self, offset: i16) {
+    fn advance_pc(&mut self, offset: i16) {
         let mut pc = self.pc as i64;
-        pc += (offset as i64) + 1;
+        pc += offset as i64;
         self.pc = pc as usize;
     }
 
@@ -158,7 +158,6 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         let op1 = self.reg(dst).as_u64();
         let op2 = self.compute_source(src).as_u64();
         let result = op(op1, op2);
-        self.next();
         self.set_reg(dst, result.into());
         Ok(())
     }
@@ -187,7 +186,6 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         if fetch {
             self.set_reg(src, old_value.into());
         }
-        self.next();
         Ok(())
     }
 
@@ -215,7 +213,6 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         if fetch {
             self.set_reg(src, old_value.into());
         }
-        self.next();
         Ok(())
     }
 
@@ -230,7 +227,6 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
                 panic!("Unexpected bit width for endianness operation");
             }
         };
-        self.next();
         self.set_reg(dst, new_value.into());
         Ok(())
     }
@@ -246,9 +242,7 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         let op1 = self.reg(dst).as_u64();
         let op2 = self.compute_source(src.clone()).as_u64();
         if op(op1, op2) {
-            self.jump_with_offset(offset);
-        } else {
-            self.next();
+            self.advance_pc(offset);
         }
         Ok(())
     }
@@ -530,7 +524,6 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         let helper = &self.helpers[&index];
         let result =
             helper.0(context, self.reg(1), self.reg(2), self.reg(3), self.reg(4), self.reg(5));
-        self.next();
         self.set_reg(0, result);
         Ok(())
     }
@@ -543,7 +536,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
 
     #[inline(always)]
     fn jump<'a>(&mut self, _context: &mut Self::Context<'a>, offset: i16) -> Result<(), String> {
-        self.jump_with_offset(offset);
+        self.advance_pc(offset);
         Ok(())
     }
 
@@ -935,7 +928,6 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         let addr = self.reg(src);
         let loaded = self.load_memory(addr, offset as u64, width);
-        self.next();
         self.set_reg(dst, loaded);
         Ok(())
     }
@@ -950,7 +942,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         let value = (lower as u64) | (((self.code[self.pc + 1].imm() as u32) as u64) << 32);
         self.set_reg(dst, value.into());
-        self.jump_with_offset(1);
+        self.advance_pc(1);
         Ok(())
     }
 
@@ -975,7 +967,6 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         // SAFETY: The verifier checks that the `src_reg` points at packet.
         let packet = unsafe { C::Packet::from_bpf_value(context, src_reg) };
         if let Some(value) = packet.load(offset, width) {
-            self.next();
             self.set_reg(dst_reg, value.into());
         } else {
             self.result = Some(self.reg(0).as_u64());
@@ -994,7 +985,6 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         let src = self.compute_source(src);
         let dst = self.reg(dst);
-        self.next();
         self.store_memory(dst, src, offset as u64, width);
         Ok(())
     }
