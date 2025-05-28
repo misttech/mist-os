@@ -46,6 +46,9 @@ import("//build/compiled_action.gni")
 #   zbi_a (optional)
 #   zbi_b (optional)
 #   zbi_r (optional)
+#   recovery_zbi_a (optional)
+#   recovery_zbi_b (optional)
+#   recovery_zbi_r (optional)
 #     [string] The name of the zbi partitions for each slot.
 #
 #   zbi_a_size (optional)
@@ -172,6 +175,30 @@ template("generated_partitions_config") {
         }
       }
       _partitions += [ _zbi_r ]
+    }
+    if (defined(invoker.recovery_zbi_a) && invoker.recovery_zbi_a != "") {
+      _recovery_zbi_a = {
+        name = invoker.recovery_zbi_a
+        type = "RecoveryZBI"
+        slot = "A"
+      }
+      _partitions += [ _recovery_zbi_a ]
+    }
+    if (defined(invoker.recovery_zbi_b) && invoker.recovery_zbi_b != "") {
+      _recovery_zbi_b = {
+        name = invoker.recovery_zbi_b
+        type = "RecoveryZBI"
+        slot = "B"
+      }
+      _partitions += [ _recovery_zbi_b ]
+    }
+    if (defined(invoker.recovery_zbi_r) && invoker.recovery_zbi_r != "") {
+      _recovery_zbi_r = {
+        name = invoker.recovery_zbi_r
+        type = "RecoveryZBI"
+        slot = "R"
+      }
+      _partitions += [ _recovery_zbi_r ]
     }
     if (defined(invoker.vbmeta_a) && invoker.vbmeta_a != "") {
       _vbmeta_a = {
