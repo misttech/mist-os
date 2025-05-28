@@ -6,8 +6,6 @@
 #include <lib/trace/event_args.h>
 #include <zircon/syscalls.h>
 
-#include <string_view>
-
 #include <fbl/string.h>
 #include <trace-test-utils/fixture.h>
 #include <zxtest/zxtest.h>
@@ -288,4 +286,18 @@ TEST(TEST_SUITE, test_trace_future_disabled_with_arg) {
   rs_test_trace_future_disabled_with_arg();
 
   ASSERT_RECORDS("");
+}
+
+TEST(TEST_SUITE, test_trace_observer) {
+  BEGIN_TRACE_TEST;
+
+  EXPECT_EQ(0, rs_check_trace_state());
+  rs_setup_trace_observer();
+  EXPECT_EQ(0, rs_check_trace_state());
+  fixture_initialize_and_start_tracing();
+  rs_wait_trace_state_is(TRACE_STARTED);
+  EXPECT_EQ(1, rs_check_trace_state());
+  ASSERT_RECORDS("");
+  rs_wait_trace_state_is(TRACE_STOPPED);
+  EXPECT_EQ(0, rs_check_trace_state());
 }

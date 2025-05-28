@@ -31,6 +31,7 @@ rustc_staticlib("rust-cpp-test-lib") {
 
   deps = [
     ":trace",
+    ":trace-observer",
     "//src/lib/fuchsia-async",
   ]
 
@@ -133,6 +134,9 @@ rustc_library("trace-observer") {
   source_root = "trace-observer/src/lib.rs"
   non_rust_deps = [
     ":rust-trace-observer",
+    ":trace",
+    "//sdk/rust/zx",
+    "//src/lib/fuchsia-async",
     "//zircon/system/ulib/trace",
   ]
 
