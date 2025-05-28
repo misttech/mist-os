@@ -50,7 +50,7 @@ fn convert_zx_time_into_seconds_until(time: zx::MonotonicInstant) -> u32 {
 
 fn make_fake_ra_prefix_packet(prefix: ot::Ip6Prefix, valid: u32, preferred: u32) -> Vec<u8> {
     use net_types::ip::Ipv6;
-    use packet::{InnerPacketBuilder, Serializer};
+    use packet::{InnerPacketBuilder, PacketBuilder, Serializer};
     use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
     use packet_formats::icmp::ndp::{OptionSequenceBuilder, RoutePreference, RouterAdvertisement};
     use packet_formats::icmp::{IcmpPacketBuilder, IcmpZeroCode};
@@ -86,9 +86,8 @@ fn make_fake_ra_prefix_packet(prefix: ot::Ip6Prefix, valid: u32, preferred: u32)
 
     let options = &[NdpOptionBuilder::PrefixInformation(prefix_information)];
 
-    let serialized = OptionSequenceBuilder::new(options.iter())
-        .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(src_addr, dst_addr, IcmpZeroCode, ra))
+    let serialized = IcmpPacketBuilder::<Ipv6, _>::new(src_addr, dst_addr, IcmpZeroCode, ra)
+        .wrap_body(OptionSequenceBuilder::new(options.iter()).into_serializer())
         .serialize_vec_outer()
         .unwrap()
         .as_ref()
