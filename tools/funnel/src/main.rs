@@ -149,8 +149,24 @@ struct SubCommandListTargets {
     watch: bool,
 }
 
+fn show_mac_deprecation_warning() {
+    if let Some(msg) = get_mac_deprecation_warning() {
+        println!("{}", msg);
+    }
+}
+
+fn get_mac_deprecation_warning() -> Option<&'static str> {
+    if cfg!(target_os = "macos") {
+        Some("[WARNING] This tool is deprecated for macOS per go/fuchsia-on-mac and will no longer run on [2025/07/01]: b/419875606")
+    } else {
+        None
+    }
+}
+
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<()> {
+    show_mac_deprecation_warning();
+
     let args: Funnel = argh::from_env();
 
     logging::init(args.log_level)?;
