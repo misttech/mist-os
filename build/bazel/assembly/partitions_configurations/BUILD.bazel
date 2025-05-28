@@ -148,6 +148,15 @@ fuchsia_partitions_configuration(
 fuchsia_partitions_configuration(
     name = "default",
     hardware_revision = "",
+    partitions = [
+        ":zircon_a",
+        ":zircon_b",
+        ":zircon_r",
+        ":vbmeta_a",
+        ":vbmeta_b",
+        ":vbmeta_r",
+        ":fvm",
+    ],
 )
 
 fuchsia_partitions_configuration(
