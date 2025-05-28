@@ -532,7 +532,10 @@ void Device::Reset(fdf::Arena& arena, ResetCompleter::Sync& completer) {
 }
 
 void Device::GetPowerState(fdf::Arena& arena, GetPowerStateCompleter::Sync& completer) {
-  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplGetPowerStateResponse::Builder(fidl_arena);
+  builder.power_on(true);
+  completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
 void Device::ServiceConnectHandler(fdf_dispatcher_t* dispatcher,
