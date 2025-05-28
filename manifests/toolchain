@@ -66,7 +66,7 @@
          https://chrome-infra-packages.appspot.com/p/infra/rbe/client/
     -->
     <package name="infra/rbe/client/${platform}"
-             version="re_client_version:0.178.0.5ee9d3e8-gomaip"
+             version="re_client_version:0.179.0.28341fc7-gomaip"
              platforms="linux-amd64,mac-amd64,mac-arm64"
              path="prebuilt/third_party/reclient/{{.OS}}-{{.Arch}}"/>
 
