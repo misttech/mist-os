@@ -20,6 +20,7 @@ group("tests") {
 
   deps = [
     "bootreason:tests",
+    "devicetree:tests",
     "ebpf:tests",
     "ebpf_api:tests",
     "ebpf_loader:tests",

@@ -9,7 +9,6 @@ group("tests") {
   deps = [
     "binderfs:tests",
     "cgroupfs:tests",
-    "devicetree:tests",
     "ext4:tests",
     "input:tests",
     "layeredfs:tests",
