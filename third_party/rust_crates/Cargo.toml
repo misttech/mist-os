@@ -152,7 +152,7 @@ maybe-owned = "0.3.4"
 md-5 = "0.10.6"
 memchr = "2.7.4"
 memoffset = "0.9.1"
-miniz_oxide = "0.3.6"
+miniz_oxide = "0.8.8"
 mock-omaha-server = { version = "0.3.4", default-features = false }
 mockall = "0.9"
 munge = "0.4.4"
@@ -489,6 +489,9 @@ require_feature_reviews = [
   "bstr",
   "tokio",
 ]
+
+[gn.package.adler2."2.0.0"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.aead."0.5.2"]
 license_files = ["LICENSE-APACHE"]

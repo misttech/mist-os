@@ -545,7 +545,7 @@ group("memoffset") {
 }
 
 group("miniz_oxide") {
-  public_deps = [ ":miniz_oxide-v0_3_6" ]
+  public_deps = [ ":miniz_oxide-v0_8_8" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -1272,6 +1272,39 @@ if (!(current_os == "fuchsia")) {
 
 group("zstd") {
   public_deps = [ ":zstd-v0_11_2+zstd_1_5_2" ]
+}
+
+license("adler2-v2_0_0.license") {
+  public_package_name = "adler2"
+  license_files = [
+    "//third_party/rust_crates/vendor/adler2-2.0.0/LICENSE-0BSD",
+    "//third_party/rust_crates/vendor/adler2-2.0.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/adler2-2.0.0/LICENSE-MIT",
+  ]
+}
+
+rustc_library("adler2-v2_0_0") {
+  crate_name = "adler2"
+  source_root = "//third_party/rust_crates/vendor/adler2-2.0.0/src/lib.rs"
+  output_name = "adler2-dc06cd0b18b4c9fa"
+  edition = "2021"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=dc06cd0b18b4c9fa",
+    "-Cextra-filename=-dc06cd0b18b4c9fa",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":adler2-v2_0_0.license" ]
 }
 
 license("adler32-v1_0_4.license") {
@@ -9681,6 +9714,43 @@ rustc_library("miniz_oxide-v0_3_6") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":miniz_oxide-v0_3_6.license" ]
+}
+
+license("miniz_oxide-v0_8_8.license") {
+  public_package_name = "miniz_oxide"
+  license_files = [
+    "//third_party/rust_crates/vendor/miniz_oxide-0.8.8/LICENSE",
+    "//third_party/rust_crates/vendor/miniz_oxide-0.8.8/LICENSE-APACHE.md",
+    "//third_party/rust_crates/vendor/miniz_oxide-0.8.8/LICENSE-MIT.md",
+    "//third_party/rust_crates/vendor/miniz_oxide-0.8.8/LICENSE-ZLIB.md",
+  ]
+}
+
+rustc_library("miniz_oxide-v0_8_8") {
+  crate_name = "miniz_oxide"
+  source_root = "//third_party/rust_crates/vendor/miniz_oxide-0.8.8/src/lib.rs"
+  output_name = "miniz_oxide-916223155ab9b230"
+  edition = "2021"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":adler2-v2_0_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=916223155ab9b230",
+    "-Cextra-filename=-916223155ab9b230",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"with-alloc\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":miniz_oxide-v0_8_8.license" ]
 }
 
 license("mio-v0_7_14.license") {
