@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fuchsia::fxblob::blob::FxBlob;
+use crate::fuchsia::fxblob::BlobDirectory;
 use crate::fuchsia::testing::{TestFixture, TestFixtureOptions};
 use crate::fuchsia::volume::FxVolume;
 use async_trait::async_trait;
@@ -10,9 +12,9 @@ use delivery_blob::{CompressionMode, Type1Blob};
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError};
 use fuchsia_component_client::connect_to_protocol_at_dir_svc;
 use fuchsia_merkle::Hash;
-
 use fxfs::object_store::directory::Directory;
 use fxfs::object_store::{DataObjectHandle, HandleOptions, ObjectStore};
+use std::sync::Arc;
 use storage_device::fake_device::FakeDevice;
 use storage_device::DeviceHolder;
 
@@ -54,6 +56,7 @@ pub trait BlobFixture {
         hash: &[u8; 32],
         allow_existing: bool,
     ) -> Result<BlobWriterProxy, CreateBlobError>;
+    async fn get_blob(&self, hash: Hash) -> Arc<FxBlob>;
 }
 
 #[async_trait]
@@ -94,6 +97,18 @@ impl BlobFixture for TestFixture {
             .await
             .expect("transport error on BlobReader.GetVmo")
             .expect("get_vmo failed")
+    }
+
+    async fn get_blob(&self, hash: Hash) -> Arc<FxBlob> {
+        self.volume()
+            .root()
+            .clone()
+            .into_any()
+            .downcast::<BlobDirectory>()
+            .unwrap()
+            .lookup_blob(hash)
+            .await
+            .unwrap()
     }
 
     async fn create_blob(

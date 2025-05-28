@@ -6,7 +6,8 @@ use fuchsia_trace::{Arg, TraceFutureArgs};
 use std::ffi::CStr;
 
 pub use fuchsia_trace::{
-    duration, flow_begin, flow_end, flow_step, ArgValue, Id, TraceCategoryContext, TraceFutureExt,
+    duration, flow_begin, flow_end, flow_step, instant, ArgValue, Id, Scope, TraceCategoryContext,
+    TraceFutureExt,
 };
 
 #[inline]

@@ -640,7 +640,7 @@ pub struct PagerRange<T: PagerBacked, U: PagerRequestType> {
 
 impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
     /// Constructs a new `PagerRange<T, U>`. `range` must be page aligned.
-    fn new(range: Range<u64>, file: Arc<T>) -> Self {
+    pub fn new(range: Range<u64>, file: Arc<T>) -> Self {
         debug_assert!(
             range.start % page_size() == 0 && range.end % page_size() == 0,
             "{:?} is not page aligned",

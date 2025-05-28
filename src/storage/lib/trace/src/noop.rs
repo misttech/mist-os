@@ -28,6 +28,13 @@ impl TraceCategoryContext {
 
 pub struct DurationScope<'a>(PhantomData<&'a ()>);
 
+#[derive(Copy, Clone)]
+pub enum Scope {
+    Thread,
+    Process,
+    Global,
+}
+
 #[inline]
 pub const fn duration<'a>(
     _category: &'static CStr,
@@ -35,6 +42,15 @@ pub const fn duration<'a>(
     _args: &'a [Arg<'_>],
 ) -> DurationScope<'a> {
     DurationScope(PhantomData)
+}
+
+#[inline]
+pub const fn instant<'a>(
+    _context: &TraceCategoryContext,
+    _name: &'static CStr,
+    _scope: Scope,
+    _args: &'a [Arg<'_>],
+) {
 }
 
 pub struct Id(());

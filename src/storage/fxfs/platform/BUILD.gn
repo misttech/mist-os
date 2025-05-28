@@ -4,6 +4,12 @@
 
 import("//build/rust/rustc_library.gni")
 
+declare_args() {
+  # Enables the tracking of refaults within blobs. A refault is when a page within a blob that was
+  # previously supplied got evicted by the kernel and needs to supplied again.
+  blob_refault_tracking = false
+}
+
 platform_sources = [
   "src/fuchsia.rs",
   "src/fuchsia/component.rs",
@@ -107,6 +113,10 @@ rustc_library("platform") {
     ]
   }
   visibility = [ "//src/storage/fxfs/*" ]
+
+  if (blob_refault_tracking) {
+    features = [ "refault-tracking" ]
+  }
 }
 
 rustc_library("fxfs-testing") {
