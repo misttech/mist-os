@@ -13,14 +13,12 @@
 # limitations under the License.
 
 load(
-    "//go/private/rules:transition.bzl",
-    "go_cross_transition",
-)
-load(
     "//go/private:providers.bzl",
     "GoArchive",
-    "GoLibrary",
-    "GoSource",
+)
+load(
+    "//go/private/rules:transition.bzl",
+    "go_cross_transition",
 )
 
 def _is_windows(ctx):
@@ -54,7 +52,6 @@ def _go_cross_impl(ctx):
     old_default_info = ctx.attr.target[DefaultInfo]
     old_executable = old_default_info.files_to_run.executable
 
-    new_default_info = None
     if old_executable:
         # Bazel requires executable rules to created the executable themselves,
         # so we create a symlink in this rule so that it appears this rule created its executable.
@@ -84,8 +81,6 @@ def _go_cross_impl(ctx):
     providers = [
         ctx.attr.target[provider]
         for provider in [
-            GoLibrary,
-            GoSource,
             GoArchive,
             OutputGroupInfo,
             CcInfo,
@@ -100,7 +95,7 @@ _go_cross_kwargs = {
         "target": attr.label(
             doc = """Go binary target to transition to the given platform and/or sdk_version.
             """,
-            providers = [GoLibrary, GoSource, GoArchive],
+            providers = [GoArchive],
             mandatory = True,
         ),
         "platform": attr.label(
@@ -131,8 +126,6 @@ _go_cross_kwargs = {
     of the golang SDK.<br><br>
     **Providers:**
     <ul>
-      <li>[GoLibrary]</li>
-      <li>[GoSource]</li>
       <li>[GoArchive]</li>
     </ul>
     """,

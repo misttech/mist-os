@@ -139,22 +139,6 @@ register_toolchains(
     "@fuchsia_prebuilt_rust//:rust_fuchsia_riscv64",
 )
 
-# buildifier: disable=load-on-top
-load(
-    "@io_bazel_rules_go//go:deps.bzl",
-    "go_register_toolchains",
-    "go_rules_dependencies",
-    "go_wrap_sdk",
-)
-
-go_wrap_sdk(
-    name = "go_sdk",
-    root_file = "//:prebuilt/third_party/go/%s/README.md" % fuchsia_host_tag,
-)
-
-go_rules_dependencies()
-go_register_toolchains()
-
 # com_google_absl is a dependency of com_google_googletest
 local_repository(
     name = "com_google_absl",

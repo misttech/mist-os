@@ -25,13 +25,13 @@ def _go_sdk_impl(ctx):
     return [GoSDK(
         goos = ctx.attr.goos,
         goarch = ctx.attr.goarch,
-        experiments = ctx.attr.experiments,
+        experiments = ",".join(ctx.attr.experiments),
         root_file = ctx.file.root_file,
         package_list = package_list,
-        libs = ctx.files.libs,
-        headers = ctx.files.headers,
-        srcs = ctx.files.srcs,
-        tools = ctx.files.tools,
+        libs = depset(ctx.files.libs),
+        headers = depset(ctx.files.headers),
+        srcs = depset(ctx.files.srcs),
+        tools = depset(ctx.files.tools),
         go = ctx.executable.go,
         version = ctx.attr.version,
     )]

@@ -30,6 +30,7 @@ _123_PREFIX_PRERELEASE_SUFFIX = "rc1"
     minor = _123_PREFIX_MINOR_VERSION,
     patch = _123_PREFIX_PATCH_VERSION,
     prerelease = _123_PREFIX_PRERELEASE_SUFFIX,
+    sdk_name = "sdk_repo",
     sdk_type = "download",
 )
 """,
@@ -69,6 +70,7 @@ def _go_toolchains_single_definition_without_version_test(ctx):
     minor = _123_PREFIX_MINOR_VERSION,
     patch = _123_PREFIX_PATCH_VERSION,
     prerelease = _123_PREFIX_PRERELEASE_SUFFIX,
+    sdk_name = "sdk_repo",
     sdk_type = "download",
 )
 """,

@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@bazel_tools//tools/build_defs/repo:utils.bzl", "patch", "read_user_netrc", "use_netrc")
 load("//go/private:common.bzl", "executable_path")
 load("//go/private:nogo.bzl", "go_register_nogo")
-load("//go/private/skylib/lib:versions.bzl", "versions")
-load("@bazel_tools//tools/build_defs/repo:utils.bzl", "patch", "read_user_netrc", "use_netrc")
+load("//go/private:platforms.bzl", "GOARCH_CONSTRAINTS", "GOOS_CONSTRAINTS")
 
 MIN_SUPPORTED_VERSION = (1, 14, 0)
 
@@ -90,6 +90,7 @@ def _go_download_sdk_impl(ctx):
         )
 
         data = ctx.read("versions.json")
+        ctx.delete("versions.json")
         sdks_by_version = _parse_versions_json(data)
 
         if not version:
@@ -226,6 +227,7 @@ def go_toolchains_single_definition(ctx, *, prefix, goos, goarch, sdk_repo, sdk_
     minor = {identifier_prefix}MINOR_VERSION,
     patch = {identifier_prefix}PATCH_VERSION,
     prerelease = {identifier_prefix}PRERELEASE_SUFFIX,
+    sdk_name = "{sdk_repo}",
     sdk_type = "{sdk_type}",
 )
 """.format(
@@ -379,7 +381,7 @@ def _go_wrap_sdk_impl(ctx):
     _sdk_build_file(ctx, platform, version, ctx.attr.experiments)
     _local_sdk(ctx, goroot)
 
-_go_wrap_sdk = repository_rule(
+go_wrap_sdk_rule = repository_rule(
     implementation = _go_wrap_sdk_impl,
     attrs = {
         "root_file": attr.label(
@@ -401,14 +403,16 @@ _go_wrap_sdk = repository_rule(
 )
 
 def go_wrap_sdk(name, register_toolchains = True, **kwargs):
-    _go_wrap_sdk(name = name, **kwargs)
+    goos = kwargs.pop("goos", None)
+    goarch = kwargs.pop("goarch", None)
+    go_wrap_sdk_rule(name = name, **kwargs)
     _go_toolchains(
         name = name + "_toolchains",
         sdk_repo = name,
         sdk_type = "remote",
         sdk_version = kwargs.get("version"),
-        goos = kwargs.get("goos"),
-        goarch = kwargs.get("goarch"),
+        goos = goos,
+        goarch = goarch,
     )
     if register_toolchains:
         _register_toolchains(name)
@@ -419,63 +423,15 @@ def _register_toolchains(repo):
 def _remote_sdk(ctx, urls, strip_prefix, sha256):
     if len(urls) == 0:
         fail("no urls specified")
-    host_goos, _ = detect_host_platform(ctx)
-
     ctx.report_progress("Downloading and extracting Go toolchain")
 
     auth = use_netrc(read_user_netrc(ctx), urls, {})
-
-    # TODO(#2771): After bazelbuild/bazel#18448 is merged and available in
-    # the minimum supported version of Bazel, remove the workarounds below.
-    #
-    # Go ships archives containing some non-ASCII file names, used in
-    # test cases for Go's build system. Bazel has a bug extracting these
-    # archives on certain file systems (macOS AFS at least, possibly also
-    # Docker on macOS with a bind mount).
-    #
-    # For .tar.gz files (available for most platforms), we work around this bug
-    # by using the system tar instead of ctx.download_and_extract.
-    #
-    # For .zip files, we use ctx.download_and_extract but with rename_files,
-    # changing certain paths that trigger the bug. This is only available
-    # in Bazel 6.0.0+ (bazelbuild/bazel#16052). The only situation where
-    # .zip files are needed seems to be a macOS host using a Windows toolchain
-    # for remote execution.
-    if urls[0].endswith(".tar.gz"):
-        if strip_prefix != "go":
-            fail("strip_prefix not supported")
-        ctx.download(
-            url = urls,
-            sha256 = sha256,
-            output = "go_sdk.tar.gz",
-            auth = auth,
-        )
-        res = ctx.execute(["tar", "-xf", "go_sdk.tar.gz", "--strip-components=1"])
-        if res.return_code:
-            fail("error extracting Go SDK:\n" + res.stdout + res.stderr)
-        ctx.delete("go_sdk.tar.gz")
-    elif (urls[0].endswith(".zip") and
-          host_goos != "windows" and
-          # Development versions of Bazel have an empty version string. We assume that they are
-          # more recent than the version that introduced rename_files.
-          versions.is_at_least("6.0.0", versions.get() or "6.0.0")):
-        ctx.download_and_extract(
-            url = urls,
-            stripPrefix = strip_prefix,
-            sha256 = sha256,
-            rename_files = {
-                "go/test/fixedbugs/issue27836.dir/\336foo.go": "go/test/fixedbugs/issue27836.dir/thfoo.go",
-                "go/test/fixedbugs/issue27836.dir/\336main.go": "go/test/fixedbugs/issue27836.dir/thmain.go",
-            },
-            auth = auth,
-        )
-    else:
-        ctx.download_and_extract(
-            url = urls,
-            stripPrefix = strip_prefix,
-            sha256 = sha256,
-            auth = auth,
-        )
+    ctx.download_and_extract(
+        url = urls,
+        stripPrefix = strip_prefix,
+        sha256 = sha256,
+        auth = auth,
+    )
 
 def _local_sdk(ctx, path):
     for entry in ctx.path(path).readdir():
@@ -505,6 +461,10 @@ def _sdk_build_file(ctx, platform, version, experiments):
             "{exe}": ".exe" if goos == "windows" else "",
             "{version}": version,
             "{experiments}": repr(experiments),
+            "{exec_compatible_with}": repr([
+                GOARCH_CONSTRAINTS[goarch],
+                GOOS_CONSTRAINTS[goos],
+            ]),
         },
     )
 
@@ -530,7 +490,6 @@ def detect_host_platform(ctx):
     return goos, goarch
 
 def _detect_host_sdk(ctx):
-    root = "@invalid@"
     if "GOROOT" in ctx.os.environ:
         return ctx.os.environ["GOROOT"]
     res = ctx.execute([executable_path(ctx, "go"), "env", "GOROOT"])
@@ -675,8 +634,6 @@ def _version_less(a, b):
 
 def _version_string(v):
     suffix = v[3] if _version_is_prerelease(v) else ""
-    if v[-1] == 0:
-        v = v[:-1]
     return ".".join([str(n) for n in v]) + suffix
 
 def _have_same_length(*lists):
@@ -689,7 +646,7 @@ def go_register_toolchains(version = None, nogo = None, go_version = None, exper
     if not version:
         version = go_version  # old name
 
-    sdk_kinds = ("go_download_sdk_rule", "go_host_sdk_rule", "_go_local_sdk", "_go_wrap_sdk")
+    sdk_kinds = ("go_download_sdk_rule", "go_host_sdk_rule", "_go_local_sdk", "go_wrap_sdk_rule")
     existing_rules = native.existing_rules()
     sdk_rules = [r for r in existing_rules.values() if r["kind"] in sdk_kinds]
     if len(sdk_rules) == 0 and "go_sdk" in existing_rules:

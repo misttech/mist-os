@@ -15,16 +15,20 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/parser"
 	"go/token"
+	"io"
 	"os"
 	"strconv"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
-type ResolvePkgFunc func(importPath string) string
+type ResolvePkgFunc func(importPath string) *packages.Package
 
 // Copy and pasted from golang.org/x/tools/go/packages
 type FlatPackagesError struct {
@@ -95,22 +99,22 @@ func WalkFlatPackagesFromJSON(jsonFile string, onPkg PackageFunc) error {
 	return nil
 }
 
-func (fp *FlatPackage) ResolvePaths(prf PathResolverFunc) error {
-	resolvePathsInPlace(prf, fp.CompiledGoFiles)
-	resolvePathsInPlace(prf, fp.GoFiles)
-	resolvePathsInPlace(prf, fp.OtherFiles)
-	fp.ExportFile = prf(fp.ExportFile)
+func ResolvePaths(pak *packages.Package, prf PathResolverFunc) error {
+	resolvePathsInPlace(prf, pak.CompiledGoFiles)
+	resolvePathsInPlace(prf, pak.GoFiles)
+	resolvePathsInPlace(prf, pak.OtherFiles)
+	pak.ExportFile = prf(pak.ExportFile)
 	return nil
 }
 
 // FilterFilesForBuildTags filters the source files given the current build
 // tags.
-func (fp *FlatPackage) FilterFilesForBuildTags() {
-	fp.GoFiles = filterSourceFilesForTags(fp.GoFiles)
-	fp.CompiledGoFiles = filterSourceFilesForTags(fp.CompiledGoFiles)
+func FilterFilesForBuildTags(pak *packages.Package) {
+	pak.GoFiles = filterSourceFilesForTags(pak.GoFiles)
+	pak.CompiledGoFiles = filterSourceFilesForTags(pak.CompiledGoFiles)
 }
 
-func (fp *FlatPackage) filterTestSuffix(files []string) (err error, testFiles []string, xTestFiles, nonTestFiles []string) {
+func filterTestSuffix(pkg *packages.Package, files []string) (err error, testFiles []string, xTestFiles, nonTestFiles []string) {
 	for _, filename := range files {
 		if strings.HasSuffix(filename, "_test.go") {
 			fset := token.NewFileSet()
@@ -118,7 +122,7 @@ func (fp *FlatPackage) filterTestSuffix(files []string) (err error, testFiles []
 			if err != nil {
 				return err, nil, nil, nil
 			}
-			if f.Name.Name == fp.Name {
+			if f.Name.Name == pkg.Name {
 				testFiles = append(testFiles, filename)
 			} else {
 				xTestFiles = append(xTestFiles, filename)
@@ -130,38 +134,45 @@ func (fp *FlatPackage) filterTestSuffix(files []string) (err error, testFiles []
 	return
 }
 
-func (fp *FlatPackage) MoveTestFiles() *FlatPackage {
-	err, tgf, xtgf, gf := fp.filterTestSuffix(fp.GoFiles)
-
+func MoveTestFiles(pkg *packages.Package) *packages.Package {
+	err, tgf, xtgf, gf := filterTestSuffix(pkg, pkg.GoFiles)
 	if err != nil {
 		return nil
 	}
-	fp.GoFiles = append(gf, tgf...)
-	fp.CompiledGoFiles = append(gf, tgf...)
 
-	if len(xtgf) == 0 {
+	pkg.GoFiles = append(gf, tgf...)
+
+	err, ctgf, cxtgf, cgf := filterTestSuffix(pkg, pkg.CompiledGoFiles)
+	if err != nil {
 		return nil
 	}
 
-	newImports := make(map[string]string, len(fp.Imports))
-	for k, v := range fp.Imports {
+	pkg.CompiledGoFiles = append(cgf, ctgf...)
+
+	if len(xtgf) == 0 && len(cxtgf) == 0 {
+		return nil
+	}
+
+	newImports := make(map[string]*packages.Package, len(pkg.Imports))
+	for k, v := range pkg.Imports {
 		newImports[k] = v
 	}
 
-	newImports[fp.PkgPath] = fp.ID
+	newImports[pkg.PkgPath] = &packages.Package{
+		ID: pkg.ID,
+	}
 
 	// Clone package, only xtgf files
-	return &FlatPackage{
-		ID:              fp.ID + "_xtest",
-		Name:            fp.Name + "_test",
-		PkgPath:         fp.PkgPath,
+	return &packages.Package{
+		ID:              pkg.ID + "_xtest",
+		Name:            pkg.Name + "_test",
+		PkgPath:         pkg.PkgPath + "_test",
 		Imports:         newImports,
-		Errors:          fp.Errors,
+		Errors:          pkg.Errors,
 		GoFiles:         append([]string{}, xtgf...),
-		CompiledGoFiles: append([]string{}, xtgf...),
-		OtherFiles:      fp.OtherFiles,
-		ExportFile:      fp.ExportFile,
-		Standard:        fp.Standard,
+		CompiledGoFiles: append([]string{}, cxtgf...),
+		OtherFiles:      pkg.OtherFiles,
+		ExportFile:      pkg.ExportFile,
 	}
 }
 
@@ -169,22 +180,26 @@ func (fp *FlatPackage) IsStdlib() bool {
 	return fp.Standard
 }
 
-func (fp *FlatPackage) ResolveImports(resolve ResolvePkgFunc) error {
-	// Stdlib packages are already complete import wise
-	if fp.IsStdlib() {
-		return nil
-	}
-
+// ResolveImports resolves imports for non-stdlib packages and integrates file overlays
+// to allow modification of package imports without modifying disk files.
+func ResolveImports(pkg *packages.Package, resolve ResolvePkgFunc, overlays map[string][]byte) error {
 	fset := token.NewFileSet()
 
-	for _, file := range fp.CompiledGoFiles {
-		f, err := parser.ParseFile(fset, file, nil, parser.ImportsOnly)
+	for _, file := range pkg.CompiledGoFiles {
+		// Only assign overlayContent when an overlay for the file exists, since ParseFile checks by type.
+		// If overlay is assigned directly from the map, it will have []byte as type
+		// Empty []byte types are parsed into io.EOF
+		var overlayReader io.Reader
+		if content, ok := overlays[file]; ok {
+			overlayReader = bytes.NewReader(content)
+		}
+		f, err := parser.ParseFile(fset, file, overlayReader, parser.ImportsOnly)
 		if err != nil {
 			return err
 		}
 		// If the name is not provided, fetch it from the sources
-		if fp.Name == "" {
-			fp.Name = f.Name.Name
+		if pkg.Name == "" {
+			pkg.Name = f.Name.Name
 		}
 
 		for _, rawImport := range f.Imports {
@@ -196,12 +211,12 @@ func (fp *FlatPackage) ResolveImports(resolve ResolvePkgFunc) error {
 			if imp == "C" {
 				continue
 			}
-			if _, ok := fp.Imports[imp]; ok {
+			if _, ok := pkg.Imports[imp]; ok {
 				continue
 			}
 
-			if pkgID := resolve(imp); pkgID != "" {
-				fp.Imports[imp] = pkgID
+			if impPkg := resolve(imp); impPkg != nil {
+				pkg.Imports[imp] = impPkg
 			}
 		}
 	}

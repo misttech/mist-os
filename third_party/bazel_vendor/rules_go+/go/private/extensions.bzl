@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@bazel_features//:features.bzl", "bazel_features")
-load("//go/private:sdk.bzl", "detect_host_platform", "go_download_sdk_rule", "go_host_sdk_rule", "go_multiple_toolchains")
-load("//go/private:repositories.bzl", "go_rules_dependencies")
+load("@io_bazel_rules_go_bazel_features//:features.bzl", "bazel_features")
+load("//go/private:go_mod.bzl", "version_from_go_mod")
+load("//go/private:nogo.bzl", "DEFAULT_NOGO", "NOGO_DEFAULT_EXCLUDES", "NOGO_DEFAULT_INCLUDES", "go_register_nogo")
+load("//go/private:sdk.bzl", "detect_host_platform", "go_download_sdk_rule", "go_host_sdk_rule", "go_multiple_toolchains", "go_wrap_sdk_rule")
 
 def host_compatible_toolchain_impl(ctx):
     ctx.file("BUILD.bazel")
@@ -35,25 +36,29 @@ host_compatible_toolchain = repository_rule(
     doc = "An external repository to expose the first host compatible toolchain",
 )
 
+_COMMON_TAG_ATTRS = {
+    "name": attr.string(),
+    "goos": attr.string(),
+    "goarch": attr.string(),
+    "sdks": attr.string_list_dict(),
+    "experiments": attr.string_list(
+        doc = "Go experiments to enable via GOEXPERIMENT",
+    ),
+    "urls": attr.string_list(default = ["https://dl.google.com/go/{}"]),
+    "patches": attr.label_list(
+        doc = "A list of patches to apply to the SDK after downloading it",
+    ),
+    "patch_strip": attr.int(
+        default = 0,
+        doc = "The number of leading path segments to be stripped from the file name in the patches.",
+    ),
+    "strip_prefix": attr.string(default = "go"),
+}
+
 _download_tag = tag_class(
-    attrs = {
-        "name": attr.string(),
-        "goos": attr.string(),
-        "goarch": attr.string(),
-        "sdks": attr.string_list_dict(),
-        "experiments": attr.string_list(
-            doc = "Go experiments to enable via GOEXPERIMENT",
-        ),
-        "urls": attr.string_list(default = ["https://dl.google.com/go/{}"]),
+    doc = """Download a specific Go SDK at the optional GOOS, GOARCH, and version, from a customisable URL.  Optionally apply local customisations to the SDK by applying patches and setting experiments.""",
+    attrs = _COMMON_TAG_ATTRS | {
         "version": attr.string(),
-        "patches": attr.label_list(
-            doc = "A list of patches to apply to the SDK after downloading it",
-        ),
-        "patch_strip": attr.int(
-            default = 0,
-            doc = "The number of leading path segments to be stripped from the file name in the patches.",
-        ),
-        "strip_prefix": attr.string(default = "go"),
     },
 )
 
@@ -67,12 +72,111 @@ _host_tag = tag_class(
     },
 )
 
+_nogo_tag = tag_class(
+    attrs = {
+        "nogo": attr.label(
+            doc = "The nogo target to use when this module is the root module.",
+        ),
+        "includes": attr.label_list(
+            default = NOGO_DEFAULT_INCLUDES,
+            # The special include "all" is undocumented on purpose: With it, adding a new transitive
+            # dependency to a Go module can cause a build failure if the new dependency has lint
+            # issues.
+            doc = """
+A Go target is checked with nogo if its package matches at least one of the entries in 'includes'
+and none of the entries in 'excludes'. By default, nogo is applied to all targets in the main
+repository.
+
+Uses the same format as 'visibility', i.e., every entry must be a label that ends with ':__pkg__' or
+':__subpackages__'.
+""",
+        ),
+        "excludes": attr.label_list(
+            default = NOGO_DEFAULT_EXCLUDES,
+            doc = "See 'includes'.",
+        ),
+    },
+)
+
+_wrap_tag = tag_class(
+    attrs = {
+        "root_file": attr.label(
+            mandatory = False,
+            doc = "A file in the SDK root directory. Use to determine GOROOT.",
+        ),
+        "root_files": attr.string_dict(
+            mandatory = False,
+            doc = "A set of mappings from the host platform to a file in the SDK's root directory.",
+        ),
+        "version": attr.string(),
+        "experiments": attr.string_list(
+            doc = "Go experiments to enable via GOEXPERIMENT.",
+        ),
+        "goos": attr.string(),
+        "goarch": attr.string(),
+    },
+)
+
+_from_file_tag = tag_class(
+    doc = """Use a specific Go SDK version described by a `go.mod` file.  Optionally supply GOOS, GOARCH, and download from a customisable URL, and apply local patches or set experiments.""",
+    attrs = _COMMON_TAG_ATTRS | {
+        "go_mod": attr.label(
+            doc = "The go.mod file to read the SDK version from.",
+        ),
+    },
+)
+
+# A list of (goos, goarch) pairs that are commonly used for remote executors in cross-platform
+# builds (where host != exec platform). By default, we register toolchains for all of these
+# platforms in addition to the host platform.
+_COMMON_EXEC_PLATFORMS = [
+    ("darwin", "amd64"),
+    ("darwin", "arm64"),
+    ("linux", "amd64"),
+    ("linux", "arm64"),
+    ("windows", "amd64"),
+    ("windows", "arm64"),
+]
+
 # This limit can be increased essentially arbitrarily, but doing so will cause a rebuild of all
 # targets using any of these toolchains due to the changed repository name.
 _MAX_NUM_TOOLCHAINS = 9999
 _TOOLCHAIN_INDEX_PAD_LENGTH = len(str(_MAX_NUM_TOOLCHAINS))
 
 def _go_sdk_impl(ctx):
+    nogo_tag = struct(
+        nogo = DEFAULT_NOGO,
+        includes = NOGO_DEFAULT_INCLUDES,
+        excludes = NOGO_DEFAULT_EXCLUDES,
+    )
+    for module in ctx.modules:
+        if not module.is_root or not module.tags.nogo:
+            continue
+        if len(module.tags.nogo) > 1:
+            # Make use of the special formatting applied to tags by fail.
+            fail(
+                "go_sdk.nogo: only one tag can be specified per module, got:\n",
+                *[t for p in zip(module.tags.nogo, len(module.tags.nogo) * ["\n"]) for t in p]
+            )
+        nogo_tag = module.tags.nogo[0]
+        for scope in nogo_tag.includes + nogo_tag.excludes:
+            # Validate that the scope references a valid, visible repository.
+            # buildifier: disable=no-effect
+            scope.repo_name
+            if scope.name != "__pkg__" and scope.name != "__subpackages__":
+                fail(
+                    "go_sdk.nogo: all entries in includes and excludes must end with ':__pkg__' or ':__subpackages__', got '{}' in".format(scope.name),
+                    nogo_tag,
+                )
+    go_register_nogo(
+        name = "io_bazel_rules_nogo",
+        nogo = str(nogo_tag.nogo),
+        # Go through canonical label literals to avoid a dependency edge on the packages in the
+        # scope.
+        includes = [str(l) for l in nogo_tag.includes],
+        excludes = [str(l) for l in nogo_tag.excludes],
+    )
+
     multi_version_module = {}
     for module in ctx.modules:
         if module.name in multi_version_module:
@@ -87,7 +191,46 @@ def _go_sdk_impl(ctx):
     host_detected_goos, host_detected_goarch = detect_host_platform(ctx)
     toolchains = []
     for module in ctx.modules:
-        for index, download_tag in enumerate(module.tags.download):
+        # Apply wrapped toolchains first to override specific platforms from the
+        # default toolchain or any downloads.
+        for index, wrap_tag in enumerate(module.tags.wrap):
+            name = _default_go_sdk_name(
+                module = module,
+                multi_version = multi_version_module[module.name],
+                tag_type = "wrap",
+                index = index,
+            )
+            go_wrap_sdk_rule(
+                name = name,
+                root_file = wrap_tag.root_file,
+                root_files = wrap_tag.root_files,
+                version = wrap_tag.version,
+                experiments = wrap_tag.experiments,
+            )
+            toolchains.append(struct(
+                goos = wrap_tag.goos,
+                goarch = wrap_tag.goarch,
+                sdk_repo = name,
+                sdk_type = "remote",
+                sdk_version = wrap_tag.version,
+            ))
+
+        additional_download_tags = []
+
+        # If the module suggests to read the toolchain version from a `go.mod` file, use that.
+        for index, from_file_tag in enumerate(module.tags.from_file):
+            version = version_from_go_mod(ctx, from_file_tag.go_mod)
+
+            # Synthesize a `download` tag so we can reuse the selection logic below.
+            download_tag = {
+                key: getattr(from_file_tag, key)
+                for key in dir(from_file_tag)
+                if key not in ["go_mod"]
+            }
+            download_tag["version"] = version
+            additional_download_tags += [struct(**download_tag)]
+
+        for index, download_tag in enumerate(module.tags.download + additional_download_tags):
             # SDKs without an explicit version are fetched even when not selected by toolchain
             # resolution. This is acceptable if brought in by the root module, but transitive
             # dependencies should not slow down the build in this way.
@@ -96,10 +239,9 @@ def _go_sdk_impl(ctx):
 
             # SDKs with an explicit name are at risk of colliding with those from other modules.
             # This is acceptable if brought in by the root module as the user is responsible for any
-            # conflicts that arise. rules_go itself provides "go_default_sdk", which is used by
-            # Gazelle to bootstrap itself.
-            # TODO(https://github.com/bazelbuild/bazel-gazelle/issues/1469): Investigate whether
-            #  Gazelle can use the first user-defined SDK instead to prevent unnecessary downloads.
+            # conflicts that arise. rules_go itself provides "go_default_sdk".
+            # TODO: Now that Gazelle relies on the go_host_compatible_sdk_label repo, remove the
+            #       special case for "go_default_sdk". Users should migrate to @rules_go//go.
             if (not module.is_root and not module.name == "rules_go") and download_tag.name:
                 fail("go_sdk.download: name must not be specified in non-root module " + module.name)
 
@@ -109,6 +251,8 @@ def _go_sdk_impl(ctx):
                 tag_type = "download",
                 index = index,
             )
+
+            # Keep in sync with the other calls to `go_download_sdk_rule` above and below.
             go_download_sdk_rule(
                 name = name,
                 goos = download_tag.goos,
@@ -133,12 +277,54 @@ def _go_sdk_impl(ctx):
                 sdk_version = download_tag.version,
             ))
 
+            # Additionally register SDKs for all common execution platforms, but only if the user
+            # specified a version to prevent eager fetches.
+            if download_tag.version and not download_tag.goos and not download_tag.goarch:
+                for goos, goarch in _COMMON_EXEC_PLATFORMS:
+                    if goos == host_detected_goos and goarch == host_detected_goarch:
+                        # We already added the host-compatible toolchain above.
+                        continue
+
+                    if download_tag.sdks and not "{}_{}".format(goos, goarch) in download_tag.sdks:
+                        # The user supplied custom download links, but not for this tuple.
+                        continue
+
+                    default_name = _default_go_sdk_name(
+                        module = module,
+                        multi_version = multi_version_module[module.name],
+                        tag_type = "download",
+                        index = index,
+                        suffix = "_{}_{}".format(goos, goarch),
+                    )
+
+                    # Keep in sync with the other calls to `go_download_sdk_rule` above.
+                    go_download_sdk_rule(
+                        name = default_name,
+                        goos = goos,
+                        goarch = goarch,
+                        sdks = download_tag.sdks,
+                        experiments = download_tag.experiments,
+                        patches = download_tag.patches,
+                        patch_strip = download_tag.patch_strip,
+                        urls = download_tag.urls,
+                        version = download_tag.version,
+                        strip_prefix = download_tag.strip_prefix,
+                    )
+
+                    toolchains.append(struct(
+                        goos = goos,
+                        goarch = goarch,
+                        sdk_repo = default_name,
+                        sdk_type = "remote",
+                        sdk_version = download_tag.version,
+                    ))
+
         for index, host_tag in enumerate(module.tags.host):
             # Dependencies can rely on rules_go providing a default remote SDK. They can also
             # configure a specific version of the SDK to use. However, they should not add a
             # dependency on the host's Go SDK.
             if not module.is_root:
-                fail("go_sdk.host: cannot be used in non-root module " + module.name)
+                fail("go_sdk.host: cannot be used in non-root module {}, consider using use_extension(..., dev_dependency = True)".format(module.name))
 
             name = host_tag.name or _default_go_sdk_name(
                 module = module,
@@ -183,15 +369,21 @@ def _go_sdk_impl(ctx):
         sdk_versions = [toolchain.sdk_version for toolchain in toolchains],
     )
 
-def _default_go_sdk_name(*, module, multi_version, tag_type, index):
-    # Keep the version out of the repository name if possible to prevent unnecessary rebuilds when
-    # it changes.
-    return "{name}_{version}_{tag_type}_{index}".format(
+    if bazel_features.external_deps.extension_metadata_has_reproducible:
+        return ctx.extension_metadata(reproducible = True)
+    else:
+        return None
+
+def _default_go_sdk_name(*, module, multi_version, tag_type, index, suffix = ""):
+    # Keep the version and name of the root module out of the repository name if possible to
+    # prevent unnecessary rebuilds when it changes.
+    return "{name}_{version}_{tag_type}_{index}{suffix}".format(
         # "main_" is not a valid module name and thus can't collide.
-        name = module.name or "main_",
+        name = "main_" if module.is_root else module.name,
         version = module.version if multi_version else "",
         tag_type = tag_type,
         index = index,
+        suffix = suffix,
     )
 
 def _toolchain_prefix(index, name):
@@ -220,13 +412,9 @@ go_sdk = module_extension(
     tag_classes = {
         "download": _download_tag,
         "host": _host_tag,
+        "nogo": _nogo_tag,
+        "wrap": _wrap_tag,
+        "from_file": _from_file_tag,
     },
     **go_sdk_extra_kwargs
-)
-
-def _non_module_dependencies_impl(_ctx):
-    go_rules_dependencies(force = True)
-
-non_module_dependencies = module_extension(
-    implementation = _non_module_dependencies_impl,
 )

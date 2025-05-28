@@ -166,7 +166,7 @@ func flatPackageForStd(cloneBase string, pkg *goListPackage, pathReplaceFn func(
 		ID:              stdlibPackageID(pkg.ImportPath),
 		Name:            pkg.Name,
 		PkgPath:         pkg.ImportPath,
-		ExportFile:      outputBasePath(cloneBase, pkg.Target),
+		ExportFile:      pathReplaceFn(pkg.Export),
 		Imports:         map[string]string{},
 		Standard:        pkg.Standard,
 		GoFiles:         goFiles,
@@ -203,10 +203,12 @@ func stdliblist(args []string) error {
 	goenv := envFlags(flags)
 	out := flags.String("out", "", "Path to output go list json")
 	cachePath := flags.String("cache", "", "Path to use for GOCACHE")
+	export := flags.Bool("export", false, "Should -export be passed to go list")
+
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if err := goenv.checkFlags(); err != nil {
+	if err := goenv.checkFlagsAndSetGoroot(); err != nil {
 		return err
 	}
 
@@ -257,9 +259,7 @@ func stdliblist(args []string) error {
 	}
 	os.Setenv("CC", quotePathIfNeeded(abs(ccEnv)))
 
-	// Modify CGO flags to use only absolute path
-	// because go is having its own sandbox, all CGO flags must use absolute path
-	if err := absEnv(cgoEnvVars, cgoAbsEnvFlags); err != nil {
+	if err := absCCCompiler(cgoEnvVars, cgoAbsEnvFlags); err != nil {
 		return fmt.Errorf("error modifying cgo environment to absolute path: %v", err)
 	}
 
@@ -276,6 +276,10 @@ func stdliblist(args []string) error {
 
 	if cgoEnabled {
 		listArgs = append(listArgs, "-compiled=true")
+	}
+
+	if *export {
+		listArgs = append(listArgs, "-export")
 	}
 
 	listArgs = append(listArgs, "-json", "builtin", "std", "runtime/cgo")

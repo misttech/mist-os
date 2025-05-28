@@ -13,13 +13,13 @@
 # limitations under the License.
 
 load(
+    "@bazel_skylib//lib:paths.bzl",
+    "paths",
+)
+load(
     "//go/private:providers.bzl",
     "GoArchive",
     "GoStdLib",
-)
-load(
-    "@bazel_skylib//lib:paths.bzl",
-    "paths",
 )
 
 GoPkgInfo = provider()
@@ -50,23 +50,20 @@ def file_path(f):
     return paths.join(prefix, f.path)
 
 def _go_archive_to_pkg(archive):
+    go_files = [
+        file_path(src)
+        for src in archive.data.srcs
+        if src.path.endswith(".go")
+    ]
     return struct(
         ID = str(archive.data.label),
         PkgPath = archive.data.importpath,
         ExportFile = file_path(archive.data.export_file),
-        GoFiles = [
-            file_path(src)
-            for src in archive.data.orig_srcs
-            if src.path.endswith(".go")
-        ],
-        CompiledGoFiles = [
-            file_path(src)
-            for src in archive.data.srcs
-            if src.path.endswith(".go")
-        ],
+        GoFiles = go_files,
+        CompiledGoFiles = go_files,
         OtherFiles = [
             file_path(src)
-            for src in archive.data.orig_srcs
+            for src in archive.data.srcs
             if not src.path.endswith(".go")
         ],
         Imports = {
@@ -77,7 +74,7 @@ def _go_archive_to_pkg(archive):
 
 def make_pkg_json(ctx, name, pkg_info):
     pkg_json_file = ctx.actions.declare_file(name + ".pkg.json")
-    ctx.actions.write(pkg_json_file, content = pkg_info.to_json())
+    ctx.actions.write(pkg_json_file, content = json.encode(pkg_info))
     return pkg_json_file
 
 def _go_pkg_info_aspect_impl(target, ctx):

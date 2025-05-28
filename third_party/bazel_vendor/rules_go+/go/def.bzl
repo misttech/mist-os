@@ -23,43 +23,29 @@ may change without notice.
 """
 
 load(
+    "//extras:gomock.bzl",
+    _gomock = "gomock",
+)
+load(
     "//go/private:context.bzl",
     _go_context = "go_context",
-)
-load(
-    "//go/private:providers.bzl",
-    _GoArchive = "GoArchive",
-    _GoArchiveData = "GoArchiveData",
-    _GoLibrary = "GoLibrary",
-    _GoPath = "GoPath",
-    _GoSDK = "GoSDK",
-    _GoSource = "GoSource",
-)
-load(
-    "//go/private/rules:sdk.bzl",
-    _go_sdk = "go_sdk",
+    _new_go_info = "new_go_info",
 )
 load(
     "//go/private:go_toolchain.bzl",
     _go_toolchain = "go_toolchain",
 )
 load(
-    "//go/private/rules:wrappers.bzl",
-    _go_binary_macro = "go_binary_macro",
-    _go_library_macro = "go_library_macro",
-    _go_test_macro = "go_test_macro",
+    "//go/private:providers.bzl",
+    _GoArchive = "GoArchive",
+    _GoArchiveData = "GoArchiveData",
+    _GoInfo = "GoInfo",
+    _GoPath = "GoPath",
+    _GoSDK = "GoSDK",
 )
 load(
-    "//go/private/rules:source.bzl",
-    _go_source = "go_source",
-)
-load(
-    "//extras:gomock.bzl",
-    _gomock = "gomock",
-)
-load(
-    "//go/private/tools:path.bzl",
-    _go_path = "go_path",
+    "//go/private/rules:cross.bzl",
+    _go_cross_binary = "go_cross_binary",
 )
 load(
     "//go/private/rules:library.bzl",
@@ -70,15 +56,29 @@ load(
     _nogo = "nogo_wrapper",
 )
 load(
-    "//go/private/rules:cross.bzl",
-    _go_cross_binary = "go_cross_binary",
+    "//go/private/rules:sdk.bzl",
+    _go_sdk = "go_sdk",
+)
+load(
+    "//go/private/rules:source.bzl",
+    _go_source = "go_source",
+)
+load(
+    "//go/private/rules:transition.bzl",
+    _go_reset_target = "go_reset_target",
+)
+load(
+    "//go/private/rules:wrappers.bzl",
+    _go_binary_macro = "go_binary_macro",
+    _go_library_macro = "go_library_macro",
+    _go_test_macro = "go_test_macro",
+)
+load(
+    "//go/private/tools:path.bzl",
+    _go_path = "go_path",
 )
 
-# TOOLS_NOGO is a list of all analysis passes in
-# golang.org/x/tools/go/analysis/passes.
-# This is not backward compatible, so use caution when depending on this --
-# new analyses may discover issues in existing builds.
-TOOLS_NOGO = [
+_TOOLS_NOGO = [
     "@org_golang_x_tools//go/analysis/passes/asmdecl:go_default_library",
     "@org_golang_x_tools//go/analysis/passes/assign:go_default_library",
     "@org_golang_x_tools//go/analysis/passes/atomic:go_default_library",
@@ -117,9 +117,16 @@ TOOLS_NOGO = [
     "@org_golang_x_tools//go/analysis/passes/unusedresult:go_default_library",
 ]
 
-# Current version or next version to be tagged. Gazelle and other tools may
-# check this to determine compatibility.
-RULES_GO_VERSION = "0.43.0"
+# TOOLS_NOGO is a list of all analysis passes in
+# golang.org/x/tools/go/analysis/passes.
+# This is not backward compatible, so use caution when depending on this --
+# new analyses may discover issues in existing builds.
+TOOLS_NOGO = [str(Label(l)) for l in _TOOLS_NOGO]
+
+# Deprecated field previously used for version detection. This will not be
+# updated for new releases, use bazel_dep in MODULE.bazel to specify a minimum
+# version of rules_go instead.
+RULES_GO_VERSION = "0.50.0"
 
 go_context = _go_context
 gomock = _gomock
@@ -128,11 +135,19 @@ go_tool_library = _go_tool_library
 go_toolchain = _go_toolchain
 nogo = _nogo
 
-# See go/providers.rst#GoLibrary for full documentation.
-GoLibrary = _GoLibrary
+# This provider is deprecated and will be removed in a future release.
+# Use GoInfo instead.
+GoLibrary = _GoInfo
 
-# See go/providers.rst#GoSource for full documentation.
-GoSource = _GoSource
+# This provider is deprecated and will be removed in a future release.
+# Use GoInfo instead.
+GoSource = _GoInfo
+
+# See go/providers.rst#GoInfo for full documentation.
+GoInfo = _GoInfo
+
+# See go/toolchains.rst#new_go_info for full documentation.
+new_go_info = _new_go_info
 
 # See go/providers.rst#GoPath for full documentation.
 GoPath = _GoPath
@@ -160,6 +175,9 @@ go_source = _go_source
 
 # See docs/go/core/rules.md#go_path for full documentation.
 go_path = _go_path
+
+# See docs/go/core/rules.md#go_reset_target for full documentation.
+go_reset_target = _go_reset_target
 
 # See docs/go/core/rules.md#go_cross_binary for full documentation.
 go_cross_binary = _go_cross_binary

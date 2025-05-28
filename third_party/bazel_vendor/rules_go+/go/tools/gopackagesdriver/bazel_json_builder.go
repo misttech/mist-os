@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 type BazelJSONBuilder struct {
@@ -39,14 +40,9 @@ var _defaultKinds = []string{"go_library", "go_test", "go_binary"}
 
 var externalRe = regexp.MustCompile(".*\\/external\\/([^\\/]+)(\\/(.*))?\\/([^\\/]+.go)")
 
-func (b *BazelJSONBuilder) fileQuery(filename string) string {
-	label := filename
-
-	if filepath.IsAbs(filename) {
-		label, _ = filepath.Rel(b.bazel.WorkspaceRoot(), filename)
-	} else if strings.HasPrefix(filename, "./") {
-		label = strings.TrimPrefix(filename, "./")
-	}
+func (b *BazelJSONBuilder) fileQuery(label string) string {
+	label = b.adjustToRelativePathIfPossible(label)
+	filename := filepath.FromSlash(label)
 
 	if matches := externalRe.FindStringSubmatch(filename); len(matches) == 5 {
 		// if filepath is for a third party lib, we need to know, what external
@@ -56,7 +52,7 @@ func (b *BazelJSONBuilder) fileQuery(filename string) string {
 	}
 
 	relToBin, err := filepath.Rel(b.bazel.info["output_path"], filename)
-	if err == nil && !strings.HasPrefix(relToBin, "../") {
+	if err == nil && !strings.HasPrefix(relToBin, filepath.FromSlash("../")) {
 		parts := strings.SplitN(relToBin, string(filepath.Separator), 3)
 		relToBin = parts[2]
 		// We've effectively converted filename from bazel-bin/some/path.go to some/path.go;
@@ -80,7 +76,7 @@ func (b *BazelJSONBuilder) fileQuery(filename string) string {
 	}
 
 	kinds := append(_defaultKinds, additionalKinds...)
-	return fmt.Sprintf(`kind("%s", same_pkg_direct_rdeps("%s"))`, strings.Join(kinds, "|"), label)
+	return fmt.Sprintf(`kind("^(%s) rule$", same_pkg_direct_rdeps("%s"))`, strings.Join(kinds, "|"), label)
 }
 
 func (b *BazelJSONBuilder) getKind() string {
@@ -93,18 +89,29 @@ func (b *BazelJSONBuilder) getKind() string {
 }
 
 func (b *BazelJSONBuilder) localQuery(request string) string {
-	request = path.Clean(request)
-	if filepath.IsAbs(request) {
-		if relPath, err := filepath.Rel(workspaceRoot, request); err == nil {
-			request = relPath
-		}
-	}
+	request = b.adjustToRelativePathIfPossible(request)
 
 	if !strings.HasSuffix(request, "...") {
 		request = fmt.Sprintf("%s:*", request)
 	}
 
-	return fmt.Sprintf(`kind("%s", %s)`, b.getKind(), request)
+	return fmt.Sprintf(`kind("^(%s) rule$", %s)`, b.getKind(), request)
+}
+
+func (b *BazelJSONBuilder) adjustToRelativePathIfPossible(request string) string {
+	// If request is a relative path and gopackagesdriver is ran within a subdirectory of the
+	// workspace, we must first resolve the absolute path for it.
+	// Note: Using FromSlash/ToSlash for handling windows
+	absRequest := filepath.FromSlash(request)
+	if !filepath.IsAbs(absRequest) {
+		absRequest = filepath.Join(b.bazel.BuildWorkingDirectory(), absRequest)
+	}
+	if relPath, err := filepath.Rel(workspaceRoot, absRequest); err == nil {
+		request = filepath.ToSlash(relPath)
+	} else {
+		fmt.Fprintf(os.Stderr, "error adjusting path to be relative to the workspace root from request %s: %v\n", request, err)
+	}
+	return request
 }
 
 func (b *BazelJSONBuilder) packageQuery(importPath string) string {
@@ -113,7 +120,7 @@ func (b *BazelJSONBuilder) packageQuery(importPath string) string {
 	}
 
 	return fmt.Sprintf(
-		`kind("%s", attr(importpath, "%s", deps(%s)))`,
+		`kind("^(%s) rule$", attr(importpath, "%s", deps(%s)))`,
 		b.getKind(),
 		importPath,
 		bazelQueryScope)
@@ -131,7 +138,7 @@ func (b *BazelJSONBuilder) queryFromRequests(requests ...string) string {
 		} else if isLocalPattern(request) {
 			result = b.localQuery(request)
 		} else if request == "builtin" || request == "std" {
-			result = fmt.Sprintf(RulesGoStdlibLabel)
+			result = fmt.Sprintf("%s", RulesGoStdlibLabel)
 		}
 
 		if result != "" {
@@ -151,9 +158,9 @@ func NewBazelJSONBuilder(bazel *Bazel, includeTests bool) (*BazelJSONBuilder, er
 	}, nil
 }
 
-func (b *BazelJSONBuilder) outputGroupsForMode(mode LoadMode) string {
+func (b *BazelJSONBuilder) outputGroupsForMode(mode packages.LoadMode) string {
 	og := "go_pkg_driver_json_file,go_pkg_driver_stdlib_json_file,go_pkg_driver_srcs"
-	if mode&NeedExportsFile != 0 {
+	if mode&packages.NeedExportsFile != 0 {
 		og += ",go_pkg_driver_export_file"
 	}
 	return og
@@ -161,8 +168,7 @@ func (b *BazelJSONBuilder) outputGroupsForMode(mode LoadMode) string {
 
 func (b *BazelJSONBuilder) query(ctx context.Context, query string) ([]string, error) {
 	var bzlmodQueryFlags []string
-	if strings.HasPrefix(rulesGoRepositoryName, "@@") {
-		// Requires Bazel 6.4.0.
+	if b.bazel.version.isAtLeast(bazelVersion{6, 4, 0}) {
 		bzlmodQueryFlags = []string{"--consistent_labels"}
 	}
 	queryArgs := concatStringsArrays(bazelQueryFlags, bzlmodQueryFlags, []string{
@@ -196,7 +202,7 @@ func (b *BazelJSONBuilder) Labels(ctx context.Context, requests []string) ([]str
 	return labels, nil
 }
 
-func (b *BazelJSONBuilder) Build(ctx context.Context, labels []string, mode LoadMode) ([]string, error) {
+func (b *BazelJSONBuilder) Build(ctx context.Context, labels []string, mode packages.LoadMode) ([]string, error) {
 	aspects := append(additionalAspects, goDefaultAspect)
 
 	buildArgs := concatStringsArrays([]string{

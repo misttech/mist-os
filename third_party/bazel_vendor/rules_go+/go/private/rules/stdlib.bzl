@@ -13,12 +13,12 @@
 # limitations under the License.
 
 load(
-    "//go/private:context.bzl",
-    "go_context",
-)
-load(
     "//go/private:common.bzl",
     "GO_TOOLCHAIN",
+)
+load(
+    "//go/private:context.bzl",
+    "go_context",
 )
 load(
     "//go/private:providers.bzl",
@@ -30,9 +30,8 @@ load(
 )
 
 def _stdlib_impl(ctx):
-    go = go_context(ctx)
-    source, library = go.toolchain.actions.stdlib(go)
-    return [source, library, source.stdlib]
+    go = go_context(ctx, include_deprecated_properties = False)
+    return go.toolchain.actions.stdlib(go)
 
 stdlib = rule(
     implementation = _stdlib_impl,

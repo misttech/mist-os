@@ -167,14 +167,14 @@ func testsInShard() []testing.InternalTest {
 func main() {
 	if bzltestutil.ShouldWrap() {
 		err := bzltestutil.Wrap("{{.Pkgname}}")
+		exitCode := 0
 		if xerr, ok := err.(*exec.ExitError); ok {
-			os.Exit(xerr.ExitCode())
+			exitCode = xerr.ExitCode()
 		} else if err != nil {
 			log.Print(err)
-			os.Exit(bzltestutil.TestWrapperAbnormalExit)
-		} else {
-			os.Exit(0)
+			exitCode = bzltestutil.TestWrapperAbnormalExit
 		}
+		os.Exit(exitCode)
 	}
 
 	testDeps :=
@@ -236,6 +236,12 @@ func main() {
 	}
 	{{end}}
 
+	testTimeout := os.Getenv("TEST_TIMEOUT")
+	if testTimeout != "" {
+		flag.Lookup("test.timeout").Value.Set(testTimeout+"s")
+		bzltestutil.RegisterTimeoutHandler()
+	}
+
 	{{if not .TestMain}}
 	res := m.Run()
 	{{else}}
@@ -266,7 +272,7 @@ func genTestMain(args []string) error {
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if err := goenv.checkFlags(); err != nil {
+	if err := goenv.checkFlagsAndSetGoroot(); err != nil {
 		return err
 	}
 	// Process import args

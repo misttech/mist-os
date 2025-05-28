@@ -17,18 +17,36 @@ load(
     "paths",
 )
 load(
+    "@rules_proto//proto:proto_common.bzl",
+    proto_toolchains = "toolchains",
+)
+load(
     "//go:def.bzl",
-    "GoLibrary",
+    "GoInfo",
     "go_context",
 )
 load(
     "//go/private:common.bzl",
     "GO_TOOLCHAIN",
+    "GO_TOOLCHAIN_LABEL",
+)
+load(
+    "//go/private:context.bzl",
+    "new_go_info",
 )
 load(
     "//go/private/rules:transition.bzl",
     "go_reset_target",
 )
+
+# This is actually a misuse of Proto toolchains: The proper way to use `protoc` would be to go
+# through a Go-specific `proto_lang_toolchain` and use the methods on `proto_common` to interact
+# with `protoc`. Since rules_go has a very bespoke setup with customizable compilers and the need
+# to apply reset transitions in case `protoc` *is* built from source, this would require major
+# changes.
+# TODO: Revisit this after --incompatible_enable_proto_toolchain_resolution has been enabled by
+#  default.
+_PROTO_TOOLCHAIN_TYPE = "@rules_proto//proto:toolchain_type"
 
 GoProtoCompiler = provider(
     doc = "Information and dependencies needed to generate Go code from protos",
@@ -45,7 +63,7 @@ the import path of the Go library being generated.
 The function should declare output .go files and actions to generate them.
 It should return a list of .go Files to be compiled by the Go compiler.
 """,
-        "deps": """List of targets providing GoLibrary, GoSource, and GoArchive.
+        "deps": """List of targets providing GoInfo and GoArchive.
 These are added as implicit dependencies for any go_proto_library using this
 compiler. Typically, these are Well Known Types and proto runtime libraries.""",
         "valid_archive": """A Boolean indicating whether the .go files produced
@@ -103,7 +121,7 @@ def go_proto_compile(go, compiler, protos, imports, importpath):
     transitive_descriptor_sets = depset(direct = [], transitive = desc_sets)
 
     args = go.actions.args()
-    args.add("-protoc", compiler.internal.protoc)
+    args.add("-protoc", compiler.internal.protoc.executable)
     args.add("-importpath", importpath)
     args.add("-out_path", outpath)
     args.add("-plugin", compiler.internal.plugin)
@@ -121,7 +139,6 @@ def go_proto_compile(go, compiler, protos, imports, importpath):
         inputs = depset(
             direct = [
                 compiler.internal.go_protoc,
-                compiler.internal.protoc,
                 compiler.internal.plugin,
             ],
             transitive = [transitive_descriptor_sets],
@@ -130,6 +147,8 @@ def go_proto_compile(go, compiler, protos, imports, importpath):
         progress_message = "Generating into %s" % go_srcs[0].dirname,
         mnemonic = "GoProtocGen",
         executable = compiler.internal.go_protoc,
+        toolchain = GO_TOOLCHAIN_LABEL,
+        tools = [compiler.internal.protoc],
         arguments = [args],
         env = go.env,
         # We may need the shell environment (potentially augmented with --action_env)
@@ -167,9 +186,13 @@ def proto_path(src, proto):
     return src.path[len(prefix):]
 
 def _go_proto_compiler_impl(ctx):
-    go = go_context(ctx)
-    library = go.new_library(go)
-    source = go.library_to_source(go, ctx.attr, library, ctx.coverage_instrumented())
+    go = go_context(ctx, include_deprecated_properties = False)
+    go_info = new_go_info(go, ctx.attr)
+    proto_toolchain = proto_toolchains.find_toolchain(
+        ctx,
+        legacy_attr = "_legacy_proto_toolchain",
+        toolchain_type = _PROTO_TOOLCHAIN_TYPE,
+    )
     return [
         GoProtoCompiler(
             deps = ctx.attr.deps,
@@ -179,20 +202,19 @@ def _go_proto_compiler_impl(ctx):
                 options = ctx.attr.options,
                 suffix = ctx.attr.suffix,
                 suffixes = ctx.attr.suffixes,
-                protoc = ctx.executable._protoc,
+                protoc = proto_toolchain.proto_compiler,
                 go_protoc = ctx.executable._go_protoc,
                 plugin = ctx.executable.plugin,
                 import_path_option = ctx.attr.import_path_option,
             ),
         ),
-        library,
-        source,
+        go_info,
     ]
 
 _go_proto_compiler = rule(
     implementation = _go_proto_compiler_impl,
-    attrs = {
-        "deps": attr.label_list(providers = [GoLibrary]),
+    attrs = dict({
+        "deps": attr.label_list(providers = [GoInfo]),
         "options": attr.string_list(),
         "suffix": attr.string(default = ".pb.go"),
         "suffixes": attr.string_list(),
@@ -208,16 +230,20 @@ _go_proto_compiler = rule(
             cfg = "exec",
             default = "//go/tools/builders:go-protoc",
         ),
-        "_protoc": attr.label(
-            executable = True,
-            cfg = "exec",
-            default = "//proto:protoc",
-        ),
         "_go_context_data": attr.label(
             default = "//:go_context_data",
         ),
-    },
-    toolchains = [GO_TOOLCHAIN],
+    }, **proto_toolchains.if_legacy_toolchain({
+        "_legacy_proto_toolchain": attr.label(
+            # Setting cfg = "exec" here as the legacy_proto_toolchain target
+            # already needs to apply the non_go_tool_transition. Flipping the
+            # two would be more idiomatic, but proto_toolchains.find_toolchain
+            # doesn't support split transitions.
+            cfg = "exec",
+            default = "//proto/private:legacy_proto_toolchain",
+        ),
+    })),
+    toolchains = [GO_TOOLCHAIN] + proto_toolchains.use_toolchain(_PROTO_TOOLCHAIN_TYPE),
 )
 
 def go_proto_compiler(name, **kwargs):

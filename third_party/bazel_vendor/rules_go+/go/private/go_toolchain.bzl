@@ -15,6 +15,7 @@
 Toolchain rules used by go.
 """
 
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("//go/private:common.bzl", "GO_TOOLCHAIN")
 load("//go/private:platforms.bzl", "PLATFORMS")
 load("//go/private:providers.bzl", "GoSDK")
@@ -22,7 +23,6 @@ load("//go/private/actions:archive.bzl", "emit_archive")
 load("//go/private/actions:binary.bzl", "emit_binary")
 load("//go/private/actions:link.bzl", "emit_link")
 load("//go/private/actions:stdlib.bzl", "emit_stdlib")
-load("@bazel_skylib//lib:selects.bzl", "selects")
 
 def _go_toolchain_impl(ctx):
     sdk = ctx.attr.sdk[GoSDK]
@@ -123,6 +123,7 @@ def declare_bazel_toolchains(
         minor,
         patch,
         prerelease,
+        sdk_name,
         sdk_type,
         prefix = ""):
     """Declares toolchain targets for each platform."""
@@ -171,6 +172,14 @@ def declare_bazel_toolchains(
     )
 
     native.config_setting(
+        name = prefix + "match_minor_release_candidate",
+        flag_values = {
+            sdk_version_label: major + "." + minor + prerelease,
+        },
+        visibility = ["//visibility:private"],
+    )
+
+    native.config_setting(
         name = prefix + "match_sdk_type",
         flag_values = {
             sdk_version_label: sdk_type,
@@ -186,7 +195,38 @@ def declare_bazel_toolchains(
             ":" + prefix + "match_major_minor_version",
             ":" + prefix + "match_patch_version",
             ":" + prefix + "match_prerelease_version",
+            ":" + prefix + "match_minor_release_candidate",
             ":" + prefix + "match_sdk_type",
+        ],
+        visibility = ["//visibility:private"],
+    )
+
+    # use Label constructor to resolve the label relative to the package this bzl file
+    # is located, instead of the context of the caller of declare_bazel_toolchains.
+    # See https://bazel.build/rules/lib/builtins/Label#Label for details.
+    sdk_name_label = Label("//go/toolchain:sdk_name")
+
+    native.config_setting(
+        name = prefix + "match_sdk_name",
+        flag_values = {
+            sdk_name_label: sdk_name,
+        },
+        visibility = ["//visibility:private"],
+    )
+
+    native.config_setting(
+        name = prefix + "match_all_sdks",
+        flag_values = {
+            sdk_name_label: "",
+        },
+        visibility = ["//visibility:private"],
+    )
+
+    selects.config_setting_group(
+        name = prefix + "sdk_name_setting",
+        match_any = [
+            ":" + prefix + "match_all_sdks",
+            ":" + prefix + "match_sdk_name",
         ],
         visibility = ["//visibility:private"],
     )
@@ -213,6 +253,9 @@ def declare_bazel_toolchains(
                 "@io_bazel_rules_go//go/toolchain:" + host_goarch,
             ],
             target_compatible_with = constraints,
-            target_settings = [":" + prefix + "sdk_version_setting"],
+            target_settings = [
+                ":" + prefix + "sdk_name_setting",
+                ":" + prefix + "sdk_version_setting",
+            ],
             toolchain = go_toolchain_repo + "//:go_" + p.name + "-impl",
         )

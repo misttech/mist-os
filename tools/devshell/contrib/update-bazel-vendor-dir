@@ -33,5 +33,6 @@ fx-update-bazel-workspace
     --repo='@@rules_license+' \
     --repo='@@rules_proto+' \
     --repo='@@rules_python+' \
+    --repo='@@rules_shell+' \
     --stub-repo='@@apple_support+' \
     --stub-repo='@@bazel_tools+remote_coverage_tools_extension+remote_coverage_tools'

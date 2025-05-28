@@ -12,3 +12,15 @@ bzl_library(
         "//proto/private:native",
     ],
 )
+
+bzl_library(
+    name = "proto_toolchain_bzl",
+    srcs = [
+        "proto_toolchain.bzl",
+        "proto_toolchain_rule.bzl",
+        "@bazel_features//:features",
+    ],
+    visibility = [
+        "//proto:__subpackages__",
+    ],
+)

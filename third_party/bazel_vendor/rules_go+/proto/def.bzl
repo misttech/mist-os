@@ -13,38 +13,39 @@
 # limitations under the License.
 
 load(
-    "//go:def.bzl",
-    "GoLibrary",
-    "GoSource",
-    "go_context",
-)
-load(
     "@bazel_skylib//lib:types.bzl",
     "types",
 )
 load(
-    "//proto:compiler.bzl",
-    "GoProtoCompiler",
-    "proto_path",
+    "@rules_proto//proto:defs.bzl",
+    "ProtoInfo",
+)
+load(
+    "//go:def.bzl",
+    "GoInfo",
+    "go_context",
 )
 load(
     "//go/private:common.bzl",
     "GO_TOOLCHAIN",
 )
 load(
+    "//go/private:context.bzl",
+    "new_go_info",
+)
+load(
     "//go/private/rules:transition.bzl",
     "non_go_tool_transition",
 )
 load(
-    "@rules_proto//proto:defs.bzl",
-    "ProtoInfo",
+    "//proto:compiler.bzl",
+    "GoProtoCompiler",
+    "proto_path",
 )
 
 GoProtoImports = provider()
 
 def get_imports(attr, importpath):
-    proto_deps = []
-
     # ctx.attr.proto is a one-element array since there is a Starlark transition attached to it.
     if hasattr(attr, "proto") and attr.proto and types.is_list(attr.proto) and ProtoInfo in attr.proto[0]:
         proto_deps = [attr.proto[0]]
@@ -67,8 +68,15 @@ def get_imports(attr, importpath):
     return depset(direct = direct.keys(), transitive = transitive)
 
 def _go_proto_aspect_impl(_target, ctx):
-    go = go_context(ctx, ctx.rule.attr)
-    imports = get_imports(ctx.rule.attr, go.importpath)
+    attr = ctx.rule.attr
+    go = go_context(
+        ctx,
+        attr,
+        include_deprecated_properties = False,
+        importpath = attr.importpath,
+        go_context_data = attr._go_context_data,
+    )
+    imports = get_imports(attr, go.importpath)
     return [GoProtoImports(imports = imports)]
 
 _go_proto_aspect = aspect(
@@ -86,11 +94,19 @@ def _proto_library_to_source(_go, attr, source, merge):
     else:
         compilers = attr.compilers
     for compiler in compilers:
-        if GoSource in compiler:
-            merge(source, compiler[GoSource])
+        if GoInfo in compiler:
+            merge(source, compiler[GoInfo])
 
 def _go_proto_library_impl(ctx):
-    go = go_context(ctx)
+    go = go_context(
+        ctx,
+        include_deprecated_properties = False,
+        importpath = ctx.attr.importpath,
+        importmap = ctx.attr.importmap,
+        importpath_aliases = ctx.attr.importpath_aliases,
+        embed = ctx.attr.embed,
+        go_context_data = ctx.attr._go_context_data,
+    )
     if ctx.attr.compiler:
         #TODO: print("DEPRECATED: compiler attribute on {}, use compilers instead".format(ctx.label))
         compilers = [ctx.attr.compiler]
@@ -123,18 +139,20 @@ def _go_proto_library_impl(ctx):
             imports = get_imports(ctx.attr, go.importpath),
             importpath = go.importpath,
         ))
-    library = go.new_library(
+
+    go_info = new_go_info(
         go,
+        ctx.attr,
         resolver = _proto_library_to_source,
-        srcs = go_srcs,
+        generated_srcs = go_srcs,
+        coverage_instrumented = False,
     )
-    source = go.library_to_source(go, ctx.attr, library, False)
-    providers = [library, source]
+    providers = [go_info]
     output_groups = {
         "go_generated_srcs": go_srcs,
     }
     if valid_archive:
-        archive = go.archive(go, source)
+        archive = go.archive(go, go_info)
         output_groups["compilation_outputs"] = [archive.data.file]
         providers.extend([
             archive,
@@ -158,13 +176,13 @@ go_proto_library = rule(
             default = [],
         ),
         "deps": attr.label_list(
-            providers = [GoLibrary],
+            providers = [GoInfo],
             aspects = [_go_proto_aspect],
         ),
         "importpath": attr.string(),
         "importmap": attr.string(),
         "importpath_aliases": attr.string_list(),  # experimental, undocumented
-        "embed": attr.label_list(providers = [GoLibrary]),
+        "embed": attr.label_list(providers = [GoInfo]),
         "gc_goopts": attr.string_list(),
         "compiler": attr.label(providers = [GoProtoCompiler]),
         "compilers": attr.label_list(
@@ -183,9 +201,16 @@ go_proto_library = rule(
 # go_proto_library is a rule that takes a proto_library (in the proto
 # attribute) and produces a go library for it.
 
-def go_grpc_library(**kwargs):
-    # TODO: Deprecate once gazelle generates just go_proto_library
-    go_proto_library(compilers = [Label("//proto:go_grpc")], **kwargs)
+def go_grpc_library(name, **kwargs):
+    if "compilers" not in kwargs:
+        kwargs["compilers"] = [
+            Label("//proto:go_proto"),
+            Label("//proto:go_grpc_v2"),
+        ]
+    go_proto_library(
+        name = name,
+        **kwargs
+    )
 
 def proto_register_toolchains():
     print("You no longer need to call proto_register_toolchains(), it does nothing")

@@ -14,39 +14,54 @@
 
 // Package runfiles provides access to Bazel runfiles.
 //
-// Usage
+// # Usage
 //
-// This package has two main entry points, the global functions Rlocation and Env,
-// and the Runfiles type.
+// This package has two main entry points, the global functions Rlocation, Env
+// and New, as well as the Runfiles type.
 //
-// Global functions
+// # Global functions
 //
-// For simple use cases that don’t require hermetic behavior, use the Rlocation and
-// Env functions to access runfiles.  Use Rlocation to find the filesystem location
-// of a runfile, and use Env to obtain environmental variables to pass on to
-// subprocesses.
+// Most users should use the Rlocation and Env functions directly to access
+// individual runfiles. Use Rlocation to find the filesystem location of a
+// runfile, and use Env to obtain environmental variables to pass on to
+// subprocesses that themselves may need to access runfiles.
 //
-// Runfiles type
+// The New function returns a Runfiles object that implements fs.FS. This allows
+// more complex operations on runfiles, such as iterating over all runfiles in a
+// certain directory or evaluating glob patterns, consistently across all
+// platforms.
 //
-// If you need hermetic behavior or want to change the runfiles discovery
-// process, use New to create a Runfiles object.  New accepts a few options to
-// change the discovery process.  Runfiles objects have methods Rlocation and Env,
-// which correspond to the package-level functions.  On Go 1.16, *Runfiles
-// implements fs.FS, fs.StatFS, and fs.ReadFileFS.
+// All of these functions follow the standard runfiles discovery process, which
+// works uniformly across Bazel build actions, `bazel test`, and `bazel run`. It
+// does rely on cooperation between processes (see Env for details).
+//
+// # Custom runfiles discovery and lookup
+//
+// If you need to look up runfiles in a custom way (e.g., you use them for a
+// packaged application or one that is available on PATH), you can pass Option
+// values to New to force a specific runfiles location.
+//
+// ## Restrictions
+//
+// Functions in this package may not observe changes to the environment or
+// os.Args after the first call to any of them. Pass Option values to New to
+// customize runfiles discovery instead.
 package runfiles
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 const (
-	directoryVar    = "RUNFILES_DIR"
-	manifestFileVar = "RUNFILES_MANIFEST_FILE"
+	directoryVar       = "RUNFILES_DIR"
+	legacyDirectoryVar = "JAVA_RUNFILES"
+	manifestFileVar    = "RUNFILES_MANIFEST_FILE"
 )
 
 type repoMappingKey struct {
@@ -56,13 +71,18 @@ type repoMappingKey struct {
 
 // Runfiles allows access to Bazel runfiles.  Use New to create Runfiles
 // objects; the zero Runfiles object always returns errors.  See
-// https://docs.bazel.build/skylark/rules.html#runfiles for some information on
+// https://bazel.build/extending/rules#runfiles for some information on
 // Bazel runfiles.
+//
+// Runfiles implements fs.FS regardless of the type of runfiles that backs it.
+// This is the preferred way to interact with runfiles in a platform-agnostic
+// way. For example, to find all runfiles beneath a directory, use fs.Glob or
+// fs.WalkDir.
 type Runfiles struct {
 	// We don’t need concurrency control since Runfiles objects are
 	// immutable once created.
 	impl        runfiles
-	env         string
+	env         []string
 	repoMapping map[repoMappingKey]string
 	sourceRepo  string
 }
@@ -198,10 +218,7 @@ func (r *Runfiles) loadRepoMapping() error {
 // The return value is a newly-allocated slice; you can modify it at will.  If
 // r is the zero Runfiles object, the return value is nil.
 func (r *Runfiles) Env() []string {
-	if r.env == "" {
-		return nil
-	}
-	return []string{r.env}
+	return r.env
 }
 
 // WithSourceRepo returns a Runfiles instance identical to the current one,
@@ -266,6 +283,7 @@ func (sr SourceRepo) apply(o *options)  { o.sourceRepo = sr }
 
 type runfiles interface {
 	path(string) (string, error)
+	open(name string) (fs.File, error)
 }
 
 // The runfiles root symlink under which the repository mapping can be found.

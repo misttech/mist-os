@@ -28,6 +28,9 @@ _cc = struct(
     # Whether the treat_warnings_as_errors feature works on macOS.
     # https://github.com/bazelbuild/bazel/commit/3d7c5ae47e2a02ccd81eb8024f22d56ae7811c9b
     treat_warnings_as_errors_works_on_macos = ge("7.1.0"),
+    # Whether protobuf repository can access private C++ features
+    # https://github.com/bazelbuild/bazel/commit/6022ee81705295704dcbedb2ceb5869049191121
+    protobuf_on_allowlist = ge("8.0.0"),
 )
 
 _external_deps = struct(
@@ -67,6 +70,12 @@ _java = struct(
     java_info_constructor_module_flags = ge_same_major("7.0.0") or ge("8.0.0-pre.20240101.1"),
 )
 
+_proto = struct(
+    # Bazel 7.0.0 introduced ProtoInfo in Starlark, which can be constructed and has different fields
+    # than ProtoInfo in previous versions. The check is needed for proto rules that are using ProtoInfo from Bazel.
+    starlark_proto_info = ge("7.0.0"),
+)
+
 _rules = struct(
     # Whether the computed_substitutions parameter of ctx.actions.expand_template and ctx.actions.template_dict are stable.
     # https://github.com/bazelbuild/bazel/commit/61c31d255b6ba65c372253f65043d6ea3f10e1f9
@@ -93,6 +102,7 @@ bazel_features = struct(
     flags = _flags,
     globals = globals,
     java = _java,
+    proto = _proto,
     rules = _rules,
     toolchains = _toolchains,
 )

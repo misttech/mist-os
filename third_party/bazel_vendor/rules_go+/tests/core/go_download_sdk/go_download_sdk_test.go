@@ -142,12 +142,43 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk")
 
 go_download_sdk(
     name = "go_sdk",
-		goarch = "amd64",
-		goos = "windows",
-		version = "1.20.4",
+	goarch = "amd64",
+	goos = "windows",
+	version = "1.20.4",
 )
 `,
 			fetchOnly: "@go_sdk//:BUILD.bazel",
+		},
+		{
+			desc: "multiple_sdks_by_name",
+			rule: `
+load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_host_sdk")
+
+go_download_sdk(
+    name = "go_sdk",
+    version = "1.23.5",
+)
+go_download_sdk(
+    name = "go_sdk_1_17",
+    version = "1.17",
+)
+go_download_sdk(
+    name = "go_sdk_1_17_1",
+    version = "1.17.1",
+)
+go_download_sdk(
+    name = "go_sdk_with_experiments",
+    version = "1.23.5",
+	experiments = ["rangefunc"],
+)
+`,
+			optToWantVersion: map[string]string{
+				"": "go1.23.5 X:nocoverageredesign",
+				"--@io_bazel_rules_go//go/toolchain:sdk_name=go_sdk_1_17_1":           "go1.17.1",
+				"--@io_bazel_rules_go//go/toolchain:sdk_name=go_sdk_1_17":             "go1.17",
+				"--@io_bazel_rules_go//go/toolchain:sdk_name=go_sdk":                  "go1.23.5 X:nocoverageredesign",
+				"--@io_bazel_rules_go//go/toolchain:sdk_name=go_sdk_with_experiments": "go1.23.5 X:nocoverageredesign,rangefunc",
+			},
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
