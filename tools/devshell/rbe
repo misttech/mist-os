@@ -40,6 +40,9 @@
 ##  fx rbe preflight
 ##      Ensure credentials for using remote build services is valid,
 ##      and prompt the user to re-auth if deemed necessary.
+##
+##  fx rbe version
+##      Reports re-client version.
 
 set -e
 set -o pipefail
@@ -408,6 +411,12 @@ function last_logdir_subcommand() {
   fi
 }
 
+function version_subcommand() {
+  readonly reproxy="${PREBUILT_RECLIENT_DIR}"/reproxy
+  echo "reclient version:"
+  "$reproxy" --version
+}
+
 # main
 case "$action" in
   -h|--help)
@@ -423,6 +432,7 @@ case "$action" in
   ensure_oauth) ensure_oauth "${action_args[@]}" ;;
   last_logdir) last_logdir_subcommand "${action_args[@]}" ;;
   preflight) preflight_subcommand "${action_args[@]}" ;;
+  version) version_subcommand "${action_args[@]}" ;;
 
   *)
     fx-error Invalid syntax
