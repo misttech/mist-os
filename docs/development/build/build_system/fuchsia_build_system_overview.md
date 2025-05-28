@@ -71,7 +71,7 @@ Note: For full details, see [Full comparison of build optimization flags].
 | **Runtime performance** | Slower | Good (acceptable for most development) | Faster |
 | **Binary size** | Larger | Much smaller than debug, and slightly larger than release | Smaller |
 | **Optimizations** | Minimal | Some | Full |
-| **Debug experience** | Full | Between `debug` and `release` (slightly more debuggability than release) | Minimal |
+| **Debug experience** | Full | Between `debug` and `release` (slightly less debuggability than debug) | Minimal |
 | **Recommended for** | Active coding and debugging | Daily development and faster iterations | Production, benchmarking, final validation |
 
 #### Set the compilation mode
