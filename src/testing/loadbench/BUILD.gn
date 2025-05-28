@@ -9,7 +9,6 @@ import("//build/testing/environments.gni")
 import("//zircon/kernel/params.gni")
 
 source_set("lib") {
-  defines = [ "EXPERIMENTAL_KTRACE_STREAMING_ENABLED=$experimental_ktrace_streaming_enabled" ]
   sources = [
     "action.h",
     "measurement.h",
@@ -54,7 +53,6 @@ fuchsia_package("loadbench") {
 
 cc_test_executable("loadbench_unittests") {
   testonly = true
-  defines = [ "EXPERIMENTAL_KTRACE_STREAMING_ENABLED=$experimental_ktrace_streaming_enabled" ]
 
   sources = [
     "tracing_unittest.cc",
