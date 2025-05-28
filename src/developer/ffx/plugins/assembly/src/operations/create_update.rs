@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use assembled_system::{AssembledSystem, PackagesMetadata};
 use assembly_container::AssemblyContainer;
 use assembly_partitions_config::PartitionsConfig;
-use assembly_tool::SdkToolProvider;
+use assembly_sdk::SdkToolProvider;
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use epoch::EpochFile;

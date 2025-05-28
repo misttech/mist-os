@@ -37,6 +37,7 @@ standardized_test_groups("tests") {
     "//src/lib/assembly/structured_config/tests/repackaging_pass",
     "//src/lib/assembly/subpackage_blobs_package:subpackage_blobs_package_test",
     "//src/lib/assembly/test_util:test_util_test",
+    "//src/lib/assembly/sdk:sdk_test",
     "//src/lib/assembly/tool:tool_test",
     "//src/lib/assembly/update_package:update_package_test",
     "//src/lib/assembly/update_packages_manifest:update_packages_manifest_test",

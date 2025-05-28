@@ -28,6 +28,7 @@ ffx_plugin("ffx_product_create") {
     "//src/lib/assembly/assembled_system",
     "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
+    "//src/lib/assembly/sdk",
     "//src/lib/assembly/tool",
     "//src/lib/assembly/update_package",
     "//src/lib/assembly/update_packages_manifest",

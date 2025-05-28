@@ -13,7 +13,7 @@ use assembly_constants::{BlobfsCompiledPackageDestination, CompiledPackageDestin
 use assembly_container::AssemblyContainer;
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::{FilesystemImageMode, ImagesConfig};
-use assembly_tool::SdkToolProvider;
+use assembly_sdk::SdkToolProvider;
 use assembly_util::read_config;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};

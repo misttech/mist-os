@@ -5,7 +5,8 @@
 use crate::operations::size_check::common::{PackageBlobSizeInfo, PackageSizeInfo};
 use anyhow::{anyhow, format_err, Context, Result};
 use assembly_blob_size::BlobSizeCalculator;
-use assembly_tool::{SdkToolProvider, ToolProvider};
+use assembly_sdk::SdkToolProvider;
+use assembly_tool::ToolProvider;
 use assembly_util::{read_config, write_json_file};
 use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_bail;

@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Tool, ToolCommand, ToolCommandLog, ToolProvider};
-
 use anyhow::{anyhow, Context, Result};
+use assembly_tool::{Tool, ToolCommand, ToolCommandLog, ToolProvider};
 use ffx_config::global_env_context;
 use ffx_config::sdk::Sdk;
 use std::path::PathBuf;
@@ -85,7 +84,7 @@ impl Tool for SdkTool {
 
 #[cfg(test)]
 mod test {
-    use crate::tool::{Tool, ToolCommandLog};
+    use assembly_tool::{Tool, ToolCommandLog};
 
     use super::SdkTool;
     use assembly_test_util::generate_fake_tool;
