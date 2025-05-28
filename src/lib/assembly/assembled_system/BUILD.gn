@@ -25,6 +25,7 @@ rustc_library("assembled_system") {
   ]
   sources = [
     "src/assembled_system.rs",
+    "src/image.rs",
     "src/lib.rs",
   ]
   test_deps = [ "//third_party/rust_crates:tempfile" ]
