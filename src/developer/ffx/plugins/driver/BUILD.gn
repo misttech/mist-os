@@ -7,25 +7,12 @@ import("//src/developer/ffx/build/ffx_tool.gni")
 
 assert(is_host, "ffx driver subtool is intended for host toolchain use only")
 
-rustc_library("ffx_driver_args") {
-  version = "0.1.0"
-  edition = "2021"
-  sources = [ "src/args.rs" ]
-  source_root = "src/args.rs"
-
-  deps = [
-    "//src/devices/bin/driver_tools:lib",
-    "//third_party/rust_crates:argh",
-  ]
-}
-
 rustc_library("ffx_driver") {
   version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
   deps = [
-    ":ffx_driver_args",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
@@ -40,10 +27,14 @@ rustc_library("ffx_driver") {
     "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:rustyline",
   ]
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/args.rs",
+    "src/lib.rs",
+  ]
 }
 
 ffx_tool("ffx_driver_tool") {
@@ -61,10 +52,7 @@ ffx_tool("ffx_driver_tool") {
 }
 
 group("driver") {
-  public_deps = [
-    ":ffx_driver_tool",
-    ":ffx_driver_tool_host_tool",
-  ]
+  public_deps = [ ":ffx_driver_tool_host_tool" ]
 }
 
 group("bin") {

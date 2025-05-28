@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 use anyhow::{Context, Result};
 use component_debug::capability;
-use ffx_driver_args::DriverCommand;
 use ffx_writer::SimpleWriter;
 use fho::{FfxMain, FfxTool};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
@@ -13,6 +12,8 @@ use {
     fidl_fuchsia_driver_registrar as fdr, fidl_fuchsia_sys2 as fsys,
     fidl_fuchsia_test_manager as ftm,
 };
+
+mod args;
 
 struct DriverConnector {
     remote_control: Option<RemoteControlProxyHolder>,
@@ -214,10 +215,8 @@ impl driver_connector::DriverConnector for DriverConnector {
 pub struct DriverTool {
     remote_control: fho::Result<RemoteControlProxyHolder>,
     #[command]
-    cmd: DriverCommand,
+    cmd: args::DriverCommand,
 }
-
-fho::embedded_plugin!(DriverTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for DriverTool {
