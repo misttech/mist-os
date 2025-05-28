@@ -51,11 +51,6 @@ zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
       return ZX_ERR_INTERNAL;
     case PSCI_NOT_PRESENT:
       return ZX_ERR_NOT_FOUND;
-    case PSCI_TIMEOUT:
-      return ZX_ERR_TIMED_OUT;
-    case PSCI_RATE_LIMITED:
-    case PSCI_BUSY:
-      return ZX_ERR_UNAVAILABLE;
     default:
       return ZX_ERR_BAD_STATE;
   }

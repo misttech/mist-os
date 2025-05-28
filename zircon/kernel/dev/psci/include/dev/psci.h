@@ -44,6 +44,7 @@
 #define PSCI64_SMCCC_ARCH_WORKAROUND_1 (0x80008000)
 #define PSCI64_SMCCC_ARCH_WORKAROUND_2 (0x80007FFF)
 
+// See section 5.2.2 of "Arm Power State Coordination Interface", DEN0022F.b.
 #define PSCI_SUCCESS 0
 #define PSCI_NOT_SUPPORTED -1
 #define PSCI_INVALID_PARAMETERS -2
@@ -54,9 +55,6 @@
 #define PSCI_NOT_PRESENT -7
 #define PSCI_DISABLED -8
 #define PSCI_INVALID_ADDRESS -9
-#define PSCI_TIMEOUT -10
-#define PSCI_RATE_LIMITED -11
-#define PSCI_BUSY -12
 
 /* TODO NOTE: - currently these routines assume cpu topologies that are described only in AFF0 and
    AFF1. If a system is architected such that AFF2 or AFF3 are non-zero then this code will need to
