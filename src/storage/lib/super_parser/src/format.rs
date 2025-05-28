@@ -304,7 +304,8 @@ bitflags! {
         const READONLY = 1 << 0;
         /// If set, indicates that the partition name needs a slot suffix applied. The slot suffix
         /// is determined by the metadata slot number (e.g. slot 0 will have suffix "_a", and slot 1
-        /// will have suffix "_b"). This will be applied when the metadata is read.
+        /// will have suffix "_b"). This will be applied when the metadata is read. Note that this
+        /// is only intended to be used with super_empty.img and super.img on retrofit devices.
         const SLOT_SUFFIXED = 1 << 1;
         /// If set, indicates the the partition was created (or modified) for a snapshot-based
         /// update. If not present, the partition was likely flashed via fastboot.
@@ -471,6 +472,8 @@ bitflags! {
         /// If this is set, indicates that the partition group name needs a slot suffix applied. The
         /// slot suffix is determined by the metadata slot number (e.g. slot 0 will have suffix
         /// "_a", and slot 1 will have suffix "_b"). This will be applied when the metadata is read.
+        /// Note that this flag is only intended to be used with super_empty.img and super.img on
+        /// retrofit devices.
         const SLOT_SUFFIXED = 1 << 0;
     }
 }
@@ -520,7 +523,8 @@ bitflags! {
         /// Similar to the other `*_Flags::SLOT_SUFFIXED` flag. If this is set, then the
         /// `partition_name` in block device needs the slot suffix applied. The slot suffix is
         /// determined by the metadata slot number (e.g. 0 => "_a" and 1 => "_b"). This will be
-        /// applied when the metadata is read.
+        /// applied when the metadata is read.  Note that this flag is only intended to be used with
+        /// super_empty.img and super.img on retrofit devices.
         const SLOT_SUFFIXED = 1 << 0;
     }
 }
