@@ -10,6 +10,7 @@ starnix_test_subpackages = [
   "//src/starnix/tests:netstack_package",
   "//src/storage/fxfs/test-fxfs:test-fxfs-package",
   "//src/connectivity/network/tun/network-tun",
+  "//src/devices/haptics/testing/fake_haptics_service:package",
   "//src/media/audio/services/device_registry/testing:stub_adr_pkg",
   "//src/power/testing/fake-hrtimer:package",
   "//src/power/broker:package",
