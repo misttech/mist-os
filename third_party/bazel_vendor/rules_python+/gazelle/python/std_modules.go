@@ -16,97 +16,25 @@ package python
 
 import (
 	"bufio"
-	"context"
-	"fmt"
-	"io"
-	"log"
-	"os"
-	"os/exec"
-	"strconv"
+	_ "embed"
 	"strings"
-	"sync"
-	"time"
-
-	"github.com/bazelbuild/rules_go/go/tools/bazel"
 )
 
 var (
-	stdModulesStdin  io.Writer
-	stdModulesStdout io.Reader
-	stdModulesMutex  sync.Mutex
-	stdModulesSeen   map[string]struct{}
+	//go:embed stdlib_list.txt
+	stdlibList string
+	stdModules map[string]struct{}
 )
 
 func init() {
-	stdModulesSeen = make(map[string]struct{})
-
-	stdModulesScriptRunfile, err := bazel.Runfile("python/std_modules")
-	if err != nil {
-		log.Printf("failed to initialize std_modules: %v\n", err)
-		os.Exit(1)
+	stdModules = make(map[string]struct{})
+	scanner := bufio.NewScanner(strings.NewReader(stdlibList))
+	for scanner.Scan() {
+		stdModules[scanner.Text()] = struct{}{}
 	}
-
-	ctx := context.Background()
-	ctx, stdModulesCancel := context.WithTimeout(ctx, time.Minute*10)
-	cmd := exec.CommandContext(ctx, stdModulesScriptRunfile)
-
-	cmd.Stderr = os.Stderr
-	// All userland site-packages should be ignored.
-	cmd.Env = []string{"PYTHONNOUSERSITE=1"}
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		log.Printf("failed to initialize std_modules: %v\n", err)
-		os.Exit(1)
-	}
-	stdModulesStdin = stdin
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Printf("failed to initialize std_modules: %v\n", err)
-		os.Exit(1)
-	}
-	stdModulesStdout = stdout
-
-	if err := cmd.Start(); err != nil {
-		log.Printf("failed to initialize std_modules: %v\n", err)
-		os.Exit(1)
-	}
-
-	go func() {
-		defer stdModulesCancel()
-		if err := cmd.Wait(); err != nil {
-			log.Printf("failed to wait for std_modules: %v\n", err)
-			os.Exit(1)
-		}
-	}()
 }
 
-func isStdModule(m module) (bool, error) {
-	if _, seen := stdModulesSeen[m.Name]; seen {
-		return true, nil
-	}
-	stdModulesMutex.Lock()
-	defer stdModulesMutex.Unlock()
-
-	fmt.Fprintf(stdModulesStdin, "%s\n", m.Name)
-
-	stdoutReader := bufio.NewReader(stdModulesStdout)
-	line, err := stdoutReader.ReadString('\n')
-	if err != nil {
-		return false, err
-	}
-	if len(line) == 0 {
-		return false, fmt.Errorf("unexpected empty output from std_modules")
-	}
-
-	isStd, err := strconv.ParseBool(strings.TrimSpace(line))
-	if err != nil {
-		return false, err
-	}
-
-	if isStd {
-		stdModulesSeen[m.Name] = struct{}{}
-		return true, nil
-	}
-	return false, nil
+func isStdModule(m module) bool {
+	_, ok := stdModules[m.Name]
+	return ok
 }

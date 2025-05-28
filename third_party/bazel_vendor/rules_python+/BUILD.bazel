@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load(":version.bzl", "BAZEL_VERSION")
 
 package(default_visibility = ["//visibility:public"])
@@ -23,25 +24,34 @@ exports_files([
     "version.bzl",
 ])
 
+exports_files(
+    glob(["*.md"]),
+    visibility = ["//docs:__subpackages__"],
+)
+
 filegroup(
     name = "distribution",
     srcs = [
         "BUILD.bazel",
         "MODULE.bazel",
         "WORKSPACE",
+        "WORKSPACE.bzlmod",
         "internal_deps.bzl",
         "internal_setup.bzl",
         "version.bzl",
         "//python:distribution",
-        "//python/pip_install:distribution",
         "//tools:distribution",
         "@rules_python_gazelle_plugin//:distribution",
     ],
     visibility = [
-        "//examples:__pkg__",
-        "//python/tests/toolchains:__pkg__",
-        "//tests:__pkg__",
+        "//:__subpackages__",
     ],
+)
+
+bzl_library(
+    name = "version_bzl",
+    srcs = ["version.bzl"],
+    visibility = ["//:__subpackages__"],
 )
 
 # Reexport of all bzl files used to allow downstream rules to generate docs

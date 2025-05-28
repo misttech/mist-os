@@ -29,7 +29,9 @@
 #
 # This example demonstrates both approaches.
 
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_toolchain", "cc_toolchain_suite")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+load("@rules_cc//cc/toolchains:cc_toolchain_suite.bzl", "cc_toolchain_suite")
 
 # Load the Starlark logic defining the toolchain's behavior. For example: what
 # program runs to compile a source file and how its command line is
@@ -81,7 +83,7 @@ filegroup(
 cc_toolchain_suite(
     name = "legacy_selector",
     toolchains = {
-        "x86": ":my_custom_toolchain",
+        "k8": ":my_custom_toolchain",
     },
 )
 

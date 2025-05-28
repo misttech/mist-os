@@ -99,9 +99,20 @@ func (t *targetBuilder) addResolvedDependency(dep string) *targetBuilder {
 	return t
 }
 
-// addVisibility adds a visibility to the target.
-func (t *targetBuilder) addVisibility(visibility string) *targetBuilder {
-	t.visibility.Add(visibility)
+// addResolvedDependencies adds multiple dependencies, that have already been
+// resolved or generated, to the target.
+func (t *targetBuilder) addResolvedDependencies(deps []string) *targetBuilder {
+	for _, dep := range deps {
+		t.addResolvedDependency(dep)
+	}
+	return t
+}
+
+// addVisibility adds visibility labels to the target.
+func (t *targetBuilder) addVisibility(visibility []string) *targetBuilder {
+	for _, item := range visibility {
+		t.visibility.Add(item)
+	}
 	return t
 }
 
@@ -122,6 +133,11 @@ func (t *targetBuilder) setTestonly() *targetBuilder {
 // case, the value we add is on Bazel sub-packages to be able to perform imports
 // relative to the root project package.
 func (t *targetBuilder) generateImportsAttribute() *targetBuilder {
+	if t.pythonProjectRoot == "" {
+		// When gazelle:python_root is not set or is at the root of the repo, we don't need
+		// to set imports, because that's the Bazel's default.
+		return t
+	}
 	p, _ := filepath.Rel(t.bzlPackage, t.pythonProjectRoot)
 	p = filepath.Clean(p)
 	if p == "." {

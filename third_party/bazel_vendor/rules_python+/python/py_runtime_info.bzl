@@ -14,6 +14,8 @@
 
 """Public entry point for PyRuntimeInfo."""
 
-load("//python/private:reexports.bzl", "internal_PyRuntimeInfo")
+load("@rules_python_internal//:rules_python_config.bzl", "config")
+load("//python/private:reexports.bzl", "BuiltinPyRuntimeInfo")
+load("//python/private/common:providers.bzl", _starlark_PyRuntimeInfo = "PyRuntimeInfo")
 
-PyRuntimeInfo = internal_PyRuntimeInfo
+PyRuntimeInfo = _starlark_PyRuntimeInfo if config.enable_pystar else BuiltinPyRuntimeInfo

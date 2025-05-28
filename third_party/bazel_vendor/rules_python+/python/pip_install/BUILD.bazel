@@ -1,31 +1,58 @@
+# Copyright 2023 The Bazel Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
+package(
+    default_visibility = ["//:__subpackages__"],
+)
+
+bzl_library(
+    name = "pip_repository_bzl",
+    srcs = ["pip_repository.bzl"],
+    deps = [
+        "//python/private/pypi:group_library_bzl",
+        "//python/private/pypi:package_annotation_bzl",
+        "//python/private/pypi:pip_repository_bzl",
+        "//python/private/pypi:whl_library_bzl",
+    ],
+)
+
+bzl_library(
+    name = "requirements_bzl",
+    srcs = ["requirements.bzl"],
+    deps = ["//python/private/pypi:pip_compile_bzl"],
+)
+
+bzl_library(
+    name = "repositories_bzl",
+    srcs = ["repositories.bzl"],
+    deps = [
+        "//python/private/pypi:deps_bzl",
+    ],
+)
+
 filegroup(
     name = "distribution",
-    srcs = glob(["*.bzl"]) + [
-        "BUILD.bazel",
-        "//python/pip_install/private:distribution",
-        "//python/pip_install/tools/dependency_resolver:distribution",
-        "//python/pip_install/tools/lib:distribution",
-        "//python/pip_install/tools/wheel_installer:distribution",
-    ],
-    visibility = ["//:__pkg__"],
+    srcs = glob(["**"]),
+    visibility = ["//python:__pkg__"],
 )
 
 filegroup(
     name = "bzl",
-    srcs = glob(["*.bzl"]) + [
-        "//python/pip_install/private:bzl_srcs",
-    ],
+    srcs = glob(["*.bzl"]),
     visibility = ["//:__subpackages__"],
-)
-
-filegroup(
-    name = "py_srcs",
-    srcs = [
-        "//python/pip_install/tools/dependency_resolver:py_srcs",
-        "//python/pip_install/tools/lib:py_srcs",
-        "//python/pip_install/tools/wheel_installer:py_srcs",
-    ],
-    visibility = ["//python/pip_install/private:__pkg__"],
 )
 
 exports_files(

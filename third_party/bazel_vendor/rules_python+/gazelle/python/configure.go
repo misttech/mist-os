@@ -25,6 +25,7 @@ import (
 
 	"github.com/bazelbuild/bazel-gazelle/config"
 	"github.com/bazelbuild/bazel-gazelle/rule"
+	"github.com/bmatcuk/doublestar/v4"
 
 	"github.com/bazelbuild/rules_python/gazelle/manifest"
 	"github.com/bazelbuild/rules_python/gazelle/pythonconfig"
@@ -59,9 +60,16 @@ func (py *Configurer) KnownDirectives() []string {
 		pythonconfig.IgnoreDependenciesDirective,
 		pythonconfig.ValidateImportStatementsDirective,
 		pythonconfig.GenerationMode,
+		pythonconfig.GenerationModePerFileIncludeInit,
+		pythonconfig.GenerationModePerPackageRequireTestEntryPoint,
 		pythonconfig.LibraryNamingConvention,
 		pythonconfig.BinaryNamingConvention,
 		pythonconfig.TestNamingConvention,
+		pythonconfig.DefaultVisibilty,
+		pythonconfig.Visibility,
+		pythonconfig.TestFilePattern,
+		pythonconfig.LabelConvention,
+		pythonconfig.LabelNormalization,
 	}
 }
 
@@ -117,6 +125,7 @@ func (py *Configurer) Configure(c *config.Config, rel string, f *rule.File) {
 			}
 		case pythonconfig.PythonRootDirective:
 			config.SetPythonProjectRoot(rel)
+			config.SetDefaultVisibility([]string{fmt.Sprintf(pythonconfig.DefaultVisibilityFmtString, rel)})
 		case pythonconfig.PythonManifestFileNameDirective:
 			gazelleManifestFilename = strings.TrimSpace(d.Value)
 		case pythonconfig.IgnoreFilesDirective:
@@ -137,12 +146,31 @@ func (py *Configurer) Configure(c *config.Config, rel string, f *rule.File) {
 			switch pythonconfig.GenerationModeType(strings.TrimSpace(d.Value)) {
 			case pythonconfig.GenerationModePackage:
 				config.SetCoarseGrainedGeneration(false)
+				config.SetPerFileGeneration(false)
+			case pythonconfig.GenerationModeFile:
+				config.SetCoarseGrainedGeneration(false)
+				config.SetPerFileGeneration(true)
 			case pythonconfig.GenerationModeProject:
 				config.SetCoarseGrainedGeneration(true)
+				config.SetPerFileGeneration(false)
 			default:
 				err := fmt.Errorf("invalid value for directive %q: %s",
 					pythonconfig.GenerationMode, d.Value)
 				log.Fatal(err)
+			}
+		case pythonconfig.GenerationModePerFileIncludeInit:
+			v, err := strconv.ParseBool(strings.TrimSpace(d.Value))
+			if err != nil {
+				log.Fatal(err)
+			}
+			config.SetPerFileGenerationIncludeInit(v)
+		case pythonconfig.GenerationModePerPackageRequireTestEntryPoint:
+			v, err := strconv.ParseBool(strings.TrimSpace(d.Value))
+			if err != nil {
+				log.Printf("invalid value for gazelle:%s in %q: %q",
+					pythonconfig.GenerationModePerPackageRequireTestEntryPoint, rel, d.Value)
+			} else {
+				config.SetPerPackageGenerationRequireTestEntryPoint(v)
 			}
 		case pythonconfig.LibraryNamingConvention:
 			config.SetLibraryNamingConvention(strings.TrimSpace(d.Value))
@@ -150,6 +178,52 @@ func (py *Configurer) Configure(c *config.Config, rel string, f *rule.File) {
 			config.SetBinaryNamingConvention(strings.TrimSpace(d.Value))
 		case pythonconfig.TestNamingConvention:
 			config.SetTestNamingConvention(strings.TrimSpace(d.Value))
+		case pythonconfig.DefaultVisibilty:
+			switch directiveArg := strings.TrimSpace(d.Value); directiveArg {
+			case "NONE":
+				config.SetDefaultVisibility([]string{})
+			case "DEFAULT":
+				pythonProjectRoot := config.PythonProjectRoot()
+				defaultVisibility := fmt.Sprintf(pythonconfig.DefaultVisibilityFmtString, pythonProjectRoot)
+				config.SetDefaultVisibility([]string{defaultVisibility})
+			default:
+				// Handle injecting the python root. Assume that the user used the
+				// exact string "$python_root$".
+				labels := strings.ReplaceAll(directiveArg, "$python_root$", config.PythonProjectRoot())
+				config.SetDefaultVisibility(strings.Split(labels, ","))
+			}
+		case pythonconfig.Visibility:
+			labels := strings.ReplaceAll(strings.TrimSpace(d.Value), "$python_root$", config.PythonProjectRoot())
+			config.AppendVisibility(labels)
+		case pythonconfig.TestFilePattern:
+			value := strings.TrimSpace(d.Value)
+			if value == "" {
+				log.Fatal("directive 'python_test_file_pattern' requires a value")
+			}
+			globStrings := strings.Split(value, ",")
+			for _, g := range globStrings {
+				if !doublestar.ValidatePattern(g) {
+					log.Fatalf("invalid glob pattern '%s'", g)
+				}
+			}
+			config.SetTestFilePattern(globStrings)
+		case pythonconfig.LabelConvention:
+			value := strings.TrimSpace(d.Value)
+			if value == "" {
+				log.Fatalf("directive '%s' requires a value", pythonconfig.LabelConvention)
+			}
+			config.SetLabelConvention(value)
+		case pythonconfig.LabelNormalization:
+			switch directiveArg := strings.ToLower(strings.TrimSpace(d.Value)); directiveArg {
+			case "pep503":
+				config.SetLabelNormalization(pythonconfig.Pep503LabelNormalizationType)
+			case "none":
+				config.SetLabelNormalization(pythonconfig.NoLabelNormalizationType)
+			case "snake_case":
+				config.SetLabelNormalization(pythonconfig.SnakeCaseLabelNormalizationType)
+			default:
+				config.SetLabelNormalization(pythonconfig.DefaultLabelNormalizationType)
+			}
 		}
 	}
 

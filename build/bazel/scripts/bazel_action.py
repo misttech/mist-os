@@ -67,6 +67,7 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "rules_license",
     "rules_license+",
     "rules_python+",
+    "rules_rust",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.

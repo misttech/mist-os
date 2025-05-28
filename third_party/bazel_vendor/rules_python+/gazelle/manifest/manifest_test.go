@@ -26,21 +26,13 @@ import (
 )
 
 var modulesMapping = manifest.ModulesMapping{
-	"arrow":           "arrow",
-	"arrow.__init__":  "arrow",
-	"arrow.api":       "arrow",
-	"arrow.arrow":     "arrow",
-	"arrow.factory":   "arrow",
-	"arrow.formatter": "arrow",
-	"arrow.locales":   "arrow",
-	"arrow.parser":    "arrow",
-	"arrow.util":      "arrow",
+	"arrow": "arrow",
 }
 
 const pipDepsRepositoryName = "test_repository_name"
 
 func TestFile(t *testing.T) {
-	t.Run("Encode", func(t *testing.T) {
+	t.Run("EncodeWithIntegrity", func(t *testing.T) {
 		f := manifest.NewFile(&manifest.Manifest{
 			ModulesMapping:        modulesMapping,
 			PipDepsRepositoryName: pipDepsRepositoryName,
@@ -53,7 +45,7 @@ func TestFile(t *testing.T) {
 			t.FailNow()
 		}
 		defer requirements.Close()
-		if err := f.Encode(&b, manifestGeneratorHashFile, requirements); err != nil {
+		if err := f.EncodeWithIntegrity(&b, manifestGeneratorHashFile, requirements); err != nil {
 			log.Println(err)
 			t.FailNow()
 		}

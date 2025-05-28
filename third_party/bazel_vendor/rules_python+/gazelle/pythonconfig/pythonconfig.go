@@ -16,7 +16,8 @@ package pythonconfig
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
+	"regexp"
 	"strings"
 
 	"github.com/emirpasic/gods/lists/singlylinkedlist"
@@ -50,6 +51,14 @@ const (
 	// GenerationMode represents the directive that controls the target generation
 	// mode. See below for the GenerationModeType constants.
 	GenerationMode = "python_generation_mode"
+	// GenerationModePerFileIncludeInit represents the directive that augments
+	// the "per_file" GenerationMode by including the package's __init__.py file.
+	// This is a boolean directive.
+	GenerationModePerFileIncludeInit = "python_generation_mode_per_file_include_init"
+	// GenerationModePerPackageRequireTestEntryPoint represents the directive that
+	// requires a test entry point to generate test targets in "package" GenerationMode.
+	// This is a boolean directive.
+	GenerationModePerPackageRequireTestEntryPoint = "python_generation_mode_per_package_require_test_entry_point"
 	// LibraryNamingConvention represents the directive that controls the
 	// py_library naming convention. It interpolates $package_name$ with the
 	// Bazel package name. E.g. if the Bazel package name is `foo`, setting this
@@ -63,6 +72,23 @@ const (
 	// naming convention. See python_library_naming_convention for more info on
 	// the package name interpolation.
 	TestNamingConvention = "python_test_naming_convention"
+	// DefaultVisibilty represents the directive that controls what visibility
+	// labels are added to generated python targets.
+	DefaultVisibilty = "python_default_visibility"
+	// Visibility represents the directive that controls what additional
+	// visibility labels are added to generated targets. It mimics the behavior
+	// of the `go_visibility` directive.
+	Visibility = "python_visibility"
+	// TestFilePattern represents the directive that controls which python
+	// files are mapped to `py_test` targets.
+	TestFilePattern = "python_test_file_pattern"
+	// LabelConvention represents the directive that defines the format of the
+	// labels to third-party dependencies.
+	LabelConvention = "python_label_convention"
+	// LabelNormalization represents the directive that controls how distribution
+	// names of labels to third-party dependencies are normalized. Supported values
+	// are 'none', 'pep503' and 'snake_case' (default). See LabelNormalizationType.
+	LabelNormalization = "python_label_normalization"
 )
 
 // GenerationModeType represents one of the generation modes for the Python
@@ -78,10 +104,23 @@ const (
 	// GenerationModeProject defines the mode in which a coarse-grained target will
 	// be generated englobing sub-directories containing Python files.
 	GenerationModeProject GenerationModeType = "project"
+	GenerationModeFile    GenerationModeType = "file"
 )
 
 const (
-	packageNameNamingConventionSubstitution = "$package_name$"
+	packageNameNamingConventionSubstitution     = "$package_name$"
+	distributionNameLabelConventionSubstitution = "$distribution_name$"
+)
+
+const (
+	// The default visibility label, including a format placeholder for `python_root`.
+	DefaultVisibilityFmtString = "//%s:__subpackages__"
+	// The default globs used to determine pt_test targets.
+	DefaultTestFilePatternString = "*_test.py,test_*.py"
+	// The default convention of label of third-party dependencies.
+	DefaultLabelConvention = "$distribution_name$"
+	// The default normalization applied to distribution names of third-party dependency labels.
+	DefaultLabelNormalizationType = SnakeCaseLabelNormalizationType
 )
 
 // defaultIgnoreFiles is the list of default values used in the
@@ -90,21 +129,13 @@ var defaultIgnoreFiles = map[string]struct{}{
 	"setup.py": {},
 }
 
-func SanitizeDistribution(distributionName string) string {
-	sanitizedDistribution := strings.ToLower(distributionName)
-	sanitizedDistribution = strings.ReplaceAll(sanitizedDistribution, "-", "_")
-	sanitizedDistribution = strings.ReplaceAll(sanitizedDistribution, ".", "_")
-
-	return sanitizedDistribution
-}
-
 // Configs is an extension of map[string]*Config. It provides finding methods
 // on top of the mapping.
 type Configs map[string]*Config
 
 // ParentForPackage returns the parent Config for the given Bazel package.
 func (c *Configs) ParentForPackage(pkg string) *Config {
-	dir := filepath.Dir(pkg)
+	dir := path.Dir(pkg)
 	if dir == "." {
 		dir = ""
 	}
@@ -121,15 +152,31 @@ type Config struct {
 	pythonProjectRoot string
 	gazelleManifest   *manifest.Manifest
 
-	excludedPatterns         *singlylinkedlist.List
-	ignoreFiles              map[string]struct{}
-	ignoreDependencies       map[string]struct{}
-	validateImportStatements bool
-	coarseGrainedGeneration  bool
-	libraryNamingConvention  string
-	binaryNamingConvention   string
-	testNamingConvention     string
+	excludedPatterns                          *singlylinkedlist.List
+	ignoreFiles                               map[string]struct{}
+	ignoreDependencies                        map[string]struct{}
+	validateImportStatements                  bool
+	coarseGrainedGeneration                   bool
+	perFileGeneration                         bool
+	perFileGenerationIncludeInit              bool
+	perPackageGenerationRequireTestEntryPoint bool
+	libraryNamingConvention                   string
+	binaryNamingConvention                    string
+	testNamingConvention                      string
+	defaultVisibility                         []string
+	visibility                                []string
+	testFilePattern                           []string
+	labelConvention                           string
+	labelNormalization                        LabelNormalizationType
 }
+
+type LabelNormalizationType int
+
+const (
+	NoLabelNormalizationType LabelNormalizationType = iota
+	Pep503LabelNormalizationType
+	SnakeCaseLabelNormalizationType
+)
 
 // New creates a new Config.
 func New(
@@ -137,17 +184,25 @@ func New(
 	pythonProjectRoot string,
 ) *Config {
 	return &Config{
-		extensionEnabled:         true,
-		repoRoot:                 repoRoot,
-		pythonProjectRoot:        pythonProjectRoot,
-		excludedPatterns:         singlylinkedlist.New(),
-		ignoreFiles:              make(map[string]struct{}),
-		ignoreDependencies:       make(map[string]struct{}),
-		validateImportStatements: true,
-		coarseGrainedGeneration:  false,
-		libraryNamingConvention:  packageNameNamingConventionSubstitution,
-		binaryNamingConvention:   fmt.Sprintf("%s_bin", packageNameNamingConventionSubstitution),
-		testNamingConvention:     fmt.Sprintf("%s_test", packageNameNamingConventionSubstitution),
+		extensionEnabled:                          true,
+		repoRoot:                                  repoRoot,
+		pythonProjectRoot:                         pythonProjectRoot,
+		excludedPatterns:                          singlylinkedlist.New(),
+		ignoreFiles:                               make(map[string]struct{}),
+		ignoreDependencies:                        make(map[string]struct{}),
+		validateImportStatements:                  true,
+		coarseGrainedGeneration:                   false,
+		perFileGeneration:                         false,
+		perFileGenerationIncludeInit:              false,
+		perPackageGenerationRequireTestEntryPoint: true,
+		libraryNamingConvention:                   packageNameNamingConventionSubstitution,
+		binaryNamingConvention:                    fmt.Sprintf("%s_bin", packageNameNamingConventionSubstitution),
+		testNamingConvention:                      fmt.Sprintf("%s_test", packageNameNamingConventionSubstitution),
+		defaultVisibility:                         []string{fmt.Sprintf(DefaultVisibilityFmtString, "")},
+		visibility:                                []string{},
+		testFilePattern:                           strings.Split(DefaultTestFilePatternString, ","),
+		labelConvention:                           DefaultLabelConvention,
+		labelNormalization:                        DefaultLabelNormalizationType,
 	}
 }
 
@@ -160,18 +215,26 @@ func (c *Config) Parent() *Config {
 // current Config and sets itself as the parent to the child.
 func (c *Config) NewChild() *Config {
 	return &Config{
-		parent:                   c,
-		extensionEnabled:         c.extensionEnabled,
-		repoRoot:                 c.repoRoot,
-		pythonProjectRoot:        c.pythonProjectRoot,
-		excludedPatterns:         c.excludedPatterns,
-		ignoreFiles:              make(map[string]struct{}),
-		ignoreDependencies:       make(map[string]struct{}),
-		validateImportStatements: c.validateImportStatements,
-		coarseGrainedGeneration:  c.coarseGrainedGeneration,
-		libraryNamingConvention:  c.libraryNamingConvention,
-		binaryNamingConvention:   c.binaryNamingConvention,
-		testNamingConvention:     c.testNamingConvention,
+		parent:                       c,
+		extensionEnabled:             c.extensionEnabled,
+		repoRoot:                     c.repoRoot,
+		pythonProjectRoot:            c.pythonProjectRoot,
+		excludedPatterns:             c.excludedPatterns,
+		ignoreFiles:                  make(map[string]struct{}),
+		ignoreDependencies:           make(map[string]struct{}),
+		validateImportStatements:     c.validateImportStatements,
+		coarseGrainedGeneration:      c.coarseGrainedGeneration,
+		perFileGeneration:            c.perFileGeneration,
+		perFileGenerationIncludeInit: c.perFileGenerationIncludeInit,
+		perPackageGenerationRequireTestEntryPoint: c.perPackageGenerationRequireTestEntryPoint,
+		libraryNamingConvention:                   c.libraryNamingConvention,
+		binaryNamingConvention:                    c.binaryNamingConvention,
+		testNamingConvention:                      c.testNamingConvention,
+		defaultVisibility:                         c.defaultVisibility,
+		visibility:                                c.visibility,
+		testFilePattern:                           c.testFilePattern,
+		labelConvention:                           c.labelConvention,
+		labelNormalization:                        c.labelNormalization,
 	}
 }
 
@@ -226,17 +289,8 @@ func (c *Config) FindThirdPartyDependency(modName string) (string, bool) {
 				} else if gazelleManifest.PipRepository != nil {
 					distributionRepositoryName = gazelleManifest.PipRepository.Name
 				}
-				sanitizedDistribution := SanitizeDistribution(distributionName)
 
-				if gazelleManifest.PipRepository != nil && gazelleManifest.PipRepository.UsePipRepositoryAliases {
-					// @<repository_name>//<distribution_name>
-					lbl := label.New(distributionRepositoryName, sanitizedDistribution, sanitizedDistribution)
-					return lbl.String(), true
-				}
-
-				// @<repository_name>_<distribution_name>//:pkg
-				distributionRepositoryName = distributionRepositoryName + "_" + sanitizedDistribution
-				lbl := label.New(distributionRepositoryName, "", "pkg")
+				lbl := currentCfg.FormatThirdPartyDependency(distributionRepositoryName, distributionName)
 				return lbl.String(), true
 			}
 		}
@@ -327,6 +381,38 @@ func (c *Config) CoarseGrainedGeneration() bool {
 	return c.coarseGrainedGeneration
 }
 
+// SetPerFileGneration sets whether a separate py_library target should be
+// generated for each file.
+func (c *Config) SetPerFileGeneration(perFile bool) {
+	c.perFileGeneration = perFile
+}
+
+// PerFileGeneration returns whether a separate py_library target should be
+// generated for each file.
+func (c *Config) PerFileGeneration() bool {
+	return c.perFileGeneration
+}
+
+// SetPerFileGenerationIncludeInit sets whether py_library targets should
+// include __init__.py files when PerFileGeneration() is true.
+func (c *Config) SetPerFileGenerationIncludeInit(includeInit bool) {
+	c.perFileGenerationIncludeInit = includeInit
+}
+
+// PerFileGenerationIncludeInit returns whether py_library targets should
+// include __init__.py files when PerFileGeneration() is true.
+func (c *Config) PerFileGenerationIncludeInit() bool {
+	return c.perFileGenerationIncludeInit
+}
+
+func (c *Config) SetPerPackageGenerationRequireTestEntryPoint(perPackageGenerationRequireTestEntryPoint bool) {
+	c.perPackageGenerationRequireTestEntryPoint = perPackageGenerationRequireTestEntryPoint
+}
+
+func (c *Config) PerPackageGenerationRequireTestEntryPoint() bool {
+	return c.perPackageGenerationRequireTestEntryPoint
+}
+
 // SetLibraryNamingConvention sets the py_library target naming convention.
 func (c *Config) SetLibraryNamingConvention(libraryNamingConvention string) {
 	c.libraryNamingConvention = libraryNamingConvention
@@ -358,4 +444,79 @@ func (c *Config) SetTestNamingConvention(testNamingConvention string) {
 // substitutions.
 func (c *Config) RenderTestName(packageName string) string {
 	return strings.ReplaceAll(c.testNamingConvention, packageNameNamingConventionSubstitution, packageName)
+}
+
+// AppendVisibility adds additional items to the target's visibility.
+func (c *Config) AppendVisibility(visibility string) {
+	c.visibility = append(c.visibility, visibility)
+}
+
+// Visibility returns the target's visibility.
+func (c *Config) Visibility() []string {
+	return append(c.defaultVisibility, c.visibility...)
+}
+
+// SetDefaultVisibility sets the default visibility of the target.
+func (c *Config) SetDefaultVisibility(visibility []string) {
+	c.defaultVisibility = visibility
+}
+
+// DefaultVisibilty returns the target's default visibility.
+func (c *Config) DefaultVisibilty() []string {
+	return c.defaultVisibility
+}
+
+// SetTestFilePattern sets the file patterns that should be mapped to 'py_test' rules.
+func (c *Config) SetTestFilePattern(patterns []string) {
+	c.testFilePattern = patterns
+}
+
+// TestFilePattern returns the patterns that should be mapped to 'py_test' rules.
+func (c *Config) TestFilePattern() []string {
+	return c.testFilePattern
+}
+
+// SetLabelConvention sets the label convention used for third-party dependencies.
+func (c *Config) SetLabelConvention(convention string) {
+	c.labelConvention = convention
+}
+
+// LabelConvention returns the label convention used for third-party dependencies.
+func (c *Config) LabelConvention() string {
+	return c.labelConvention
+}
+
+// SetLabelConvention sets the label normalization applied to distribution names of third-party dependencies.
+func (c *Config) SetLabelNormalization(normalizationType LabelNormalizationType) {
+	c.labelNormalization = normalizationType
+}
+
+// LabelConvention returns the label normalization applied to distribution names of third-party dependencies.
+func (c *Config) LabelNormalization() LabelNormalizationType {
+	return c.labelNormalization
+}
+
+// FormatThirdPartyDependency returns a label to a third-party dependency performing all formating and normalization.
+func (c *Config) FormatThirdPartyDependency(repositoryName string, distributionName string) label.Label {
+	conventionalDistributionName := strings.ReplaceAll(c.labelConvention, distributionNameLabelConventionSubstitution, distributionName)
+
+	var normConventionalDistributionName string
+	switch norm := c.LabelNormalization(); norm {
+	case SnakeCaseLabelNormalizationType:
+		// See /python/private/normalize_name.bzl
+		normConventionalDistributionName = strings.ToLower(conventionalDistributionName)
+		normConventionalDistributionName = regexp.MustCompile(`[-_.]+`).ReplaceAllString(normConventionalDistributionName, "_")
+		normConventionalDistributionName = strings.Trim(normConventionalDistributionName, "_")
+	case Pep503LabelNormalizationType:
+		// See https://packaging.python.org/en/latest/specifications/name-normalization/#name-format
+		normConventionalDistributionName = strings.ToLower(conventionalDistributionName)                                        // ... "should be lowercased"
+		normConventionalDistributionName = regexp.MustCompile(`[-_.]+`).ReplaceAllString(normConventionalDistributionName, "-") // ... "all runs of the characters ., -, or _ replaced with a single -"
+		normConventionalDistributionName = strings.Trim(normConventionalDistributionName, "-")                                  // ... "must start and end with a letter or number"
+	default:
+		fallthrough
+	case NoLabelNormalizationType:
+		normConventionalDistributionName = conventionalDistributionName
+	}
+
+	return label.New(repositoryName, normConventionalDistributionName, normConventionalDistributionName)
 }

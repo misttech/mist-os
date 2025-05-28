@@ -17,22 +17,23 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # Define an http_archive rule that will download the below ruleset,
 # test the sha, and extract the ruleset to you local bazel cache.
+
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "099a9fb96a376ccbbb7d291ed4ecbdfd42f6bc822ab77ae6f1b5cb9e914e94fa",
+    sha256 = "278b7ff5a826f3dc10f04feaf0b70d48b68748ccd512d7f98bf442077f043fe3",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.35.0/rules_go-v0.35.0.zip",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.35.0/rules_go-v0.35.0.zip",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.41.0/rules_go-v0.41.0.zip",
     ],
 )
 
 # Download the bazel_gazelle ruleset.
 http_archive(
     name = "bazel_gazelle",
-    sha256 = "448e37e0dbf61d6fa8f00aaa12d191745e14f07c31cabfa731f0c8e8a4f41b97",
+    sha256 = "d3fa66a39028e97d76f9e2db8f1b0c11c099e8e01bf363a923074784e451f809",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.28.0/bazel-gazelle-v0.28.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.28.0/bazel-gazelle-v0.28.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-gazelle/releases/download/v0.33.0/bazel-gazelle-v0.33.0.tar.gz",
+        "https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.33.0/bazel-gazelle-v0.33.0.tar.gz",
     ],
 )
 
@@ -69,8 +70,11 @@ local_repository(
     path = "../../gazelle",
 )
 
-# Next we load the toolchain from rules_python.
-load("@rules_python//python:repositories.bzl", "python_register_toolchains")
+# Next we load the setup and toolchain from rules_python.
+load("@rules_python//python:repositories.bzl", "py_repositories", "python_register_toolchains")
+
+# Perform general setup
+py_repositories()
 
 # We now register a hermetic Python interpreter rather than relying on a system-installed interpreter.
 # This toolchain will allow bazel to download a specific python version, and use that version
@@ -80,8 +84,6 @@ python_register_toolchains(
     python_version = "3.9",
 )
 
-# Load the interpreter and pip_parse rules.
-load("@python39//:defs.bzl", "interpreter")
 load("@rules_python//python:pip.bzl", "pip_parse")
 
 # This macro wraps the `pip_repository` rule that invokes `pip`, with `incremental` set.
@@ -90,8 +92,19 @@ load("@rules_python//python:pip.bzl", "pip_parse")
 # You can instead check this `requirements.bzl` file into your repo.
 pip_parse(
     name = "pip",
-    # Generate user friendly alias labels for each dependency that we have.
-    incompatible_generate_aliases = True,
+
+    # Requirement groups allow Bazel to tolerate PyPi cycles by putting dependencies
+    # which are known to form cycles into groups together.
+    experimental_requirement_cycles = {
+        "sphinx": [
+            "sphinx",
+            "sphinxcontrib-qthelp",
+            "sphinxcontrib-htmlhelp",
+            "sphinxcontrib-devhelp",
+            "sphinxcontrib-applehelp",
+            "sphinxcontrib-serializinghtml",
+        ],
+    },
     # (Optional) You can provide a python_interpreter (path) or a python_interpreter_target (a Bazel target, that
     # acts as an executable). The latter can be anything that could be used as Python interpreter. E.g.:
     # 1. Python interpreter that you compile in the build file.
@@ -99,7 +112,7 @@ pip_parse(
     # 3. Wrapper script, like in the autodetecting python toolchain.
     #
     # Here, we use the interpreter constant that resolves to the host interpreter from the default Python toolchain.
-    python_interpreter_target = interpreter,
+    python_interpreter_target = "@python39_host//:python",
     # Set the location of the lock file.
     requirements_lock = "//:requirements_lock.txt",
     requirements_windows = "//:requirements_windows.txt",

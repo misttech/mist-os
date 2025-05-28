@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import argparse
 import base64
-import collections
 import hashlib
 import os
 import re
+import stat
 import sys
 import zipfile
 from pathlib import Path
+
+_ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
 
 
 def commonpath(path1, path2):
@@ -33,86 +37,89 @@ def commonpath(path1, path2):
 
 
 def escape_filename_segment(segment):
-    """Escapes a filename segment per https://www.python.org/dev/peps/pep-0427/#escaping-and-unicode"""
+    """Escapes a filename segment per https://www.python.org/dev/peps/pep-0427/#escaping-and-unicode
+
+    This is a legacy function, kept for backwards compatibility,
+    and may be removed in the future. See `escape_filename_distribution_name`
+    and `normalize_pep440` for the modern alternatives.
+    """
     return re.sub(r"[^\w\d.]+", "_", segment, re.UNICODE)
 
 
-class WheelMaker(object):
+def normalize_package_name(name):
+    """Normalize a package name according to the Python Packaging User Guide.
+
+    See https://packaging.python.org/en/latest/specifications/name-normalization/
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def escape_filename_distribution_name(name):
+    """Escape the distribution name component of a filename.
+
+    See https://packaging.python.org/en/latest/specifications/binary-distribution-format/#escaping-and-unicode
+    """
+    return normalize_package_name(name).replace("-", "_")
+
+
+def normalize_pep440(version):
+    """Normalize version according to PEP 440, with fallback for placeholders.
+
+    If there's a placeholder in braces, such as {BUILD_TIMESTAMP},
+    replace it with 0. Such placeholders can be used with stamping, in
+    which case they would have been resolved already by now; if they
+    haven't, we're doing an unstamped build, but we still need to
+    produce a valid version. If such replacements are made, the
+    original version string, sanitized to dot-separated alphanumerics,
+    is appended as a local version segment, so you understand what
+    placeholder was involved.
+
+    If that still doesn't produce a valid version, use version 0 and
+    append the original version string, sanitized to dot-separated
+    alphanumerics, as a local version segment.
+
+    """
+
+    import packaging.version
+
+    try:
+        return str(packaging.version.Version(version))
+    except packaging.version.InvalidVersion:
+        pass
+
+    sanitized = re.sub(r"[^a-z0-9]+", ".", version.lower()).strip(".")
+    substituted = re.sub(r"\{\w+\}", "0", version)
+    delimiter = "." if "+" in substituted else "+"
+    try:
+        return str(packaging.version.Version(f"{substituted}{delimiter}{sanitized}"))
+    except packaging.version.InvalidVersion:
+        return str(packaging.version.Version(f"0+{sanitized}"))
+
+
+class _WhlFile(zipfile.ZipFile):
     def __init__(
         self,
-        name,
-        version,
-        build_tag,
-        python_tag,
-        abi,
-        platform,
-        outfile=None,
+        filename,
+        *,
+        mode,
+        distribution_prefix: str,
         strip_path_prefixes=None,
+        compression=zipfile.ZIP_DEFLATED,
+        **kwargs,
     ):
-        self._name = name
-        self._version = version
-        self._build_tag = build_tag
-        self._python_tag = python_tag
-        self._abi = abi
-        self._platform = platform
-        self._outfile = outfile
-        self._strip_path_prefixes = (
-            strip_path_prefixes if strip_path_prefixes is not None else []
-        )
+        self._distribution_prefix = distribution_prefix
 
-        self._distinfo_dir = (
-            escape_filename_segment(self._name)
-            + "-"
-            + escape_filename_segment(self._version)
-            + ".dist-info/"
-        )
-        self._zipfile = None
+        self._strip_path_prefixes = strip_path_prefixes or []
         # Entries for the RECORD file as (filename, hash, size) tuples.
         self._record = []
 
-    def __enter__(self):
-        self._zipfile = zipfile.ZipFile(
-            self.filename(), mode="w", compression=zipfile.ZIP_DEFLATED
-        )
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self._zipfile.close()
-        self._zipfile = None
-
-    def wheelname(self) -> str:
-        components = [self._name, self._version]
-        if self._build_tag:
-            components.append(self._build_tag)
-        components += [self._python_tag, self._abi, self._platform]
-        return "-".join(components) + ".whl"
-
-    def filename(self) -> str:
-        if self._outfile:
-            return self._outfile
-        return self.wheelname()
-
-    def disttags(self):
-        return ["-".join([self._python_tag, self._abi, self._platform])]
+        super().__init__(filename, mode=mode, compression=compression, **kwargs)
 
     def distinfo_path(self, basename):
-        return self._distinfo_dir + basename
+        return f"{self._distribution_prefix}.dist-info/{basename}"
 
-    def _serialize_digest(self, hash):
-        # https://www.python.org/dev/peps/pep-0376/#record
-        # "base64.urlsafe_b64encode(digest) with trailing = removed"
-        digest = base64.urlsafe_b64encode(hash.digest())
-        digest = b"sha256=" + digest.rstrip(b"=")
-        return digest
-
-    def add_string(self, filename, contents):
-        """Add given 'contents' as filename to the distribution."""
-        if sys.version_info[0] > 2 and isinstance(contents, str):
-            contents = contents.encode("utf-8", "surrogateescape")
-        self._zipfile.writestr(filename, contents)
-        hash = hashlib.sha256()
-        hash.update(contents)
-        self._add_to_record(filename, self._serialize_digest(hash), len(contents))
+    def data_path(self, basename):
+        return f"{self._distribution_prefix}.data/{basename}"
 
     def add_file(self, package_filename, real_filename):
         """Add given file to the distribution."""
@@ -120,8 +127,8 @@ class WheelMaker(object):
         def arcname_from(name):
             # Always use unix path separators.
             normalized_arcname = name.replace(os.path.sep, "/")
-            # Don't manipulate names filenames in the .distinfo directory.
-            if normalized_arcname.startswith(self._distinfo_dir):
+            # Don't manipulate names filenames in the .distinfo or .data directories.
+            if normalized_arcname.startswith(self._distribution_prefix):
                 return normalized_arcname
             for prefix in self._strip_path_prefixes:
                 if normalized_arcname.startswith(prefix):
@@ -139,19 +146,148 @@ class WheelMaker(object):
             return
 
         arcname = arcname_from(package_filename)
+        zinfo = self._zipinfo(arcname)
 
-        self._zipfile.write(real_filename, arcname=arcname)
-        # Find the hash and length
+        # Write file to the zip archive while computing the hash and length
         hash = hashlib.sha256()
         size = 0
-        with open(real_filename, "rb") as f:
-            while True:
-                block = f.read(2**20)
-                if not block:
-                    break
-                hash.update(block)
-                size += len(block)
+        with open(real_filename, "rb") as fsrc:
+            with self.open(zinfo, "w") as fdst:
+                while True:
+                    block = fsrc.read(2**20)
+                    if not block:
+                        break
+                    fdst.write(block)
+                    hash.update(block)
+                    size += len(block)
+
         self._add_to_record(arcname, self._serialize_digest(hash), size)
+
+    def add_string(self, filename, contents):
+        """Add given 'contents' as filename to the distribution."""
+        if isinstance(contents, str):
+            contents = contents.encode("utf-8", "surrogateescape")
+        zinfo = self._zipinfo(filename)
+        self.writestr(zinfo, contents)
+        hash = hashlib.sha256()
+        hash.update(contents)
+        self._add_to_record(filename, self._serialize_digest(hash), len(contents))
+
+    def _serialize_digest(self, hash):
+        # https://www.python.org/dev/peps/pep-0376/#record
+        # "base64.urlsafe_b64encode(digest) with trailing = removed"
+        digest = base64.urlsafe_b64encode(hash.digest())
+        digest = b"sha256=" + digest.rstrip(b"=")
+        return digest
+
+    def _add_to_record(self, filename, hash, size):
+        size = str(size).encode("ascii")
+        self._record.append((filename, hash, size))
+
+    def _zipinfo(self, filename):
+        """Construct deterministic ZipInfo entry for a file named filename"""
+        # Strip leading path separators to mirror ZipInfo.from_file behavior
+        separators = os.path.sep
+        if os.path.altsep is not None:
+            separators += os.path.altsep
+        arcname = filename.lstrip(separators)
+
+        zinfo = zipfile.ZipInfo(filename=arcname, date_time=_ZIP_EPOCH)
+        zinfo.create_system = 3  # ZipInfo entry created on a unix-y system
+        # Both pip and installer expect the regular file bit to be set in order for the
+        # executable bit to be preserved after extraction
+        # https://github.com/pypa/pip/blob/23.3.2/src/pip/_internal/utils/unpacking.py#L96-L100
+        # https://github.com/pypa/installer/blob/0.7.0/src/installer/sources.py#L310-L313
+        zinfo.external_attr = (
+            stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO | stat.S_IFREG
+        ) << 16  # permissions: -rwxrwxrwx
+        zinfo.compress_type = self.compression
+        return zinfo
+
+    def add_recordfile(self):
+        """Write RECORD file to the distribution."""
+        record_path = self.distinfo_path("RECORD")
+        entries = self._record + [(record_path, b"", b"")]
+        contents = b""
+        for filename, digest, size in entries:
+            if isinstance(filename, str):
+                filename = filename.lstrip("/").encode("utf-8", "surrogateescape")
+            contents += b"%s,%s,%s\n" % (filename, digest, size)
+
+        self.add_string(record_path, contents)
+        return contents
+
+
+class WheelMaker(object):
+    def __init__(
+        self,
+        name,
+        version,
+        build_tag,
+        python_tag,
+        abi,
+        platform,
+        outfile=None,
+        strip_path_prefixes=None,
+    ):
+        self._name = name
+        self._version = normalize_pep440(version)
+        self._build_tag = build_tag
+        self._python_tag = python_tag
+        self._abi = abi
+        self._platform = platform
+        self._outfile = outfile
+        self._strip_path_prefixes = strip_path_prefixes
+        self._wheelname_fragment_distribution_name = escape_filename_distribution_name(
+            self._name
+        )
+
+        self._distribution_prefix = (
+            self._wheelname_fragment_distribution_name + "-" + self._version
+        )
+
+        self._whlfile = None
+
+    def __enter__(self):
+        self._whlfile = _WhlFile(
+            self.filename(),
+            mode="w",
+            distribution_prefix=self._distribution_prefix,
+            strip_path_prefixes=self._strip_path_prefixes,
+        )
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self._whlfile.close()
+        self._whlfile = None
+
+    def wheelname(self) -> str:
+        components = [
+            self._wheelname_fragment_distribution_name,
+            self._version,
+        ]
+        if self._build_tag:
+            components.append(self._build_tag)
+        components += [self._python_tag, self._abi, self._platform]
+        return "-".join(components) + ".whl"
+
+    def filename(self) -> str:
+        if self._outfile:
+            return self._outfile
+        return self.wheelname()
+
+    def disttags(self):
+        return ["-".join([self._python_tag, self._abi, self._platform])]
+
+    def distinfo_path(self, basename):
+        return self._whlfile.distinfo_path(basename)
+
+    def data_path(self, basename):
+        return self._whlfile.data_path(basename)
+
+    def add_file(self, package_filename, real_filename):
+        """Add given file to the distribution."""
+        self._whlfile.add_file(package_filename, real_filename)
 
     def add_wheelfile(self):
         """Write WHEEL file to the distribution"""
@@ -165,35 +301,23 @@ Root-Is-Purelib: {}
         )
         for tag in self.disttags():
             wheel_contents += "Tag: %s\n" % tag
-        self.add_string(self.distinfo_path("WHEEL"), wheel_contents)
+        self._whlfile.add_string(self.distinfo_path("WHEEL"), wheel_contents)
 
-    def add_metadata(self, metadata, description, version):
+    def add_metadata(self, metadata, name, description):
         """Write METADATA file to the distribution."""
         # https://www.python.org/dev/peps/pep-0566/
         # https://packaging.python.org/specifications/core-metadata/
-        metadata += "Version: " + version
-        metadata += "\n\n"
+        metadata = re.sub("^Name: .*$", "Name: %s" % name, metadata, flags=re.MULTILINE)
+        metadata += "Version: %s\n\n" % self._version
         # setuptools seems to insert UNKNOWN as description when none is
         # provided.
         metadata += description if description else "UNKNOWN"
         metadata += "\n"
-        self.add_string(self.distinfo_path("METADATA"), metadata)
+        self._whlfile.add_string(self.distinfo_path("METADATA"), metadata)
 
     def add_recordfile(self):
         """Write RECORD file to the distribution."""
-        record_path = self.distinfo_path("RECORD")
-        entries = self._record + [(record_path, b"", b"")]
-        entries.sort()
-        contents = b""
-        for filename, digest, size in entries:
-            if sys.version_info[0] > 2 and isinstance(filename, str):
-                filename = filename.lstrip("/").encode("utf-8", "surrogateescape")
-            contents += b"%s,%s,%s\n" % (filename, digest, size)
-        self.add_string(record_path, contents)
-
-    def _add_to_record(self, filename, hash, size):
-        size = str(size).encode("ascii")
-        self._record.append((filename, hash, size))
+        self._whlfile.add_recordfile()
 
 
 def get_files_to_package(input_files):
@@ -207,18 +331,18 @@ def get_files_to_package(input_files):
     return files
 
 
-def resolve_version_stamp(
-    version: str, volatile_status_stamp: Path, stable_status_stamp: Path
+def resolve_argument_stamp(
+    argument: str, volatile_status_stamp: Path, stable_status_stamp: Path
 ) -> str:
-    """Resolve workspace status stamps format strings found in the version string
+    """Resolve workspace status stamps format strings found in the argument string
 
     Args:
-        version (str): The raw version represenation for the wheel (may include stamp variables)
+        argument (str): The raw argument represenation for the wheel (may include stamp variables)
         volatile_status_stamp (Path): The path to a volatile workspace status file
         stable_status_stamp (Path): The path to a stable workspace status file
 
     Returns:
-        str: A resolved version string
+        str: A resolved argument string
     """
     lines = (
         volatile_status_stamp.read_text().splitlines()
@@ -229,9 +353,9 @@ def resolve_version_stamp(
             continue
         key, value = line.split(" ", maxsplit=1)
         stamp = "{" + key + "}"
-        version = version.replace(stamp, value)
+        argument = argument.replace(stamp, value)
 
-    return version
+    return argument
 
 
 def parse_args() -> argparse.Namespace:
@@ -290,6 +414,9 @@ def parse_args() -> argparse.Namespace:
         "--description_file", help="Path to the file with package description"
     )
     wheel_group.add_argument(
+        "--description_content_type", help="Content type of the package description"
+    )
+    wheel_group.add_argument(
         "--entry_points_file",
         help="Path to a correctly-formatted entry_points.txt file",
     )
@@ -314,6 +441,12 @@ def parse_args() -> argparse.Namespace:
         help="'filename;real_path' pairs listing extra files to include in"
         "dist-info directory. Can be supplied multiple times.",
     )
+    contents_group.add_argument(
+        "--data_files",
+        action="append",
+        help="'filename;real_path' pairs listing data files to include in"
+        "data directory. Can be supplied multiple times.",
+    )
 
     build_group = parser.add_argument_group("Building requirements")
     build_group.add_argument(
@@ -330,25 +463,25 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args(sys.argv[1:])
 
 
+def _parse_file_pairs(content: List[str]) -> List[List[str]]:
+    """
+    Parse ; delimited lists of files into a 2D list.
+    """
+    return [i.split(";", maxsplit=1) for i in content or []]
+
+
 def main() -> None:
     arguments = parse_args()
 
-    if arguments.input_file:
-        input_files = [i.split(";") for i in arguments.input_file]
-    else:
-        input_files = []
+    input_files = _parse_file_pairs(arguments.input_file)
+    extra_distinfo_file = _parse_file_pairs(arguments.extra_distinfo_file)
+    data_files = _parse_file_pairs(arguments.data_files)
 
-    if arguments.extra_distinfo_file:
-        extra_distinfo_file = [i.split(";") for i in arguments.extra_distinfo_file]
-    else:
-        extra_distinfo_file = []
-
-    if arguments.input_file_list:
-        for input_file in arguments.input_file_list:
-            with open(input_file) as _file:
-                input_file_list = _file.read().splitlines()
-            for _input_file in input_file_list:
-                input_files.append(_input_file.split(";"))
+    for input_file in arguments.input_file_list:
+        with open(input_file) as _file:
+            input_file_list = _file.read().splitlines()
+        for _input_file in input_file_list:
+            input_files.append(_input_file.split(";"))
 
     all_files = get_files_to_package(input_files)
     # Sort the files for reproducible order in the archive.
@@ -357,7 +490,16 @@ def main() -> None:
     strip_prefixes = [p for p in arguments.strip_path_prefix]
 
     if arguments.volatile_status_file and arguments.stable_status_file:
-        version = resolve_version_stamp(
+        name = resolve_argument_stamp(
+            arguments.name,
+            arguments.volatile_status_file,
+            arguments.stable_status_file,
+        )
+    else:
+        name = arguments.name
+
+    if arguments.volatile_status_file and arguments.stable_status_file:
+        version = resolve_argument_stamp(
             arguments.version,
             arguments.volatile_status_file,
             arguments.stable_status_file,
@@ -366,7 +508,7 @@ def main() -> None:
         version = arguments.version
 
     with WheelMaker(
-        name=arguments.name,
+        name=name,
         version=version,
         build_tag=arguments.build_tag,
         python_tag=arguments.python_tag,
@@ -381,24 +523,69 @@ def main() -> None:
 
         description = None
         if arguments.description_file:
-            if sys.version_info[0] == 2:
-                with open(arguments.description_file, "rt") as description_file:
-                    description = description_file.read()
+            with open(
+                arguments.description_file, "rt", encoding="utf-8"
+            ) as description_file:
+                description = description_file.read()
+
+        metadata = arguments.metadata_file.read_text(encoding="utf-8")
+
+        # This is not imported at the top of the file due to the reliance
+        # on this file in the `whl_library` repository rule which does not
+        # provide `packaging` but does import symbols defined here.
+        from packaging.requirements import Requirement
+
+        # Search for any `Requires-Dist` entries that refer to other files and
+        # expand them.
+
+        def get_new_requirement_line(reqs_text, extra):
+            req = Requirement(reqs_text.strip())
+            if req.marker:
+                if extra:
+                    return f"Requires-Dist: {req.name}{req.specifier}; ({req.marker}) and {extra}"
+                else:
+                    return f"Requires-Dist: {req.name}{req.specifier}; {req.marker}"
             else:
-                with open(
-                    arguments.description_file, "rt", encoding="utf-8"
-                ) as description_file:
-                    description = description_file.read()
+                return f"Requires-Dist: {req.name}{req.specifier}; {extra}".strip(" ;")
 
-        metadata = None
-        if sys.version_info[0] == 2:
-            with open(arguments.metadata_file, "rt") as metadata_file:
-                metadata = metadata_file.read()
-        else:
-            with open(arguments.metadata_file, "rt", encoding="utf-8") as metadata_file:
-                metadata = metadata_file.read()
+        for meta_line in metadata.splitlines():
+            if not meta_line.startswith("Requires-Dist: "):
+                continue
 
-        maker.add_metadata(metadata=metadata, description=description, version=version)
+            if not meta_line[len("Requires-Dist: ") :].startswith("@"):
+                # This is a normal requirement.
+                package, _, extra = meta_line[len("Requires-Dist: ") :].rpartition(";")
+                if not package:
+                    # This is when the package requirement does not have markers.
+                    continue
+                extra = extra.strip()
+                metadata = metadata.replace(
+                    meta_line, get_new_requirement_line(package, extra)
+                )
+                continue
+
+            # This is a requirement that refers to a file.
+            file, _, extra = meta_line[len("Requires-Dist: @") :].partition(";")
+            extra = extra.strip()
+
+            reqs = []
+            for reqs_line in Path(file).read_text(encoding="utf-8").splitlines():
+                reqs_text = reqs_line.strip()
+                if not reqs_text or reqs_text.startswith(("#", "-")):
+                    continue
+
+                # Strip any comments
+                reqs_text, _, _ = reqs_text.partition("#")
+
+                reqs.append(get_new_requirement_line(reqs_text, extra))
+
+            metadata = metadata.replace(meta_line, "\n".join(reqs))
+
+        maker.add_metadata(
+            metadata=metadata,
+            name=name,
+            description=description,
+        )
 
         if arguments.entry_points_file:
             maker.add_file(
@@ -406,6 +593,8 @@ def main() -> None:
             )
 
         # Sort the files for reproducible order in the archive.
+        for filename, real_path in sorted(data_files):
+            maker.add_file(maker.data_path(filename), real_path)
         for filename, real_path in sorted(extra_distinfo_file):
             maker.add_file(maker.distinfo_path(filename), real_path)
 

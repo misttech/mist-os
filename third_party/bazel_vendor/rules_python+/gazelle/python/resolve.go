@@ -61,11 +61,17 @@ func (py *Resolver) Imports(c *config.Config, r *rule.Rule, f *rule.File) []reso
 	provides := make([]resolve.ImportSpec, 0, len(srcs)+1)
 	for _, src := range srcs {
 		ext := filepath.Ext(src)
-		if ext == ".py" {
-			pythonProjectRoot := cfg.PythonProjectRoot()
-			provide := importSpecFromSrc(pythonProjectRoot, f.Pkg, src)
-			provides = append(provides, provide)
+		if ext != ".py" {
+			continue
 		}
+		if cfg.PerFileGeneration() && len(srcs) > 1 && src == pyLibraryEntrypointFilename {
+			// Do not provide import spec from __init__.py when it is being included as
+			// part of another module.
+			continue
+		}
+		pythonProjectRoot := cfg.PythonProjectRoot()
+		provide := importSpecFromSrc(pythonProjectRoot, f.Pkg, src)
+		provides = append(provides, provide)
 	}
 	if len(provides) == 0 {
 		return nil
@@ -151,10 +157,10 @@ func (py *Resolver) Resolve(
 			for len(moduleParts) > 1 {
 				// Iterate back through the possible imports until
 				// a match is found.
-				// For example, "from foo.bar import baz" where bar is a variable, we should try
-				// `foo.bar.baz` first, then `foo.bar`, then `foo`. In the first case, the import could be file `baz.py`
-				// in the directory `foo/bar`.
-				// Or, the import could be variable `bar` in file `foo/bar.py`.
+				// For example, "from foo.bar import baz" where baz is a module, we should try `foo.bar.baz` first, then
+				// `foo.bar`, then `foo`.
+				// In the first case, the import could be file `baz.py` in the directory `foo/bar`.
+				// Or, the import could be variable `baz` in file `foo/bar.py`.
 				// The import could also be from a standard module, e.g. `six.moves`, where
 				// the dependency is actually `six`.
 				moduleParts = moduleParts[:len(moduleParts)-1]
@@ -172,7 +178,7 @@ func (py *Resolver) Resolve(
 						if override.Repo == from.Repo {
 							override.Repo = ""
 						}
-						dep := override.String()
+						dep := override.Rel(from.Repo, from.Pkg).String()
 						deps.Add(dep)
 						if explainDependency == dep {
 							log.Printf("Explaining dependency (%s): "+
@@ -196,19 +202,15 @@ func (py *Resolver) Resolve(
 						matches := ix.FindRulesByImportWithConfig(c, imp, languageName)
 						if len(matches) == 0 {
 							// Check if the imported module is part of the standard library.
-							if isStd, err := isStdModule(module{Name: moduleName}); err != nil {
-								log.Println("Error checking if standard module: ", err)
-								hasFatalError = true
-								continue POSSIBLE_MODULE_LOOP
-							} else if isStd {
+							if isStdModule(module{Name: moduleName}) {
 								continue MODULES_LOOP
 							} else if cfg.ValidateImportStatements() {
 								err := fmt.Errorf(
-									"%[1]q at line %[2]d from %[3]q is an invalid dependency: possible solutions:\n"+
+									"%[1]q, line %[2]d: %[3]q is an invalid dependency: possible solutions:\n"+
 										"\t1. Add it as a dependency in the requirements.txt file.\n"+
-										"\t2. Instruct Gazelle to resolve to a known dependency using the gazelle:resolve directive.\n"+
-										"\t3. Ignore it with a comment '# gazelle:ignore %[1]s' in the Python file.\n",
-									moduleName, mod.LineNumber, mod.Filepath,
+										"\t2. Use the '# gazelle:resolve py %[3]s TARGET_LABEL' BUILD file directive to resolve to a known dependency.\n"+
+										"\t3. Ignore it with a comment '# gazelle:ignore %[3]s' in the Python file.\n",
+									mod.Filepath, mod.LineNumber, moduleName,
 								)
 								errs = append(errs, err)
 								continue POSSIBLE_MODULE_LOOP
@@ -234,9 +236,10 @@ func (py *Resolver) Resolve(
 							}
 							if len(sameRootMatches) != 1 {
 								err := fmt.Errorf(
-									"multiple targets (%s) may be imported with %q at line %d in %q "+
-										"- this must be fixed using the \"gazelle:resolve\" directive",
-									targetListFromResults(filteredMatches), moduleName, mod.LineNumber, mod.Filepath)
+									"%[1]q, line %[2]d: multiple targets (%[3]s) may be imported with %[4]q: possible solutions:\n"+
+										"\t1. Disambiguate the above multiple targets by removing duplicate srcs entries.\n"+
+										"\t2. Use the '# gazelle:resolve py %[4]s TARGET_LABEL' BUILD file directive to resolve to one of the above targets.\n",
+									mod.Filepath, mod.LineNumber, targetListFromResults(filteredMatches), moduleName)
 								errs = append(errs, err)
 								continue POSSIBLE_MODULE_LOOP
 							}
@@ -261,7 +264,7 @@ func (py *Resolver) Resolve(
 				for _, err := range errs {
 					joinedErrs = fmt.Sprintf("%s%s\n", joinedErrs, err)
 				}
-				log.Printf("ERROR: failed to validate dependencies for target %q: %v\n", from.String(), joinedErrs)
+				log.Printf("ERROR: failed to validate dependencies for target %q:\n\n%v", from.String(), joinedErrs)
 				hasFatalError = true
 			}
 		}

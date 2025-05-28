@@ -17,7 +17,7 @@
 load("@rules_proto//proto:defs.bzl", "ProtoInfo", "proto_common")
 load("//python:defs.bzl", "PyInfo")
 
-ProtoLangToolchainInfo = proto_common.ProtoLangToolchainInfo
+PY_PROTO_TOOLCHAIN = "@rules_python//python/proto:toolchain_type"
 
 _PyProtoInfo = provider(
     doc = "Encapsulates information needed by the Python proto rules.",
@@ -35,6 +35,9 @@ _PyProtoInfo = provider(
 def _filter_provider(provider, *attrs):
     return [dep[provider] for attr in attrs for dep in attr if provider in dep]
 
+def _incompatible_toolchains_enabled():
+    return getattr(proto_common, "INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION", False)
+
 def _py_proto_aspect_impl(target, ctx):
     """Generates and compiles Python code for a proto_library.
 
@@ -51,7 +54,6 @@ def _py_proto_aspect_impl(target, ctx):
       ([_PyProtoInfo]) Providers collecting transitive information about
       generated files.
     """
-
     _proto_library = ctx.rule.attr
 
     # Check Proto file names
@@ -61,11 +63,19 @@ def _py_proto_aspect_impl(target, ctx):
                 proto.path,
             ))
 
-    proto_lang_toolchain_info = ctx.attr._aspect_proto_toolchain[ProtoLangToolchainInfo]
+    if _incompatible_toolchains_enabled():
+        toolchain = ctx.toolchains[PY_PROTO_TOOLCHAIN]
+        if not toolchain:
+            fail("No toolchains registered for '%s'." % PY_PROTO_TOOLCHAIN)
+        proto_lang_toolchain_info = toolchain.proto
+    else:
+        proto_lang_toolchain_info = getattr(ctx.attr, "_aspect_proto_toolchain")[proto_common.ProtoLangToolchainInfo]
+
     api_deps = [proto_lang_toolchain_info.runtime]
 
     generated_sources = []
     proto_info = target[ProtoInfo]
+    proto_root = proto_info.proto_source_root
     if proto_info.direct_sources:
         # Generate py files
         generated_sources = proto_common.declare_generated_files(
@@ -75,12 +85,19 @@ def _py_proto_aspect_impl(target, ctx):
             name_mapper = lambda name: name.replace("-", "_").replace(".", "/"),
         )
 
+        # Handles multiple repository and virtual import cases
+        if proto_root.startswith(ctx.bin_dir.path):
+            proto_root = proto_root[len(ctx.bin_dir.path) + 1:]
+
+        plugin_output = ctx.bin_dir.path + "/" + proto_root
+        proto_root = ctx.workspace_name + "/" + proto_root
+
         proto_common.compile(
             actions = ctx.actions,
             proto_info = proto_info,
             proto_lang_toolchain_info = proto_lang_toolchain_info,
             generated_files = generated_sources,
-            plugin_output = ctx.bin_dir.path,
+            plugin_output = plugin_output,
         )
 
     # Generated sources == Python sources
@@ -99,7 +116,14 @@ def _py_proto_aspect_impl(target, ctx):
     return [
         _PyProtoInfo(
             imports = depset(
-                transitive = [dep[PyInfo].imports for dep in api_deps],
+                # Adding to PYTHONPATH so the generated modules can be
+                # imported.  This is necessary when there is
+                # strip_import_prefix, the Python modules are generated under
+                # _virtual_imports. But it's undesirable otherwise, because it
+                # will put the repo root at the top of the PYTHONPATH, ahead of
+                # directories added through `imports` attributes.
+                [proto_root] if "_virtual_imports" in proto_root else [],
+                transitive = [dep[PyInfo].imports for dep in api_deps] + [dep.imports for dep in deps],
             ),
             runfiles_from_proto_deps = runfiles_from_proto_deps,
             transitive_sources = transitive_sources,
@@ -108,7 +132,7 @@ def _py_proto_aspect_impl(target, ctx):
 
 _py_proto_aspect = aspect(
     implementation = _py_proto_aspect_impl,
-    attrs = {
+    attrs = {} if _incompatible_toolchains_enabled() else {
         "_aspect_proto_toolchain": attr.label(
             default = ":python_toolchain",
         ),
@@ -116,6 +140,7 @@ _py_proto_aspect = aspect(
     attr_aspects = ["deps"],
     required_providers = [ProtoInfo],
     provides = [_PyProtoInfo],
+    toolchains = [PY_PROTO_TOOLCHAIN] if _incompatible_toolchains_enabled() else [],
 )
 
 def _py_proto_library_rule(ctx):

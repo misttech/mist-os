@@ -14,6 +14,9 @@
 
 """Public API for for building wheels."""
 
+load("@bazel_skylib//rules:native_binary.bzl", "native_binary")
+load("//python:py_binary.bzl", "py_binary")
+load("//python/private:bzlmod_enabled.bzl", "BZLMOD_ENABLED")
 load("//python/private:py_package.bzl", "py_package_lib")
 load("//python/private:py_wheel.bzl", _PyWheelInfo = "PyWheelInfo", _py_wheel = "py_wheel")
 load("//python/private:util.bzl", "copy_propagating_kwargs")
@@ -32,25 +35,28 @@ This rule is intended to be used as data dependency to py_wheel rule.
     attrs = py_package_lib.attrs,
 )
 
-# Based on https://github.com/aspect-build/bazel-lib/tree/main/lib/private/copy_to_directory.bzl
-# Avoiding a bazelbuild -> aspect-build dependency :(
 def _py_wheel_dist_impl(ctx):
-    dir = ctx.actions.declare_directory(ctx.attr.out)
+    out = ctx.actions.declare_directory(ctx.attr.out)
     name_file = ctx.attr.wheel[PyWheelInfo].name_file
-    cmds = [
-        "mkdir -p \"%s\"" % dir.path,
-        """cp "{}" "{}/$(cat "{}")" """.format(ctx.files.wheel[0].path, dir.path, name_file.path),
-    ]
-    ctx.actions.run_shell(
-        inputs = ctx.files.wheel + [name_file],
-        outputs = [dir],
-        command = "\n".join(cmds),
-        mnemonic = "CopyToDirectory",
-        progress_message = "Copying files to directory",
-        use_default_shell_env = True,
+    wheel = ctx.attr.wheel[PyWheelInfo].wheel
+
+    args = ctx.actions.args()
+    args.add("--wheel", wheel)
+    args.add("--name_file", name_file)
+    args.add("--output", out.path)
+
+    ctx.actions.run(
+        mnemonic = "PyWheelDistDir",
+        executable = ctx.executable._copier,
+        inputs = [wheel, name_file],
+        outputs = [out],
+        arguments = [args],
     )
     return [
-        DefaultInfo(files = depset([dir])),
+        DefaultInfo(
+            files = depset([out]),
+            runfiles = ctx.runfiles([out]),
+        ),
     ]
 
 py_wheel_dist = rule(
@@ -64,12 +70,28 @@ This also has the advantage that stamping information is included in the wheel's
 """,
     implementation = _py_wheel_dist_impl,
     attrs = {
-        "out": attr.string(doc = "name of the resulting directory", mandatory = True),
-        "wheel": attr.label(doc = "a [py_wheel rule](/docs/packaging.md#py_wheel_rule)", providers = [PyWheelInfo]),
+        "out": attr.string(
+            doc = "name of the resulting directory",
+            mandatory = True,
+        ),
+        "wheel": attr.label(
+            doc = "a [py_wheel target](#py_wheel)",
+            providers = [PyWheelInfo],
+        ),
+        "_copier": attr.label(
+            cfg = "exec",
+            executable = True,
+            default = Label("//python/private:py_wheel_dist"),
+        ),
     },
 )
 
-def py_wheel(name, twine = None, **kwargs):
+def py_wheel(
+        name,
+        twine = None,
+        twine_binary = Label("//tools/publish:twine") if BZLMOD_ENABLED else None,
+        publish_args = [],
+        **kwargs):
     """Builds a Python Wheel.
 
     Wheels are Python distribution format defined in https://www.python.org/dev/peps/pep-0427/.
@@ -114,19 +136,21 @@ def py_wheel(name, twine = None, **kwargs):
     )
     ```
 
-    To publish the wheel to Pypi, the twine package is required.
-    rules_python doesn't provide twine itself, see https://github.com/bazelbuild/rules_python/issues/1016
-    However you can install it with pip_parse, just like we do in the WORKSPACE file in rules_python.
+    To publish the wheel to PyPI, the twine package is required and it is installed
+    by default on `bzlmod` setups. On legacy `WORKSPACE`, `rules_python`
+    doesn't provide `twine` itself
+    (see https://github.com/bazelbuild/rules_python/issues/1016), but
+    you can install it with `pip_parse`, just like we do any other dependencies.
 
-    Once you've installed twine, you can pass its label to the `twine` attribute of this macro,
-    to get a "[name].publish" target.
+    Once you've installed twine, you can pass its label to the `twine`
+    attribute of this macro, to get a "[name].publish" target.
 
     Example:
 
     ```python
     py_wheel(
         name = "my_wheel",
-        twine = "@publish_deps_twine//:pkg",
+        twine = "@publish_deps//twine",
         ...
     )
     ```
@@ -142,37 +166,67 @@ def py_wheel(name, twine = None, **kwargs):
     Args:
         name:  A unique name for this target.
         twine: A label of the external location of the py_library target for twine
+        twine_binary: A label of the external location of a binary target for twine.
+        publish_args: arguments passed to twine, e.g. ["--repository-url", "https://pypi.my.org/simple/"].
+            These are subject to make var expansion, as with the `args` attribute.
+            Note that you can also pass additional args to the bazel run command as in the example above.
         **kwargs: other named parameters passed to the underlying [py_wheel rule](#py_wheel_rule)
     """
-    _dist_target = "{}.dist".format(name)
+    tags = kwargs.pop("tags", [])
+    manual_tags = depset(tags + ["manual"]).to_list()
+
+    dist_target = "{}.dist".format(name)
     py_wheel_dist(
-        name = _dist_target,
+        name = dist_target,
         wheel = name,
         out = kwargs.pop("dist_folder", "{}_dist".format(name)),
+        tags = manual_tags,
         **copy_propagating_kwargs(kwargs)
     )
 
-    _py_wheel(name = name, **kwargs)
+    _py_wheel(
+        name = name,
+        tags = tags,
+        **kwargs
+    )
 
-    if twine:
+    twine_args = []
+    if twine or twine_binary:
+        twine_args = ["upload"]
+        twine_args.extend(publish_args)
+        twine_args.append("$(rootpath :{})/*".format(dist_target))
+
+    if twine_binary:
+        native_binary(
+            name = "{}.publish".format(name),
+            src = twine_binary,
+            out = select({
+                "@platforms//os:windows": "{}.publish_script.exe".format(name),
+                "//conditions:default": "{}.publish_script".format(name),
+            }),
+            args = twine_args,
+            data = [dist_target],
+            tags = manual_tags,
+            visibility = kwargs.get("visibility"),
+            **copy_propagating_kwargs(kwargs)
+        )
+    elif twine:
         if not twine.endswith(":pkg"):
             fail("twine label should look like @my_twine_repo//:pkg")
+
         twine_main = twine.replace(":pkg", ":rules_python_wheel_entry_point_twine.py")
 
-        # TODO: use py_binary from //python:defs.bzl after our stardoc setup is less brittle
-        # buildifier: disable=native-py
-        native.py_binary(
+        py_binary(
             name = "{}.publish".format(name),
             srcs = [twine_main],
-            args = [
-                "upload",
-                "$(rootpath :{})/*".format(_dist_target),
-            ],
-            data = [_dist_target],
+            args = twine_args,
+            data = [dist_target],
             imports = ["."],
             main = twine_main,
             deps = [twine],
+            tags = manual_tags,
             visibility = kwargs.get("visibility"),
+            **copy_propagating_kwargs(kwargs)
         )
 
 py_wheel_rule = _py_wheel

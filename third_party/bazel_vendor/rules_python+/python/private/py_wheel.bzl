@@ -16,6 +16,7 @@
 
 load("//python/private:stamp.bzl", "is_stamping_enabled")
 load(":py_package.bzl", "py_package_lib")
+load(":py_wheel_normalize_pep440.bzl", "normalize_pep440")
 
 PyWheelInfo = provider(
     doc = "Information about a wheel produced by `py_wheel`",
@@ -38,8 +39,14 @@ _distribution_attrs = {
         doc = """\
 Name of the distribution.
 
-This should match the project name onm PyPI. It's also the name that is used to
+This should match the project name on PyPI. It's also the name that is used to
 refer to the package in other packages' dependencies.
+
+Workspace status keys are expanded using `{NAME}` format, for example:
+ - `distribution = "package.{CLASSIFIER}"`
+ - `distribution = "{DISTRIBUTION}"`
+
+For the available keys, see https://bazel.build/docs/user-manual#workspace-status
 """,
     ),
     "platform": attr.string(
@@ -99,10 +106,10 @@ For example:
 Note that Bazel's output filename cannot include the stamp information, as outputs must be known
 during the analysis phase and the stamp data is available only during the action execution.
 
-The [`py_wheel`](/docs/packaging.md#py_wheel) macro produces a `.dist`-suffix target which creates a
+The [`py_wheel`](#py_wheel) macro produces a `.dist`-suffix target which creates a
 `dist/` folder containing the wheel with the stamped name, suitable for publishing.
 
-See [`py_wheel_dist`](/docs/packaging.md#py_wheel_dist) for more info.
+See [`py_wheel_dist`](#py_wheel_dist) for more info.
 """,
     ),
     "_stamp_flag": attr.label(
@@ -111,14 +118,31 @@ See [`py_wheel_dist`](/docs/packaging.md#py_wheel_dist) for more info.
     ),
 }
 
+_feature_flags = {}
+
+ALLOWED_DATA_FILE_PREFIX = ("purelib", "platlib", "headers", "scripts", "data")
 _requirement_attrs = {
     "extra_requires": attr.string_list_dict(
-        doc = "List of optional requirements for this package",
+        doc = ("A mapping of [extras](https://peps.python.org/pep-0508/#extras) options to lists of requirements (similar to `requires`). This attribute " +
+               "is mutually exclusive with `extra_requires_file`."),
+    ),
+    "extra_requires_files": attr.label_keyed_string_dict(
+        doc = ("A mapping of requirements files (similar to `requires_file`) to the name of an [extras](https://peps.python.org/pep-0508/#extras) option " +
+               "This attribute is mutually exclusive with `extra_requires`."),
+        allow_files = True,
     ),
     "requires": attr.string_list(
         doc = ("List of requirements for this package. See the section on " +
                "[Declaring required dependency](https://setuptools.readthedocs.io/en/latest/userguide/dependency_management.html#declaring-dependencies) " +
-               "for details and examples of the format of this argument."),
+               "for details and examples of the format of this argument. This " +
+               "attribute is mutually exclusive with `requires_file`."),
+    ),
+    "requires_file": attr.label(
+        doc = ("A file containing a list of requirements for this package. See the section on " +
+               "[Declaring required dependency](https://setuptools.readthedocs.io/en/latest/userguide/dependency_management.html#declaring-dependencies) " +
+               "for details and examples of the format of this argument. This " +
+               "attribute is mutually exclusive with `requires`."),
+        allow_single_file = True,
     ),
 }
 
@@ -149,6 +173,16 @@ _other_attrs = {
     "classifiers": attr.string_list(
         doc = "A list of strings describing the categories for the package. For valid classifiers see https://pypi.org/classifiers",
     ),
+    "data_files": attr.label_keyed_string_dict(
+        doc = ("Any file that is not normally installed inside site-packages goes into the .data directory, named " +
+               "as the .dist-info directory but with the .data/ extension.  Allowed paths: {prefixes}".format(prefixes = ALLOWED_DATA_FILE_PREFIX)),
+        allow_files = True,
+    ),
+    "description_content_type": attr.string(
+        doc = ("The type of contents in description_file. " +
+               "If not provided, the type will be inferred from the extension of description_file. " +
+               "Also see https://packaging.python.org/en/latest/specifications/core-metadata/#description-content-type"),
+    ),
     "description_file": attr.label(
         doc = "A file containing text describing the package.",
         allow_single_file = True,
@@ -165,6 +199,11 @@ _other_attrs = {
         doc = "A string specifying the license of the package.",
         default = "",
     ),
+    "project_urls": attr.string_dict(
+        doc = ("A string dict specifying additional browsable URLs for the project and corresponding labels, " +
+               "where label is the key and url is the value. " +
+               'e.g `{{"Bug Tracker": "http://bitbucket.org/tarek/distribute/issues/"}}`'),
+    ),
     "python_requires": attr.string(
         doc = (
             "Python versions required by this distribution, e.g. '>=3.5,<3.7'"
@@ -175,7 +214,60 @@ _other_attrs = {
         default = [],
         doc = "path prefixes to strip from files added to the generated package",
     ),
+    "summary": attr.string(
+        doc = "A one-line summary of what the distribution does",
+    ),
 }
+
+_PROJECT_URL_LABEL_LENGTH_LIMIT = 32
+_DESCRIPTION_FILE_EXTENSION_TO_TYPE = {
+    "md": "text/markdown",
+    "rst": "text/x-rst",
+}
+_DEFAULT_DESCRIPTION_FILE_TYPE = "text/plain"
+
+def _escape_filename_distribution_name(name):
+    """Escape the distribution name component of a filename.
+
+    See https://packaging.python.org/en/latest/specifications/binary-distribution-format/#escaping-and-unicode
+    and https://packaging.python.org/en/latest/specifications/name-normalization/.
+
+    Apart from the valid names according to the above, we also accept
+    '{' and '}', which may be used as placeholders for stamping.
+    """
+    escaped = ""
+    _inside_stamp_var = False
+    for character in name.elems():
+        if character == "{":
+            _inside_stamp_var = True
+            escaped += character
+        elif character == "}":
+            _inside_stamp_var = False
+            escaped += character
+        elif character.isalnum():
+            escaped += character if _inside_stamp_var else character.lower()
+        elif character in ["-", "_", "."]:
+            if escaped == "":
+                fail(
+                    "A valid name must start with a letter or number.",
+                    "Name '%s' does not." % name,
+                )
+            elif escaped.endswith("_"):
+                pass
+            else:
+                escaped += "_"
+        else:
+            fail(
+                "A valid name consists only of ASCII letters ",
+                "and numbers, period, underscore and hyphen.",
+                "Name '%s' has bad character '%s'." % (name, character),
+            )
+    if escaped.endswith("_"):
+        fail(
+            "A valid name must end with a letter or number.",
+            "Name '%s' does not." % name,
+        )
+    return escaped
 
 def _escape_filename_segment(segment):
     """Escape a segment of the wheel filename.
@@ -211,13 +303,15 @@ def _py_wheel_impl(ctx):
     python_tag = _replace_make_variables(ctx.attr.python_tag, ctx)
     version = _replace_make_variables(ctx.attr.version, ctx)
 
-    outfile = ctx.actions.declare_file("-".join([
-        _escape_filename_segment(ctx.attr.distribution),
-        _escape_filename_segment(version),
+    filename_segments = [
+        _escape_filename_distribution_name(ctx.attr.distribution),
+        normalize_pep440(version),
         _escape_filename_segment(python_tag),
         _escape_filename_segment(abi),
         _escape_filename_segment(ctx.attr.platform),
-    ]) + ".whl")
+    ]
+
+    outfile = ctx.actions.declare_file("-".join(filename_segments) + ".whl")
 
     name_file = ctx.actions.declare_file(ctx.label.name + ".name")
 
@@ -269,21 +363,72 @@ def _py_wheel_impl(ctx):
         metadata_contents.append("Home-page: %s" % ctx.attr.homepage)
     if ctx.attr.license:
         metadata_contents.append("License: %s" % ctx.attr.license)
+    if ctx.attr.description_content_type:
+        metadata_contents.append("Description-Content-Type: %s" % ctx.attr.description_content_type)
+    elif ctx.attr.description_file:
+        # infer the content type from description file extension.
+        description_file_type = _DESCRIPTION_FILE_EXTENSION_TO_TYPE.get(
+            ctx.file.description_file.extension,
+            _DEFAULT_DESCRIPTION_FILE_TYPE,
+        )
+        metadata_contents.append("Description-Content-Type: %s" % description_file_type)
+    if ctx.attr.summary:
+        metadata_contents.append("Summary: %s" % ctx.attr.summary)
+
+    for label, url in sorted(ctx.attr.project_urls.items()):
+        if len(label) > _PROJECT_URL_LABEL_LENGTH_LIMIT:
+            fail("`label` {} in `project_urls` is too long. It is limited to {} characters.".format(len(label), _PROJECT_URL_LABEL_LENGTH_LIMIT))
+        metadata_contents.append("Project-URL: %s, %s" % (label, url))
 
     for c in ctx.attr.classifiers:
         metadata_contents.append("Classifier: %s" % c)
 
     if ctx.attr.python_requires:
         metadata_contents.append("Requires-Python: %s" % ctx.attr.python_requires)
-    for requirement in ctx.attr.requires:
-        metadata_contents.append("Requires-Dist: %s" % requirement)
 
+    if ctx.attr.requires and ctx.attr.requires_file:
+        fail("`requires` and `requires_file` are mutually exclusive. Please update {}".format(ctx.label))
+
+    for requires in ctx.attr.requires:
+        metadata_contents.append("Requires-Dist: %s" % requires)
+    if ctx.attr.requires_file:
+        # The @ prefixed paths will be resolved by the PyWheel action.
+        # Expanding each line containing a constraint in place of this
+        # directive.
+        metadata_contents.append("Requires-Dist: @%s" % ctx.file.requires_file.path)
+        other_inputs.append(ctx.file.requires_file)
+
+    if ctx.attr.extra_requires and ctx.attr.extra_requires_files:
+        fail("`extra_requires` and `extra_requires_files` are mutually exclusive. Please update {}".format(ctx.label))
     for option, option_requirements in sorted(ctx.attr.extra_requires.items()):
         metadata_contents.append("Provides-Extra: %s" % option)
         for requirement in option_requirements:
             metadata_contents.append(
                 "Requires-Dist: %s; extra == '%s'" % (requirement, option),
             )
+    extra_requires_files = {}
+    for option_requires_target, option in ctx.attr.extra_requires_files.items():
+        if option in extra_requires_files:
+            fail("Duplicate `extra_requires_files` option '{}' found on target {}".format(option, ctx.label))
+        option_requires_files = option_requires_target[DefaultInfo].files.to_list()
+        if len(option_requires_files) != 1:
+            fail("Labels in `extra_requires_files` must result in a single file, but {label} provides {files} from {owner}".format(
+                label = ctx.label,
+                files = option_requires_files,
+                owner = option_requires_target.label,
+            ))
+        extra_requires_files.update({option: option_requires_files[0]})
+
+    for option, option_requires_file in sorted(extra_requires_files.items()):
+        metadata_contents.append("Provides-Extra: %s" % option)
+        metadata_contents.append(
+            # The @ prefixed paths will be resolved by the PyWheel action.
+            # Expanding each line containing a constraint in place of this
+            # directive and appending the extra option.
+            "Requires-Dist: @%s; extra == '%s'" % (option_requires_file.path, option),
+        )
+        other_inputs.append(option_requires_file)
+
     ctx.actions.write(
         output = metadata_file,
         content = "\n".join(metadata_contents) + "\n",
@@ -334,7 +479,30 @@ def _py_wheel_impl(ctx):
             filename + ";" + target_files[0].path,
         )
 
+    for target, filename in ctx.attr.data_files.items():
+        target_files = target.files.to_list()
+        if len(target_files) != 1:
+            fail(
+                "Multi-file target listed in data_files %s",
+                filename,
+            )
+
+        if filename.partition("/")[0] not in ALLOWED_DATA_FILE_PREFIX:
+            fail(
+                "The target data file must start with one of these prefixes: '%s'.  Target filepath: '%s'" %
+                (
+                    ",".join(ALLOWED_DATA_FILE_PREFIX),
+                    filename,
+                ),
+            )
+        other_inputs.extend(target_files)
+        args.add(
+            "--data_files",
+            filename + ";" + target_files[0].path,
+        )
+
     ctx.actions.run(
+        mnemonic = "PyWheel",
         inputs = depset(direct = other_inputs, transitive = [inputs_to_package]),
         outputs = [outfile, name_file],
         arguments = [args],
@@ -381,6 +549,7 @@ tries to locate `.runfiles` directory which is not packaged in the wheel.
             ),
         },
         _distribution_attrs,
+        _feature_flags,
         _requirement_attrs,
         _entrypoint_attrs,
         _other_attrs,
@@ -390,7 +559,7 @@ tries to locate `.runfiles` directory which is not packaged in the wheel.
 py_wheel = rule(
     implementation = py_wheel_lib.implementation,
     doc = """\
-Internal rule used by the [py_wheel macro](/docs/packaging.md#py_wheel).
+Internal rule used by the [py_wheel macro](#py_wheel).
 
 These intentionally have the same name to avoid sharp edges with Bazel macros.
 For example, a `bazel query` for a user's `py_wheel` macro expands to `py_wheel` targets,

@@ -14,21 +14,24 @@
 
 """Setup for rules_python tests and tools."""
 
+load("@bazel_features//:deps.bzl", "bazel_features_deps")
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
-load("@build_bazel_integration_testing//tools:repositories.bzl", "bazel_binaries")
+load("@cgrindel_bazel_starlib//:deps.bzl", "bazel_starlib_dependencies")
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+load("@rules_bazel_integration_test//bazel_integration_test:deps.bzl", "bazel_integration_test_rules_dependencies")
+load("@rules_bazel_integration_test//bazel_integration_test:repo_defs.bzl", "bazel_binaries")
 load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
 load("//:version.bzl", "SUPPORTED_BAZEL_VERSIONS")
-load("//python/pip_install:repositories.bzl", "pip_install_dependencies")
+load("//python/private:internal_config_repo.bzl", "internal_config_repo")  # buildifier: disable=bzl-visibility
+load("//python/private/pypi:deps.bzl", "pypi_deps")  # buildifier: disable=bzl-visibility
 
 def rules_python_internal_setup():
     """Setup for rules_python tests and tools."""
 
-    # Because we don't use the pip_install rule, we have to call this to fetch its deps
-    pip_install_dependencies()
+    internal_config_repo(name = "rules_python_internal")
 
-    # Depend on the Bazel binaries for running bazel-in-bazel tests
-    bazel_binaries(versions = SUPPORTED_BAZEL_VERSIONS)
+    # Because we don't use the pip_install rule, we have to call this to fetch its deps
+    pypi_deps()
 
     bazel_skylib_workspace()
 
@@ -36,3 +39,8 @@ def rules_python_internal_setup():
     rules_proto_toolchains()
 
     protobuf_deps()
+
+    bazel_integration_test_rules_dependencies()
+    bazel_starlib_dependencies()
+    bazel_binaries(versions = SUPPORTED_BAZEL_VERSIONS)
+    bazel_features_deps()

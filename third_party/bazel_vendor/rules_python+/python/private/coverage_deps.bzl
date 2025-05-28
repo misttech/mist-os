@@ -17,98 +17,113 @@
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
-load(
-    "//python:versions.bzl",
-    "MINOR_MAPPING",
-    "PLATFORMS",
-)
+load("//python/private:version_label.bzl", "version_label")
 
-# Update with './tools/update_coverage_deps.py <version>'
-#START: managed by update_coverage_deps.py script
+# START: maintained by 'bazel run //tools/private/update_deps:update_coverage_deps <version>'
 _coverage_deps = {
     "cp310": {
         "aarch64-apple-darwin": (
-            "https://files.pythonhosted.org/packages/89/a2/cbf599e50bb4be416e0408c4cf523c354c51d7da39935461a9687e039481/coverage-6.5.0-cp310-cp310-macosx_11_0_arm64.whl",
-            "784f53ebc9f3fd0e2a3f6a78b2be1bd1f5575d7863e10c6e12504f240fd06660",
+            "https://files.pythonhosted.org/packages/a3/36/b5ae380c05f58544a40ff36f87fa1d6e45f5c2f299335586aac140c341ce/coverage-7.4.3-cp310-cp310-macosx_11_0_arm64.whl",
+            "718187eeb9849fc6cc23e0d9b092bc2348821c5e1a901c9f8975df0bc785bfd4",
         ),
         "aarch64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/15/b0/3639d84ee8a900da0cf6450ab46e22517e4688b6cec0ba8ab6f8166103a2/coverage-6.5.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
-            "b4a5be1748d538a710f87542f22c2cad22f80545a847ad91ce45e77417293eb4",
+            "https://files.pythonhosted.org/packages/9e/48/5ae1ccf4601500af0ca36eba0a2c1f1796e58fb7495de6da55ed43e13e5f/coverage-7.4.3-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+            "767b35c3a246bcb55b8044fd3a43b8cd553dd1f9f2c1eeb87a302b1f8daa0524",
         ),
         "x86_64-apple-darwin": (
-            "https://files.pythonhosted.org/packages/c4/8d/5ec7d08f4601d2d792563fe31db5e9322c306848fec1e65ec8885927f739/coverage-6.5.0-cp310-cp310-macosx_10_9_x86_64.whl",
-            "ef8674b0ee8cc11e2d574e3e2998aea5df5ab242e012286824ea3c6970580e53",
+            "https://files.pythonhosted.org/packages/50/5a/d727fcd2e0fc3aba61591b6f0fe1e87865ea9b6275f58f35810d6f85b05b/coverage-7.4.3-cp310-cp310-macosx_10_9_x86_64.whl",
+            "8580b827d4746d47294c0e0b92854c85a92c2227927433998f0d3320ae8a71b6",
         ),
         "x86_64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/3c/7d/d5211ea782b193ab8064b06dc0cc042cf1a4ca9c93a530071459172c550f/coverage-6.5.0-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-            "af4fffaffc4067232253715065e30c5a7ec6faac36f8fc8d6f64263b15f74db0",
+            "https://files.pythonhosted.org/packages/23/0a/ab5b0f6d6b24f7156624e7697ec7ab49f9d5cdac922da90d9927ae5de1cf/coverage-7.4.3-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "ba3a8aaed13770e970b3df46980cb068d1c24af1a1968b7818b69af8c4347efb",
         ),
     },
     "cp311": {
+        "aarch64-apple-darwin": (
+            "https://files.pythonhosted.org/packages/f8/a1/161102d2e26fde2d878d68cc1ed303758dc7b01ee14cc6aa70f5fd1b910d/coverage-7.4.3-cp311-cp311-macosx_11_0_arm64.whl",
+            "489763b2d037b164846ebac0cbd368b8a4ca56385c4090807ff9fad817de4113",
+        ),
         "aarch64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/36/f3/5cbd79cf4cd059c80b59104aca33b8d05af4ad5bf5b1547645ecee716378/coverage-6.5.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
-            "c4ed2820d919351f4167e52425e096af41bfabacb1857186c1ea32ff9983ed75",
+            "https://files.pythonhosted.org/packages/a7/af/1510df1132a68ca876013c0417ca46836252e43871d2623b489e4339c980/coverage-7.4.3-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+            "451f433ad901b3bb00184d83fd83d135fb682d780b38af7944c9faeecb1e0bfe",
         ),
         "x86_64-apple-darwin": (
-            "https://files.pythonhosted.org/packages/50/cf/455930004231fa87efe8be06d13512f34e070ddfee8b8bf5a050cdc47ab3/coverage-6.5.0-cp311-cp311-macosx_10_9_x86_64.whl",
-            "4a5375e28c5191ac38cca59b38edd33ef4cc914732c916f2929029b4bfb50795",
+            "https://files.pythonhosted.org/packages/ca/77/f17a5b199e8ca0443ace312f7e07ff3e4e7ba7d7c52847567d6f1edb22a7/coverage-7.4.3-cp311-cp311-macosx_10_9_x86_64.whl",
+            "cbbe5e739d45a52f3200a771c6d2c7acf89eb2524890a4a3aa1a7fa0695d2a47",
         ),
         "x86_64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/6a/63/8e82513b7e4a1b8d887b4e85c1c2b6c9b754a581b187c0b084f3330ac479/coverage-6.5.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-            "a8fb6cf131ac4070c9c5a3e21de0f7dc5a0fbe8bc77c9456ced896c12fcdad91",
+            "https://files.pythonhosted.org/packages/a9/1a/e2120233177b3e2ea9dcfd49a050748060166c74792b2b1db4a803307da4/coverage-7.4.3-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "b3ec74cfef2d985e145baae90d9b1b32f85e1741b04cd967aaf9cfa84c1334f3",
+        ),
+    },
+    "cp312": {
+        "aarch64-apple-darwin": (
+            "https://files.pythonhosted.org/packages/9d/d8/111ec1a65fef57ad2e31445af627d481f660d4a9218ee5c774b45187812a/coverage-7.4.3-cp312-cp312-macosx_11_0_arm64.whl",
+            "d6cdecaedea1ea9e033d8adf6a0ab11107b49571bbb9737175444cea6eb72328",
+        ),
+        "aarch64-unknown-linux-gnu": (
+            "https://files.pythonhosted.org/packages/8f/eb/28416f1721a3b7fa28ea499e8a6f867e28146ea2453839c2bca04a001eeb/coverage-7.4.3-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+            "3b2eccb883368f9e972e216c7b4c7c06cabda925b5f06dde0650281cb7666a30",
+        ),
+        "x86_64-apple-darwin": (
+            "https://files.pythonhosted.org/packages/11/5c/2cf3e794fa5d1eb443aa8544e2ba3837d75073eaf25a1fda64d232065609/coverage-7.4.3-cp312-cp312-macosx_10_9_x86_64.whl",
+            "b51bfc348925e92a9bd9b2e48dad13431b57011fd1038f08316e6bf1df107d10",
+        ),
+        "x86_64-unknown-linux-gnu": (
+            "https://files.pythonhosted.org/packages/2f/db/70900f10b85a66f761a3a28950ccd07757d51548b1d10157adc4b9415f15/coverage-7.4.3-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "b9a4a8dd3dcf4cbd3165737358e4d7dfbd9d59902ad11e3b15eebb6393b0446e",
         ),
     },
     "cp38": {
         "aarch64-apple-darwin": (
-            "https://files.pythonhosted.org/packages/07/82/79fa21ceca9a9b091eb3c67e27eb648dade27b2c9e1eb23af47232a2a365/coverage-6.5.0-cp38-cp38-macosx_11_0_arm64.whl",
-            "2198ea6fc548de52adc826f62cb18554caedfb1d26548c1b7c88d8f7faa8f6ba",
+            "https://files.pythonhosted.org/packages/96/71/1c299b12e80d231e04a2bfd695e761fb779af7ab66f8bd3cb15649be82b3/coverage-7.4.3-cp38-cp38-macosx_11_0_arm64.whl",
+            "280459f0a03cecbe8800786cdc23067a8fc64c0bd51dc614008d9c36e1659d7e",
         ),
         "aarch64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/40/3b/cd68cb278c4966df00158811ec1e357b9a7d132790c240fc65da57e10013/coverage-6.5.0-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
-            "6c4459b3de97b75e3bd6b7d4b7f0db13f17f504f3d13e2a7c623786289dd670e",
+            "https://files.pythonhosted.org/packages/c7/a7/b00eaa53d904193478eae01625d784b2af8b522a98028f47c831dcc95663/coverage-7.4.3-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+            "6c0cdedd3500e0511eac1517bf560149764b7d8e65cb800d8bf1c63ebf39edd2",
         ),
         "x86_64-apple-darwin": (
-            "https://files.pythonhosted.org/packages/05/63/a789b462075395d34f8152229dccf92b25ca73eac05b3f6cd75fa5017095/coverage-6.5.0-cp38-cp38-macosx_10_9_x86_64.whl",
-            "d900bb429fdfd7f511f868cedd03a6bbb142f3f9118c09b99ef8dc9bf9643c3c",
+            "https://files.pythonhosted.org/packages/e2/bc/f54b24b476db0069ac04ff2cdeb28cd890654c8619761bf818726022c76a/coverage-7.4.3-cp38-cp38-macosx_10_9_x86_64.whl",
+            "28ca2098939eabab044ad68850aac8f8db6bf0b29bc7f2887d05889b17346454",
         ),
         "x86_64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/bd/a0/e263b115808226fdb2658f1887808c06ac3f1b579ef5dda02309e0d54459/coverage-6.5.0-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-            "6b07130585d54fe8dff3d97b93b0e20290de974dc8177c320aeaf23459219c0b",
+            "https://files.pythonhosted.org/packages/d0/3a/e882caceca2c7d65791a4a759764a1bf803bbbd10caf38ec41d73a45219e/coverage-7.4.3-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "dec9de46a33cf2dd87a5254af095a409ea3bf952d85ad339751e7de6d962cde6",
         ),
     },
     "cp39": {
         "aarch64-apple-darwin": (
-            "https://files.pythonhosted.org/packages/63/e9/f23e8664ec4032d7802a1cf920853196bcbdce7b56408e3efe1b2da08f3c/coverage-6.5.0-cp39-cp39-macosx_11_0_arm64.whl",
-            "95203854f974e07af96358c0b261f1048d8e1083f2de9b1c565e1be4a3a48cfc",
+            "https://files.pythonhosted.org/packages/66/f2/57f5d3c9d2e78c088e4c8dbc933b85fa81c424f23641f10c1aa64052ee4f/coverage-7.4.3-cp39-cp39-macosx_11_0_arm64.whl",
+            "77fbfc5720cceac9c200054b9fab50cb2a7d79660609200ab83f5db96162d20c",
         ),
         "aarch64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/18/95/27f80dcd8273171b781a19d109aeaed7f13d78ef6d1e2f7134a5826fd1b4/coverage-6.5.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
-            "b9023e237f4c02ff739581ef35969c3739445fb059b060ca51771e69101efffe",
+            "https://files.pythonhosted.org/packages/ad/3f/cde6fd2e4cc447bd24e3dc2e79abd2e0fba67ac162996253d3505f8efef4/coverage-7.4.3-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+            "6679060424faa9c11808598504c3ab472de4531c571ab2befa32f4971835788e",
         ),
         "x86_64-apple-darwin": (
-            "https://files.pythonhosted.org/packages/ea/52/c08080405329326a7ff16c0dfdb4feefaa8edd7446413df67386fe1bbfe0/coverage-6.5.0-cp39-cp39-macosx_10_9_x86_64.whl",
-            "633713d70ad6bfc49b34ead4060531658dc6dfc9b3eb7d8a716d5873377ab745",
+            "https://files.pythonhosted.org/packages/d6/cf/4094ac6410b680c91c5e55a56f25f4b3a878e2fcbf773c1cecfbdbaaec4f/coverage-7.4.3-cp39-cp39-macosx_10_9_x86_64.whl",
+            "3b253094dbe1b431d3a4ac2f053b6d7ede2664ac559705a704f621742e034f1f",
         ),
         "x86_64-unknown-linux-gnu": (
-            "https://files.pythonhosted.org/packages/6b/f2/919f0fdc93d3991ca074894402074d847be8ac1e1d78e7e9e1c371b69a6f/coverage-6.5.0-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
-            "8f830ed581b45b82451a40faabb89c84e1a998124ee4212d440e9c6cf70083e5",
+            "https://files.pythonhosted.org/packages/b5/ad/effc12b8f72321cb847c5ba7f4ea7ce3e5c19c641f6418131f8fb0ab2f61/coverage-7.4.3-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+            "8640f1fde5e1b8e3439fe482cdc2b0bb6c329f4bb161927c28d2e8879c6029ee",
         ),
     },
 }
-#END: managed by update_coverage_deps.py script
+# END: maintained by 'bazel run //tools/private/update_deps:update_coverage_deps <version>'
 
 _coverage_patch = Label("//python/private:coverage.patch")
 
-def coverage_dep(name, python_version, platform, visibility, install = True):
-    """Register a singe coverage dependency based on the python version and platform.
+def coverage_dep(name, python_version, platform, visibility):
+    """Register a single coverage dependency based on the python version and platform.
 
     Args:
         name: The name of the registered repository.
         python_version: The full python version.
         platform: The platform, which can be found in //python:versions.bzl PLATFORMS dict.
         visibility: The visibility of the coverage tool.
-        install: should we install the dependency with a given name or generate the label
-            of the bzlmod dependency fallback, which is hard-coded in MODULE.bazel?
 
     Returns:
         The label of the coverage tool if the platform is supported, otherwise - None.
@@ -119,24 +134,12 @@ def coverage_dep(name, python_version, platform, visibility, install = True):
         # for now as it is not actionable.
         return None
 
-    python_short_version = python_version.rpartition(".")[0]
-    abi = python_short_version.replace("3.", "cp3")
+    abi = "cp" + version_label(python_version)
     url, sha256 = _coverage_deps.get(abi, {}).get(platform, (None, ""))
 
     if url == None:
         # Some wheels are not present for some builds, so let's silently ignore those.
         return None
-
-    if not install:
-        # FIXME @aignas 2023-01-19: right now we use globally installed coverage
-        # which has visibility set to public, but is hidden due to repo remapping.
-        #
-        # The name of the toolchain is not known when registering the coverage tooling,
-        # so we use this as a workaround for now.
-        return Label("@pypi__coverage_{abi}_{platform}//:coverage".format(
-            abi = abi,
-            platform = platform,
-        ))
 
     maybe(
         http_archive,
@@ -158,26 +161,4 @@ filegroup(
         urls = [url],
     )
 
-    return Label("@@{name}//:coverage".format(name = name))
-
-def install_coverage_deps():
-    """Register the dependency for the coverage dep.
-
-    This is only used under bzlmod.
-    """
-
-    for python_version in MINOR_MAPPING.values():
-        for platform in PLATFORMS.keys():
-            if "windows" in platform:
-                continue
-
-            coverage_dep(
-                name = "pypi__coverage_cp{version_no_dot}_{platform}".format(
-                    version_no_dot = python_version.rpartition(".")[0].replace(".", ""),
-                    platform = platform,
-                ),
-                python_version = python_version,
-                platform = platform,
-                visibility = ["//visibility:public"],
-                install = True,
-            )
+    return "@{name}//:coverage".format(name = name)

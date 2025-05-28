@@ -7,10 +7,8 @@
 # requirements.
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@pip//:requirements.bzl", "all_whl_requirements")
-load("@python3//:defs.bzl", py_test_with_transition = "py_test")
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@rules_python//python:pip.bzl", "compile_pip_requirements")
-load("@rules_python_gazelle_plugin//:def.bzl", "GAZELLE_PYTHON_RUNTIME_DEPS")
 load("@rules_python_gazelle_plugin//manifest:defs.bzl", "gazelle_python_manifest")
 load("@rules_python_gazelle_plugin//modules_mapping:def.bzl", "modules_mapping")
 
@@ -18,8 +16,7 @@ load("@rules_python_gazelle_plugin//modules_mapping:def.bzl", "modules_mapping")
 # with pip-compile.
 compile_pip_requirements(
     name = "requirements",
-    extra_args = ["--allow-unsafe"],
-    requirements_in = "requirements.in",
+    src = "requirements.in",
     requirements_txt = "requirements_lock.txt",
     requirements_windows = "requirements_windows.txt",
 )
@@ -32,6 +29,8 @@ modules_mapping(
     exclude_patterns = [
         "^_|(\\._)+",  # This is the default.
         "(\\.tests)+",  # Add a custom one to get rid of the psutil tests.
+        "^colorama",  # Get rid of colorama on Windows.
+        "^lazy_object_proxy\\.cext$",  # Get rid of this on Linux because it isn't included on Windows.
     ],
     wheels = all_whl_requirements,
 )
@@ -50,10 +49,7 @@ gazelle_python_manifest(
     name = "gazelle_python_manifest",
     modules_mapping = ":modules_map",
     pip_repository_name = "pip",
-    requirements = "//:requirements_lock.txt",
-    # NOTE: we can use this flag in order to make our setup compatible with
-    # bzlmod.
-    use_pip_repository_aliases = True,
+    tags = ["exclusive"],
 )
 
 # Our gazelle target points to the python gazelle binary.
@@ -68,15 +64,7 @@ gazelle_python_manifest(
 # See: https://github.com/bazelbuild/bazel-gazelle#fix-and-update
 gazelle(
     name = "gazelle",
-    data = GAZELLE_PYTHON_RUNTIME_DEPS,
     gazelle = "@rules_python_gazelle_plugin//python:gazelle_binary",
-)
-
-py_test_with_transition(
-    name = "test_with_transition",
-    srcs = ["__test__.py"],
-    main = "__test__.py",
-    deps = [":bzlmod_build_file_generation"],
 )
 
 # The following targets are created and maintained by gazelle

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])  # Apache 2.0
@@ -80,6 +82,30 @@ filegroup(
     ],
 )
 
+bzl_library(
+    name = "find_cc_toolchain_bzl",
+    srcs = ["find_cc_toolchain.bzl"],
+    visibility = ["//visibility:public"],
+)
+
+bzl_library(
+    name = "action_names_bzl",
+    srcs = ["action_names.bzl"],
+    visibility = ["//visibility:public"],
+)
+
+bzl_library(
+    name = "cc_toolchain_config_lib_bzl",
+    srcs = ["cc_toolchain_config_lib.bzl"],
+    visibility = ["//cc/toolchains:__subpackages__"],
+)
+
 cc_toolchain_alias(name = "current_cc_toolchain")
+
+# Use alias, because it doesn't build on Bazel 6.
+alias(
+    name = "optional_current_cc_toolchain",
+    actual = "//cc/private/bazel7:optional_current_cc_toolchain",
+)
 
 cc_libc_top_alias(name = "current_libc_top")

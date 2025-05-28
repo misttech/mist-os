@@ -12,25 +12,66 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import os
 import platform
+import stat
 import subprocess
 import unittest
 import zipfile
+
+from python.runfiles import runfiles
 
 
 class WheelTest(unittest.TestCase):
     maxDiff = None
 
+    def setUp(self):
+        super().setUp()
+        self.runfiles = runfiles.Create()
+
+    def _get_path(self, filename):
+        runfiles_path = os.path.join("rules_python/examples/wheel", filename)
+        path = self.runfiles.Rlocation(runfiles_path)
+        # The runfiles API can return None if the path doesn't exist or
+        # can't be resolved.
+        if not path:
+            raise AssertionError(f"Runfiles failed to resolve {runfiles_path}")
+        elif not os.path.exists(path):
+            # A non-None value doesn't mean the file actually exists, though
+            raise AssertionError(
+                f"Path {path} does not exist (from runfiles path {runfiles_path}"
+            )
+        else:
+            return path
+
+    def assertFileSha256Equal(self, filename, want):
+        hash = hashlib.sha256()
+        with open(filename, "rb") as f:
+            while True:
+                buf = f.read(2**20)
+                if not buf:
+                    break
+                hash.update(buf)
+        self.assertEqual(want, hash.hexdigest())
+
+    def assertAllEntriesHasReproducibleMetadata(self, zf):
+        for zinfo in zf.infolist():
+            self.assertEqual(zinfo.date_time, (1980, 1, 1, 0, 0, 0), msg=zinfo.filename)
+            self.assertEqual(zinfo.create_system, 3, msg=zinfo.filename)
+            self.assertEqual(
+                zinfo.external_attr,
+                (stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO | stat.S_IFREG) << 16,
+                msg=zinfo.filename,
+            )
+            self.assertEqual(
+                zinfo.compress_type, zipfile.ZIP_DEFLATED, msg=zinfo.filename
+            )
+
     def test_py_library_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
-            "example_minimal_library-0.0.1-py3-none-any.whl",
-        )
+        filename = self._get_path("example_minimal_library-0.0.1-py3-none-any.whl")
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             self.assertEqual(
                 zf.namelist(),
                 [
@@ -41,16 +82,16 @@ class WheelTest(unittest.TestCase):
                     "example_minimal_library-0.0.1.dist-info/RECORD",
                 ],
             )
+        self.assertFileSha256Equal(
+            filename, "79a4e9c1838c0631d5d8fa49a26efd6e9a364f6b38d9597c0f6df112271a0e28"
+        )
 
     def test_py_package_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             "example_minimal_package-0.0.1-py3-none-any.whl",
         )
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             self.assertEqual(
                 zf.namelist(),
                 [
@@ -63,16 +104,16 @@ class WheelTest(unittest.TestCase):
                     "example_minimal_package-0.0.1.dist-info/RECORD",
                 ],
             )
+        self.assertFileSha256Equal(
+            filename, "b4815a1d3a17cc6a5ce717ed42b940fa7788cb5168f5c1de02f5f50abed7083e"
+        )
 
     def test_customized_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             "example_customized-0.0.1-py3-none-any.whl",
         )
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             self.assertEqual(
                 zf.namelist(),
                 [
@@ -99,16 +140,16 @@ class WheelTest(unittest.TestCase):
                 record_contents,
                 # The entries are guaranteed to be sorted.
                 b"""\
-example_customized-0.0.1.dist-info/METADATA,sha256=YUnzQ9gTMXspIBURe90Ct3aL_CCn8fwC3SiZe6MMTs8,372
-example_customized-0.0.1.dist-info/NOTICE,sha256=Xpdw-FXET1IRgZ_wTkx1YQfo1-alET0FVf6V1LXO4js,76
-example_customized-0.0.1.dist-info/README,sha256=WmOFwZ3Jga1bHG3JiGRsUheb4UbLffUxyTdHczS27-o,40
-example_customized-0.0.1.dist-info/RECORD,,
-example_customized-0.0.1.dist-info/WHEEL,sha256=sobxWSyDDkdg_rinUth-jxhXHqoNqlmNMJY3aTZn2Us,91
-example_customized-0.0.1.dist-info/entry_points.txt,sha256=pqzpbQ8MMorrJ3Jp0ntmpZcuvfByyqzMXXi2UujuXD0,137
 examples/wheel/lib/data.txt,sha256=9vJKEdfLu8bZRArKLroPZJh1XKkK3qFMXiM79MBL2Sg,12
 examples/wheel/lib/module_with_data.py,sha256=8s0Khhcqz3yVsBKv2IB5u4l4TMKh7-c_V6p65WVHPms,637
 examples/wheel/lib/simple_module.py,sha256=z2hwciab_XPNIBNH8B1Q5fYgnJvQTeYf0ZQJpY8yLLY,637
 examples/wheel/main.py,sha256=sgg5iWN_9inYBjm6_Zw27hYdmo-l24fA-2rfphT-IlY,909
+example_customized-0.0.1.dist-info/WHEEL,sha256=sobxWSyDDkdg_rinUth-jxhXHqoNqlmNMJY3aTZn2Us,91
+example_customized-0.0.1.dist-info/METADATA,sha256=QYQcDJFQSIqan8eiXqL67bqsUfgEAwf2hoK_Lgi1S-0,559
+example_customized-0.0.1.dist-info/entry_points.txt,sha256=pqzpbQ8MMorrJ3Jp0ntmpZcuvfByyqzMXXi2UujuXD0,137
+example_customized-0.0.1.dist-info/NOTICE,sha256=Xpdw-FXET1IRgZ_wTkx1YQfo1-alET0FVf6V1LXO4js,76
+example_customized-0.0.1.dist-info/README,sha256=WmOFwZ3Jga1bHG3JiGRsUheb4UbLffUxyTdHczS27-o,40
+example_customized-0.0.1.dist-info/RECORD,,
 """,
             )
             self.assertEqual(
@@ -129,6 +170,10 @@ Author: Example Author with non-ascii characters: \xc5\xbc\xc3\xb3\xc5\x82w
 Author-email: example@example.com
 Home-page: www.example.com
 License: Apache 2.0
+Description-Content-Type: text/markdown
+Summary: A one-line summary of this test package
+Project-URL: Bug Tracker, www.example.com/issues
+Project-URL: Documentation, www.example.com/docs
 Classifier: License :: OSI Approved :: Apache Software License
 Classifier: Intended Audience :: Developers
 Requires-Dist: pytest
@@ -148,14 +193,13 @@ customized_wheel = examples.wheel.main:main
 first = first.main:f
 second = second.main:s""",
             )
+        self.assertFileSha256Equal(
+            filename, "27f3038be6e768d28735441a1bc567eca2213bd3568d18b22a414e6399a2d48e"
+        )
 
     def test_filename_escaping(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
-            "file_name_escaping-0.0.1_r7-py3-none-any.whl",
+        filename = self._get_path(
+            "file_name_escaping-0.0.1rc1+ubuntu.r7-py3-none-any.whl",
         )
         with zipfile.ZipFile(filename) as zf:
             self.assertEqual(
@@ -168,35 +212,32 @@ second = second.main:s""",
                     # PEP calls for replacing only in the archive filename.
                     # Alas setuptools also escapes in the dist-info directory
                     # name, so let's be compatible.
-                    "file_name_escaping-0.0.1_r7.dist-info/WHEEL",
-                    "file_name_escaping-0.0.1_r7.dist-info/METADATA",
-                    "file_name_escaping-0.0.1_r7.dist-info/RECORD",
+                    "file_name_escaping-0.0.1rc1+ubuntu.r7.dist-info/WHEEL",
+                    "file_name_escaping-0.0.1rc1+ubuntu.r7.dist-info/METADATA",
+                    "file_name_escaping-0.0.1rc1+ubuntu.r7.dist-info/RECORD",
                 ],
             )
             metadata_contents = zf.read(
-                "file_name_escaping-0.0.1_r7.dist-info/METADATA"
+                "file_name_escaping-0.0.1rc1+ubuntu.r7.dist-info/METADATA"
             )
             self.assertEqual(
                 metadata_contents,
                 b"""\
 Metadata-Version: 2.1
-Name: file~~name-escaping
-Version: 0.0.1-r7
+Name: File--Name-Escaping
+Version: 0.0.1rc1+ubuntu.r7
 
 UNKNOWN
 """,
             )
 
     def test_custom_package_root_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             "examples_custom_package_root-0.0.1-py3-none-any.whl",
         )
 
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             self.assertEqual(
                 zf.namelist(),
                 [
@@ -218,17 +259,17 @@ UNKNOWN
             # Ensure RECORD files do not have leading forward slashes
             for line in record_contents.splitlines():
                 self.assertFalse(line.startswith("/"))
+        self.assertFileSha256Equal(
+            filename, "f034b3278781f4df32a33df70d794bb94170b450e477c8bd9cd42d2d922476ae"
+        )
 
     def test_custom_package_root_multi_prefix_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             "example_custom_package_root_multi_prefix-0.0.1-py3-none-any.whl",
         )
 
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             self.assertEqual(
                 zf.namelist(),
                 [
@@ -249,17 +290,17 @@ UNKNOWN
             # Ensure RECORD files do not have leading forward slashes
             for line in record_contents.splitlines():
                 self.assertFalse(line.startswith("/"))
+        self.assertFileSha256Equal(
+            filename, "ff19f5e4540948247742716338bb4194d619cb56df409045d1a99f265ce8e36c"
+        )
 
     def test_custom_package_root_multi_prefix_reverse_order_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             "example_custom_package_root_multi_prefix_reverse_order-0.0.1-py3-none-any.whl",
         )
 
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             self.assertEqual(
                 zf.namelist(),
                 [
@@ -280,16 +321,16 @@ UNKNOWN
             # Ensure RECORD files do not have leading forward slashes
             for line in record_contents.splitlines():
                 self.assertFalse(line.startswith("/"))
+        self.assertFileSha256Equal(
+            filename, "4331e378ea8b8148409ae7c02177e4eb24d151a85ef937bb44b79ff5258d634b"
+        )
 
     def test_python_requires_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             "example_python_requires_in_a_package-0.0.1-py3-none-any.whl",
         )
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             metadata_contents = zf.read(
                 "example_python_requires_in_a_package-0.0.1.dist-info/METADATA"
             )
@@ -305,6 +346,9 @@ Version: 0.0.1
 UNKNOWN
 """,
             )
+        self.assertFileSha256Equal(
+            filename, "b34676828f93da8cd898d50dcd4f36e02fe273150e213aacb999310a05f5f38c"
+        )
 
     def test_python_abi3_binary_wheel(self):
         arch = "amd64"
@@ -317,14 +361,11 @@ UNKNOWN
             "Windows": "win",
         }
         os_string = os_strings[platform.system()]
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             f"example_python_abi3_binary_wheel-0.0.1-cp38-abi3-{os_string}_{arch}.whl",
         )
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             metadata_contents = zf.read(
                 "example_python_abi3_binary_wheel-0.0.1.dist-info/METADATA"
             )
@@ -354,15 +395,12 @@ Tag: cp38-abi3-{os_string}_{arch}
             )
 
     def test_rule_creates_directory_and_is_included_in_wheel(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
+        filename = self._get_path(
             "use_rule_with_dir_in_outs-0.0.1-py3-none-any.whl",
         )
 
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             self.assertEqual(
                 zf.namelist(),
                 [
@@ -373,31 +411,113 @@ Tag: cp38-abi3-{os_string}_{arch}
                     "use_rule_with_dir_in_outs-0.0.1.dist-info/RECORD",
                 ],
             )
+        self.assertFileSha256Equal(
+            filename, "ac9216bd54dcae1a6270c35fccf8a73b0be87c1b026c28e963b7c76b2f9b722b"
+        )
 
-    def test_rule_sets_stamped_version_in_wheel_metadata(self):
-        filename = os.path.join(
-            os.environ["TEST_SRCDIR"],
-            "rules_python",
-            "examples",
-            "wheel",
-            "example_minimal_library-0.1._BUILD_TIMESTAMP_-py3-none-any.whl",
+    def test_rule_expands_workspace_status_keys_in_wheel_metadata(self):
+        filename = self._get_path(
+            "example_minimal_library{BUILD_USER}-0.1.{BUILD_TIMESTAMP}-py3-none-any.whl"
         )
 
         with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
             metadata_file = None
             for f in zf.namelist():
-                self.assertNotIn("_BUILD_TIMESTAMP_", f)
+                self.assertNotIn("{BUILD_TIMESTAMP}", f)
+                self.assertNotIn("{BUILD_USER}", f)
                 if os.path.basename(f) == "METADATA":
                     metadata_file = f
             self.assertIsNotNone(metadata_file)
 
             version = None
+            name = None
             with zf.open(metadata_file) as fp:
                 for line in fp:
-                    if line.startswith(b'Version:'):
+                    if line.startswith(b"Version:"):
                         version = line.decode().split()[-1]
+                    if line.startswith(b"Name:"):
+                        name = line.decode().split()[-1]
             self.assertIsNotNone(version)
+            self.assertIsNotNone(name)
             self.assertNotIn("{BUILD_TIMESTAMP}", version)
+            self.assertNotIn("{BUILD_USER}", name)
+
+    def test_requires_file_and_extra_requires_files(self):
+        filename = self._get_path("requires_files-0.0.1-py3-none-any.whl")
+
+        with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
+            metadata_file = None
+            for f in zf.namelist():
+                if os.path.basename(f) == "METADATA":
+                    metadata_file = f
+            self.assertIsNotNone(metadata_file)
+
+            requires = []
+            with zf.open(metadata_file) as fp:
+                for line in fp:
+                    if line.startswith(b"Requires-Dist:"):
+                        requires.append(line.decode("utf-8").strip())
+
+            print(requires)
+            self.assertEqual(
+                [
+                    "Requires-Dist: tomli>=2.0.0",
+                    "Requires-Dist: starlark",
+                    "Requires-Dist: pyyaml!=6.0.1,>=6.0.0; extra == 'example'",
+                    'Requires-Dist: toml; ((python_version == "3.11" or python_version == "3.12") and python_version != "3.8") and extra == \'example\'',
+                    'Requires-Dist: wheel; (python_version == "3.11" or python_version == "3.12") and extra == \'example\'',
+                ],
+                requires,
+            )
+
+    def test_minimal_data_files(self):
+        filename = self._get_path("minimal_data_files-0.0.1-py3-none-any.whl")
+
+        with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
+            metadata_file = None
+            self.assertEqual(
+                zf.namelist(),
+                [
+                    "minimal_data_files-0.0.1.dist-info/WHEEL",
+                    "minimal_data_files-0.0.1.dist-info/METADATA",
+                    "minimal_data_files-0.0.1.data/data/target/path/README.md",
+                    "minimal_data_files-0.0.1.data/scripts/NOTICE",
+                    "minimal_data_files-0.0.1.dist-info/RECORD",
+                ],
+            )
+
+    def test_extra_requires(self):
+        filename = self._get_path("extra_requires-0.0.1-py3-none-any.whl")
+
+        with zipfile.ZipFile(filename) as zf:
+            self.assertAllEntriesHasReproducibleMetadata(zf)
+            metadata_file = None
+            for f in zf.namelist():
+                if os.path.basename(f) == "METADATA":
+                    metadata_file = f
+            self.assertIsNotNone(metadata_file)
+
+            requires = []
+            with zf.open(metadata_file) as fp:
+                for line in fp:
+                    if line.startswith(b"Requires-Dist:"):
+                        requires.append(line.decode("utf-8").strip())
+
+            print(requires)
+            self.assertEqual(
+                [
+                    "Requires-Dist: tomli>=2.0.0",
+                    "Requires-Dist: starlark",
+                    'Requires-Dist: pytest; python_version != "3.8"',
+                    "Requires-Dist: pyyaml!=6.0.1,>=6.0.0; extra == 'example'",
+                    'Requires-Dist: toml; ((python_version == "3.11" or python_version == "3.12") and python_version != "3.8") and extra == \'example\'',
+                    'Requires-Dist: wheel; (python_version == "3.11" or python_version == "3.12") and extra == \'example\'',
+                ],
+                requires,
+            )
 
 
 if __name__ == "__main__":

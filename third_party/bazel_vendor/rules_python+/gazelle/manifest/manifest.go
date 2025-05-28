@@ -31,7 +31,7 @@ type File struct {
 	// Integrity is the hash of the requirements.txt file and the Manifest for
 	// ensuring the integrity of the entire gazelle_python.yaml file. This
 	// controls the testing to keep the gazelle_python.yaml file up-to-date.
-	Integrity string `yaml:"integrity"`
+	Integrity string `yaml:"integrity,omitempty"`
 }
 
 // NewFile creates a new File with a given Manifest.
@@ -40,12 +40,21 @@ func NewFile(manifest *Manifest) *File {
 }
 
 // Encode encodes the manifest file to the given writer.
-func (f *File) Encode(w io.Writer, manifestGeneratorHashFile, requirements io.Reader) error {
+func (f *File) EncodeWithIntegrity(w io.Writer, manifestGeneratorHashFile, requirements io.Reader) error {
 	integrityBytes, err := f.calculateIntegrity(manifestGeneratorHashFile, requirements)
 	if err != nil {
 		return fmt.Errorf("failed to encode manifest file: %w", err)
 	}
 	f.Integrity = fmt.Sprintf("%x", integrityBytes)
+
+	return f.encode(w)
+}
+
+func (f *File) EncodeWithoutIntegrity(w io.Writer) error {
+	return f.encode(w)
+}
+
+func (f *File) encode(w io.Writer) error {
 	encoder := yaml.NewEncoder(w)
 	defer encoder.Close()
 	if err := encoder.Encode(f); err != nil {
@@ -133,18 +142,15 @@ type Manifest struct {
 	// ModulesMapping is the mapping from importable modules to which Python
 	// wheel name provides these modules.
 	ModulesMapping ModulesMapping `yaml:"modules_mapping"`
-	// PipDepsRepositoryName is the name of the pip_install repository target.
+	// PipDepsRepositoryName is the name of the pip_parse repository target.
 	// DEPRECATED
 	PipDepsRepositoryName string `yaml:"pip_deps_repository_name,omitempty"`
-	// PipRepository contains the information for pip_install or pip_repository
+	// PipRepository contains the information for pip_parse or pip_repository
 	// target.
 	PipRepository *PipRepository `yaml:"pip_repository,omitempty"`
 }
 
 type PipRepository struct {
-	// The name of the pip_install or pip_repository target.
+	// The name of the pip_parse or pip_repository target.
 	Name string
-	// UsePipRepositoryAliases allows to use aliases generated pip_repository
-	// when passing incompatible_generate_aliases = True.
-	UsePipRepositoryAliases bool `yaml:"use_pip_repository_aliases,omitempty"`
 }

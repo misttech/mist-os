@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Helpers for CC Toolchains.
 
@@ -29,7 +28,7 @@ to depend on and find a cc toolchain.
         attrs = {
             "_cc_toolchain": attr.label(
                 default = Label(
-                    "@rules_cc//cc:current_cc_toolchain", # copybara-use-repo-external-label
+                    "@rules_cc//cc:current_cc_toolchain",
                 ),
             ),
         },
@@ -53,17 +52,27 @@ https://github.com/bazelbuild/bazel/issues/7260 is flipped (and support for old
 Bazel version is not needed), it's enough to only keep the toolchain type.
 """
 
-CC_TOOLCHAIN_TYPE = "@bazel_tools//tools/cpp:toolchain_type"  # copybara-use-repo-external-label
+load("//cc/common:cc_common.bzl", "cc_common")
 
-def find_cc_toolchain(ctx):
+CC_TOOLCHAIN_TYPE = Label("@bazel_tools//tools/cpp:toolchain_type")
+
+CC_TOOLCHAIN_ATTRS = {
+    # Needed for Bazel 6.x and 7.x compatibility.
+    "_cc_toolchain": attr.label(default = Label("@rules_cc//cc:current_cc_toolchain")),
+}
+
+def find_cc_toolchain(ctx, *, mandatory = True):
     """
 Returns the current `CcToolchainInfo`.
 
     Args:
       ctx: The rule context for which to find a toolchain.
+      mandatory: (bool) If this is set to False, this function will return None
+        rather than fail if no toolchain is found.
 
     Returns:
-      A CcToolchainInfo.
+      A CcToolchainInfo or None if the c++ toolchain is declared as
+      optional, mandatory is False and no toolchain has been found.
     """
 
     # Check the incompatible flag for toolchain resolution.
@@ -72,6 +81,9 @@ Returns the current `CcToolchainInfo`.
             fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
         toolchain_info = ctx.toolchains[CC_TOOLCHAIN_TYPE]
         if toolchain_info == None:
+            if not mandatory:
+                return None
+
             # No cpp toolchain was found, so report an error.
             fail("Unable to find a CC toolchain using toolchain resolution. Target: %s, Platform: %s, Exec platform: %s" %
                  (ctx.label, ctx.fragments.platform.platform, ctx.fragments.platform.host_platform))
@@ -84,6 +96,8 @@ Returns the current `CcToolchainInfo`.
         return ctx.attr._cc_toolchain[cc_common.CcToolchainInfo]
 
     # We didn't find anything.
+    if not mandatory:
+        return None
     fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
 
 def find_cpp_toolchain(ctx):

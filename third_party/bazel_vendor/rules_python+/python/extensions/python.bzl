@@ -12,53 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"Python toolchain module extensions for use with bzlmod"
+"""Python toolchain module extensions for use with bzlmod.
 
-load("@rules_python//python:repositories.bzl", "python_register_toolchains")
-load("@rules_python//python/extensions/private:interpreter_hub.bzl", "hub_repo")
+:::{topic} Basic usage
 
-def _python_impl(module_ctx):
-    toolchains = []
-    for mod in module_ctx.modules:
-        for toolchain_attr in mod.tags.toolchain:
-            python_register_toolchains(
-                name = toolchain_attr.name,
-                python_version = toolchain_attr.python_version,
-                bzlmod = True,
-                # Toolchain registration in bzlmod is done in MODULE file
-                register_toolchains = False,
-                register_coverage_tool = toolchain_attr.configure_coverage_tool,
-                ignore_root_user_error = toolchain_attr.ignore_root_user_error,
-            )
+The simplest way to configure the toolchain with `rules_python` is as follows.
 
-            # We collect all of the toolchain names to create
-            # the INTERPRETER_LABELS map.  This is used
-            # by interpreter_extensions.bzl
-            toolchains.append(toolchain_attr.name)
-
-    hub_repo(
-        name = "pythons_hub",
-        toolchains = toolchains,
-    )
-
-python = module_extension(
-    doc = "Bzlmod extension that is used to register a Python toolchain.",
-    implementation = _python_impl,
-    tag_classes = {
-        "toolchain": tag_class(
-            attrs = {
-                "configure_coverage_tool": attr.bool(
-                    mandatory = False,
-                    doc = "Whether or not to configure the default coverage tool for the toolchains.",
-                ),
-                "ignore_root_user_error": attr.bool(
-                    default = False,
-                    doc = "Whether the check for root should be ignored or not. This causes cache misses with .pyc files.",
-                    mandatory = False,
-                ),
-                "name": attr.string(mandatory = True),
-                "python_version": attr.string(mandatory = True),
-            },
-        ),
-    },
+```starlark
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.11",
 )
+use_repo(python, "python_3_11")
+```
+
+::::{seealso}
+For more in-depth documentation see the {obj}`python.toolchain`.
+::::
+:::
+
+:::{topic} Overrides
+
+Overrides can be done at 3 different levels:
+* Overrides affecting all python toolchain versions on all platforms - {obj}`python.override`.
+* Overrides affecting a single toolchain versions on all platforms - {obj}`python.single_version_override`.
+* Overrides affecting a single toolchain versions on a single platforms - {obj}`python.single_version_platform_override`.
+
+::::{seealso}
+The main documentation page on registering [toolchains](/toolchains).
+::::
+:::
+"""
+
+load("//python/private:python.bzl", _python = "python")
+
+python = _python

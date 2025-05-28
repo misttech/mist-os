@@ -17,7 +17,12 @@ them to the desired target platform.
 """
 
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
-load("//python:defs.bzl", _py_binary = "py_binary", _py_test = "py_test")
+load("//python:py_binary.bzl", _py_binary = "py_binary")
+load("//python:py_info.bzl", "PyInfo")
+load("//python:py_runtime_info.bzl", "PyRuntimeInfo")
+load("//python:py_test.bzl", _py_test = "py_test")
+load("//python/config_settings/private:py_args.bzl", "py_args")
+load("//python/private:reexports.bzl", "BuiltinPyInfo", "BuiltinPyRuntimeInfo")
 
 def _transition_python_version_impl(_, attr):
     return {"//python/config_settings:python_version": str(attr.python_version)}
@@ -38,22 +43,40 @@ def _transition_py_impl(ctx):
         output = executable,
         target_file = target[DefaultInfo].files_to_run.executable,
     )
-    zipfile_symlink = None
+    default_outputs = []
     if target_is_windows:
-        # Under Windows, the expected "<name>.zip" does not exist, so we have to
-        # create the symlink ourselves to achieve the same behaviour as in macOS
-        # and Linux.
-        zipfile = None
-        expected_target_path = target[DefaultInfo].files_to_run.executable.short_path[:-4] + ".zip"
-        for file in target[DefaultInfo].default_runfiles.files.to_list():
-            if file.short_path == expected_target_path:
-                zipfile = file
-        zipfile_symlink = ctx.actions.declare_file(ctx.attr.name + ".zip")
-        ctx.actions.symlink(
-            is_executable = True,
-            output = zipfile_symlink,
-            target_file = zipfile,
-        )
+        # NOTE: Bazel 6 + host=linux + target=windows results in the .exe extension missing
+        inner_bootstrap_path = _strip_suffix(target[DefaultInfo].files_to_run.executable.short_path, ".exe")
+        inner_bootstrap = None
+        inner_zip_file_path = inner_bootstrap_path + ".zip"
+        inner_zip_file = None
+        for file in target[DefaultInfo].files.to_list():
+            if file.short_path == inner_bootstrap_path:
+                inner_bootstrap = file
+            elif file.short_path == inner_zip_file_path:
+                inner_zip_file = file
+
+        # TODO: Use `fragments.py.build_python_zip` once Bazel 6 support is dropped.
+        # Which file the Windows .exe looks for depends on the --build_python_zip file.
+        # Bazel 7+ has APIs to know the effective value of that flag, but not Bazel 6.
+        # To work around this, we treat the existence of a .zip in the default outputs
+        # to mean --build_python_zip=true.
+        if inner_zip_file:
+            suffix = ".zip"
+            underlying_launched_file = inner_zip_file
+        else:
+            suffix = ""
+            underlying_launched_file = inner_bootstrap
+
+        if underlying_launched_file:
+            launched_file_symlink = ctx.actions.declare_file(ctx.attr.name + suffix)
+            ctx.actions.symlink(
+                is_executable = True,
+                output = launched_file_symlink,
+                target_file = underlying_launched_file,
+            )
+            default_outputs.append(launched_file_symlink)
+
     env = {}
     for k, v in ctx.attr.env.items():
         env[k] = ctx.expand_location(v)
@@ -61,11 +84,9 @@ def _transition_py_impl(ctx):
     providers = [
         DefaultInfo(
             executable = executable,
-            files = depset([zipfile_symlink] if zipfile_symlink else [], transitive = [target[DefaultInfo].files]),
-            runfiles = ctx.runfiles([zipfile_symlink] if zipfile_symlink else []).merge(target[DefaultInfo].default_runfiles),
+            files = depset(default_outputs, transitive = [target[DefaultInfo].files]),
+            runfiles = ctx.runfiles(default_outputs).merge(target[DefaultInfo].default_runfiles),
         ),
-        target[PyInfo],
-        target[PyRuntimeInfo],
         # Ensure that the binary we're wrapping is included in code coverage.
         coverage_common.instrumented_files_info(
             ctx,
@@ -78,6 +99,15 @@ def _transition_py_impl(ctx):
         # https://github.com/bazelbuild/bazel/commit/dbdfa07e92f99497be9c14265611ad2920161483
         testing.TestEnvironment(env),
     ]
+    if PyInfo in target:
+        providers.append(target[PyInfo])
+    if BuiltinPyInfo in target and PyInfo != BuiltinPyInfo:
+        providers.append(target[BuiltinPyInfo])
+
+    if PyRuntimeInfo in target:
+        providers.append(target[PyRuntimeInfo])
+    if BuiltinPyRuntimeInfo in target and PyRuntimeInfo != BuiltinPyRuntimeInfo:
+        providers.append(target[BuiltinPyRuntimeInfo])
     return providers
 
 _COMMON_ATTRS = {
@@ -123,32 +153,52 @@ _COMMON_ATTRS = {
     ),
 }
 
+_PY_TEST_ATTRS = {
+    # Magic attribute to help C++ coverage work. There's no
+    # docs about this; see TestActionBuilder.java
+    "_collect_cc_coverage": attr.label(
+        default = "@bazel_tools//tools/test:collect_cc_coverage",
+        executable = True,
+        cfg = "exec",
+    ),
+    # Magic attribute to make coverage work. There's no
+    # docs about this; see TestActionBuilder.java
+    "_lcov_merger": attr.label(
+        default = configuration_field(fragment = "coverage", name = "output_generator"),
+        executable = True,
+        cfg = "exec",
+    ),
+}
+
 _transition_py_binary = rule(
     _transition_py_impl,
-    attrs = _COMMON_ATTRS,
+    attrs = _COMMON_ATTRS | _PY_TEST_ATTRS,
     cfg = _transition_python_version,
     executable = True,
+    fragments = ["py"],
 )
 
 _transition_py_test = rule(
     _transition_py_impl,
-    attrs = _COMMON_ATTRS,
+    attrs = _COMMON_ATTRS | _PY_TEST_ATTRS,
     cfg = _transition_python_version,
     test = True,
+    fragments = ["py"],
 )
 
 def _py_rule(rule_impl, transition_rule, name, python_version, **kwargs):
-    args = kwargs.pop("args", None)
-    data = kwargs.pop("data", None)
-    env = kwargs.pop("env", None)
-    srcs = kwargs.pop("srcs", None)
-    deps = kwargs.pop("deps", None)
+    pyargs = py_args(name, kwargs)
+    args = pyargs["args"]
+    data = pyargs["data"]
+    env = pyargs["env"]
+    srcs = pyargs["srcs"]
+    deps = pyargs["deps"]
+    main = pyargs["main"]
 
     # Attributes common to all build rules.
     # https://bazel.build/reference/be/common-definitions#common-attributes
     compatible_with = kwargs.pop("compatible_with", None)
     deprecation = kwargs.pop("deprecation", None)
-    distribs = kwargs.pop("distribs", None)
     exec_compatible_with = kwargs.pop("exec_compatible_with", None)
     exec_properties = kwargs.pop("exec_properties", None)
     features = kwargs.pop("features", None)
@@ -162,7 +212,6 @@ def _py_rule(rule_impl, transition_rule, name, python_version, **kwargs):
     common_attrs = {
         "compatible_with": compatible_with,
         "deprecation": deprecation,
-        "distribs": distribs,
         "exec_compatible_with": exec_compatible_with,
         "exec_properties": exec_properties,
         "features": features,
@@ -197,6 +246,7 @@ def _py_rule(rule_impl, transition_rule, name, python_version, **kwargs):
         deps = deps,
         env = env,
         srcs = srcs,
+        main = main,
         tags = ["manual"] + (tags if tags else []),
         visibility = ["//visibility:private"],
         **dicts.add(common_attrs, kwargs)
@@ -221,3 +271,9 @@ def py_binary(name, python_version, **kwargs):
 
 def py_test(name, python_version, **kwargs):
     return _py_rule(_py_test, _transition_py_test, name, python_version, **kwargs)
+
+def _strip_suffix(s, suffix):
+    if s.endswith(suffix):
+        return s[:-len(suffix)]
+    else:
+        return s

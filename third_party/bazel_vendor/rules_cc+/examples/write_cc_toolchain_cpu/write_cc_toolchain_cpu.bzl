@@ -14,7 +14,7 @@
 
 """Example showing how to get CcToolchainInfo in a custom rule."""
 
-load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
+load("@rules_cc//cc:find_cc_toolchain.bzl", "CC_TOOLCHAIN_ATTRS", "find_cpp_toolchain", "use_cc_toolchain")
 
 def _write_cc_toolchain_cpu_impl(ctx):
     cc_toolchain = find_cpp_toolchain(ctx)
@@ -25,8 +25,6 @@ def _write_cc_toolchain_cpu_impl(ctx):
 # This rule does nothing, just writes the target_cpu from the cc_toolchain used for this build.
 write_cc_toolchain_cpu = rule(
     implementation = _write_cc_toolchain_cpu_impl,
-    attrs = {
-        "_cc_toolchain": attr.label(default = Label("@bazel_tools//tools/cpp:current_cc_toolchain")),
-    },
-    toolchains = use_cpp_toolchain(),
+    attrs = CC_TOOLCHAIN_ATTRS,
+    toolchains = use_cc_toolchain(),
 )

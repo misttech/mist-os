@@ -1,7 +1,7 @@
 """Defines all the features this module supports detecting."""
 
 load("@bazel_features_globals//:globals.bzl", "globals")
-load("//private:util.bzl", "ge", "ge_same_major", "lt")
+load("//private:util.bzl", "ge", "ge_same_major", "gt", "lt")
 
 _cc = struct(
     # Whether @bazel_tools//tools/cpp:optional_current_cc_toolchain and the `mandatory` parameter
@@ -31,6 +31,12 @@ _cc = struct(
     # Whether protobuf repository can access private C++ features
     # https://github.com/bazelbuild/bazel/commit/6022ee81705295704dcbedb2ceb5869049191121
     protobuf_on_allowlist = ge("8.0.0"),
+)
+
+_docs = struct(
+    # The stardoc output changed in https://github.com/bazelbuild/bazel/commit/bd1c3af2ea14e81268e940d2b8ba5ad00c3f08d7
+    # This may be required for "diff tests" that assert on the generated API docs.
+    kwargs_name_with_double_star = ge("8.0.0-pre.20240603.2"),
 )
 
 _external_deps = struct(
@@ -77,6 +83,9 @@ _proto = struct(
 )
 
 _rules = struct(
+    # Whether runfiles may contain all characters. Support for all characters added in:
+    # https://github.com/bazelbuild/bazel/commit/c9115305cb81e7fe645f91ca790642cab136b2a1
+    all_characters_allowed_in_runfiles = ge("7.4.0"),
     # Whether the computed_substitutions parameter of ctx.actions.expand_template and ctx.actions.template_dict are stable.
     # https://github.com/bazelbuild/bazel/commit/61c31d255b6ba65c372253f65043d6ea3f10e1f9
     expand_template_has_computed_substitutions = ge("7.0.0-pre.20231011.2"),
@@ -88,6 +97,8 @@ _rules = struct(
     instrumented_files_info_has_metadata_files = ge("7.0.0-pre.20230710.5"),
     # Whether treeartifacts can have symlinks pointing outside of the tree artifact. (#21263)
     permits_treeartifact_uplevel_symlinks = ge("7.1.0"),
+    # Whether rule extension APIs are available by default
+    rule_extension_apis_available = ge("8.0.0rc1"),
 )
 
 _toolchains = struct(
@@ -98,6 +109,7 @@ _toolchains = struct(
 
 bazel_features = struct(
     cc = _cc,
+    docs = _docs,
     external_deps = _external_deps,
     flags = _flags,
     globals = globals,

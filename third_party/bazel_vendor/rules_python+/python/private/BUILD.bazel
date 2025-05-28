@@ -13,15 +13,36 @@
 # limitations under the License.
 
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_setting")
+load("//python:py_binary.bzl", "py_binary")
+load("//python:py_library.bzl", "py_library")
 load("//python:versions.bzl", "print_toolchains_checksums")
+load(":py_exec_tools_toolchain.bzl", "current_interpreter_executable")
+load(":sentinel.bzl", "sentinel")
 load(":stamp.bzl", "stamp_build_setting")
+
+package(
+    default_visibility = ["//:__subpackages__"],
+)
 
 licenses(["notice"])
 
 filegroup(
     name = "distribution",
-    srcs = glob(["**"]) + ["//python/private/proto:distribution"],
+    srcs = glob(["**"]) + [
+        "//python/private/common:distribution",
+        "//python/private/proto:distribution",
+        "//python/private/pypi:distribution",
+        "//python/private/whl_filegroup:distribution",
+        "//tools/build_defs/python/private:distribution",
+    ],
     visibility = ["//python:__pkg__"],
+)
+
+filegroup(
+    name = "coverage_deps",
+    srcs = ["coverage_deps.bzl"],
+    visibility = ["//tools/private/update_deps:__pkg__"],
 )
 
 # Filegroup of bzl files that can be used by downstream rules for documentation generation
@@ -32,34 +53,354 @@ filegroup(
 )
 
 bzl_library(
+    name = "auth_bzl",
+    srcs = ["auth.bzl"],
+    deps = [":bazel_tools_bzl"],
+)
+
+bzl_library(
+    name = "runtime_env_toolchain_bzl",
+    srcs = ["runtime_env_toolchain.bzl"],
+    deps = [
+        ":py_exec_tools_toolchain_bzl",
+        ":toolchain_types_bzl",
+        "//python:py_runtime_bzl",
+        "//python:py_runtime_pair_bzl",
+    ],
+)
+
+bzl_library(
+    name = "bzlmod_enabled_bzl",
+    srcs = ["bzlmod_enabled.bzl"],
+)
+
+bzl_library(
+    name = "config_settings_bzl",
+    srcs = ["config_settings.bzl"],
+    deps = [
+        ":semver_bzl",
+        "@bazel_skylib//lib:selects",
+        "@bazel_skylib//rules:common_settings",
+    ],
+)
+
+bzl_library(
+    name = "coverage_deps_bzl",
+    srcs = ["coverage_deps.bzl"],
+    deps = [
+        ":bazel_tools_bzl",
+        ":version_label_bzl",
+    ],
+)
+
+bzl_library(
+    name = "enum_bzl",
+    srcs = ["enum.bzl"],
+)
+
+bzl_library(
+    name = "envsubst_bzl",
+    srcs = ["envsubst.bzl"],
+)
+
+bzl_library(
+    name = "flags_bzl",
+    srcs = ["flags.bzl"],
+    deps = [
+        ":enum_bzl",
+        "@bazel_skylib//rules:common_settings",
+    ],
+)
+
+bzl_library(
+    name = "full_version_bzl",
+    srcs = ["full_version.bzl"],
+)
+
+bzl_library(
+    name = "internal_config_repo_bzl",
+    srcs = ["internal_config_repo.bzl"],
+    deps = [":bzlmod_enabled_bzl"],
+)
+
+bzl_library(
+    name = "is_standalone_interpreter_bzl",
+    srcs = ["is_standalone_interpreter.bzl"],
+    deps = [
+        ":repo_utils_bzl",
+    ],
+)
+
+bzl_library(
+    name = "normalize_name_bzl",
+    srcs = ["normalize_name.bzl"],
+)
+
+bzl_library(
+    name = "python_bzl",
+    srcs = ["python.bzl"],
+    deps = [
+        ":full_version_bzl",
+        ":python_register_toolchains_bzl",
+        ":pythons_hub_bzl",
+        ":repo_utils_bzl",
+        ":semver_bzl",
+        ":toolchains_repo_bzl",
+        ":util_bzl",
+        "@bazel_features//:features",
+    ],
+)
+
+bzl_library(
+    name = "py_repositories_bzl",
+    srcs = ["py_repositories.bzl"],
+    deps = [
+        ":bazel_tools_bzl",
+        ":internal_config_repo_bzl",
+        "//python/private/pypi:deps_bzl",
+    ],
+)
+
+bzl_library(
+    name = "python_register_toolchains_bzl",
+    srcs = ["python_register_toolchains.bzl"],
+    deps = [
+        ":auth_bzl",
+        ":bazel_tools_bzl",
+        ":bzlmod_enabled_bzl",
+        ":coverage_deps_bzl",
+        ":full_version_bzl",
+        ":internal_config_repo_bzl",
+        ":python_repository_bzl",
+        ":toolchains_repo_bzl",
+        "//python:versions_bzl",
+        "//python/private/pypi:deps_bzl",
+    ],
+)
+
+bzl_library(
+    name = "python_repository_bzl",
+    srcs = ["python_repository.bzl"],
+    deps = [
+        ":auth_bzl",
+        ":repo_utils_bzl",
+        ":text_util_bzl",
+        "//python:versions_bzl",
+    ],
+)
+
+bzl_library(
+    name = "python_register_multi_toolchains_bzl",
+    srcs = ["python_register_multi_toolchains.bzl"],
+    deps = [
+        ":python_register_toolchains_bzl",
+        ":toolchains_repo_bzl",
+        "//python:versions_bzl",
+    ],
+)
+
+bzl_library(
+    name = "pythons_hub_bzl",
+    srcs = ["pythons_hub.bzl"],
+    deps = [
+        ":py_toolchain_suite_bzl",
+    ],
+)
+
+bzl_library(
+    name = "py_cc_toolchain_macro_bzl",
+    srcs = ["py_cc_toolchain_macro.bzl"],
+    deps = [
+        ":py_cc_toolchain_rule_bzl",
+    ],
+)
+
+bzl_library(
+    name = "py_cc_toolchain_rule_bzl",
+    srcs = ["py_cc_toolchain_rule.bzl"],
+    deps = [
+        ":py_cc_toolchain_info_bzl",
+        ":rules_cc_srcs_bzl",
+        ":util_bzl",
+        "@bazel_skylib//rules:common_settings",
+    ],
+)
+
+bzl_library(
+    name = "py_cc_toolchain_info_bzl",
+    srcs = ["py_cc_toolchain_info.bzl"],
+)
+
+bzl_library(
+    name = "py_console_script_binary_bzl",
+    srcs = [
+        "py_console_script_binary.bzl",
+        "py_console_script_gen.bzl",
+    ],
+    visibility = ["//python/entry_points:__pkg__"],
+    deps = [
+        "//python:py_binary_bzl",
+    ],
+)
+
+bzl_library(
+    name = "py_exec_tools_info_bzl",
+    srcs = ["py_exec_tools_info.bzl"],
+)
+
+bzl_library(
+    name = "py_exec_tools_toolchain_bzl",
+    srcs = ["py_exec_tools_toolchain.bzl"],
+    deps = [
+        ":py_exec_tools_info_bzl",
+        ":sentinel_bzl",
+        ":toolchain_types_bzl",
+        "//python/private/common:providers_bzl",
+        "@bazel_skylib//lib:paths",
+        "@bazel_skylib//rules:common_settings",
+    ],
+)
+
+bzl_library(
+    name = "py_executable_info_bzl",
+    srcs = ["py_executable_info.bzl"],
+)
+
+bzl_library(
+    name = "py_interpreter_program_bzl",
+    srcs = ["py_interpreter_program.bzl"],
+    deps = ["@bazel_skylib//rules:common_settings"],
+)
+
+bzl_library(
+    name = "py_package_bzl",
+    srcs = ["py_package.bzl"],
+    visibility = ["//:__subpackages__"],
+)
+
+bzl_library(
+    name = "py_runtime_pair_macro_bzl",
+    srcs = ["py_runtime_pair_macro.bzl"],
+    visibility = ["//:__subpackages__"],
+    deps = [":py_runtime_pair_rule_bzl"],
+)
+
+bzl_library(
+    name = "py_runtime_pair_rule_bzl",
+    srcs = ["py_runtime_pair_rule.bzl"],
+    deps = [
+        "//python:py_runtime_bzl",
+        "//python:py_runtime_info_bzl",
+        "@bazel_skylib//rules:common_settings",
+    ],
+)
+
+bzl_library(
+    name = "py_toolchain_suite_bzl",
+    srcs = ["py_toolchain_suite.bzl"],
+    deps = [
+        ":config_settings_bzl",
+        ":text_util_bzl",
+        ":toolchain_types_bzl",
+        "@bazel_skylib//lib:selects",
+    ],
+)
+
+bzl_library(
+    name = "py_wheel_bzl",
+    srcs = ["py_wheel.bzl"],
+    visibility = ["//:__subpackages__"],
+    deps = [
+        ":py_package_bzl",
+        ":stamp_bzl",
+    ],
+)
+
+bzl_library(
     name = "reexports_bzl",
     srcs = ["reexports.bzl"],
     visibility = [
-        "//docs:__pkg__",
-        "//python:__pkg__",
+        "//:__subpackages__",
     ],
     deps = [":bazel_tools_bzl"],
+)
+
+bzl_library(
+    name = "register_extension_info_bzl",
+    srcs = ["register_extension_info.bzl"],
+)
+
+bzl_library(
+    name = "repo_utils_bzl",
+    srcs = ["repo_utils.bzl"],
+)
+
+bzl_library(
+    name = "semver_bzl",
+    srcs = ["semver.bzl"],
+)
+
+bzl_library(
+    name = "sentinel_bzl",
+    srcs = ["sentinel.bzl"],
+)
+
+bzl_library(
+    name = "stamp_bzl",
+    srcs = ["stamp.bzl"],
+    visibility = ["//:__subpackages__"],
+)
+
+bzl_library(
+    name = "text_util_bzl",
+    srcs = ["text_util.bzl"],
+)
+
+bzl_library(
+    name = "toolchains_repo_bzl",
+    srcs = ["toolchains_repo.bzl"],
+    deps = [
+        ":repo_utils_bzl",
+        ":text_util_bzl",
+        "//python:versions_bzl",
+    ],
+)
+
+bzl_library(
+    name = "toolchain_types_bzl",
+    srcs = ["toolchain_types.bzl"],
 )
 
 bzl_library(
     name = "util_bzl",
     srcs = ["util.bzl"],
     visibility = [
-        "//docs:__subpackages__",
-        "//python:__subpackages__",
+        "//:__subpackages__",
     ],
     deps = ["@bazel_skylib//lib:types"],
+)
+
+bzl_library(
+    name = "version_label_bzl",
+    srcs = ["version_label.bzl"],
 )
 
 # @bazel_tools can't define bzl_library itself, so we just put a wrapper around it.
 bzl_library(
     name = "bazel_tools_bzl",
     srcs = [
-        "@bazel_tools//tools/python:srcs_version.bzl",
-        "@bazel_tools//tools/python:toolchain.bzl",
-        "@bazel_tools//tools/python:utils.bzl",
+        # This set of sources is overly broad, but it's the only public
+        # target available across Bazel versions that has all the necessary
+        # sources.
+        "@bazel_tools//tools:bzl_srcs",
     ],
-    visibility = ["//python:__pkg__"],
+)
+
+# @rules_cc does not offer a bzl_library target for @rules_cc//cc:defs.bzl
+bzl_library(
+    name = "rules_cc_srcs_bzl",
+    srcs = ["@rules_cc//cc:bzl_srcs"],
+    deps = [":bazel_tools_bzl"],
 )
 
 # Needed to define bzl_library targets for docgen. (We don't define the
@@ -68,16 +409,117 @@ bzl_library(
 exports_files(
     [
         "coverage.patch",
+        "repack_whl.py",
         "py_package.bzl",
         "py_wheel.bzl",
+        "py_wheel_normalize_pep440.bzl",
         "reexports.bzl",
         "stamp.bzl",
         "util.bzl",
     ],
-    visibility = ["//docs:__pkg__"],
+    visibility = ["//:__subpackages__"],
+)
+
+exports_files(
+    ["python_bootstrap_template.txt"],
+    # Not actually public. Only public because it's an implicit dependency of
+    # py_runtime.
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "stage1_bootstrap_template",
+    srcs = ["stage1_bootstrap_template.sh"],
+    # Not actually public. Only public because it's an implicit dependency of
+    # py_runtime.
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "stage2_bootstrap_template",
+    srcs = ["stage2_bootstrap_template.py"],
+    # Not actually public. Only public because it's an implicit dependency of
+    # py_runtime.
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "zip_main_template",
+    srcs = ["zip_main_template.py"],
+    # Not actually public. Only public because it's an implicit dependency of
+    # py_runtime.
+    visibility = ["//visibility:public"],
+)
+
+# NOTE: Windows builds don't use this bootstrap. Instead, a native Windows
+# program locates some Python exe and runs `python.exe foo.zip` which
+# runs the __main__.py in the zip file.
+alias(
+    name = "bootstrap_template",
+    actual = select({
+        ":is_script_bootstrap_enabled": "stage1_bootstrap_template.sh",
+        "//conditions:default": "python_bootstrap_template.txt",
+    }),
+    # Not actually public. Only public because it's an implicit dependency of
+    # py_runtime.
+    visibility = ["//visibility:public"],
 )
 
 # Used to determine the use of `--stamp` in Starlark rules
 stamp_build_setting(name = "stamp")
 
+config_setting(
+    name = "is_script_bootstrap_enabled",
+    flag_values = {
+        "//python/config_settings:bootstrap_impl": "script",
+    },
+)
+
+# This should only be set by analysis tests to expose additional metadata to
+# aid testing, so a setting instead of a flag.
+bool_setting(
+    name = "visible_for_testing",
+    build_setting_default = False,
+    # This is only because it is an implicit dependency by the toolchains.
+    visibility = ["//visibility:public"],
+)
+
 print_toolchains_checksums(name = "print_toolchains_checksums")
+
+# Used for py_console_script_gen rule
+py_binary(
+    name = "py_console_script_gen_py",
+    srcs = ["py_console_script_gen.py"],
+    main = "py_console_script_gen.py",
+    visibility = [
+        "//visibility:public",
+    ],
+)
+
+py_binary(
+    name = "py_wheel_dist",
+    srcs = ["py_wheel_dist.py"],
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "py_console_script_gen_lib",
+    srcs = ["py_console_script_gen.py"],
+    imports = ["../.."],
+    visibility = [
+        "//tests/entry_points:__pkg__",
+    ],
+)
+
+# The current toolchain's interpreter as an excutable, usable with
+# executable=True attributes.
+current_interpreter_executable(
+    name = "current_interpreter_executable",
+    # Not actually public. Only public because it's an implicit dependency of
+    # py_exec_tools_toolchain.
+    visibility = ["//visibility:public"],
+)
+
+sentinel(
+    name = "sentinel",
+)

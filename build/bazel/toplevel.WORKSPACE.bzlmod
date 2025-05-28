@@ -24,28 +24,6 @@ local_repository(
     path = "third_party/bazel_rules_cc",
 )
 
-local_repository(
-    name = "rules_rust",
-    path = "third_party/bazel_rules_rust",
-)
-
-# A dependency of rules_rust
-new_local_repository(
-    name = "rules_rust_tinyjson",
-    path = "third_party/rust_crates/vendor/tinyjson-2.5.1",
-    build_file = "@rules_rust//util/process_wrapper:BUILD.tinyjson.bazel",
-)
-
-local_repository(
-    name = "rules_python",
-    path = "third_party/bazel_rules_python",
-)
-
-# buildifier: disable=load-on-top
-load("@rules_python//python:repositories.bzl", "py_repositories")
-
-py_repositories()
-
 # @rules_proto is the deprecated set of rules to generate protobuf-related
 # actions. @com_google_protobuf should be used instead, but many other
 # repositories still depend on it implicitly.
@@ -56,10 +34,10 @@ local_repository(
 
 # @com_google_protobuf is the new set of rules for protobuf actions.
 # This is now required by pigweed.
-local_repository(
-    name = "com_google_protobuf",
-    path = "third_party/protobuf",
-)
+# local_repository(
+#     name = "com_google_protobuf",
+#     path = "third_party/protobuf",
+# )
 
 local_repository(
     name = "pigweed",
@@ -117,9 +95,9 @@ fuchsia_icu_config_repository(
 )
 
 # buildifier: disable=load-on-top
-load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies")
-
-rules_rust_dependencies()
+# load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies")
+#
+# rules_rust_dependencies()
 
 # buildifier: disable=load-on-top
 load(
