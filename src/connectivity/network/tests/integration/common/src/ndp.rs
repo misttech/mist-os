@@ -44,9 +44,9 @@ pub fn create_message<M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpZeroCode> +
 ) -> crate::Result<Buf<Vec<u8>>> {
     Ok(OptionSequenceBuilder::new(options.iter())
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, _>::new(src_ip, dst_ip, IcmpZeroCode, message))
-        .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, MESSAGE_TTL, Ipv6Proto::Icmpv6))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(IcmpPacketBuilder::<_, _>::new(src_ip, dst_ip, IcmpZeroCode, message))
+        .wrap_in(Ipv6PacketBuilder::new(src_ip, dst_ip, MESSAGE_TTL, Ipv6Proto::Icmpv6))
+        .wrap_in(EthernetFrameBuilder::new(
             src_mac,
             dst_mac,
             EtherType::Ipv6,

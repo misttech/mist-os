@@ -17,7 +17,7 @@ use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use log::{error, info};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
-use packet::{ParseBuffer as _, Serializer as _};
+use packet::{PacketBuilder as _, ParseBuffer as _, Serializer as _};
 use packet_formats::icmp::{
     IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpPacketRaw, IcmpZeroCode,
 };
@@ -494,15 +494,11 @@ where
     <I as Ip>::Addr: From<SpecifiedAddr<<I as Ip>::Addr>>,
     IcmpEchoReply: IcmpMessage<I, Code = IcmpZeroCode>,
 {
-    buf.encapsulate(IcmpPacketBuilder::<I, _>::new(
-        I::LOOPBACK_ADDRESS,
-        I::LOOPBACK_ADDRESS,
-        IcmpZeroCode,
-        reply,
-    ))
-    .serialize_no_alloc_outer()
-    .expect("serialize ICMP echo reply")
-    .into_inner()
+    IcmpPacketBuilder::<I, _>::new(I::LOOPBACK_ADDRESS, I::LOOPBACK_ADDRESS, IcmpZeroCode, reply)
+        .wrap_body(buf)
+        .serialize_no_alloc_outer()
+        .expect("serialize ICMP echo reply")
+        .into_inner()
 }
 
 async fn handle_datagram_request(

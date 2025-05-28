@@ -245,19 +245,19 @@ fn serialize_neighbor_solictation(
 
     let snmc = src_ip.to_solicited_node_address();
     [].into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, _>::new(
+        .wrap_in(IcmpPacketBuilder::<_, _>::new(
             net_types::ip::Ipv6::UNSPECIFIED_ADDRESS,
             snmc.get(),
             IcmpZeroCode,
             NeighborSolicitation::new(src_ip),
         ))
-        .encapsulate(Ipv6PacketBuilder::new(
+        .wrap_in(Ipv6PacketBuilder::new(
             net_types::ip::Ipv6::UNSPECIFIED_ADDRESS,
             snmc.get(),
             netstack_testing_common::ndp::MESSAGE_TTL,
             Ipv6Proto::Icmpv6,
         ))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(EthernetFrameBuilder::new(
             src_mac,
             net_types::ethernet::Mac::from(&snmc),
             EtherType::Ipv6,

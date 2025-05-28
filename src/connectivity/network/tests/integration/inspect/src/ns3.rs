@@ -2706,14 +2706,14 @@ async fn inspect_conntrack_nat_state(name: &str) {
     // netstack.
     let mut payload = [1u8, 2, 3, 4];
     let frame = packet::Buf::new(&mut payload, ..)
-        .encapsulate(UdpPacketBuilder::new(SRC_IP, DST_IP, Some(SRC_PORT), DST_PORT))
-        .encapsulate(Ipv4PacketBuilder::new(
+        .wrap_in(UdpPacketBuilder::new(SRC_IP, DST_IP, Some(SRC_PORT), DST_PORT))
+        .wrap_in(Ipv4PacketBuilder::new(
             SRC_IP,
             DST_IP,
             u8::MAX, /* ttl */
             IpProto::Udp.into(),
         ))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(EthernetFrameBuilder::new(
             constants::eth::MAC_ADDR,         /* src_mac */
             interface.mac().await.into_ext(), /* dst_mac */
             EtherType::Ipv4,

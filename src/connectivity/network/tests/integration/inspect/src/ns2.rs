@@ -523,9 +523,9 @@ async fn inspect_dhcp(
 
     for PacketAttributes { ip_proto, port } in &inbound_packets {
         let ser = packet::Buf::new(&mut [], ..)
-            .encapsulate(UdpPacketBuilder::new(SRC_IP, *DST_IP, None, *port))
-            .encapsulate(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /* ttl */ 1, *ip_proto))
-            .encapsulate(EthernetFrameBuilder::new(
+            .wrap_in(UdpPacketBuilder::new(SRC_IP, *DST_IP, None, *port))
+            .wrap_in(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /* ttl */ 1, *ip_proto))
+            .wrap_in(EthernetFrameBuilder::new(
                 constants::eth::MAC_ADDR,            /* src_mac */
                 net_types::ethernet::Mac::BROADCAST, /* dst_mac */
                 EtherType::Ipv4,

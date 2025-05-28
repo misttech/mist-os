@@ -395,14 +395,14 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
     let mut icmp_body = [1, 2, 3, 4, 5, 6, 7, 8];
 
     let ser = packet::Buf::new(&mut icmp_body, ..)
-        .encapsulate(IcmpPacketBuilder::<I, _>::new(
+        .wrap_in(IcmpPacketBuilder::<I, _>::new(
             src_ip,
             dst_ip,
             IcmpZeroCode,
             IcmpEchoRequest::new(ECHO_ID, ECHO_SEQ),
         ))
-        .encapsulate(<I as IpExt>::PacketBuilder::new(src_ip, dst_ip, TTL, I::ICMP_IP_PROTO))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(<I as IpExt>::PacketBuilder::new(src_ip, dst_ip, TTL, I::ICMP_IP_PROTO))
+        .wrap_in(EthernetFrameBuilder::new(
             net_types::ethernet::Mac::new([1, 2, 3, 4, 5, 6]),
             net_types::ethernet::Mac::BROADCAST,
             I::ETHER_TYPE,

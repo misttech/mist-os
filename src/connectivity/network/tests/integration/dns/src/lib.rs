@@ -580,20 +580,20 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str, check_type: 
                 let builder = v6::MessageBuilder::new(v6::MessageType::Reply, tx_id, &options);
                 let ser = builder
                     .into_serializer()
-                    .encapsulate(UdpPacketBuilder::new(
+                    .wrap_in(UdpPacketBuilder::new(
                         DHCPV6_SERVER,
                         src_ip,
                         NonZeroU16::new(net_dhcpv6::RELAY_AGENT_AND_SERVER_PORT),
                         NonZeroU16::new(net_dhcpv6::DEFAULT_CLIENT_PORT)
                             .expect("default DHCPv6 client port is non-zero"),
                     ))
-                    .encapsulate(Ipv6PacketBuilder::new(
+                    .wrap_in(Ipv6PacketBuilder::new(
                         DHCPV6_SERVER,
                         src_ip,
                         ipv6_consts::DEFAULT_HOP_LIMIT,
                         IpProto::Udp.into(),
                     ))
-                    .encapsulate(EthernetFrameBuilder::new(
+                    .wrap_in(EthernetFrameBuilder::new(
                         dst_mac,
                         src_mac,
                         EtherType::Ipv6,
