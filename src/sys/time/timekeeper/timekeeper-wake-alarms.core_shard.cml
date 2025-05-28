@@ -21,5 +21,11 @@
             from: "parent",
             to: "#timekeeper",
         },
+        {
+            // Wake alarms handling.
+            protocol: [ "fuchsia.time.alarms.Wake" ],
+            from: "#timekeeper",
+            to: [ "#starnix_runner" ],
+        },
     ],
 }

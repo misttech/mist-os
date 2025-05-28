@@ -240,11 +240,6 @@
             to: "#starnix_runner",
             availability: "optional",
         },
-        {
-            protocol: [ "fuchsia.time.alarms.Wake" ],
-            from: "#timekeeper",
-            to: [ "#starnix_runner" ],
-        },
     ],
     expose: [
         {
