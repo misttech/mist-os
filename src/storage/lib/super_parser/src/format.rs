@@ -205,7 +205,11 @@ impl MetadataHeader {
         // The `checksum` field is expected to be zero when computing the SHA256 checksum.
         let mut temp_metadata_header = self.clone();
         temp_metadata_header.header_checksum = [0; 32];
-        sha2::Sha256::digest(temp_metadata_header.as_bytes()).into()
+        return if self.minor_version < METADATA_VERSION_FOR_EXPANDED_HEADER_MIN {
+            sha2::Sha256::digest(&temp_metadata_header.as_bytes()[..METADATA_HEADER_V1_SIZE]).into()
+        } else {
+            sha2::Sha256::digest(temp_metadata_header.as_bytes()).into()
+        };
     }
 
     pub fn validate(&mut self) -> Result<(), Error> {
