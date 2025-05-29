@@ -329,7 +329,8 @@ class TestExecution:
             os.makedirs(outdir)
 
         # Update the outdir to match the current working directory for the test command (if any).
-        if "CWD" in env:
+        # Only do this if the output directory is a relative path, otherwise keep it as is.
+        if "CWD" in env and not os.path.isabs(outdir):
             outdir = os.path.relpath(outdir, env["CWD"])
 
         env.update(
