@@ -163,6 +163,13 @@ void CrashReporter::FileReport(fuchsia::feedback::CrashReport report, FileReport
     return;
   }
 
+  if (report.has_weight() && report.weight() == 0) {
+    FX_LOGS(ERROR) << "Input report has invalid weight of 0. Won't file.";
+    callback(InternalResultsToFidl(FilingResult::kInvalidArgsError));
+    info_.LogCrashState(cobalt::CrashState::kDropped);
+    return;
+  }
+
   File(std::move(report), /*is_hourly_snapshot=*/false, std::move(callback));
 }
 
