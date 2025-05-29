@@ -12,10 +12,8 @@ use crate::security;
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
 use crate::vfs::aio::AioContext;
-use crate::vfs::{
-    DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode,
-    SequenceFileSource,
-};
+use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, SequenceFileSource};
+use crate::vfs::{FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode};
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use flyweights::FlyByteStr;

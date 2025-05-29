@@ -16,7 +16,7 @@ use crate::task::{
     CurrentTask, Kernel, PidTable, ProcessSelector, StopState, Task, TaskMutableState, ThreadGroup,
     ThreadState, ZombieProcess,
 };
-use crate::vfs::parse_unsigned_file;
+use crate::vfs::pseudo::simple_file::parse_unsigned_file;
 use bitflags::bitflags;
 use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, MmDumpable, Unlocked};

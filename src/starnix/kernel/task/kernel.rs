@@ -21,13 +21,12 @@ use crate::task::{
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
+use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
 };
-use crate::vfs::{
-    DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts, StaticDirectoryBuilder,
-};
+use crate::vfs::{DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts};
 use bstr::BString;
 use expando::Expando;
 use fidl::endpoints::{

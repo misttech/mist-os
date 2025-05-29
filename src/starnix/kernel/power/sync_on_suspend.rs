@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::{parse_i32_file, BytesFile, BytesFileOps, FsNodeOps};
+use crate::vfs::pseudo::simple_file::{parse_i32_file, BytesFile, BytesFileOps};
+use crate::vfs::FsNodeOps;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::borrow::Cow;

@@ -7,9 +7,11 @@ use fidl_fuchsia_hardware_qcom_hvdcpopti as fhvdcpopti;
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::simple_file::BytesFile;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
-    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr,
 };
 use starnix_logging::log_error;
 use starnix_sync::{FileOpsCore, Locked};

@@ -6,9 +6,10 @@ use crate::socket_tunnel_file::{FirmwareFile, SocketTunnelSysfsFile};
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    FsNodeOps, FsStr,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;

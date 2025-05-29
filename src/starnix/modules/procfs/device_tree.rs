@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::{FileSystemHandle, FsNodeHandle};
 
 pub fn device_tree_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut directory = StaticDirectoryBuilder::new(fs);

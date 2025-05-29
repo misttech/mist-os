@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_core::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::FsNodeOps;
 use starnix_logging::log_error;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;

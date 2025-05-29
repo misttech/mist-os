@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::stub_empty_file::StubEmptyFile;
-use starnix_core::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::{FileSystemHandle, FsNodeHandle};
 use starnix_logging::bug_ref;
 use starnix_uapi::mode;
 

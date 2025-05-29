@@ -6,9 +6,10 @@ use super::event::{TraceEvent, TraceEventQueue};
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
 use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps, FsNodeOps,
 };
 use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{FileOpsCore, Locked};

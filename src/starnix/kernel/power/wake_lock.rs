@@ -1,9 +1,10 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::task::CurrentTask;
-use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 
+use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
+use crate::vfs::FsNodeOps;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;

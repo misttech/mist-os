@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::stub_bytes_file::StubBytesFile;
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_bytes_file::StubBytesFile;
 use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
     fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps, FsNode,
-    FsNodeHandle, FsNodeOps, FsStr, StaticDirectoryBuilder,
+    FsNodeHandle, FsNodeOps, FsStr,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::{FileOpsCore, Locked};

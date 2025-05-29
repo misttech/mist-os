@@ -11,15 +11,20 @@ use starnix_core::task::{
     ThreadGroupKey,
 };
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
-use starnix_core::vfs::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_file::{
+    parse_i32_file, parse_unsigned_file, serialize_for_file, BytesFile, BytesFileOps,
+    SimpleFileNode,
+};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fileops_impl_unbounded_seek, fs_node_impl_dir_readonly, parse_i32_file,
-    parse_unsigned_file, serialize_for_file, BytesFile, BytesFileOps, CallbackSymlinkNode,
-    DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FdNumber,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode,
-    StaticDirectoryBuilder, SymlinkTarget, VecDirectory, VecDirectoryEntry,
+    fileops_impl_noop_sync, fileops_impl_unbounded_seek, fs_node_impl_dir_readonly,
+    CallbackSymlinkNode, DirectoryEntryType, DirentSink, FdNumber, FileObject, FileOps,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};

@@ -9,11 +9,12 @@ use crate::fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remo
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly,
     CacheMode, DirEntryHandle, DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
+    FsNodeOps, FsStr, FsString, SpecialNode,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked};

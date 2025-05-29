@@ -796,7 +796,8 @@ mod tests {
     use starnix_core::fs::fuchsia::new_remote_file;
     use starnix_core::testing::*;
     use starnix_core::vfs::buffers::*;
-    use starnix_core::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps};
+    use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+    use starnix_core::vfs::{FdFlags, FsNodeOps};
 
     #[derive(Clone)]
     struct PassthroughTestFile(Vec<u8>);

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::pseudo_directory::PseudoDirectoryBuilder;
 use crate::task::Kernel;
-use crate::vfs::create_bytes_file_with_handler;
-use crate::vfs::stub_empty_file::StubEmptyFile;
+use crate::vfs::pseudo::pseudo_directory::PseudoDirectoryBuilder;
+use crate::vfs::pseudo::simple_file::create_bytes_file_with_handler;
+use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_logging::bug_ref;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::file_mode::mode;

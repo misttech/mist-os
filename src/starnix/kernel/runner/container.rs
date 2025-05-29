@@ -31,9 +31,8 @@ use starnix_core::security;
 use starnix_core::task::container_namespace::ContainerNamespace;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
 use starnix_core::time::utc::update_utc_clock;
-use starnix_core::vfs::{
-    FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
-};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
 use starnix_logging::{
     log_debug, log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX,
     NAME_CREATE_CONTAINER,

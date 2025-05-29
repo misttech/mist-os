@@ -5,9 +5,9 @@
 use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::sysfs::sysfs_create_link;
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
     fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
-    VecDirectory, VecDirectoryEntry,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;

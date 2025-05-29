@@ -4,9 +4,9 @@
 
 use fidl_fuchsia_hardware_qcom_hvdcpopti as fhvdcpopti;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::simple_file::{BytesFile, BytesFileOps, SimpleFileNode};
 use starnix_core::vfs::{
-    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, BytesFile,
-    BytesFileOps, FileOps, FsNodeOps, SimpleFileNode,
+    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, FileOps, FsNodeOps,
 };
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;

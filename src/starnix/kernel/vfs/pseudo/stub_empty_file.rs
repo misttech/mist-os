@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::vfs::pseudo::simple_file::SimpleFileNode;
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, FileOps, FsNodeOps,
-    SimpleFileNode,
 };
 use starnix_logging::BugRef;
 use std::panic::Location;

@@ -5,7 +5,6 @@
 mod anon_node;
 mod dir_entry;
 mod dirent_sink;
-mod dynamic_file;
 mod epoll;
 mod fd_number;
 mod fd_table;
@@ -17,12 +16,9 @@ mod fs_node;
 mod memory_regular;
 mod namespace;
 mod record_locks;
-mod simple_file;
 mod splice;
-mod static_directory;
 mod symlink_node;
 mod userfault_file;
-mod vec_directory;
 mod wd_number;
 mod xattr;
 
@@ -40,10 +36,9 @@ pub mod memory_directory;
 pub mod path;
 pub mod pidfd;
 pub mod pipe;
+pub mod pseudo;
 pub mod rw_queue;
 pub mod socket;
-pub mod stub_bytes_file;
-pub mod stub_empty_file;
 pub mod syscalls;
 pub mod timer;
 
@@ -51,7 +46,6 @@ pub use anon_node::*;
 pub use buffers::*;
 pub use dir_entry::*;
 pub use dirent_sink::*;
-pub use dynamic_file::*;
 pub use epoll::*;
 pub use fd_number::*;
 pub use fd_table::*;
@@ -66,11 +60,8 @@ pub use namespace::*;
 pub use path::*;
 pub use pidfd::*;
 pub use record_locks::*;
-pub use simple_file::*;
-pub use static_directory::*;
 pub use symlink_node::*;
 pub use userfault_file::*;
-pub use vec_directory::*;
 pub use wd_number::*;
 pub use xattr::*;
 
@@ -208,11 +199,7 @@ impl DelayedReleaser {
     }
 
     /// Run all current delayed releases for the current thread.
-    pub fn apply<'a>(
-        &self,
-        locked: &'a mut Locked<FileOpsCore>,
-        current_task: &'a CurrentTask,
-    ) {
+    pub fn apply<'a>(&self, locked: &'a mut Locked<FileOpsCore>, current_task: &'a CurrentTask) {
         loop {
             let releasers = RELEASERS.with(|cell| {
                 std::mem::take(

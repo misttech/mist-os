@@ -10,10 +10,8 @@
 //! Full details at https://docs.kernel.org/admin-guide/cgroup-v2.html#core-interface-files
 
 use starnix_core::task::{CgroupOps, CurrentTask, Kernel, ProcessEntryRef};
-use starnix_core::vfs::{
-    AppendLockGuard, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode,
-    FsNodeOps, InputBuffer,
-};
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::{AppendLockGuard, FileObject, FileOps, FsNode, FsNodeOps, InputBuffer};
 use starnix_core::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
 };

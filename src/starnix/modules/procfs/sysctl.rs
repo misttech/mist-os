@@ -7,10 +7,11 @@ use crate::sys_net::{
 };
 use starnix_core::security;
 use starnix_core::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, SeccompAction};
-use starnix_core::vfs::stub_bytes_file::StubBytesFile;
+use starnix_core::vfs::pseudo::simple_file::{parse_unsigned_file, BytesFile, BytesFileOps};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_bytes_file::StubBytesFile;
 use starnix_core::vfs::{
-    fs_args, inotify, parse_unsigned_file, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsString, StaticDirectoryBuilder,
+    fs_args, inotify, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsNodeOps, FsString,
 };
 use starnix_logging::bug_ref;
 use starnix_uapi::auth::{FsCred, CAP_LAST_CAP, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};

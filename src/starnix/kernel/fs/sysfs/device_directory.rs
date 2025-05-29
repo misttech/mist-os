@@ -5,12 +5,14 @@
 use crate::device::kobject::{Device, KObjectBased, KObjectHandle, UEventFsNode};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::InputBuffer;
-use crate::vfs::stub_empty_file::StubEmptyFile;
+use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    fs_node_impl_not_dir, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
+    fs_node_impl_not_dir, DirectoryEntryType, FileObject, FileOps, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, DEFAULT_BYTES_PER_BLOCK,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};

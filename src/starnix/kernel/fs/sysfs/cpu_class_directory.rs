@@ -5,9 +5,11 @@
 use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
-    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString,
 };
 
 use starnix_sync::{FileOpsCore, Locked};
@@ -114,7 +116,7 @@ impl FsNodeOps for CpuClassDirectory {
                 } else {
                     error!(ENOENT)
                 }
-            },
+            }
             _ => error!(ENOENT),
         }
     }

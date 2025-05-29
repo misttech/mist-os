@@ -9,10 +9,11 @@ use starnix_core::device::kobject::KObject;
 use starnix_core::fs::sysfs::KObjectSymlinkDirectory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     DirectoryEntryType, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry, VecInputBuffer,
+    InputBuffer, OutputBuffer, VecInputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, Unlocked};

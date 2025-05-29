@@ -5,9 +5,11 @@
 use crate::device::kobject::KObject;
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
-    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr,
 };
 
 use starnix_sync::{FileOpsCore, Locked};
@@ -55,9 +57,7 @@ impl VulnerabilitiesClassDirectory {
         files.insert("spectre_v2", "Not affected\n");
         files.insert("srbds", "Not affected\n");
         files.insert("tsx_async_abort", "Not affected\n");
-        Self {
-            vulnerability_files: files,
-        }
+        Self { vulnerability_files: files }
     }
 }
 
@@ -72,14 +72,14 @@ impl FsNodeOps for VulnerabilitiesClassDirectory {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let entries = self
-          .vulnerability_files
-          .keys()
-          .map(|name| VecDirectoryEntry {
+            .vulnerability_files
+            .keys()
+            .map(|name| VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
                 name: (*name).into(),
                 inode: None,
             })
-          .collect::<Vec<_>>();
+            .collect::<Vec<_>>();
 
         Ok(VecDirectory::new_file(entries))
     }

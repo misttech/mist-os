@@ -6,11 +6,12 @@ use fidl::endpoints::SynchronousProxy;
 use futures_util::StreamExt;
 use starnix_core::power::{create_proxy_for_wake_events_counter_zero, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
     fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
+    InputBuffer, OutputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};

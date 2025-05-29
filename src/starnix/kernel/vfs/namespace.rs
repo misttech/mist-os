@@ -8,13 +8,14 @@ use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter}
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::fs_registry::FsRegistry;
+use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use crate::vfs::pseudo::simple_file::SimpleFileNode;
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
     fileops_impl_noop_sync, fs_node_impl_not_dir, CheckAccessReason, DirEntry, DirEntryHandle,
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, FileObject, FileOps,
-    FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
-    PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
+    FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SymlinkTarget, UnlinkKind,
 };
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;

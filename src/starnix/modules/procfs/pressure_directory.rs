@@ -13,10 +13,12 @@ use starnix_core::task::{
     CurrentTask, EventHandler, Kernel, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter,
 };
 use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNodeHandle, FsNodeOps,
-    SimpleFileNode, StaticDirectoryBuilder,
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps,
+    FileSystemHandle, FsNodeHandle, FsNodeOps,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{

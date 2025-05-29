@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{BytesFile, FileSystemHandle, FsNodeHandle, FsNodeInfo};
+use starnix_core::vfs::pseudo::simple_file::BytesFile;
+use starnix_core::vfs::{FileSystemHandle, FsNodeHandle, FsNodeInfo};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::mode;
 

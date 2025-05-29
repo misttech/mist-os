@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use starnix_core::task::{CurrentTask, EventHandler, SyslogAccess, WaitCanceler, Waiter};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, FileObject, FileOps, FileSystemHandle,
-    FsNodeHandle, FsNodeInfo, InputBuffer, OutputBuffer, SimpleFileNode,
+    FsNodeHandle, FsNodeInfo, InputBuffer, OutputBuffer,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;

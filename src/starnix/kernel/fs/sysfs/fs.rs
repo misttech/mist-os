@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::KObjectHandle;
-use crate::fs::pseudo_directory::PseudoDirectoryBuilder;
 use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
     VulnerabilitiesClassDirectory,
 };
 use crate::task::CurrentTask;
-use crate::vfs::stub_empty_file::StubEmptyFile;
+use crate::vfs::pseudo::pseudo_directory::PseudoDirectoryBuilder;
+use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
-    BytesFile, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, SymlinkNode,
+    CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+    FsNodeInfo, FsStr, PathBuilder, SymlinkNode,
 };
 use ebpf_api::BPF_PROG_TYPE_FUSE;
 use starnix_logging::bug_ref;
