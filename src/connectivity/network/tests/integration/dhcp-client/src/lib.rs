@@ -491,7 +491,7 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
     assert_eq!(dns_servers, Vec::new());
     assert_eq!(routers, Vec::new());
 
-    let fnet_dhcp_ext::Address { address, address_parameters, address_state_provider } =
+    let fnet_dhcp_ext::Address { address, address_parameters: _, address_state_provider } =
         address.expect("address should be present in response");
     assert_eq!(
         address,
@@ -503,17 +503,6 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
         }
     );
-    let fnet_interfaces_admin::AddressParameters {
-        add_subnet_route,
-        perform_dad,
-        temporary: _,
-        initial_properties: _,
-        __source_breaking,
-    } = address_parameters;
-    // DHCP addresses should be added with the corresponding subnet route.
-    assert_eq!(add_subnet_route, Some(true));
-    // DHCP addresses should have DAD performed before being assigned.
-    assert_eq!(perform_dad, Some(true));
 
     assert_client_shutdown(client, address_state_provider).await;
 }

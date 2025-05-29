@@ -18,7 +18,7 @@ use futures::future::TryFutureExt as _;
 use futures::stream::{self, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_mac, net_subnet_v4};
 use net_types::ip::Ipv4;
-use netemul::{DhcpClient, InterfaceConfig, DEFAULT_MTU};
+use netemul::{DhcpClient, DEFAULT_MTU};
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::realms::{
     constants, DhcpClientVersion, KnownServiceProvider, Netstack, NetstackAndDhcpClient,
@@ -44,7 +44,6 @@ enum DhcpEndpointType {
     Client {
         expected_acquired: fidl_fuchsia_net::Subnet,
         static_address: Option<fidl_fuchsia_net::Ipv4AddressWithPrefix>,
-        ipv4_dad_transmits_override: Option<u16>,
     },
     Server {
         static_addrs: Vec<fidl_fuchsia_net::Subnet>,
@@ -314,9 +313,6 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
                 ep_type: DhcpEndpointType::Client {
                     expected_acquired,
                     static_address: Some(STATIC_ADDRESS),
-                    // NB: Use fewer DAD transmits than the default to speed up
-                    // the test.
-                    ipv4_dad_transmits_override: Some(1),
                 },
                 network: &network,
             }],
@@ -451,7 +447,6 @@ async fn acquire_with_dhcpd_bound_device<SERVER: Netstack, CLIENT: NetstackAndDh
                     ep_type: DhcpEndpointType::Client {
                         expected_acquired: dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired(),
                         static_address: None,
-                        ipv4_dad_transmits_override: None,
                     },
                     network: &network,
                 }],
@@ -503,7 +498,6 @@ async fn does_not_crash_with_overlapping_subnet_route<
                 ep_type: DhcpEndpointType::Client {
                     expected_acquired: expected_acquired.clone(),
                     static_address: None,
-                    ipv4_dad_transmits_override: None,
                 },
                 network: &network,
             }],
@@ -640,10 +634,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
     // A realistic lease length that won't expire within the test timeout of 2 minutes.
     const LONG_LEASE: u32 = 60 * 60 * 24;
     // A short client renewal time which will trigger well before the test timeout of 2 minutes.
-    // This time is intentionally long enough to allow DAD to finish prior to entering renewal.
-    // TODO(https://fxbug.dev/420987904): Add test coverage of entering renewal
-    // before DAD finishes.
-    const SHORT_RENEW: u32 = 10;
+    const SHORT_RENEW: u32 = 3;
 
     let mut parameters = dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters();
     parameters.push(fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
@@ -661,9 +652,6 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
                     ep_type: DhcpEndpointType::Client {
                         expected_acquired: dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired(),
                         static_address: None,
-                        // NB: Use fewer DAD transmits than the default to speed
-                        // up the test.
-                        ipv4_dad_transmits_override: Some(1),
                     },
                     network: &network,
                 }],
@@ -697,6 +685,10 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
     .await;
 }
 
+// TODO(https://fxbug.dev/42077260): Enable this test for Netstack3. Note that
+// the test will need to be updated to make DAD more robust to CQ timing
+// variability. This could be done by configuring the number of IPV4
+// `dad_transmits` to some large value.
 #[netstack_test]
 #[variant(SERVER, Netstack)]
 #[variant(CLIENT, NetstackAndDhcpClient)]
@@ -739,9 +731,6 @@ async fn acquire_with_dhcpd_bound_device_dup_addr<
                     ep_type: DhcpEndpointType::Client {
                         expected_acquired: expected_addr,
                         static_address: None,
-                        // NB: To reduce the flake rate in CQ, perform several
-                        // DAD transmits.
-                        ipv4_dad_transmits_override: Some(5),
                     },
                     network: &network,
                 }],
@@ -852,7 +841,7 @@ fn test_dhcp<'a, D: DhcpClient>(
                                     .expect("failed to install server endpoint");
                                 iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
                                 let (static_addrs, server_should_bind) = match ep_type {
-                                    DhcpEndpointType::Client { .. } => {
+                                    DhcpEndpointType::Client { expected_acquired: _, static_address: _ } => {
                                         panic!(
                                             "found client endpoint instead of server or unbound endpoint"
                                         )
@@ -925,23 +914,19 @@ fn test_dhcp<'a, D: DhcpClient>(
                         let endpoint = network
                             .create_endpoint()
                             .await;
-                        match ep_type {
+                        let iface = netstack_realm_ref
+                            .install_endpoint(endpoint, Default::default())
+                            .await
+                            .expect("failed to install client endpoint");
+                        let expected_acquired = match ep_type {
                             DhcpEndpointType::Client {
                                 expected_acquired,
                                 static_address,
-                                ipv4_dad_transmits_override
                             } => {
-                            let iface = netstack_realm_ref
-                                .install_endpoint(endpoint, InterfaceConfig {
-                                    ipv4_dad_transmits: *ipv4_dad_transmits_override,
-                                    ..Default::default()
-                                })
-                                .await
-                                .expect("failed to install client endpoint");
                                 if let Some(static_address) = static_address {
                                     iface.add_address(static_address.clone().into_ext()).await.expect("add static address");
                                 }
-                                (iface, expected_acquired)
+                                expected_acquired
                             },
                             DhcpEndpointType::Server { static_addrs: _ } => panic!(
                                 "found server endpoint instead of client endpoint"
@@ -949,7 +934,8 @@ fn test_dhcp<'a, D: DhcpClient>(
                             DhcpEndpointType::Unbound { static_addrs: _ } => panic!(
                                 "found unbound endpoint instead of client endpoint"
                             ),
-                        }
+                        };
+                        (iface, expected_acquired)
                     })
                     .collect::<Vec<_>>()
                     .await;
