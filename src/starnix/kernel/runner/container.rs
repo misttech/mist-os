@@ -842,6 +842,7 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
         let value = value.parse::<u64>()?;
         let kv = match key {
             "RLIMIT_NOFILE" => (Resource::NOFILE, value),
+            "RLIMIT_RTPRIO" => (Resource::RTPRIO, value),
             _ => bail!("Unknown rlimit: {key}"),
         };
         res.push(kv);

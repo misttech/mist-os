@@ -2,8 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/starnix/containers/debian/meta/debian_container.cml" ],
+    include: [ "//src/starnix/containers/container.shard.cml" ],
     program: {
+        runner: "starnix",
+        name: "role_manager_test",
+        init: [],
+        mounts: [
+            "/:remote_bundle:data/system:nosuid,nodev,relatime",
+            "/tmp:tmpfs",
+        ],
         rt_role_overrides: [
             {
                 role: "first_custom_role",
@@ -16,5 +23,14 @@
                 role: "second_custom_role",
             },
         ],
+        features: [ "container" ],
+        rlimits: [ "RLIMIT_RTPRIO=10" ],
     },
+    capabilities: [
+        {
+            directory: "fs_root",
+            rights: [ "rw*" ],
+            path: "/fs_root",
+        },
+    ],
 }
