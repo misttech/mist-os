@@ -193,6 +193,7 @@ void HandoffFromPhys(paddr_t handoff_paddr) {
   gBootOptions = &gBootOptionsInstance;
 
   gKernelPhysicalLoadAddress = gPhysHandoff->kernel_physical_load_address;
+  ZX_DEBUG_ASSERT(KernelPhysicalAddressOf<__executable_start>() == gKernelPhysicalLoadAddress);
 
   if (gPhysHandoff->reboot_reason) {
     platform_set_hw_reboot_reason(gPhysHandoff->reboot_reason.value());
@@ -200,6 +201,14 @@ void HandoffFromPhys(paddr_t handoff_paddr) {
 }
 
 paddr_t KernelPhysicalLoadAddress() { return gKernelPhysicalLoadAddress; }
+
+paddr_t KernelPhysicalAddressOf(uintptr_t va) {
+  const uintptr_t start = reinterpret_cast<uintptr_t>(__executable_start);
+  [[maybe_unused]] const uintptr_t end = reinterpret_cast<uintptr_t>(_end);
+  ZX_DEBUG_ASSERT_MSG(va >= start, "%#" PRIxPTR " < %p", va, __executable_start);
+  ZX_DEBUG_ASSERT_MSG(va < end, "%#" PRIxPTR " < %p", va, _end);
+  return gKernelPhysicalLoadAddress + (va - start);
+}
 
 HandoffEnd EndHandoff() {
   HandoffEnd end{

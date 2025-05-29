@@ -286,9 +286,7 @@ zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id) {
   arch::ThreadMemoryBarrier();
 
   // Compute the entry point in physical address.
-  uintptr_t kernel_secondary_entry_paddr =
-      KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&riscv64_secondary_start) -
-                                     reinterpret_cast<uintptr_t>(__executable_start));
+  paddr_t kernel_secondary_entry_paddr = KernelPhysicalAddressOf<riscv64_secondary_start>();
 
   LTRACEF("physical address of entry point at %p is %#lx\n", &riscv64_secondary_start,
           kernel_secondary_entry_paddr);

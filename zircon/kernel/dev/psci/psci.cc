@@ -234,9 +234,7 @@ int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
-    uintptr_t secondary_entry_paddr =
-        KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
-                                       reinterpret_cast<uintptr_t>(__executable_start));
+    paddr_t secondary_entry_paddr = KernelPhysicalAddressOf<arm64_secondary_start>();
     uint32_t ret = psci_cpu_on(argv[2].u, secondary_entry_paddr, 0);
     printf("psci_cpu_on returns %u\n", ret);
   } else if (!strcmp(argv[1].str, "affinity_info")) {

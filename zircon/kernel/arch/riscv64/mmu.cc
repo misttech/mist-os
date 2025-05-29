@@ -274,16 +274,6 @@ constexpr bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
   return true;
 }
 
-// Converts a symbol in the kernel to its physical address based on knowledge of
-// where the kernel is loaded virtually and physically. Only works for data within
-// the kernel proper.
-paddr_t kernel_virt_to_phys(const void* va) {
-  uintptr_t pa = reinterpret_cast<uintptr_t>(va);
-  pa += KernelPhysicalLoadAddress() - kernel_relocated_base;
-
-  return pa;
-}
-
 // Argument to SfenceVma.  Used to perform TLB invalidation on an optional range
 // with an optional ASID.  When no range is present, the target is all
 // addresses.  When no ASID is present the target is invalidated for all ASIDs.
@@ -1339,7 +1329,7 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     DEBUG_ASSERT(size_ == KERNEL_ASPACE_SIZE);
 
     tt_virt_ = riscv64_kernel_translation_table;
-    tt_phys_ = kernel_virt_to_phys(riscv64_kernel_translation_table);
+    tt_phys_ = KernelPhysicalAddressOf<riscv64_kernel_translation_table>();
     asid_ = kernel_asid();
   } else {
     if (type_ == Riscv64AspaceType::kUser) {
@@ -1625,7 +1615,7 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
     // Switching to the null aspace, which means kernel address space only.
     satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
            (static_cast<uint64_t>(kernel_asid()) << RISCV64_SATP_ASID_SHIFT) |
-           (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+           (KernelPhysicalAddressOf<riscv64_kernel_translation_table>() >> PAGE_SIZE_SHIFT);
   }
   if (likely(old_aspace != nullptr)) {
     [[maybe_unused]] uint32_t prev =
@@ -1703,8 +1693,8 @@ void riscv64_mmu_early_init() {
   // top level entries are synchronized.
   for (size_t i = RISCV64_MMU_PT_KERNEL_BASE_INDEX; i < RISCV64_MMU_PT_ENTRIES; i++) {
     if (!riscv64_pte_is_valid(bootstrap_translation_table[i])) {
-      paddr_t pt_paddr = kernel_virt_to_phys(
-          riscv64_kernel_top_level_page_tables[i - RISCV64_MMU_PT_KERNEL_BASE_INDEX]);
+      paddr_t pt_paddr = KernelPhysicalAddressOf<riscv64_kernel_top_level_page_tables>(
+          i - RISCV64_MMU_PT_KERNEL_BASE_INDEX);
 
       LTRACEF("RISCV: MMU allocating top level page table for slot %zu, pa %#lx\n", i, pt_paddr);
 
@@ -1727,9 +1717,10 @@ namespace {
 
 // Load the kernel page tables and set the passed in asid
 void riscv64_switch_kernel_asid(uint16_t asid) {
-  const uint64_t satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-                        (static_cast<uint64_t>(asid) << RISCV64_SATP_ASID_SHIFT) |
-                        (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+  const uint64_t satp =
+      (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+      (static_cast<uint64_t>(asid) << RISCV64_SATP_ASID_SHIFT) |
+      (KernelPhysicalAddressOf<riscv64_kernel_translation_table>() >> PAGE_SIZE_SHIFT);
   riscv64_csr_write(RISCV64_CSR_SATP, satp);
 
   // Globally TLB flush.

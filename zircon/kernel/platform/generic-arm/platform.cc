@@ -195,9 +195,7 @@ zx_status_t platform_suspend_cpu() {
 }
 
 zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
-  uintptr_t kernel_secondary_entry_paddr =
-      KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
-                                     reinterpret_cast<uintptr_t>(__executable_start));
+  paddr_t kernel_secondary_entry_paddr = KernelPhysicalAddressOf<arm64_secondary_start>();
 
   uint32_t ret = power_cpu_on(mpid, kernel_secondary_entry_paddr, 0);
   dprintf(INFO, "Trying to start cpu %u, mpid %#" PRIx64 " returned: %d\n", cpu_id, mpid, (int)ret);
