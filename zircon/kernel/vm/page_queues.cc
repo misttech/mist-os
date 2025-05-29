@@ -33,8 +33,6 @@ KCOUNTER(pq_lru_pages_compressed, "pq.lru.pages_compressed")
 KCOUNTER(pq_lru_pages_discarded, "pq.lru.pages_discarded")
 KCOUNTER(pq_accessed_normal, "pq.accessed.normal")
 KCOUNTER(pq_accessed_normal_same_queue, "pq.accessed.normal_same_queue")
-KCOUNTER(pq_accessed_deferred_count, "pq.accessed.deferred")
-KCOUNTER(pq_accessed_deferred_count_same_queue, "pq.accessed.deferred_same_queue")
 
 // Helper class for building an isolate list for deferred processing when acting on the LRU queues.
 // Pages are added while the page queues lock is held, and processed once the lock is dropped.
@@ -296,10 +294,10 @@ void PageQueues::SetActiveRatioMultiplier(uint32_t multiplier) {
   Guard<SpinLock, IrqSave> guard{&lock_};
   active_ratio_multiplier_ = multiplier;
   // The change in multiplier might have caused us to need to age.
-  MaybeSignalActiveRatioAgingLocked(dps);
+  CheckActiveRatioAgingLocked(dps);
 }
 
-void PageQueues::MaybeSignalActiveRatioAgingLocked(DeferPendingSignals& dps) {
+void PageQueues::CheckActiveRatioAgingLocked(DeferPendingSignals& dps) {
   if (active_ratio_triggered_) {
     // Already triggered, nothing more to do.
     return;
@@ -310,9 +308,9 @@ void PageQueues::MaybeSignalActiveRatioAgingLocked(DeferPendingSignals& dps) {
   }
 }
 
-bool PageQueues::IsActiveRatioTriggeringAging() const {
-  ActiveInactiveCounts active_count = GetActiveInactiveCountsLocked();
-  return active_count.active * active_ratio_multiplier_ > active_count.inactive;
+bool PageQueues::IsActiveRatioTriggeringAging() {
+  ActiveInactiveCounts counts = GetActiveInactiveCounts();
+  return counts.active * active_ratio_multiplier_ > counts.inactive;
 }
 
 ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::ConsumeAgeReason() {
@@ -486,7 +484,7 @@ void PageQueues::Dump() {
     for (uint32_t i = 0; i < kNumReclaim; i++) {
       counts[i] = page_queue_counts_[PageQueueReclaimBase + i].load(ktl::memory_order_relaxed);
     }
-    activeinactive = GetActiveInactiveCountsLocked();
+    activeinactive = GetActiveInactiveCounts();
     last_age_time = last_age_time_.load(ktl::memory_order_relaxed);
     last_age_reason = last_age_reason_;
   }
@@ -528,9 +526,8 @@ void PageQueues::Dump() {
          mru_gen, age_time.tv_sec, age_time.tv_nsec, string_from_age_reason(last_age_reason),
          lru_gen);
   printf("pq: Pager buckets %s evict first: %zu\n", buf, inactive_count);
-  printf("pq: %s active/inactive totals: %zu/%zu dirty: %zu failed reclaim: %zu\n",
-         activeinactive.cached ? "cached" : "live", activeinactive.active, activeinactive.inactive,
-         dirty, failed_reclaim);
+  printf("pq: active/inactive totals: %zu/%zu dirty: %zu failed reclaim: %zu\n",
+         activeinactive.active, activeinactive.inactive, dirty, failed_reclaim);
 }
 
 // This runs the aging thread. Aging, unlike lru processing, scanning or eviction, requires very
@@ -721,9 +718,7 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
     mru_gen_.fetch_add(1, ktl::memory_order_relaxed);
     last_age_time_ = current_mono_time();
     last_age_reason_ = reason;
-    // Update the active/inactive counts. We could be a bit smarter here since we know exactly which
-    // active bucket might have changed, but this will work.
-    RecalculateActiveInactiveLocked(dps);
+    CheckActiveRatioAgingLocked(dps);
   }
 
   {
@@ -938,91 +933,49 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
   }
 }
 
-void PageQueues::UpdateActiveInactiveLocked(PageQueue old_queue, PageQueue new_queue,
-                                            DeferPendingSignals& dps) {
-  // Short circuit the lock acquisition and logic if not dealing with active/inactive queues
-  if (!queue_is_reclaim(old_queue) && !queue_is_reclaim(new_queue)) {
-    return;
-  }
-  // This just blindly updates the active/inactive counts. If accessed scanning is happening, and
-  // used use_cached_queue_counts_ is true, then we could be racing and setting these to garbage
-  // values. That's fine as they will never get returned anywhere, and will get reset to correct
-  // values once access scanning completes.
-  PageQueue mru = mru_gen_to_queue();
-  if (queue_is_active(old_queue, mru)) {
-    active_queue_count_--;
-  } else if (queue_is_inactive(old_queue, mru)) {
-    inactive_queue_count_--;
-  }
-  if (queue_is_active(new_queue, mru)) {
-    active_queue_count_++;
-  } else if (queue_is_inactive(new_queue, mru)) {
-    inactive_queue_count_++;
-  }
-  MaybeSignalActiveRatioAgingLocked(dps);
-}
-
-void PageQueues::MarkAccessedContinued(vm_page_t* page) {
-  // Although we can get called with the zero page, it would not be in a reclaimable queue and so
-  // we should have returned in the MarkAccessed wrapper.
-  DEBUG_ASSERT(page != vm_get_zero_page());
-
+void PageQueues::MarkAccessed(vm_page_t* page) {
   pq_accessed_normal.Add(1);
-
-  auto queue_ref = page->object.get_page_queue_ref();
-
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-
-  // We need to check the current queue to see if it is in the reclaimable range. Between checking
-  // this and updating the queue it could change, however it would only change as a result of
-  // MarkAccessedDeferredCount, which would only move it to another reclaimable queue. No other
-  // change is possible as we are holding lock_.
-  if (queue_ref.load(ktl::memory_order_relaxed) < PageQueueReclaimIsolate) {
-    return;
-  }
-
-  PageQueue queue = mru_gen_to_queue();
-  PageQueue old_queue =
-      static_cast<PageQueue>(queue_ref.exchange(queue, ktl::memory_order_relaxed));
-  // Double check again that this was previously reclaimable
-  DEBUG_ASSERT(old_queue != PageQueueNone && old_queue >= PageQueueReclaimIsolate);
-  if (old_queue != queue) {
-    page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
-    page_queue_counts_[queue].fetch_add(1, ktl::memory_order_relaxed);
-    UpdateActiveInactiveLocked(old_queue, queue, dps);
-  } else {
-    pq_accessed_normal_same_queue.Add(1);
-  }
-}
-
-void PageQueues::MarkAccessedDeferredCount(vm_page_t* page) {
-  // Ensure that the page queues is returning the cached counts at the moment, otherwise we might
-  // race.
-  pq_accessed_deferred_count.Add(1);
-  DEBUG_ASSERT(use_cached_queue_counts_.load(ktl::memory_order_relaxed));
   auto queue_ref = page->object.get_page_queue_ref();
   uint8_t old_gen = queue_ref.load(ktl::memory_order_relaxed);
+  if (!queue_is_reclaim(static_cast<PageQueue>(old_gen))) {
+    return;
+  }
+  const uint32_t target_queue = mru_gen_to_queue();
+  if (old_gen == target_queue) {
+    pq_accessed_normal_same_queue.Add(1);
+    return;
+  }
   // Between loading the mru_gen and finally storing it in the queue_ref it's possible for our
   // calculated target_queue to become invalid. This is extremely unlikely as it would require
   // us to stall for long enough for the lru_gen to pass this point, but if it does happen then
   // ProcessLruQueues will notice our queue is invalid and correct our age to be that of lru_gen.
-  const uint32_t target_queue = mru_gen_to_queue();
-  if (old_gen == target_queue) {
-    pq_accessed_deferred_count_same_queue.Add(1);
-    return;
-  }
-  do {
+  while (!queue_ref.compare_exchange_weak(old_gen, static_cast<uint8_t>(target_queue),
+                                          ktl::memory_order_relaxed)) {
     // If we ever find old_gen to not be in the active/inactive range then this means the page has
     // either been racily removed from, or was never in, the reclaim queue. In which case we
     // can return as there's nothing to be marked accessed.
     if (!queue_is_reclaim(static_cast<PageQueue>(old_gen))) {
       return;
     }
-  } while (!queue_ref.compare_exchange_weak(old_gen, static_cast<uint8_t>(target_queue),
-                                            ktl::memory_order_relaxed));
+  }
   page_queue_counts_[old_gen].fetch_sub(1, ktl::memory_order_relaxed);
   page_queue_counts_[target_queue].fetch_add(1, ktl::memory_order_relaxed);
+
+  MaybeCheckActiveRatioAging(1);
+}
+
+void PageQueues::MaybeCheckActiveRatioAging(size_t pages) {
+  if (unlikely(!RecordActiveRatioSkips(pages))) {
+    DeferPendingSignals dps{*this};
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    CheckActiveRatioAgingLocked(dps);
+  }
+}
+
+void PageQueues::MaybeCheckActiveRatioAgingLocked(size_t pages, DeferPendingSignals& dps) {
+  if (unlikely(!RecordActiveRatioSkips(pages))) {
+    CheckActiveRatioAgingLocked(dps);
+  }
 }
 
 void PageQueues::SetQueueBacklinkLocked(vm_page_t* page, void* object, uintptr_t page_offset,
@@ -1041,7 +994,9 @@ void PageQueues::SetQueueBacklinkLocked(vm_page_t* page, void* object, uintptr_t
   page->object.get_page_queue_ref().store(queue, ktl::memory_order_relaxed);
   list_add_head(&page_queues_[queue], &page->queue_node);
   page_queue_counts_[queue].fetch_add(1, ktl::memory_order_relaxed);
-  UpdateActiveInactiveLocked(PageQueueNone, queue, dps);
+  if (queue_is_reclaim(queue)) {
+    MaybeCheckActiveRatioAgingLocked(1, dps);
+  }
 }
 
 void PageQueues::MoveToQueueLocked(vm_page_t* page, PageQueue queue, DeferPendingSignals& dps) {
@@ -1057,7 +1012,9 @@ void PageQueues::MoveToQueueLocked(vm_page_t* page, PageQueue queue, DeferPendin
   list_add_head(&page_queues_[queue], &page->queue_node);
   page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
   page_queue_counts_[queue].fetch_add(1, ktl::memory_order_relaxed);
-  UpdateActiveInactiveLocked(static_cast<PageQueue>(old_queue), queue, dps);
+  if (queue_is_reclaim((PageQueue)old_queue) || queue_is_reclaim(queue)) {
+    MaybeCheckActiveRatioAgingLocked(1, dps);
+  }
 }
 
 void PageQueues::SetWired(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
@@ -1241,7 +1198,9 @@ void PageQueues::RemoveLocked(vm_page_t* page, DeferPendingSignals& dps) {
       page->object.get_page_queue_ref().exchange(PageQueueNone, ktl::memory_order_relaxed);
   DEBUG_ASSERT(old_queue != PageQueueNone);
   page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
-  UpdateActiveInactiveLocked((PageQueue)old_queue, PageQueueNone, dps);
+  if (queue_is_reclaim((PageQueue)old_queue)) {
+    MaybeCheckActiveRatioAgingLocked(1, dps);
+  }
   page->object.set_object(nullptr);
   page->object.set_page_offset(0);
   AdvanceIsolateCursorIf(page);
@@ -1282,56 +1241,6 @@ void PageQueues::RemoveArrayIntoList(vm_page_t** pages, size_t count, list_node_
       arch::Yield();
     }
   }
-}
-
-void PageQueues::BeginAccessScan() {
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  ASSERT(!use_cached_queue_counts_.load(ktl::memory_order_relaxed));
-  cached_active_queue_count_ = active_queue_count_;
-  cached_inactive_queue_count_ = inactive_queue_count_;
-  use_cached_queue_counts_.store(true, ktl::memory_order_relaxed);
-}
-
-void PageQueues::RecalculateActiveInactiveLocked(DeferPendingSignals& dps) {
-  uint64_t active = 0;
-  uint64_t inactive = 0;
-
-  uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
-  uint64_t mru = mru_gen_.load(ktl::memory_order_relaxed);
-
-  for (uint64_t index = lru; index <= mru; index++) {
-    uint64_t count = page_queue_counts_[gen_to_queue(index)].load(ktl::memory_order_relaxed);
-    if (queue_is_active(gen_to_queue(index), gen_to_queue(mru))) {
-      active += count;
-    } else {
-      // As we are only operating on reclaimable queues, !active should imply inactive
-      DEBUG_ASSERT(queue_is_inactive(gen_to_queue(index), gen_to_queue(mru)));
-      inactive += count;
-    }
-  }
-  inactive += page_queue_counts_[PageQueueReclaimIsolate].load(ktl::memory_order_relaxed);
-
-  // Update the counts.
-  active_queue_count_ = active;
-  inactive_queue_count_ = inactive;
-
-  // New counts might mean we need to age.
-  MaybeSignalActiveRatioAgingLocked(dps);
-}
-
-void PageQueues::EndAccessScan() {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-
-  ASSERT(use_cached_queue_counts_.load(ktl::memory_order_relaxed));
-
-  // First clear the cached counts. Although the uncached counts aren't correct right now, we hold
-  // the lock so no one can observe the counts right now.
-  cached_active_queue_count_ = 0;
-  cached_inactive_queue_count_ = 0;
-  use_cached_queue_counts_.store(false, ktl::memory_order_relaxed);
-
-  RecalculateActiveInactiveLocked(dps);
 }
 
 PageQueues::ReclaimCounts PageQueues::GetReclaimQueueCounts() const {
@@ -1518,24 +1427,19 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekIsolate(size_t lowest_que
 }
 
 PageQueues::ActiveInactiveCounts PageQueues::GetActiveInactiveCounts() const {
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  return GetActiveInactiveCountsLocked();
-}
-
-PageQueues::ActiveInactiveCounts PageQueues::GetActiveInactiveCountsLocked() const {
-  if (use_cached_queue_counts_.load(ktl::memory_order_relaxed)) {
-    return ActiveInactiveCounts{.cached = true,
-                                .active = cached_active_queue_count_,
-                                .inactive = cached_inactive_queue_count_};
-  } else {
-    // With use_cached_queue_counts_ false the counts should have been updated to remove any
-    // negative values that might have been caused by races.
-    ASSERT(active_queue_count_ >= 0);
-    ASSERT(inactive_queue_count_ >= 0);
-    return ActiveInactiveCounts{.cached = false,
-                                .active = static_cast<uint64_t>(active_queue_count_),
-                                .inactive = static_cast<uint64_t>(inactive_queue_count_)};
+  uint64_t active_count = 0;
+  uint64_t inactive_count = 0;
+  PageQueue mru = mru_gen_to_queue();
+  for (uint8_t queue = 0; queue < PageQueueNumQueues; queue++) {
+    uint64_t count = page_queue_counts_[queue].load(ktl::memory_order_relaxed);
+    if (queue_is_active(static_cast<PageQueue>(queue), mru)) {
+      active_count += count;
+    }
+    if (queue_is_inactive(static_cast<PageQueue>(queue), mru)) {
+      inactive_count += count;
+    }
   }
+  return ActiveInactiveCounts{.active = active_count, .inactive = inactive_count};
 }
 
 void PageQueues::SetAgingEvent(Event* event) {

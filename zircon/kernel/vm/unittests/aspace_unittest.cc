@@ -59,9 +59,7 @@ const ktl::array kernel_regions = {
 static void harvest_access_bits(VmAspace::NonTerminalAction non_terminal_action,
                                 VmAspace::TerminalAction terminal_action) {
   AutoVmScannerDisable scanner_disable;
-  pmm_page_queues()->BeginAccessScan();
   VmAspace::HarvestAllUserAccessedBits(non_terminal_action, terminal_action);
-  pmm_page_queues()->EndAccessScan();
 }
 
 // Consume the (scalar) value, ensuring that the operation to calculate the value can not be

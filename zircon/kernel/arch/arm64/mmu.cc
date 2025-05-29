@@ -1309,7 +1309,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
       // Mappings for physical VMOs do not have pages associated with them and so there's no state
       // to update on an access.
       if (likely(page)) {
-        pmm_page_queues()->MarkAccessedDeferredCount(page);
+        Pmm::Node().GetPageQueues()->MarkAccessed(page);
 
         if (terminal_action == TerminalAction::UpdateAgeAndHarvest) {
           // Modifying the access flag does not require break-before-make for correctness and as we

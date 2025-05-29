@@ -1432,7 +1432,7 @@ class X86PageTableImpl : public X86PageTableBase {
         // to update on an access. As the hardware will update any higher level accessed bits for us
         // we do not even ned to remove the accessed bit in that case.
         if (likely(page)) {
-          pmm_page_queues()->MarkAccessedDeferredCount(page);
+          Pmm::Node().GetPageQueues()->MarkAccessed(page);
 
           if (terminal_action == TerminalAction::UpdateAgeAndHarvest) {
             UpdateEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), e,

@@ -50,6 +50,13 @@ class PageQueues {
   // a race between aging once and needing to collect/harvest age information.
   static constexpr size_t kNumActiveQueues = 2;
 
+  // The amount of pages that will have to move around the queues before the active/inactive
+  // ratio is re-checked. This therefore represents how much error the active ratio aging process
+  // might have, or how delayed the MRU generation might be.
+  // In the worst case once the active ratio is triggered this value is how much page data needs to
+  // then change queues before the aging process happens.
+  static constexpr size_t kActiveInactiveErrorMargin = (2 * MB) / PAGE_SIZE;
+
   static_assert(kNumReclaim > kNumActiveQueues, "Needs to be at least one non-active queue");
 
   // In addition to active and inactive, we want to consider some of the queues as 'oldest' to
@@ -83,12 +90,6 @@ class PageQueues {
   ~PageQueues();
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PageQueues);
-
-  // This is a specialized version of MarkAccessed designed to be called during accessed harvesting.
-  // It does not update active/inactive counts, and this needs to be done separately once harvesting
-  // is complete. It is only permitted to call this in between BeginAccessScan and EndAccessScan
-  // calls.
-  void MarkAccessedDeferredCount(vm_page_t* page);
 
   // All Set operations places a page, which must not currently be in a page queue, into the
   // specified queue. The backlink information of |object| and |page_offset| must be specified and
@@ -141,23 +142,8 @@ class PageQueues {
   void RemoveArrayIntoList(vm_page_t** page, size_t count, list_node_t* out_list);
 
   // Tells the page queue this page has been accessed, and it should have its position in the queues
-  // updated. This method will take the internal page queues lock and should not be used for
-  // accessed harvesting, where MarkAccessedDeferredCount should be used instead.
-  void MarkAccessed(vm_page_t* page) {
-    // Can retrieve the queue ref and do a short circuit check for whether mark accessed is
-    // necessary. Although this check is racy, since we do not yet hold the lock, we will either:
-    //  * Race and fail to mark accessed - this is fine since racing implies a newly added page,
-    //    which would be added to the mru queue anyway.
-    //  * Race and attempt to spuriously mark accessed - this is fine as we will check again with
-    //    the lock held.
-    auto queue_ref = page->object.get_page_queue_ref();
-    const uint8_t queue = queue_ref.load(ktl::memory_order_relaxed);
-    if (queue < PageQueueReclaimIsolate) {
-      return;
-    }
-    // With the early check complete, continue with the non-inlined longer body.
-    MarkAccessedContinued(page);
-  }
+  // updated.
+  void MarkAccessed(vm_page_t* page);
 
   // Provides access to the underlying lock, allowing _Locked variants to be called. Use of this is
   // highly discouraged as the underlying lock is a CriticalMutex which disables preemption.
@@ -250,10 +236,6 @@ class PageQueues {
   Counts QueueCounts() const;
 
   struct ActiveInactiveCounts {
-    // Whether the returned counts were cached values, or the current 'true' values. Cached values
-    // are returned if an accessed scan is ongoing, as the true values cannot be determined in a
-    // race free way.
-    bool cached = false;
     // Pages that would normally be available for eviction, but are presently considered active and
     // so will not be evicted.
     size_t active = 0;
@@ -261,18 +243,11 @@ class PageQueues {
     size_t inactive = 0;
 
     bool operator==(const ActiveInactiveCounts& other) const {
-      return cached == other.cached && active == other.active && inactive == other.inactive;
+      return active == other.active && inactive == other.inactive;
     }
     bool operator!=(const ActiveInactiveCounts& other) const { return !(*this == other); }
   };
-
-  // Retrieves the current active/inactive counts, or a cache of the last known good ones if
-  // accessed harvesting is happening. This method is guaranteed to return in a small window of time
-  // due to only needing to acquire a single lock that has very short critical sections. However,
-  // this means it may have to return old values if accessed scanning is happening. If blocking and
-  // waiting is acceptable then |scanner_synchronized_active_inactive_counts| should be used, which
-  // calls this when it knows accessed scanning is not happening, guaranteeing a live value.
-  ActiveInactiveCounts GetActiveInactiveCounts() const TA_EXCL(lock_);
+  ActiveInactiveCounts GetActiveInactiveCounts() const;
 
   void Dump() TA_EXCL(lock_);
 
@@ -349,12 +324,6 @@ class PageQueues {
   // PageQueues object. A nullptr can be passed in to unregister an Event, otherwise it is an error
   // to attempt to register over the top of an existing event.
   void SetAgingEvent(Event* event);
-
-  // Called by the scanner to indicate the beginning of an accessed scan. This allows
-  // MarkAccessedDeferredCount, and will cause the active/inactive counts returned by
-  // GetActiveInactiveCounts to remain unchanged until the accessed scan is complete.
-  void BeginAccessScan();
-  void EndAccessScan();
 
  private:
   // An enumeration of the various types of signals which could become
@@ -601,18 +570,11 @@ class PageQueues {
                               DeferPendingSignals& dps) TA_REQ(lock_);
   void MoveToQueueLocked(vm_page_t* page, PageQueue queue, DeferPendingSignals& dps) TA_REQ(lock_);
 
-  // Updates the active/inactive counts assuming a single page has moved from |old_queue| to
-  // |new_queue|. Either of these can be PageQueueNone to simulate pages being added or removed.
-  void UpdateActiveInactiveLocked(PageQueue old_queue, PageQueue new_queue,
-                                  DeferPendingSignals& dps) TA_REQ(lock_);
-
-  // Recalculates |active_queue_count_| and |inactive_queue_count_|. This is pulled into a helper
-  // method as this needs to be done both when accessed scanning completes, or if the mru_gen_ is
-  // changed.
-  void RecalculateActiveInactiveLocked(DeferPendingSignals& dps) TA_REQ(lock_);
-
-  // Internal locked version of GetActiveInactiveCounts.
-  ActiveInactiveCounts GetActiveInactiveCountsLocked() const TA_REQ(lock_);
+  // Potentially calls |CheckActiveRatioAgingLocked| based on the kActiveInactiveErrorMargin.
+  // |pages| indicates how many pages might have changed queue, and hence how much the ratio could
+  // have changed by.
+  void MaybeCheckActiveRatioAging(size_t pages) TA_EXCL(lock_);
+  void MaybeCheckActiveRatioAgingLocked(size_t pages, DeferPendingSignals& dps) TA_REQ(lock_);
 
   // Internal helper for shutting down any threads created in |StartThreads|.
   void StopThreads();
@@ -622,7 +584,7 @@ class PageQueues {
 
   // Checks if the active ratio has exceeded the threshold to cause aging, and if so signals the
   // event.
-  void MaybeSignalActiveRatioAgingLocked(DeferPendingSignals& dps) TA_REQ(lock_);
+  void CheckActiveRatioAgingLocked(DeferPendingSignals& dps) TA_REQ(lock_);
 
   // Consumes any pending age reason and either returns the reason, or how long till aging will
   // happen. This timeout does not take into account that other changes, namely the active ratio,
@@ -642,15 +604,11 @@ class PageQueues {
   void SynchronizeWithAging() TA_EXCL(lock_);
 
   // Helper method that calculates whether the current active ratio would trigger aging.
-  bool IsActiveRatioTriggeringAging() const TA_REQ(lock_);
+  bool IsActiveRatioTriggeringAging() TA_REQ(lock_);
 
   void LruThread();
   void MaybeTriggerLruProcessing() TA_EXCL(lock_);
   bool NeedsLruProcessingLocked() const TA_REQ(lock_);
-
-  // MarkAccessed is split into a small inlinable portion that attempts to short circuit, and this
-  // main implementation that does the actual accessed marking if needed.
-  void MarkAccessedContinued(vm_page_t* page);
 
   // Returns true if a page is both in one of the Reclaim queues, and succeeds the passed in
   // validator, which takes a fbl::RefPtr<VmCowPages>.
@@ -667,6 +625,23 @@ class PageQueues {
       isolate_cursor_ = list_next_type(&page_queues_[PageQueueReclaimIsolate], &page->queue_node,
                                        vm_page_t, queue_node);
     }
+  }
+
+  // Records that |pages| have potentially changed queue impacting the active/inactive ratio, and
+  // returns |true| if checking the active ratio can be skipped.
+  bool RecordActiveRatioSkips(size_t pages) {
+    // Add the pages to the skip count and check if our specific addition caused the count to cross
+    // the threshold. This prevents a thundering herd of threads all noticing once the count passes
+    // the threshold.
+    uint64_t old_count = lazy_active_ratio_aging_skips_.fetch_add(pages);
+    if (unlikely(old_count < kActiveInactiveErrorMargin &&
+                 old_count + pages >= kActiveInactiveErrorMargin)) {
+      // Reset the skips counter to zero. This possibly loses some counts, but as the active ratio
+      // has not yet been checked, this is fine.
+      lazy_active_ratio_aging_skips_ = 0;
+      return false;
+    }
+    return true;
   }
 
   // The lock_ is needed to protect the linked lists queues as these cannot be implemented with
@@ -798,22 +773,10 @@ class PageQueues {
   // counts.
   ktl::array<ktl::atomic<size_t>, PageQueueNumQueues> page_queue_counts_ = {};
 
-  // These are the continuously updated active/inactive queue counts. Continuous here means updated
-  // by all page queue methods except for MarkAccessedDeferredCount. Due to races whilst accessed
-  // harvesting is happening, these could be inaccurate or even become negative, and should not be
-  // read from whilst used_cached_queue_counts_ is true, and need to be completely recalculated
-  // prior to setting |used_cached_queue_counts_| back to false.
-  int64_t active_queue_count_ TA_GUARDED(lock_) = 0;
-  int64_t inactive_queue_count_ TA_GUARDED(lock_) = 0;
-  // When accessed harvesting is happening these hold the last known 'good' values of the
-  // active/inactive queue counts.
-  uint64_t cached_active_queue_count_ TA_GUARDED(lock_) = 0;
-  uint64_t cached_inactive_queue_count_ TA_GUARDED(lock_) = 0;
-  // Indicates whether the cached counts should be returned in queries or not. This also indicates
-  // whether the page queues expect accessed harvesting to be happening. This is only an atomic
-  // so that MarkAccessedDeferredCount can reference it in a DEBUG_ASSERT without triggering
-  // memory safety issues.
-  ktl::atomic<bool> use_cached_queue_counts_ = false;
+  // Count for how many pages have moved queue without us recalculating the active ratio. This is a
+  // RelaxedAtomic to allow for completely skipping lock acquisition in MarkAccessed, except when
+  // the ratio actually needs to be recalculated.
+  RelaxedAtomic<uint64_t> lazy_active_ratio_aging_skips_ = 0;
 
   // Track the mru and lru threads and have a signalling mechanism to shut them down.
   ktl::atomic<bool> shutdown_threads_ = false;
@@ -840,7 +803,7 @@ class PageQueues {
   RelaxedAtomic<bool> anonymous_is_reclaimable_ = false;
 
   // Current active ratio multiplier.
-  uint64_t active_ratio_multiplier_ TA_GUARDED(lock_);
+  int64_t active_ratio_multiplier_ TA_GUARDED(lock_) = 0;
 
   // In order to process all the items in the Isolate list, whilst still being able to periodically
   // drop the lock to avoid a long running operation, we use a cursor to record the current page
