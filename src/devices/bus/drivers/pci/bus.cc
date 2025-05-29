@@ -223,8 +223,9 @@ void Bus::ScanBus(BusScanEntry entry, std::list<BusScanEntry>* scan_list) {
 
       bool is_bridge = ((config->Read(Config::kHeaderType) & PCI_HEADER_TYPE_MASK) ==
                         PCI_HEADER_TYPE_PCI_BRIDGE);
-      zxlogf(TRACE, "\tfound %s at %02x:%02x.%1x", (is_bridge) ? "bridge" : "device", bus_id,
-             dev_id, func_id);
+      zxlogf(TRACE, "\tfound %s at %02x:%02x.%1x VID %#04x DID %#04x",
+             (is_bridge) ? "bridge" : "device", bus_id, dev_id, func_id,
+             config->Read(Config::kVendorId), config->Read(Config::kDeviceId));
 
       inspect::Node node = devices_node_.CreateChild(config->addr());
       // If we found a bridge, add it to our bridge list and initialize /
