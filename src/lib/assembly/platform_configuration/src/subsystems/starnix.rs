@@ -6,7 +6,7 @@ use crate::subsystems::prelude::*;
 use anyhow::ensure;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::starnix_config::{
-    PlatformStarnixConfig, SocketMarkTreatment,
+    PlatformStarnixConfig, RtnetlinkTreatmentOfIfb0Interface, SocketMarkTreatment,
 };
 use starnix_features::{Feature, FeatureAndArgs};
 
@@ -17,7 +17,8 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
         starnix_config: &PlatformStarnixConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let PlatformStarnixConfig { enabled, enable_android_support, socket_mark } = starnix_config;
+        let PlatformStarnixConfig { enabled, enable_android_support, socket_mark, rtnetlink_ifb0 } =
+            starnix_config;
 
         if *enabled {
             ensure!(
@@ -60,16 +61,28 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                         nested_type: ConfigNestedValueType::String { max_size: 1024 },
                         max_count: 1024,
                     },
-                    [match socket_mark {
-                        SocketMarkTreatment::StarnixOnly => None,
-                        SocketMarkTreatment::SharedWithNetstack => Some(
-                            FeatureAndArgs { feature: Feature::NetstackMark, raw_args: None }
-                                .to_string(),
-                        ),
-                    }]
+                    [
+                        match socket_mark {
+                            SocketMarkTreatment::StarnixOnly => None,
+                            SocketMarkTreatment::SharedWithNetstack => Some(FeatureAndArgs {
+                                feature: Feature::NetstackMark,
+                                raw_args: None,
+                            }),
+                        },
+                        match rtnetlink_ifb0 {
+                            RtnetlinkTreatmentOfIfb0Interface::ProvideFake => None,
+                            RtnetlinkTreatmentOfIfb0Interface::NoProvideFake => {
+                                Some(FeatureAndArgs {
+                                    feature: Feature::RtnetlinkAssumeIfb0Existence,
+                                    raw_args: None,
+                                })
+                            }
+                        },
+                    ]
                     .into_iter()
                     .flatten()
-                    .collect::<Vec<String>>()
+                    .map(|feature: FeatureAndArgs| feature.to_string())
+                    .collect::<Vec<_>>()
                     .into(),
                 ),
             )?;

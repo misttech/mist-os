@@ -114,6 +114,10 @@ pub struct KernelFeatures {
 
     /// Allows the netstack to mark packets/sockets.
     pub netstack_mark: bool,
+
+    /// Allows the rtnetlink worker to rely on an `ifb0` interface being present instead of faking
+    /// the existence of one itself.
+    pub rtnetlink_assume_ifb0_existence: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -638,7 +642,9 @@ impl Kernel {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) = Netlink::new(
                 InterfacesHandlerImpl(Arc::downgrade(self)),
-                netlink::FeatureFlags::prod(),
+                netlink::FeatureFlags {
+                    assume_ifb0_existence: self.features.rtnetlink_assume_ifb0_existence,
+                },
             );
             self.kthreads.spawn(move |_, _| {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);

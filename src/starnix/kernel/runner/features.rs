@@ -150,6 +150,7 @@ impl Features {
                         mlock_always_onfault,
                         mlock_pin_flavor,
                         netstack_mark,
+                        rtnetlink_assume_ifb0_existence,
                     },
                 selinux,
                 ashmem,
@@ -253,6 +254,10 @@ impl Features {
                     inspect_node
                         .record_string("mlock_pin_flavor", format!("{:?}", mlock_pin_flavor));
                     inspect_node.record_bool("netstack_mark", *netstack_mark);
+                    inspect_node.record_bool(
+                        "rtnetlink_assume_ifb0_existence",
+                        *rtnetlink_assume_ifb0_existence,
+                    );
                 });
             }
         });
@@ -349,6 +354,9 @@ pub fn parse_features(
                 return Err(anyhow!("Perfetto Producer feature must contain a socket path"));
             }
             (Feature::RootfsRw, _) => features.rootfs_rw = true,
+            (Feature::RtnetlinkAssumeIfb0Existence, _) => {
+                features.kernel.rtnetlink_assume_ifb0_existence = true;
+            }
             (Feature::SelfProfile, _) => features.self_profile = true,
             (Feature::Selinux, arg) => {
                 features.selinux = SELinuxFeature {
