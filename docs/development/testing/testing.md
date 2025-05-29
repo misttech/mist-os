@@ -13,7 +13,7 @@ fx build
 fx qemu
 
 # Build and run arm64.
-fx set bringup_with_tests.arm64 --with-base
+fx set bringup_with_tests.arm64
 
 fx build
 
