@@ -78,4 +78,15 @@ ErrorOrString LastRebootUptimeAnnotation(const RebootLog& reboot_log) {
   return ErrorOrString(Error::kMissingValue);
 }
 
+ErrorOrString LastRebootRuntimeAnnotation(const RebootLog& reboot_log) {
+  if (reboot_log.Runtime().has_value()) {
+    const auto runtime = FormatDuration(*reboot_log.Runtime());
+    if (runtime.has_value()) {
+      return ErrorOrString(*runtime);
+    }
+  }
+
+  return ErrorOrString(Error::kMissingValue);
+}
+
 }  // namespace forensics::feedback

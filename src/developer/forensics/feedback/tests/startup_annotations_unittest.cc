@@ -65,6 +65,7 @@ TEST_F(StartupAnnotationsTest, Keys) {
                                        Key(kSystemBootIdCurrentKey),
                                        Key(kSystemBootIdPreviousKey),
                                        Key(kSystemLastRebootReasonKey),
+                                       Key(kSystemLastRebootRuntimeKey),
                                        Key(kSystemLastRebootUptimeKey),
                                    }));
 }
@@ -112,6 +113,7 @@ TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
           Pair(kSystemBootIdCurrentKey, ErrorOrString("current-boot-id")),
           Pair(kSystemBootIdPreviousKey, ErrorOrString("previous-boot-id")),
           Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
+          Pair(kSystemLastRebootRuntimeKey, LastRebootRuntimeAnnotation(reboot_log)),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
 }
 
@@ -137,6 +139,7 @@ TEST_F(StartupAnnotationsTest, Values_FilesMissing) {
           Pair(kSystemBootIdCurrentKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kSystemBootIdPreviousKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
+          Pair(kSystemLastRebootRuntimeKey, LastRebootRuntimeAnnotation(reboot_log)),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
 }
 
@@ -171,7 +174,8 @@ TEST_F(StartupAnnotationsTest, BuildProductVersionPreviousBootFallback) {
           Pair(kBuildProductVersionPreviousBootKey, ErrorOrString("previous-version")),
           Pair(kBuildIsDebugKey, _), Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
           Pair(kSystemBootIdCurrentKey, _), Pair(kSystemBootIdPreviousKey, _),
-          Pair(kSystemLastRebootReasonKey, _), Pair(kSystemLastRebootUptimeKey, _)));
+          Pair(kSystemLastRebootReasonKey, _), Pair(kSystemLastRebootRuntimeKey, _),
+          Pair(kSystemLastRebootUptimeKey, _)));
 }
 
 }  // namespace

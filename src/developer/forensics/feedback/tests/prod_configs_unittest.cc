@@ -118,6 +118,7 @@ TEST_F(ProdConfigTest, DefaultSnapshot) {
                                                "system.boot-id.current",
                                                "system.boot-id.previous",
                                                "system.last-reboot.reason",
+                                               "system.last-reboot.runtime",
                                                "system.last-reboot.uptime",
                                                "system.locale.primary",
                                                "system.timezone.primary",
