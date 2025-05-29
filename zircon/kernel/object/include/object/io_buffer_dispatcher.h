@@ -100,6 +100,16 @@ class IoBufferDispatcher : public PeeredDispatcher<IoBufferDispatcher, ZX_DEFAUL
       ZX_DEBUG_ASSERT(ep_vmos_[1]);
     }
 
+    // Move only.
+    IobRegion(IobRegion&&) = default;
+    IobRegion& operator=(IobRegion&&) = default;
+
+    ~IobRegion() {
+      if (mapping_) {
+        mapping_->Destroy();
+      }
+    }
+
     zx_iob_region_t region() const { return region_; }
 
     zx_rights_t GetMapRights(IobEndpointId id) const {
