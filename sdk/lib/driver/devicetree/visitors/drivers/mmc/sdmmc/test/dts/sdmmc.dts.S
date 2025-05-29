@@ -20,4 +20,10 @@
 		no-mmc-hsddr;
 	};
 
+	sdhci@fe000000 {
+		compatible = "test-sdmmc";
+		reg = <0x0 0xfe000000 0x0 0x2000>;
+		non-removable;
+	};
+
 };
