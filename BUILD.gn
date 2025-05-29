@@ -2371,9 +2371,6 @@ group("root_targets") {
     # `target_cpu` architecture.
     "//sdk:final_fuchsia_sdk_head_only",
 
-    # The final Fuchsia IDK built from Bazel.
-    "//sdk:bazel_built_final_fuchsia_idk_bazel_sdk_tests",
-
     # This target is listed explicitly by multiple CI bot build configurations.
     # See https://fxbug.dev/42162374 for context.
     "//build/images:record_filesystem_sizes",

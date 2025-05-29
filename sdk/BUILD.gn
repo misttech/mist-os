@@ -192,7 +192,7 @@ template("final_fuchsia_idk_for_cpus_and_levels") {
 
 # Generates the "final" IDK archive, including prebuilt binaries for all
 # supported target_cpu architectures on all Supported API levels.
-final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
+bazel_build_action("final_fuchsia_idk.exported") {
   visibility = []
   visibility = [
     ":final_fuchsia_idk",
@@ -205,13 +205,10 @@ final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
     ":final_fuchsia_sdk",
   ]
 
-  output_name = "fuchsia_idk"
-  target_cpus = idk_buildable_cpus
-  api_levels = idk_buildable_api_levels
-}
+  # The following are implicit.
+  # target_cpus = idk_buildable_cpus
+  # api_levels = idk_buildable_api_levels
 
-bazel_build_action("bazel_built_fuchsia_idk") {
-  testonly = true
   bazel_target = "//build/bazel/bazel_sdk:final_fuchsia_idk"
   deps = [
     "//sdk:fuchsia_collection_all_subbuilds_for_merge",
@@ -223,10 +220,12 @@ bazel_build_action("bazel_built_fuchsia_idk") {
   directory_outputs = [
     {
       bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
-      ninja_dir = "sdk/exported/bazel_built_final_idk"
+      ninja_dir = "sdk/exported/fuchsia_idk"
       tracked_files = [ "meta/manifest.json" ]
     },
   ]
+
+  no_sdk = true
 }
 
 idk_archive("final_fuchsia_idk.archive") {
@@ -262,15 +261,6 @@ run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests") {
   target_cpus = idk_buildable_cpus
   idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
   idk_exported_target = "//sdk:final_fuchsia_idk.exported"
-}
-
-# Same as above but for the IDK built in Bazel.
-# TODO(https://fxbug.dev/413071161) Replace the contents of the target above
-# when switching to the IDK built in Bazel.
-run_fuchsia_bazel_sdk_tests("bazel_built_final_fuchsia_idk_bazel_sdk_tests") {
-  target_cpus = idk_buildable_cpus
-  idk_exported_path = "$root_build_dir/sdk/exported/bazel_built_final_idk"
-  idk_exported_target = "//sdk:bazel_built_fuchsia_idk"
 }
 
 # This target generates a Fuchsia Bazel SDK directory directly
@@ -337,8 +327,7 @@ if (!is_host) {
     ]
     subbuilds_visibility = [
       ":final_fuchsia_idk.exported",
-      ":bazel_built_fuchsia_idk",
-      ":bazel_built_fuchsia_idk.bazel_inputs",
+      ":final_fuchsia_idk.exported.bazel_inputs",
     ]
 
     forward_variables_from(fuchsia_idk_contents, "*")
