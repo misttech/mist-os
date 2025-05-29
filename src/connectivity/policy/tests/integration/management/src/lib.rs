@@ -1577,19 +1577,19 @@ mod dhcpv6_helper {
         let buf: packet::Either<EmptyBuf, _> =
             dhcpv6::MessageBuilder::new(msg_type, tx_id, &options)
                 .into_serializer()
-                .encapsulate(UdpPacketBuilder::new(
+                .wrap_in(UdpPacketBuilder::new(
                     SERVER_ADDR,
                     client_addr,
                     Some(DHCPV6_SERVER_PORT),
                     DHCPV6_CLIENT_PORT,
                 ))
-                .encapsulate(Ipv6PacketBuilder::new(
+                .wrap_in(Ipv6PacketBuilder::new(
                     SERVER_ADDR,
                     client_addr,
                     64, /* ttl */
                     Ipv6Proto::Proto(IpProto::Udp),
                 ))
-                .encapsulate(EthernetFrameBuilder::new(
+                .wrap_in(EthernetFrameBuilder::new(
                     Mac::BROADCAST,
                     Mac::BROADCAST,
                     EtherType::Ipv6,

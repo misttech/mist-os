@@ -116,19 +116,19 @@ fn reply_if_echo_request(
             .then(|| {
                 icmp_body
                     .into_serializer()
-                    .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv4, _>::new(
+                    .wrap_in(IcmpPacketBuilder::<net_types::ip::Ipv4, _>::new(
                         dst_ip,
                         src_ip,
                         IcmpZeroCode,
                         message.reply(),
                     ))
-                    .encapsulate(Ipv4PacketBuilder::new(
+                    .wrap_in(Ipv4PacketBuilder::new(
                         dst_ip,
                         src_ip,
                         ipv4_consts::DEFAULT_TTL,
                         Ipv4Proto::Icmp,
                     ))
-                    .encapsulate(EthernetFrameBuilder::new(
+                    .wrap_in(EthernetFrameBuilder::new(
                         dst_mac,
                         src_mac,
                         EtherType::Ipv4,
@@ -168,19 +168,19 @@ fn reply_if_echo_request(
             .then(|| {
                 icmp_body
                     .into_serializer()
-                    .encapsulate(IcmpPacketBuilder::<net_types::ip::Ipv6, _>::new(
+                    .wrap_in(IcmpPacketBuilder::<net_types::ip::Ipv6, _>::new(
                         dst_ip,
                         src_ip,
                         IcmpZeroCode,
                         message.reply(),
                     ))
-                    .encapsulate(Ipv6PacketBuilder::new(
+                    .wrap_in(Ipv6PacketBuilder::new(
                         dst_ip,
                         src_ip,
                         ipv6_consts::DEFAULT_HOP_LIMIT,
                         Ipv6Proto::Icmpv6,
                     ))
-                    .encapsulate(EthernetFrameBuilder::new(
+                    .wrap_in(EthernetFrameBuilder::new(
                         dst_mac,
                         src_mac,
                         EtherType::Ipv6,
