@@ -394,7 +394,10 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
     #[cfg(not(is_debug))]
     track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
 
-    FsNodeSidAndClass { sid: InitialSid::Unlabeled.into(), class: FileClass::File.into() }
+    FsNodeSidAndClass {
+        sid: SecurityId::initial(InitialSid::Unlabeled),
+        class: FileClass::File.into(),
+    }
 }
 
 /// Perform the specified check as would `check_permission()`, but report denials as "todo_deny" in
@@ -544,12 +547,12 @@ pub(super) struct TaskAttrs {
 impl TaskAttrs {
     /// Returns initial state for kernel tasks.
     pub(super) fn for_kernel() -> Self {
-        Self::for_sid(InitialSid::Kernel.into())
+        Self::for_sid(SecurityId::initial(InitialSid::Kernel))
     }
 
     /// Returns placeholder state for use when SELinux is not enabled.
     pub(super) fn for_selinux_disabled() -> Self {
-        Self::for_sid(InitialSid::Unlabeled.into())
+        Self::for_sid(SecurityId::initial(InitialSid::Unlabeled))
     }
 
     /// Used to create initial state for tasks with a specified SID.
@@ -889,7 +892,7 @@ fn get_cached_sid_and_class(fs_node: &FsNode) -> Option<FsNodeSidAndClass> {
                 .upgrade()
                 .map(|t| t.security_state.lock().current_sid)
                 // If `upgrade()` fails then the `Task` has exited, so return a placeholder SID.
-                .unwrap_or_else(|| InitialSid::Unlabeled.into()),
+                .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled)),
         ),
         FsNodeLabel::Uninitialized => None,
     }

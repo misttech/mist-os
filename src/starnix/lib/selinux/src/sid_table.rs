@@ -104,7 +104,7 @@ impl SidTable {
     /// context is returned instead.
     pub fn sid_to_security_context(&self, sid: SecurityId) -> &SecurityContext {
         &self.try_sid_to_security_context(sid).unwrap_or_else(|| {
-            self.try_sid_to_security_context(InitialSid::Unlabeled.into()).unwrap()
+            self.try_sid_to_security_context(SecurityId::initial(InitialSid::Unlabeled)).unwrap()
         })
     }
 
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn initial_sids_remapped_to_dynamic_sids() {
-        let file_initial_sid = InitialSid::File.into();
+        let file_initial_sid = SecurityId::initial(InitialSid::File);
         let policy = test_policy();
         let mut sid_table = SidTable::new(policy);
         let file_initial_security_context = sid_table.sid_to_security_context(file_initial_sid);
