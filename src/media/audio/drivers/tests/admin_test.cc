@@ -813,6 +813,12 @@ void AdminTest::ValidateElement(const fhasp::Element& element) {
       << "ElementTypeSpecific should " << (should_have_type_specific ? "" : "not")
       << " be set, for this ElementType";
 
+  // can_bypass: Optional, but DAI_INTERCONNECT and RING_BUFFER elements must not set to true.
+  EXPECT_FALSE((element.type() == fhasp::ElementType::DAI_INTERCONNECT ||
+                element.type() == fhasp::ElementType::RING_BUFFER) &&
+               element.has_can_bypass() && element.can_bypass())
+      << "DAI_INTERCONNECT and RING_BUFFER elements must not set 'can_bypass'";
+
   // can_disable | type_specific.endpoint: Deprecated (removed in SDK 20), thus disallowed.
   EXPECT_FALSE(element.has_can_disable());
   EXPECT_FALSE(element.has_type_specific() && element.type_specific().is_endpoint());

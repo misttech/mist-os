@@ -151,6 +151,8 @@ type Element = table {
 
     /// If true, the processing element can be bypassed via `SetElementState`.
     /// If not included or false, the processing element cannot be bypassed.
+    /// By definition, elements of type DAI_INTERCONNECT or RING_BUFFER cannot be bypassed and
+    /// must never set this field to true.
     ///
     /// Optional.
     @available(added=20)
