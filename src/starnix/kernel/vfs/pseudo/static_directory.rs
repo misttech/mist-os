@@ -55,7 +55,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
         creds: FsCred,
     ) {
         let ops = ops.into();
-        let node = self.fs.create_node(current_task, ops, |id| {
+        let node = self.fs.create_node_and_allocate_node_id(current_task, ops, |id| {
             let mut info = FsNodeInfo::new(id, mode, creds);
             info.rdev = dev;
             info
@@ -97,7 +97,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
 
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
     pub fn build(self, current_task: &CurrentTask) -> FsNodeHandle {
-        self.fs.create_node(
+        self.fs.create_node_and_allocate_node_id(
             current_task,
             Arc::new(StaticDirectory { entries: self.entries }),
             FsNodeInfo::new_factory(self.mode, self.creds),

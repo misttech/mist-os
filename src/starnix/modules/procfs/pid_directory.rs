@@ -127,7 +127,7 @@ impl TaskDirectory {
     ) -> FsNodeHandle {
         let creds = task.creds().euid_as_fscred();
         let task_weak = WeakRef::from(task);
-        fs.create_node(
+        fs.create_node_and_allocate_node_id(
             current_task,
             TaskDirectoryNode(Arc::new(TaskDirectory {
                 task_weak,
@@ -268,7 +268,7 @@ impl FsNodeOps for TaskDirectoryNode {
             ),
         };
 
-        Ok(fs.create_node_with_id(current_task, ops, inode, FsNodeInfo::new(inode, mode, creds)))
+        Ok(fs.create_node_with_info(current_task, ops, FsNodeInfo::new(inode, mode, creds)))
     }
 }
 
@@ -371,7 +371,7 @@ impl FsNodeOps for FdDirectory {
         // Make sure that the file descriptor exists before creating the node.
         let _ = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
         let task_reference = self.task.clone();
-        Ok(node.fs().create_node(
+        Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             CallbackSymlinkNode::new(move || {
                 let task = Task::from_weak(&task_reference)?;
@@ -484,8 +484,13 @@ impl FsNodeOps for NsDirectory {
                 return error!(ENOENT);
             }
             let node_info = || FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred());
-            let fallback =
-                || node.fs().create_node(current_task, BytesFile::new_node(vec![]), node_info());
+            let fallback = || {
+                node.fs().create_node_and_allocate_node_id(
+                    current_task,
+                    BytesFile::new_node(vec![]),
+                    node_info(),
+                )
+            };
             Ok(match ns {
                 "cgroup" => {
                     track_stub!(TODO("https://fxbug.dev/297313673"), "cgroup namespaces");
@@ -495,7 +500,7 @@ impl FsNodeOps for NsDirectory {
                     track_stub!(TODO("https://fxbug.dev/297313673"), "ipc namespaces");
                     fallback()
                 }
-                "mnt" => node.fs().create_node(
+                "mnt" => node.fs().create_node_and_allocate_node_id(
                     current_task,
                     current_task.task.fs().namespace(),
                     node_info(),
@@ -536,7 +541,7 @@ impl FsNodeOps for NsDirectory {
         } else {
             // The name is {namespace}, link to the correct one of the current task.
             let id = current_task.task.fs().namespace().id;
-            Ok(node.fs().create_node(
+            Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 CallbackSymlinkNode::new(move || {
                     Ok(SymlinkTarget::Path(format!("{name}:[{id}]").into()))
@@ -590,7 +595,7 @@ impl FsNodeOps for FdInfoDirectory {
         let pos = *file.offset.lock();
         let flags = file.flags();
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
-        Ok(node.fs().create_node(
+        Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             BytesFile::new_node(data),
             FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred()),

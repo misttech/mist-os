@@ -89,22 +89,22 @@ impl FsNodeOps for ThermalZoneDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            b"temp" => Ok(node.fs().create_node(
+            b"temp" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 TemperatureFile::new_node(self.proxy.clone()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o664), FsCred::root()),
             )),
-            b"type" => Ok(node.fs().create_node(
+            b"type" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(format!("{}\n", self.device_type).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
-            b"policy" => Ok(node.fs().create_node(
+            b"policy" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(format!("{}\n", "step_wise").into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
-            b"available_policies" => Ok(node.fs().create_node(
+            b"available_policies" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(format!("{}\n", "step_wise").into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),

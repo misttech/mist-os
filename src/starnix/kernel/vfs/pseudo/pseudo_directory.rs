@@ -164,7 +164,7 @@ impl FsNodeOps for Arc<PseudoDirectory> {
             .map(|entry| {
                 let ops = (entry.node_ops_factory)();
                 let info = FsNodeInfo::new(entry.ino, entry.mode, entry.creds);
-                node.fs().create_node_with_id(current_task, ops, entry.ino, info)
+                node.fs().create_node_with_info(current_task, ops, info)
             })
             .ok_or_else(|| {
                 errno!(

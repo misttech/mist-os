@@ -657,10 +657,9 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
-        let child = fs.create_node_with_id(
+        let child = fs.create_node_with_info(
             current_task,
             ops,
-            node_id,
             FsNodeInfo { rdev: dev, ..FsNodeInfo::new(node_id, mode, owner) },
         );
         Ok(child)
@@ -718,12 +717,8 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
-        let child = fs.create_node_with_id(
-            current_task,
-            ops,
-            node_id,
-            FsNodeInfo::new(node_id, mode, owner),
-        );
+        let child =
+            fs.create_node_with_info(current_task, ops, FsNodeInfo::new(node_id, mode, owner));
         Ok(child)
     }
 
@@ -963,10 +958,9 @@ impl FsNodeOps for RemoteNode {
         } else {
             fs.next_node_id()
         };
-        let symlink = fs.create_node_with_id(
+        let symlink = fs.create_node_with_info(
             current_task,
             RemoteSymlink { zxio: Mutex::new(zxio) },
-            node_id,
             FsNodeInfo {
                 size: target.len(),
                 ..FsNodeInfo::new(node_id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner)
@@ -1035,12 +1029,8 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
-        let child = fs.create_node_with_id(
-            current_task,
-            ops,
-            node_id,
-            FsNodeInfo::new(node_id, mode, owner),
-        );
+        let child =
+            fs.create_node_with_info(current_task, ops, FsNodeInfo::new(node_id, mode, owner));
 
         Ok(child)
     }

@@ -152,7 +152,7 @@ impl DirectoryNodes {
         fs: &FileSystemHandle,
     ) -> FsNodeHandle {
         let id = cgroup.id();
-        let node = fs.create_node(
+        let node = fs.create_node_and_allocate_node_id(
             current_task,
             directory,
             FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),

@@ -68,7 +68,7 @@ impl TraceFs {
 
         dir.node(
             "trace",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 TraceFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
@@ -94,7 +94,7 @@ impl TraceFs {
                     };
                     dir.node(
                         "trace_pipe_raw",
-                        fs.create_node(
+                        fs.create_node_and_allocate_node_id(
                             current_task,
                             ops,
                             FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -123,7 +123,7 @@ impl TraceFs {
             });
             dir.node(
                 "enable",
-                fs.create_node(
+                fs.create_node_and_allocate_node_id(
                     current_task,
                     TraceBytesFile::new_node(),
                     FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
@@ -135,7 +135,7 @@ impl TraceFs {
         });
         dir.node(
             "tracing_on",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 TracingOnFile::new_node(trace_event_queue.clone()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
@@ -143,7 +143,7 @@ impl TraceFs {
         );
         dir.node(
             "current_tracer",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 ConstFile::new_node("nop".into()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
@@ -151,7 +151,7 @@ impl TraceFs {
         );
         dir.node(
             "trace_marker",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 TraceMarkerFile::new_node(trace_event_queue.clone()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
@@ -159,7 +159,7 @@ impl TraceFs {
         );
         dir.node(
             "printk_formats",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 TraceBytesFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
@@ -167,7 +167,7 @@ impl TraceFs {
         );
         dir.node(
             "trace_clock",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 ConstFile::new_node(
                     "[local] global counter uptime perf mono mono_raw boot tai x86-tsc ".into(),
@@ -177,7 +177,7 @@ impl TraceFs {
         );
         dir.node(
             "buffer_size_kb",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 ConstFile::new_node("7".into()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),

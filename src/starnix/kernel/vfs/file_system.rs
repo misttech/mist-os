@@ -260,28 +260,26 @@ impl FileSystem {
     /// File systems that produce their own IDs for nodes should invoke this
     /// function. The ones who leave to this object to assign the IDs should
     /// call |create_node|.
-    pub fn create_node_with_id(
+    pub fn create_node_with_info(
         self: &Arc<Self>,
         current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
-        id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        let node = FsNode::new_uncached(current_task, ops, self, id, info);
+        let node = FsNode::new_uncached(current_task, ops, self, info.ino, info);
         self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
         node
     }
 
-    pub fn create_node(
+    pub fn create_node_and_allocate_node_id(
         self: &Arc<Self>,
         current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
-        info: impl FnOnce(ino_t) -> FsNodeInfo,
+        create_info_fn: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FsNodeHandle {
-        let ops = ops.into();
-        let node_id = self.next_node_id();
-        self.create_node_with_id(current_task, ops, node_id, info(node_id))
+        let info = create_info_fn(self.next_node_id());
+        self.create_node_with_info(current_task, ops, info)
     }
 
     /// Remove the given FsNode from the node cache.

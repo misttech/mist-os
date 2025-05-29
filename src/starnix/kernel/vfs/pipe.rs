@@ -397,7 +397,7 @@ pub fn new_pipe(
         .get::<FsRegistry>()
         .create(locked, current_task, "pipefs".into(), FileSystemOptions::default())
         .ok_or_else(|| errno!(EINVAL))??;
-    let node = fs.create_node(current_task, SpecialNode, |id| {
+    let node = fs.create_node_and_allocate_node_id(current_task, SpecialNode, |id| {
         let mut info = FsNodeInfo::new(id, mode!(IFIFO, 0o600), current_task.as_fscred());
         info.blksize = ATOMIC_IO_BYTES.into();
         info

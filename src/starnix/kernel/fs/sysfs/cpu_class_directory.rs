@@ -89,17 +89,17 @@ impl FsNodeOps for CpuClassDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            name if name.starts_with(b"cpu") => Ok(node.fs().create_node(
+            name if name.starts_with(b"cpu") => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 TmpfsDirectory::new(),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
             )),
-            b"online" => Ok(node.fs().create_node(
+            b"online" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
-            b"possible" => Ok(node.fs().create_node(
+            b"possible" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -108,7 +108,7 @@ impl FsNodeOps for CpuClassDirectory {
                 let mut child_kobject: Option<std::sync::Arc<KObject>> =
                     self.kobject().get_child(name);
                 if let Some(kobject) = child_kobject.take() {
-                    Ok(node.fs().create_node(
+                    Ok(node.fs().create_node_and_allocate_node_id(
                         current_task,
                         kobject.ops(),
                         FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),

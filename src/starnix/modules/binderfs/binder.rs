@@ -5263,12 +5263,14 @@ impl FsNodeOps for BinderFsDir {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         if name == FEATURES_DIR {
-            Ok(node.fs().create_node(current_task, BinderFeaturesDir::new(), |ino| {
-                FsNodeInfo::new(ino, mode!(IFDIR, 0o755), FsCred::root())
-            }))
+            Ok(node.fs().create_node_and_allocate_node_id(
+                current_task,
+                BinderFeaturesDir::new(),
+                |ino| FsNodeInfo::new(ino, mode!(IFDIR, 0o755), FsCred::root()),
+            ))
         } else if let Some(dev) = self.devices.get(name) {
             let mode = if name == "remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
-            Ok(node.fs().create_node(current_task, SpecialNode, |ino| {
+            Ok(node.fs().create_node_and_allocate_node_id(current_task, SpecialNode, |ino| {
                 let mut info = FsNodeInfo::new(ino, mode, FsCred::root());
                 info.rdev = *dev;
                 info
@@ -5332,7 +5334,7 @@ impl FsNodeOps for BinderFeaturesDir {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         if let Some(enable) = self.features.get(name) {
-            return Ok(node.fs().create_node(
+            return Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(if *enable { b"1\n" } else { b"0\n" }.to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -7863,7 +7865,7 @@ pub mod tests {
     ) -> FileHandle {
         // `open()` requires an `FsNode` so create one in `AnonFs`.
         let fs = anon_fs(current_task.kernel());
-        let node = fs.create_node(
+        let node = fs.create_node_and_allocate_node_id(
             &current_task,
             Anon::new_for_binder_device(),
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),

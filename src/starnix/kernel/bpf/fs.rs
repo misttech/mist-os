@@ -346,7 +346,7 @@ impl BpfFsDir {
             &node.mount,
             name,
             |_locked, dir, _mount, _name| {
-                Ok(dir.fs().create_node(
+                Ok(dir.fs().create_node_and_allocate_node_id(
                     current_task,
                     BpfFsObject::new(object),
                     FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
@@ -379,7 +379,7 @@ impl FsNodeOps for BpfFsDir {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        Ok(node.fs().create_node(
+        Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             BpfFsDir::new(),
             FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),

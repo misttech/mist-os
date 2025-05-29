@@ -15,7 +15,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, mode};
 
 pub fn kmsg_file(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    fs.create_node(
+    fs.create_node_and_allocate_node_id(
         current_task,
         SimpleFileNode::new(|| Ok(KmsgFile)),
         FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root()),

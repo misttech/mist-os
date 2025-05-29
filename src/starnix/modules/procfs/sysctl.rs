@@ -48,7 +48,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
     dir.subdir(current_task, "crypto", 0o555, |dir| {
         dir.node(
             "fips_enabled",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"0\n".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -56,7 +56,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "fips_name",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"Linux Kernel Cryptographic API\n".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -64,7 +64,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "fips_version",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -74,7 +74,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
     dir.subdir(current_task, "kernel", 0o555, |dir| {
         dir.node(
             "cap_last_cap",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(|| Ok(format!("{}\n", CAP_LAST_CAP))),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -82,7 +82,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "core_pattern",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 // TODO(https://fxbug.dev/322873960): Use the core pattern when generating a core dump.
                 BytesFile::new_node(b"core".to_vec()),
@@ -343,7 +343,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "osrelease",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_RELEASE))),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -351,7 +351,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "ostype",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"Linux\n".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -359,7 +359,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "overflowuid",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
                 FsNodeInfo::new_factory(mode, FsCred::root()),
@@ -367,7 +367,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "overflowgid",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
                 FsNodeInfo::new_factory(mode, FsCred::root()),
@@ -375,7 +375,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "printk",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"4\t4\t1\t7\n".to_vec()),
                 FsNodeInfo::new_factory(mode, FsCred::root()),
@@ -383,7 +383,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "pid_max",
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"4194304".to_vec()),
                 FsNodeInfo::new_factory(mode, FsCred::root()),
@@ -422,7 +422,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
     dir.node("net", sysctl_net_diretory(current_task, fs));
     dir.node(
         "version",
-        fs.create_node(
+        fs.create_node_and_allocate_node_id(
             current_task,
             BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
             FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),

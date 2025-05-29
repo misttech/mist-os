@@ -218,7 +218,7 @@ fn create_child_node(
         }
         _ => return error!(EACCES),
     };
-    let child = parent.fs().create_node(current_task, ops, move |id| {
+    let child = parent.fs().create_node_and_allocate_node_id(current_task, ops, move |id| {
         let mut info = FsNodeInfo::new(id, mode, owner);
         info.rdev = dev;
         // blksize is PAGE_SIZE for in memory node.
@@ -258,7 +258,7 @@ impl FsNodeOps for TmpfsDirectory {
             info.link_count += 1;
         });
         self.child_count.fetch_add(1, Ordering::Release);
-        Ok(node.fs().create_node(
+        Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             TmpfsDirectory::new(),
             FsNodeInfo::new_factory(mode, owner),
@@ -291,7 +291,7 @@ impl FsNodeOps for TmpfsDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         self.child_count.fetch_add(1, Ordering::Release);
         let (link, info) = SymlinkNode::new(target, owner);
-        Ok(node.fs().create_node(current_task, link, info))
+        Ok(node.fs().create_node_and_allocate_node_id(current_task, link, info))
     }
 
     fn create_tmpfile(

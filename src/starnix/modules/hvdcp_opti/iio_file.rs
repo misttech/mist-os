@@ -77,7 +77,7 @@ impl FsNodeOps for IioDirectory0 {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let iio_create_file = |value| {
-            Ok(node.fs().create_node(
+            Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(value),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -102,7 +102,7 @@ impl FsNodeOps for IioDirectory0 {
         };
 
         let create_invalid = || {
-            Ok(node.fs().create_node(
+            Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 InvalidFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -184,7 +184,7 @@ impl FsNodeOps for IioDirectory1 {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let iio_create_file = |value| {
-            Ok(node.fs().create_node(
+            Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(value),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),

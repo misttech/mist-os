@@ -76,7 +76,7 @@ impl CgroupDirectory {
         assert!(interface_files.is_empty(), "init is only called once");
         interface_files.insert(
             PROCS_FILE.into(),
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 ControlGroupNode::new(self.cgroup.clone()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
@@ -84,7 +84,7 @@ impl CgroupDirectory {
         );
         interface_files.insert(
             CONTROLLERS_FILE.into(),
-            fs.create_node(
+            fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -102,7 +102,7 @@ impl CgroupDirectory {
         let interface_files = BTreeMap::from([
             (
                 PROCS_FILE.into(),
-                fs.create_node(
+                fs.create_node_and_allocate_node_id(
                     current_task,
                     ControlGroupNode::new(cgroup.clone()),
                     FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
@@ -110,7 +110,7 @@ impl CgroupDirectory {
             ),
             (
                 CONTROLLERS_FILE.into(),
-                fs.create_node(
+                fs.create_node_and_allocate_node_id(
                     current_task,
                     BytesFile::new_node(b"".to_vec()),
                     FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -118,7 +118,7 @@ impl CgroupDirectory {
             ),
             (
                 FREEZE_FILE.into(),
-                fs.create_node(
+                fs.create_node_and_allocate_node_id(
                     current_task,
                     FreezeFile::new_node(cgroup.clone()),
                     FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
@@ -126,7 +126,7 @@ impl CgroupDirectory {
             ),
             (
                 EVENTS_FILE.into(),
-                fs.create_node(
+                fs.create_node_and_allocate_node_id(
                     current_task,
                     EventsFile::new_node(cgroup.clone()),
                     FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
@@ -134,7 +134,7 @@ impl CgroupDirectory {
             ),
             (
                 KILL_FILE.into(),
-                fs.create_node(
+                fs.create_node_and_allocate_node_id(
                     current_task,
                     KillFile::new_node(cgroup.clone()),
                     FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),

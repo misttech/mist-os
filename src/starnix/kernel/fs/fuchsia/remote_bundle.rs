@@ -416,11 +416,9 @@ impl FsNodeOps for DirectoryObject {
         let info = to_fs_node_info(inode_num, metadata_node);
 
         match metadata_node.info() {
-            NodeInfo::Symlink(_) => {
-                Ok(fs.create_node_with_id(current_task, SymlinkObject, inode_num, info))
-            }
+            NodeInfo::Symlink(_) => Ok(fs.create_node_with_info(current_task, SymlinkObject, info)),
             NodeInfo::Directory(_) => {
-                Ok(fs.create_node_with_id(current_task, DirectoryObject, inode_num, info))
+                Ok(fs.create_node_with_info(current_task, DirectoryObject, info))
             }
             NodeInfo::File(_) => {
                 let (file, server_end) = fidl::endpoints::create_sync_proxy::<fio::FileMarker>();
@@ -433,10 +431,9 @@ impl FsNodeOps for DirectoryObject {
                         server_end.into_channel(),
                     )
                     .map_err(|_| errno!(EIO))?;
-                Ok(fs.create_node_with_id(
+                Ok(fs.create_node_with_info(
                     current_task,
                     File { inner: Mutex::new(Inner::NeedsVmo(file)) },
-                    inode_num,
                     info,
                 ))
             }

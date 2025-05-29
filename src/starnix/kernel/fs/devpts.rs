@@ -250,7 +250,7 @@ impl FsNodeOps for DevPtsRootDir {
             let mut info = FsNodeInfo::new(PTMX_NODE_ID, mode!(IFCHR, 0o666), FsCred::root());
             info.rdev = DeviceType::PTMX;
             info.blksize = BLOCK_SIZE;
-            let node = node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
+            let node = node.fs().create_node_with_info(current_task, SpecialNode, info);
             return Ok(node);
         }
         if let Ok(id) = name.parse::<u32>() {
@@ -270,7 +270,7 @@ impl FsNodeOps for DevPtsRootDir {
                         .expect("DevPts should only handle `DevPtsFs`s");
                     info.uid = devptsfs.uid.unwrap_or_else(|| current_task.creds().uid);
                     info.gid = devptsfs.gid.unwrap_or_else(|| current_task.creds().gid);
-                    let node = fs.create_node_with_id(current_task, SpecialNode, info.ino, info);
+                    let node = fs.create_node_with_info(current_task, SpecialNode, info);
                     return Ok(node);
                 }
             }

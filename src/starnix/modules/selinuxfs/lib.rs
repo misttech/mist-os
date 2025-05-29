@@ -240,7 +240,7 @@ impl SeLinuxFs {
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
         let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
-        let null_fs_node = fs.create_node(current_task, null_ops, |id| {
+        let null_fs_node = fs.create_node_and_allocate_node_id(current_task, null_ops, |id| {
             let mut info = FsNodeInfo::new(id, mode!(IFCHR, 0o666), FsCred::root());
             info.rdev = DeviceType::NULL;
             info
@@ -722,7 +722,7 @@ impl FsNodeOps for BooleansDirectory {
         let utf8_name = String::from_utf8(name.to_vec()).map_err(|_| errno!(ENOENT))?;
         if self.security_server.conditional_booleans().contains(&utf8_name) {
             profile_duration!("selinuxfs.booleans.lookup");
-            Ok(node.fs().create_node(
+            Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BooleanFile::new_node(self.security_server.clone(), utf8_name),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), current_task.as_fscred()),
@@ -941,7 +941,7 @@ impl FsNodeOps for PermsDirectory {
             .ok_or_else(|| errno!(ENOENT))?
             .0;
 
-        Ok(node.fs().create_node(
+        Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
             FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
