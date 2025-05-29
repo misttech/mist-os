@@ -10,6 +10,7 @@ libs = [
   "buildid",
   "compat_info",
   "daemonize",
+  "diagnostics",
   "discovery",
   "doctor_utils",
   "emulator_instance",
