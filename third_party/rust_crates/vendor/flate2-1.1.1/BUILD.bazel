@@ -20,19 +20,22 @@ package(
 
 package_info(
     name = "package_info",
-    package_name = "zip",
-    package_url = "https://github.com/mvdnes/zip-rs.git",
-    package_version = "0.5.5",
+    package_name = "flate2",
+    package_url = "https://github.com/rust-lang/flate2-rs",
+    package_version = "1.1.1",
 )
 
 license(
     name = "license",
-    license_kinds = ["@rules_license//licenses/spdx:MIT"],
-    license_text = "LICENSE",
+    license_kinds = [
+        "@rules_license//licenses/spdx:Apache-2.0",
+        "@rules_license//licenses/spdx:MIT",
+    ],
+    license_text = "LICENSE-APACHE",
 )
 
 rust_library(
-    name = "zip",
+    name = "flate2",
     srcs = glob(
         include = ["**/*.rs"],
         allow_empty = False,
@@ -50,8 +53,9 @@ rust_library(
         ],
     ),
     crate_features = [
-        "deflate",
-        "flate2",
+        "any_impl",
+        "miniz_oxide",
+        "rust_backend",
     ],
     crate_root = "src/lib.rs",
     edition = "2018",
@@ -60,7 +64,7 @@ rust_library(
     ],
     tags = [
         "cargo-bazel",
-        "crate-name=zip",
+        "crate-name=flate2",
         "manual",
         "noclippy",
         "norustfmt",
@@ -73,10 +77,9 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "0.5.5",
+    version = "1.1.1",
     deps = [
         "//third_party/rust_crates/vendor/crc32fast-1.2.0:crc32fast",
-        "//third_party/rust_crates/vendor/flate2-1.1.1:flate2",
-        "//third_party/rust_crates/vendor/podio-0.1.6:podio",
+        "//third_party/rust_crates/vendor/miniz_oxide-0.8.8:miniz_oxide",
     ],
 )

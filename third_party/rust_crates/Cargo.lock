@@ -1349,14 +1349,12 @@ checksum = "b3ea1ec5f8307826a5b71094dd91fc04d4ae75d5709b20ad351c7fb4815c86ec"
 
 [[package]]
 name = "flate2"
-version = "1.0.14"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cfff41391129e0a856d6d822600b8d71179d46879e310417eb9c762eb178b42"
+checksum = "7ced92e76e966ca2fd84c8f7aa01a4aea65b0eb6648d72f7c8f3e2764a67fece"
 dependencies = [
- "cfg-if 0.1.10",
  "crc32fast",
- "libc",
- "miniz_oxide 0.3.6",
+ "miniz_oxide",
 ]
 
 [[package]]
@@ -1555,7 +1553,7 @@ dependencies = [
  "md-5",
  "memchr",
  "memoffset 0.9.1",
- "miniz_oxide 0.8.8",
+ "miniz_oxide",
  "mio 0.8.9",
  "mock-omaha-server",
  "mockall",
@@ -2497,15 +2495,6 @@ checksum = "f7c44f8e672c00fe5308fa235f821cb4198414e1c77935c1ab6948d3fd78550e"
 dependencies = [
  "mime",
  "unicase",
-]
-
-[[package]]
-name = "miniz_oxide"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa679ff6578b1cddee93d7e82e263b94a575e0bfced07284eb0c037c1d2416a5"
-dependencies = [
- "adler32",
 ]
 
 [[package]]

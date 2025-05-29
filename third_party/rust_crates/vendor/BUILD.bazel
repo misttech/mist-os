@@ -895,14 +895,14 @@ alias(
 )
 
 alias(
-    name = "flate2-1.0.14",
-    actual = "//third_party/rust_crates/vendor/flate2-1.0.14:flate2",
+    name = "flate2-1.1.1",
+    actual = "//third_party/rust_crates/vendor/flate2-1.1.1:flate2",
     tags = ["manual"],
 )
 
 alias(
     name = "flate2",
-    actual = "//third_party/rust_crates/vendor/flate2-1.0.14:flate2",
+    actual = "//third_party/rust_crates/vendor/flate2-1.1.1:flate2",
     tags = ["manual"],
 )
 

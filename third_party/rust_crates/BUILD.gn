@@ -316,7 +316,7 @@ if (current_os == "fuchsia") {
 }
 
 group("flate2") {
-  public_deps = [ ":flate2-v1_0_14" ]
+  public_deps = [ ":flate2-v1_1_1" ]
 }
 
 group("foreign-types") {
@@ -6336,45 +6336,44 @@ rustc_library("flagset-v0_4_6") {
   applicable_licenses = [ ":flagset-v0_4_6.license" ]
 }
 
-license("flate2-v1_0_14.license") {
+license("flate2-v1_1_1.license") {
   public_package_name = "flate2"
   license_files = [
-    "//third_party/rust_crates/vendor/flate2-1.0.14/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/flate2-1.0.14/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/flate2-1.1.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/flate2-1.1.1/LICENSE-MIT",
   ]
 }
 
-rustc_library("flate2-v1_0_14") {
+rustc_library("flate2-v1_1_1") {
   crate_name = "flate2"
-  source_root = "//third_party/rust_crates/vendor/flate2-1.0.14/src/lib.rs"
-  output_name = "flate2-28efad300e8652f3"
+  source_root = "//third_party/rust_crates/vendor/flate2-1.1.1/src/lib.rs"
+  output_name = "flate2-5ffb53633802b964"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":cfg-if-v0_1_10" ]
   deps += [ ":crc32fast-v1_2_0" ]
-  deps += [ ":libc-v0_2_171" ]
-  deps += [ ":miniz_oxide-v0_3_6" ]
+  deps += [ ":miniz_oxide-v0_8_8" ]
   if (current_cpu == "wasm32" && !false) {
-    deps += [ ":miniz_oxide-v0_3_6" ]
+    deps += [ ":miniz_oxide-v0_8_8" ]
   }
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=28efad300e8652f3",
-    "-Cextra-filename=-28efad300e8652f3",
+    "-Cmetadata=5ffb53633802b964",
+    "-Cextra-filename=-5ffb53633802b964",
+    "--cfg=feature=\"any_impl\"",
     "--cfg=feature=\"miniz_oxide\"",
     "--cfg=feature=\"rust_backend\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":flate2-v1_0_14.license" ]
+  applicable_licenses = [ ":flate2-v1_1_1.license" ]
 }
 
 license("float-cmp-v0_8_0.license") {
@@ -9683,37 +9682,6 @@ rustc_library("mime_guess-v2_0_5") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":mime_guess-v2_0_5.license" ]
-}
-
-license("miniz_oxide-v0_3_6.license") {
-  public_package_name = "miniz_oxide"
-  license_files =
-      [ "//third_party/rust_crates/vendor/miniz_oxide-0.3.6/LICENSE" ]
-}
-
-rustc_library("miniz_oxide-v0_3_6") {
-  crate_name = "miniz_oxide"
-  source_root = "//third_party/rust_crates/vendor/miniz_oxide-0.3.6/src/lib.rs"
-  output_name = "miniz_oxide-9a756a7abca21ed4"
-  edition = "2018"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":adler32-v1_0_4" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=9a756a7abca21ed4",
-    "-Cextra-filename=-9a756a7abca21ed4",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":miniz_oxide-v0_3_6.license" ]
 }
 
 license("miniz_oxide-v0_8_8.license") {
@@ -20870,7 +20838,7 @@ rustc_library("zip-v0_5_5") {
 
   deps = []
   deps += [ ":crc32fast-v1_2_0" ]
-  deps += [ ":flate2-v1_0_14" ]
+  deps += [ ":flate2-v1_1_1" ]
   deps += [ ":podio-v0_1_6" ]
 
   rustenv = []
