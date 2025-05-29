@@ -1,9 +1,5 @@
 {
     "pbms": {
-        "metadata": [
-            "gs://fuchsia/development/{version}/sdk/product_bundles.json",
-            "{sdk.root}/*.json"
-        ],
         "base_urls": [
             "gs://fuchsia/development"
         ]
