@@ -2,33 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::power::{create_proxy_for_wake_events_counter_zero, OnWakeOps};
+use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
+use crate::vfs::timer::TimerOps;
+
 use anyhow::{Context, Result};
 use fidl::endpoints::Proxy;
 use fuchsia_inspect::ArrayProperty;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
-use futures::FutureExt;
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::{FutureExt, SinkExt, StreamExt};
+use scopeguard::defer;
 use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
+use std::collections::HashMap;
+use std::sync::{Arc, OnceLock, Weak};
 use zx::{self as zx, AsHandleRef, HandleBased, HandleRef};
 use {fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync};
-
-use std::collections::{BinaryHeap, HashSet};
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, OnceLock, Weak};
-
-use crate::power::{
-    create_proxy_for_wake_events_counter_zero, mark_all_proxy_messages_handled, OnWakeOps,
-};
-use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
-use crate::vfs::timer::TimerOps;
-
-/// TODO(b/383062441): remove this special casing once Starnix hrtimer is fully
-/// migrated to multiplexed timer.
-/// A special-cased Starnix timer ID, used to allow cross-connection setup
-/// for Starnix only.
-const TEMPORARY_STARNIX_TIMER_ID: &str = "starnix-hrtimer";
 
 /// Max value for inspect event history.
 const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 128;
@@ -86,38 +78,59 @@ fn get_wake_proxy_internal(mut wake_channel: Option<zx::Channel>) -> fta::WakePr
         })
 }
 
-// Synchronous connect to wake alarms serves as a connection test. If there is no usable connection
-// to the wake alarms API, or if wake alarms are not supported, the wake alarms functionality
-// will be disabled and wake alarms will never fire.
-fn connect_to_wake_alarms() -> Result<fta::WakeSynchronousProxy, Errno> {
-    log_debug!("connecting to SYNC wake alarms");
-    let wake_alarm_sync = fuchsia_component::client::connect_to_protocol_sync::<fta::WakeMarker>()
-        .map_err(|e| {
-            errno!(
-                EINVAL,
-                format!("Failed to connect to fuchsia.time.alarms/Wake synchronously: {e}")
-            )
-        })?;
+/// Cancels an alarm by ID.
+async fn cancel_by_id(
+    _suspend_lock: &SuspendLock,
+    timer_state: Option<TimerState>,
+    timer_id: &zx::Koid,
+    proxy: &fta::WakeProxy,
+    interval_timers_pending_reschedule: &mut HashMap<zx::Koid, SuspendLock>,
+    alarm_id: &str,
+) {
+    if let Some(timer_state) = timer_state {
+        fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:cancel_by_id", "timer_id" => *timer_id);
+        log_debug!("cancel_by_id: START canceling timer: {:?}: alarm_id: {}", timer_id, alarm_id);
+        proxy.cancel(&alarm_id).expect("infallible");
+        log_debug!("cancel_by_id: 1/2 canceling timer: {:?}: alarm_id: {}", timer_id, alarm_id);
 
-    // Try to connect to verify that the proxy is usable.
-    let maybe_supported = wake_alarm_sync
-        .get_properties(zx::MonotonicInstant::INFINITE)
-        .map_err(|e| {
-            log_warn!("Failed to connect to fuchsia.time.alarms/Wake synchronously, assuming the protocol is not available: {e}");
-            errno!(
-                EINVAL,
-                format!("Failed to connect to fuchsia.time.alarms/Wake synchronously: {e}")
-            )
-        })
-    .map(|r| r.is_supported)
-    ?;
+        // Let the timer closure complete before continuing.
+        let _ = timer_state.task.await;
 
-    match maybe_supported {
-        Some(true) => Ok(wake_alarm_sync),
-        other => Err(errno!(
-            EINVAL,
-            format!("Failed to connect to fuchsia.time.alarm/Wake synchronously: {:?}", other)
-        )),
+        // If this timer is an interval timer, we must remove it from the pending reschedule list.
+        // This does not affect container suspend, since `_suspend_lock` is live. It's a no-op for
+        // other timers.
+        interval_timers_pending_reschedule.remove(timer_id);
+        log_debug!("cancel_by_id: 2/2 DONE canceling timer: {timer_id:?}: alarm_id: {alarm_id}");
+    }
+}
+
+/// Called when the underlying wake alarms manager reports a fta::WakeError
+/// as a result of a call to set_and_wait.
+fn process_alarm_protocol_error(
+    pending: &mut HashMap<zx::Koid, TimerState>,
+    timer_id: &zx::Koid,
+    error: fta::WakeError,
+) -> Option<TimerState> {
+    match error {
+        fta::WakeError::Unspecified => {
+            log_warn!(
+                "watch_new_hrtimer_loop: Cmd::AlarmProtocolFail: unspecified error: {error:?}"
+            );
+            pending.remove(timer_id)
+        }
+        fta::WakeError::Dropped => {
+            log_debug!("watch_new_hrtimer_loop: Cmd::AlarmProtocolFail: alarm dropped: {error:?}");
+            // Do not remove a Dropped timer here, in contrast to other error states: a Dropped
+            // timer is a result of a Stop or a Cancel ahead of a reschedule. In both cases, that
+            // code takes care of removing the timer from the pending timers list.
+            None
+        }
+        error => {
+            log_warn!(
+                "watch_new_hrtimer_loop: Cmd::AlarmProtocolFail: unspecified error: {error:?}"
+            );
+            pending.remove(timer_id)
+        }
     }
 }
 
@@ -134,7 +147,6 @@ enum InspectHrTimerEvent {
     Add,
     Update,
     Remove,
-    Expired,
     // The String inside will be used in fmt. But the compiler does not recognize the use when
     // formatting with the Debug derivative.
     Error(#[allow(dead_code)] String),
@@ -143,7 +155,7 @@ enum InspectHrTimerEvent {
 impl InspectHrTimerEvent {
     fn retain_err(prev_len: usize, after_len: usize, context: &str) -> InspectHrTimerEvent {
         InspectHrTimerEvent::Error(format!(
-            "retain the timer heap incorrectly, before len: {prev_len}, after len: {after_len}, context: {context}",
+            "retain the timer incorrectly, before len: {prev_len}, after len: {after_len}, context: {context}",
         ))
     }
 }
@@ -216,58 +228,94 @@ impl SuspendLock {
 }
 
 struct HrTimerManagerState {
-    /// Binary heap that stores all pending timers, with the sooner deadline having higher priority.
-    timer_heap: BinaryHeap<HrTimerNode>,
-    /// The deadline of the currently running timer on the `HrTimer` device.
-    ///
-    /// This deadline is set from the first timer in the `timer_heap`. It is used to determine when
-    /// the next timer in the heap will be expired.
-    ///
-    /// When the `stop` method is called, the HrTimer device is stopped and the `current_deadline`
-    /// is set to `None`.
-    current_deadline: Option<zx::BootInstant>,
+    /// All pending timers are stored here.
+    pending_timers: HashMap<zx::Koid, TimerState>,
 
     /// The event that is registered with runner to allow the hrtimer to wake the kernel.
-    ///
-    /// A custom wake event is injected in unit tests in this mod.
-    message_counter: Option<zx::Counter>,
+    /// Optional, because we want the ability to inject a counter in tests.
+    message_counter: Option<Arc<zx::Counter>>,
 
-    /// Inspect node to record events in the timer heap
+    /// For recording timer events.
     inspect_node: BoundedListNode,
-
-    // Contains the IDs of interval timers that are pending a reschedule. This information
-    // is used to prevent sleeps between the instants some interval timer T expires, and the
-    // instant where the next periodic wake-up for T is scheduled.
-    interval_timers_pending_reschedule: HashSet<zx::Koid>,
 }
 
 impl HrTimerManagerState {
     fn new(parent_node: &fuchsia_inspect::Node) -> Self {
         Self {
+            pending_timers: HashMap::new(),
+            // Initialized later in the State's lifecycle because it only becomes
+            // available after making a connection to the wake proxy.
+            message_counter: None,
             inspect_node: BoundedListNode::new(
                 parent_node.create_child("events"),
                 INSPECT_GRAPH_EVENT_BUFFER_SIZE,
             ),
-            timer_heap: Default::default(),
-            current_deadline: Default::default(),
-            message_counter: Default::default(),
-            interval_timers_pending_reschedule: Default::default(),
         }
     }
+
+    fn get_pending_timers_count(&self) -> usize {
+        self.pending_timers.len()
+    }
+
+    /// Gets a new shareable instance of the message counter.
+    fn get_counter(&self) -> Arc<zx::Counter> {
+        let counter_ref =
+            self.message_counter.as_ref().expect("message_counter is None, but should not be.");
+        counter_ref.clone()
+    }
+}
+
+/// Asynchronous commands sent to `watch_new_hrtimer_loop`.
+///
+/// The synchronous methods on HrTimerManager use these commands to communicate
+/// with the alarm manager actor that loops about in `watch_new_hrtimer_loop`.
+///
+/// This allows us to not have to share state between the synchronous and async
+/// methods of `HrTimerManager`.
+#[derive(Debug)]
+enum Cmd {
+    // Start the timer contained in `new_timer_node`.
+    // The processing loop will signal `done` to allow synchronous
+    // return from scheduling an async Cmd::Start.
+    Start {
+        new_timer_node: HrTimerNode,
+        /// Signaled once the timer is started.
+        done: zx::Event,
+        /// The Starnix container suspend lock. Keep it alive until no more
+        /// work is necessary.
+        suspend_lock: SuspendLock,
+    },
+    /// Stop the timer noted below. `done` is similar to above.
+    Stop {
+        /// The timer to stop.
+        timer: HrTimerHandle,
+        /// Signaled once the timer is stopped.
+        done: zx::Event,
+        /// The Starnix container suspend lock. Keep it alive until no more
+        /// work is necessary.
+        suspend_lock: SuspendLock,
+    },
+    // A wake alarm occurred.
+    Alarm {
+        /// The affected timer's node.
+        new_timer_node: HrTimerNode,
+        /// The wake lease provided by the underlying API.
+        lease: zx::EventPair,
+        /// The Starnix container suspend lock. Keep it alive until no more
+        /// work is necessary.
+        suspend_lock: SuspendLock,
+    },
 }
 
 /// The manager for high-resolution timers.
 ///
 /// This manager is responsible for creating and managing high-resolution timers.
-/// It uses a binary heap to keep track of the timers and their deadlines.
-/// The timer with the soonest deadline is always at the front of the heap.
 pub struct HrTimerManager {
-    device_proxy: Option<fta::WakeSynchronousProxy>,
     state: Mutex<HrTimerManagerState>,
 
     /// The channel sender that notifies the worker thread that HrTimer driver needs to be
     /// (re)started with a new deadline.
-    start_next_sender: OnceLock<Sender<()>>,
+    start_next_sender: OnceLock<UnboundedSender<Cmd>>,
 }
 pub type HrTimerManagerHandle = Arc<HrTimerManager>;
 
@@ -275,32 +323,56 @@ impl HrTimerManager {
     pub fn new(parent_node: &fuchsia_inspect::Node) -> HrTimerManagerHandle {
         let inspect_node = parent_node.create_child("hr_timer_manager");
         let new_manager = Arc::new(Self {
-            device_proxy: connect_to_wake_alarms().ok(),
             state: Mutex::new(HrTimerManagerState::new(&inspect_node)),
             start_next_sender: Default::default(),
         });
         let manager_weak = Arc::downgrade(&new_manager);
+
         // Create a lazy inspect node to get HrTimerManager info at read-time.
-        inspect_node.record_lazy_child("heap", move || {
+        inspect_node.record_lazy_child("hr_timer_manager", move || {
             let manager_ref = manager_weak.upgrade().expect("inner HrTimerManager");
             async move {
+                // This gets the clock value directly from the kernel, it is not subject
+                // to the local runner's clock.
+                let now = zx::BootInstant::get();
+
                 let inspector = fuchsia_inspect::Inspector::default();
-                inspector.root().record_int("now", zx::BootInstant::get().into_nanos());
+                inspector.root().record_int("now_ns", now.into_nanos());
 
-                let guard = manager_ref.lock();
-                let deadline = guard.current_deadline.unwrap_or(zx::BootInstant::ZERO).into_nanos();
-                let mut sorted_heap = guard.timer_heap.clone().into_sorted_vec();
-                drop(guard);
+                let (timers, pending_timers_count, message_counter) = {
+                    let guard = manager_ref.lock();
+                    (
+                        guard
+                            .pending_timers
+                            .iter()
+                            .map(|(k, v)| (*k, v.deadline))
+                            .collect::<Vec<_>>(),
+                        guard.get_pending_timers_count(),
+                        guard
+                            .message_counter
+                            .as_ref()
+                            .map(|c| c.read().expect("message counter is readable"))
+                            .unwrap_or(0),
+                    )
+                };
+                inspector.root().record_uint("pending_timers_count", pending_timers_count as u64);
+                inspector.root().record_int("message_counter", message_counter);
 
-                inspector.root().record_int("deadline", deadline);
-
-                // Get the descending order
-                sorted_heap.reverse();
-                let heap_inspector = inspector.root().create_int_array("heap", sorted_heap.len());
-                for (index, timer) in sorted_heap.into_iter().enumerate() {
-                    heap_inspector.set(index, timer.deadline.into_nanos());
+                // These are the deadlines we are currently waiting for. The format is:
+                // `alarm koid` -> `deadline nanos` (remains: `duration until alarm nanos`)
+                let deadlines = inspector.root().create_string_array("timers", timers.len());
+                for (i, (k, v)) in timers.into_iter().enumerate() {
+                    deadlines.set(
+                        i,
+                        format!(
+                            "{:?} -> {:?} ns (remains: {:?} ns)",
+                            k,
+                            v.into_nanos(),
+                            (v - now).into_nanos()
+                        ),
+                    );
                 }
-                inspector.root().record(heap_inspector);
+                inspector.root().record(deadlines);
 
                 Ok(inspector)
             }
@@ -310,107 +382,172 @@ impl HrTimerManager {
         new_manager
     }
 
-    pub fn init(
+    /// Get a copy of a sender channel used for passing async command to the
+    /// event processing loop.
+    fn get_sender(&self) -> UnboundedSender<Cmd> {
+        self.start_next_sender.get().expect("start_next_sender is initialized").clone()
+    }
+
+    /// Initialize the [HrTimerManager] in the context of the current system task.
+    pub fn init(self: &HrTimerManagerHandle, system_task: &CurrentTask) -> Result<(), Errno> {
+        self.init_for_test(
+            system_task,
+            /*wake_channel_for_test=*/ None,
+            /*message_counter_for_test=*/ None,
+        )
+    }
+
+    // Call this init for testing instead of the one above.
+    fn init_for_test(
         self: &HrTimerManagerHandle,
         system_task: &CurrentTask,
+        // Can be injected for testing.
         wake_channel_for_test: Option<zx::Channel>,
+        // Can be injected for testing.
         message_counter_for_test: Option<zx::Counter>,
     ) -> Result<(), Errno> {
-        let (start_next_sender, start_next_receiver) = channel();
+        let (start_next_sender, start_next_receiver) = mpsc::unbounded();
         self.start_next_sender.set(start_next_sender).map_err(|_| errno!(EEXIST))?;
 
         let self_ref = self.clone();
-        // Spawn a worker thread to register the HrTimer driver event and listen incoming
-        // `start_next` request
-        system_task.kernel().kthreads.spawn(move |_, system_task| {
-            fuchsia_trace::duration!(c"alarms", c"init:watch_new_hrtimer_loop_thread");
-            let Ok(_device_proxy) = self_ref.check_connection() else {
-                log_warn!("worker thread failed due to no connection to wake alarms manager");
-                return;
-            };
 
+        // Ensure that all internal init has completed in `watch_new_hrtimer_loop`
+        // before proceeding from here.
+        let setup_done = zx::Event::create();
+        let setup_done_clone = duplicate_handle(&setup_done)?;
+
+        system_task.kernel().kthreads.spawn(move |_, system_task| {
             let mut executor = fasync::LocalExecutor::new();
-            executor.run_singlethreaded(self_ref.watch_new_hrtimer_loop(
-                &system_task,
-                &start_next_receiver,
-                wake_channel_for_test,
-                message_counter_for_test,
-            ));
+            let _ = executor
+                .run_singlethreaded(self_ref.watch_new_hrtimer_loop(
+                    &system_task,
+                    start_next_receiver,
+                    wake_channel_for_test,
+                    message_counter_for_test,
+                    Some(setup_done_clone),
+                ))
+                .map_err(|err| log_error!("while running watch_new_hrtimer_loop: {err:?}"));
+            log_warn!("hr_timer_manager: finished kernel thread. should never happen in prod code");
         });
+        wait_signaled_sync(&setup_done)
+            .to_result()
+            .map_err(|status| from_status_like_fdio!(status))?;
 
         Ok(())
     }
 
-    // If no events have been injected for tests, set `event` as wake event.
-    //
-    // Otherwise use the injected event. This approach *only* makes sense in the unit tests in this
-    // mod, as they do not exercise the async proxy.
-    fn inject_or_set_message_counter(self: &HrTimerManagerHandle, message_counter: zx::Counter) {
+    // Notifies `timer` and wake sources about a triggered alarm.
+    fn notify_timer(
+        self: &HrTimerManagerHandle,
+        system_task: &CurrentTask,
+        timer: &HrTimerNode,
+        lease: impl HandleBased,
+    ) -> Result<()> {
+        let timer_id = timer.hr_timer.get_id();
+        log_debug!("watch_new_hrtimer_loop: Cmd::Alarm: triggered alarm: {:?}", timer_id);
+        fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:notify_timer", "timer_id" => timer_id);
+        self.lock().pending_timers.remove(&timer_id).map(|s| s.task.detach());
+        signal_handle(&timer.hr_timer.event(), zx::Signals::NONE, zx::Signals::TIMER_SIGNALED)
+            .context("notify_timer: hrtimer signal handle")?;
+
+        // Handle wake source here.
+        let wake_source = timer.wake_source.clone();
+        if let Some(wake_source) = wake_source.as_ref().and_then(|f| f.upgrade()) {
+            let lease_token = lease.into_handle();
+            wake_source.on_wake(system_task, &lease_token);
+            // Drop the baton lease after wake leases in associated epfd
+            // are activated.
+            drop(lease_token);
+        }
+        fuchsia_trace::instant!(c"alarms", c"starnix:hrtimer:notify_timer:drop_lease", fuchsia_trace::Scope::Process, "timer_id" => timer_id);
+        Ok(())
+    }
+
+    // If no counter has been injected for tests, set provided `counter` to serve as that
+    // counter. Used to inject a fake counter in tests.
+    fn inject_or_set_message_counter(
+        self: &HrTimerManagerHandle,
+        message_counter: Arc<zx::Counter>,
+    ) {
         let mut guard = self.lock();
         if guard.message_counter.is_none() {
             guard.message_counter = Some(message_counter);
         }
     }
 
-    // Handles message acknowledgments so that interval timers are correctly handled.
-    //
-    // Returns true if suspends have been allowed as a result of the reschedule.
-    //
-    // # Args
-    // - `guard`: a lock on `self`.
-    // - `hrtimer_ref`: the timer to maybe reschedule.
-    // - `allow_reschedule`: if set, `hrtimer_ref` will be rescheduled; otherwise
-    //   only the state of the rescheduled timers collection is examined.
-    fn handle_interval_timer_reschedule(
+    fn record_inspect_on_stop(
         self: &HrTimerManagerHandle,
         guard: &mut MutexGuard<'_, HrTimerManagerState>,
-        hrtimer_ref: &Arc<HrTimer>,
-        allow_reschedule: bool,
-    ) -> bool {
-        let is_interval = *hrtimer_ref.is_interval.lock();
-        let interval_timers_pending_reschedule_empty = {
-            let pending_set = &mut guard.interval_timers_pending_reschedule;
-            if is_interval && allow_reschedule {
-                // We know that a Starnix interval timer that triggered will get
-                // rescheduled by Starnix. We keep track of such timers to guarantee
-                // that they will be handled properly. See the comment below for
-                // details.
-                pending_set.insert(hrtimer_ref.get_id());
-            }
-            pending_set.is_empty()
+        prev_len: usize,
+    ) {
+        let after_len = guard.get_pending_timers_count();
+        let inspect_event_type = if after_len == prev_len {
+            None
+        } else if after_len == prev_len - 1 {
+            Some(InspectHrTimerEvent::Remove)
+        } else {
+            Some(InspectHrTimerEvent::retain_err(prev_len, after_len, "removing timer"))
         };
-
-        if guard.timer_heap.is_empty() && interval_timers_pending_reschedule_empty {
-            // Only mark the message as handled (and allow suspend) if there are no more timers to
-            // start.
-            //
-            // Marking messages as handled will allow the container to suspend, but we
-            // may not allow a container to suspend if there are more timers to start
-            // before we start one.
-            //
-            // Timers to start can come (1) from the set of already scheduled timers
-            // (timer_heap), or (2) from the set of interval timers that happen to have
-            // triggered recently but have not been rescheduled yet (interval_timers).
-            //
-            // If there are more timers to start, we have to keep the message counter
-            // positive to prevent suspension until the hanging get for the wake has
-            // been scheduled. Otherwise, the container might suspend without having
-            // scheduled a wake alarm first, and therefore miss a wake up.
-            guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
-            return true;
+        if let Some(inspect_event_type) = inspect_event_type {
+            self.record_event(guard, inspect_event_type, None);
         }
-
-        false
     }
 
-    /// Watch any new hrtimer being added to the front the heap.
+    fn record_inspect_on_start(
+        self: &HrTimerManagerHandle,
+        guard: &mut MutexGuard<'_, HrTimerManagerState>,
+        timer_id: zx::Koid,
+        task: fasync::Task<()>,
+        deadline: zx::BootInstant,
+        prev_len: usize,
+    ) {
+        guard
+            .pending_timers
+            .insert(timer_id, TimerState { task, deadline })
+            .map(|timer_state| {
+                // This should not happen, at this point we already canceled
+                // any previous instances of the same wake alarm.
+                log_debug!(
+                    "watch_new_hrtimer_loop: removing timer task in Cmd::Start: {:?}",
+                    timer_state
+                );
+                timer_state
+            })
+            .map(|v| v.task.detach());
+
+        // Record the inspect event
+        let after_len = guard.get_pending_timers_count();
+        let inspect_event_type = if after_len == prev_len {
+            InspectHrTimerEvent::Update
+        } else if after_len == prev_len + 1 {
+            InspectHrTimerEvent::Add
+        } else {
+            InspectHrTimerEvent::retain_err(prev_len, after_len, "adding timer")
+        };
+        self.record_event(guard, inspect_event_type, Some(deadline));
+    }
+
+    /// Timer handler loop.
+    ///
+    /// # Args:
+    /// - `wake_channel_for_test`: a channel implementing `fuchsia.time.alarms/Wake`
+    ///   injected by tests only.
+    /// - `message_counter_for_test`: a zx::Counter injected only by tests, to
+    ///   emulate the wake proxy message counter.
+    /// - `setup_done`: signaled once the initial loop setup is complete. Allows
+    ///   pausing any async callers until this loop is in a runnable state.
     async fn watch_new_hrtimer_loop(
         self: &HrTimerManagerHandle,
         system_task: &CurrentTask,
-        start_next_receiver: &Receiver<()>,
+        mut start_next_receiver: UnboundedReceiver<Cmd>,
         wake_channel_for_test: Option<zx::Channel>,
         message_counter_for_test: Option<zx::Counter>,
-    ) {
+        setup_done: Option<zx::Event>,
+    ) -> Result<()> {
+        defer! {
+            log_warn!("watch_new_hrtimer_loop: exiting. This should only happen in tests.");
+        }
+
         let wake_proxy = get_wake_proxy_internal(wake_channel_for_test);
         let wake_channel = wake_proxy
             .into_channel()
@@ -424,177 +561,212 @@ impl HrTimerManager {
             } else {
                 create_proxy_for_wake_events_counter_zero(wake_channel, "wake-alarms".to_string())
             };
-        self.inject_or_set_message_counter(message_counter);
+        let message_counter = Arc::new(message_counter);
+        self.inject_or_set_message_counter(message_counter.clone());
+        setup_done
+            .as_ref()
+            .map(|e| signal_handle(e, zx::Signals::NONE, zx::Signals::EVENT_SIGNALED));
+
         let device_async_proxy =
             fta::WakeProxy::new(fidl::AsyncChannel::from_channel(device_channel));
 
-        while start_next_receiver
-            .recv()
-            .inspect_err(|_| {
-                log_error!("HrTimer manager worker thread failed to receive start signal.")
-            })
-            .is_ok()
-        {
+        // Contains suspend locks for interval (periodic) timers that expired, but have not been
+        // rescheduled yet. This allows us to defer container suspend until all such timers have
+        // been rescheduled.
+        // TODO: b/418813184 - Remove in favor of Fuchsia-specific interval timer support
+        // once it is available.
+        let mut interval_timers_pending_reschedule: HashMap<zx::Koid, SuspendLock> = HashMap::new();
+
+        while let Some(cmd) = start_next_receiver.next().await {
             fuchsia_trace::duration!(c"alarms", c"start_next_receiver:loop");
-            let guard = self.lock();
-            let Some(node) = guard.timer_heap.peek() else {
-                log_warn!("hrtimer: manager worker thread woke up with an empty timer heap.");
-                // Permit suspend only if we have no interval timers pending reschedule. We must
-                // stay awake until those are scheduled.
-                if guard.interval_timers_pending_reschedule.is_empty() {
-                    guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
-                }
-                continue;
-            };
 
-            let Some(new_deadline) = guard.current_deadline else {
-                log_warn!("hrtimer: manager worker thread woke up without a timer deadline");
-                // See similar code above.
-                if guard.interval_timers_pending_reschedule.is_empty() {
-                    guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
-                }
-                continue;
-            };
-
-            fuchsia_trace::instant!(
-                c"alarms",
-                c"start_next_receiver:loop:deadline",
-                fuchsia_trace::Scope::Process,
-                "new_deadline" => new_deadline.into_nanos()
-            );
-            let wake_source = node.wake_source.clone();
-            let hrtimer_ref = node.hr_timer.clone();
-
-            let setup_event = zx::Event::create();
-            let duplicate_event =
-                setup_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into();
-
-            fuchsia_trace::instant!(
-                c"alarms",
-                c"set_and_wait:before",
-                fuchsia_trace::Scope::Process,
-                "deadline" => new_deadline.into_nanos()
-            );
-
-            // Note: This fidl::QueryResponseFut is scheduled when created. To prevent suspend
-            // before the next hrtimer is started, it needs to be created before
-            // the message counter is decremented.
-            let set_and_wait = device_async_proxy.set_and_wait(
-                new_deadline,
-                fta::SetAndWaitMode::NotifySetupDone(duplicate_event),
-                &TEMPORARY_STARNIX_TIMER_ID,
-            );
-            fuchsia_trace::instant!(
-                c"alarms",
-                c"set_and_wait:after",
-                fuchsia_trace::Scope::Process,
-                "deadline" => new_deadline.into_nanos()
-            );
-
-            {
-                fuchsia_trace::duration!(
-                    c"alarms", c"start_next_receiver:set_and_wait:setup_event",
-                    "deadline" => new_deadline.into_nanos());
-                setup_event
-                    .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE)
-                    .expect("infallible");
-            }
-
-            // Mark all the proxy messages as handled (reset the counter to 0), since it's now
-            // fine to suspend. The counter can't simply be decremented by one since the
-            // hr_timer_manager itself may have incremented the counter to keep the container from
-            // suspending while an alarm was being scheduled.
-            guard.message_counter.as_ref().map(mark_all_proxy_messages_handled);
-            drop(guard);
-
-            let resp = {
-                fuchsia_trace::duration!(
-                    c"alarms", c"start_next_receiver:set_and_wait:await",
-                    "deadline" => new_deadline.into_nanos());
-                set_and_wait.await
-            };
-
-            let mut guard = self.lock();
-            match resp {
-                Ok(Ok(lease)) => {
-                    let koid = lease.get_koid().unwrap();
-                    fuchsia_trace::duration!(
-                        c"alarms", c"start_next_receiver:set_and_wait:ok", "koid" => koid,
-                        "deadline" => new_deadline.into_nanos());
-                    let _ = hrtimer_ref
-                        .event
-                        .as_handle_ref()
-                        .signal(zx::Signals::NONE, zx::Signals::TIMER_SIGNALED);
-                    if let Some(wake_source) = wake_source.as_ref().and_then(|f| f.upgrade()) {
-                        fuchsia_trace::duration!(c"alarms", c"lease_token:drop");
-                        let lease_token = lease.into_handle();
-                        wake_source.on_wake(system_task, &lease_token);
-                        // Drop the baton lease after wake leases in associated epfd
-                        // are activated.
-                        drop(lease_token);
+            log_debug!("watch_new_hrtimer_loop: got command: {cmd:?}");
+            match cmd {
+                // A new timer needs to be started.  The timer node for the timer
+                // is provided, and `done` must be signaled once the setup is
+                // complete.
+                Cmd::Start { new_timer_node, done, suspend_lock } => {
+                    defer! {
+                        // Allow add_timer to proceed once command processing is done.
+                        signal_handle(&done, zx::Signals::NONE, zx::Signals::EVENT_SIGNALED).map_err(|err| to_errno_with_log(err)).expect("event can be signaled");
                     }
 
-                    // Remove the expired HrTimer from the heap, but only actually remove it if the
-                    // deadline has not changed.
-                    guard.timer_heap.retain(|t| {
-                        !(t.deadline == new_deadline && Arc::ptr_eq(&t.hr_timer, &hrtimer_ref))
-                    });
-                    self.record_event(&mut guard, InspectHrTimerEvent::Expired, Some(new_deadline));
+                    let hr_timer = &new_timer_node.hr_timer;
+                    let timer_id = hr_timer.get_id();
+                    let wake_alarm_id = hr_timer.wake_alarm_id();
+                    let trace_id = hr_timer.trace_id();
+                    log_debug!(
+                        "watch_new_hrtimer_loop: Cmd::Start: timer_id: {:?}, wake_alarm_id: {}",
+                        timer_id,
+                        wake_alarm_id
+                    );
+                    fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:start", "timer_id" => timer_id);
+                    fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", trace_id);
 
-                    // Clear the deadline to guarantee the next timer will trigger the driver.
-                    guard.current_deadline = None;
+                    let maybe_cancel = self.lock().pending_timers.remove(&timer_id);
+                    cancel_by_id(
+                        &suspend_lock,
+                        maybe_cancel,
+                        &timer_id,
+                        &device_async_proxy,
+                        &mut interval_timers_pending_reschedule,
+                        &wake_alarm_id,
+                    )
+                    .await;
 
-                    if self.handle_interval_timer_reschedule(
-                        &mut guard,
-                        &hrtimer_ref,
-                        /*allow_timer_insert=*/ true,
-                    ) {
-                        continue;
-                    }
+                    // Signaled when the timer completed setup.
+                    let setup_event = zx::Event::create();
+                    let deadline = new_timer_node.deadline;
 
-                    if let Err(e) = self.start_next(&mut guard) {
-                        log_error!(
-                            "Failed to start the next hrtimer when the last one is expired: {e:?}"
-                        );
-                        continue;
-                    }
-                }
-                Ok(Err(e)) => match e {
-                    fta::WakeError::Dropped => {
-                        fuchsia_trace::duration!(c"alarms", c"alarm:drop", "deadline" => new_deadline.into_nanos());
+                    // A hrtimer may enter Start while signaled, let's see if this improves on the
+                    // situation, thought I'm sceptical.
+                    signal_handle(
+                        &hr_timer.event(),
+                        zx::Signals::TIMER_SIGNALED,
+                        zx::Signals::NONE,
+                    )?;
 
+                    // Make a request here. Move it into the closure after. Current FIDL semantics
+                    // ensure that even though we do not `.await` on this future, a request to
+                    // schedule a wake alarm based on this timer will be sent.
+                    let request_fut = device_async_proxy.set_and_wait(
+                        new_timer_node.deadline,
+                        fta::SetAndWaitMode::NotifySetupDone(duplicate_handle(&setup_event)?),
+                        &wake_alarm_id,
+                    );
+                    let mut done_sender = self.get_sender();
+                    let prev_len = self.lock().get_pending_timers_count();
+
+                    let counter_clone = message_counter.clone();
+                    let self_clone = self.clone();
+                    let task = fasync::Task::local(async move {
                         log_debug!(
-                            "A new HrTimer with \
-                                an earlier deadline has been started. \
-                                This `SetAndWait` attempt is cancelled."
-                        )
+                            "wake_alarm_future: set_and_wait will block here: {wake_alarm_id:?}"
+                        );
+                        fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:wait", "timer_id" => timer_id);
+                        fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", trace_id);
+
+                        let response = request_fut.await;
+                        let suspend_lock = SuspendLock::new_without_increment(counter_clone);
+                        fuchsia_trace::instant!(c"alarms", c"starnix:hrtimer:wake", fuchsia_trace::Scope::Process, "timer_id" => timer_id);
+
+                        log_debug!("wake_alarm_future: set_and_wait over: {:?}", response);
+                        match response {
+                            // Alarm.  This must be processed in the main loop because notification
+                            // requires access to &CurrentTask, which is not available here. So we
+                            // only forward it.
+                            Ok(Ok(lease)) => {
+                                done_sender
+                                    .send(Cmd::Alarm { new_timer_node, lease, suspend_lock })
+                                    .await
+                                    .expect("infallible");
+                            }
+                            Ok(Err(error)) => {
+                                fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:wake_error", "timer_id" => timer_id);
+                                log_debug!(
+                                    "wake_alarm_future: protocol error: {error:?}: timer_id: {timer_id:?}"
+                                );
+                                let mut guard = self_clone.lock();
+                                let pending = &mut guard.pending_timers;
+                                process_alarm_protocol_error(pending, &timer_id, error);
+                            }
+                            Err(error) => {
+                                fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:fidl_error", "timer_id" => timer_id);
+                                log_debug!(
+                                    "wake_alarm_future: FIDL error: {error:?}: timer_id: {timer_id:?}"
+                                );
+                                self_clone.lock().pending_timers.remove(&timer_id);
+                            }
+                        }
+                        log_debug!("wake_alarm_future: closure done for timer_id: {timer_id:?}");
+                    });
+                    wait_signaled(&setup_event).await.map_err(|e| to_errno_with_log(e))?;
+                    let mut guard = self.lock();
+                    self.record_inspect_on_start(&mut guard, timer_id, task, deadline, prev_len);
+                    log_debug!("Cmd::Start scheduled: timer_id: {:?}", timer_id);
+                }
+                Cmd::Alarm { new_timer_node, lease, suspend_lock } => {
+                    let timer = &new_timer_node.hr_timer;
+                    let timer_id = timer.get_id();
+                    fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:alarm", "timer_id" => timer_id);
+                    fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", timer.trace_id());
+                    self.notify_timer(system_task, &new_timer_node, lease)
+                        .map_err(|e| to_errno_with_log(e))?;
+
+                    // Interval timers currently need special handling: we must not suspend the
+                    // container until the interval timer in question gets re-scheduled. To
+                    // ensure that we stay awake, we store the suspend lock for a while. This
+                    // prevents container suspend.
+                    //
+                    // This map entry and its SuspendLock is removed in one of the following cases:
+                    //
+                    // (1) When the interval timer eventually gets rescheduled. We
+                    // assume that for interval timers the reschedule will be imminent and that
+                    // therefore not suspending until that re-schedule happens will not unreasonably
+                    // extend the awake period.
+                    //
+                    // (2) When the timer is canceled.
+                    if *timer.is_interval.lock() {
+                        interval_timers_pending_reschedule.insert(timer_id, suspend_lock);
                     }
-                    _ => log_error!("Wake::SetAndWait driver error: {e:?}"),
-                },
-                // In this case we don't need to set a FIDL message as handled, since the error was
-                // in the bindings/connection so no message was returned.
-                Err(e) => log_error!("Wake::SetAndWait fidl error: {e}"),
+                    log_debug!("Cmd::Alarm done: timer_id: {timer_id:?}");
+                }
+                Cmd::Stop { timer, done, suspend_lock } => {
+                    defer! {
+                        signal_handle(&done, zx::Signals::NONE, zx::Signals::EVENT_SIGNALED).expect("can signal");
+                    }
+                    let timer_id = timer.get_id();
+                    log_debug!("watch_new_hrtimer_loop: Cmd::Stop: timer_id: {:?}", timer_id);
+                    fuchsia_trace::duration!(c"alarms", c"starnix:hrtimer:stop", "timer_id" => timer_id);
+                    fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", timer.trace_id());
+
+                    let (maybe_cancel, prev_len) = {
+                        let mut guard = self.lock();
+                        let prev_len = guard.get_pending_timers_count();
+                        (guard.pending_timers.remove(&timer_id), prev_len)
+                    };
+
+                    cancel_by_id(
+                        &suspend_lock,
+                        maybe_cancel,
+                        &timer_id,
+                        &device_async_proxy,
+                        &mut interval_timers_pending_reschedule,
+                        &timer.wake_alarm_id(),
+                    )
+                    .await;
+
+                    {
+                        let mut guard = self.lock();
+                        self.record_inspect_on_stop(&mut guard, prev_len);
+                    }
+                    log_debug!("Cmd::Stop done: {timer_id:?}");
+                }
             }
-        }
+            let guard = self.lock();
+
+            log_debug!(
+                "watch_new_hrtimer_loop: pending timers count: {}",
+                guard.pending_timers.len()
+            );
+            log_debug!("watch_new_hrtimer_loop: pending timers:       {:?}", guard.pending_timers);
+            log_debug!(
+                "watch_new_hrtimer_loop: message counter:      {:?}",
+                message_counter.read().expect("message counter is readable"),
+            );
+            log_debug!(
+                "watch_new_hrtimer_loop: interval timers:      {:?}",
+                interval_timers_pending_reschedule.len(),
+            );
+        } // while
+
+        Ok(())
     }
 
     fn lock(&self) -> MutexGuard<'_, HrTimerManagerState> {
         self.state.lock()
     }
 
-    /// Make sure the proxy to HrTimer device is active.
-    fn check_connection(&self) -> Result<&fta::WakeSynchronousProxy, Errno> {
-        self.device_proxy
-            .as_ref()
-            .ok_or_else(|| errno!(EINVAL, "No connection to wake alarms manager"))
-    }
-
-    #[cfg(test)]
-    fn current_deadline(&self) -> Option<zx::BootInstant> {
-        self.lock().current_deadline.clone()
-    }
-
-    /// Record the inspect event of the heap.
     fn record_event(
         self: &HrTimerManagerHandle,
         guard: &mut MutexGuard<'_, HrTimerManagerState>,
@@ -610,170 +782,68 @@ impl HrTimerManager {
         });
     }
 
-    /// Start the front timer in the heap.
+    /// Add a new timer.
     ///
-    /// When a new timer is added to the heap, the `start_next` method is called. This method checks
-    /// if the new timer has a sooner deadline than the current deadline. If it does, the HrTimer
-    /// device is restarted with the new deadline. Otherwise, the current deadline remains
-    /// unchanged.
-    ///
-    /// When a timer is removed from the heap, the `start_next` method is called again if it is the
-    /// first timer in the `timer_heap`. This ensures that the next timer in the heap is started.
-    fn start_next(
-        self: &HrTimerManagerHandle,
-        guard: &mut MutexGuard<'_, HrTimerManagerState>,
-    ) -> Result<(), Errno> {
-        fuchsia_trace::duration!(c"alarms", c"starnix:start_next");
-        let Some(node) = guard.timer_heap.peek() else {
-            return self.stop(guard);
-        };
-
-        let new_deadline = node.deadline;
-        fuchsia_trace::duration!(c"alarms", c"starnix:start_next", "new_deadline" => new_deadline.into_nanos());
-
-        // Only restart the HrTimer device when the deadline is different from the running one.
-        if guard.current_deadline == Some(new_deadline) {
-            return Ok(());
-        }
-
-        // Stop any currently active timers, since they no longer have the earliest deadline.
-        self.stop(guard)?;
-        guard.current_deadline = Some(new_deadline);
-
-        // Notify the worker thread that a new hrtimer is added to the front.
-        self.start_next_sender
-            .get()
-            .ok_or_else(|| errno!(EINVAL))?
-            .send(())
-            .map_err(|_| errno!(EINVAL))
-    }
-
-    fn stop(
-        self: &HrTimerManagerHandle,
-        guard: &mut MutexGuard<'_, HrTimerManagerState>,
-    ) -> Result<(), Errno> {
-        fuchsia_trace::duration!(c"alarms", c"starnix:stop");
-        guard.current_deadline = None;
-        self.check_connection()?
-            .cancel_sync(TEMPORARY_STARNIX_TIMER_ID, zx::Instant::INFINITE)
-            .map_err(|e| errno!(EINVAL, format!("HrTimer::Stop fidl error: {e}")))?
-            .map_err(|e| errno!(EINVAL, format!("HrTimer::Stop driver error: {e:?}")))?;
-
-        Ok(())
-    }
-
-    /// Add a new timer into the heap.
+    /// A wake alarm is scheduled for the timer.
     pub fn add_timer(
         self: &HrTimerManagerHandle,
         wake_source: Option<Weak<dyn OnWakeOps>>,
         new_timer: &HrTimerHandle,
         deadline: zx::BootInstant,
     ) -> Result<(), Errno> {
-        log_debug!("add_timer: entry: {new_timer:?}, {deadline:?}");
+        log_debug!("add_timer: entry: {new_timer:?}, deadline: {deadline:?}");
         fuchsia_trace::duration!(c"alarms", c"starnix:add_timer", "deadline" => deadline.into_nanos());
-        let mut guard = self.lock();
+        fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", new_timer.trace_id());
 
+        let counter = self.lock().get_counter();
+        let suspend_lock_until_timer_scheduled = SuspendLock::new_with_increment(counter);
+
+        let sender = self.get_sender();
         let new_timer_node = HrTimerNode::new(deadline, wake_source, new_timer.clone());
-        let prev_len = guard.timer_heap.len();
-        // If the deadline of a timer changes, this function will be called to update the order of
-        // the `timer_heap`.
-        // Check if the timer already exists and remove it to ensure the `timer_heap` remains
-        // ordered by update-to-date deadline.
-        guard.timer_heap.retain(|t| !Arc::ptr_eq(&t.hr_timer, new_timer));
-        // Add the new timer into the heap.
-        fuchsia_trace::instant!(
-            c"alarms",
-            c"timer_heap:push",
-            fuchsia_trace::Scope::Process,
-            "deadline" => deadline.into_nanos()
-        );
+        let wake_alarm_scheduled = zx::Event::create();
+        let wake_alarm_scheduled_clone = duplicate_handle(&wake_alarm_scheduled)?;
+        let timer_id = new_timer.get_id();
+        sender
+            .unbounded_send(Cmd::Start {
+                new_timer_node,
+                suspend_lock: suspend_lock_until_timer_scheduled,
+                done: wake_alarm_scheduled_clone,
+            })
+            .map_err(|_| errno!(EINVAL, "add_timer: could not send Cmd::Start"))?;
 
-        // New timer added.  If it happens to be one of the interval timers that was pending
-        // reschedule, we can remove it from that set, since we will schedule it imminently.
-        guard.timer_heap.push(new_timer_node.clone());
-        guard.interval_timers_pending_reschedule.remove(&new_timer_node.hr_timer.get_id());
+        // Block until the wake alarm for this timer is scheduled.
+        wait_signaled_sync(&wake_alarm_scheduled)
+            .map_err(|_| errno!(EINVAL, "add_timer: wait_signaled_sync failed"))?;
 
-        // Record the inspect event
-        let after_len = guard.timer_heap.len();
-        let inspect_event_type = if after_len == prev_len {
-            InspectHrTimerEvent::Update
-        } else if after_len == prev_len + 1 {
-            InspectHrTimerEvent::Add
-        } else {
-            InspectHrTimerEvent::retain_err(prev_len, after_len, "adding timer")
-        };
-        self.record_event(&mut guard, inspect_event_type, Some(new_timer_node.deadline));
-
-        let increment_message_counter = after_len == 1 && Some(deadline) != guard.current_deadline;
-
-        // Increment the counter before starting the first timer. This ensures that the
-        // kernel will not suspend until the first timer has been started.
-        if increment_message_counter {
-            guard.message_counter.as_ref().map(|c| c.add(1));
-        }
-
-        if let Some(running_timer) = guard.timer_heap.peek() {
-            // If the new timer is in front, it has a sooner deadline. (Re)Start the HrTimer device
-            // with the new deadline.
-            if Arc::ptr_eq(&running_timer.hr_timer, new_timer) {
-                return self.start_next(&mut guard);
-            }
-        }
-        log_debug!("add_timer: exit:  {new_timer:?}, {deadline:?}");
+        log_debug!("add_timer: exit : timer_id: {timer_id:?}");
         Ok(())
     }
 
-    /// Remove a timer from the heap.
+    /// Remove a timer.
+    ///
+    /// The timer is removed if scheduled, nothing is changed if it is not.
     pub fn remove_timer(self: &HrTimerManagerHandle, timer: &HrTimerHandle) -> Result<(), Errno> {
         log_debug!("remove_timer: entry:  {timer:?}");
         fuchsia_trace::duration!(c"alarms", c"starnix:remove_timer");
-        let mut guard = self.lock();
-        if let Some(running_timer_node) = guard.timer_heap.peek() {
-            if Arc::ptr_eq(&running_timer_node.hr_timer, timer) {
-                let deadline = Some(running_timer_node.deadline);
-                self.record_event(&mut guard, InspectHrTimerEvent::Update, deadline);
-                let popped = guard.timer_heap.pop();
-                fuchsia_trace::instant!(
-                    c"alarms",
-                    c"timer_heap:pop",
-                    fuchsia_trace::Scope::Process,
-                    "deadline" => popped.expect("heap is not empty").deadline.into_nanos()
-                );
-                self.start_next(&mut guard)?;
-                log_debug!("remove_timer: early exit:  {timer:?}");
-                return Ok(());
-            }
-        }
+        let counter = self.lock().get_counter();
+        let suspend_lock_until_removed = SuspendLock::new_with_increment(counter);
 
-        let prev_len = guard.timer_heap.len();
+        let sender = self.get_sender();
+        let done = zx::Event::create();
+        let done_clone = duplicate_handle(&done)?;
+        let timer_id = timer.get_id();
+        sender
+            .unbounded_send(Cmd::Stop {
+                timer: timer.clone(),
+                suspend_lock: suspend_lock_until_removed,
+                done: done_clone,
+            })
+            .map_err(|_| errno!(EINVAL, "remove_timer: could not send Cmd::Stop"))?;
 
-        // Find the timer to stop and remove.  If it is one of the interval timers that were
-        // pending reschedule, we can remove it from that list too, since now we know Starnix no
-        // longer wants it to be scheduled. And if that removal happens to allow suspends, then
-        // clear any suspend bans.
-        guard.timer_heap.retain(|tn| !Arc::ptr_eq(&tn.hr_timer, timer));
-        if *timer.is_interval.lock() {
-            guard.interval_timers_pending_reschedule.remove(&timer.get_id());
-            self.handle_interval_timer_reschedule(
-                &mut guard, timer, /*allow_timer_insert=*/ false,
-            );
-        }
-
-        // Record the inspect event
-        let after_len = guard.timer_heap.len();
-        let inspect_event_type = if after_len == prev_len {
-            // There is no-op on the heap
-            None
-        } else if after_len == prev_len - 1 {
-            Some(InspectHrTimerEvent::Remove)
-        } else {
-            Some(InspectHrTimerEvent::retain_err(prev_len, after_len, "removing timer"))
-        };
-        if let Some(inspect_event_type) = inspect_event_type {
-            self.record_event(&mut guard, inspect_event_type, None);
-        }
-
-        log_debug!("remove_timer: exit:  {timer:?}");
+        // Block until the alarm for this timer is scheduled.
+        wait_signaled_sync(&done)
+            .map_err(|_| errno!(EINVAL, "add_timer: wait_signaled_sync failed"))?;
+        log_debug!("remove_timer: exit:  {timer_id:?}");
         Ok(())
     }
 }
@@ -796,9 +866,22 @@ pub struct HrTimer {
 }
 pub type HrTimerHandle = Arc<HrTimer>;
 
+impl Drop for HrTimer {
+    fn drop(&mut self) {
+        let wake_alarm_id = self.wake_alarm_id();
+        fuchsia_trace::duration!(c"alarms", c"hrtimer::drop", "timer_id" => self.get_id(), "wake_alarm_id" => &wake_alarm_id[..]);
+        fuchsia_trace::flow_end!(c"alarms", c"hrtimer_lifecycle", self.trace_id());
+    }
+}
+
 impl HrTimer {
     pub fn new() -> HrTimerHandle {
-        Arc::new(Self { event: Arc::new(zx::Event::create()), is_interval: Mutex::new(false) })
+        let ret =
+            Arc::new(Self { event: Arc::new(zx::Event::create()), is_interval: Mutex::new(false) });
+        let wake_alarm_id = ret.wake_alarm_id();
+        fuchsia_trace::duration!(c"alarms", c"hrtimer::new", "timer_id" => ret.get_id(), "wake_alarm_id" => &wake_alarm_id[..]);
+        fuchsia_trace::flow_begin!(c"alarms", c"hrtimer_lifecycle", ret.trace_id(), "wake_alarm_id" => &wake_alarm_id[..]);
+        ret
     }
 
     pub fn event(&self) -> zx::Event {
@@ -810,8 +893,22 @@ impl HrTimer {
     /// Returns the unique identifier of this [HrTimer].
     ///
     /// All holders of the same [HrTimerHandle] will see the same value here.
-    fn get_id(&self) -> zx::Koid {
+    pub fn get_id(&self) -> zx::Koid {
         self.event.as_handle_ref().get_koid().expect("infallible")
+    }
+
+    /// Returns the unique alarm ID for this [HrTimer].
+    ///
+    /// The naming pattern is: `starnix:Koid(NNNNN):iB`, where `NNNNN` is a koid
+    /// and B is `1` if the timer is an interval timer, or `0` otherwise.
+    fn wake_alarm_id(&self) -> String {
+        let i = if *self.is_interval.lock() { "i1" } else { "i0" };
+        let koid = self.get_id();
+        format!("starnix:{koid:?}:{i}")
+    }
+
+    fn trace_id(&self) -> fuchsia_trace::Id {
+        self.get_id().raw_koid().into()
     }
 }
 
@@ -823,9 +920,7 @@ impl TimerOps for HrTimerHandle {
         deadline: TargetTime,
     ) -> Result<(), Errno> {
         // Before (re)starting the timer, ensure the signal is cleared.
-        self.event
-            .as_handle_ref()
-            .signal(zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
+        signal_handle(&*self.event, zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
             .map_err(|status| from_status_like_fdio!(status))?;
         current_task.kernel().hrtimer_manager.add_timer(
             source,
@@ -836,10 +931,8 @@ impl TimerOps for HrTimerHandle {
     }
 
     fn stop(&self, current_task: &CurrentTask) -> Result<(), Errno> {
-        // Clear the signal when stopping the hrtimer.
-        self.event
-            .as_handle_ref()
-            .signal(zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
+        // Clear the signal when removing the hrtimer.
+        signal_handle(&*self.event, zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
             .map_err(|status| from_status_like_fdio!(status))?;
         Ok(current_task.kernel().hrtimer_manager.remove_timer(self)?)
     }
@@ -853,12 +946,10 @@ impl TimerOps for HrTimerHandle {
     }
 }
 
-/// Represents a node of `HrTimer` in the binary heap used by the `HrTimerManager`.
-#[derive(Clone)]
+/// Represents a node of `HrTimer`.
+#[derive(Clone, Debug)]
 struct HrTimerNode {
     /// The deadline of the associated `HrTimer`.
-    ///
-    /// This is used to determine the order of the nodes in the heap.
     deadline: zx::BootInstant,
 
     /// The source where initiated this `HrTimer`.
@@ -868,6 +959,7 @@ struct HrTimerNode {
     /// wake event.
     wake_source: Option<Weak<dyn OnWakeOps>>,
 
+    /// The underlying HrTimer.
     hr_timer: HrTimerHandle,
 }
 
@@ -915,385 +1007,388 @@ impl PartialOrd for HrTimerNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::testing::create_kernel_and_task;
-    use assert_matches::assert_matches;
-    use futures::channel::mpsc;
-    use futures::{select, SinkExt, StreamExt};
+    use super::*;
+    use crate::task::HrTimer;
+    use crate::testing::{create_kernel_and_task, AutoReleasableTask};
+    use starnix_logging::log_warn;
     use std::thread;
-    use test_util::assert_gt;
     use {fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync};
 
-    use super::*;
+    #[derive(Debug, Copy, Clone)]
+    enum Response {
+        Immediate,
+        Delayed,
+        Error,
+    }
 
     impl HrTimerManagerState {
-        fn new_for_test(message_counter: zx::Counter) -> Self {
+        fn new_for_test() -> Self {
             Self {
                 inspect_node: BoundedListNode::new(
                     fuchsia_inspect::component::inspector().root().create_child("events"),
                     INSPECT_GRAPH_EVENT_BUFFER_SIZE,
                 ),
-                timer_heap: Default::default(),
-                current_deadline: Default::default(),
-                message_counter: Some(message_counter),
-                interval_timers_pending_reschedule: Default::default(),
+                pending_timers: Default::default(),
+                message_counter: None,
             }
         }
     }
 
-    async fn serve_wake_proxy_task(
-        mut stream: fta::WakeRequestStream,
-        emulate: Option<zx::Counter>,
-    ) {
-        let (mut snd, mut rcv) = mpsc::channel(1);
-        let mut open_requests = 0;
+    // Scheduling a hrtimer with this deadline will expire it.
+    const MAGIC_EXPIRE_DEADLINE: i64 = 424242;
 
-        log_debug!("serve_wake_proxy_task: entering loop");
-
-        while let Some(Ok(request)) = stream.next().await {
-            log_debug!("serve_wake_proxy_task: request: {request:?}");
-            match request {
-                fta::WakeRequest::CancelSync { responder, .. } => {
-                    if emulate.is_some() {
-                        if open_requests > 0 {
-                            snd.send(()).await.unwrap()
-                        }
-                    }
-                    responder.send(Ok(())).expect("");
-                }
-                fta::WakeRequest::Cancel { .. } => {
-                    if emulate.is_some() {
-                        if open_requests > 0 {
-                            snd.send(()).await.unwrap()
-                        }
-                    }
-                }
-                fta::WakeRequest::GetProperties { responder, .. } => {
-                    let response = fta::WakeGetPropertiesResponse {
-                        is_supported: Some(true),
-                        ..Default::default()
-                    };
-                    responder.send(&response).expect("send success");
-                }
-                fta::WakeRequest::SetAndWait { deadline, responder, mode, .. } => {
-                    log_debug!("set_and_wait: new timer: deadline: {deadline:?}, {emulate:?}");
-                    open_requests += 1;
-
-                    if let fta::SetAndWaitMode::NotifySetupDone(setup_done) = mode {
-                        setup_done
-                            .signal_handle(zx::Signals::empty(), zx::Signals::EVENT_SIGNALED)
-                            .expect("infallible");
-                    }
-
-                    if emulate.is_some() {
-                        select! {
-                            _ = fasync::Timer::new(deadline) => {
-                                let (p0, _p1) = zx::EventPair::create();
-
-                                // Wake proxy adds 1 to the emulated counter on each response.
-                                emulate.as_ref().map(|c| c.add(1).unwrap());
-                                responder.send(Ok(p0)).expect("unlikely");
-                                log_debug!("set_and_wait: returning OK: deadline: {deadline:?}, value: {:?}",
-                                    emulate.as_ref().unwrap().read().unwrap());
-                            },
-                            r = rcv.next() => {
-                                r.unwrap();
-                                responder.send(Err(fta::WakeError::Dropped)).expect("unlikely");
-                                log_debug!("set_and_wait: returning error: {deadline:?}");
-                            },
-                        }
-                    } else {
-                        // Just fail.
-                        responder.send(Err(fta::WakeError::Internal)).expect("unlikely");
-                    }
-
-                    open_requests -= 1;
-                }
-                fta::WakeRequest::_UnknownMethod { .. } => unreachable!(),
-            }
-        }
+    // Makes sure that a dropped responder is properly responded to.
+    struct ResponderCleanup {
+        responder: Option<fta::WakeSetAndWaitResponder>,
     }
 
-    /// Returns a mocked HrTimer::Device client sync proxy and its server running in a spawned
-    /// thread.
-    ///
-    /// Note: fuchsia::test with async starts a fuchsia-async executor, which the mock server needs.
-    /// Having a sync fidl call running on an async executor that is talking to something that
-    /// needs to run on the same executor is troublesome. Mutithread should be set in these tests.
-    /// It should never happen outside of test code.
-    fn mock_hrtimer_connection(emulate: Option<zx::Counter>) -> fta::WakeSynchronousProxy {
-        let (sync_proxy, server_end) = fidl::endpoints::create_sync_proxy::<fta::WakeMarker>();
-        let channel = server_end.into_channel();
-
-        // Give our fake its own thread, to ensure that we don't accidentally deadlock in a way
-        // that is impossible in a realistic situation. Normally the Wake API is served by
-        // a separate process.
-        let _detached = thread::spawn(move || {
-            let mut executor = fasync::LocalExecutor::new();
-            let server_end: fidl::endpoints::ServerEnd<fta::WakeMarker> =
-                fidl::endpoints::ServerEnd::new(channel);
-            let _ = executor.run_singlethreaded(async move {
-                serve_wake_proxy_task(server_end.into_stream(), emulate).await;
+    impl Drop for ResponderCleanup {
+        fn drop(&mut self) {
+            let responder = self.responder.take();
+            log_debug!("dropping responder: {responder:?}");
+            responder.map(|r| {
+                r.send(Err(fta::WakeError::Dropped))
+                    .map_err(|err| log_error!("could not respond to a FIDL message: {err:?}"))
+                    .expect("should be able to respond to a FIDL message")
             });
-        });
-        sync_proxy
+        }
     }
 
-    fn mock_hrtimer_connection_async(emulate: Option<zx::Counter>) -> fta::WakeProxy {
+    // Serves a fake `fuchsia.time.alarms/Wake` API. The behavior is simplistic when compared to
+    // the "real" implementation in that it never actually expires alarms on its own, and has
+    // fixed behavior for each scheduled alarm, which is selected at the beginning of the test.
+    //
+    // Despite this, we can use it to check a number of correctness scenarios with unit tests.
+    //
+    // This allows us to remove the flakiness that may arise from the use of real time, and also
+    // avoid the complications of fake time.  If you want an alarm that expires, schedule it with
+    // a deadline of `MAGIC_EXPIRE_DEADLINE` above, and call this with `response_type ==
+    // Response::Delayed`.
+    async fn serve_fake_wake_alarms(
+        message_counter: zx::Counter,
+        response_type: Response,
+        mut stream: fta::WakeRequestStream,
+        once: bool,
+    ) {
+        log_warn!("serve_fake_wake_alarms: serving loop entry. response_type={:?}", response_type);
+        let mut responders: HashMap<String, ResponderCleanup> = HashMap::new();
+        if once {
+            return;
+        }
+
+        while let Some(maybe_request) = stream.next().await {
+            match maybe_request {
+                Ok(request) => {
+                    log_debug!(
+                        "serve_fake_wake_alarms: request: {:?}; response_type: {:?}",
+                        request,
+                        response_type
+                    );
+                    match request {
+                        fta::WakeRequest::SetAndWait { mode, responder, alarm_id, deadline } => {
+                            log_debug!(
+                                "serve_fake_wake_alarms: SetAndWait: alarm_id: {:?}: deadline: {:?}",
+                                alarm_id,
+                                deadline
+                            );
+                            defer! {
+                                if let fta::SetAndWaitMode::NotifySetupDone(setup_done) = mode {
+                                    // Caller blocks until this event is signaled.
+                                    signal_handle(&setup_done, zx::Signals::NONE, zx::Signals::EVENT_SIGNALED).map_err(|e| to_errno_with_log(e)).unwrap();
+                                }
+                            };
+                            match response_type {
+                                Response::Delayed => {
+                                    // Just don't respond, forever.
+                                    log_debug!(
+                                        "serve_fake_wake_alarms: SetAndWait: will not respond"
+                                    );
+                                    // A special value that causes alarm expiry.
+                                    if deadline.into_nanos() == MAGIC_EXPIRE_DEADLINE {
+                                        // If any responders are removed, then add one return
+                                        // message for each.
+                                        let r_count_before = responders.len();
+                                        responders.retain(|k, _| *k != alarm_id);
+                                        let r_count_after = responders.len();
+
+                                        message_counter
+                                            .add(
+                                                (r_count_before - r_count_after)
+                                                    .try_into()
+                                                    .expect("should be convertible"),
+                                            )
+                                            .expect("add to message_counter");
+                                        let (_, peer) = zx::EventPair::create();
+                                        message_counter.add(1).expect("add 1 to message counter");
+                                        responder.send(Ok(peer)).expect("send FIDL response");
+                                    } else {
+                                        let removed = responders.insert(
+                                            alarm_id,
+                                            ResponderCleanup { responder: Some(responder) },
+                                        );
+                                        // If a responder was removed, add a return message for it.
+                                        if let Some(_) = removed {
+                                            message_counter.add(1).unwrap();
+                                        }
+                                    }
+                                }
+                                Response::Immediate => {
+                                    // Manufacture a token to return, not relevant for the test.
+                                    let (_ignored, fake_lease) = zx::EventPair::create();
+                                    message_counter.add(1).unwrap();
+                                    responder.send(Ok(fake_lease)).expect("infallible");
+                                    log_debug!(
+                                        "serve_fake_wake_alarms: SetAndWait: test fake responded immediately"
+                                    );
+                                }
+                                Response::Error => {
+                                    message_counter.add(1).unwrap();
+                                    responder
+                                        .send(Err(fta::WakeError::Unspecified))
+                                        .expect("infallible");
+                                    log_debug!(
+                                        "serve_fake_wake_alarms: SetAndWait: Responded with error"
+                                    );
+                                }
+                            }
+                        }
+                        fta::WakeRequest::Cancel { alarm_id, .. } => {
+                            let r_count_before = responders.len();
+                            responders.retain(|k, _| *k != alarm_id);
+                            let r_count_after = responders.len();
+                            message_counter
+                                .add((r_count_before - r_count_after).try_into().unwrap())
+                                .unwrap();
+
+                            log_debug!("serve_fake_wake_alarms: Cancel: {}", alarm_id);
+                        }
+                        fta::WakeRequest::CancelSync { .. } => unreachable!(),
+                        fta::WakeRequest::GetProperties { .. } => unreachable!(),
+                        fta::WakeRequest::_UnknownMethod { .. } => unreachable!(),
+                    }
+                }
+                Err(e) => {
+                    // This may or may not be an error, depending on what you wanted
+                    // to test.
+                    log_warn!("alarms::serve: error in request: {:?}", e);
+                }
+            }
+        }
+        log_warn!("serve_fake_wake_alarms: exiting");
+    }
+
+    // Injected for testing.
+    async fn connect_factory(
+        message_counter: zx::Counter,
+        response_type: Response,
+    ) -> fta::WakeProxy {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fta::WakeMarker>();
         let channel = server_end.into_channel();
 
-        // See the comment in `mock_hrtimer_connection` above.
+        // A separate thread is needed to allow independent execution of the server.
         let _detached = thread::spawn(move || {
             let mut executor = fasync::LocalExecutor::new();
             let server_end: fidl::endpoints::ServerEnd<fta::WakeMarker> =
                 fidl::endpoints::ServerEnd::new(channel);
             let _ = executor.run_singlethreaded(async move {
-                serve_wake_proxy_task(server_end.into_stream(), emulate).await;
+                serve_fake_wake_alarms(
+                    message_counter,
+                    response_type,
+                    server_end.into_stream(),
+                    /*once*/ false,
+                )
+                .await;
             });
         });
         proxy
     }
 
-    // If `emulate == true`, the mock WakeAlarms will emulate some of the behavior. Most
-    // tests here only exercise timer heap management, and need `emulate == false`.
-    fn init_hr_timer_manager(emulate: bool) -> (HrTimerManagerHandle, zx::Counter) {
-        let message_counter = zx::Counter::create();
-        let emulate_channel = if emulate {
-            Some(message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup"))
-        } else {
-            None
-        };
-        let proxy = mock_hrtimer_connection(emulate_channel);
-
+    // Initializes HrTimerManager for tests.
+    //
+    // # Returns
+    //
+    // A tuple of:
+    // - `HrTimerManagerHandle` the unit under test
+    // - `AutoReleasableTask` the kernel task to keep alive
+    // - `zx::Counter` a message counter to use in tests to observe suspend state
+    async fn init_hr_timer_manager(
+        response_type: Response,
+    ) -> (HrTimerManagerHandle, AutoReleasableTask, zx::Counter) {
         let (_, current_task) = create_kernel_and_task();
-        let local_message_counter = message_counter
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .expect("Failed to dup handle");
-
         let manager = Arc::new(HrTimerManager {
-            device_proxy: Some(proxy),
-            state: Mutex::new(HrTimerManagerState::new_for_test(local_message_counter)),
+            state: Mutex::new(HrTimerManagerState::new_for_test()),
             start_next_sender: Default::default(),
         });
-
-        let local_message_counter = message_counter
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .expect("Failed to dup handle");
-        let emulate_channel = if emulate {
-            Some(message_counter.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup"))
-        } else {
-            None
-        };
-        let async_proxy = mock_hrtimer_connection_async(emulate_channel);
-        let async_proxy_channel = async_proxy.into_channel().ok().map(|ac| ac.into_zx_channel());
-        manager.init(&current_task, async_proxy_channel, Some(local_message_counter)).expect("");
-        (manager, message_counter)
-    }
-
-    #[fuchsia::test(threads = 3)]
-    async fn hr_timer_manager_add_timers() {
-        let (hrtimer_manager, _message_counter) = init_hr_timer_manager(/*emulate=*/ false);
-        let soonest_deadline = zx::BootInstant::from_nanos(1);
-        let timer1 = HrTimer::new();
-        let timer2 = HrTimer::new();
-        let timer3 = HrTimer::new();
-
-        // Add three timers into the heap.
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer3, zx::BootInstant::from_nanos(3)),
-            Ok(_)
-        );
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer2, zx::BootInstant::from_nanos(2)),
-            Ok(_)
-        );
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, soonest_deadline), Ok(_));
-
-        // Make sure the deadline of the current running timer is the soonest.
-        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == soonest_deadline));
-    }
-
-    #[fuchsia::test(threads = 2)]
-    async fn hr_timer_manager_add_duplicate_timers() {
-        let (hrtimer_manager, _message_counter) = init_hr_timer_manager(/*emulate=*/ false);
-
-        let timer1 = HrTimer::new();
-        let sooner_deadline = zx::BootInstant::from_nanos(1);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, sooner_deadline), Ok(_));
-        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));
-
-        let later_deadline = zx::BootInstant::from_nanos(2);
-        assert_gt!(later_deadline, sooner_deadline);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, later_deadline), Ok(_));
-        assert_matches!(hrtimer_manager.current_deadline(), Some(_));
-        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
-        // Make sure no duplicate timers.
-        assert_eq!(hrtimer_manager.lock().timer_heap.len(), 1);
-    }
-
-    #[fuchsia::test(threads = 2)]
-    async fn hr_timer_manager_remove_timers() {
-        let (hrtimer_manager, _message_counter) = init_hr_timer_manager(/*emulate=*/ false);
-
-        let timer1 = HrTimer::new();
-        let timer2 = HrTimer::new();
-        let timer2_deadline = zx::BootInstant::from_nanos(2);
-        let timer3 = HrTimer::new();
-        let timer3_deadline = zx::BootInstant::from_nanos(3);
-
-        assert_matches!(hrtimer_manager.add_timer(None, &timer3, timer3_deadline), Ok(_));
-        assert_matches!(hrtimer_manager.add_timer(None, &timer2, timer2_deadline), Ok(_));
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer1, zx::BootInstant::from_nanos(1)),
-            Ok(_)
-        );
-
-        assert_matches!(hrtimer_manager.remove_timer(&timer1), Ok(_));
-        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer2_deadline));
-
-        assert_matches!(hrtimer_manager.remove_timer(&timer2), Ok(_));
-        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer3_deadline));
-    }
-
-    #[fuchsia::test(threads = 2)]
-    async fn hr_timer_manager_clear_heap() {
-        let (hrtimer_manager, _message_counter) = init_hr_timer_manager(/*emulate=*/ false);
-
-        let timer = HrTimer::new();
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer, zx::BootInstant::from_nanos(1)),
-            Ok(_)
-        );
-        assert_matches!(hrtimer_manager.remove_timer(&timer), Ok(_));
-        assert_matches!(hrtimer_manager.current_deadline(), None);
-    }
-
-    #[fuchsia::test(threads = 2)]
-    async fn hr_timer_manager_update_deadline() {
-        let (hrtimer_manager, _message_counter) = init_hr_timer_manager(/*emulate=*/ false);
-
-        let timer = HrTimer::new();
-        let sooner_deadline = zx::BootInstant::from_nanos(1);
-        let later_deadline = zx::BootInstant::from_nanos(2);
-
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, later_deadline), Ok(_));
-        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, sooner_deadline), Ok(_));
-        // Make sure no duplicate timers.
-        assert_eq!(hrtimer_manager.lock().timer_heap.len(), 1);
-        assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));
-    }
-
-    #[fuchsia::test(threads = 2)]
-    async fn hr_timer_manager_wake_proxy_signal() {
-        let (hrtimer_manager, message_counter) = init_hr_timer_manager(/*emulate=*/ false);
-
-        let timer = HrTimer::new();
-        let sooner_deadline = zx::BootInstant::INFINITE;
-        let later_deadline = zx::BootInstant::from_nanos(1000);
-
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, later_deadline), Ok(_));
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, sooner_deadline), Ok(_));
-
-        // Make sure that the counter goes to zero eventually again.
-        message_counter
-            .wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE)
+        let counter = zx::Counter::create();
+        let counter_clone = duplicate_handle(&counter).unwrap();
+        let proxy = connect_factory(counter_clone, response_type).await;
+        let counter_clone = duplicate_handle(&counter).unwrap();
+        manager
+            .init_for_test(
+                &current_task,
+                Some(proxy.into_channel().unwrap().into_zx_channel()),
+                Some(counter_clone),
+            )
             .expect("infallible");
+        (manager, current_task, counter)
     }
 
     #[fuchsia::test]
-    async fn hr_timer_node_cmp() {
-        let time = zx::BootInstant::from_nanos(1);
+    async fn test_triggering() {
+        let (hrtimer_manager, _starnix_task, counter) =
+            init_hr_timer_manager(Response::Immediate).await;
         let timer1 = HrTimer::new();
-        let node1 = HrTimerNode::new(time, None, timer1.clone());
         let timer2 = HrTimer::new();
-        let node2 = HrTimerNode::new(time, None, timer2.clone());
+        let timer3 = HrTimer::new();
 
-        assert!(node1 != node2 && node1.cmp(&node2) != std::cmp::Ordering::Equal);
+        hrtimer_manager.add_timer(None, &timer1, zx::BootInstant::from_nanos(1)).unwrap();
+        hrtimer_manager.add_timer(None, &timer2, zx::BootInstant::from_nanos(2)).unwrap();
+        hrtimer_manager.add_timer(None, &timer3, zx::BootInstant::from_nanos(3)).unwrap();
+
+        wait_signaled(&timer1.event()).await.unwrap();
+        wait_signaled(&timer2.event()).await.unwrap();
+        wait_signaled(&timer3.event()).await.unwrap();
+
+        assert_eq!(
+            counter.wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
+            zx::WaitResult::Ok(zx::Signals::COUNTER_NON_POSITIVE)
+        );
     }
 
-    #[fuchsia::test(threads = 2)]
+    #[fuchsia::test]
+    async fn test_delayed_response() {
+        let (hrtimer_manager, _starnix_task, counter) =
+            init_hr_timer_manager(Response::Delayed).await;
+        let timer = HrTimer::new();
+
+        hrtimer_manager.add_timer(None, &timer, zx::BootInstant::from_nanos(1)).unwrap();
+
+        assert_eq!(
+            counter.wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
+            zx::WaitResult::Ok(zx::Signals::COUNTER_NON_POSITIVE)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_protocol_error_response() {
+        let (hrtimer_manager, _starnix_task, counter) =
+            init_hr_timer_manager(Response::Error).await;
+        let timer = HrTimer::new();
+        hrtimer_manager.add_timer(None, &timer, zx::BootInstant::from_nanos(1)).unwrap();
+        assert_eq!(
+            counter.wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
+            zx::WaitResult::Ok(zx::Signals::COUNTER_NON_POSITIVE)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn reschedule_same_timer() {
+        let (hrtimer_manager, _starnix_task, counter) =
+            init_hr_timer_manager(Response::Delayed).await;
+        let timer = HrTimer::new();
+
+        hrtimer_manager.add_timer(None, &timer, zx::BootInstant::from_nanos(1)).unwrap();
+        hrtimer_manager.add_timer(None, &timer, zx::BootInstant::from_nanos(2)).unwrap();
+
+        // Force alarm expiry.
+        hrtimer_manager
+            .add_timer(None, &timer, zx::BootInstant::from_nanos(MAGIC_EXPIRE_DEADLINE))
+            .unwrap();
+        wait_signaled(&timer.event()).await.unwrap();
+
+        assert_eq!(
+            counter.wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
+            zx::WaitResult::Ok(zx::Signals::COUNTER_NON_POSITIVE)
+        );
+    }
+
+    #[fuchsia::test]
     async fn rescheduling_interval_timers_forbids_suspend() {
-        const DURATION_1S: zx::BootDuration = zx::BootDuration::from_seconds(1);
-        let (hrtimer_manager, message_counter) = init_hr_timer_manager(/*emulate=*/ true);
+        let (hrtimer_manager, _starnix_task, counter) =
+            init_hr_timer_manager(Response::Delayed).await;
 
         // Schedule an interval timer and let it expire.
         let timer1 = HrTimer::new();
         *timer1.is_interval.lock() = true;
-        let deadline1 = fasync::BootInstant::after(DURATION_1S);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, deadline1.into()), Ok(_));
-        fasync::OnSignals::new(timer1.event(), zx::Signals::EVENT_SIGNALED).await.unwrap();
+        hrtimer_manager
+            .add_timer(None, &timer1, zx::BootInstant::from_nanos(MAGIC_EXPIRE_DEADLINE))
+            .unwrap();
+        wait_signaled(&timer1.event()).await.unwrap();
 
         // Schedule a regular timer and let it expire.
         let timer2 = HrTimer::new();
-        let deadline2 = fasync::BootInstant::after(DURATION_1S);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer2, deadline2.into()), Ok(_));
-        fasync::OnSignals::new(timer2.event(), zx::Signals::EVENT_SIGNALED).await.unwrap();
+        hrtimer_manager
+            .add_timer(None, &timer2, zx::BootInstant::from_nanos(MAGIC_EXPIRE_DEADLINE))
+            .unwrap();
+        wait_signaled(&timer2.event()).await.unwrap();
 
         // When we have an expired but not rescheduled interval timer (`timer1`), and we have
         // an intervening timer that gets scheduled and expires (`timer2`) before `timer1` is
         // rescheduled, then suspend should be disallowed (counter > 0) to allow `timer1` to
         // be scheduled eventually.
-        assert_gt!(message_counter.read().unwrap(), 0);
+        assert_eq!(
+            counter.wait_handle(zx::Signals::COUNTER_POSITIVE, zx::MonotonicInstant::INFINITE),
+            zx::WaitResult::Ok(zx::Signals::COUNTER_POSITIVE)
+        );
     }
 
-    #[fuchsia::test(threads = 2)]
+    #[fuchsia::test]
     async fn canceling_interval_timer_allows_suspend() {
-        const DURATION_1S: zx::BootDuration = zx::BootDuration::from_seconds(1);
-        let (hrtimer_manager, message_counter) = init_hr_timer_manager(/*emulate=*/ true);
+        let (hrtimer_manager, _starnix_task, counter) =
+            init_hr_timer_manager(Response::Delayed).await;
 
         let timer1 = HrTimer::new();
         *timer1.is_interval.lock() = true;
-        let deadline1 = fasync::BootInstant::after(DURATION_1S);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, deadline1.into()), Ok(_));
-        fasync::OnSignals::new(timer1.event(), zx::Signals::EVENT_SIGNALED).await.unwrap();
+        hrtimer_manager
+            .add_timer(None, &timer1, zx::BootInstant::from_nanos(MAGIC_EXPIRE_DEADLINE))
+            .unwrap();
+        wait_signaled(&timer1.event()).await.unwrap();
 
         // When an interval timer expires, we should not be allowed to suspend.
-        assert_gt!(message_counter.read().unwrap(), 0);
+        assert_eq!(
+            counter.wait_handle(zx::Signals::COUNTER_POSITIVE, zx::MonotonicInstant::INFINITE),
+            zx::WaitResult::Ok(zx::Signals::COUNTER_POSITIVE)
+        );
 
         // Schedule the same timer again. This time around we do not wait for it to expire,
         // but cancel the timer instead.
         const DURATION_100S: zx::BootDuration = zx::BootDuration::from_seconds(100);
         let deadline2 = fasync::BootInstant::after(DURATION_100S);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, deadline2.into()), Ok(_));
+        hrtimer_manager.add_timer(None, &timer1, deadline2.into()).unwrap();
 
-        // Ensure that the bottom half work from add_timer does not spill over into `remove_timer`.
-        // The current implementation does not allow us to control that beyond waiting to ensure
-        // that bottom half makes progress. So, we generously pause instead and accept the
-        // consequences.
-        fasync::Timer::new(fasync::BootInstant::after(DURATION_1S)).await;
-        assert_matches!(hrtimer_manager.remove_timer(&timer1), Ok(_));
+        hrtimer_manager.remove_timer(&timer1).unwrap();
 
         // When we cancel an interval timer, we should be allowed to suspend.
         assert_eq!(
-            message_counter
-                .wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
+            counter.wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
             zx::WaitResult::Ok(zx::Signals::COUNTER_NON_POSITIVE),
         );
     }
 
-    #[fuchsia::test(threads = 2)]
+    #[fuchsia::test]
     async fn canceling_interval_timer_allows_suspend_with_flake() {
-        const DURATION_1S: zx::BootDuration = zx::BootDuration::from_seconds(1);
-        let (hrtimer_manager, message_counter) = init_hr_timer_manager(/*emulate=*/ true);
+        let (hrtimer_manager, _starnix_task, counter) =
+            init_hr_timer_manager(Response::Delayed).await;
 
         let timer1 = HrTimer::new();
         *timer1.is_interval.lock() = true;
-        let deadline1 = fasync::BootInstant::after(DURATION_1S);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, deadline1.into()), Ok(_));
-        fasync::OnSignals::new(timer1.event(), zx::Signals::EVENT_SIGNALED).await.unwrap();
-
-        assert_gt!(message_counter.read().unwrap(), 0);
-
-        const DURATION_100S: zx::BootDuration = zx::BootDuration::from_seconds(100);
-        let deadline2 = fasync::BootInstant::after(DURATION_100S);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, deadline2.into()), Ok(_));
-        // No pause between start and stop has lead to flakes before.
-        assert_matches!(hrtimer_manager.remove_timer(&timer1), Ok(_));
+        hrtimer_manager
+            .add_timer(None, &timer1, zx::BootInstant::from_nanos(MAGIC_EXPIRE_DEADLINE))
+            .unwrap();
+        wait_signaled(&timer1.event()).await.unwrap();
 
         assert_eq!(
-            message_counter
-                .wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
+            counter.wait_handle(zx::Signals::COUNTER_POSITIVE, zx::MonotonicInstant::INFINITE),
+            zx::WaitResult::Ok(zx::Signals::COUNTER_POSITIVE)
+        );
+        const DURATION_100S: zx::BootDuration = zx::BootDuration::from_seconds(100);
+        let deadline2 = fasync::BootInstant::after(DURATION_100S);
+        hrtimer_manager.add_timer(None, &timer1, deadline2.into()).unwrap();
+        // No pause between start and stop has led to flakes before.
+        hrtimer_manager.remove_timer(&timer1).unwrap();
+
+        assert_eq!(
+            counter.wait_handle(zx::Signals::COUNTER_NON_POSITIVE, zx::MonotonicInstant::INFINITE),
             zx::WaitResult::Ok(zx::Signals::COUNTER_NON_POSITIVE),
         );
     }
