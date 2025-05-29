@@ -328,9 +328,9 @@ where
     P: ControlProtocol,
 {
     let frame = P::serialize_options(options)
-        .encapsulate(ConfigurationPacketBuilder::new())
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_CONFIGURE_REQUEST, identifier))
-        .encapsulate(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
+        .wrap_in(ConfigurationPacketBuilder::new())
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_CONFIGURE_REQUEST, identifier))
+        .wrap_in(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -348,9 +348,9 @@ where
     P: ControlProtocol,
 {
     let frame = P::serialize_options(options)
-        .encapsulate(ConfigurationPacketBuilder::new())
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_CONFIGURE_ACK, identifier))
-        .encapsulate(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
+        .wrap_in(ConfigurationPacketBuilder::new())
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_CONFIGURE_ACK, identifier))
+        .wrap_in(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -368,9 +368,9 @@ where
     P: ControlProtocol,
 {
     let frame = P::serialize_options(options)
-        .encapsulate(ConfigurationPacketBuilder::new())
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_CONFIGURE_REJECT, identifier))
-        .encapsulate(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
+        .wrap_in(ConfigurationPacketBuilder::new())
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_CONFIGURE_REJECT, identifier))
+        .wrap_in(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -384,9 +384,9 @@ where
     P: ControlProtocol,
 {
     let frame = Buf::new(&mut [], ..)
-        .encapsulate(TerminationPacketBuilder::new())
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_TERMINATE_REQUEST, identifier))
-        .encapsulate(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
+        .wrap_in(TerminationPacketBuilder::new())
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_TERMINATE_REQUEST, identifier))
+        .wrap_in(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -400,9 +400,9 @@ where
     P: ControlProtocol,
 {
     let frame = Buf::new(&mut [], ..)
-        .encapsulate(TerminationPacketBuilder::new())
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_TERMINATE_ACK, identifier))
-        .encapsulate(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
+        .wrap_in(TerminationPacketBuilder::new())
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_TERMINATE_ACK, identifier))
+        .wrap_in(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -422,9 +422,9 @@ where
 {
     buf.shrink_front_to(0);
     let frame = buf
-        .encapsulate(CodeRejectPacketBuilder::new())
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_CODE_REJECT, identifier))
-        .encapsulate(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
+        .wrap_in(CodeRejectPacketBuilder::new())
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_CODE_REJECT, identifier))
+        .wrap_in(PppPacketBuilder::new(P::PROTOCOL_IDENTIFIER))
         .serialize_vec_outer()
         .ok()
         .unwrap();
