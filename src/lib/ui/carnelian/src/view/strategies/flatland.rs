@@ -25,11 +25,12 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
-use fuchsia_trace::{duration, instant};
+use fuchsia_trace::{duration, flow_begin, instant};
 use futures::channel::mpsc::UnboundedSender;
 use futures::prelude::*;
 use futures::{StreamExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::ffi::CStr;
 use zx::{self as zx, Event, HandleBased, MonotonicInstant, Signals};
 
 fn setup_handle_flatland_events(
@@ -178,6 +179,10 @@ impl Plumber {
     pub fn enter_retirement(&mut self, _flatland: &flatland::FlatlandProxy) {}
 }
 
+// If the first one changes, the second one should too.
+pub const FLATLAND_DEBUG_NAME: &str = "Carnelian View";
+pub static FLATLAND_DEBUG_FLOW_NAME: &CStr = c"Flatland::PerAppPresent[Carnelian View]";
+
 const RENDER_BUFFER_COUNT: usize = 3;
 const DEFAULT_PRESENT_INTERVAL: i64 = (1_000_000_000.0 / 60.0) as i64;
 const TRANSFORM_ID: flatland::TransformId = flatland::TransformId { value: 1 };
@@ -199,6 +204,8 @@ pub(crate) struct FlatlandViewStrategy {
     // The number of `Flatland.Present()` calls we're authorized to make.  Initial value is 1.
     // Decremented whenever `Present()` is called, and incremented whenever Scenic authorizes us to.
     num_presents_allowed: usize,
+    // Only used for tracing, does not affect behavior.
+    present_count: u64,
     // Only used for tracing, does not affect behavior.
     pending_present_count: usize,
     render_timer_scheduled: bool,
@@ -262,6 +269,7 @@ impl FlatlandViewStrategy {
             custom_render_offset: None,
             present_interval: DEFAULT_PRESENT_INTERVAL,
             num_presents_allowed: 1,
+            present_count: 0,
             pending_present_count: 0,
             render_timer_scheduled: false,
             missed_frame: false,
@@ -467,7 +475,10 @@ impl FlatlandViewStrategy {
         _key: ViewKey,
         presentation_time: i64,
         release_event: Option<Event>,
+        present_count: u64,
     ) {
+        flow_begin!(c"gfx", FLATLAND_DEBUG_FLOW_NAME, fuchsia_trace::Id::from(present_count));
+
         flatland
             .present(flatland::PresentArgs {
                 requested_presentation_time: Some(presentation_time),
@@ -767,8 +778,10 @@ impl ViewStrategy for FlatlandViewStrategy {
                 self.view_key,
                 presentation_time.presentation_time,
                 release_event,
+                self.present_count,
             );
             self.last_presentation_time = presentation_time.presentation_time;
+            self.present_count += 1;
             self.pending_present_count += 1;
             self.num_presents_allowed -= 1;
             self.previous_present_release_event = self.current_present_release_event.take();
