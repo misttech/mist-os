@@ -63,16 +63,6 @@
             availability: "transitional",
         },
         {
-            config: "fuchsia.time.config.HasWakeAlarms",
-            key: "enable_wake_alarms",
-            type: "bool",
-
-            // TODO: b/416081776 - set to false once actual config is deployed.
-            // Current behavior is equivalent to having this set to `true`.
-            default: true,
-            availability: "transitional",
-        },
-        {
             config: "fuchsia.ui.VisualDebuggingLevel",
             from: "parent",
             key: "ui_visual_debugging_level",

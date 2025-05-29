@@ -114,11 +114,6 @@ pub struct Features {
     pub android_bootreason: bool,
 
     pub hvdcp_opti: bool,
-
-    /// If set, Starnix will use the wake alarms APIs. When set to `false`, the
-    /// underlying platform will not have power management, so we can also skip
-    /// programming wake alarms.
-    pub enable_wake_alarms: bool,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -176,7 +171,6 @@ impl Features {
                 thermal,
                 android_bootreason,
                 hvdcp_opti,
-                enable_wake_alarms,
             } => {
                 inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
@@ -249,7 +243,6 @@ impl Features {
                     );
                     inspect_node
                         .record_bool("enable_utc_time_adjustment", *enable_utc_time_adjustment);
-                    inspect_node.record_bool("enable_wake_alarms", *enable_wake_alarms);
                     inspect_node.record_bool("mlock_always_onfault", *mlock_always_onfault);
                     inspect_node
                         .record_string("mlock_pin_flavor", format!("{:?}", mlock_pin_flavor));
@@ -278,7 +271,6 @@ pub fn parse_features(
         mlock_pin_flavor,
         selinux_exceptions,
         ui_visual_debugging_level,
-        enable_wake_alarms,
     } = &start_info.config;
 
     let mut features = Features::default();
@@ -381,7 +373,6 @@ pub fn parse_features(
         features.enable_visual_debugging = true;
     }
     features.enable_utc_time_adjustment = *enable_utc_time_adjustment;
-    features.enable_wake_alarms = *enable_wake_alarms;
 
     features.kernel.default_uid = start_info.program.default_uid.0;
     features.kernel.default_seclabel = start_info.program.default_seclabel.clone();
