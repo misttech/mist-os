@@ -680,45 +680,6 @@ mod test {
         }};
     }
 
-    fn core_test_data_root() -> TempDir {
-        let r = tempfile::tempdir().unwrap();
-        put_file!(
-            r,
-            "../test_data/core-sdk-root",
-            "host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
-        );
-        put_file!(
-            r,
-            "../test_data/core-sdk-root",
-            "host_x64/sdk/manifest/host_tools_used_by_ffx_action_during_build"
-        );
-        put_file!(
-            r,
-            "../test_data/core-sdk-root",
-            "host_arm64/sdk/manifest/host_tools_used_by_ffx_action_during_build"
-        );
-        put_file!(
-            r,
-            "../test_data/core-sdk-root",
-            "host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json"
-        );
-        put_file!(
-            r,
-            "../test_data/core-sdk-root",
-            "host_x64/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json"
-        );
-        put_file!(
-            r,
-            "../test_data/core-sdk-root",
-            "host_x64/gen/tools/symbol-index/symbol_index_sdk_legacy.meta.json"
-        );
-        put_file!(
-            r,
-            "../test_data/core-sdk-root",
-            "host_x64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
-        );
-        r
-    }
     fn sdk_test_data_root() -> TempDir {
         let r = tempfile::tempdir().unwrap();
         put_file!(r, "../test_data/release-sdk-root", "fidl/fuchsia.data/meta.json");
@@ -730,16 +691,8 @@ mod test {
 
     #[test]
     fn test_manifest_exists() {
-        let core_root = core_test_data_root();
         let release_root = sdk_test_data_root();
 
-        // Modular SDK is used in-tree by ffx-action build templates.
-        assert!(SdkRoot::Modular {
-            root: core_root.path().to_owned(),
-            module: "host_tools_used_by_ffx_action_during_build".to_owned()
-        }
-        .manifest_path()
-        .is_some());
         assert!(SdkRoot::Full {
             root: release_root.path().to_owned(),
             manifest: Some(SDK_MANIFEST_PATH.into())

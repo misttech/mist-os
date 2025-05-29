@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import os
 import subprocess
 
 
@@ -31,16 +30,14 @@ def run_product_assembly(
     """
 
     # assume we're in the root build dir right now and that is where we'll find ffx env
-    root_build_dir = os.getcwd()
     ffx_env_path = "./.ffx.env"
 
-    # imitate the configuration in //src/developer/ffx/build/ffx_action.gni
     base_config = [
-        "analytics.disabled=true",
         "assembly_enabled=true",
-        "sdk.root=" + root_build_dir,
-        "sdk.type=in-tree",
-        "sdk.module=host_tools_used_by_ffx_action_during_build",
+        # imitate the configuration in //src/developer/ffx/build/ffx_action.gni
+        "ffx.analytics.disabled=true",
+        "daemon.autostart=false",
+        "log.enabled=false",
     ]
 
     args = [ffx_bin]

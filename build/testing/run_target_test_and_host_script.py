@@ -23,14 +23,12 @@ def run_target_test(
     ffx_bin: str, test_url: str, outdir: str, ffx_test_args: List[str]
 ) -> subprocess.CompletedProcess:
     """Runs 'ffx test run <url> --output-directory outdir [args]'"""
-    root_build_dir = os.getcwd()
 
     # use the same configuration in //src/developer/ffx/build/ffx_action.gni
     base_config = [
-        "analytics.disabled=true",
-        "sdk.root=" + root_build_dir,
-        "sdk.type=in-tree",
-        "sdk.module=host_tools_used_by_ffx_action_during_build",
+        "ffx.analytics.disabled=true",
+        "daemon.autostart=false",
+        "log.enabled=false",
     ]
 
     args = [ffx_bin]
