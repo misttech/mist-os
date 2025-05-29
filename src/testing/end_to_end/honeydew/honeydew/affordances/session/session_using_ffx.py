@@ -21,6 +21,14 @@ class SessionUsingFfx(session.Session):
         self._name: str = device_name
         self._ffx: ffx_transport.FFX = ffx
         self._started = False
+        self.verify_supported()
+
+    def verify_supported(self) -> None:
+        """Check if Session is supported on the DUT.
+        Raises:
+            NotSupportedError: Session affordance is not supported by Fuchsia device.
+        """
+        # TODO(http://b/409624056): Implement the method logic
 
     def start(self) -> None:
         """Start session.

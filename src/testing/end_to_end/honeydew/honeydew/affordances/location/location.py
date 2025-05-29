@@ -5,8 +5,10 @@
 
 import abc
 
+from honeydew.affordances import affordance
 
-class Location(abc.ABC):
+
+class Location(affordance.Affordance):
     """Abstract base class for Location affordance."""
 
     # List all the public methods

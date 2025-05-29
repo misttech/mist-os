@@ -32,6 +32,10 @@ class BluetoothGapFCTests(unittest.TestCase):
             reboot_affordance=self.reboot_affordance_obj,
         )
 
+    def test_verify_supported(self) -> None:
+        """Test if verify_supported works."""
+        # TODO(http://b/409623783): Implement the test method logic
+
     def test_gap_using_fc(self) -> None:
         """Test case for gap_using_fc.py"""
         self.assertIsInstance(self.bluetooth_gap_obj, gap_using_fc.GapUsingFc)

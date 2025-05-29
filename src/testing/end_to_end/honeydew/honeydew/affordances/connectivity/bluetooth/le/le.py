@@ -8,13 +8,14 @@ from typing import Any
 
 import fidl_fuchsia_bluetooth as f_bt
 
+from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common,
 )
 from honeydew.affordances.connectivity.bluetooth.utils import types as bt_types
 
 
-class LE(bluetooth_common.BluetoothCommon):
+class LE(affordance.Affordance, bluetooth_common.BluetoothCommon):
     """Abstract base class for Bluetooth LE Profile affordance."""
 
     # TODO(b/352584355): Add functional tests for BLE affordance

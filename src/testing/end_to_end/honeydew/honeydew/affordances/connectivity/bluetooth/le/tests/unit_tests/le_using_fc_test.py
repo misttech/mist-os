@@ -129,6 +129,10 @@ class BluetoothLETest(unittest.TestCase):
             reboot_affordance=self.reboot_affordance_obj,
         )
 
+    def test_verify_supported(self) -> None:
+        """Test if verify_supported works."""
+        # TODO(http://b/409623831): Implement the test method logic
+
     @parameterized.expand(
         [
             (

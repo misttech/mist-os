@@ -235,6 +235,15 @@ class UserInputUsingFc(user_input.UserInput):
                 f"{_INPUT_HELPER_COMPONENT} is not available in device {device_name}"
             )
 
+        self.verify_supported()
+
+    def verify_supported(self) -> None:
+        """Check if User Input affordance  is supported on the DUT.
+        Raises:
+            NotSupportedError: User Input affordance is not supported by Fuchsia device.
+        """
+        # TODO(http://b/409626027): Implement the method logic
+
     def create_touch_device(
         self,
         touch_screen_size: ui_custom_types.Size = user_input.DEFAULTS[

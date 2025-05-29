@@ -93,6 +93,14 @@ class TracingUsingFc(tracing.Tracing):
         # every device bootup.
         self._reset_state()
         reboot_affordance.register_for_on_device_boot(fn=self._reset_state)
+        self.verify_supported()
+
+    def verify_supported(self) -> None:
+        """Check if Trace is supported on the DUT.
+        Raises:
+            NotSupportedError: Tracing affordance is not supported by Fuchsia device.
+        """
+        # TODO(http://b/409625325): Implement the method logic
 
     def _reset_state(self) -> None:
         """Resets internal state tracking variables to correspond to an inactive

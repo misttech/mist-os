@@ -8,8 +8,10 @@ import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from honeydew.affordances import affordance
 
-class Tracing(abc.ABC):
+
+class Tracing(affordance.Affordance):
     """Abstract base class for Tracing affordance."""
 
     # List all the public methods

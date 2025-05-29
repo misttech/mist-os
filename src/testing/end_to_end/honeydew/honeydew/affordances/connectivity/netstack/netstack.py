@@ -5,10 +5,11 @@
 
 import abc
 
+from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.netstack.types import InterfaceProperties
 
 
-class Netstack(abc.ABC):
+class Netstack(affordance.Affordance):
     """Abstract base class for Netstack affordance."""
 
     # List all the public methods

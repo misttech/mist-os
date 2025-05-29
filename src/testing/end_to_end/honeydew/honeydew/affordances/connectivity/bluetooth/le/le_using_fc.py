@@ -99,10 +99,19 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         self._central_controller_proxy: (
             f_ble_controller.Central.Client | None
         ) = None
+
         self._gatt_server_proxy: f_gatt_controller.Server.Client | None = None
         self._le_session_initialized = False
         self._reboot_affordance.register_for_on_device_boot(fn=self.init_le_sys)
+        self.verify_supported()
         self.init_le_sys()
+
+    def verify_supported(self) -> None:
+        """Check if Bluetooth le is supported on the DUT.
+        Raises:
+            NotSupportedError: Bluetooth Le affordance is not supported by Fuchsia device.
+        """
+        # TODO(http://b/409623831): Implement the method logic
 
     def reset_state(self) -> None:
         """Reset the internal state tracking variables to correspond to an inactive BLE State."""
@@ -130,6 +139,7 @@ class LEUsingFc(le.LE, bluetooth_common_using_fc.BluetoothCommonUsingFc):
         Raises:
             BluetoothStateError: On failure.
         """
+
         if self._le_session_initialized:
             raise bt_errors.BluetoothStateError(
                 f"Bluetooth session is already initialized on {self._device_name}. Can be "

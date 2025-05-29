@@ -43,12 +43,19 @@ class RtcUsingFc(rtc.Rtc):
     ) -> None:
         """Initializer."""
         self._controller = fuchsia_controller
-
+        self.verify_supported()
         # This needs to be called once upon __init__(), and any time the device
         # is rebooted. On reboot, the connection is lost and needs to be
         # re-established.
         self._connect_proxy()
         reboot_affordance.register_for_on_device_boot(self._connect_proxy)
+
+    def verify_supported(self) -> None:
+        """Check if RTC is supported on the DUT.
+        Raises:
+            NotSupportedError: RTC affordance is not supported by Fuchsia device.
+        """
+        # TODO(http://b/409624089): Implement the method logic
 
     def _connect_proxy(self) -> None:
         """Connect the RTC Device protocol proxy."""

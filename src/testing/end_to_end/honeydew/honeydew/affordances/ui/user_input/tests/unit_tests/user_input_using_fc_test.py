@@ -30,6 +30,10 @@ class UserInputFCTests(unittest.TestCase):
         )
         self.ffx_transport_obj = mock.MagicMock(spec=ffx_transport.FFX)
 
+    def test_verify_supported(self) -> None:
+        """Test if verify_supported works."""
+        # TODO(http://b/409626027): Implement the test method logic
+
     def test_no_virtual_device_support_raise_error(self) -> None:
         """Test for user_input_using_fc.UserInputUsingFc() method raise error without virtual device
         support."""

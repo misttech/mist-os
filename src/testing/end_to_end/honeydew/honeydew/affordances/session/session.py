@@ -5,8 +5,10 @@
 
 import abc
 
+from honeydew.affordances import affordance
 
-class Session(abc.ABC):
+
+class Session(affordance.Affordance):
     """Abstract base class for Session affordance."""
 
     @abc.abstractmethod

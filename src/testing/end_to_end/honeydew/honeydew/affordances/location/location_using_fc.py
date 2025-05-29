@@ -50,15 +50,18 @@ class LocationUsingFc(location.Location):
             reboot_affordance: Object that implements RebootCapableDevice.
         """
         super().__init__()
-        self._verify_supported(device_name, ffx)
 
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
+        self.device = device_name
+        self.ffx = ffx
+
+        self.verify_supported()
 
         self._connect_proxy()
         self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
 
-    def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
+    def verify_supported(self) -> None:
         """Check if location is supported on the DUT.
 
         Args:
@@ -66,21 +69,23 @@ class LocationUsingFc(location.Location):
             ffx: FFX transport
 
         Raises:
-            NotSupportedError: A required component capability is not available.
+            NotSupportedError: Location affordance is not supported by Fuchsia device.
         """
         for capability in _REQUIRED_CAPABILITIES:
             # TODO(http://b/359342196): This is a maintenance burden; find a
             # better way to detect FIDL component capabilities.
-            if capability not in ffx.run(
+            if capability not in self.ffx.run(
                 ["component", "capability", capability]
             ):
                 _LOGGER.warning(
                     "All available location component capabilities:\n%s",
-                    ffx.run(["component", "capability", "fuchsia.location"]),
+                    self.ffx.run(
+                        ["component", "capability", "fuchsia.location"]
+                    ),
                 )
                 raise errors.NotSupportedError(
                     f'Component capability "{capability}" not exposed by device '
-                    f"{device}; this build of Fuchsia does not support the "
+                    f"{self.device}; this build of Fuchsia does not support the "
                     "location affordance."
                 )
 

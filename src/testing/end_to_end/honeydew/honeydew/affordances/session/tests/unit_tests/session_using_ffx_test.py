@@ -27,6 +27,10 @@ class SessionFFXTests(unittest.TestCase):
             device_name="fuchsia-emulator", ffx=self.ffx_obj
         )
 
+    def test_verify_supported(self) -> None:
+        """Test if verify_supported works."""
+        # TODO(http://b/409624056): Implement the test method logic
+
     def test_start(self) -> None:
         """Test for Session.start() method."""
         self.session_obj.start()
