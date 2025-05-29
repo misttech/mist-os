@@ -210,7 +210,6 @@ acpi::status<bool> Manager::DiscoverDevice(ACPI_HANDLE handle) {
   UniquePtr<ACPI_DEVICE_INFO> info = std::move(result.value());
   std::string name(reinterpret_cast<char*>(&info->Name), sizeof(info->Name));
 
-  // TODO(https://fxbug.dev/42160841): newer versions of ACPICA return this from GetObjectInfo().
   auto state_result = acpi_->EvaluateObject(handle, "_STA", std::nullopt);
   bool examine_children;
   uint64_t state;
