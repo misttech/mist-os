@@ -17,7 +17,13 @@ rustc_library("lib") {
     "//third_party/rust_crates:log",
   ]
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/filter.rs",
+    "src/format.rs",
+    "src/lib.rs",
+    "src/log_sink.rs",
+    "src/test.rs",
+  ]
 }
 
 group("logging") {
