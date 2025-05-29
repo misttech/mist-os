@@ -275,9 +275,15 @@ function multi-set {
                 :
               done
           }; do
-      set_cmd=(set $build --auto-dir "${spec_switches[@]}" "$@")
+      # Clear the build directory variable so the checks in `fx-build-dir-if-present` allow us to
+      # change the build directory, otherwise we end up with the first build directory as the
+      # directory for each set invocation.
+      FUCHSIA_BUILD_DIR=""
+      set_cmd=("set" "$build" "${spec_switches[@]}" "$@")
       if fx-command-run "${set_cmd[@]}" 3<&-; then
-        fx-build-dir-if-present
+        # FUCHSIA_BUILD_DIR is not updated by fx-* functions after the first build directory so use
+        # .fx-build-dir to update it ourselves.
+        FUCHSIA_BUILD_DIR="$(<"${FUCHSIA_DIR}/.fx-build-dir")"
         add
       else
         status=$?
