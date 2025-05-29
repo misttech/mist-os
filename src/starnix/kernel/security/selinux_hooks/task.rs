@@ -152,7 +152,7 @@ pub(in crate::security) fn task_alloc_from_context(
     let sid = if context.starts_with(INITIAL_PREFIX) {
         let name = &*context[INITIAL_PREFIX.len()..];
         let initial_sid = InitialSid::all_variants().iter().find(|x| x.name().as_bytes() == name);
-        SecurityId::initial(*initial_sid.ok_or_else(|| errno!(EINVAL))?)
+        (*initial_sid.ok_or_else(|| errno!(EINVAL))?).into()
     } else {
         security_server
             .security_context_to_sid(context.into())
@@ -808,7 +808,6 @@ mod tests {
     use crate::security::selinux_hooks::{testing, InitialSid, TaskAttrs};
     use crate::security::update_state_on_exec;
     use crate::testing::create_task;
-    use selinux::SecurityId;
     use starnix_uapi::signals::SIGTERM;
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
     use testing::spawn_kernel_with_selinux_hooks_test_policy_and_run;
@@ -819,13 +818,13 @@ mod tests {
             |_locked, current_task, _security_server| {
                 // Create a fake parent state, with values for some fields, to check for.
                 let parent_security_state = TaskAttrs {
-                    current_sid: SecurityId::initial(InitialSid::Unlabeled),
-                    effective_sid: SecurityId::initial(InitialSid::Unlabeled),
-                    previous_sid: SecurityId::initial(InitialSid::Kernel),
-                    exec_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    fscreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    keycreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    sockcreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
+                    current_sid: InitialSid::Unlabeled.into(),
+                    effective_sid: InitialSid::Unlabeled.into(),
+                    previous_sid: InitialSid::Kernel.into(),
+                    exec_sid: Some(InitialSid::Unlabeled.into()),
+                    fscreate_sid: Some(InitialSid::Unlabeled.into()),
+                    keycreate_sid: Some(InitialSid::Unlabeled.into()),
+                    sockcreate_sid: Some(InitialSid::Unlabeled.into()),
                 };
 
                 *current_task.security_state.lock() = parent_security_state.clone();
@@ -839,7 +838,7 @@ mod tests {
     #[fuchsia::test]
     fn task_alloc_for() {
         let for_kernel = TaskAttrs::for_kernel();
-        assert_eq!(for_kernel.current_sid, SecurityId::initial(InitialSid::Kernel));
+        assert_eq!(for_kernel.current_sid, InitialSid::Kernel.into());
         assert_eq!(for_kernel.effective_sid, for_kernel.current_sid);
         assert_eq!(for_kernel.previous_sid, for_kernel.current_sid);
         assert_eq!(for_kernel.exec_sid, None);
@@ -1044,12 +1043,12 @@ mod tests {
 
                     // Set previous SID to a different value from current, to allow verification
                     // of the pre-exec "current" being moved into "previous".
-                    state.previous_sid = SecurityId::initial(InitialSid::Unlabeled);
+                    state.previous_sid = InitialSid::Unlabeled.into();
 
                     // Set the other optional SIDs to a value, to verify that it is cleared on exec update.
-                    state.sockcreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-                    state.fscreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-                    state.keycreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+                    state.sockcreate_sid = Some(InitialSid::Unlabeled.into());
+                    state.fscreate_sid = Some(InitialSid::Unlabeled.into());
+                    state.keycreate_sid = Some(InitialSid::Unlabeled.into());
 
                     state.clone()
                 };

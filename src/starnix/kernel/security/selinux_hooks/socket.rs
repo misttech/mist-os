@@ -60,9 +60,7 @@ fn has_socket_permission_for_sid(
     // If the socket is for kernel-internal use we can return success immediately.
     // TODO: https://fxbug.dev/364569010 - check if there are additional cases when the socket is
     // for kernel-internal use.
-    if subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || socket_sid == SecurityId::initial(InitialSid::Kernel)
-    {
+    if subject_sid == InitialSid::Kernel.into() || socket_sid == InitialSid::Kernel.into() {
         return Ok(());
     }
     check_permission(permission_check, kernel, subject_sid, socket_sid, permission, audit_context)
@@ -85,8 +83,8 @@ fn todo_has_socket_permission(
     // TODO: https://fxbug.dev/364569010 - check if there are additional cases when the socket is
     // for kernel-internal use.
     if Anon::is_private(socket_node)
-        || subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || socket_sid == SecurityId::initial(InitialSid::Kernel)
+        || subject_sid == InitialSid::Kernel.into()
+        || socket_sid == InitialSid::Kernel.into()
     {
         return Ok(());
     }
@@ -191,7 +189,7 @@ pub(in crate::security) fn check_socket_create_access(
     )?
     .map(|(sid, _)| sid)
     // TODO: https://fxbug.dev/364569053 - default to socket-related initial SIDs.
-    .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled));
+    .unwrap_or_else(|| InitialSid::Unlabeled.into());
 
     has_socket_permission_for_sid(
         &security_server.as_permission_check(),
@@ -467,8 +465,7 @@ pub(in crate::security) fn socket_getpeersec_stream(
     _current_task: &CurrentTask,
     socket: &Socket,
 ) -> Result<Vec<u8>, Errno> {
-    let peer_sid =
-        socket.security.state.peer_sid.lock().unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+    let peer_sid = socket.security.state.peer_sid.lock().unwrap_or(InitialSid::Unlabeled.into());
     Ok(security_server.sid_to_security_context(peer_sid).unwrap())
 }
 

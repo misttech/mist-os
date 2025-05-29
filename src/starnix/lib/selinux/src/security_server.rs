@@ -371,9 +371,7 @@ impl SecurityServer {
                 sid: fs_sid,
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: use_type,
-                    default_sid: mount_sids
-                        .def_context
-                        .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
+                    default_sid: mount_sids.def_context.unwrap_or_else(|| InitialSid::File.into()),
                 },
                 mount_sids,
             }
@@ -387,14 +385,10 @@ impl SecurityServer {
         } else {
             // The name of the filesystem type was not recognized.
             FileSystemLabel {
-                sid: mount_sids
-                    .fs_context
-                    .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled)),
+                sid: mount_sids.fs_context.unwrap_or_else(|| InitialSid::Unlabeled.into()),
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: FsUseType::Xattr,
-                    default_sid: mount_sids
-                        .def_context
-                        .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
+                    default_sid: mount_sids.def_context.unwrap_or_else(|| InitialSid::File.into()),
                 },
                 mount_sids,
             }
@@ -628,7 +622,7 @@ fn sid_from_mount_option(
                 active_policy.sid_table.security_context_to_sid(&context).unwrap()
             } else {
                 // The mount option is present-but-not-valid: we use `Unlabeled`.
-                SecurityId::initial(InitialSid::Unlabeled)
+                InitialSid::Unlabeled.into()
             },
         )
     } else {
@@ -665,8 +659,8 @@ mod tests {
     #[test]
     fn compute_access_vector_allows_all() {
         let security_server = SecurityServer::new_default();
-        let sid1 = SecurityId::initial(InitialSid::Kernel);
-        let sid2 = SecurityId::initial(InitialSid::Unlabeled);
+        let sid1 = InitialSid::Kernel.into();
+        let sid2 = InitialSid::Unlabeled.into();
         assert_eq!(
             security_server.compute_access_decision(sid1, sid2, KernelClass::Process.into()).allow,
             AccessVector::ALL
