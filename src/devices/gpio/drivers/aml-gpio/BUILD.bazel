@@ -104,10 +104,10 @@ fuchsia_cc_test(
     ],
     deps = [
         ":common",
+        "//src/lib/testing/predicates",
         "//zircon/system/ulib/ddk-platform-defs",
         "//zircon/system/ulib/fzl",
         "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/driver_testing_cpp",
         "@fuchsia_sdk//pkg/fit-promise",
         "@internal_sdk//pkg/mock-mmio-reg",

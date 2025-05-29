@@ -4,14 +4,14 @@
 
 #include "aml-gpio.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -22,31 +22,40 @@ constexpr size_t kInterruptRegOffset = 0x3c00;
 }  // namespace
 
 namespace gpio {
+
 template <uint32_t kPid>
-class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
+class FakePlatformDevice final
+    : public fidl::testing::WireTestBase<fuchsia_hardware_platform_device::Device> {
  public:
+  FakePlatformDevice(fdf::MmioBuffer mmio, fdf::MmioBuffer ao_mmio,
+                     fdf::MmioBuffer interrupt_mmio) {
+    mmios_.insert({0, std::move(mmio)});
+    mmios_.insert({1, std::move(ao_mmio)});
+    mmios_.insert({2, std::move(interrupt_mmio)});
+  }
+
   fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler() {
     return fuchsia_hardware_platform_device::Service::InstanceHandler({
         .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                           fidl::kIgnoreBindingClosure),
     });
   }
+
   void SetExpectedInterruptFlags(uint32_t flags) { expected_interrupt_flags_ = flags; }
 
- private:
-  void GetMmioById(fuchsia_hardware_platform_device::wire::DeviceGetMmioByIdRequest* request,
-                   GetMmioByIdCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  void GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) override {
+    auto mmio = mmios_.find(request->index);
+    ASSERT_NE(mmio, mmios_.end());
+    auto& mmio_buffer = mmio->second;
+    fidl::Arena arena;
+    auto buffer = fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
+                      .offset(reinterpret_cast<size_t>(&mmio_buffer))
+                      .Build();
+    completer.ReplySuccess(buffer);
   }
 
-  void GetMmioByName(fuchsia_hardware_platform_device::wire::DeviceGetMmioByNameRequest* request,
-                     GetMmioByNameCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  void GetInterruptById(
-      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByIdRequest* request,
-      GetInterruptByIdCompleter::Sync& completer) override {
+  void GetInterruptById(GetInterruptByIdRequestView request,
+                        GetInterruptByIdCompleter::Sync& completer) override {
     EXPECT_EQ(request->flags, expected_interrupt_flags_);
     zx::interrupt irq;
     if (zx_status_t status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
@@ -59,34 +68,6 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
     completer.ReplySuccess(std::move(irq));
   }
 
-  void GetInterruptByName(
-      fuchsia_hardware_platform_device::wire::DeviceGetInterruptByNameRequest* request,
-      GetInterruptByNameCompleter::Sync& completer) override {
-    zx::interrupt irq;
-    if (zx_status_t status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
-        status != ZX_OK) {
-      completer.ReplyError(status);
-      return;
-    }
-    irq.trigger(0, zx::time_boot());
-    completer.ReplySuccess(std::move(irq));
-  }
-
-  void GetBtiById(fuchsia_hardware_platform_device::wire::DeviceGetBtiByIdRequest* request,
-                  GetBtiByIdCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  void GetBtiByName(fuchsia_hardware_platform_device::wire::DeviceGetBtiByNameRequest* request,
-                    GetBtiByNameCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  void GetSmcById(fuchsia_hardware_platform_device::wire::DeviceGetSmcByIdRequest* request,
-                  GetSmcByIdCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
   void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {
     fidl::Arena arena;
     auto info = fuchsia_hardware_platform_device::wire::NodeDeviceInfo::Builder(arena);
@@ -95,32 +76,19 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
     completer.ReplySuccess(info.vid(PDEV_VID_AMLOGIC).pid(kPid).irq_count(kIrqCount).Build());
   }
 
-  void GetSmcByName(fuchsia_hardware_platform_device::wire::DeviceGetSmcByNameRequest* request,
-                    GetSmcByNameCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
   void GetMetadata(fuchsia_hardware_platform_device::wire::DeviceGetMetadataRequest* request,
                    GetMetadataCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_FOUND);
   }
 
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
+ private:
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> bindings_;
   uint32_t expected_interrupt_flags_ = ZX_INTERRUPT_MODE_EDGE_HIGH;
+  std::unordered_map<uint32_t, fdf::MmioBuffer> mmios_;
 };
 
 class TestAmlGpioDriver : public AmlGpioDriver {
@@ -135,138 +103,136 @@ class TestAmlGpioDriver : public AmlGpioDriver {
                                           fdf_internal::DriverServer<TestAmlGpioDriver>::destroy);
   }
 
-  ddk_mock::MockMmioRegRegion& mmio() { return mock_mmio_gpio_; }
-  ddk_mock::MockMmioRegRegion& ao_mmio() { return mock_mmio_gpio_ao_; }
-  ddk_mock::MockMmioRegRegion& interrupt_mmio() { return mock_mmio_interrupt_; }
-
  protected:
   fpromise::promise<fdf::MmioBuffer, zx_status_t> MapMmio(
       fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id) override {
-    switch (mmio_id) {
-      case 0:
-        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
-          return fpromise::ok(mock_mmio_gpio_.GetMmioBuffer());
-        });
-      case 1:
-        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
-          return fpromise::ok(mock_mmio_gpio_ao_.GetMmioBuffer());
-        });
-      case 2:
-        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
-          return fpromise::ok(mock_mmio_interrupt_.GetMmioBuffer());
-        });
-      default:
-        return fpromise::make_promise([&]() -> fpromise::result<fdf::MmioBuffer, zx_status_t> {
-          return fpromise::error(ZX_ERR_BAD_STATE);
-        });
-    }
-  }
+    fpromise::bridge<fdf::MmioBuffer, zx_status_t> bridge;
 
- private:
-  ddk_mock::MockMmioRegRegion mock_mmio_gpio_{sizeof(uint32_t), kGpioRegSize};
-  ddk_mock::MockMmioRegRegion mock_mmio_gpio_ao_{sizeof(uint32_t), kGpioRegSize};
-  ddk_mock::MockMmioRegRegion mock_mmio_interrupt_{sizeof(uint32_t), kInterruptRegSize,
-                                                   kInterruptRegOffset};
+    pdev->GetMmioById(mmio_id).Then(
+        [completer = std::move(bridge.completer)](
+            fidl::WireUnownedResult<fuchsia_hardware_platform_device::Device::GetMmioById>&
+                result) mutable {
+          EXPECT_TRUE(result.ok());
+          EXPECT_FALSE(result->is_error());
+
+          auto& mmio = *result->value();
+          EXPECT_TRUE(mmio.has_offset());
+          auto* mmio_buffer = reinterpret_cast<fdf::MmioBuffer*>(mmio.offset());
+          completer.complete_ok(std::move(*mmio_buffer));
+        });
+
+    return bridge.consumer.promise_or(fpromise::error(ZX_ERR_BAD_STATE));
+  }
 };
 
 template <uint32_t kPid>
-struct IncomingNamespace {
-  FakePlatformDevice<kPid> platform_device;
+class FakeAmlGpioTestEnvironment : public fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+          pdev_.GetInstanceHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    return zx::ok();
+  }
+
+  ddk_mock::MockMmioRegRegion& mmio() { return mmio_gpio_; }
+  ddk_mock::MockMmioRegRegion& ao_mmio() { return mmio_gpio_ao_; }
+  ddk_mock::MockMmioRegRegion& interrupt_mmio() { return mmio_interrupt_; }
+  FakePlatformDevice<kPid>& pdev() { return pdev_; }
+
+ private:
+  ddk_mock::MockMmioRegRegion mmio_gpio_{sizeof(uint32_t), kGpioRegSize};
+  ddk_mock::MockMmioRegRegion mmio_gpio_ao_{sizeof(uint32_t), kGpioRegSize};
+  ddk_mock::MockMmioRegRegion mmio_interrupt_{sizeof(uint32_t), kInterruptRegSize,
+                                              kInterruptRegOffset};
+  FakePlatformDevice<kPid> pdev_{mmio_gpio_.GetMmioBuffer(), mmio_gpio_ao_.GetMmioBuffer(),
+                                 mmio_interrupt_.GetMmioBuffer()};
 };
 
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
+template <uint32_t kPid>
+class FixtureConfig final {
+ public:
+  using DriverType = TestAmlGpioDriver;
+  using EnvironmentType = FakeAmlGpioTestEnvironment<kPid>;
+};
+
 template <uint32_t kPid>
 class AmlGpioTest : public testing::Test {
  public:
-  AmlGpioTest() : node_server_("root"), dut_(TestAmlGpioDriver::GetDriverRegistration()) {}
-
   void SetUp() override {
-    zx::result start_args = node_server_.CreateStartArgsAndServe();
-    ASSERT_TRUE(start_args.is_ok());
-
-    driver_outgoing_ = std::move(start_args->outgoing_directory_client);
-
-    {
-      zx::result result =
-          test_environment_.Initialize(std::move(start_args->incoming_directory_server));
-      ASSERT_TRUE(result.is_ok());
-    }
-
-    {
-      zx::result result = test_environment_.incoming_directory()
-                              .AddService<fuchsia_hardware_platform_device::Service>(
-                                  incoming_.platform_device.GetInstanceHandler());
-      ASSERT_TRUE(result.is_ok());
-    }
-
-    zx::result start_result =
-        runtime_.RunToCompletion(dut_.Start(std::move(start_args->start_args)));
-    ASSERT_TRUE(start_result.is_ok());
-
-    ASSERT_NE(node_server_.children().find("aml-gpio"), node_server_.children().cend());
-
-    // Connect to the driver through its outgoing directory and get a pinimpl client.
-    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
-    EXPECT_EQ(fdio_open3_at(driver_outgoing_.handle()->get(), "/svc",
-                            static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
-                            svc_endpoints.server.TakeChannel().release()),
-              ZX_OK);
-
-    zx::result pinimpl_client_end =
-        fdf::internal::DriverTransportConnect<fuchsia_hardware_pinimpl::Service::Device>(
-            svc_endpoints.client, component::kDefaultInstance);
-    ASSERT_TRUE(pinimpl_client_end.is_ok());
-
-    client_.Bind(*std::move(pinimpl_client_end), fdf::Dispatcher::GetCurrent()->get());
+    ASSERT_OK(driver_test_.StartDriver());
+    zx::result client = driver_test_.template Connect<fuchsia_hardware_pinimpl::Service::Device>();
+    ASSERT_OK(client);
+    client_.Bind(std::move(client.value()));
   }
 
   void TearDown() override {
-    zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
-    EXPECT_EQ(prepare_stop_result.status_value(), ZX_OK);
-    EXPECT_TRUE(dut_.Stop().is_ok());
+    ASSERT_OK(driver_test_.StopDriver());
+
+    driver_test_.RunInEnvironmentTypeContext([](auto& env) {
+      env.mmio().VerifyAll();
+      env.ao_mmio().VerifyAll();
+      env.interrupt_mmio().VerifyAll();
+    });
   }
 
  protected:
   void CheckA113GetInterrupt(uint32_t expected_kernel_interrupt_flags,
                              uint32_t expected_register_polarity_values) {
-    incoming_.platform_device.SetExpectedInterruptFlags(expected_kernel_interrupt_flags);
-    interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(expected_register_polarity_values);
+    driver_test_.RunInEnvironmentTypeContext([&](auto& env) {
+      env.pdev().SetExpectedInterruptFlags(expected_kernel_interrupt_flags);
+      auto& interrupt_mmio = env.interrupt_mmio();
+      interrupt_mmio[0x3c20 * sizeof(uint32_t)].ExpectRead(expected_register_polarity_values);
 
-    // Modify IRQ index for IRQ pin.
-    interrupt_mmio()[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000048);
-    // Interrupt select filter.
-    interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+      // Modify IRQ index for IRQ pin.
+      interrupt_mmio[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000048);
+      // Interrupt select filter.
+      interrupt_mmio[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+    });
 
     zx::interrupt out_int;
     fdf::Arena arena('GPIO');
-    client_.buffer(arena)->GetInterrupt(0x0B, {}).Then([&](auto& result) {
-      ASSERT_TRUE(result.ok());
-      EXPECT_TRUE(result->is_ok());
-      runtime_.Quit();
-    });
-    runtime_.Run();
 
-    mmio().VerifyAll();
-    ao_mmio().VerifyAll();
-    interrupt_mmio().VerifyAll();
+    fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0x0B, {});
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
   }
-  ddk_mock::MockMmioRegRegion& mmio() { return dut_->mmio(); }
-  ddk_mock::MockMmioRegRegion& ao_mmio() { return dut_->ao_mmio(); }
-  ddk_mock::MockMmioRegRegion& interrupt_mmio() { return dut_->interrupt_mmio(); }
-  IncomingNamespace<kPid>& incoming() { return incoming_; }
 
-  fdf_testing::DriverRuntime runtime_;
-  fdf::WireClient<fuchsia_hardware_pinimpl::PinImpl> client_;
+  void WithMmio(fit::callback<void(ddk_mock::MockMmioRegRegion&)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](auto& env) mutable { callback(env.mmio()); });
+  }
+
+  void WithAoMmio(fit::callback<void(ddk_mock::MockMmioRegRegion&)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](auto& env) mutable { callback(env.ao_mmio()); });
+  }
+
+  void WithInterruptMmio(fit::callback<void(ddk_mock::MockMmioRegRegion&)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](auto& env) mutable { callback(env.interrupt_mmio()); });
+  }
+
+  void WithPDev(fit::callback<void(FakePlatformDevice<kPid>&)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](auto& env) mutable { callback(env.pdev()); });
+  }
+
+  fdf::WireSyncClient<fuchsia_hardware_pinimpl::PinImpl>& client() { return client_; }
 
  private:
-  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
-  fdf::UnownedSynchronizedDispatcher background_dispatcher_;
-  IncomingNamespace<kPid> incoming_;
-  fdf_testing::TestNode node_server_;
-  fdf_testing::internal::TestEnvironment test_environment_;
-  fdf_testing::internal::DriverUnderTest<TestAmlGpioDriver> dut_;
+  static void ExpectReadThenWrite(ddk_mock::MockMmioReg& mmio_reg, uint64_t read_value,
+                                  uint64_t expected_write_value) {
+    mmio_reg.ExpectRead(read_value).ExpectWrite(expected_write_value);
+  }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig<kPid>> driver_test_;
+  fdf::WireSyncClient<fuchsia_hardware_pinimpl::PinImpl> client_;
 };
 
 using A113AmlGpioTest = AmlGpioTest<PDEV_PID_AMLOGIC_A113>;
@@ -274,264 +240,224 @@ using S905d2AmlGpioTest = AmlGpioTest<PDEV_PID_AMLOGIC_S905D2>;
 
 // PinImplSetAltFunction Tests
 TEST_F(A113AmlGpioTest, A113AltMode1) {
-  mmio()[0x24 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
+  WithMmio([](auto& mmio_region) {
+    mmio_region[0x24 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(1).Build();
-  client_.buffer(arena)->Configure(0x00, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x00, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 TEST_F(A113AmlGpioTest, A113AltMode2) {
-  mmio()[0x26 * sizeof(uint32_t)].ExpectRead(0x00000009 << 8).ExpectWrite(0x00000005 << 8);
+  WithMmio([](auto& mmio_region) {
+    mmio_region[0x26 * sizeof(uint32_t)].ExpectRead(0x00000009 << 8).ExpectWrite(0x00000005 << 8);
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(5).Build();
-  client_.buffer(arena)->Configure(0x12, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x12, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 TEST_F(A113AmlGpioTest, A113AltMode3) {
-  ao_mmio()[0x05 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000005 << 16);
+  WithAoMmio([](auto& ao_mmio) {
+    ao_mmio[0x05 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000005 << 16);
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(5).Build();
-  client_.buffer(arena)->Configure(0x56, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x56, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 TEST_F(S905d2AmlGpioTest, S905d2AltMode) {
-  mmio()[0xb6 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
+  WithMmio([](auto& mmio) {
+    mmio[0xb6 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(1).Build();
-  client_.buffer(arena)->Configure(0x00, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x00, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 TEST_F(A113AmlGpioTest, AltModeFail1) {
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(16).Build();
-  client_.buffer(arena)->Configure(0x00, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_FALSE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x00, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_FALSE(result->is_ok());
 }
 
 TEST_F(A113AmlGpioTest, AltModeFail2) {
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(1).Build();
-  client_.buffer(arena)->Configure(0xFFFF, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_FALSE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0xFFFF, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_FALSE(result->is_ok());
 }
 
 // PinImplConfigIn Tests
 TEST_F(A113AmlGpioTest, A113NoPull0) {
-  mmio()[0x12 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
-  mmio()[0x3c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
-  mmio()[0x4a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFE);  // pull_en
+  WithMmio([](auto& mmio) {
+    mmio[0x12 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
+    mmio[0x3c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
+    mmio[0x4a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFE);  // pull_en
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kNone)
                     .Build();
-  client_.buffer(arena)->Configure(0, config).Then([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Configure(0, config);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  client_.buffer(arena)
-      ->SetBufferMode(0, fuchsia_hardware_gpio::BufferMode::kInput)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
-  runtime_.Run();
+  }
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  {
+    fdf::WireUnownedResult result =
+        client().buffer(arena)->SetBufferMode(0, fuchsia_hardware_gpio::BufferMode::kInput);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 TEST_F(A113AmlGpioTest, A113NoPullMid) {
-  mmio()[0x12 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
-  mmio()[0x3c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
-  mmio()[0x4a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFBFFFF);  // pull_en
+  WithMmio([](auto& mmio) {
+    mmio[0x12 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
+    mmio[0x3c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
+    mmio[0x4a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFBFFFF);  // pull_en
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kNone)
                     .Build();
-  client_.buffer(arena)->Configure(0x12, config).Then([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x12, config);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  client_.buffer(arena)
-      ->SetBufferMode(0x12, fuchsia_hardware_gpio::BufferMode::kInput)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
-  runtime_.Run();
+  }
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  {
+    fdf::WireUnownedResult result =
+        client().buffer(arena)->SetBufferMode(0x12, fuchsia_hardware_gpio::BufferMode::kInput);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 TEST_F(A113AmlGpioTest, A113NoPullHigh) {
-  ao_mmio()[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
-  ao_mmio()[0x0b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
-  ao_mmio()[0x0b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);  // pull_en
+  WithAoMmio([](auto& ao_mmio) {
+    ao_mmio[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
+    ao_mmio[0x0b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
+    ao_mmio[0x0b * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFEFFFF);  // pull_en
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kNone)
                     .Build();
-  client_.buffer(arena)->Configure(0x56, config).Then([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x56, config);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  client_.buffer(arena)
-      ->SetBufferMode(0x56, fuchsia_hardware_gpio::BufferMode::kInput)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
-  runtime_.Run();
+  }
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  {
+    fdf::WireUnownedResult result =
+        client().buffer(arena)->SetBufferMode(0x56, fuchsia_hardware_gpio::BufferMode::kInput);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 TEST_F(S905d2AmlGpioTest, S905d2NoPull0) {
-  mmio()[0x1c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
-  mmio()[0x3e * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
-  mmio()[0x4c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFE);  // pull_en
+  WithMmio([](auto& mmio) {
+    mmio[0x1c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
+    mmio[0x3e * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
+    mmio[0x4c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFE);  // pull_en
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kNone)
                     .Build();
-  client_.buffer(arena)->Configure(0x0, config).Then([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x0, config);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  client_.buffer(arena)
-      ->SetBufferMode(0x0, fuchsia_hardware_gpio::BufferMode::kInput)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
-  runtime_.Run();
+  }
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  {
+    fdf::WireUnownedResult result =
+        client().buffer(arena)->SetBufferMode(0x0, fuchsia_hardware_gpio::BufferMode::kInput);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 TEST_F(S905d2AmlGpioTest, S905d2PullUp) {
-  mmio()[0x10 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
-  mmio()[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
-  mmio()[0x48 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull_en
+  WithMmio([](auto& mmio) {
+    mmio[0x10 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
+    mmio[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
+    mmio[0x48 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull_en
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kUp)
                     .Build();
-  client_.buffer(arena)->Configure(0x21, config).Then([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x21, config);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  client_.buffer(arena)
-      ->SetBufferMode(0x21, fuchsia_hardware_gpio::BufferMode::kInput)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
-  runtime_.Run();
+  }
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  {
+    fdf::WireUnownedResult result =
+        client().buffer(arena)->SetBufferMode(0x21, fuchsia_hardware_gpio::BufferMode::kInput);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 TEST_F(S905d2AmlGpioTest, S905d2PullDown) {
-  mmio()[0x10 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
-  mmio()[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFE);  // pull
-  mmio()[0x48 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull_en
+  WithMmio([](auto& mmio) {
+    mmio[0x10 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
+    mmio[0x3a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFE);  // pull
+    mmio[0x48 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull_en
+  });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kDown)
                     .Build();
-  client_.buffer(arena)->Configure(0x20, config).Then([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x20, config);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  client_.buffer(arena)
-      ->SetBufferMode(0x20, fuchsia_hardware_gpio::BufferMode::kInput)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
-  runtime_.Run();
+  }
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  {
+    fdf::WireUnownedResult result =
+        client().buffer(arena)->SetBufferMode(0x20, fuchsia_hardware_gpio::BufferMode::kInput);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 TEST_F(A113AmlGpioTest, A113NoPullFail) {
@@ -539,102 +465,85 @@ TEST_F(A113AmlGpioTest, A113NoPullFail) {
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kNone)
                     .Build();
-  client_.buffer(arena)->Configure(0xFFFF, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_FALSE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0xFFFF, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_FALSE(result->is_ok());
 }
 
 // PinImplConfigOut Tests
 TEST_F(A113AmlGpioTest, A113Out) {
-  mmio()[0x0d * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // output
-  mmio()[0x0c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFB);  // oen
+  WithMmio([](auto& mmio) {
+    mmio[0x0d * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // output
+    mmio[0x0c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFB);  // oen
+  });
 
   fdf::Arena arena('GPIO');
-  client_.buffer(arena)
-      ->SetBufferMode(0x19, fuchsia_hardware_gpio::BufferMode::kOutputHigh)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-        runtime_.Quit();
-      });
-  runtime_.Run();
+  fdf::WireUnownedResult result =
+      client().buffer(arena)->SetBufferMode(0x19, fuchsia_hardware_gpio::BufferMode::kOutputHigh);
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 // PinImplRead Tests
 TEST_F(A113AmlGpioTest, A113Read) {
-  mmio()[0x12 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
-  mmio()[0x3c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
-  mmio()[0x4a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFDF);  // pull_en
+  WithMmio([](auto& mmio) {
+    mmio[0x12 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // oen
+    mmio[0x3c * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFF);  // pull
+    mmio[0x4a * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFDF);  // pull_en
 
-  mmio()[0x14 * sizeof(uint32_t)].ExpectRead(0x00000020);  // read 0x01.
-  mmio()[0x14 * sizeof(uint32_t)].ExpectRead(0x00000000);  // read 0x00.
-  mmio()[0x14 * sizeof(uint32_t)].ExpectRead(0x00000020);  // read 0x01.
+    mmio[0x14 * sizeof(uint32_t)].ExpectRead(0x00000020);  // read 0x01.
+    mmio[0x14 * sizeof(uint32_t)].ExpectRead(0x00000000);  // read 0x00.
+    mmio[0x14 * sizeof(uint32_t)].ExpectRead(0x00000020);  // read 0x01.
+  });
 
   fdf::Arena arena('GPIO');
 
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
                     .pull(fuchsia_hardware_pin::Pull::kNone)
                     .Build();
-  client_.buffer(arena)->Configure(5, config).Then([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Configure(5, config);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
+  }
 
-  client_.buffer(arena)
-      ->SetBufferMode(5, fuchsia_hardware_gpio::BufferMode::kInput)
-      .Then([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        EXPECT_TRUE(result->is_ok());
-      });
+  {
+    fdf::WireUnownedResult result =
+        client().buffer(arena)->SetBufferMode(5, fuchsia_hardware_gpio::BufferMode::kInput);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 
-  client_.buffer(arena)->Read(5).Then([&](auto& result) {
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Read(5);
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     EXPECT_EQ(result->value()->value, 0x01);
-  });
-  client_.buffer(arena)->Read(5).Then([&](auto& result) {
+  }
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Read(5);
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     EXPECT_EQ(result->value()->value, 0x00);
-  });
-  client_.buffer(arena)->Read(5).Then([&](auto& result) {
+  }
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->Read(5);
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     EXPECT_EQ(result->value()->value, 0x01);
-    runtime_.Quit();
-  });
-
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  }
 }
 
 // PinImplGetInterrupt Tests
 TEST_F(A113AmlGpioTest, A113GetInterruptFail) {
   fdf::Arena arena('GPIO');
-  client_.buffer(arena)->GetInterrupt(0xFFFF, {}).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_FALSE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0xFFFF, {});
+  ASSERT_TRUE(result.ok());
+  EXPECT_FALSE(result->is_ok());
 }
 
 TEST_F(A113AmlGpioTest, A113GetInterruptEdgeLow) {
@@ -660,107 +569,101 @@ TEST_F(A113AmlGpioTest, A113GetInterruptLevelHigh) {
 // PinImplReleaseInterrupt Tests
 TEST_F(A113AmlGpioTest, A113ReleaseInterruptFail) {
   fdf::Arena arena('GPIO');
-  client_.buffer(arena)->ReleaseInterrupt(0x66).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_FALSE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->ReleaseInterrupt(0x66);
+  ASSERT_TRUE(result.ok());
+  EXPECT_FALSE(result->is_ok());
 }
 
 TEST_F(A113AmlGpioTest, A113ReleaseInterrupt) {
-  interrupt_mmio()[0x3c21 * sizeof(uint32_t)]
-      .ExpectRead(0x00000000)
-      .ExpectWrite(0x00000048);  // modify
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00010001);
-  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+  WithInterruptMmio([](auto& interrupt_mmio) {
+    interrupt_mmio[0x3c21 * sizeof(uint32_t)]
+        .ExpectRead(0x00000000)
+        .ExpectWrite(0x00000048);  // modify
+    interrupt_mmio[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00010001);
+    interrupt_mmio[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+  });
 
   fdf::Arena arena('GPIO');
 
-  client_.buffer(arena)->GetInterrupt(0x0B, {}).Then([&](auto& result) {
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0x0B, {});
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
+  }
 
-    client_.buffer(arena)->ReleaseInterrupt(0x0B).Then([&](auto& result) {
-      ASSERT_TRUE(result.ok());
-      EXPECT_TRUE(result->is_ok());
-      runtime_.Quit();
-    });
-  });
-
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->ReleaseInterrupt(0x0B);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 // PinImplConfigureInterrupt Tests
 TEST_F(A113AmlGpioTest, A113ConfigureInterrupt) {
-  interrupt_mmio()[0x3c21 * sizeof(uint32_t)]
-      .ExpectRead(0x00000000)
-      .ExpectWrite(0x00000048);  // modify
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00010001);
-  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)]
-      .ExpectRead(0x00010001)
-      .ExpectWrite(0x00000001)  // polarity + for any edge.
-      .ExpectRead(0x00000001)
-      .ExpectWrite(0x00000000)
-      .ExpectRead(0x00000000)
-      .ExpectWrite(0x00010000)
-      .ExpectRead(0x00010000)
-      .ExpectWrite(0x00010001);
+  WithInterruptMmio([](auto& interrupt_mmio) {
+    interrupt_mmio[0x3c21 * sizeof(uint32_t)]
+        .ExpectRead(0x00000000)
+        .ExpectWrite(0x00000048);  // modify
+    interrupt_mmio[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00010001);
+    interrupt_mmio[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+    interrupt_mmio[0x3c20 * sizeof(uint32_t)]
+        .ExpectRead(0x00010001)
+        .ExpectWrite(0x00000001)  // polarity + for any edge.
+        .ExpectRead(0x00000001)
+        .ExpectWrite(0x00000000)
+        .ExpectRead(0x00000000)
+        .ExpectWrite(0x00010000)
+        .ExpectRead(0x00010000)
+        .ExpectWrite(0x00010001);
+  });
 
   fdf::Arena arena('GPIO');
 
-  client_.buffer(arena)->GetInterrupt(0x0B, {}).Then([&](auto& result) {
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0x0B, {});
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
+  }
 
-    auto edge_high = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
-                         .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeHigh)
-                         .Build();
-    client_.buffer(arena)->ConfigureInterrupt(0x0B, edge_high).Then([&](auto& result) {
-      ASSERT_TRUE(result.ok());
-      EXPECT_TRUE(result->is_ok());
-    });
+  auto edge_high = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                       .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeHigh)
+                       .Build();
 
-    auto level_high = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
-                          .mode(fuchsia_hardware_gpio::InterruptMode::kLevelHigh)
-                          .Build();
-    client_.buffer(arena)->ConfigureInterrupt(0x0B, level_high).Then([&](auto& result) {
-      ASSERT_TRUE(result.ok());
-      EXPECT_TRUE(result->is_ok());
-    });
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->ConfigureInterrupt(0x0B, edge_high);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 
-    auto level_low = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
-                         .mode(fuchsia_hardware_gpio::InterruptMode::kLevelLow)
-                         .Build();
-    client_.buffer(arena)->ConfigureInterrupt(0x0B, level_low).Then([&](auto& result) {
-      ASSERT_TRUE(result.ok());
-      EXPECT_TRUE(result->is_ok());
-    });
-
-    auto edge_low = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
-                        .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+  auto level_high = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                        .mode(fuchsia_hardware_gpio::InterruptMode::kLevelHigh)
                         .Build();
-    client_.buffer(arena)->ConfigureInterrupt(0x0B, edge_low).Then([&](auto& result) {
-      ASSERT_TRUE(result.ok());
-      EXPECT_TRUE(result->is_ok());
-      runtime_.Quit();
-    });
-  });
 
-  runtime_.Run();
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->ConfigureInterrupt(0x0B, level_high);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  auto level_low = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                       .mode(fuchsia_hardware_gpio::InterruptMode::kLevelLow)
+                       .Build();
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->ConfigureInterrupt(0x0B, level_low);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
+
+  auto edge_low = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                      .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+                      .Build();
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->ConfigureInterrupt(0x0B, edge_low);
+    ASSERT_TRUE(result.ok());
+    EXPECT_TRUE(result->is_ok());
+  }
 }
 
 TEST_F(A113AmlGpioTest, A113ConfigureThenGetInterrupt) {
@@ -771,25 +674,24 @@ TEST_F(A113AmlGpioTest, A113ConfigureThenGetInterrupt) {
   auto edge_high = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
                        .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeHigh)
                        .Build();
-  client_.buffer(arena)->ConfigureInterrupt(0x0B, edge_high).ThenExactlyOnce([&](auto& result) {
+
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->ConfigureInterrupt(0x0B, edge_high);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
+  }
+
+  WithInterruptMmio([](auto& interrupt_mmio) {
+    interrupt_mmio[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
+    interrupt_mmio[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000048);
+    interrupt_mmio[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
   });
-  runtime_.RunUntilIdle();
 
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000001);
-  interrupt_mmio()[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000048);
-  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
-
-  client_.buffer(arena)->GetInterrupt(0x0B, {}).ThenExactlyOnce([&](auto& result) {
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0x0B, {});
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  runtime_.RunUntilIdle();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  }
 }
 
 // PinImplSetDriveStrength Tests
@@ -797,142 +699,114 @@ TEST_F(A113AmlGpioTest, A113SetDriveStrength) {
   fdf::Arena arena('GPIO');
   auto config =
       fuchsia_hardware_pin::wire::Configuration::Builder(arena).drive_strength_ua(2).Build();
-  client_.buffer(arena)->Configure(0x87, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_FALSE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x87, config);
+  ASSERT_TRUE(result.ok());
+  EXPECT_FALSE(result->is_ok());
 }
 
 TEST_F(S905d2AmlGpioTest, S905d2SetDriveStrength) {
-  ao_mmio()[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFB);
+  WithAoMmio([](auto& ao_mmio) {
+    ao_mmio[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFFFFFB);
+  });
 
   fdf::Arena arena('GPIO');
   auto config =
       fuchsia_hardware_pin::wire::Configuration::Builder(arena).drive_strength_ua(3000).Build();
-  client_.buffer(arena)->Configure(0x62, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_TRUE(result->value()->new_config.has_drive_strength_ua());
-    EXPECT_EQ(result->value()->new_config.drive_strength_ua(), 3000);
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x62, config);
+  ASSERT_TRUE(result.ok());
+  ASSERT_TRUE(result->is_ok());
+  ASSERT_TRUE(result->value()->new_config.has_drive_strength_ua());
+  EXPECT_EQ(result->value()->new_config.drive_strength_ua(), 3000);
 }
 
 TEST_F(S905d2AmlGpioTest, S905d2GetDriveStrength) {
-  ao_mmio()[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFB);
+  WithAoMmio(
+      [](auto& mmio_region) { mmio_region[0x08 * sizeof(uint32_t)].ExpectRead(0xFFFFFFFB); });
 
   fdf::Arena arena('GPIO');
   auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).Build();
-  client_.buffer(arena)->Configure(0x62, config).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_TRUE(result->value()->new_config.has_drive_strength_ua());
-    EXPECT_EQ(result->value()->new_config.drive_strength_ua(), 3000);
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->Configure(0x62, config);
+  ASSERT_TRUE(result.ok());
+  ASSERT_TRUE(result->is_ok());
+  ASSERT_TRUE(result->value()->new_config.has_drive_strength_ua());
+  EXPECT_EQ(result->value()->new_config.drive_strength_ua(), 3000);
 }
 
 TEST_F(S905d2AmlGpioTest, TimestampMonoInterruptOption) {
-  incoming().platform_device.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH |
-                                                       ZX_INTERRUPT_TIMESTAMP_MONO);
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x0001'0001);
+  WithPDev([](auto& pdev) {
+    pdev.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH | ZX_INTERRUPT_TIMESTAMP_MONO);
+  });
+  WithInterruptMmio([](auto& interrupt_mmio) {
+    interrupt_mmio[0x3c20 * sizeof(uint32_t)].ExpectRead(0x0001'0001);
 
-  // Modify IRQ index for IRQ pin.
-  interrupt_mmio()[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000017);
-  // Interrupt select filter.
-  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+    // Modify IRQ index for IRQ pin.
+    interrupt_mmio[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000017);
+    // Interrupt select filter.
+    interrupt_mmio[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+  });
 
   constexpr auto kOptions = fuchsia_hardware_gpio::InterruptOptions::kTimestampMono;
 
   zx::interrupt out_int;
   fdf::Arena arena('GPIO');
-  client_.buffer(arena)->GetInterrupt(0x0B, kOptions).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0x0B, kOptions);
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 TEST_F(S905d2AmlGpioTest, WakeableInterruptOption) {
   constexpr uint32_t kWakeableZirconInterruptOption = 0x20;
-  incoming().platform_device.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH |
-                                                       kWakeableZirconInterruptOption);
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x0001'0001);
+  WithPDev([](auto& pdev) {
+    pdev.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH | kWakeableZirconInterruptOption);
+  });
+  WithInterruptMmio([](auto& interrupt_mmio) {
+    interrupt_mmio[0x3c20 * sizeof(uint32_t)].ExpectRead(0x0001'0001);
 
-  // Modify IRQ index for IRQ pin.
-  interrupt_mmio()[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000017);
-  // Interrupt select filter.
-  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+    // Modify IRQ index for IRQ pin.
+    interrupt_mmio[0x3c21 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000017);
+    // Interrupt select filter.
+    interrupt_mmio[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+  });
 
   constexpr auto kOptions = fuchsia_hardware_gpio::InterruptOptions::kWakeable;
 
   zx::interrupt out_int;
   fdf::Arena arena('GPIO');
-  client_.buffer(arena)->GetInterrupt(0x0B, kOptions).Then([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    EXPECT_TRUE(result->is_ok());
-    runtime_.Quit();
-  });
-  runtime_.Run();
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
+  fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0x0B, kOptions);
+  ASSERT_TRUE(result.ok());
+  EXPECT_TRUE(result->is_ok());
 }
 
 TEST_F(A113AmlGpioTest, DestroyInterruptOnRelease) {
-  interrupt_mmio()[0x3c21 * sizeof(uint32_t)]
-      .ExpectRead(0x00000000)
-      .ExpectWrite(0x00000048);  // modify
-  interrupt_mmio()[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00010001);
-  interrupt_mmio()[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+  WithInterruptMmio([](auto& interrupt_mmio) {
+    interrupt_mmio[0x3c21 * sizeof(uint32_t)]
+        .ExpectRead(0x00000000)
+        .ExpectWrite(0x00000048);  // modify
+    interrupt_mmio[0x3c20 * sizeof(uint32_t)].ExpectRead(0x00010001);
+    interrupt_mmio[0x3c23 * sizeof(uint32_t)].ExpectRead(0x00000000).ExpectWrite(0x00000007);
+  });
 
   fdf::Arena arena('GPIO');
 
   zx::interrupt interrupt{};
-  client_.buffer(arena)->GetInterrupt(0x0B, {}).Then([&](auto& result) {
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->GetInterrupt(0x0B, {});
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
     interrupt = std::move(result->value()->interrupt);
-  });
-  runtime_.RunUntilIdle();
+  }
 
   // FakePlatformDevice triggered the interrupt -- wait on it to make sure we have a working handle.
   EXPECT_EQ(interrupt.wait(nullptr), ZX_OK);
 
-  client_.buffer(arena)->ReleaseInterrupt(0x0B).Then([&](auto& result) {
+  {
+    fdf::WireUnownedResult result = client().buffer(arena)->ReleaseInterrupt(0x0B);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-  });
-  runtime_.RunUntilIdle();
+  }
 
   // AmlGpio should have called zx_interrupt_destroy in the interrupt for this pin.
   EXPECT_EQ(interrupt.wait(nullptr), ZX_ERR_CANCELED);
-
-  mmio().VerifyAll();
-  ao_mmio().VerifyAll();
-  interrupt_mmio().VerifyAll();
 }
 
 }  // namespace gpio
