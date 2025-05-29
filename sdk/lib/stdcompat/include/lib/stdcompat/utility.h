@@ -12,22 +12,6 @@
 #include "internal/utility.h"
 #include "version.h"
 
-namespace cpp17 {
-// Use alias for cpp17 and above.
-
-using std::in_place;
-using std::in_place_t;
-
-using std::in_place_index;
-using std::in_place_index_t;
-
-using std::in_place_type;
-using std::in_place_type_t;
-
-using std::as_const;
-
-}  // namespace cpp17
-
 namespace cpp20 {
 
 #if defined(__cpp_lib_constexpr_algorithms) && __cpp_lib_constexpr_algorithms >= 201806L && \
@@ -37,10 +21,9 @@ using std::exchange;
 
 #else  // Add swap constexpr polyfill.
 
-template <
-    typename T, typename U = T,
-    typename std::enable_if<std::is_move_assignable<T>::value && cpp17::is_assignable_v<T&, U>,
-                            bool>::type = true>
+template <typename T, typename U = T,
+          typename std::enable_if<std::is_move_assignable<T>::value && std::is_assignable_v<T&, U>,
+                                  bool>::type = true>
 constexpr T exchange(T& obj, U&& new_value) {
   T old = std::move(obj);
   obj = std::forward<U>(new_value);

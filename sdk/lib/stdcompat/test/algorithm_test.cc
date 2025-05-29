@@ -86,13 +86,13 @@ TEST(InternalSortHeapTest, SortedHeapOrderIsReverseToComparison) {
                          kLessOrEqual),
                 "");
 
-  static_assert(IsSorted(make_sorted_heap(cpp20::to_array<cpp17::string_view>(
+  static_assert(IsSorted(make_sorted_heap(cpp20::to_array<std::string_view>(
                                               {"1", "Foo", "2", "345", "1", "678", "0"}),
                                           kLessThan),
                          kGreaterOrEqual),
                 "");
 
-  static_assert(IsSorted(make_sorted_heap(cpp20::to_array<cpp17::string_view>(
+  static_assert(IsSorted(make_sorted_heap(cpp20::to_array<std::string_view>(
                                               {"1", "Foo", "2", "345", "1", "678", "0"}),
                                           kGreaterThan),
                          kLessOrEqual),

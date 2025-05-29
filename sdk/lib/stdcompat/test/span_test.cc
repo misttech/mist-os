@@ -129,7 +129,7 @@ TEST(SpanTest, EmptyConstructorWithZeroStaticExtent) {
 }
 
 TEST(SpanTest, ConstructFromIteratorAndCountWithDynamicExtent) {
-  constexpr cpp17::string_view kLiteral = "Some String";
+  constexpr std::string_view kLiteral = "Some String";
   constexpr cpp20::span<const char> literal_span(kLiteral.begin(), 2);
 
   static_assert(literal_span.extent == cpp20::dynamic_extent,
@@ -139,7 +139,7 @@ TEST(SpanTest, ConstructFromIteratorAndCountWithDynamicExtent) {
 }
 
 TEST(SpanTest, ConstructFromIteratorAndCountWithStaticExtent) {
-  constexpr cpp17::string_view kLiteral = "Some String";
+  constexpr std::string_view kLiteral = "Some String";
   constexpr cpp20::span<const char, 2> literal_span(kLiteral.begin(), 2);
 
   static_assert(literal_span.extent == 2, "Empty span by default is dynamic extent.");
@@ -846,7 +846,7 @@ template <size_t Count, typename T, typename std::enable_if<Count == 0, bool>::t
 constexpr bool span_last_check_with_static_extent_impl(T& view) {
   // TODO(https://fxbug.dev/42149777): switch to cpp20::to_address when upstream is fixed
   auto subview = view.template last<Count>();
-  return are_pointers_equal(subview.data(), cpp17::addressof(*view.end())) && subview.size() == 0 &&
+  return are_pointers_equal(subview.data(), std::addressof(*view.end())) && subview.size() == 0 &&
          subview.extent == 0;
 }
 
@@ -859,7 +859,7 @@ constexpr bool span_last_check_with_static_extent_impl(T& view) {
   }
 
   // TODO(https://fxbug.dev/42149777): switch to cpp20::to_address when upstream is fixed
-  if (!are_pointers_equal(subview.data(), cpp17::addressof(*(view.end() - Count)))) {
+  if (!are_pointers_equal(subview.data(), std::addressof(*(view.end() - Count)))) {
     return false;
   }
 
@@ -888,7 +888,7 @@ TEST(SpanTest, AsWriteableBytesWithDynamicExtent) {
   cpp20::span<int> view = a;
   auto byte_view = cpp20::as_writable_bytes(view);
 
-  static_assert(std::is_same<decltype(byte_view), cpp20::span<cpp17::byte>>::value, "");
+  static_assert(std::is_same<decltype(byte_view), cpp20::span<std::byte>>::value, "");
 
   EXPECT_TRUE(are_pointers_equal(byte_view.data(), view.data()));
   EXPECT_EQ(byte_view.size(), view.size_bytes());
@@ -899,7 +899,7 @@ TEST(SpanTest, AsWriteableBytesWithStaticExtent) {
   cpp20::span<int, 4> view(a);
   auto byte_view = cpp20::as_writable_bytes(view);
 
-  static_assert(std::is_same<decltype(byte_view), cpp20::span<cpp17::byte, 4 * sizeof(int)>>::value,
+  static_assert(std::is_same<decltype(byte_view), cpp20::span<std::byte, 4 * sizeof(int)>>::value,
                 "");
 
   EXPECT_TRUE(are_pointers_equal(byte_view.data(), view.data()));
@@ -911,7 +911,7 @@ TEST(SpanTest, AsBytesWithDynamicExtent) {
   cpp20::span<int> view = a;
   auto byte_view = cpp20::as_bytes(view);
 
-  static_assert(std::is_same<decltype(byte_view), cpp20::span<const cpp17::byte>>::value, "");
+  static_assert(std::is_same<decltype(byte_view), cpp20::span<const std::byte>>::value, "");
 
   EXPECT_TRUE(are_pointers_equal(byte_view.data(), view.data()));
   EXPECT_EQ(byte_view.size(), view.size_bytes());
@@ -923,8 +923,7 @@ TEST(SpanTest, AsBytesWithStaticExtent) {
   auto byte_view = cpp20::as_bytes(view);
 
   static_assert(
-      std::is_same<decltype(byte_view), cpp20::span<const cpp17::byte, 4 * sizeof(int)>>::value,
-      "");
+      std::is_same<decltype(byte_view), cpp20::span<const std::byte, 4 * sizeof(int)>>::value, "");
 
   EXPECT_TRUE(are_pointers_equal(byte_view.data(), view.data()));
   EXPECT_EQ(byte_view.size(), view.size_bytes());
@@ -937,29 +936,29 @@ TEST(SpanTest, IsAliasWhenStdIsAvailable) {
                 "cpp20::span must an alias of std::span when provided.");
   static_assert(&cpp20::dynamic_extent == &std::dynamic_extent);
   {
-    constexpr cpp20::span<cpp17::byte> (*cpp20_as_writeable_bytes)(cpp20::span<int>) =
+    constexpr cpp20::span<std::byte> (*cpp20_as_writeable_bytes)(cpp20::span<int>) =
         &cpp20::as_writable_bytes;
-    constexpr std::span<cpp17::byte> (*std_as_writeable_bytes)(std::span<int>) =
+    constexpr std::span<std::byte> (*std_as_writeable_bytes)(std::span<int>) =
         &std::as_writable_bytes;
     static_assert(cpp20_as_writeable_bytes == std_as_writeable_bytes, "");
   }
   {
-    constexpr cpp20::span<cpp17::byte, sizeof(int)> (*cpp20_as_writeable_bytes)(
-        cpp20::span<int, 1>) = &cpp20::as_writable_bytes;
-    constexpr std::span<cpp17::byte, sizeof(int)> (*std_as_writeable_bytes)(std::span<int, 1>) =
+    constexpr cpp20::span<std::byte, sizeof(int)> (*cpp20_as_writeable_bytes)(cpp20::span<int, 1>) =
+        &cpp20::as_writable_bytes;
+    constexpr std::span<std::byte, sizeof(int)> (*std_as_writeable_bytes)(std::span<int, 1>) =
         &std::as_writable_bytes;
     static_assert(cpp20_as_writeable_bytes == std_as_writeable_bytes, "");
   }
 
   {
-    constexpr cpp20::span<const cpp17::byte> (*cpp20_as_bytes)(cpp20::span<int>) = &cpp20::as_bytes;
-    constexpr std::span<const cpp17::byte> (*std_as_bytes)(std::span<int>) = &std::as_bytes;
+    constexpr cpp20::span<const std::byte> (*cpp20_as_bytes)(cpp20::span<int>) = &cpp20::as_bytes;
+    constexpr std::span<const std::byte> (*std_as_bytes)(std::span<int>) = &std::as_bytes;
     static_assert(cpp20_as_bytes == std_as_bytes, "");
   }
   {
-    constexpr cpp20::span<const cpp17::byte, sizeof(int)> (*cpp20_as_bytes)(cpp20::span<int, 1>) =
+    constexpr cpp20::span<const std::byte, sizeof(int)> (*cpp20_as_bytes)(cpp20::span<int, 1>) =
         &cpp20::as_bytes;
-    constexpr std::span<const cpp17::byte, sizeof(int)> (*std_as_bytes)(std::span<int, 1>) =
+    constexpr std::span<const std::byte, sizeof(int)> (*std_as_bytes)(std::span<int, 1>) =
         &std::as_bytes;
     static_assert(cpp20_as_bytes == std_as_bytes, "");
   }

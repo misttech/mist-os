@@ -6,26 +6,5 @@
 #define LIB_STDCOMPAT_CSTDDEF_H_
 
 #include <cstddef>
-#include <type_traits>
-
-#include "version.h"
-
-namespace cpp17 {
-
-using std::byte;
-using std::operator<<=;
-using std::operator<<;
-using std::operator>>=;
-using std::operator>>;
-using std::operator|=;
-using std::operator|;
-using std::operator&=;
-using std::operator&;
-using std::operator^=;
-using std::operator^;
-using std::operator~;
-using std::to_integer;
-
-}  // namespace cpp17
 
 #endif  // LIB_STDCOMPAT_CSTDDEF_H_

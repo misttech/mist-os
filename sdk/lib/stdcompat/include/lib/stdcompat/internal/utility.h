@@ -55,38 +55,40 @@ constexpr std::size_t occurences_of_v = occurences_of<T, Ts...>::value;
 
 // Evaluates to truth-like when type T matches type U with cv-reference removed.
 template <typename T, typename U>
-using not_same_type = negation<std::is_same<T, ::cpp20::remove_cvref_t<U>>>;
+using not_same_type = std::negation<std::is_same<T, ::cpp20::remove_cvref_t<U>>>;
 
 // Concept helper for constructors.
 template <typename... Conditions>
-using requires_conditions = std::enable_if_t<conjunction_v<Conditions...>, bool>;
+using requires_conditions = std::enable_if_t<std::conjunction_v<Conditions...>, bool>;
 
 // Concept helper for assignment operators.
 template <typename Return, typename... Conditions>
 using assignment_requires_conditions =
-    std::enable_if_t<conjunction_v<Conditions...>, std::add_lvalue_reference_t<Return>>;
+    std::enable_if_t<std::conjunction_v<Conditions...>, std::add_lvalue_reference_t<Return>>;
 
 // Evaluates to true when every element type of Ts is trivially destructible.
 template <typename... Ts>
-constexpr bool is_trivially_destructible_v = conjunction_v<std::is_trivially_destructible<Ts>...>;
+constexpr bool is_trivially_destructible_v =
+    std::conjunction_v<std::is_trivially_destructible<Ts>...>;
 
 // Evaluates to true when every element type of Ts is trivially copyable.
 template <typename... Ts>
 constexpr bool is_trivially_copyable_v =
-    (conjunction_v<std::is_trivially_copy_assignable<Ts>...> &&
-     conjunction_v<std::is_trivially_copy_constructible<Ts>...>);
+    (std::conjunction_v<std::is_trivially_copy_assignable<Ts>...> &&
+     std::conjunction_v<std::is_trivially_copy_constructible<Ts>...>);
 
 // Evaluates to true when every element type of Ts is trivially movable.
 template <typename... Ts>
 constexpr bool is_trivially_movable_v =
-    (conjunction_v<std::is_trivially_move_assignable<Ts>...> &&
-     conjunction_v<std::is_trivially_move_constructible<Ts>...>);
+    (std::conjunction_v<std::is_trivially_move_assignable<Ts>...> &&
+     std::conjunction_v<std::is_trivially_move_constructible<Ts>...>);
 
 // Enable if relational operator is convertible to bool and the optional
 // conditions are true.
 template <typename Op, typename... Conditions>
 using enable_relop_t =
-    std::enable_if_t<(std::is_convertible<Op, bool>::value && conjunction_v<Conditions...>), bool>;
+    std::enable_if_t<(std::is_convertible<Op, bool>::value && std::conjunction_v<Conditions...>),
+                     bool>;
 
 // Returns true when T is a complete type or an unbounded array.
 template <typename T, std::size_t = sizeof(T)>
@@ -95,8 +97,8 @@ constexpr bool is_complete_or_unbounded_array(::cpp20::type_identity<T>) {
 }
 template <typename Identity, typename T = typename Identity::type>
 constexpr bool is_complete_or_unbounded_array(Identity) {
-  return disjunction<std::is_reference<T>, std::is_function<T>, std::is_void<T>,
-                     ::cpp20::is_unbounded_array<T>>::value;
+  return std::disjunction<std::is_reference<T>, std::is_function<T>, std::is_void<T>,
+                          ::cpp20::is_unbounded_array<T>>::value;
 }
 
 // Using swap for ADL. This directive is contained within the cpp17::internal
@@ -112,7 +114,7 @@ struct is_swappable : std::false_type {
                 "T must be a complete type or an unbounded array!");
 };
 template <typename T>
-struct is_swappable<T, void_t<decltype(swap(std::declval<T&>(), std::declval<T&>()))>>
+struct is_swappable<T, std::void_t<decltype(swap(std::declval<T&>(), std::declval<T&>()))>>
     : std::true_type {
   static_assert(is_complete_or_unbounded_array(::cpp20::type_identity<T>{}),
                 "T must be a complete type or an unbounded array!");
@@ -125,7 +127,7 @@ struct is_nothrow_swappable : std::false_type {
                 "T must be a complete type or an unbounded array!");
 };
 template <typename T>
-struct is_nothrow_swappable<T, void_t<decltype(swap(std::declval<T&>(), std::declval<T&>()))>>
+struct is_nothrow_swappable<T, std::void_t<decltype(swap(std::declval<T&>(), std::declval<T&>()))>>
     : std::integral_constant<bool, noexcept(swap(std::declval<T&>(), std::declval<T&>()))> {
   static_assert(is_complete_or_unbounded_array(::cpp20::type_identity<T>{}),
                 "T must be a complete type or an unbounded array!");

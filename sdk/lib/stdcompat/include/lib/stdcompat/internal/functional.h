@@ -17,40 +17,40 @@ namespace internal {
 // Definitions for the invoke functions in internal/type_traits.h.
 // These collectively implement INVOKE from [func.require] ¶ 1.
 template <typename MemFn, typename Class, typename T, typename... Args>
-constexpr auto invoke(MemFn Class::*f, T&& obj, Args&&... args)
+constexpr auto invoke(MemFn Class::* f, T&& obj, Args&&... args)
     -> std::enable_if_t<invoke_pmf_base<MemFn, Class, T>,
                         decltype((std::forward<T>(obj).*f)(std::forward<Args>(args)...))> {
   return (std::forward<T>(obj).*f)(std::forward<Args>(args)...);
 }
 
 template <typename MemFn, typename Class, typename T, typename... Args>
-constexpr auto invoke(MemFn Class::*f, T&& obj, Args&&... args)
+constexpr auto invoke(MemFn Class::* f, T&& obj, Args&&... args)
     -> std::enable_if_t<invoke_pmf_refwrap<MemFn, Class, T>,
                         decltype((obj.get().*f)(std::forward<Args>(args)...))> {
   return (obj.get().*f)(std::forward<Args>(args)...);
 }
 
 template <typename MemFn, typename Class, typename T, typename... Args>
-constexpr auto invoke(MemFn Class::*f, T&& obj, Args&&... args)
+constexpr auto invoke(MemFn Class::* f, T&& obj, Args&&... args)
     -> std::enable_if_t<invoke_pmf_other<MemFn, Class, T>,
                         decltype(((*std::forward<T>(obj)).*f)(std::forward<Args>(args)...))> {
   return (*std::forward<T>(obj).*f)(std::forward<Args>(args)...);
 }
 
 template <typename MemObj, typename Class, typename T>
-constexpr auto invoke(MemObj Class::*f, T&& obj)
+constexpr auto invoke(MemObj Class::* f, T&& obj)
     -> std::enable_if_t<invoke_pmd_base<MemObj, Class, T>, decltype(std::forward<T>(obj).*f)> {
   return std::forward<T>(obj).*f;
 }
 
 template <typename MemObj, typename Class, typename T>
-constexpr auto invoke(MemObj Class::*f, T&& obj)
+constexpr auto invoke(MemObj Class::* f, T&& obj)
     -> std::enable_if_t<invoke_pmd_refwrap<MemObj, Class, T>, decltype(obj.get().*f)> {
   return obj.get().*f;
 }
 
 template <typename MemObj, typename Class, typename T>
-constexpr auto invoke(MemObj Class::*f, T&& obj)
+constexpr auto invoke(MemObj Class::* f, T&& obj)
     -> std::enable_if_t<invoke_pmd_other<MemObj, Class, T>, decltype((*std::forward<T>(obj)).*f)> {
   return (*std::forward<T>(obj)).*f;
 }
@@ -81,17 +81,17 @@ class front_binder {
 
  public:
   template <typename F, typename... Args>
-  explicit constexpr front_binder(cpp17::in_place_t, F&& f, Args&&... args) noexcept(
-      cpp17::conjunction_v<std::is_nothrow_constructible<FD, F>,
-                           std::is_nothrow_constructible<BoundArgs, Args>...>)
+  explicit constexpr front_binder(std::in_place_t, F&& f, Args&&... args) noexcept(
+      std::conjunction_v<std::is_nothrow_constructible<FD, F>,
+                         std::is_nothrow_constructible<BoundArgs, Args>...>)
       : fd_(std::forward<F>(f)), bound_args_(std::forward<Args>(args)...) {
     // [func.bind.front] ¶ 2
-    static_assert(cpp17::is_constructible_v<FD, F>,
+    static_assert(std::is_constructible_v<FD, F>,
                   "Must be able to construct decayed callable type.");
-    static_assert(cpp17::is_move_constructible_v<FD>, "Callable type must be move-constructible.");
-    static_assert(cpp17::conjunction_v<std::is_constructible<BoundArgs, Args>...>,
+    static_assert(std::is_move_constructible_v<FD>, "Callable type must be move-constructible.");
+    static_assert(std::conjunction_v<std::is_constructible<BoundArgs, Args>...>,
                   "Must be able to construct decayed bound argument types.");
-    static_assert(cpp17::conjunction_v<std::is_move_constructible<BoundArgs>...>,
+    static_assert(std::conjunction_v<std::is_move_constructible<BoundArgs>...>,
                   "Bound argument types must be move-constructible.");
   }
 
@@ -101,33 +101,33 @@ class front_binder {
   constexpr front_binder& operator=(front_binder&&) noexcept = default;
 
   template <typename... CallArgs>
-  constexpr cpp17::invoke_result_t<FD&, BoundArgs&..., CallArgs&&...>
+  constexpr std::invoke_result_t<FD&, BoundArgs&..., CallArgs&&...>
   operator()(CallArgs&&... call_args) & noexcept(
-      cpp17::is_nothrow_invocable_v<FD&, BoundArgs&..., CallArgs&&...>) {
+      std::is_nothrow_invocable_v<FD&, BoundArgs&..., CallArgs&&...>) {
     return invoke_with_bound(fd_, bound_args_, bound_indices(),
                              std::forward<CallArgs>(call_args)...);
   }
 
   template <typename... CallArgs>
-  constexpr cpp17::invoke_result_t<const FD&, const BoundArgs&..., CallArgs&&...>
-  operator()(CallArgs&&... call_args) const& noexcept(
-      cpp17::is_nothrow_invocable_v<const FD&, const BoundArgs&..., CallArgs&&...>) {
+  constexpr std::invoke_result_t<const FD&, const BoundArgs&..., CallArgs&&...> operator()(
+      CallArgs&&... call_args)
+      const& noexcept(std::is_nothrow_invocable_v<const FD&, const BoundArgs&..., CallArgs&&...>) {
     return invoke_with_bound(fd_, bound_args_, bound_indices(),
                              std::forward<CallArgs>(call_args)...);
   }
 
   template <typename... CallArgs>
-  constexpr cpp17::invoke_result_t<FD&&, BoundArgs&&..., CallArgs&&...>
+  constexpr std::invoke_result_t<FD&&, BoundArgs&&..., CallArgs&&...>
   operator()(CallArgs&&... call_args) && noexcept(
-      cpp17::is_nothrow_invocable_v<FD&&, BoundArgs&&..., CallArgs&&...>) {
+      std::is_nothrow_invocable_v<FD&&, BoundArgs&&..., CallArgs&&...>) {
     return invoke_with_bound(std::move(fd_), std::move(bound_args_), bound_indices(),
                              std::forward<CallArgs>(call_args)...);
   }
 
   template <typename... CallArgs>
-  constexpr cpp17::invoke_result_t<const FD&&, const BoundArgs&&..., CallArgs&&...>
+  constexpr std::invoke_result_t<const FD&&, const BoundArgs&&..., CallArgs&&...>
   operator()(CallArgs&&... call_args) const&& noexcept(
-      cpp17::is_nothrow_invocable_v<const FD&&, const BoundArgs&&..., CallArgs&&...>) {
+      std::is_nothrow_invocable_v<const FD&&, const BoundArgs&&..., CallArgs&&...>) {
     return invoke_with_bound(std::move(fd_), std::move(bound_args_), bound_indices(),
                              std::forward<CallArgs>(call_args)...);
   }

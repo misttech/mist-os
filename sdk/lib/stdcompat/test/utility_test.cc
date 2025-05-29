@@ -19,8 +19,8 @@ constexpr bool ExchangeCheck() {
 }
 
 constexpr bool ExchangeCheck2() {
-  cpp17::string_view a = "1";
-  cpp17::string_view b = "2";
+  std::string_view a = "1";
+  std::string_view b = "2";
 
   b = cpp20::exchange(a, std::move(b));
 
@@ -28,8 +28,8 @@ constexpr bool ExchangeCheck2() {
 }
 
 bool ExchangeCheck3() {
-  cpp17::string_view a = "1";
-  cpp17::string_view b = "2";
+  std::string_view a = "1";
+  std::string_view b = "2";
 
   b = cpp20::exchange(a, std::move(b));
 
@@ -76,7 +76,7 @@ TEST(ToUnderlying, TypesMatch) {
 // !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
 // TEST(AsConstTest, IsAliasWhenAvailable) {
-// constexpr const int& (*cpp17_as_const)(int&) = &cpp17::as_const<int>;
+// constexpr const int& (*cpp17_as_const)(int&) = &std::as_const<int>;
 // constexpr const int& (*std_as_const)(int&) = &std::as_const<int>;
 // static_assert(cpp17_as_const == std_as_const,
 //"cpp17::as_const must be an alias for std::as_const in c++17.");

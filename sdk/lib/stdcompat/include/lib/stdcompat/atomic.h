@@ -36,7 +36,7 @@ class atomic_ref : public atomic_internal::atomic_difference_type<T>,
                    public atomic_internal::arithmetic_ops<atomic_ref<T>, T>,
                    public atomic_internal::bitwise_ops<atomic_ref<T>, T> {
  public:
-  static_assert(cpp17::is_trivially_copyable_v<T>, "");
+  static_assert(std::is_trivially_copyable_v<T>, "");
 
   using value_type = T;
 
@@ -47,7 +47,7 @@ class atomic_ref : public atomic_internal::atomic_difference_type<T>,
       atomic_internal::alignment<T>::required_alignment;
 
   atomic_ref() = delete;
-  LIB_STDCOMPAT_INLINE_LINKAGE explicit atomic_ref(T& obj) : ptr_(cpp17::addressof(obj)) {
+  LIB_STDCOMPAT_INLINE_LINKAGE explicit atomic_ref(T& obj) : ptr_(std::addressof(obj)) {
     check_ptr_alignment();
   }
   LIB_STDCOMPAT_INLINE_LINKAGE atomic_ref(const atomic_ref& ref) noexcept = default;
