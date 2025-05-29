@@ -42,14 +42,14 @@ bootfs_files_for_assembly("bootfs") {
   deps = [ ":inspector" ]
 }
 
-# GWP-ASan crash handling utility that wraps //zircon/system/ulib/c/scudo:gwp-asan-common.
+# GWP-ASan crash handling utility that wraps //sdk/lib/c/scudo:gwp-asan-common.
 source_set("gwp-asan") {
   sources = [
     "gwp-asan.cc",
     "gwp-asan.h",
   ]
   deps = [
-    "//zircon/system/ulib/c/scudo:gwp-asan-common",
+    "//sdk/lib/c/scudo:gwp-asan-common",
     "//zircon/system/ulib/elf-search",
   ]
 }

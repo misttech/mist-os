@@ -28,8 +28,8 @@ version_content = {
   debug_libs = []
 }
 
+import("//sdk/lib/c/sysroot_entries.gni")
 import("//src/zircon/lib/zircon/sysroot_entries.gni")
-import("//zircon/system/ulib/c/sysroot_entries.gni")
 
 # Turn the information from Zircon into a set of copy() rules for the
 # sysroot while filling in $version_content.
@@ -106,7 +106,7 @@ foreach(entry, sysroot_entries) {
 
 sdk_files += [
   {
-    source = "//zircon/system/ulib/c/libc.ifs"
+    source = "//sdk/lib/c/libc.ifs"
     dest = "pkg/sysroot/libc.ifs"
   },
   {

@@ -151,7 +151,7 @@ toolchain variants to create based on the following conditions:
 
   For example, the ASan and UBSan variants of the toolchain used to build the C library
   are always enabled, because these are needed when building the Core Fuchsia IDK
-  (see `//zircon/system/ulib/c/BUILD.gn`).
+  (see `//sdk/lib/c/BUILD.gn`).
 
 - The list of variant tags that appear in the
   [`exclude_variant_tags`][exclude-variant-tags]{:.external}

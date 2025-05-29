@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/zircon/migrated_targets.gni")
-import("//zircon/system/ulib/c/libc.gni")
+import("//sdk/lib/c/libc.gni")
 
 group("string") {
   deps = [
@@ -197,7 +197,7 @@ source_set("stdstr") {
 source_set("strerror_r") {
   visibility = [
     ":*",
-    "//zircon/system/ulib/c/*",
+    "//sdk/lib/c/*",
   ]
 
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
@@ -210,7 +210,7 @@ source_set("strerror_r") {
 source_set("strsignal") {
   visibility = [
     ":*",
-    "//zircon/system/ulib/c/*",
+    "//sdk/lib/c/*",
   ]
 
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
@@ -223,7 +223,7 @@ source_set("strsignal") {
 source_set("strverscmp") {
   visibility = [
     ":*",
-    "//zircon/system/ulib/c/*",
+    "//sdk/lib/c/*",
   ]
 
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]

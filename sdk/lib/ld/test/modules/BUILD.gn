@@ -645,8 +645,8 @@ source_set("test-ubsan") {
       "test-ubsan.h",
     ]
     deps = [
+      "//sdk/lib/c/stdio/printf_core:wrapper",
       "//src/lib/ubsan-custom:handlers",
-      "//zircon/system/ulib/c/stdio/printf_core:wrapper",
     ]
     if (is_fuchsia) {
       sources += [ "test-ubsan-zircon.cc" ]
@@ -912,8 +912,8 @@ test_loadable_module("tls-dep-module") {
 test_shared_library("tls-desc-dep") {
   visibility = [
     ":*",
+    "//sdk/lib/c/*",
     "//sdk/lib/dl/test/*",
-    "//zircon/system/ulib/c/*",
   ]
 
   public = [ "tls-dep.h" ]

@@ -19,7 +19,6 @@ group("tests") {
     "abs_clock:tests",
     "affine:tests",
     "bitmap:tests",
-    "c:tests",
     "closure-queue:tests",
     "cmdline:tests",
     "concurrent:tests",

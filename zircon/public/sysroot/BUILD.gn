@@ -2,9 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//sdk/lib/c/libc_toolchain.gni")
+import("//sdk/lib/c/sysroot_entries.gni")
 import("//src/zircon/lib/zircon/sysroot_entries.gni")
-import("//zircon/system/ulib/c/libc_toolchain.gni")
-import("//zircon/system/ulib/c/sysroot_entries.gni")
 
 assert(current_toolchain != shlib_toolchain,
        "deps in //zircon/public/sysroot should use \$variant_base_toolchain")
@@ -229,7 +229,7 @@ group("include") {
 # is everything a shared_library() target might need, but not the startfiles.
 
 link_stub_dirs = [
-  "//zircon/system/ulib/c",
+  "//sdk/lib/c",
   "//src/zircon/lib/zircon",
 ]
 
@@ -323,7 +323,7 @@ action("startfiles") {
   }
 
   # This has "$sysroot/lib/Scrt1.o" as a direct output.
-  deps += [ "//zircon/system/ulib/c/startup:startfiles" ]
+  deps += [ "//sdk/lib/c/startup:startfiles" ]
 
   # The script takes the directory, the JSON file, and the stamp file.  All the
   # other inputs are just to get it to check for stray files more often.
@@ -335,12 +335,12 @@ action("startfiles") {
 # loadable_module(). It has data_deps here to ensure any runtime file
 # dependencies for shared libraries linked in from the sysroot get packaged up.
 group("data") {
-  data_deps = [ "//zircon/system/ulib/c:libc" ]
+  data_deps = [ "//sdk/lib/c:libc" ]
 }
 
 # A special dependency that ensures that the uninstrumented C library is
 # available in the system package as /lib/ld.so.1. For more details read
-# //zircon/system/ulib/c/libc_toolchain.gni
+# //sdk/lib/c/libc_toolchain.gni
 #
 # In practice, should only be used to build the system package, and some
 # prebuilt driver packages.

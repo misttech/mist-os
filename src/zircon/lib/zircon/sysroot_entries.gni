@@ -6,7 +6,7 @@ import("//zircon/vdso/vdso.gni")
 
 # This file defines the sysroot entries corresponding to the Zircon VDSO
 # (a.k.a. libzircon.so). More details about how these are used are in
-# //zircon/system/ulib/c/sysroot_entries.gni.
+# //sdk/lib/c/sysroot_entries.gni.
 
 _vdso_generated_headers_dep = "//zircon/vdso:public($default_toolchain)"
 _gen_include_dir = zircon_public_header_include_dir

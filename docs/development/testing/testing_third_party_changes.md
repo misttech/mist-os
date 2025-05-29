@@ -31,10 +31,10 @@ tests will be run differently, if they are run at all. A good place to start
 is to grep around `*.gn{,i}` files to see where in the build these projects are
 being referred to. In the case of Scudo, it is part of libc's build and most
 of the build logic concerning it and its tests can be found in
-[//zircon/system/ulib/c/scudo/BUILD.gn](/zircon/system/ulib/c/scudo/BUILD.gn).
-For this particular target it is depended on by `//zircon/system/ulib/c:tests`.
+[//sdk/lib/c/scudo/BUILD.gn](/sdk/lib/c/scudo/BUILD.gn).
+For this particular target it is depended on by `//sdk/lib/c:tests`.
 
-First run `fx set core.x64 --with //zircon/system/ulib/c:tests`, see the
+First run `fx set core.x64 --with //sdk/lib/c:tests`, see the
 [build](/docs/get-started/build_fuchsia.md) docs on more details, but this
 configuration is a good default. This only needs to be run once.
 
@@ -50,7 +50,7 @@ the test you are interested in. Scudo tests are rolled into libc tests which
 are `libc-unittests-pkg`, some GWP-ASan tests are there as well as
 `gwp-asan-test-pkg`. Run `fx test -v libc-unittests-pkg gwp-asan-test-pkg` to run just those tests.
 When in doubt, `fx test -v` can be run without arguments to run all tests, which
-if you only included `//zircon/system/ulib/c:tests` won't take too long.
+if you only included `//sdk/lib/c:tests` won't take too long.
 
 ## Testing a change locally
 

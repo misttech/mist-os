@@ -29,8 +29,8 @@ source_set("start-main") {
   sources = [ "__libc_start_main.c" ]
 
   deps = [
-    "//zircon/system/ulib/c/startup:startup-random-impl",
-    "//zircon/system/ulib/c/startup/musl-processargs",
+    "//sdk/lib/c/startup:startup-random-impl",
+    "//sdk/lib/c/startup/musl-processargs",
     "//zircon/third_party/ulib/musl:musl_internal",
   ]
 

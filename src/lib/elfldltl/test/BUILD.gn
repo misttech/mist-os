@@ -135,7 +135,7 @@ if (current_os == "linux") {
       ]
       deps = [
         ":linux-static-pie",
-        "//zircon/system/ulib/c/string:hermetic",
+        "//sdk/lib/c/string:hermetic",
       ]
 
       exclude_toolchain_tags = [ "instrumented" ]
@@ -195,9 +195,9 @@ if (is_fuchsia) {
 
       deps = [
         ":static-pie",
+        "//sdk/lib/c/stdlib:hermetic",
+        "//sdk/lib/c/string:hermetic",
         "//src/zircon/lib/zircon",
-        "//zircon/system/ulib/c/stdlib:hermetic",
-        "//zircon/system/ulib/c/string:hermetic",
       ]
 
       exclude_toolchain_tags = [ "instrumented" ]

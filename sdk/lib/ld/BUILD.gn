@@ -378,10 +378,10 @@ static_library("standalone") {
 
   sources = [ "standalone-assert.cc" ]
   deps = [
+    "//sdk/lib/c/stdlib:hermetic",
+    "//sdk/lib/c/string:hermetic",
+    "//sdk/lib/c/strings:hermetic",
     "//zircon/system/public",
-    "//zircon/system/ulib/c/stdlib:hermetic",
-    "//zircon/system/ulib/c/string:hermetic",
-    "//zircon/system/ulib/c/strings:hermetic",
   ]
 
   if (is_linux) {
@@ -508,7 +508,7 @@ source_set("startup-diagnostics") {
   sources = [ "startup-diagnostics.cc" ]
   deps = [
     ":startup-diagnostics.headers",
-    "//zircon/system/ulib/c/stdio/printf_core:wrapper",
+    "//sdk/lib/c/stdio/printf_core:wrapper",
   ]
   if (is_fuchsia) {
     deps += [
@@ -559,7 +559,7 @@ source_set("linux-syscalls") {
   visibility = [ ":*" ]
   sources = [ "linux-syscalls.cc" ]
   include_dirs = [ "//third_party/linux-syscall-support/src" ]
-  deps = [ "//zircon/system/ulib/c/stdio:snprintf" ]
+  deps = [ "//sdk/lib/c/stdio:snprintf" ]
 }
 
 library_headers("fuchsia-debugdata.headers") {

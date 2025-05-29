@@ -2,20 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
-
-zx_library("zx-panic-libc") {
-  sdk = "source"
-
-  sdk_headers = []
-
+static_library("zx-panic-libc") {
+  public_deps = [ "//zircon/system/public" ]
   sources = [ "zx_panic_libc.cc" ]
 }
 
 source_set("as_source") {
-  visibility = [ "//zircon/system/ulib/c:*" ]
-  sources = [ "zx_panic_libc.cc" ]
+  visibility = [ "//sdk/lib/c:*" ]
+
   public_deps = [ "//zircon/system/public" ]
+
+  sources = [ "zx_panic_libc.cc" ]
 
   # This library is linked into libc, which is used by libfuzzer.
   # Don't instrument it to avoid getting noise in code coverage.

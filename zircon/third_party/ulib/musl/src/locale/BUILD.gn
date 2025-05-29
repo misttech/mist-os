@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//zircon/system/ulib/c/libc.gni")
+import("//sdk/lib/c/libc.gni")
 
 source_set("locale") {
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]

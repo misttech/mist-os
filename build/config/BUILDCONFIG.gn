@@ -175,7 +175,7 @@ if (!defined(toolchain_variant.name)) {
 # Meanwhile "lib/${toolchain_variant.libprefix}" will be used to determine the
 # installation/distirbution destination path of shared libraries.
 #
-# IMPORTANT: KEEP THIS IN SYNC WITH //zircon/system/ulib/c/sysroot_entries.gni
+# IMPORTANT: KEEP THIS IN SYNC WITH //sdk/lib/c/sysroot_entries.gni
 #
 toolchain_variant.libprefix = ""
 if (toolchain_variant.instrumented) {
@@ -2612,13 +2612,13 @@ template("variant_target") {
   # files. Please keep them in sync, see:
   #   //build/dist/packaged_shared_library.gni
   #   //build/fuzzing/v1/fuzzer_package.gni
-  #   //zircon/system/ulib/c/libc_toolchain.gni
+  #   //sdk/lib/c/libc_toolchain.gni
   target_variant = false
   excluded_toolchain = false
   if (select_variant_canonical != []) {
     # See if there is a selector that matches this target.
     # IMPORTANT: The selection logic below is replicated in
-    # //zircon/system/ulib/c/libc_toolchain.gni due to specific
+    # //sdk/lib/c/libc_toolchain.gni due to specific
     # sysroot-related requirements. See comments in this file for
     # more details. ALWAYS KEEP THEM IN SYNC!
     selected = false

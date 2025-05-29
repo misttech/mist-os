@@ -19,18 +19,18 @@ test("inspector-gwp-asan-test") {
   defines = [ "HAS_GWP_ASAN=$has_gwp_asan" ]
   deps = [
     "..:gwp-asan",
+    "//sdk/lib/c/scudo:gwp-asan-common",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
-    "//zircon/system/ulib/c/scudo:gwp-asan-common",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
   data_deps = [
-    "//zircon/system/ulib/c/test:gwp-asan-test-buffer-overflow",
-    "//zircon/system/ulib/c/test:gwp-asan-test-buffer-underflow",
-    "//zircon/system/ulib/c/test:gwp-asan-test-double-free",
-    "//zircon/system/ulib/c/test:gwp-asan-test-invalid-free",
-    "//zircon/system/ulib/c/test:gwp-asan-test-use-after-free",
+    "//sdk/lib/c/test:gwp-asan-test-buffer-overflow",
+    "//sdk/lib/c/test:gwp-asan-test-buffer-underflow",
+    "//sdk/lib/c/test:gwp-asan-test-double-free",
+    "//sdk/lib/c/test:gwp-asan-test-invalid-free",
+    "//sdk/lib/c/test:gwp-asan-test-use-after-free",
   ]
 }
 
