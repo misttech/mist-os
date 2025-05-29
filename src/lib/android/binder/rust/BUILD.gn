@@ -24,11 +24,16 @@ rustc_library("binder_ndk_sys") {
   configs += [
     "//build/config/rust:cap_lints_allow",
     "//src/lib/android:android_rust_config",
+    ":allow_non_snake_case",
   ]
 
   deps = [ "//third_party/rust_crates:libc" ]
 
   disable_clippy = true
+}
+
+config("allow_non_snake_case") {
+  rustflags = [ "-Anon_snake_case" ]
 }
 
 # This target lets us link the C++ standard library statically into programs which
