@@ -137,6 +137,7 @@ impl TargetFilter for TcpTargetFilter {
 mod test {
     use super::*;
     use addr::TargetIpAddr;
+    use discovery::DiscoveryOrigin;
     use std::net::{IpAddr, Ipv4Addr};
 
     ///////////////////////////////////////////////////////////////////////////////
@@ -159,6 +160,7 @@ mod test {
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
             }),
             manual: false,
+            origin: DiscoveryOrigin::FastbootTcp,
         }));
         // Fails: wrong name
         assert!(!filter.filter_target(&TargetHandle {
@@ -168,6 +170,7 @@ mod test {
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
             }),
             manual: false,
+            origin: DiscoveryOrigin::FastbootTcp,
         }));
         // Fails: wrong state
         assert!(!filter.filter_target(&TargetHandle {
@@ -177,6 +180,7 @@ mod test {
                 connection_state: FastbootConnectionState::Udp(vec![addr])
             }),
             manual: false,
+            origin: DiscoveryOrigin::FastbootTcp,
         }));
         // Fails: Bad name
         assert!(!filter.filter_target(&TargetHandle {
@@ -186,6 +190,17 @@ mod test {
                 connection_state: FastbootConnectionState::Tcp(vec![addr])
             }),
             manual: false,
+            origin: DiscoveryOrigin::FastbootTcp,
+        }));
+        // Fails: wrong origin.
+        assert!(!filter.filter_target(&TargetHandle {
+            node_name: None,
+            state: TargetState::Fastboot(discovery::FastbootTargetState {
+                serial_number: "".to_string(),
+                connection_state: FastbootConnectionState::Tcp(vec![addr])
+            }),
+            manual: false,
+            origin: DiscoveryOrigin::Mdns,
         }));
         Ok(())
     }

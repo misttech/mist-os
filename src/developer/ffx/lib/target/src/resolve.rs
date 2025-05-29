@@ -818,6 +818,7 @@ impl TryFromEnvContext for Resolution {
 #[cfg(test)]
 mod test {
     use super::*;
+    use discovery::DiscoveryOrigin;
     use std::net::{Ipv6Addr, SocketAddrV6};
 
     #[fuchsia::test]
@@ -922,7 +923,12 @@ mod test {
         let name_spec = Some("foobar".to_string());
         let sa = addr.parse::<SocketAddr>().unwrap();
         let state = TargetState::Product { addrs: vec![sa.into()], serial: None };
-        let th = TargetHandle { node_name: name_spec.clone(), state, manual: false };
+        let th = TargetHandle {
+            node_name: name_spec.clone(),
+            state,
+            manual: false,
+            origin: DiscoveryOrigin::Mdns,
+        };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
         resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
         let target_spec =
@@ -940,6 +946,7 @@ mod test {
                 connection_state: discovery::FastbootConnectionState::Usb,
             }),
             manual: false,
+            origin: DiscoveryOrigin::FastbootUsb,
         };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
         resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
@@ -956,8 +963,18 @@ mod test {
         let sa = addr.parse::<SocketAddr>().unwrap();
         let ts1 = TargetState::Product { addrs: vec![sa.into(), sa.into()], serial: None };
         let ts2 = TargetState::Product { addrs: vec![sa.into(), sa.into()], serial: None };
-        let th1 = TargetHandle { node_name: name_spec.clone(), state: ts1, manual: false };
-        let th2 = TargetHandle { node_name: name_spec.clone(), state: ts2, manual: false };
+        let th1 = TargetHandle {
+            node_name: name_spec.clone(),
+            state: ts1,
+            manual: false,
+            origin: DiscoveryOrigin::Mdns,
+        };
+        let th2 = TargetHandle {
+            node_name: name_spec.clone(),
+            state: ts2,
+            manual: false,
+            origin: DiscoveryOrigin::Mdns,
+        };
         resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th1, th2]));
         resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
         let target_spec_res =

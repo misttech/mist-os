@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::DiscoveryOrigin;
 use addr::{TargetAddr, TargetIpAddr};
 use anyhow::{bail, Result};
 use manual_targets::watcher::{ManualTargetEvent, ManualTargetState};
@@ -73,6 +74,7 @@ pub struct TargetHandle {
     pub node_name: Option<String>,
     pub state: TargetState,
     pub manual: bool,
+    pub origin: DiscoveryOrigin,
 }
 
 impl Display for TargetHandle {
@@ -121,15 +123,18 @@ impl TryFrom<ffx::MdnsEventType> for TargetEvent {
     fn try_from(event: ffx::MdnsEventType) -> Result<Self, Self::Error> {
         match event {
             ffx::MdnsEventType::TargetFound(info) => {
-                let handle: TargetHandle = info.try_into()?;
+                let mut handle: TargetHandle = info.try_into()?;
+                handle.origin = DiscoveryOrigin::Mdns;
                 Ok(TargetEvent::Added(handle))
             }
             ffx::MdnsEventType::TargetRediscovered(info) => {
-                let handle: TargetHandle = info.try_into()?;
+                let mut handle: TargetHandle = info.try_into()?;
+                handle.origin = DiscoveryOrigin::Mdns;
                 Ok(TargetEvent::Added(handle))
             }
             ffx::MdnsEventType::TargetExpired(info) => {
-                let handle: TargetHandle = info.try_into()?;
+                let mut handle: TargetHandle = info.try_into()?;
+                handle.origin = DiscoveryOrigin::Mdns;
                 Ok(TargetEvent::Removed(handle))
             }
             ffx::MdnsEventType::SocketBound(_) => {
@@ -145,11 +150,13 @@ impl TryFrom<emulator_instance::EmulatorTargetAction> for TargetEvent {
     fn try_from(event: emulator_instance::EmulatorTargetAction) -> Result<Self, Self::Error> {
         match event {
             emulator_instance::EmulatorTargetAction::Add(info) => {
-                let handle: TargetHandle = info.try_into()?;
+                let mut handle: TargetHandle = info.try_into()?;
+                handle.origin = DiscoveryOrigin::Emulator;
                 Ok(TargetEvent::Added(handle))
             }
             emulator_instance::EmulatorTargetAction::Remove(info) => {
-                let handle: TargetHandle = info.try_into()?;
+                let mut handle: TargetHandle = info.try_into()?;
+                handle.origin = DiscoveryOrigin::Emulator;
                 Ok(TargetEvent::Removed(handle))
             }
         }
@@ -174,6 +181,7 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
             Ok(())
         }
 
+        let mut origin = DiscoveryOrigin::Unknown;
         let state = match info.fastboot_interface {
             None => {
                 assert_non_empty_addrs(&addrs)?;
@@ -185,12 +193,17 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
             Some(iface) => {
                 let serial_number = info.serial_number.unwrap_or_else(|| "".to_string());
                 let connection_state = match iface {
-                    ffx::FastbootInterface::Usb => FastbootConnectionState::Usb,
+                    ffx::FastbootInterface::Usb => {
+                        origin = DiscoveryOrigin::FastbootUsb;
+                        FastbootConnectionState::Usb
+                    }
                     ffx::FastbootInterface::Udp => {
+                        origin = DiscoveryOrigin::FastbootUdp;
                         assert_non_empty_addrs(&addrs)?;
                         FastbootConnectionState::Udp(addrs)
                     }
                     ffx::FastbootInterface::Tcp => {
+                        origin = DiscoveryOrigin::FastbootTcp;
                         assert_non_empty_addrs(&addrs)?;
                         FastbootConnectionState::Tcp(addrs)
                     }
@@ -199,7 +212,10 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
             }
         };
         let manual = info.is_manual.unwrap_or(false);
-        Ok(TargetHandle { node_name: info.nodename, state, manual })
+        if manual {
+            origin = DiscoveryOrigin::Manual;
+        }
+        Ok(TargetHandle { node_name: info.nodename, state, manual, origin })
     }
 }
 
@@ -214,6 +230,7 @@ impl From<FastbootEvent> for TargetEvent {
                         connection_state: FastbootConnectionState::Usb,
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootUsb,
                 };
                 TargetEvent::Added(handle)
             }
@@ -225,6 +242,7 @@ impl From<FastbootEvent> for TargetEvent {
                         connection_state: FastbootConnectionState::Usb,
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootUsb,
                 };
                 TargetEvent::Removed(handle)
             }
@@ -254,6 +272,7 @@ impl From<ManualTargetEvent> for TargetEvent {
                     node_name: Some(manual_target.addr().to_string()),
                     state,
                     manual: true,
+                    origin: DiscoveryOrigin::Manual,
                 };
                 TargetEvent::Added(handle)
             }
@@ -262,6 +281,7 @@ impl From<ManualTargetEvent> for TargetEvent {
                     node_name: Some(manual_target.addr().to_string()),
                     state: TargetState::Unknown,
                     manual: true,
+                    origin: DiscoveryOrigin::Manual,
                 };
                 TargetEvent::Removed(handle)
             }
@@ -290,6 +310,7 @@ impl From<fastboot_file_discovery::FastbootEvent> for TargetEvent {
                         connection_state,
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootFile,
                 };
                 TargetEvent::Added(handle)
             }
@@ -310,6 +331,7 @@ impl From<fastboot_file_discovery::FastbootEvent> for TargetEvent {
                         connection_state,
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootFile,
                 };
                 TargetEvent::Removed(handle)
             }
@@ -340,6 +362,7 @@ mod test {
                         connection_state: FastbootConnectionState::Usb,
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootUsb,
                 })
             );
         }
@@ -356,6 +379,7 @@ mod test {
                         connection_state: FastbootConnectionState::Usb,
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootUsb,
                 })
             );
         }
@@ -395,6 +419,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Product { addrs: vec![addr], serial: None },
                     manual: false,
+                    origin: DiscoveryOrigin::Unknown,
                 }
             );
         }
@@ -417,6 +442,7 @@ mod test {
                         connection_state: FastbootConnectionState::Udp(vec![addr])
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootUdp,
                 }
             );
         }
@@ -439,6 +465,7 @@ mod test {
                         connection_state: FastbootConnectionState::Tcp(vec![addr])
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootTcp,
                 }
             );
         }
@@ -461,6 +488,7 @@ mod test {
                         connection_state: FastbootConnectionState::Usb
                     }),
                     manual: false,
+                    origin: DiscoveryOrigin::FastbootUsb,
                 }
             );
         }
@@ -490,6 +518,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Product { addrs: vec![addr], serial: None },
                     manual: false,
+                    origin: DiscoveryOrigin::Mdns,
                 })
             );
         }
@@ -513,6 +542,7 @@ mod test {
                         serial: Some("12348890".to_string())
                     },
                     manual: false,
+                    origin: DiscoveryOrigin::Mdns,
                 })
             );
         }
@@ -532,6 +562,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Product { addrs: vec![addr], serial: None },
                     manual: false,
+                    origin: DiscoveryOrigin::Mdns,
                 })
             );
         }
@@ -551,6 +582,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Product { addrs: vec![addr], serial: None },
                     manual: false,
+                    origin: DiscoveryOrigin::Mdns,
                 })
             );
         }
@@ -574,6 +606,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Product { addrs: vec![addr], serial: None },
                     manual: false,
+                    origin: DiscoveryOrigin::Emulator,
                 })
             );
         }
@@ -591,6 +624,7 @@ mod test {
                     node_name: Some("foo".to_string()),
                     state: TargetState::Product { addrs: vec![addr], serial: None },
                     manual: false,
+                    origin: DiscoveryOrigin::Emulator,
                 })
             );
         }
@@ -612,6 +646,7 @@ mod test {
                     node_name: Some("127.0.0.1:8080".to_string()),
                     state: TargetState::Product { addrs: vec![addr.into()], serial: None },
                     manual: true,
+                    origin: DiscoveryOrigin::Manual,
                 })
             );
         }
@@ -633,6 +668,7 @@ mod test {
                     node_name: Some("[::1]:8023".to_string()),
                     state: TargetState::Product { addrs: vec![addr.into()], serial: None },
                     manual: true,
+                    origin: DiscoveryOrigin::Manual,
                 })
             );
         }
@@ -652,6 +688,7 @@ mod test {
                         connection_state: FastbootConnectionState::Tcp(vec![addr.into()])
                     }),
                     manual: true,
+                    origin: DiscoveryOrigin::Manual,
                 })
             );
         }
@@ -665,6 +702,7 @@ mod test {
                     node_name: Some("127.0.0.1:8080".to_string()),
                     state: TargetState::Unknown,
                     manual: true,
+                    origin: DiscoveryOrigin::Manual,
                 })
             );
         }

@@ -666,6 +666,7 @@ mod test {
                 connection_state: discovery::FastbootConnectionState::Usb,
             }),
             manual: false,
+            origin: discovery::DiscoveryOrigin::FastbootUsb,
         });
         let stream = futures::stream::once(async { handle });
         let targets = handles_to_infos(stream, &env.context, true).await;
