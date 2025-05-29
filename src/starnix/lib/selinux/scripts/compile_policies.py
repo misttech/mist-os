@@ -198,6 +198,7 @@ _LEGACY_POLICIES = [
     "allow_a_t_b_attr_class0_perm0_policy",
     "allow_a_t_b_t_class0_perm0_policy",
     "allow_with_constraints_policy",
+    "allowxperm_policy",
     "constraints_policy",
     "file_no_defaults_policy",
     "file_range_source_high_policy",

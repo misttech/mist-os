@@ -247,14 +247,14 @@ impl SeLinuxFs {
         dir.build_root();
 
         // Initialize selinux kernel state to store a copy of "/sys/fs/selinux/null" for use in
-        // hooks that redirect file descriptors to null.
+        // hooks that redirect file descriptors to null. This has the side-effect of applying the
+        // policy-defined "devnull" SID to the `null_fs_node`.
         let null_ops: Box<dyn FileOps> = Box::new(DevNull);
         let null_flags = OpenFlags::empty();
         let null_name =
             NamespaceNode::new_anonymous(DirEntry::new(null_fs_node, None, "null".into()));
         let null_file_object = FileObject::new(current_task, null_ops, null_name, null_flags)
             .expect("create file object for just-created selinuxfs/null");
-
         security::selinuxfs_init_null(current_task, &null_file_object);
 
         Ok(fs)

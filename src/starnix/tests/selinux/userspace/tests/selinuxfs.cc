@@ -76,6 +76,12 @@ SeLinuxApiResult ComputeCreateContext(std::string_view source_context,
   return CallSeLinuxApi("create", request);
 }
 
+TEST(SeLinuxFsNull, HasPolicyDevnullContext) {
+  constexpr char kSeLinuxFsNull[] = "/sys/fs/selinux/null";
+
+  EXPECT_EQ(GetLabel(kSeLinuxFsNull), fit::ok("system_u:object_r:devnull_t:s0"));
+}
+
 TEST(SeLinuxFsContext, ValidatesRequiredFieldsPresent) {
   // Contexts that have too few colons to provide user, role, type & sensitivity are rejected.
   EXPECT_EQ(ValidateContext("test_selinuxfs_u"), fit::failed());

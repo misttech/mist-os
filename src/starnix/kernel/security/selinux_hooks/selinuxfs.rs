@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{check_permission, superblock, task_effective_sid};
+use super::{check_permission, set_cached_sid, superblock, task_effective_sid};
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
@@ -14,6 +14,9 @@ pub(in crate::security) fn selinuxfs_init_null(
     current_task: &CurrentTask,
     null_file_handle: &FileHandle,
 ) {
+    // Apply the "devnull" initial SID to the node.
+    set_cached_sid(null_file_handle.node(), SecurityId::initial(InitialSid::Devnull));
+
     let kernel_state = current_task
         .kernel()
         .security_state

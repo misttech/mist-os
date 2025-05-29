@@ -1345,13 +1345,12 @@ enum ReferenceInitialSid {
     Unlabeled = 3,
     _Fs = 4,
     File = 5,
-    _AnySocket = 6,
-    _Port = 7,
-    _Netif = 8,
-    _Netmsg = 9,
-    _Node = 10,
-    _Sysctl = 15,
-    _Devnull = 25,
+    _Port = 9,
+    _Netif = 10,
+    _Netmsg = 11,
+    _Node = 12,
+    _Sysctl = 17,
+    Devnull = 27,
 
     FirstUnused,
 }
@@ -1391,6 +1390,7 @@ initial_sid_enum! {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     InitialSid {
         // keep-sorted start
+        Devnull("devnull"),
         File("file"),
         Kernel("kernel"),
         Security("security"),
