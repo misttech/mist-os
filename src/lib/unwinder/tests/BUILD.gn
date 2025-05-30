@@ -33,9 +33,10 @@ source_set("cfi_only") {
 
   configs += [ "//build/config:no-shadow-call-stack" ]
 
-  # Some build variants explicitly require frame pointers. E.g., ASan build requires frame pointer
-  # and/or shadow call stack for fast unwinding. See //zircon/system/ulib/c/sanitizers/backtrace.h.
-  # We generally don't want to mess it up so don't touch the config in these cases.
+  # Some build variants explicitly require frame pointers. E.g., ASan build
+  # requires frame pointer and/or shadow call stack for fast unwinding. See
+  # //sdk/lib/c/sanitizers/backtrace.h.  We generally don't want to mess it up
+  # so don't touch the config in these cases.
   #
   # Only default_frame_pointers is in the config list, the unwind tables and shadow call stacks are
   # enabled implicitly in the compiler on appropriate platforms.
