@@ -183,3 +183,5 @@ void arm64_fpu_exception(iframe_t* iframe, uint exception_flags) {
     arm64_fpu_load_regs(t);
   }
 }
+
+bool arm64_fpu_is_enabled() { return is_fpu_enabled(__arm_rsr64("cpacr_el1")); }

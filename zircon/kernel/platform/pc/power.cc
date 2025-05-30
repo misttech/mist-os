@@ -102,6 +102,8 @@ void platform_halt_cpu(void) {
   halted_cpus.fetch_or(cpu_num_to_mask(arch_curr_cpu_num()));
 }
 
+bool platform_supports_suspend_cpu() { return false; }
+
 zx_status_t platform_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
 
 // TODO(https://fxbug.dev/42180675): Refactor platform_panic_start.

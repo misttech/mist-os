@@ -12,7 +12,10 @@ library_headers("headers") {
 }
 
 source_set("psci") {
-  sources = [ "psci.cc" ]
+  sources = [
+    "psci-suspend.S",
+    "psci.cc",
+  ]
   public_deps = [ ":headers" ]
   deps = [
     "//zircon/kernel/dev/pdev/power",

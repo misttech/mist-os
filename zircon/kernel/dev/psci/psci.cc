@@ -57,6 +57,7 @@ zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
 }
 
 uint64_t psci_smc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
+  LTRACEF("0x%x 0x%" PRIx64 " 0x%" PRIx64 " 0x%" PRIx64 "\n", function, arg0, arg1, arg2);
   return arm_smccc_smc(function, arg0, arg1, arg2, 0, 0, 0, 0).x0;
 }
 
@@ -69,6 +70,46 @@ using psci_call_proc = uint64_t (*)(uint32_t, uint64_t, uint64_t, uint64_t);
 psci_call_proc do_psci_call = psci_smc_call;
 
 }  // anonymous namespace
+
+// Saves register state in |context|, then issues a PSCI call, using
+// |psci_call|, for the specified |psci_func|, passing along the supplied
+// |power_state|, |entry|, and |context| arguments.
+//
+// This function is designed to be called with PSCI64_CPU_SUSPEND and work with
+// |psci_do_resume| and |arm64_secondary_start|.
+//
+// In all cases, this function will always appear to return to its caller.
+// Depending on the PSCI implementation and the conditions, it may do so
+// directly, or in the case of a successful CPU_SUSPEND, it may do so via
+// |arm64_secondary_start| and |psci_do_resume|.
+//
+// If the return value is less than or equal to zero, then control did not
+// branch to |entry| and the return value should be interpreted as a PSCI return
+// value (see section 5.4.5 of DEN0022F.b):
+//
+//   PSCI_SUCCESS - The CPU_SUSPEND call succeeded.  However, the CPU did not
+//   reach a power down state because of a pending interrupt, or simply because
+//   the requested |power_state| is not a power down state.
+//
+//   PSCI_INVALID_PARAMETERS - The |power_state| is invalid, or a low-power
+//   state was requested for a higher-than-core-level topology node
+//   (e.g. cluster) and at least one of the children in that node is in a local
+//   low-power state that is incompatible with the request.
+//
+//   PSCI_DENIED - A low-power state is requested for a higher-than-core-level
+//   topology node (e.g. cluster) and all the cores that are in an incompatible
+//   state with the request are running, as opposed to being in a low-power
+//   state.
+//
+//   PSCI_INVALID_ADDRESS - |entry| is not a valid physical address.
+//
+// If the return value is greater than zero, then the CPU did in fact suspend
+// and resume execution at |entry| before returning to the caller.
+//
+// Implemented in assembly.
+extern "C" int64_t psci_do_suspend(psci_call_proc psci_call, uint32_t power_state, paddr_t entry,
+                                   psci_cpu_resume_context* context);
+extern "C" zx_status_t psci_do_resume(psci_cpu_resume_context* context) __NO_RETURN;
 
 zx_status_t psci_system_off() {
   return psci_status_to_zx_status(
@@ -87,6 +128,45 @@ zx_status_t psci_cpu_off() {
 zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context) {
   LTRACEF("CPU_ON mpid %#" PRIx64 ", entry %#" PRIx64 "\n", mpid, entry);
   return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, context));
+}
+
+PsciCpuSuspendResult psci_cpu_suspend(uint32_t power_state) {
+  LTRACE_ENTRY;
+
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  if (!psci_cpu_suspend_supported) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  const paddr_t entry_pa = KernelPhysicalAddressOf<arm64_secondary_start>();
+
+  psci_cpu_resume_context context{};
+
+  LTRACEF("cpu %u, psci_call_routine 0x%" PRIx64 ", power_state 0x%x, entry 0x%" PRIx64
+          ", context %p\n",
+          arch_curr_cpu_num(), reinterpret_cast<uintptr_t>(do_psci_call), power_state, entry_pa,
+          &context);
+
+  const int64_t result = psci_do_suspend(do_psci_call, power_state, entry_pa, &context);
+  if (result > 0) {
+    // We took the "long way" and restored CPU context from a power down state.
+    return zx::ok(CpuPoweredDown::Yes);
+  }
+
+  switch (result) {
+    case PSCI_SUCCESS:
+      return zx::ok(CpuPoweredDown::No);
+    case PSCI_INVALID_PARAMETERS:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    case PSCI_DENIED:
+      return zx::error(ZX_ERR_ACCESS_DENIED);
+    default:
+      panic("cpu %u, psci_call_routine 0x%" PRIx64 ", power_state 0x%x, entry 0x%" PRIx64
+            ", context %p\n",
+            arch_curr_cpu_num(), reinterpret_cast<uintptr_t>(do_psci_call), power_state, entry_pa,
+            &context);
+  };
 }
 
 int64_t psci_get_affinity_info(uint64_t mpid) {

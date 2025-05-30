@@ -67,6 +67,9 @@ void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_
 /* optionally stop the current cpu in a way the platform finds appropriate */
 void platform_halt_cpu();
 
+// Returns true iff this platform supports |platform_suspend_cpu|.
+bool platform_supports_suspend_cpu();
+
 // Suspend the calling CPU.
 //
 // On success, the CPU will enter an implementation-defined suspend state.
@@ -78,10 +81,26 @@ void platform_halt_cpu();
 // Prior to calling, interrupts must be disabled, preemption must be disabled,
 // and the caller must be pinned to the calling CPU.
 //
-// Returns ZX_ERR_NOT_SUPPORTED if unsupported on this platform.
+// The calling thread must be a kernel-only thread.  Because this routine saves
+// only the minimum required register state, it is an error to call this
+// function on a thread that has a "user half" (ThreadDispatcher).
 //
-// Returns ZX_ERR_CANCELED if the suspend operation could not completed because
-// of a pending wake event (e.g. a pending interrupt).
+// Possible error results include (but are not limited to),
+//
+// ZX_ERR_NOT_SUPPORTED if unsupported on this platform.
+//
+// ZX_ERR_ACCESS_DENIED or ZX_ERR_INVALID_ARGS if the suspend power state is
+// incompatible with the current power state of other CPUs.  This is a somewhat
+// normal error and must be handled by callers.
+//
+// TODO(https://fxbug.dev/414456459): Consider adding a platform-specific or
+// custom result type to differentiates between success-but-did-not-power-down
+// and powered-down.
+//
+// TODO(https://fxbug.dev/414456459): Consider checking the state of the
+// secondary CPUs in order to determine which power state value to use so that
+// we can eliminate the need to return ZX_ERR_ACCESS_DENIED or
+// ZX_ERR_INVALID_ARGS in "normal" situations.
 //
 // TODO(https://fxbug.dev/414456459): Currently, the caller is responsible for
 // determining if pausing/resuming the monotonic clock is necessary and then

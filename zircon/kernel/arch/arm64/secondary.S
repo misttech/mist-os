@@ -24,10 +24,17 @@ tmp2                    .req x10
 page_table0             .req x21
 page_table1             .req x22
 kernel_vaddr            .req x23
+resume_context          .req x24
 
 // This code is purely position-independent and generates no relocations
 // that need boot-time fixup.
+//
+// void arm64_secondary_start(void* resume_context);
 .function arm64_secondary_start, global
+  // Save the resume_context arg so we can later check whether this is a boot up
+  // or a resume.
+  mov resume_context, x0
+
   // If we entered at a higher EL than 1, drop to EL1.
   //
   // Make sure to clear the stack pointer first. The call will reuse in EL1
@@ -117,6 +124,12 @@ kernel_vaddr            .req x23
   // not SP_EL0.
   msr SPSel, #1
 
+
+  // Now that we've set up the most basic architectural state, it's time to
+  // determine if we're booting up or resuming from suspend and finish the job.
+  cbnz resume_context,.Lresume
+
+  // We're booting up rather than resuming from suspend.
   bl arm64_get_secondary_sp
   cbz x0, .Lunsupported_cpu_trap
   mov sp, x0
@@ -127,6 +140,13 @@ kernel_vaddr            .req x23
 #endif
 
   bl arm64_secondary_entry
+  b .Lunsupported_cpu_trap
+
+.Lresume:
+  // We're resuming.  The resume_context will have our stack pointer and
+  // everything else we need.
+  mov x0, resume_context
+  bl psci_do_resume
 
 .Lunsupported_cpu_trap:
   wfe
