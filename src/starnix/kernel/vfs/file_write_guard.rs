@@ -123,6 +123,11 @@ pub struct FileWriteGuard {
 }
 
 impl FileWriteGuard {
+    pub fn new(node: &FsNodeHandle, mode: FileWriteGuardMode) -> Result<Self, Errno> {
+        let mut state = node.write_guard_state.lock();
+        state.create_write_guard(node.clone(), mode)
+    }
+
     pub fn into_ref(self) -> FileWriteGuardRef {
         FileWriteGuardRef(Some(Arc::new(self)))
     }
@@ -201,61 +206,57 @@ mod tests {
     async fn test_write_exec_locking() {
         let fs_node = create_fs_node();
 
-        let write_guard = fs_node
-            .create_write_guard(FileWriteGuardMode::WriteFile)
+        let write_guard = FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteFile)
             .expect("FsNode::lock failed unexpectedly");
 
         assert_eq!(
-            fs_node.create_write_guard(FileWriteGuardMode::Exec).unwrap_err(),
+            FileWriteGuard::new(&fs_node, FileWriteGuardMode::Exec).unwrap_err(),
             errno!(ETXTBSY)
         );
 
-        let write_mapping_guard = fs_node
-            .create_write_guard(FileWriteGuardMode::WriteMapping)
+        let write_mapping_guard = FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteMapping)
             .expect("FsNode::lock failed unexpectedly")
             .into_ref();
 
         assert_eq!(
-            fs_node.create_write_guard(FileWriteGuardMode::Exec).unwrap_err(),
+            FileWriteGuard::new(&fs_node, FileWriteGuardMode::Exec).unwrap_err(),
             errno!(ETXTBSY)
         );
 
         let write_mapping_guard_2 = write_mapping_guard.clone();
 
         assert_eq!(
-            fs_node.create_write_guard(FileWriteGuardMode::Exec).unwrap_err(),
+            FileWriteGuard::new(&fs_node, FileWriteGuardMode::Exec).unwrap_err(),
             errno!(ETXTBSY)
         );
 
         std::mem::drop(write_guard);
 
         assert_eq!(
-            fs_node.create_write_guard(FileWriteGuardMode::Exec).unwrap_err(),
+            FileWriteGuard::new(&fs_node, FileWriteGuardMode::Exec).unwrap_err(),
             errno!(ETXTBSY)
         );
 
         std::mem::drop(write_mapping_guard);
 
         assert_eq!(
-            fs_node.create_write_guard(FileWriteGuardMode::Exec).unwrap_err(),
+            FileWriteGuard::new(&fs_node, FileWriteGuardMode::Exec).unwrap_err(),
             errno!(ETXTBSY)
         );
 
         std::mem::drop(write_mapping_guard_2);
 
-        let exec_guard = fs_node
-            .create_write_guard(FileWriteGuardMode::Exec)
+        let exec_guard = FileWriteGuard::new(&fs_node, FileWriteGuardMode::Exec)
             .expect("FsNode::lock failed unexpectedly");
 
         assert_eq!(
-            fs_node.create_write_guard(FileWriteGuardMode::WriteFile).unwrap_err(),
+            FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteFile).unwrap_err(),
             errno!(ETXTBSY)
         );
 
         std::mem::drop(exec_guard);
 
-        fs_node
-            .create_write_guard(FileWriteGuardMode::WriteFile)
+        FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteFile)
             .expect("FsNode::lock failed unexpectedly");
     }
 
@@ -288,13 +289,12 @@ mod tests {
         }
 
         // Files with WRITE seal can be opened for write.
-        let file_guard = fs_node
-            .create_write_guard(FileWriteGuardMode::WriteFile)
+        let file_guard = FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteFile)
             .expect("lock(WriteFile) failed");
 
         // Files with WRITE seal cannot be mapped.
         assert_eq!(
-            fs_node.create_write_guard(FileWriteGuardMode::WriteMapping).unwrap_err(),
+            FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteMapping).unwrap_err(),
             errno!(EPERM)
         );
 
@@ -306,11 +306,9 @@ mod tests {
         let fs_node = create_fs_node();
         fs_node.write_guard_state.lock().enable_sealing(SealFlags::empty());
 
-        let _write_guard = fs_node
-            .create_write_guard(FileWriteGuardMode::WriteFile)
+        let _write_guard = FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteFile)
             .expect("FsNode::lock failed unexpectedly");
-        let write_mapping_guard = fs_node
-            .create_write_guard(FileWriteGuardMode::WriteMapping)
+        let write_mapping_guard = FileWriteGuard::new(&fs_node, FileWriteGuardMode::WriteMapping)
             .expect("FsNode::lock failed unexpectedly");
 
         // Should fail since the file is mapped.

@@ -1504,7 +1504,7 @@ impl FileObject {
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
         let file_write_guard = if flags.can_write() {
-            Some(name.entry.node.create_write_guard(FileWriteGuardMode::WriteFile)?)
+            Some(FileWriteGuard::new(&name.entry.node, FileWriteGuardMode::WriteFile)?)
         } else {
             None
         };

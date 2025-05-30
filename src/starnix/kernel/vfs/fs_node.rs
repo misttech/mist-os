@@ -15,9 +15,9 @@ use crate::vfs::rw_queue::{RwQueue, RwQueueReadGuard};
 use crate::vfs::socket::SocketHandle;
 use crate::vfs::{
     checked_add_offset_and_length, inotify, CurrentTaskAndLocked, DefaultDirEntryOps, DirEntryOps,
-    FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
-    FileWriteGuardState, FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
-    RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
+    FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuardState, FsNodeReleaser, FsStr,
+    FsString, MountInfo, NamespaceNode, OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks,
+    WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
 use fuchsia_runtime::UtcInstant;
@@ -117,10 +117,6 @@ impl AppendLockStrategy<FileOpsCore> for AlreadyLockedAppendLockStrategy<'_> {
 }
 
 pub struct FsNode {
-    /// Weak reference to the `FsNodeHandle` of this `FsNode`. This allows to retrieve the
-    /// `FsNodeHandle` from a `FsNode`.
-    pub weak_handle: WeakFsNodeHandle,
-
     /// The FsNodeOps for this FsNode.
     ///
     /// The FsNodeOps are implemented by the individual file systems to provide
@@ -1240,11 +1236,8 @@ impl FsNode {
             .into_handle()
     }
 
-    pub fn into_handle(mut self) -> FsNodeHandle {
-        FsNodeHandle::new_cyclic(move |weak_handle| {
-            self.weak_handle = weak_handle.clone();
-            self.into()
-        })
+    pub fn into_handle(self) -> FsNodeHandle {
+        FsNodeHandle::new(self.into())
     }
 
     fn new_internal(
@@ -1282,7 +1275,6 @@ impl FsNode {
         #[allow(clippy::let_and_return)]
         {
             let result = Self {
-                weak_handle: Default::default(),
                 ops,
                 fs,
                 node_id,
@@ -2668,11 +2660,6 @@ impl FsNode {
             })?;
         }
         Ok(())
-    }
-
-    pub fn create_write_guard(&self, mode: FileWriteGuardMode) -> Result<FileWriteGuard, Errno> {
-        let handle = self.weak_handle.upgrade().ok_or_else(|| errno!(ENOENT))?;
-        self.write_guard_state.lock().create_write_guard(handle, mode)
     }
 
     /// Returns a string describing this `FsNode` in the format used by "/proc/../fd" for anonymous

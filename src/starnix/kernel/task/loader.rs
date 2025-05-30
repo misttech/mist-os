@@ -10,7 +10,7 @@ use crate::mm::{
 use crate::security;
 use crate::task::CurrentTask;
 use crate::vdso::vdso_loader::ZX_TIME_VALUES_MEMORY;
-use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
+use crate::vfs::{FdNumber, FileHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef};
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{Locked, Unlocked};
@@ -541,13 +541,13 @@ fn resolve_elf(
             ProtectionFlags::READ | ProtectionFlags::EXEC,
         )?;
         let file_write_guard =
-            interp_file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
+            FileWriteGuard::new(&interp_file.name.entry.node, FileWriteGuardMode::Exec)?.into_ref();
         Some(ResolvedInterpElf { file: interp_file, memory: interp_memory, file_write_guard })
     } else {
         None
     };
     let file_write_guard =
-        file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
+        FileWriteGuard::new(&file.name.entry.node, FileWriteGuardMode::Exec)?.into_ref();
     let arch_width = get_arch_width(&elf_headers);
     Ok(ResolvedElf {
         file,
