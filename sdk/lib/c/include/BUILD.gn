@@ -15,110 +15,42 @@ import("libc_headers.gni")
 # These go into the "sysroot" built by //zircon/public/sysroot; that's used to
 # compile most Fuchsia user code, and it goes into the SDK.
 #
-# Any changes to these files require manual API review approval.  Some of
-# these files come from llvm-libc so changes do not land directly in this
-# repository where they could be tied to the API review and metadata updates.
-# Instead, an automated roller job updates the integration pin for
-# //third_party/llvm-libc/src.  To allow the automated roll commits to land,
-# there must be no changes to what goes into the SDK directly caused by that
-# commit.  To avoid this problem, the llvm-libc headers copied into the SDK
-# never come from //third_party/llvm-libc/src/include; instead they come from
-# the llvm-libc-golden subdirectory here.
+# Any changes to these files require manual API review approval via update of
+# the sysroot.api file.  Some of these files come from llvm-libc.  But the
+# auto-roller that updates the llvm-libc code will never update sysroot.api; so
+# llvm-libc header changes always require a manual roll that includes the
+# sysroot.api update along with the //manifests update in a single commit.
 #
-# Ordinarily the build will check that all llvm-libc-golden files match the
-# source of truth found in //third_party/llvm-libc/src/include.  When there is
-# a change, rolls will fail with a golden_files() error pointing here.  Then a
-# temporary change must be landed setting this flag to true to allow an
-# llvm-libc roll to complete.  Finally, the flag must be set back to false
-# along with rebuilding with `update_goldens=true` in `args.gn` to update the
-# API summary files for the SDK, for a change that go through API review.
-llvm_libc_soft_transition = false
-
-# When the llvm-libc hdrgen sources change incompatibly, then a more thorough
-# kind of soft transition is required.  In that case, there's no way to do any
-# header generation.  So even libc's own code has to use the llvm-libc-golden
-# files instead of "current" files.  This scenario is much more rare than the
-# generic llvm_libc_soft_transition scenario.
-llvm_libc_hdrgen_transition = false
-
-# Files generated from "$llvm_libc/include/*.yaml" files.  This list drives the
-# generation work done here, including regenerating llvm-libc-generated.json
-# using the golden_files() mechanism.  However, the golden JSON file in the
-# source tree is what drives the libc_headers.gni lists that everything else
-# uses.  After changing this list, the next build with update_goldens=true will
-# update the JSON file in the sources; that will necessitate another build to
-# pick up the new lists and complete the update of llvm-libc-golden files.
+# Public llvm-libc headers used are generated from "$llvm_libc/include/*.yaml"
+# files.  This list drives all the generation work done here, including
+# regenerating llvm-libc-generated.json using the golden_files() mechanism.
+# However, the golden JSON file in the source tree is what drives the
+# libc_headers.gni lists that everything else uses.  After changing this list,
+# the next build with update_goldens=true will update the JSON file in the
+# sources; that will necessitate another build to pick up the new lists and
+# generate the headers correctly so that the sysroot can be updated.
 llvm_libc_generated_headers = [
   "fenv.h",
   "malloc.h",
 ]
 
-# Generated headers go into this directory, always the same in every toolchain.
-if (!llvm_libc_hdrgen_transition) {
-  gen_dir =
-      get_label_info("//third_party/llvm-libc/src/include($default_toolchain)",
-                     "target_gen_dir")
-}
+# The generated headers go here, where libc_headers.gni looks for them.
+gen_dir = libc_headers.llvm_libc_gen_dir
+
+# Directory holding the hdrgen Python sources.
+hdrgen_dir = "$llvm_libc/utils/hdrgen"
 
 # This target is in an sdk.deps list in sysroot_entries, to ensure that the
-# llvm-libc-golden copies are up to date.  It does nothing during a soft
-# transition declared by setting llvm_libc_soft_transition=true above.  This
-# checking only happens in the $default_toolchain and is not repeated
-# elsewhere.
+# generated headers are in place.  This checking only ever happens in the
+# $default_toolchain and is not repeated elsewhere.
 group("include") {
-  if (!llvm_libc_hdrgen_transition) {
-    public_deps = [ ":check-llvm-libc-json($default_toolchain)" ]
-  }
-  if (!llvm_libc_soft_transition && !llvm_libc_hdrgen_transition) {
-    public_deps += [ ":check-llvm-libc-golden($default_toolchain)" ]
-  }
+  public_deps = [
+    ":check-llvm-libc-json($default_toolchain)",
+    ":llvm-libc-generated-headers($default_toolchain)",
+  ]
 }
 
-if (current_toolchain == default_toolchain && !llvm_libc_hdrgen_transition) {
-  # If the comparisons list goes directly into golden_files() as a list of
-  # scopes, then each golden file will be an input and Ninja will insist that
-  # it already exist before running anything.  With the list in a JSON file,
-  # the golden_files() action gets a chance to run and create new files.
-  generated_file("check-llvm-libc-golden.manifest") {
-    visibility = [ ":check-llvm-libc-golden" ]
-    outputs = [ "$target_gen_dir/$target_name" ]
-    output_conversion = "json"
-    contents = []
-    foreach(file, libc_headers.llvm_libc_impl_headers) {
-      contents += [
-        {
-          candidate = rebase_path(file, root_build_dir, "$llvm_libc/include")
-          golden = rebase_path(file, "//", libc_headers.golden_dir)
-        },
-      ]
-    }
-    foreach(file, llvm_libc_generated_headers) {
-      contents += [
-        {
-          candidate = rebase_path(file, root_build_dir, gen_dir)
-          golden = rebase_path(file, "//", libc_headers.golden_dir)
-        },
-      ]
-    }
-  }
-
-  golden_files("check-llvm-libc-golden") {
-    visibility = [ ":*" ]
-    dir = libc_headers.golden_dir
-    message = "Changes to copied llvm-libc headers will require API review." +
-              " First land a `llvm_libc_soft_transition = true` update to " +
-              get_path_info("BUILD.gn", "abspath") +
-              " to allow //third_party/llvm-libc/src to be updated." +
-              " Then flip the flag back, build with `update_goldens=true`." +
-              " This will update API summary files."
-    deps = [
-      ":check-llvm-libc-golden.manifest",
-      ":llvm-libc-generated-headers",
-    ]
-    _outputs = get_target_outputs(deps[0])
-    comparisons = _outputs[0]
-  }
-
+if (current_toolchain == default_toolchain) {
   python_action_foreach("llvm-libc-generated-headers") {
     binary_label = ":hdrgen"
 
@@ -208,10 +140,7 @@ if (current_toolchain == default_toolchain && !llvm_libc_hdrgen_transition) {
 # This reaches all the public libc headers (ones that will be installed)
 # directly at the source of truth.  It's only used for compiling libc code.
 # Note this includes the libc unit test code, as well as the hermetic partial
-# libc bits built for special environments.  These headers are meant to match
-# the libc source code being built.  During a soft transition, they will not
-# match the public headers in the SDK and used by most normal Fuchsia user
-# code in the build.
+# libc bits built for special environments.
 #
 # source_set() is actually a template that injects additional deps...that
 # reach back here.  So this must use basic_source_set() to have only the
@@ -244,25 +173,14 @@ basic_source_set("headers") {
     public += [ "${libc_headers.musl_dir}/$file" ]
   }
 
-  if (llvm_libc_hdrgen_transition) {
-    # When hdrgen is not available, libc code will use the llvm-libc-golden
-    # files that everything else is using via the sysroot, rather than the
-    # $llvm_libc/include and generated files, but directly and still not via
-    # the sysroot.
-    foreach(file,
-            libc_headers.llvm_libc_impl_headers + llvm_libc_generated_headers) {
-      public += [ "llvm-libc-golden/$file" ]
-    }
-  } else {
-    foreach(file, libc_headers.llvm_libc_impl_headers) {
-      public += [ "$llvm_libc/include/$file" ]
-    }
-
-    foreach(file, llvm_libc_generated_headers) {
-      public += [ "$gen_dir/$file" ]
-    }
-    public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
+  foreach(file, libc_headers.llvm_libc_impl_headers) {
+    public += [ "$llvm_libc/include/$file" ]
   }
+
+  foreach(file, llvm_libc_generated_headers) {
+    public += [ "$gen_dir/$file" ]
+  }
+  public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
 
   public_deps += [ "//zircon/system/public" ]
 }
@@ -273,15 +191,9 @@ config("headers.config") {
   dirs = [
     ".",
     libc_headers.musl_dir,
+    gen_dir,
+    "$llvm_libc/include",
   ]
-  if (llvm_libc_hdrgen_transition) {
-    dirs += [ "llvm-libc-golden" ]
-  } else {
-    dirs += [
-      gen_dir,
-      "$llvm_libc/include",
-    ]
-  }
   foreach(dir, dirs) {
     cflags += [
       "-idirafter",
@@ -291,39 +203,35 @@ config("headers.config") {
   asmflags = cflags
 }
 
-if (!llvm_libc_hdrgen_transition) {
-  hdrgen_dir = "$llvm_libc/utils/hdrgen"
+python_binary("hdrgen") {
+  visibility = [ ":*" ]
 
-  python_binary("hdrgen") {
-    visibility = [ ":*" ]
+  main_source = "$hdrgen_dir/main.py"
+  deps = [ ":hdrgen.library" ]
 
-    main_source = "$hdrgen_dir/main.py"
-    deps = [ ":hdrgen.library" ]
+  enable_mypy = false
+}
 
-    enable_mypy = false
-  }
+python_library("hdrgen.library") {
+  visibility = [ ":*" ]
 
-  python_library("hdrgen.library") {
-    visibility = [ ":*" ]
+  library_name = "hdrgen"
+  source_root = "$hdrgen_dir/hdrgen"
+  sources = [
+    "__init__.py",
+    "enumeration.py",
+    "function.py",
+    "gpu_headers.py",
+    "header.py",
+    "macro.py",
+    "main.py",
+    "object.py",
+    "type.py",
+    "yaml_to_classes.py",
+  ]
+  library_deps = [ "//third_party/pyyaml:yaml" ]
 
-    library_name = "hdrgen"
-    source_root = "$hdrgen_dir/hdrgen"
-    sources = [
-      "__init__.py",
-      "enumeration.py",
-      "function.py",
-      "gpu_headers.py",
-      "header.py",
-      "macro.py",
-      "main.py",
-      "object.py",
-      "type.py",
-      "yaml_to_classes.py",
-    ]
-    library_deps = [ "//third_party/pyyaml:yaml" ]
-
-    enable_mypy = false
-  }
+  enable_mypy = false
 }
 
 # Generate standlaone "#include <foo.h>" compile-time tests for each public

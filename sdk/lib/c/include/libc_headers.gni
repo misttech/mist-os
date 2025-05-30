@@ -8,8 +8,12 @@
 libc_headers = {
   # The *_dir values and *_headers lists are used by BUILD.gn code.
   root_dir = "//sdk/lib/c/include"
-  golden_dir = "$root_dir/llvm-libc-golden"
   musl_dir = "//zircon/third_party/ulib/musl/include"
+  llvm_libc_dir = "//third_party/llvm-libc/src/include"
+
+  # Generated headers all go into this same directory regardless of toolchain.
+  llvm_libc_gen_dir =
+      get_label_info("$llvm_libc_dir($default_toolchain)", "target_gen_dir")
 
   # The *_public_headers variables list headers that users should include
   # directly, and that should be tested for being used standalone (roughly a
@@ -214,15 +218,22 @@ libc_headers = {
     },
     {
       sdk = {
-        include_dir = golden_dir
-        headers = llvm_libc_public_headers + llvm_libc_impl_headers
+        include_dir = musl_dir
+        headers = musl_public_headers + musl_impl_headers
+      }
+    },
+    {
+      sdk = {
+        include_dir = llvm_libc_gen_dir
+        headers = llvm_libc_public_headers
         deps = [ root_dir ]
       }
     },
     {
       sdk = {
-        include_dir = musl_dir
-        headers = musl_public_headers + musl_impl_headers
+        include_dir = llvm_libc_dir
+        headers = llvm_libc_impl_headers
+        deps = [ root_dir ]
       }
     },
   ]

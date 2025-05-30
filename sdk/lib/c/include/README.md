@@ -25,37 +25,18 @@ in `<zircon/*.h>` header files.  Those are maintained [right here](zircon).
 
 ### musl headers
 
-The Fuchsia C library began as a fork of [musl](https://musl.libc.org/).  A
-great deal of implementation code, and most of the public header files, are
-still those inherited from musl (and much modified).  These are maintained
-within this repository as the sole source of truth (without reference to
-upstream musl, which has long since diverged from Fuchsia's fork).  They are
-found in a [separate directory](/zircon/third_party/ulib/musl/include) to
-reflect their lineage.
+The Fuchsia C library began as a fork of [musl](../#musl).  Most of the public
+header files are still those inherited from musl (some much modified).  These
+are maintained within this repository as the sole source of truth (without
+reference to upstream musl, which has long since diverged from Fuchsia's fork).
+They are found in a [separate directory](/zircon/third_party/ulib/musl/include)
+to reflect their lineage.
 
 ### llvm-libc headers
 
-The future of the Fuchsia C library lies with the
-[llvm-libc](https://libc.llvm.org/) project.  The LLVM C Library is not an
-alternative to the Fuchsia C library.  It's one of the building blocks.  The
-Fuchsia C library is steadily migrating to using both implementation code and
-public header files from llvm-libc where possible.  This will eventually
-replace everything inherited from musl, though much Fuchsia-specific
-implementation detail (and the Zircon extension APIs) will continue to be
-maintained in this repository and not in LLVM.
-
-For code and header files from llvm-libc, the ultimate source of truth is in
-the upstream [LLVM repository](https://github.com/llvm/llvm-project).  The
-[`libc`](https://github.com/llvm/llvm-project/tree/main/libc) subdirectory of
-that is [mirrored by Google](https://llvm.googlesource.com/llvm-project/libc/).
-[Fuchsia `integration`](https://fuchsia.googlesource.com/integration) places
-that mirror at [`//third_party/llvm-libc/src`](/third_party/llvm-libc/src) in a
-Fuchsia checkout.  The [build rules here](../libc.gni) refer to that code.  An
-automated "roller" job attempts to update the pinned revision whenever the
-mirror repository's `main` branch is updated (the mirror usually updates within
-a few minutes of upstream LLVM repository changes).  This uses a normal Gerrit
-change that must pass all automated build and test steps across many Fuchsia
-builders before the update lands.
+Some headers come from [llvm-libc], and many more will in the future as musl
+code is replaced.  Those upstream headers can be updated along with the code,
+triggering Fuchsia's [auto-rollers].
 
 The llvm-libc [`include`](/third_party/llvm-libc/src/include) subdirectory
 contains the public header files.  Some of these are used as public headers by
@@ -173,13 +154,10 @@ failing to change it will make the CQ bots fail.)
 
 #### No automatic API review
 
-As mentioned earlier, [llvm-libc](/third_party/llvm-libc/src) is usually
-updated to a new revision in Fuchsia integration by an automatic "roller" job.
-No integration change can land that invalidates any `.api` file in the Fuchsia
-repository.  Manual approval is required--but that's in the Fuchsia repository.
-Commits to the Fuchsia repository are usually independent of integration
-commits and vice versa.  Hence, an upstream change will break the roller if it
-would cause a change to the sysroot.  This problem is addressed below.
+As mentioned earlier, [llvm-libc] updated to a new revision in Fuchsia
+[manifests] by the [auto-rollers].  No [Gerrit] change can land that
+invalidates any `.api` file in the Fuchsia repository.  Manual approval is
+always required, even for [auto-rollers] that usually get automatic approval.
 
 ### Building libc
 
@@ -229,166 +207,40 @@ Two competing principles are particularly relevant to the Fuchsia C library:
  1. Automation is essential to effective software development.
  2. Careful human review is essential to effective API maintenance.
 
-The first is exemplified by the auto-roller from the LLVM repository.  The
-second is exemplified by the strict API review requirement for all changes to
-public header files.  The compromise between these two is reached by
-_semi-automated copying_ and _soft transitions_.
-
-### llvm-libc-golden
-
-The [`llvm-libc-golden`](llvm-libc-golden) subdirectory contains all the header
-files from llvm-libc that will be copied into [the sysroot](#sysroot) by the
-[Fuchsia platform GN build](#fuchsia-platform-gn-build).  These in turn are
-_copied_ from [the llvm-libc sources](/third_party/llvm-libc/src), but **not
-entirely automatically**.
-
-Ordinarily, a Fuchsia build will simply check that all the files in
-[`llvm-libc-golden`](llvm-libc-golden) are already up to date: the build will
-fail if any header file's source of truth in the checkout's revision of
-llvm-libc has changed.  This checking is implemented using the same ["golden
-files" mechanism](/build/testing/golden_files.gni) used for the `.api` files in
-the source tree.  The `llvm-libc-golden` subdirectory of the local checkout can
-be updated using the same [procedure described above](#sysroot_api).
+The first is exemplified by the [auto-roller](../#llvm-libc_auto_roller) from
+the LLVM repository.  The second is exemplified by the strict API review
+requirement for all changes to public header files.  The compromise between
+these two is reached by semi-automated updates with manual API review via
+[manual rolls].
 
 **NOTE:** This means that any upstream header change will cause the auto-roller
-to start failing.  Any such change will require a _soft transition_.
+to start failing.  This is resolved using [manual rolls], as described below.
 
-The [generated headers](#generated-llvm-libc-headers) are regenerated by the
-build as needed and then also compared to `llvm-libc-golden` files (or copied
-there when updating the golden files).
+### Landing llvm-libc header updates
 
-#### Soft transition procedure
+Upstream llvm-libc changes can produce two kinds of differences in headers:
+ 1. Different contents of some existing headers.
+ 2. A different set of headers to install.
 
-When public header files taken from llvm-libc have changed upstream, the
-llvm-libc auto-roller will fail until a _soft transition_ is completed.  A
-_soft_ transition is a sequence of commits that can each land separately via
-the CQ and pass all the normal automated checks, so no developer or bot build
-is broken in the intermediate states.  All the changes in the sequence must
-land in the correct order, but unrelated changes can safely land between them.
+Changes to the contents are reflected in [the generated sysroot](#sysroot) just
+like any local edits made here in this source tree.  With a the revision update
+in the [manifests], follow the same [procedure described above](#sysroot_api).
 
-The soft transition for an llvm-libc header change will have these steps:
- 1. Temporarily disable checking [`llvm-libc-golden`](llvm-libc-golden).
- 2. Complete the llvm-libc "roll": update the pinned revision.
- 3. Update [`llvm-libc-golden`](llvm-libc-golden) and resume checking.
+Changes to the set of headers can come from an upstream change due to a
+generated header changing what subordinate implementation headers it uses.
+They can also come from changing the [`llvm_libc_generated_headers`](BUILD.gn)
+list.  In either case, the build will notice the difference when it generates
+the [`llvm-libc-generated.json`](llvm-libc-generated.json) file.  This is
+generated by the build and verified against the checked-in copy.  Updating that
+copy uses the [same mechanism](/docs/gen/build_arguments.md#update_goldens) as
+[`sysroot.api`](#sysroot_api).  The procedure for updating them both is the
+same, except that it's necessary to run the build **twice** so that the first
+build can replace the JSON file that's used by the second build to re-run GN
+and then regenerate the sysroot headers following the updated build rules.
 
-To start any soft transition, first make sure there is a bug filed specifically
-to track the whole sequence of steps.  This bug won't be closed until the
-entire soft transition sequence is complete, but every commit in the sequence
-will be tagged with the same bug number.  (If there is already a tracking bug
-for the specific libc changes of which these upstream header changes are a
-known component, then it can be reused even if it's not going to be marked
-closed immediately upon completion of the header soft transition per se.  If
-instead there is a generic "llvm-libc auto-roller is broken for some reason"
-bug that turns out to just be the need for a header-change soft transition,
-then it can be reused.)  We'll use `https://fxbug.dev/nnn` to refer to that
-bug's canonical (short) URL.
+---
 
-The precise details for each step are:
-
- * Disable checking.
-   1. Edit [this `BUILD.gn` file](BUILD.gn) to find the line that reads:
-      ```gn
-      llvm_libc_soft_transition = false
-      ```
-   2. Change this line to:
-      ```gn
-      llvm_libc_soft_transition = true # TODO(https://fxbug.dev/nnn)
-      ```
-   3. Land this change as a normal commit through Gerrit.
-      Be sure to use `Bug: nnn` in the commit log.  For example:
-      ```
-      [libc] Start soft transition for llvm-libc header changes
-
-      Bug: nnn
-      Change-Id: ...
-      ```
- * Complete the roll with a Gerrit integration commit.  This can be done
-   manually through Gerrit, but it's best to leave it to the auto-roller job.
-   1. Manually trigger it through the LUCI web UI (requires ACL privileges)
-   2. A new upstream LLVM commit in the `libc` subdirectory will trigger it.
-   3. Just wait a few hours, and it will try a job with the latest llvm-libc
-      revision even if there haven't been more commits since the last (failed)
-      roll attempt.
- * Update goldens and resume checking.
-   1. Put `update_goldens = true` the `args.gn` of your local build.
-   2. Reverse the edit to [this `BUILD.gn` file](BUILD.gn), so it reads:
-      ```gn
-      llvm_libc_soft_transition = false
-      ```
-   3. Update your local build, with whatever you usually do, or:
-      ```shell
-      fx build //zircon/public/sysroot_sdk
-      ```
-      This should modify the `llvm-libc-golden` files in the source tree,
-      and perhaps also the `llvm-libc-generated.json` file.
-      **Note:** It may be necessary to run this build at least twice to pick
-      up all kinds of changes; to be safe, repeat until `nothing to do`.
-      **Note:** If files are removed upstream, this should `git rm -f`
-      the corresponding `llvm-libc-golden` files, but it won't in all
-      cases `git add` new files that were used before.  It's a good idea to do:
-      ```shell
-      git add sdk/lib/c/include/llvm-libc-generated
-      ```
-      That should be fine to do whether there are new files or not, and
-      ensures that your next `git commit` will include everything new.
-   4. Land this change as a normal commit through Gerrit.
-      Be sure to use `Fixed: nnn` in the commit log.  For example:
-      ```
-      [libc] Complete soft transition for llvm-libc header changes
-
-      Fixed: nnn
-      Change-Id: ...
-      ```
-
-#### Mid-transition state
-
-After the first two steps of the soft transition procedure, there will be
-differences between the header files in the llvm-libc "source of truth" that's
-used to compile the C library, its tests, etc.; and those in the sysroot, as
-copied from [`llvm-libc-golden`](llvm-libc-golden).
-
-In this state, there could be arcane unexpected effects of ABI drift between
-callers compiled with older headers and callees compiled with newer headers.
-If any such issues prevent landing either the llvm-libc roll step or the
-golden-updates completion step, then ad hoc workarounds may be required.
-
-However, some such issues could affect downstream SDK users not directly tested
-in Fuchsia CQ/CI or not noticed very quickly.  It's important to minimize the
-window of time and unrelated Fuchsia commits where `llvm_libc_soft_transition`
-remains set to `true`.  Ideally no Fuchsia SDK built during that window would
-be used by anything outside the Fuchsia build.
-
-**Make absolutely sure that no new release branch is cut from a mid-transition
-state of the Fuchsia repository!**
-
-#### Adding or removing llvm-libc header files
-
-Currently all the end-user API headers taken from llvm-libc are generated.  The
-`llvm_libc_generated_headers` list in [`BUILD.gn`](BUILD.gn) is the source of
-truth about which headers to generate from the llvm-libc sources.  Edit that
-list to add or remove a generated header.  Any hand-written headers that are
-included transitively should be picked up automatically.
-
-The soft transition procedure above not only updates the `llvm-libc-golden`
-files but also [`llvm-libc-generated.json`](llvm-libc-generated.json).  The
-JSON file is used by the `gn gen` phase of the build code; this is implemented
-in [`libc_headers.gni`](libc_headers.gni).  It lists each generated llvm-libc
-header file, along with the list of hand-written files that it uses, to inform
-the build machinery which files to maintain in the `llvm-libc-golden` directory
-and ultimately to install for users.  This file itself is generated from the
-llvm-libc sources and its `hdrgen` tool, and the `llvm_libc_generated_headers`
-list in [`BUILD.gn`](BUILD.gn).  With `update_goldens = true`, the build will
-update the JSON file in the source tree (without, the build will fail if the
-JSON file needs to be updated due to a change in `BUILD.gn` or in llvm-libc).
-Updating the JSON file may have changed what `llvm-libc-golden` files the build
-knows about, so the next incremental build should finish the job; a third build
-is prudent just to double-check that no more golden files are left to update.
-
-Once everything is right in the local checkout, make sure that `git` is up to
-date with the new or removed files in `llvm-libc-golden` before creating your
-Gerrit change.  The checking / update script with `update_goldens = true` will
-try to handle this for you by running some `git rm` and `git add` commands.
-But that won't catch all cases.  It should always be safe and sufficient to do:
-```shell
-git add -A sdk/lib/c/include/llvm-libc-golden
-```
+[auto-rollers]: ../#auto_rollers
+[llvm-libc]: ../#llvm_libc
+[manifests]: /manifests
+[manual rolls]: ../#manual-rolls
