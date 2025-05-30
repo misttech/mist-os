@@ -9,6 +9,7 @@ include /src/connectivity/location/OWNERS
 include /src/connectivity/overnet/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/lib/emulator_instance/OWNERS
+include /src/developer/ffx/lib/fuchsia-controller/OWNERS
 include /src/developer/ffx/lib/pbms/OWNERS
 include /src/developer/ffx/lib/pkg/OWNERS
 include /src/developer/ffx/lib/symbol-index/OWNERS
@@ -21,6 +22,7 @@ include /src/developer/ffx/plugins/inspect/OWNERS
 include /src/developer/ffx/plugins/package/OWNERS
 include /src/developer/ffx/plugins/product/OWNERS
 include /src/developer/ffx/plugins/repository/OWNERS
+include /src/developer/ffx/plugins/target/default/OWNERS
 include /src/developer/ffx/plugins/target/screenshot/OWNERS
 include /src/developer/ffx/plugins/test/OWNERS
 include /src/developer/ffx/plugins/trace/OWNERS

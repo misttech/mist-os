@@ -35,7 +35,6 @@ include /src/connectivity/network/tests/integration/OWNERS
 include /src/connectivity/network/tests/integration/common/OWNERS
 include /src/connectivity/policy/OWNERS
 include /src/developer/ffx/OWNERS
-include /src/developer/ffx/plugins/assembly/OWNERS
 include /src/developer/ffx/plugins/audio/OWNERS
 include /src/developer/ffx/plugins/coverage/OWNERS
 include /src/developer/ffx/plugins/log/OWNERS

@@ -13,7 +13,6 @@ include /src/connectivity/wlan/tools/wlantool/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
 include /src/developer/ffx/lib/profiler/OWNERS
 include /src/developer/ffx/lib/symbolize/OWNERS
-include /src/developer/ffx/plugins/assembly/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/developer/ffx/plugins/wlan/OWNERS
 include /src/firmware/OWNERS
