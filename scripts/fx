@@ -272,7 +272,8 @@ while [[ $# -ne 0 ]]; do
         fx-error $error_message
         exit 1
       fi
-      export _FX_BUILD_DIR="$1"
+      # Remove trailing slash, as it can impede other checks elsewhere in the code.
+      export _FX_BUILD_DIR="${1%/}"
       if [[ "$_FX_BUILD_DIR" == //* ]]; then
         _FX_BUILD_DIR="${fuchsia_dir}/${_FX_BUILD_DIR#//}"
       else
