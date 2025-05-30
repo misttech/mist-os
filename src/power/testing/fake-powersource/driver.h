@@ -46,8 +46,7 @@ class Driver : public fdf::DriverBase {
 
   void ServeSimulatorAc(fidl::ServerEnd<fuchsia_hardware_powersource_test::SourceSimulator> server);
 
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  std::vector<fidl::WireSyncClient<fuchsia_driver_framework::NodeController>> controllers_;
+  std::vector<fdf::OwnedChildNode> children_;
 
   std::shared_ptr<PowerSourceState> fake_data_battery_ =
       std::make_shared<PowerSourceState>(fuchsia_hardware_powersource::SourceInfo({

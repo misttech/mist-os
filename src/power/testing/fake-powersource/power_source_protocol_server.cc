@@ -5,11 +5,7 @@
 #include "power_source_protocol_server.h"
 
 #include <fidl/fuchsia.hardware.powersource/cpp/natural_types.h>
-#include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
-
-using fuchsia_hardware_powersource::PowerType;
-using fuchsia_hardware_powersource::SourceInfo;
+#include <lib/driver/logging/cpp/logger.h>
 
 namespace fake_powersource {
 
@@ -23,7 +19,7 @@ PowerSourceProtocolServer::~PowerSourceProtocolServer() { state_->RemoveObserver
 zx_status_t PowerSourceProtocolServer::ClearSignal() {
   zx_status_t status = state_event_.signal(ZX_USER_SIGNAL_0, 0);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to clear signal on event: %s", zx_status_get_string(status));
+    fdf::error("Failed to clear signal on event: {}", zx_status_get_string(status));
   }
   // For now, a client calls GetStateChangeEvent and then waits
   // Add to observers_ so it can be notified later when the fake data changes.
@@ -37,7 +33,7 @@ zx_status_t PowerSourceProtocolServer::ClearSignal() {
 zx_status_t PowerSourceProtocolServer::SignalClient() {
   zx_status_t status = state_event_.signal(0, ZX_USER_SIGNAL_0);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to set signal on event: %s", zx_status_get_string(status));
+    fdf::error("Failed to set signal on event: {}", zx_status_get_string(status));
   }
   state_->RemoveObserver(this);
   return status;

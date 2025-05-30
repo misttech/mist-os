@@ -546,7 +546,7 @@ assembly_input_bundle("xhci_driver") {
 assembly_input_bundle("fake_battery_driver") {
   base_driver_packages = [
     {
-      package_target = "//src/power/testing/fake-powersource:fake-battery"
+      package_target = "//src/power/testing/fake-powersource:fake_battery"
       driver_components = [ "meta/fake_battery.cm" ]
     },
   ]
