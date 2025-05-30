@@ -28,6 +28,15 @@ driver_bind_rules("sdhci-bind") {
   deps = [ "//sdk/fidl/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_bindlib" ]
 }
 
+fuchsia_component_manifest("sdhci-manifest") {
+  component_name = "sdhci"
+  manifest = "meta/sdhci.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("sdhci-config") {
+  cm_label = ":sdhci-manifest"
+}
+
 source_set("sdhci-driver-source") {
   configs += [
     "//build/config:all_source",
@@ -42,6 +51,7 @@ source_set("sdhci-driver-source") {
     ":sdhci-bind",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
@@ -50,6 +60,7 @@ source_set("sdhci-driver-source") {
   ]
   public_deps = [
     ":dma-descriptor-builder",
+    ":sdhci-config",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
@@ -79,7 +90,7 @@ fuchsia_driver_component("sdhci") {
     ":sdhci-driver",
   ]
   info = "meta/sdhci-info.json"
-  manifest = "meta/sdhci.cml"
+  cm_label = ":sdhci-manifest"
 }
 
 fuchsia_driver_package("package") {
