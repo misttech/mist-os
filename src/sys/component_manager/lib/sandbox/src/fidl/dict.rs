@@ -145,7 +145,7 @@ impl RemotableCapability for Dict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dict::Key;
+    use crate::dict::{HybridMap, Key, HYBRID_SWITCH_INSERTION_LEN, HYBRID_SWITCH_REMOVAL_LEN};
     use crate::{serve_capability_store, Data, Dict, DirEntry, Handle, Unit};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, Proxy, ServerEnd};
@@ -153,6 +153,8 @@ mod tests {
     use fuchsia_fs::directory;
     use futures::StreamExt;
     use lazy_static::lazy_static;
+    use std::{fmt, iter};
+    use test_case::test_case;
     use test_util::Counter;
     use vfs::directory::entry::{
         serve_directory, DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest,
@@ -164,7 +166,15 @@ mod tests {
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     lazy_static! {
-        static ref CAP_KEY: Key = "cap".parse().unwrap();
+        static ref CAP_KEY: Key = "Cap".parse().unwrap();
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum TestType {
+        // Test dictionary stored as vector
+        Small,
+        // Test dictionary stored as map
+        Big,
     }
 
     #[fuchsia::test]
@@ -278,12 +288,14 @@ mod tests {
         );
     }
 
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
     #[fuchsia::test]
-    async fn insert() {
+    async fn insert(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
-        let dict = Dict::new();
+        let dict = new_dict(test_type);
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = 1;
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -300,13 +312,11 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let mut dict = dict.lock();
-
         // Inserting adds the entry to `entries`.
-        assert_eq!(dict.entries.len(), 1);
+        assert_eq!(adjusted_len(&dict, test_type), 1);
 
         // The entry that was inserted should now be in `entries`.
-        let cap = dict.entries.remove(&*CAP_KEY).expect("not in entries after insert");
+        let cap = dict.remove(&*CAP_KEY).expect("not in entries after insert");
         let Capability::Unit(unit) = cap else { panic!("Bad capability type: {:#?}", cap) };
         assert_eq!(unit, Unit::default());
     }
@@ -364,16 +374,18 @@ mod tests {
         );
     }
 
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
     #[fuchsia::test]
-    async fn remove() {
+    async fn remove(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
-        let dict = Dict::new();
+        let dict = new_dict(test_type);
 
         // Insert a Unit into the Dict.
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
-        assert_eq!(dict.lock().entries.len(), 1);
+        assert_eq!(adjusted_len(&dict, test_type), 1);
 
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = 1;
@@ -394,7 +406,7 @@ mod tests {
         assert_eq!(cap, Unit::default().into());
 
         // Removing the entry with Remove should remove it from `entries`.
-        assert!(dict.lock().entries.is_empty());
+        assert_eq!(adjusted_len(&dict, test_type), 0);
     }
 
     #[fuchsia::test]
@@ -438,15 +450,17 @@ mod tests {
         );
     }
 
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
     #[fuchsia::test]
-    async fn get() {
+    async fn get(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
-        let dict = Dict::new();
+        let dict = new_dict(test_type);
 
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
-        assert_eq!(dict.lock().entries.len(), 1);
+        assert_eq!(adjusted_len(&dict, test_type), 1);
         let (ch, _) = fidl::Channel::create();
         let handle = Handle::from(ch.into_handle());
         dict.insert("h".parse().unwrap(), Capability::Handle(handle)).unwrap();
@@ -514,13 +528,15 @@ mod tests {
         );
     }
 
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
     #[fuchsia::test]
-    async fn copy() {
+    async fn copy(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
         // Create a Dict with a Unit inside, and copy the Dict.
-        let dict = Dict::new();
+        let dict = new_dict(test_type);
         dict.insert("unit1".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
         store.import(1, dict.clone().into()).await.unwrap().unwrap();
         store.dictionary_copy(1, 2).await.unwrap().unwrap();
@@ -538,16 +554,16 @@ mod tests {
         let copy = Capability::try_from(copy).unwrap();
         let Capability::Dictionary(copy) = copy else { panic!() };
         {
+            assert_eq!(adjusted_len(&copy, test_type), 2);
             let copy = copy.lock();
-            assert_eq!(copy.entries.len(), 2);
-            assert!(copy.entries.values().all(|value| matches!(value, Capability::Unit(_))));
+            assert!(copy.entries.iter().all(|(_, value)| matches!(value, Capability::Unit(_))));
         }
 
         // The original Dict should have only one Unit.
         {
+            assert_eq!(adjusted_len(&dict, test_type), 1);
             let dict = dict.lock();
-            assert_eq!(dict.entries.len(), 1);
-            assert!(dict.entries.values().all(|value| matches!(value, Capability::Unit(_))));
+            assert!(dict.entries.iter().all(|(_, value)| matches!(value, Capability::Unit(_))));
         }
     }
 
@@ -588,12 +604,14 @@ mod tests {
         );
     }
 
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
     #[fuchsia::test]
-    async fn duplicate() {
+    async fn duplicate(test_type: TestType) {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
-        let dict = Dict::new();
+        let dict = new_dict(test_type);
         store.import(1, dict.clone().into()).await.unwrap().unwrap();
         store.duplicate(1, 2).await.unwrap().unwrap();
 
@@ -607,16 +625,18 @@ mod tests {
         let dict_dup = store.export(2).await.unwrap().unwrap();
         let dict_dup = Capability::try_from(dict_dup).unwrap();
         let Capability::Dictionary(dict_dup) = dict_dup else { panic!() };
-        assert_eq!(dict_dup.lock().entries.len(), 1);
+        assert_eq!(adjusted_len(&dict_dup, test_type), 1);
 
         // The original dict should now have an entry because it shares entries with the clone.
-        assert_eq!(dict.lock().entries.len(), 1);
+        assert_eq!(adjusted_len(&dict_dup, test_type), 1);
     }
 
     /// Tests basic functionality of read APIs.
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
     #[fuchsia::test]
-    async fn read() {
-        let dict = Dict::new();
+    async fn read(test_type: TestType) {
+        let dict = new_dict(test_type);
         let id_gen = sandbox::CapabilityIdGenerator::new();
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
@@ -637,7 +657,7 @@ mod tests {
         store
             .dictionary_insert(
                 dict_id,
-                &fsandbox::DictionaryItem { key: "cap1".into(), value: data_caps.remove(0) },
+                &fsandbox::DictionaryItem { key: "Cap1".into(), value: data_caps.remove(0) },
             )
             .await
             .unwrap()
@@ -645,7 +665,7 @@ mod tests {
         store
             .dictionary_insert(
                 dict_id,
-                &fsandbox::DictionaryItem { key: "cap2".into(), value: data_caps.remove(0) },
+                &fsandbox::DictionaryItem { key: "Cap2".into(), value: data_caps.remove(0) },
             )
             .await
             .unwrap()
@@ -655,7 +675,7 @@ mod tests {
         let id = id_gen.next();
         store.import(id, fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
         store
-            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "cap3".into(), value: id })
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "Cap3".into(), value: id })
             .await
             .unwrap()
             .unwrap();
@@ -666,19 +686,29 @@ mod tests {
             store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
             let keys = iterator.get_next().await.unwrap();
             assert!(iterator.get_next().await.unwrap().is_empty());
-            assert_eq!(keys, ["cap1", "cap2", "cap3"]);
+            match test_type {
+                TestType::Small => assert_eq!(keys, ["Cap1", "Cap2", "Cap3"]),
+                TestType::Big => {
+                    assert_eq!(keys[0..3], ["Cap1", "Cap2", "Cap3"]);
+                    assert_eq!(keys.len(), 3 + HYBRID_SWITCH_INSERTION_LEN);
+                }
+            }
         }
         // Enumerate
         {
             let (iterator, server_end) = create_proxy();
             store.dictionary_enumerate(dict_id, server_end).await.unwrap().unwrap();
             let start_id = 100;
-            let limit = 4;
+            let ofs: u32 = match test_type {
+                TestType::Small => 0,
+                TestType::Big => HYBRID_SWITCH_INSERTION_LEN as u32,
+            };
+            let limit = 4 + ofs;
             let (mut items, end_id) = iterator.get_next(start_id, limit).await.unwrap().unwrap();
-            assert_eq!(end_id, 102);
+            assert_eq!(end_id, 102 + ofs as u64);
             let (last, end_id) = iterator.get_next(end_id, limit).await.unwrap().unwrap();
             assert!(last.is_empty());
-            assert_eq!(end_id, 102);
+            assert_eq!(end_id, 102 + ofs as u64);
 
             assert_matches!(
                 items.remove(0),
@@ -686,7 +716,7 @@ mod tests {
                     key,
                     value: Some(value)
                 }
-                if key == "cap1" && value.id == 100
+                if key == "Cap1" && value.id == 100
             );
             assert_matches!(
                 store.export(100).await.unwrap().unwrap(),
@@ -698,7 +728,7 @@ mod tests {
                     key,
                     value: Some(value)
                 }
-                if key == "cap2" && value.id == 101
+                if key == "Cap2" && value.id == 101
             );
             assert_matches!(
                 store.export(101).await.unwrap().unwrap(),
@@ -710,14 +740,22 @@ mod tests {
                     key,
                     value: None
                 }
-                if key == "cap3"
+                if key == "Cap3"
             );
+            match test_type {
+                TestType::Small => {}
+                TestType::Big => {
+                    assert_eq!(items.len(), HYBRID_SWITCH_INSERTION_LEN);
+                }
+            }
         }
     }
 
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
     #[fuchsia::test]
-    async fn drain() {
-        let dict = Dict::new();
+    async fn drain(test_type: TestType) {
+        let dict = new_dict(test_type);
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
@@ -737,7 +775,7 @@ mod tests {
         store
             .dictionary_insert(
                 dict_id,
-                &fsandbox::DictionaryItem { key: "cap1".into(), value: data_caps.remove(0) },
+                &fsandbox::DictionaryItem { key: "Cap1".into(), value: data_caps.remove(0) },
             )
             .await
             .unwrap()
@@ -745,7 +783,7 @@ mod tests {
         store
             .dictionary_insert(
                 dict_id,
-                &fsandbox::DictionaryItem { key: "cap2".into(), value: data_caps.remove(0) },
+                &fsandbox::DictionaryItem { key: "Cap2".into(), value: data_caps.remove(0) },
             )
             .await
             .unwrap()
@@ -756,20 +794,24 @@ mod tests {
         let value = 20;
         store.import(value, fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
         store
-            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "cap3".into(), value })
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "Cap3".into(), value })
             .await
             .unwrap()
             .unwrap();
 
         let (iterator, server_end) = create_proxy();
         store.dictionary_drain(dict_id, Some(server_end)).await.unwrap().unwrap();
+        let ofs: u32 = match test_type {
+            TestType::Small => 0,
+            TestType::Big => HYBRID_SWITCH_INSERTION_LEN as u32,
+        };
         let start_id = 100;
-        let limit = 4;
+        let limit = 4 + ofs;
         let (mut items, end_id) = iterator.get_next(start_id, limit).await.unwrap().unwrap();
-        assert_eq!(end_id, 103);
+        assert_eq!(end_id, 103 + ofs as u64);
         let (last, end_id) = iterator.get_next(end_id, limit).await.unwrap().unwrap();
         assert!(last.is_empty());
-        assert_eq!(end_id, 103);
+        assert_eq!(end_id, 103 + ofs as u64);
 
         assert_matches!(
             items.remove(0),
@@ -777,7 +819,7 @@ mod tests {
                 key,
                 value: 100
             }
-            if key == "cap1"
+            if key == "Cap1"
         );
         assert_matches!(
             store.export(100).await.unwrap().unwrap(),
@@ -789,7 +831,7 @@ mod tests {
                 key,
                 value: 101
             }
-            if key == "cap2"
+            if key == "Cap2"
         );
         assert_matches!(
             store.export(101).await.unwrap().unwrap(),
@@ -801,7 +843,7 @@ mod tests {
                 key,
                 value: 102
             }
-            if key == "cap3"
+            if key == "Cap3"
         );
         assert_matches!(
             store.export(102).await.unwrap().unwrap(),
@@ -1128,6 +1170,252 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn switch_between_vec_and_map() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let dict = Dict::new();
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
+
+        // Just one less one the switchover point. Count down instead of up to test sorting.
+        {
+            for i in (1..=HYBRID_SWITCH_INSERTION_LEN - 1).rev() {
+                let unit = Unit::default().into();
+                let value = (i + 10) as u64;
+                store.import(value, unit).await.unwrap().unwrap();
+                store
+                    .dictionary_insert(
+                        dict_id,
+                        &fsandbox::DictionaryItem { key: key_for(i).into(), value },
+                    )
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
+
+            let entries = &dict.lock().entries;
+            let HybridMap::Vec(v) = entries else { panic!() };
+            v.iter().for_each(|(_, v)| assert_matches!(v, Capability::Unit(_)));
+            let actual_keys: Vec<Key> = v.iter().map(|(k, _)| k.clone()).collect();
+            let expected: Vec<Key> =
+                (1..=HYBRID_SWITCH_INSERTION_LEN - 1).map(|i| key_for(i)).collect();
+            assert_eq!(actual_keys, expected);
+        }
+
+        // Add one more, and the switch happens.
+        {
+            let i = HYBRID_SWITCH_INSERTION_LEN;
+            let unit = Unit::default().into();
+            let value = (i + 10) as u64;
+            store.import(value, unit).await.unwrap().unwrap();
+            store
+                .dictionary_insert(
+                    dict_id,
+                    &fsandbox::DictionaryItem { key: key_for(i).into(), value },
+                )
+                .await
+                .unwrap()
+                .unwrap();
+
+            let entries = &dict.lock().entries;
+            let HybridMap::Map(m) = entries else { panic!() };
+            m.iter().for_each(|(_, m)| assert_matches!(m, Capability::Unit(_)));
+            let actual_keys: Vec<Key> = m.iter().map(|(k, _)| k.clone()).collect();
+            let expected: Vec<Key> =
+                (1..=HYBRID_SWITCH_INSERTION_LEN).map(|i| key_for(i)).collect();
+            assert_eq!(actual_keys, expected);
+        }
+
+        // Now go in reverse: remove just one less than the switchover point for removal.
+        {
+            for i in (HYBRID_SWITCH_INSERTION_LEN - HYBRID_SWITCH_REMOVAL_LEN + 1
+                ..=HYBRID_SWITCH_INSERTION_LEN)
+                .rev()
+            {
+                store.dictionary_remove(dict_id, key_for(i).as_str(), None).await.unwrap().unwrap();
+            }
+
+            let entries = &dict.lock().entries;
+            let HybridMap::Map(m) = entries else { panic!() };
+            m.iter().for_each(|(_, v)| assert_matches!(v, Capability::Unit(_)));
+            let actual_keys: Vec<Key> = m.iter().map(|(k, _)| k.clone()).collect();
+            let expected: Vec<Key> =
+                (1..=HYBRID_SWITCH_REMOVAL_LEN + 1).map(|i| key_for(i)).collect();
+            assert_eq!(actual_keys, expected);
+        }
+
+        // Finally, remove one more, and it switches back to a map.
+        {
+            let i = HYBRID_SWITCH_REMOVAL_LEN + 1;
+            store.dictionary_remove(dict_id, key_for(i).as_str(), None).await.unwrap().unwrap();
+
+            let entries = &dict.lock().entries;
+            let HybridMap::Vec(v) = entries else { panic!() };
+            v.iter().for_each(|(_, v)| assert_matches!(v, Capability::Unit(_)));
+            let actual_keys: Vec<Key> = v.iter().map(|(k, _)| k.clone()).collect();
+            let expected: Vec<Key> = (1..=HYBRID_SWITCH_REMOVAL_LEN).map(|i| key_for(i)).collect();
+            assert_eq!(actual_keys, expected);
+        }
+    }
+
+    #[test_case(TestType::Small)]
+    #[test_case(TestType::Big)]
+    #[fuchsia::test]
+    async fn register_update_notifier(test_type: TestType) {
+        // We would like to use futures::channel::oneshot here but because the sender is captured
+        // by the `FnMut` to `register_update_notifier`, it would not compile because `send` would
+        // consume the sender. std::sync::mpsc is used instead of futures::channel::mpsc because
+        // the register_update_notifier callback is not async-aware.
+        use std::sync::mpsc;
+
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        #[derive(PartialEq)]
+        enum Update {
+            Add(Key),
+            Remove(Key),
+            Idle,
+        }
+        impl fmt::Debug for Update {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    Self::Add(k) => write!(f, "Add({k})"),
+                    Self::Remove(k) => write!(f, "Remove({k})"),
+                    Self::Idle => write!(f, "Idle"),
+                }
+            }
+        }
+
+        let dict = new_dict(test_type);
+        let (update_tx, update_rx) = mpsc::channel();
+        let subscribed = Arc::new(Mutex::new(true));
+        let subscribed2 = subscribed.clone();
+        dict.register_update_notifier(Box::new(move |update: EntryUpdate<'_>| {
+            let u = match update {
+                EntryUpdate::Add(k, v) => {
+                    assert_matches!(v, Capability::Unit(_));
+                    Update::Add(k.into())
+                }
+                EntryUpdate::Remove(k) => Update::Remove(k.into()),
+                EntryUpdate::Idle => Update::Idle,
+            };
+            update_tx.send(u).unwrap();
+            if *subscribed2.lock().unwrap() {
+                UpdateNotifierRetention::Retain
+            } else {
+                UpdateNotifierRetention::Drop_
+            }
+        }));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
+
+        // 1. Three inserts, one of which overlaps
+        let i = 1;
+        let unit = Unit::default().into();
+        let value = (i + 10) as u64;
+        store.import(value, unit).await.unwrap().unwrap();
+        store
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: key_for(i).into(), value })
+            .await
+            .unwrap()
+            .unwrap();
+
+        for expected_result in [Ok(()), Err(fsandbox::CapabilityStoreError::ItemAlreadyExists)] {
+            let i = 2;
+            let unit = Unit::default().into();
+            let value = (i + 10) as u64;
+            store.import(value, unit).await.unwrap().unwrap();
+            let result = store
+                .dictionary_insert(
+                    dict_id,
+                    &fsandbox::DictionaryItem { key: key_for(i).into(), value },
+                )
+                .await
+                .unwrap();
+            assert_eq!(result, expected_result);
+        }
+
+        // 2. Remove the same item twice. Second time is a no-op
+        for expected_result in [Ok(()), Err(fsandbox::CapabilityStoreError::ItemNotFound)] {
+            let i = 1;
+            let result =
+                store.dictionary_remove(dict_id, &key_for(i).as_str(), None).await.unwrap();
+            assert_eq!(result, expected_result);
+        }
+
+        // 3. One more insert, then drain
+        let i = 3;
+        let unit = Unit::default().into();
+        let value = (i + 10) as u64;
+        store.import(value, unit).await.unwrap().unwrap();
+        store
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: key_for(i).into(), value })
+            .await
+            .unwrap()
+            .unwrap();
+        store.dictionary_drain(dict_id, None).await.unwrap().unwrap();
+
+        // 4. Unsubscribe to updates
+        *subscribed.lock().unwrap() = false;
+        let i = 4;
+        let unit = Unit::default().into();
+        let value = (i + 10) as u64;
+        store.import(value, unit).await.unwrap().unwrap();
+        store
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: key_for(i).into(), value })
+            .await
+            .unwrap()
+            .unwrap();
+        // This Remove shouldn't appear in the updates because we unsubscribed
+        store.dictionary_remove(dict_id, key_for(i).as_str(), None).await.unwrap().unwrap();
+
+        // Check the updates
+        let updates: Vec<_> = iter::from_fn(move || match update_rx.try_recv() {
+            Ok(e) => Some(e),
+            Err(mpsc::TryRecvError::Disconnected) => None,
+            // The producer should die before we get here because we unsubscribed
+            Err(mpsc::TryRecvError::Empty) => unreachable!(),
+        })
+        .collect();
+        let expected_updates = [
+            Update::Idle,
+            // 1.
+            Update::Add(key_for(1)),
+            Update::Add(key_for(2)),
+            Update::Remove(key_for(2)),
+            Update::Add(key_for(2)),
+            // 2.
+            Update::Remove(key_for(1)),
+            // 3.
+            Update::Add(key_for(3)),
+            Update::Remove(key_for(2)),
+            Update::Remove(key_for(3)),
+            // 4.
+            Update::Add(key_for(4)),
+        ];
+        match test_type {
+            TestType::Small => {
+                assert_eq!(updates, expected_updates);
+            }
+            TestType::Big => {
+                // Skip over items populated to make the dict big
+                let updates = &updates[HYBRID_SWITCH_INSERTION_LEN..];
+                let nexpected = expected_updates.len() - 1;
+                assert_eq!(updates[..nexpected], expected_updates[..nexpected]);
+
+                // Skip over these items again when they are drained
+                let expected_updates = &expected_updates[nexpected..];
+                let updates = &updates[nexpected + HYBRID_SWITCH_INSERTION_LEN..];
+                assert_eq!(updates, expected_updates);
+            }
+        }
+    }
+
+    #[fuchsia::test]
     async fn live_update_add_nodes() {
         let dict = Dict::new();
         let scope = ExecutionScope::new();
@@ -1281,5 +1569,39 @@ mod tests {
         // At this point there are no entries left in the dictionary, so the directory should be
         // empty too.
         assert_eq!(fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap(), vec![],);
+    }
+
+    /// Generates a key from an integer such that if i < j, key_for(i) < key_for(j).
+    /// (A simple string conversion doesn't work because 1 < 10 but "1" > "10" in terms of
+    /// string comparison.)
+    fn key_for(i: usize) -> Key {
+        iter::repeat("A").take(i).collect::<String>().parse().unwrap()
+    }
+
+    fn new_dict(test_type: TestType) -> Dict {
+        let dict = Dict::new();
+        match test_type {
+            TestType::Small => {}
+            TestType::Big => {
+                for i in 1..=HYBRID_SWITCH_INSERTION_LEN {
+                    // These items will come last in the order as long as all other keys begin with
+                    // a capital letter
+                    dict.insert(
+                        format!("_{i}").parse().unwrap(),
+                        Capability::Unit(Unit::default()),
+                    )
+                    .unwrap();
+                }
+            }
+        }
+        dict
+    }
+
+    fn adjusted_len(dict: &Dict, test_type: TestType) -> usize {
+        let ofs = match test_type {
+            TestType::Small => 0,
+            TestType::Big => HYBRID_SWITCH_INSERTION_LEN,
+        };
+        dict.lock().entries.len() - ofs
     }
 }

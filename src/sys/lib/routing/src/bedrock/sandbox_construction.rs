@@ -161,7 +161,7 @@ impl ComponentSandbox {
             child_inputs,
             collection_inputs,
         } = sandbox;
-        for (copy_from, copy_to) in &[
+        for (copy_from, copy_to) in [
             (&component_input.capabilities(), &self.component_input.capabilities()),
             (&component_input.environment().debug(), &self.component_input.environment().debug()),
             (
@@ -181,21 +181,13 @@ impl ComponentSandbox {
             (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
             (&declared_dictionaries, &self.declared_dictionaries),
         ] {
-            for (key, capability_res) in copy_from.enumerate() {
-                copy_to
-                    .insert(key, capability_res.expect("sandbox capability is not cloneable"))
-                    .unwrap();
-            }
+            copy_to.append(copy_from).expect("sandbox capability is not cloneable");
         }
         if let Some(runner_router) = program_input.runner() {
             self.program_input.set_runner(runner_router.into());
         }
-        for (key, component_input) in child_inputs.enumerate() {
-            self.child_inputs.insert(key, component_input).unwrap();
-        }
-        for (key, component_input) in collection_inputs.enumerate() {
-            self.collection_inputs.insert(key, component_input).unwrap();
-        }
+        self.child_inputs.append(child_inputs).unwrap();
+        self.collection_inputs.append(collection_inputs).unwrap();
     }
 }
 

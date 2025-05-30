@@ -6,6 +6,7 @@ use crate::{Capability, CapabilityBound};
 use derivative::Derivative;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::borrow::Borrow;
+use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -25,7 +26,7 @@ pub struct Dict {
 #[derivative(Debug)]
 pub(crate) struct DictInner {
     /// The contents of the [Dict].
-    pub(crate) entries: BTreeMap<Key, Capability>,
+    pub(crate) entries: HybridMap,
 
     /// When an external request tries to access a non-existent entry, this closure will be invoked
     /// with the name of the entry.
@@ -43,7 +44,7 @@ pub(crate) struct DictInner {
 
     /// Functions that will be invoked whenever the contents of this dictionary changes.
     #[derivative(Debug = "ignore")]
-    update_notifiers: Vec<UpdateNotifierFn>,
+    update_notifiers: UpdateNotifiers,
 }
 
 impl CapabilityBound for Dict {
@@ -57,9 +58,9 @@ impl Drop for DictInner {
         // When this dictionary doesn't exist anymore, then neither do its entries (or at least
         // these references of them). Notify anyone listening that all of the entries have been
         // removed.
-        let keys = self.entries.keys().cloned().collect::<Vec<_>>();
-        for key in keys {
-            self.call_update_notifiers(EntryUpdate::Remove(&key))
+        let entries = std::mem::replace(&mut self.entries, HybridMap::default());
+        for (key, _) in entries.into_iter() {
+            self.update_notifiers.update(EntryUpdate::Remove(&key))
         }
     }
 }
@@ -90,11 +91,11 @@ impl Default for Dict {
     fn default() -> Self {
         Self {
             inner: Arc::new(Mutex::new(DictInner {
-                entries: BTreeMap::new(),
+                entries: HybridMap::default(),
                 not_found: None,
                 #[cfg(target_os = "fuchsia")]
                 task_group: None,
-                update_notifiers: vec![],
+                update_notifiers: UpdateNotifiers::default(),
             })),
         }
     }
@@ -111,11 +112,11 @@ impl Dict {
     pub fn new_with_not_found(not_found: impl Fn(&str) -> () + 'static + Send + Sync) -> Self {
         Self {
             inner: Arc::new(Mutex::new(DictInner {
-                entries: BTreeMap::new(),
+                entries: HybridMap::default(),
                 not_found: Some(Box::new(not_found)),
                 #[cfg(target_os = "fuchsia")]
                 task_group: None,
-                update_notifiers: vec![],
+                update_notifiers: UpdateNotifiers::default(),
             })),
         }
     }
@@ -142,7 +143,7 @@ impl Dict {
             }
         }
         if let UpdateNotifierRetention::Retain = (notifier_fn)(EntryUpdate::Idle) {
-            guard.update_notifiers.push(notifier_fn);
+            guard.update_notifiers.0.push(notifier_fn);
         }
     }
 
@@ -153,15 +154,14 @@ impl Dict {
         key: Key,
         capability: Capability,
     ) -> Result<(), fsandbox::CapabilityStoreError> {
-        let mut this = self.lock();
-        if this.entries.contains_key(&key) {
-            this.call_update_notifiers(EntryUpdate::Remove(&key));
-        }
-        this.call_update_notifiers(EntryUpdate::Add(&key, &capability));
-        match this.entries.insert(key, capability) {
-            Some(_) => Err(fsandbox::CapabilityStoreError::ItemAlreadyExists),
-            None => Ok(()),
-        }
+        let DictInner { entries, update_notifiers, .. } = &mut *self.lock();
+        entries.insert(key, capability, update_notifiers)
+    }
+
+    pub fn append(&self, other: &Dict) -> Result<(), ()> {
+        let DictInner { entries, update_notifiers, .. } = &mut *self.lock();
+        let other = other.lock();
+        entries.append(&other.entries, update_notifiers)
     }
 
     /// Returns a clone of the capability associated with `key`. If there is no entry for `key`,
@@ -173,57 +173,40 @@ impl Dict {
         Key: Borrow<Q> + Ord,
         Q: Ord,
     {
-        self.lock().entries.get(key).map(|c| c.try_clone()).transpose().map_err(|_| ())
+        self.lock().entries.get(key)
     }
 
     /// Removes `key` from the entries, returning the capability at `key` if the key was already in
     /// the entries.
     pub fn remove(&self, key: &Key) -> Option<Capability> {
-        let mut this = self.lock();
-        let result = this.entries.remove(key);
-        if result.is_some() {
-            this.call_update_notifiers(EntryUpdate::Remove(key))
-        }
-        result
+        let DictInner { entries, update_notifiers, .. } = &mut *self.lock();
+        entries.remove(key, update_notifiers)
     }
 
     /// Returns an iterator over a clone of the entries, sorted by key.
     ///
     /// If a capability is not cloneable, an error returned for the value.
     pub fn enumerate(&self) -> impl Iterator<Item = (Key, Result<Capability, ()>)> {
-        let entries = {
-            let this = self.lock();
-            let entries: Vec<_> = this
-                .entries
-                .iter()
-                .map(|(k, v)| {
-                    let k = k.clone();
-                    let v = v.try_clone();
-                    (k, v)
-                })
-                .collect();
-            entries
-        };
-        entries.into_iter()
+        self.lock()
+            .entries
+            .iter()
+            .map(|(k, v)| (k.clone(), v.try_clone()))
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 
     /// Returns an iterator over the keys, in sorted order.
     pub fn keys(&self) -> impl Iterator<Item = Key> {
-        #[allow(clippy::needless_collect)] // This is needed for a 'static iterator
-        let keys: Vec<_> = self.lock().entries.keys().cloned().collect();
-        keys.into_iter()
+        self.lock().entries.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>().into_iter()
     }
 
     /// Removes all entries from the Dict and returns them as an iterator.
     pub fn drain(&self) -> impl Iterator<Item = (Key, Capability)> {
-        let entries = {
-            let mut this = self.lock();
-            let keys = this.entries.keys().cloned().collect::<Vec<_>>();
-            for key in keys {
-                this.call_update_notifiers(EntryUpdate::Remove(&key))
-            }
-            std::mem::replace(&mut this.entries, BTreeMap::new())
-        };
+        let DictInner { entries, update_notifiers, .. } = &mut *self.lock();
+        let entries = std::mem::replace(entries, HybridMap::default());
+        for (key, _) in entries.iter() {
+            update_notifiers.update(EntryUpdate::Remove(&key))
+        }
         entries.into_iter()
     }
 
@@ -235,22 +218,10 @@ impl Dict {
     /// If any value in the dictionary could not be cloned, returns an error.
     pub fn shallow_copy(&self) -> Result<Self, ()> {
         let copy = Self::new();
-        let copied_entries = {
-            let this = self.lock();
-            let res: Result<BTreeMap<_, _>, _> = this
-                .entries
-                .iter()
-                .map(|(k, v)| {
-                    let k = k.clone();
-                    let v = v.try_clone().map_err(|_| ())?;
-                    Ok((k, v))
-                })
-                .collect();
-            res?
-        };
         {
+            let DictInner { entries, .. } = &*self.lock();
             let mut copy = copy.lock();
-            let _ = std::mem::replace(&mut copy.entries, copied_entries);
+            copy.entries = entries.shallow_copy()?;
         }
         Ok(copy)
     }
@@ -270,17 +241,252 @@ impl DictInner {
     pub(crate) fn tasks(&mut self) -> &mut fasync::TaskGroup {
         self.task_group.get_or_insert_with(|| fasync::TaskGroup::new())
     }
+}
 
-    /// Calls the update notifiers registered on this dictionary with the given update. Any
-    /// notifiers that signal that they should be dropped will be removed from
-    /// `self.update_notifiers.
-    fn call_update_notifiers<'a>(&'a mut self, update: EntryUpdate<'a>) {
-        let mut retained_notifier_fns = vec![];
-        for mut notifier_fn in self.update_notifiers.drain(..) {
-            if let UpdateNotifierRetention::Retain = (notifier_fn)(update) {
-                retained_notifier_fns.push(notifier_fn)
-            }
-        }
-        self.update_notifiers = retained_notifier_fns
+pub(crate) const HYBRID_SWITCH_INSERTION_LEN: usize = 11;
+pub(crate) const HYBRID_SWITCH_REMOVAL_LEN: usize = 5;
+
+/// A map collection whose representation is a `Vec` for small `N` and a `BTreeMap` for larger `N`,
+/// where the threshold is defined by the constant `HYBRID_SWITCH_INSERTION_LEN` for insertion and
+/// `HYBRID_SWITCH_REMOVAL_LEN` for removal. This is a more space efficient representation for
+/// small `N` than a `BTreeMap`, which has a big impact because component_manager creates lots of
+/// `Dict` objects for component sandboxes.
+///
+/// Details: Rust's `BTreeMap` implementation uses a `B` value of 6, which means each node in the
+/// `BTreeMap` reserves space for 11 entries. Inserting 1 entry will allocate a node with space for
+/// 11 entries. Each entry is 48 bytes, 48 * 11 + some metadata = 544 bytes. Rounding up to the
+/// nearest scudo bucket size means each node consumes 656 bytes of memory.
+///
+/// A BTreeMap with only 2 entries uses 656 bytes when 112 would be sufficient (48 * 2 = 96 fits in
+/// the 112 byte scudo bucket).
+#[derive(Debug)]
+pub(crate) enum HybridMap {
+    Vec(Vec<(Key, Capability)>),
+    Map(BTreeMap<Key, Capability>),
+}
+
+impl Default for HybridMap {
+    fn default() -> Self {
+        Self::Vec(Vec::default())
     }
 }
+
+impl HybridMap {
+    pub fn get<Q: ?Sized>(&self, key: &Q) -> Result<Option<Capability>, ()>
+    where
+        Key: Borrow<Q> + Ord,
+        Q: Ord,
+    {
+        match self {
+            Self::Vec(vec) => match Self::sorted_vec_index_of(vec, key) {
+                Ok(index) => Ok(Some(vec[index].1.try_clone()?)),
+                Err(_) => Ok(None),
+            },
+            Self::Map(map) => match map.get(key) {
+                Some(capability) => Ok(Some(capability.try_clone()?)),
+                None => Ok(None),
+            },
+        }
+    }
+
+    pub fn insert(
+        &mut self,
+        key: Key,
+        capability: Capability,
+        update_notifiers: &mut UpdateNotifiers,
+    ) -> Result<(), fsandbox::CapabilityStoreError> {
+        match self {
+            Self::Vec(vec) => match Self::sorted_vec_index_of(vec, &key) {
+                Ok(index) => {
+                    update_notifiers.update(EntryUpdate::Remove(&key));
+                    update_notifiers.update(EntryUpdate::Add(&key, &capability));
+                    vec[index].1 = capability;
+                    Err(fsandbox::CapabilityStoreError::ItemAlreadyExists)
+                }
+                Err(index) => {
+                    update_notifiers.update(EntryUpdate::Add(&key, &capability));
+                    if vec.len() + 1 >= HYBRID_SWITCH_INSERTION_LEN {
+                        self.switch_to_map();
+                        let Self::Map(map) = self else { unreachable!() };
+                        map.insert(key, capability);
+                        Ok(())
+                    } else {
+                        vec.reserve_exact(1);
+                        vec.insert(index, (key, capability));
+                        Ok(())
+                    }
+                }
+            },
+            Self::Map(map) => match map.entry(key.clone()) {
+                Entry::Occupied(mut occupied) => {
+                    update_notifiers.update(EntryUpdate::Remove(&key));
+                    update_notifiers.update(EntryUpdate::Add(&key, &capability));
+                    occupied.insert(capability);
+                    Err(fsandbox::CapabilityStoreError::ItemAlreadyExists)
+                }
+                Entry::Vacant(vacant) => {
+                    update_notifiers.update(EntryUpdate::Add(&key, &capability));
+                    vacant.insert(capability);
+                    Ok(())
+                }
+            },
+        }
+    }
+
+    pub fn remove(
+        &mut self,
+        key: &Key,
+        update_notifiers: &mut UpdateNotifiers,
+    ) -> Option<Capability> {
+        let result = match self {
+            Self::Vec(vec) => match Self::sorted_vec_index_of(vec, key) {
+                Ok(index) => {
+                    update_notifiers.update(EntryUpdate::Remove(&key));
+                    Some(vec.remove(index).1)
+                }
+                Err(_) => None,
+            },
+            Self::Map(map) => {
+                let result = map.remove(key);
+                if result.is_some() {
+                    update_notifiers.update(EntryUpdate::Remove(&key));
+                    if self.len() <= HYBRID_SWITCH_REMOVAL_LEN {
+                        self.switch_to_vec();
+                    }
+                }
+                result
+            }
+        };
+        result
+    }
+
+    pub fn append(
+        &mut self,
+        other: &Self,
+        update_notifiers: &mut UpdateNotifiers,
+    ) -> Result<(), ()> {
+        if other.is_empty() {
+            // If other is empty then return early.
+            return Ok(());
+        }
+
+        // If any clone would fail, throw an error early and don't modify the dict
+        let to_insert: Result<Vec<_>, _> =
+            other.iter().map(|(k, v)| v.try_clone().map(|v| (k.clone(), v))).collect();
+        let to_insert = to_insert?;
+        for (k, _) in &to_insert {
+            let contains_key = match self {
+                Self::Vec(vec) => matches!(Self::sorted_vec_index_of(vec, k), Ok(_)),
+                Self::Map(map) => map.contains_key(k),
+            };
+            if contains_key {
+                return Err(());
+            }
+        }
+
+        if self.len() + other.len() >= HYBRID_SWITCH_INSERTION_LEN {
+            // If at some point we will need to switch to a map then do it now.
+            self.switch_to_map();
+        } else if let Self::Vec(vec) = self {
+            // We're currently a Vec and won't need to convert to a Map so grow the Vec to the final
+            // size now.
+            vec.reserve(other.len());
+        }
+        for (k, v) in to_insert {
+            self.insert(k, v, update_notifiers).expect("append: insert should have succeeded");
+        }
+        Ok(())
+    }
+
+    pub fn shallow_copy(&self) -> Result<Self, ()> {
+        match self {
+            Self::Vec(vec) => {
+                let mut new_vec = Vec::with_capacity(vec.len());
+                for (key, value) in vec.iter() {
+                    new_vec.push((key.clone(), value.try_clone()?));
+                }
+                Ok(HybridMap::Vec(new_vec))
+            }
+            Self::Map(map) => {
+                let mut new_map = BTreeMap::new();
+                for (key, value) in map.iter() {
+                    new_map.insert(key.clone(), value.try_clone()?);
+                }
+                Ok(HybridMap::Map(new_map))
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Map(map) => map.len(),
+            Self::Vec(vec) => vec.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Self::Map(map) => map.is_empty(),
+            Self::Vec(vec) => vec.is_empty(),
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Key, &Capability)> {
+        match self {
+            Self::Vec(vec) => itertools::Either::Left(vec.iter().map(|kv| (&kv.0, &kv.1))),
+            Self::Map(map) => itertools::Either::Right(map.iter()),
+        }
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = (Key, Capability)> {
+        match self {
+            Self::Vec(vec) => itertools::Either::Left(vec.into_iter()),
+            Self::Map(map) => itertools::Either::Right(map.into_iter()),
+        }
+    }
+
+    fn switch_to_map(&mut self) {
+        match self {
+            Self::Map(_) => {}
+            Self::Vec(vec) => {
+                let vec = std::mem::replace(vec, Vec::new());
+                let map = BTreeMap::from_iter(vec.into_iter());
+                *self = Self::Map(map);
+            }
+        }
+    }
+
+    fn switch_to_vec(&mut self) {
+        match self {
+            Self::Vec(_) => {}
+            Self::Map(map) => {
+                let map = std::mem::replace(map, Default::default());
+                let vec = Vec::from_iter(map.into_iter());
+                *self = Self::Vec(vec);
+            }
+        }
+    }
+
+    #[inline]
+    fn sorted_vec_index_of<Q: ?Sized>(vec: &Vec<(Key, Capability)>, key: &Q) -> Result<usize, usize>
+    where
+        Key: Borrow<Q> + Ord,
+        Q: Ord,
+    {
+        vec.binary_search_by(|probe| probe.0.borrow().cmp(&key))
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct UpdateNotifiers(Vec<UpdateNotifierFn>);
+
+impl UpdateNotifiers {
+    fn update<'a>(&'a mut self, update: EntryUpdate<'a>) {
+        self.0.retain_mut(|notifier_fn| match (notifier_fn)(update) {
+            UpdateNotifierRetention::Retain => true,
+            UpdateNotifierRetention::Drop_ => false,
+        });
+    }
+}
+
+// Tests are located in fidl/dict.rs.

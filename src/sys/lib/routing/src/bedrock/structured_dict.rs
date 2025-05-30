@@ -72,6 +72,10 @@ impl<T: StructuredDict> StructuredDictMap<T> {
         })
     }
 
+    pub fn append(&self, other: &Self) -> Result<(), ()> {
+        self.inner.append(&other.inner)
+    }
+
     pub fn enumerate(&self) -> impl Iterator<Item = (Name, T)> {
         self.inner.enumerate().map(|(key, capability_res)| match capability_res {
             Ok(Capability::Dictionary(dict)) => (key, T::from_dict(dict)),
