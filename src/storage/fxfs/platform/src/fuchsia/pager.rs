@@ -324,7 +324,10 @@ impl Pager {
     /// page request. See `ZX_PAGER_OP_DIRTY` for more information.
     fn dirty_pages(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::Dirty, vmo, range) {
-            // TODO(https://fxbug.dev/42086069): The kernel can spuriously return ZX_ERR_NOT_FOUND.
+            // It is possible for `ZX_ERR_NOT_FOUND` to be returned on a clean page that has been
+            // evicted. In this case, the  kernel will retry if necessary. Unfortunately, this will
+            // cause a mismatch in the accounting between Fxfs and the kernel but there is nothing
+            // we can do about that right now. See https://fxubg.dev/42086069 for more information.
             if e != zx::Status::NOT_FOUND {
                 error!(error:? = e; "dirty_pages failed");
             }
