@@ -37,15 +37,15 @@ template("rustc_test_internal") {
   # use the target name unless another name is specified
   assert(!(defined(invoker.output_name) && defined(invoker.name)),
          "Only one of output_name and name may be specified.")
-  package_name = target_name
+  _package_name = target_name
   if (defined(invoker.output_name)) {
-    package_name = invoker.output_name
+    _package_name = invoker.output_name
   } else if (defined(invoker.name)) {
-    package_name = invoker.name
+    _package_name = invoker.name
   }
 
   # built-in gn rules do not support dashes
-  crate_name = string_replace(package_name, "-", "_")
+  _crate_name = string_replace(_package_name, "-", "_")
 
   exe_target_name = target_name
 
@@ -53,9 +53,9 @@ template("rustc_test_internal") {
     exe_target_name = "${target_name}_executable"
     host_test(target_name) {
       if (defined(invoker.output_dir)) {
-        binary_path = "${invoker.output_dir}/${crate_name}"
+        binary_path = "${invoker.output_dir}/${_crate_name}"
       } else {
-        binary_path = "${root_out_dir}/${crate_name}"
+        binary_path = "${root_out_dir}/${_crate_name}"
       }
 
       # The host test should only depend on the _actual_ binary, because only
@@ -99,7 +99,31 @@ template("rustc_test_internal") {
   }
 
   rustc_artifact(exe_target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "check_cfgs",
+                             "data_deps",
+                             "disable_clippy",
+                             "edition",
+                             "enforce_source_listing",
+                             "exclude_toolchain_tags",
+                             "features",
+                             "inputs",
+                             "output_dir",
+                             "public_deps",
+                             "quiet_clippy",
+                             "rustenv",
+                             "sources",
+                             "visibility",
+                           ])
+
     target_type = "executable"
+
+    crate_root = source_root
+    rust_crate_type = "bin"
+    original_target_name = _original_target_name
+    crate_name = _crate_name
+    output_name = _crate_name
 
     configs = []
     configs = invoker.configs
@@ -112,21 +136,6 @@ template("rustc_test_internal") {
       forward_variables_from(invoker.test_vars, "*")
     }
 
-    crate_root = source_root
-    rust_crate_type = "bin"
-    pass_through = {
-      forward_variables_from(invoker,
-                             [
-                               "data_deps",
-                               "exclude_toolchain_tags",
-                               "output_dir",
-                             ])
-      output_name = crate_name
-    }
-    crate_name = crate_name
-
-    original_target_name = _original_target_name
-
     # tell rustc to compile in the test harness
     rustflags += [ "--test" ]
 
@@ -135,21 +144,6 @@ template("rustc_test_internal") {
 
     # Exclude tests from tool_paths.json.
     emit_tool_path = false
-
-    forward_variables_from(invoker,
-                           [
-                             "check_cfgs",
-                             "disable_clippy",
-                             "edition",
-                             "enforce_source_listing",
-                             "features",
-                             "inputs",
-                             "public_deps",
-                             "quiet_clippy",
-                             "rustenv",
-                             "sources",
-                             "visibility",
-                           ])
 
     _use_rbe = rust_rbe_enable
     if (defined(invoker.disable_rbe)) {

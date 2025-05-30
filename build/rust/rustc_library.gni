@@ -249,23 +249,44 @@ template("rustc_library") {
   }
 
   rustc_artifact(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "aliased_deps",
+                             "applicable_licenses",
+                             "assert_no_deps",
+                             "check_cfgs",
+                             "configs",
+                             "data_deps",
+                             "define_rustdoc_test_override",
+                             "disable_clippy",
+                             "disable_rbe",
+                             "edition",
+                             "enforce_source_listing",
+                             "features",
+                             "inputs",
+                             "output_dir",
+                             "output_name",
+                             "pool",
+                             "public_configs",
+                             "public_deps",
+                             "quiet_clippy",
+                             "rustdoc_args",
+                             "rustdoc_out_dir",
+                             "rustenv",
+                             "rustflags",
+                             "sources",
+                             "testonly",
+                             "visibility",
+                             "zip_rustdoc_to",
+                           ])
+
     target_type = "rust_library"
     crate_root = source_root
     rust_crate_type = "rlib"
     crate_name = _crate_name
     original_target_name = _original_target_name
-    pass_through = {
-      forward_variables_from(invoker,
-                             [
-                               "data_deps",
-                               "output_name",
-                               "output_dir",
-                             ])
-
-      # TODO: maybe just use target_name instead?
-      if (!defined(output_name)) {
-        output_name = crate_name
-      }
+    if (!defined(output_name)) {
+      output_name = crate_name
     }
 
     deps = []
@@ -287,34 +308,6 @@ template("rustc_library") {
     if (defined(invoker.proc_macro_deps)) {
       deps += invoker.proc_macro_deps
     }
-
-    forward_variables_from(invoker,
-                           [
-                             "aliased_deps",
-                             "applicable_licenses",
-                             "assert_no_deps",
-                             "check_cfgs",
-                             "configs",
-                             "disable_clippy",
-                             "disable_rbe",
-                             "edition",
-                             "enforce_source_listing",
-                             "define_rustdoc_test_override",
-                             "features",
-                             "inputs",
-                             "pool",
-                             "public_configs",
-                             "public_deps",
-                             "quiet_clippy",
-                             "rustdoc_args",
-                             "rustdoc_out_dir",
-                             "rustenv",
-                             "rustflags",
-                             "sources",
-                             "testonly",
-                             "visibility",
-                             "zip_rustdoc_to",
-                           ])
 
     # Avoid walking into data_deps when checking component manifest expected includes.
     metadata = {

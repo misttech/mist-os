@@ -268,35 +268,21 @@ template("rustc_binary") {
   }
 
   rustc_artifact(target_name) {
-    target_type = "executable"
-    crate_root = source_root
-    rust_crate_type = "bin"
-    crate_name = _crate_name
-    original_target_name = _original_target_name
-
-    pass_through = {
-      # pass through these variables unmodified
-      forward_variables_from(invoker,
-                             [
-                               "data_deps",
-                               "exclude_toolchain_tags",
-                               "output_dir",
-                               "output_extension",
-                             ])
-      output_name = _output_name
-    }
-
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
-                             "emit_tool_path",
                              "check_cfgs",
+                             "data_deps",
                              "disable_clippy",
                              "edition",
+                             "emit_tool_path",
                              "enforce_source_listing",
+                             "exclude_toolchain_tags",
                              "features",
                              "inputs",
                              "link_args",
+                             "output_dir",
+                             "output_extension",
                              "pool",
                              "quiet_clippy",
                              "rustenv",
@@ -304,6 +290,13 @@ template("rustc_binary") {
                              "testonly",
                              "visibility",
                            ])
+
+    target_type = "executable"
+    crate_root = source_root
+    rust_crate_type = "bin"
+    crate_name = _crate_name
+    original_target_name = _original_target_name
+    output_name = _output_name
 
     disable_rbe = !rust_rbe_enable
     if (defined(invoker.disable_rbe)) {

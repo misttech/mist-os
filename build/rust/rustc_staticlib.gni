@@ -181,14 +181,25 @@ template("rustc_staticlib") {
   }
 
   rustc_artifact(rustc_target) {
+    forward_variables_from(invoker,
+                           [
+                             "disable_clippy",
+                             "edition",
+                             "enforce_source_listing",
+                             "features",
+                             "inputs",
+                             "output_dir",
+                             "rustenv",
+                             "sources",
+                             "testonly",
+                             "visibility",
+                           ])
+
     target_type = "static_library"
     crate_root = source_root
     rust_crate_type = "staticlib"
     crate_name = rustc_target
-    pass_through = {
-      forward_variables_from(invoker, [ "output_dir" ])
-      output_name = rustc_target
-    }
+    output_name = crate_name
     original_target_name = _original_target_name
 
     deps = []
@@ -231,19 +242,6 @@ template("rustc_staticlib") {
       # libstd deps needs to be picked up by distribution entries.
       data_deps = [ "//build/toolchain/runtime:shared-rust-libstd-deps" ]
     }
-
-    forward_variables_from(invoker,
-                           [
-                             "disable_clippy",
-                             "edition",
-                             "enforce_source_listing",
-                             "features",
-                             "inputs",
-                             "rustenv",
-                             "sources",
-                             "testonly",
-                             "visibility",
-                           ])
 
     configs = []
     configs = invoker.configs

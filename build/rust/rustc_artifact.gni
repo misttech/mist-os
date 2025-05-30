@@ -191,7 +191,6 @@ template("rustc_artifact") {
                                  "aliased_deps",
                                  "configs",
                                  "crate_root",
-                                 "crate_type",
                                  "define_rustdoc_test_override",
                                  "disable_clippy",
                                  "disable_rustdoc",
@@ -254,7 +253,12 @@ template("rustc_artifact") {
               searchdir_path += "/" + _actual_target_name
             }
           }
-          rlib_path = "${searchdir_path}/lib${crate_name}.rlib"
+
+          _output_name = invoker.crate_name
+          if (defined(invoker.output_name)) {
+            _output_name = invoker.output_name
+          }
+          rlib_path = "${searchdir_path}/lib${_output_name}.rlib"
         }
       }
     } else {
@@ -291,21 +295,27 @@ template("rustc_artifact") {
     target(invoker.target_type, _actual_target_name) {
       forward_variables_from(invoker,
                              [
+                               "aliased_deps",
                                "all_dependent_configs",
                                "applicable_licenses",
                                "assert_no_deps",
-                               "aliased_deps",
+                               "crate_type",
                                "data_deps",
                                "deps",
                                "emit_tool_path",
+                               "exclude_toolchain_tags",
                                "metadata",
+                               "output_dir",
+                               "output_extension",
                                "output_name",
                                "output_prefix_override",
                                "pool",
                                "public_configs",
                                "public_deps",
+                               "runtime_deps",
                                "rustenv",
                                "testonly",
+                               "variant_selector_target_type",
                                "visibility",
                              ])
 
@@ -366,14 +376,6 @@ template("rustc_artifact") {
           rustflags += [ "-Clink-args=" + link_arg ]
         }
       }
-
-      # _pass_through and not_needed are to workaround https://crbug.com/gn/10
-      _pass_through = invoker.pass_through
-      assert(!defined(_pass_through.metadata))
-      not_needed([ "_pass_through" ])
-
-      # Pass through these variables unmodified.
-      forward_variables_from(invoker.pass_through, "*")
 
       # The Fuchsia standard library has an implicit #[link] directive
       # pointing to libfdio.so
