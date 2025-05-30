@@ -175,7 +175,7 @@ impl FileSystem {
     }
 
     /// Inserts a node in the FsNode cache.
-    pub fn insert_node(self: &FileSystemHandle, mut node: FsNode) -> DirEntryHandle {
+    fn insert_node(self: &FileSystemHandle, mut node: FsNode) -> DirEntryHandle {
         if node.node_id == 0 {
             node.set_id(self.next_node_id());
         }
@@ -266,7 +266,6 @@ impl FileSystem {
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
-        let ops = ops.into();
         let node = FsNode::new_uncached(current_task, ops, self, info.ino, info);
         self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
         node
@@ -280,6 +279,19 @@ impl FileSystem {
     ) -> FsNodeHandle {
         let info = create_info_fn(self.next_node_id());
         self.create_node_with_info(current_task, ops, info)
+    }
+
+    /// Create a node for a directory that has no parent.
+    pub fn create_root_node(
+        self: &Arc<Self>,
+        kernel: &Arc<Kernel>,
+        ops: impl Into<Box<dyn FsNodeOps>>,
+        info: FsNodeInfo,
+    ) -> FsNodeHandle {
+        assert!(info.mode.is_dir());
+        let node = FsNode::new_uncached_directory(kernel, ops, self, info.ino, info);
+        self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
+        node
     }
 
     /// Remove the given FsNode from the node cache.

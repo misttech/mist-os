@@ -28,7 +28,7 @@ use starnix_sync::{
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EEXIST, ENOENT};
-use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, ino_t, off_t, statfs};
 use std::collections::BTreeSet;
@@ -589,8 +589,7 @@ impl FsNodeOps for OverlayNodeOps {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let resolve_child = |locked: &mut Locked<FileOpsCore>,
-                             dir_opt: Option<&ActiveEntry>| {
+        let resolve_child = |locked: &mut Locked<FileOpsCore>, dir_opt: Option<&ActiveEntry>| {
             // TODO(sergeyu): lookup() checks access, but we don't need that here.
             dir_opt
                 .as_ref()
@@ -1195,14 +1194,15 @@ impl OverlayStack {
 
         // Create upper and work directories in an invisible tmpfs.
         let invisible_tmp = TmpFs::new_fs(kernel);
-        let upper = ActiveEntry {
-            entry: invisible_tmp.insert_node(FsNode::new_root(TmpfsDirectory::new())),
-            mount: MountInfo::detached(),
+        let create_directory = |fs: &FileSystemHandle| {
+            let info = FsNodeInfo::new(fs.next_node_id(), mode!(IFDIR, 0o777), FsCred::root());
+            let node = fs.create_root_node(kernel, TmpfsDirectory::new(), info);
+            DirEntry::new(node, None, FsString::default())
         };
-        let work = ActiveEntry {
-            entry: invisible_tmp.insert_node(FsNode::new_root(TmpfsDirectory::new())),
-            mount: MountInfo::detached(),
-        };
+        let upper =
+            ActiveEntry { entry: create_directory(&invisible_tmp), mount: MountInfo::detached() };
+        let work =
+            ActiveEntry { entry: create_directory(&invisible_tmp), mount: MountInfo::detached() };
 
         let lower_fs = rootfs;
         let upper_fs = invisible_tmp;

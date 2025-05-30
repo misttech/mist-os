@@ -1198,8 +1198,10 @@ impl FsNode {
         Self::new_internal(Box::new(ops), Weak::new(), Weak::new(), 0, info, None)
     }
 
-    /// Create a node without inserting it into the FileSystem node cache. This is usually not what
-    /// you want! Only use if you're also using get_or_create_node, like ext4.
+    /// Create a node without inserting it into the FileSystem node cache.
+    ///
+    /// This is usually not what you want!
+    /// Only use if you're also using get_or_create_node, like ext4.
     pub fn new_uncached(
         current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
@@ -1217,6 +1219,25 @@ impl FsNode {
             Some(current_task),
         )
         .into_handle()
+    }
+
+    /// Create a directory without inserting it into the FileSystem node cache.
+    ///
+    /// This is usually not what you want!
+    ///
+    /// This is used for creating nodes that are not part of the filesystem, like the root of the
+    /// kernel.
+    pub fn new_uncached_directory(
+        kernel: &Arc<Kernel>,
+        ops: impl Into<Box<dyn FsNodeOps>>,
+        fs: &FileSystemHandle,
+        node_id: ino_t,
+        info: FsNodeInfo,
+    ) -> FsNodeHandle {
+        assert!(info.mode.is_dir());
+        let ops = ops.into();
+        Self::new_internal(ops, Arc::downgrade(kernel), Arc::downgrade(fs), node_id, info, None)
+            .into_handle()
     }
 
     pub fn into_handle(mut self) -> FsNodeHandle {
@@ -2895,24 +2916,21 @@ mod tests {
             .expect("create_node")
             .entry
             .node;
-        let check_access = |locked: &mut Locked<Unlocked>,
-                            uid: uid_t,
-                            gid: gid_t,
-                            perm: u32,
-                            access: Access| {
-            node.update_info(|info| {
-                info.mode = mode!(IFREG, perm);
-                info.uid = uid;
-                info.gid = gid;
-            });
-            node.check_access(
-                locked,
-                &current_task,
-                &MountInfo::detached(),
-                access,
-                CheckAccessReason::InternalPermissionChecks,
-            )
-        };
+        let check_access =
+            |locked: &mut Locked<Unlocked>, uid: uid_t, gid: gid_t, perm: u32, access: Access| {
+                node.update_info(|info| {
+                    info.mode = mode!(IFREG, perm);
+                    info.uid = uid;
+                    info.gid = gid;
+                });
+                node.check_access(
+                    locked,
+                    &current_task,
+                    &MountInfo::detached(),
+                    access,
+                    CheckAccessReason::InternalPermissionChecks,
+                )
+            };
 
         assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::EXEC), error!(EACCES));
         assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::READ), error!(EACCES));
