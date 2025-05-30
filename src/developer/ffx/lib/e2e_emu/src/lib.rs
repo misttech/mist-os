@@ -203,6 +203,19 @@ impl IsolatedEmulator {
         self.ffx_isolate.env_context()
     }
 
+    /// Acquire a Fuchsia Host Objects (FHO) environment for use with this
+    /// isolated instance.
+    ///
+    /// Note: The global [`ffx_config::global_env_context`] is set to
+    /// `Self::env_context` if it's not already set in order for the returned
+    /// environment to work correctly.
+    pub fn fho_env(&self) -> fho::FhoEnvironment {
+        if ffx_config::global_env_context().is_none() {
+            ffx_config::init(self.env_context()).expect("failed to initialize environment");
+        }
+        fho::FhoEnvironment::new_with_args(self.env_context(), &self.make_args(&[])[..])
+    }
+
     fn make_args<'a>(&'a self, args: &[&'a str]) -> Vec<&str> {
         let mut prefixed = vec!["--target", &self.emu_name];
         prefixed.extend(args);

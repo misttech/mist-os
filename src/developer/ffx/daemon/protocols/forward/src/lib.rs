@@ -5,19 +5,16 @@
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
 use ffx_config::ConfigLevel;
+use ffx_target_net::PortForwarder;
+use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_net::SocketAddress;
 use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
-use futures::future::join;
-use futures::{AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
-use netext::{TcpListenerStream, TokioAsyncReadExt};
+use futures::FutureExt as _;
 use protocols::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use {::rcs as rcs_lib, fidl_fuchsia_developer_ffx as ffx};
-
-const REVERSE_BACKLOG: u16 = 128;
 
 #[ffx_protocol]
 #[derive(Default)]
@@ -46,99 +43,33 @@ impl Forward {
         target: String,
         target_address: SocketAddress,
         listener: TcpListener,
-        tasks: Arc<tasks::TaskManager>,
     ) {
-        let mut incoming = TcpListenerStream(listener);
-        while let Some(conn) = incoming.next().await {
-            let conn = match conn {
-                Ok(conn) => conn,
-                Err(e) => {
-                    log::error!("Error accepting connection for TCP forwarding: {:?}", e);
-                    continue;
-                }
-            };
+        let target = match cx.open_remote_control(Some(target.clone())).await {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("Could not connect to proxy for TCP forwarding: {:?}", e);
+                return;
+            }
+        };
 
-            let target = match cx.open_remote_control(Some(target.clone())).await {
-                Ok(t) => t,
-                Err(e) => {
-                    log::error!("Could not connect to proxy for TCP forwarding: {:?}", e);
-                    break;
-                }
-            };
+        let forwarder = match PortForwarder::new_with_rcs(FORWARD_SETUP_TIMEOUT, &target).await {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Error requesting port forward from RCS: {:?}", e);
+                return;
+            }
+        };
 
-            let socket = match rcs_lib::port_forward::forward_port(
-                &target,
-                SocketAddressExt::from(target_address).0,
-                FORWARD_SETUP_TIMEOUT,
-            )
+        forwarder
+            .forward(listener, SocketAddressExt::from(target_address).0)
             .await
-            {
-                Ok(socket) => socket,
-                Err(e) => {
-                    log::error!("Error requesting port forward from RCS: {:?}", e);
-                    continue;
-                }
-            };
-
-            let (socket, keep_alive) = socket.split();
-
-            let socket = fuchsia_async::Socket::from_socket(socket);
-
-            Self::establish_tcp_forward(conn, socket, keep_alive, Arc::clone(&tasks));
-        }
+            .unwrap_or_else(|e| log::error!("Error port forwarding: {e:?}"));
     }
 
     async fn bind_or_log(addr: std::net::SocketAddr) -> Result<TcpListener, ()> {
         TcpListener::bind(addr).await.map_err(|e| {
             log::error!("Could not listen on {:?}: {:?}", addr, e);
         })
-    }
-
-    fn establish_tcp_forward(
-        conn: tokio::net::TcpStream,
-        socket: fuchsia_async::Socket,
-        keep_alive: rcs::port_forward::SocketKeepAliveToken,
-        tasks: Arc<tasks::TaskManager>,
-    ) {
-        let (mut socket_read, mut socket_write) = socket.into_futures_stream().split();
-        let (mut conn_read, mut conn_write) = conn.into_futures_stream().split();
-
-        let write_read = async move {
-            let mut buf = [0; 4096];
-            loop {
-                let bytes = socket_read.read(&mut buf).await?;
-                if bytes == 0 {
-                    break Ok(());
-                }
-                conn_write.write_all(&buf[..bytes]).await?;
-                conn_write.flush().await?;
-            }
-        };
-        let read_write = async move {
-            // TODO(84188): Use a buffer pool once we have them.
-            let mut buf = [0; 4096];
-            loop {
-                let bytes = conn_read.read(&mut buf).await?;
-                if bytes == 0 {
-                    break Ok(()) as Result<(), std::io::Error>;
-                }
-                socket_write.write_all(&buf[..bytes]).await?;
-                socket_write.flush().await?;
-            }
-        };
-        let forward = join(read_write, write_read);
-        tasks.spawn(async move {
-            let _keep_alive = keep_alive;
-            match forward.await {
-                (Err(a), Err(b)) => {
-                    log::warn!("Port forward closed with errors:\n  {:?}\n  {:?}", a, b)
-                }
-                (Err(e), _) | (_, Err(e)) => {
-                    log::warn!("Port forward closed with error: {:?}", e)
-                }
-                _ => (),
-            }
-        });
     }
 }
 
@@ -165,14 +96,7 @@ impl FidlProtocol for Forward {
                     }
                 };
 
-                let tasks = Arc::clone(&self.0);
-                self.0.spawn(Self::port_forward_task(
-                    cx,
-                    target.clone(),
-                    target_address,
-                    listener,
-                    tasks,
-                ));
+                self.0.spawn(Self::port_forward_task(cx, target.clone(), target_address, listener));
 
                 let cfg = serde_json::to_value(ForwardConfig {
                     ty: ForwardConfigType::Tcp,
@@ -200,51 +124,38 @@ impl FidlProtocol for Forward {
                     }
                 };
 
-                let stream = match rcs_lib::port_forward::reverse_port(
-                    &target,
-                    SocketAddressExt::from(target_address).0,
-                    std::time::Duration::from_secs(5),
-                    REVERSE_BACKLOG,
-                )
-                .await
+                let forwarder = match PortForwarder::new_with_rcs(FORWARD_SETUP_TIMEOUT, &target)
+                    .await
                 {
-                    Ok(s) => s,
+                    Ok(p) => p,
                     Err(e) => {
-                        log::error!("Could establish reverse forward: {:?}", e);
+                        log::error!("Error connecting to forwarding protocol from RCS: {:?}", e);
                         return responder
-                            .send(Err(ffx::TunnelError::CouldNotListen))
+                            .send(Err(ffx::TunnelError::TargetConnectFailed))
                             .context("error sending response");
                     }
                 };
 
-                let host_address: SocketAddressExt = host_address.into();
-                let host_address = host_address.0;
-                let tasks = Arc::clone(&self.0);
-                self.0.spawn(async move {
-                    let mut stream = std::pin::pin!(stream);
-                    while let Some((addr, socket)) = stream.next().await {
-                        log::info!("Connection from {:?} forwarding to {:?}", addr, host_address);
-                        let tcp_stream = match tokio::net::TcpStream::connect(&host_address).await {
-                            Ok(stream) => stream,
-                            Err(e) => {
-                                log::error!("Could not connect to {:?}: {:?}", host_address, e);
-                                continue;
-                            }
-                        };
-
-                        let (socket, keep_alive) = socket.split();
-
-                        let socket = fuchsia_async::Socket::from_socket(socket);
-
-                        Self::establish_tcp_forward(
-                            tcp_stream,
-                            socket,
-                            keep_alive,
-                            Arc::clone(&tasks),
-                        )
+                let target_listener = match forwarder
+                    .socket_provider()
+                    .listen(SocketAddressExt::from(target_address).0, None)
+                    .await
+                {
+                    Ok(t) => t,
+                    Err(e) => {
+                        log::error!("Error creating target-side listener: {:?}", e);
+                        return responder
+                            .send(Err(ffx::TunnelError::TargetConnectFailed))
+                            .context("error sending response");
                     }
-                });
-
+                };
+                let task =
+                    forwarder.reverse(target_listener, SocketAddressExt::from(host_address).0);
+                self.0.spawn(
+                    task.map(|r| {
+                        r.unwrap_or_else(|e| log::error!("Error during forwarding {e:?}"))
+                    }),
+                );
                 responder.send(Ok(())).context("error sending response")?;
                 Ok(())
             }
@@ -272,13 +183,11 @@ impl FidlProtocol for Forward {
                         Ok(t) => t,
                         Err(_) => continue,
                     };
-                    let tasks = Arc::clone(&self.0);
                     self.0.spawn(Self::port_forward_task(
                         cx.clone(),
                         tunnel.target,
                         target_address.into(),
                         listener,
-                        tasks,
                     ));
                 }
             }
@@ -296,6 +205,7 @@ impl FidlProtocol for Forward {
 mod tests {
     use super::*;
     use ffx::DaemonError;
+    use futures::StreamExt;
     use {
         fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_posix_socket as fsock,
         fidl_fuchsia_sys2 as sys2,
@@ -340,6 +250,9 @@ mod tests {
                     assert!(!listening, "listened to socket twice");
                     listening = true;
                     responder.send(Ok(())).unwrap();
+                }
+                fsock::StreamSocketRequest::GetSockName { responder } => {
+                    responder.send(Ok(&target_address())).unwrap();
                 }
                 other => panic!("Unexpected request: {other:?}"),
             }

@@ -32,15 +32,13 @@ rustc_library("lib") {
            "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
            "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
            "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
-           "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
            "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
            "//src/connectivity/overnet/lib/core",
            "//src/lib/fuchsia-async",
-           "//src/lib/network/fidl_fuchsia_net_ext",
            "//src/sys/lib/moniker",
          ]
 
-  sources = rcs_sources + [ "src/port_forward.rs" ]
+  sources = rcs_sources
 }
 
 rustc_library("lib_fdomain") {

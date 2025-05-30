@@ -39,6 +39,7 @@ libs = [
   "target/connector",
   "target/holders",
   "target_errors",
+  "target_net",
   "tasks",
   "testing",
   "timeout",
@@ -83,5 +84,6 @@ group("host_tests") {
     "e2e_emu:host_tests",
     "fuchsia-controller:host_tests",
     "symbolize:host_tests",
+    "target_net:host_tests",
   ]
 }

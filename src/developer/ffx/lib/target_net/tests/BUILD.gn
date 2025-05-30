@@ -1,0 +1,77 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_partitions_config.gni")
+import("//build/assembly/product_assembly_configuration.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/sdk/product_bundle.gni")
+import("//build/testing/symbols_dir_test_data.gni")
+import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
+
+assert(
+    has_board,
+    "This file must only be included in build configurations that have a board.")
+
+if (is_host) {
+  ffx_e2e_test("ffx_target_net_lib_e2e_test") {
+    edition = "2024"
+    source_root = "e2e_test.rs"
+    sources = [ source_root ]
+    deps = [
+      "//src/connectivity/lib/net-declare",
+      "//src/developer/ffx/lib/e2e_emu",
+      "//src/developer/ffx/lib/fho:lib",
+      "//src/developer/ffx/lib/target/holders:lib",
+      "//src/developer/ffx/lib/target_net:lib",
+      "//src/lib/fuchsia",
+      "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:log",
+      "//third_party/rust_crates:tokio",
+    ]
+
+    product_bundle = ":product_bundle($default_toolchain)"
+  }
+
+  group("host_tests") {
+    testonly = true
+    deps = [ ":ffx_target_net_lib_e2e_test" ]
+  }
+} else if (current_toolchain == default_toolchain) {
+  # Don't let the assembly templates expand except on the default toolchain.
+  # Weirndess ensues if they're expanded on variant toolchains like for asan.
+  files = {
+    outdir = target_out_dir + "/fuchsia"
+  }
+
+  product_bundle("product_bundle") {
+    testonly = true
+    name = "ffx-target-net-test"
+
+    partitions = "//boards/partitions:${target_cpu}"
+    system_a = files.outdir
+
+    deps = [ ":assembly" ]
+  }
+
+  assembled_system("assembly") {
+    testonly = true
+    image_name = "fuchsia"
+
+    # Use generic/emu board for the target arch.
+    board_config_label = "//boards/${target_cpu}"
+    generate_fxfs = true
+    generate_vbmeta = true
+    product_assembly_config_label = ":product_assembly_config"
+  }
+
+  product_assembly_configuration("product_assembly_config") {
+    testonly = true
+    platform = {
+      build_type = "eng"
+      feature_set_level = "standard"
+    }
+  }
+}

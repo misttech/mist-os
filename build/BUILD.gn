@@ -159,6 +159,7 @@ group("non_hermetic_deps") {
     "//src/bringup/lib/mexec/tests/*",
     "//src/developer/ffx/lib/profiler/tests:*",
     "//src/developer/ffx/lib/symbolize/tests:*",
+    "//src/developer/ffx/lib/target_net/tests:*",
     "//src/lib/elfldltl/test/*",
     "//src/security/lib/scrutiny/collector/*",
     "//src/security/lib/scrutiny/tests/*",
