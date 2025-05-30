@@ -304,6 +304,7 @@ def standard_metrics_set(
     unit: trace_metrics.Unit,
     percentiles: tuple[int, int, int, int, int] = (5, 25, 50, 75, 95),
     durations: List[float] | None = None,
+    doc_prefix: str | None = None,
 ) -> list[trace_metrics.TestCaseResult]:
     """Generates min, max, average and percentiles metrics for the given values.
 
@@ -321,17 +322,20 @@ def standard_metrics_set(
                 duration: [1, 5]
             The average would be around (30*1+2*5)/(1+5) = 6.7%
             instead of statistics.mean([30, 1]) = 15.5%
+        doc_prefix: a descriptive string with which to document this set of metrics.
+            Defaults to label_prefix.
 
     Returns:
         A list of TestCaseResults representing each of the generated metrics.
     """
+    doc_prefix = doc_prefix if doc_prefix else label_prefix
 
     results = [
         trace_metrics.TestCaseResult(
             f"{label_prefix}P{p}",
             unit,
             [percentile(values, p)],
-            f"{label_prefix}, {p}th percentile",
+            f"{doc_prefix}, {p}th percentile",
         )
         for p in percentiles
     ]
@@ -341,13 +345,13 @@ def standard_metrics_set(
             f"{label_prefix}Min",
             unit,
             [min(values)],
-            f"{label_prefix}, minimum",
+            f"{doc_prefix}, minimum",
         ),
         trace_metrics.TestCaseResult(
             f"{label_prefix}Max",
             unit,
             [max(values)],
-            f"{label_prefix}, maximum",
+            f"{doc_prefix}, maximum",
         ),
     ]
 
@@ -367,7 +371,7 @@ def standard_metrics_set(
             f"{label_prefix}Average",
             unit,
             [average],
-            f"{label_prefix}, mean",
+            f"{doc_prefix}, mean",
         ),
     ]
 

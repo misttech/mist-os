@@ -216,3 +216,20 @@ class TraceUtilsTest(unittest.TestCase):
                 TCR("FooAverage", unit, [5.0], "Foo, mean"),
             ],
         )
+
+        results = trace_utils.standard_metrics_set(
+            values=values, label_prefix="Foo", unit=unit, doc_prefix="Foo doc"
+        )
+        self.assertEqual(
+            results,
+            [
+                TCR("FooP5", unit, [0.5], p_format_str.format("Foo doc", 5)),
+                TCR("FooP25", unit, [2.5], p_format_str.format("Foo doc", 25)),
+                TCR("FooP50", unit, [5.0], p_format_str.format("Foo doc", 50)),
+                TCR("FooP75", unit, [7.5], p_format_str.format("Foo doc", 75)),
+                TCR("FooP95", unit, [9.5], p_format_str.format("Foo doc", 95)),
+                TCR("FooMin", unit, [0.0], "Foo doc, minimum"),
+                TCR("FooMax", unit, [10.0], "Foo doc, maximum"),
+                TCR("FooAverage", unit, [5.0], "Foo doc, mean"),
+            ],
+        )
