@@ -19,7 +19,7 @@ rustc_test("driver_test_realm_example_realm_builder_rust") {
   source_root = "test.rs"
   sources = [ "test.rs" ]
   deps = [
-    "//examples/drivers/driver_test_realm/sample-driver:fuchsia.hardware.sample_rust",
+    "//examples/drivers/driver_test_realm/sample_driver:fuchsia.hardware.sample_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
@@ -36,7 +36,7 @@ fuchsia_unittest_package("package") {
     ":driver_test_realm_example_realm_builder_rust",
 
     # Include the driver(s) you will be testing.
-    "//examples/drivers/driver_test_realm/sample-driver",
+    "//examples/drivers/driver_test_realm/sample_driver",
 
     # Include the platform bus (if your driver binds to it).
     "//src/devices/bus/drivers/platform:platform-bus",

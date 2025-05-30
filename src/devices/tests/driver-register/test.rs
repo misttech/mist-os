@@ -22,7 +22,7 @@ use {
 // bind_all_unbound_nodes.
 // Whatever the bind rules on the fake driver are will be identical to the one in bootfs
 // and if there is a device that would bind to it, it would bind to the bootfs one first.
-const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample-driver.cm";
+const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample_driver.cm";
 const PARENT_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";
 const FAKE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/driver-test-realm-fake-driver.cm";
 const EPHEMERAL_FAKE_DRIVER_URL: &str =

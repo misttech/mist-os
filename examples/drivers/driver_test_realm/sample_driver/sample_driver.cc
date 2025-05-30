@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "examples/drivers/driver_test_realm/sample-driver/sample_driver.h"
+#include "examples/drivers/driver_test_realm/sample_driver/sample_driver.h"
 
 #include <lib/ddk/binding_driver.h>
 

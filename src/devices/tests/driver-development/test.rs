@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_driver_test as fdt, zx_status,
 };
 
-const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample-driver.cm";
+const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample_driver.cm";
 const PARENT_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";
 const FAKE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/driver-test-realm-fake-driver.cm";
 
@@ -180,7 +180,7 @@ async fn test_get_driver_info_with_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///dtr#driver/sample-driver.so", "foo"];
+    const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///dtr#driver/sample_driver.so", "foo"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -192,7 +192,7 @@ async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_incomplete_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#driver/sample-driver"];
+    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#driver/sample_driver"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -266,7 +266,7 @@ async fn test_get_driver_info_with_mixed_filter() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_incomplete_filter() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#meta/sample-driver"];
+    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#meta/sample_driver"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;

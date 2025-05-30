@@ -12,7 +12,7 @@
         bind: "meta/bind/sample_driver.bindbc",
         fallback: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        compat: "driver/sample-driver.so",
+        compat: "driver/sample_driver.so",
         colocate: "true",
     },
     use: [],

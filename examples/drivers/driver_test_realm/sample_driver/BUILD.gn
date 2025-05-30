@@ -20,7 +20,7 @@ driver_bind_rules("bind") {
 
 fuchsia_cc_driver("driver") {
   legacy = true
-  output_name = "sample-driver"
+  output_name = "sample_driver"
   sources = [ "sample_driver.cc" ]
   deps = [
     ":bind",
@@ -33,9 +33,9 @@ fuchsia_cc_driver("driver") {
   ]
 }
 
-fuchsia_driver_component("sample-driver") {
-  component_name = "sample-driver"
+fuchsia_driver_component("sample_driver") {
+  component_name = "sample_driver"
   deps = [ ":driver" ]
-  info = "meta/sample_driver-info.json"
-  manifest = "meta/sample-driver.cml"
+  info = "meta/sample_driver_info.json"
+  manifest = "meta/sample_driver.cml"
 }
