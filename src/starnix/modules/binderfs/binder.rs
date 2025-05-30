@@ -5489,6 +5489,8 @@ pub mod tests {
     /// Simulates an mmap call on the binder driver, setting up shared memory between the driver and
     /// `proc`.
     fn mmap_shared_memory(driver: &BinderDriver, current_task: &CurrentTask, proc: &BinderProcess) {
+        let fs = create_testfs(&current_task.kernel());
+        let node = create_fs_node_for_testing(&fs, PanickingFsNode);
         let prot_flags = ProtectionFlags::READ;
         driver
             .mmap(
@@ -5498,10 +5500,7 @@ pub mod tests {
                 VMO_LENGTH,
                 prot_flags,
                 MappingOptions::empty(),
-                NamespaceNode::new_anonymous_unrooted(
-                    current_task,
-                    FsNode::new_root(PanickingFsNode).into_handle(),
-                ),
+                NamespaceNode::new_anonymous_unrooted(current_task, node),
             )
             .expect("mmap");
     }

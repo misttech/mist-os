@@ -78,7 +78,7 @@ mod tests {
     use crate::device::kobject::KObject;
     use crate::fs::sysfs::{KObjectDirectory, KObjectSymlinkDirectory};
     use crate::task::CurrentTask;
-    use crate::testing::{create_fs, create_kernel_task_and_unlocked};
+    use crate::testing::{create_kernel_task_and_unlocked, create_testfs_with_root};
     use crate::vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode};
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
@@ -100,8 +100,10 @@ mod tests {
         let root_kobject = KObject::new_root(Default::default());
         root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
         root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
-        let test_fs =
-            create_fs(&kernel, KObjectSymlinkDirectory::new(Arc::downgrade(&root_kobject)));
+        let test_fs = create_testfs_with_root(
+            &kernel,
+            KObjectSymlinkDirectory::new(Arc::downgrade(&root_kobject)),
+        );
 
         let device_entry = lookup_node(&mut locked, &current_task, &test_fs, "0".into())
             .expect("device 0 directory");

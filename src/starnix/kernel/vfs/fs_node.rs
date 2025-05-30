@@ -36,7 +36,7 @@ use starnix_uapi::auth::{
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES, ENOTSUP};
-use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
+use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
@@ -1172,15 +1172,6 @@ impl FsNodeOps for SpecialNode {
 }
 
 impl FsNode {
-    /// Create a new node with default value for the root of a filesystem.
-    ///
-    /// The node identifier and ino will be set by the filesystem on insertion. It will be owned by
-    /// root and have a 777 permission.
-    pub fn new_root(ops: impl FsNodeOps) -> Self {
-        let info = FsNodeInfo::new(0, mode!(IFDIR, 0o777), FsCred::root());
-        Self::new_internal(Box::new(ops), Weak::new(), 0, info, None)
-    }
-
     /// Create a node without inserting it into the FileSystem node cache.
     ///
     /// This is usually not what you want!
@@ -2745,6 +2736,7 @@ mod tests {
     use crate::testing::*;
     use crate::vfs::buffers::VecOutputBuffer;
     use starnix_uapi::auth::Credentials;
+    use starnix_uapi::file_mode::mode;
 
     #[::fuchsia::test]
     async fn open_device_file() {

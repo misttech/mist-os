@@ -18,7 +18,7 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
     FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr, Namespace,
+    FileSystemOptions, FsContext, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, Namespace,
 };
 use fidl_fuchsia_io as fio;
 use selinux::SecurityServer;
@@ -26,7 +26,9 @@ use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_types::arch::ArchWidth;
 use starnix_types::vfs::default_statfs;
+use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{ArchSpecific, UserAddress};
 use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
@@ -649,10 +651,20 @@ impl FileSystemOps for TestFs {
     }
 }
 
-pub fn create_fs(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> FileSystemHandle {
-    let test_fs = FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default())
-        .expect("testfs constructed with valid options");
+pub fn create_testfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+    FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default())
+        .expect("testfs constructed with valid options")
+}
+
+pub fn create_testfs_with_root(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> FileSystemHandle {
+    let test_fs = create_testfs(kernel);
     let root_ino = test_fs.next_node_id();
     test_fs.create_root(ops, root_ino);
     test_fs
+}
+
+pub fn create_fs_node_for_testing(fs: &FileSystemHandle, ops: impl FsNodeOps) -> FsNodeHandle {
+    let ino = fs.next_node_id();
+    let info = FsNodeInfo::new(ino, mode!(IFDIR, 0o777), FsCred::root());
+    FsNode::new_uncached_directory(ops, fs, ino, info)
 }

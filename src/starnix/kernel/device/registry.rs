@@ -271,12 +271,8 @@ struct DeviceRegistryState {
 
 impl DeviceRegistry {
     /// Notify devfs and listeners that a device has been added to the registry.
-    fn notify_device<L>(
-        &self,
-        locked: &mut Locked<L>,
-        current_task: &CurrentTask,
-        device: Device,
-    ) where
+    fn notify_device<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask, device: Device)
+    where
         L: LockBefore<FileOpsCore>,
     {
         if let Some(metadata) = &device.metadata {
@@ -708,14 +704,15 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_opens_device() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let registry = DeviceRegistry::default();
         registry
             .register_major("mem".into(), DeviceMode::Char, MEM_MAJOR, simple_device_ops::<DevNull>)
             .expect("registers unique");
 
-        let node = FsNode::new_root(PanickingFsNode);
+        let fs = create_testfs(&kernel);
+        let node = create_fs_node_for_testing(&fs, PanickingFsNode);
 
         // Fail to open non-existent device.
         assert!(registry
@@ -756,7 +753,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_dynamic_misc() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         fn create_test_device(
             _locked: &mut Locked<DeviceOpen>,
@@ -782,7 +779,8 @@ mod tests {
         let device_type = device.metadata.expect("has metadata").device_type;
         assert!(DYN_MAJOR_RANGE.contains(&device_type.major()));
 
-        let node = FsNode::new_root(PanickingFsNode);
+        let fs = create_testfs(&kernel);
+        let node = create_fs_node_for_testing(&fs, PanickingFsNode);
         let _ = registry
             .open_device(
                 &mut locked,
