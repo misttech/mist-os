@@ -1480,8 +1480,6 @@ trait TestIpExt: packet_formats::ip::IpExt {
     const DOMAIN: fposix_socket::Domain;
     const CLIENT_SUBNET: fnet::Subnet;
     const SERVER_SUBNET: fnet::Subnet;
-    #[allow(dead_code)] // TODO(https://fxbug.dev/421408690)
-    const CLIENT_ADDR: Self::Addr;
     const SERVER_ADDR: Self::Addr;
 }
 
@@ -1489,7 +1487,6 @@ impl TestIpExt for Ipv4 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv4;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
-    const CLIENT_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.2");
     const SERVER_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.1");
 }
 
@@ -1497,7 +1494,6 @@ impl TestIpExt for Ipv6 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7334/64");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7335/64");
-    const CLIENT_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7334");
     const SERVER_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7335");
 }
 

@@ -2753,8 +2753,6 @@ pub mod testutil {
             const DST_PORT: u16 = 9876;
             const SRC_IP_2: Self::Addr;
             const DST_IP_2: Self::Addr;
-            #[allow(dead_code)] // TODO(https://fxbug.dev/421408690)
-            const SRC_IP_3: Self::Addr;
             const DST_IP_3: Self::Addr;
             const IP_OUTSIDE_SUBNET: Self::Addr;
             const SUBNET: Subnet<Self::Addr>;
@@ -2765,7 +2763,6 @@ pub mod testutil {
             const DST_IP: Self::Addr = net_ip_v4!("192.0.2.2");
             const SRC_IP_2: Self::Addr = net_ip_v4!("192.0.2.3");
             const DST_IP_2: Self::Addr = net_ip_v4!("192.0.2.4");
-            const SRC_IP_3: Self::Addr = net_ip_v4!("192.0.2.5");
             const DST_IP_3: Self::Addr = net_ip_v4!("192.0.2.6");
             const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v4!("192.0.3.1");
             const SUBNET: Subnet<Self::Addr> = net_subnet_v4!("192.0.2.0/24");
@@ -2776,7 +2773,6 @@ pub mod testutil {
             const DST_IP: Self::Addr = net_ip_v6!("2001:db8::2");
             const SRC_IP_2: Self::Addr = net_ip_v6!("2001:db8::3");
             const DST_IP_2: Self::Addr = net_ip_v6!("2001:db8::4");
-            const SRC_IP_3: Self::Addr = net_ip_v6!("2001:db8::5");
             const DST_IP_3: Self::Addr = net_ip_v6!("2001:db8::6");
             const IP_OUTSIDE_SUBNET: Self::Addr = net_ip_v6!("2001:db8:ffff::1");
             const SUBNET: Subnet<Self::Addr> = net_subnet_v6!("2001:db8::/64");
