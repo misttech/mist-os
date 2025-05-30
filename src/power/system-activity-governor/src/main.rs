@@ -17,6 +17,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::BoolProperty as IBool;
 use futures::{FutureExt, StreamExt};
+use inspect_format::constants::DEFAULT_VMO_SIZE_BYTES as DEFAULT_INSPECT_VMO;
 use sag_config::Config;
 use std::rc::Rc;
 use std::time::Duration;
@@ -115,7 +116,8 @@ async fn main() -> Result<()> {
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
-    let inspector = fuchsia_inspect::component::inspector();
+    let inspect_vmo_size = (1.25f32 * DEFAULT_INSPECT_VMO as f32) as usize;
+    let inspector = fuchsia_inspect::component::init_inspector_with_size(inspect_vmo_size);
     let _inspect_server_task =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
     fuchsia_inspect::component::serve_inspect_stats();
