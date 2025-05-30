@@ -152,8 +152,7 @@ Monitor::Monitor(async_dispatcher_t* dispatcher, memory_monitor_config::Config c
   inspector_.root().RecordLazyValues("memory_measurements", [this] {
     return fpromise::make_result_promise(fpromise::ok(Inspect()));
   });
-  inspect::Node config_node = inspector_.root().CreateChild("config");
-  config_.RecordInspect(&config_node);
+  inspector_.root().RecordChild("config", [this](auto& node) { config_.RecordInspect(&node); });
 
   trace_observer_.Start(dispatcher_, [this] { UpdateState(); });
 

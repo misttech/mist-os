@@ -190,7 +190,7 @@ TEST_F(InspectTest, FirstLaunch) {
   EXPECT_THAT(data.GetByPath({"root"}),
               IsObjectWithKeys(testing::UnorderedElementsAreArray(
                   {"logger", "current", "high_water", "current_digest", "high_water_digest",
-                   "kmem_stats_compression", "values"})));
+                   "kmem_stats_compression", "values", "config"})));
 }
 
 TEST_F(InspectTest, SecondLaunch) {
@@ -203,7 +203,7 @@ TEST_F(InspectTest, SecondLaunch) {
   EXPECT_THAT(data.GetByPath({"root"}),
               IsObjectWithKeys(testing::UnorderedElementsAreArray(
                   {"logger", "current", "high_water", "current_digest", "high_water_digest",
-                   "kmem_stats_compression", "values"})));
+                   "kmem_stats_compression", "values", "config"})));
 
   DestroyChild();
   StartChild();
@@ -216,7 +216,7 @@ TEST_F(InspectTest, SecondLaunch) {
               IsObjectWithKeys(testing::UnorderedElementsAreArray(
                   {"logger", "current", "high_water", "high_water_previous_boot", "current_digest",
                    "high_water_digest", "high_water_digest_previous_boot", "kmem_stats_compression",
-                   "values"})));
+                   "values", "config"})));
   EXPECT_THAT(data.GetByPath({"root", "current"}), EqJson(R"json(
     "Time: 0 VMO: 46B Free: 41B\nkernel<1> 280B\n other 52B\n ipc 48B\n mmu 47B\n vmo 46B\n heap 44B\n wired 43B\n"
   )json"));
@@ -283,6 +283,16 @@ TEST_F(InspectTest, SecondLaunch) {
         79,
         80
       ]
+    }
+  )json"));
+
+  EXPECT_THAT(data.GetByPath({"root", "config"}), EqJson(R"json(
+    {
+      "capture_on_pressure_change": false,
+      "critical_capture_delay_s": 10,
+      "imminent_oom_capture_delay_s": 10,
+      "normal_capture_delay_s": 10,
+      "warning_capture_delay_s": 10
     }
   )json"));
 }

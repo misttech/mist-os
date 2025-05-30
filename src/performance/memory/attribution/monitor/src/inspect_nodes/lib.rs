@@ -47,7 +47,12 @@ pub fn start_service(
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
             .ok_or_else(|| anyhow!("Failed to serve server handling `fuchsia.inspect.Tree`"))?;
 
-    build_inspect_tree(kernel_stats_proxy.clone(), stall_provider.clone(), inspector);
+    build_inspect_tree(
+        kernel_stats_proxy.clone(),
+        stall_provider.clone(),
+        inspector,
+        &memory_monitor2_config,
+    );
     let digest_service = digest_service(
         memory_monitor2_config,
         attribution_data_service,
@@ -64,7 +69,11 @@ fn build_inspect_tree(
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
     inspector: &Inspector,
+    config: &Config,
 ) {
+    // Register the current config.
+    inspector.root().record_child("config", |node| config.record_inspect(node));
+
     // Lazy evaluation is unregistered when the `LazyNode` is dropped.
     {
         let kernel_stats_proxy = kernel_stats_proxy.clone();
@@ -451,7 +460,18 @@ mod tests {
 
         let inspector = fuchsia_inspect::Inspector::default();
 
-        build_inspect_tree(stats_provider, Arc::new(FakeStallProvider {}), &inspector);
+        build_inspect_tree(
+            stats_provider,
+            Arc::new(FakeStallProvider {}),
+            &inspector,
+            &Config {
+                capture_on_pressure_change: true,
+                critical_capture_delay_s: 1,
+                imminent_oom_capture_delay_s: 2,
+                normal_capture_delay_s: 3,
+                warning_capture_delay_s: 4,
+            },
+        );
 
         let output = exec
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
@@ -500,7 +520,14 @@ mod tests {
             stalls: {
                 some: 10i64,
                 full: 20i64,
-            }
+            },
+            config: {
+                capture_on_pressure_change: true,
+                critical_capture_delay_s: 1u64,
+                imminent_oom_capture_delay_s: 2u64,
+                normal_capture_delay_s: 3u64,
+                warning_capture_delay_s: 4u64,
+            },
         });
     }
 
