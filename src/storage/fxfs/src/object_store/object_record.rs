@@ -1135,9 +1135,30 @@ impl<'a> From<ItemRef<'a, ObjectKey, ObjectValue>>
 
 #[cfg(test)]
 mod tests {
-    use super::ObjectKey;
-    use crate::lsm_tree::types::{LayerKey, OrdLowerBound, OrdUpperBound, RangeKey};
+    use super::{ObjectKey, ObjectKeyV43};
+    use crate::lsm_tree::types::{
+        FuzzyHash as _, LayerKey, OrdLowerBound, OrdUpperBound, RangeKey,
+    };
     use std::cmp::Ordering;
+
+    // Smoke test to ensure hash stability for Fxfs objects.
+    // If this test fails, the hash algorithm changed, and that won't do -- Fxfs relies on stable
+    // hash values, and existing images will appear to be corrupt if they change (see
+    // https://fxbug.dev/419133532).
+    #[test]
+    fn test_hash_stability() {
+        // Target a specific version of ObjectKey.  If you want to delete ObjectKeyV43, simply
+        // update this test with a later key version, which will also require re-generating the
+        // hashes.
+        assert_eq!(
+            &ObjectKeyV43::object(100).fuzzy_hash().collect::<Vec<_>>()[..],
+            &[2770938889503972258]
+        );
+        assert_eq!(
+            &ObjectKeyV43::extent(1, 0, 0..2 * 1024 * 1024).fuzzy_hash().collect::<Vec<_>>()[..],
+            &[2619169106812529315, 13884007937324812898]
+        );
+    }
 
     #[test]
     fn test_next_key() {
