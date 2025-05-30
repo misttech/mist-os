@@ -193,20 +193,11 @@ the Fuchsia source tree directly in the [fuchsia.git] repository.  This means
 that a "roll" is nothing more than a normal [fuchsia.git] commit, always
 tested, reviewed (except when by auto-rollers), and landed via [Gerrit].
 
-A maintainer can do those commits as well as the auto-roller.  This can be
-done by hand edits in [the XML file](/manifests/third_party/all) or via the
+A maintainer can do those commits as well as the auto-roller.  This can be done
+by hand edits in [the XML file](/manifests/third_party/all) or via the
 command-line `jiri edit` tool.  It has to be invoked with some idiosyncratic
-details from the manifest to match the revisions changed locally using `git
-checkout` commands in `//third_party` subdirectories.
-
-```sh
-REV=$(git -C third-party/llvm-libc/src rev-parse HEAD)
-fx jiri -edit -project llvm-project/libc=$REV manifests/third_party/all
-REV=$(git -C third-party/scudo/src rev-parse HEAD)
-fx jiri -edit -project scudo=$REV manifests/third_party/all
-REV=$(git -C third-party/scuo/gwp_asan rev-parse HEAD)
-fx jiri -edit -project gwp-asan=$REV manifests/third_party/all
-```
+details from the manifest.  The [`manual-roll.sh` script](manual-roll.sh) helps
+with this.
 
 There's rarely any use for a manual roll that moves one of the pins to an
 older revision than it was before, which the auto-roller never does.  It can
@@ -215,9 +206,12 @@ update it back to the latest available upstream revision sooner or later.
 
 Usually a `git remote update` and `git checkout origin/main` in the local
 `//third-party/llvm-libc/src` and its brethren makes local development match
-the best case update that the auto-rollers are attempting.  Each can be
+the best case update that the auto-rollers are attempting.  (This is what the
+[`manual-roll.sh` script](manual-roll.sh) without arguments does.)  Each can be
 separately adjusted to a different revision as needed such that they all work
-together in the Fuchsia build.
+together in the Fuchsia build.  (The same script can then be used with `HEAD`
+as the argument to do the `jiri edit` command to match your local checkout
+state for each upstream mirror repository.)
 
 In the same way, any changes needed to the source code or build files here to
 work with the new revisions can be included in the same change and land as an
