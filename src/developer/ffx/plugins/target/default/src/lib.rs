@@ -272,8 +272,12 @@ mod test {
     use tempfile::tempdir;
 
     #[fuchsia::test]
-    async fn test_get_env_unset() -> Result<()> {
-        let env = test_env().build().await.unwrap();
+    async fn test_get_env_unset_stateless() -> Result<()> {
+        let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
+            .build()
+            .await
+            .unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -292,8 +296,9 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_get_env_empty() -> Result<()> {
+    async fn test_get_env_empty_stateless() -> Result<()> {
         let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
             .env_var("FUCHSIA_NODENAME", "")
             .env_var("FUCHSIA_DEVICE_ADDR", "")
             .build()
@@ -317,9 +322,10 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_get_no_env() -> Result<()> {
+    async fn test_get_non_env_stateless() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
         let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
             .runtime_config(TARGET_DEFAULT_KEY, "distraction-target1")
             .in_tree(&test_build_dir.path())
             .build()
@@ -362,9 +368,10 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_get_all() -> Result<()> {
+    async fn test_get_all_stateless() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
         let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
             .in_tree(&test_build_dir.path())
             .env_var("FUCHSIA_NODENAME", "stateless-nodename-target")
             .env_var("FUCHSIA_DEVICE_ADDR", "stateless-device-addr-target")
@@ -409,8 +416,200 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_set_oot_deprecation_error() -> Result<()> {
+    async fn test_get_no_default() -> Result<()> {
         let env = test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, TARGET_GET_NO_TARGET_MSG);
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_get_configuration() -> Result<()> {
+        let env = test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set("foo-target".into())
+            .await
+            .expect("default target setting");
+
+        exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "foo-target\n");
+        assert_eq!(stderr, "");
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_get_env_fuchsia_nodename() -> Result<()> {
+        let env = test_env().env_var("FUCHSIA_NODENAME", "bar-target").build().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "bar-target\n");
+        assert_eq!(stderr, "");
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_get_env_fuchsia_device_addr() -> Result<()> {
+        let env = test_env().env_var("FUCHSIA_DEVICE_ADDR", "baz-target").build().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "baz-target\n");
+        assert_eq!(stderr, "");
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_get_env_and_configuration() -> Result<()> {
+        let env = test_env()
+            .env_var("FUCHSIA_NODENAME", "env1-target")
+            .env_var("FUCHSIA_DEVICE_ADDR", "env2-target")
+            .build()
+            .await
+            .unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set("config-target".into())
+            .await
+            .expect("default target setting");
+
+        exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "config-target\n");
+        assert_eq!(stderr, "");
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_set_oot() -> Result<()> {
+        let env = test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand {
+                subcommand: SubCommand::Set(TargetDefaultSetCommand {
+                    nodename: "foo-set-device".into(),
+                }),
+            },
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, TARGET_SET_DEPRECATION_OOT_WARNING_MSG);
+
+        let config_default_target = env
+            .context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .get_optional::<Option<String>>()
+            .expect("query default target");
+
+        assert_eq!(config_default_target, Some("foo-set-device".into()));
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_set_in_tree() -> Result<()> {
+        let test_build_dir = tempdir().expect("output directory");
+        let env = test_env().in_tree(test_build_dir.path()).build().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand {
+                subcommand: SubCommand::Set(TargetDefaultSetCommand {
+                    nodename: "foo-set-device".into(),
+                }),
+            },
+            &mut writer,
+        )
+        .await
+        .unwrap();
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, TARGET_SET_DEPRECATION_IN_TREE_WARNING_MSG);
+
+        let config_default_target = env
+            .context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .get_optional::<Option<String>>()
+            .expect("query default target");
+
+        assert_eq!(config_default_target, Some("foo-set-device".into()));
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_set_oot_stateless_deprecation_error() -> Result<()> {
+        let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
+            .build()
+            .await
+            .unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -444,9 +643,14 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_set_in_tree_deprecation_error() -> Result<()> {
+    async fn test_set_in_tree_stateless_deprecation_error() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
-        let env = test_env().in_tree(test_build_dir.path()).build().await.unwrap();
+        let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
+            .in_tree(test_build_dir.path())
+            .build()
+            .await
+            .unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -480,314 +684,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_get_no_default_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
-            &mut writer,
-        )
-        .await
-        .unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "");
-        assert_eq!(stderr, TARGET_GET_NO_TARGET_MSG);
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_unset_oot_deprecation_error() -> Result<()> {
-        let env = test_env()
-            .env_var("FUCHSIA_NODENAME", "distraction-target1")
-            .env_var("FUCHSIA_DEVICE_ADDR", "distraction-target2")
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set("distraction-target3".into())
-            .await
-            .expect("default target setting");
-
-        let result = exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand { subcommand: SubCommand::Unset(TargetDefaultUnsetCommand {}) },
-            &mut writer,
-        )
-        .await;
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "");
-        assert_eq!(stderr, "");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), TARGET_UNSET_DEPRECATION_OOT_ERROR_MSG);
-
-        let user_default_target = env
-            .context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .get_optional::<Option<String>>()
-            .expect("query default target");
-        assert_eq!(user_default_target, Some("distraction-target3".into()));
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_unset_in_tree_deprecation_error() -> Result<()> {
-        let test_build_dir = tempdir().expect("output directory");
-        let env = test_env()
-            .env_var("FUCHSIA_NODENAME", "distraction-target1")
-            .env_var("FUCHSIA_DEVICE_ADDR", "distraction-target2")
-            .in_tree(test_build_dir.path())
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set("distraction-target3".into())
-            .await
-            .expect("default target setting");
-
-        let result = exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand { subcommand: SubCommand::Unset(TargetDefaultUnsetCommand {}) },
-            &mut writer,
-        )
-        .await;
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "");
-        assert_eq!(stderr, "");
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), TARGET_UNSET_DEPRECATION_IN_TREE_ERROR_MSG);
-
-        let user_default_target = env
-            .context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .get_optional::<Option<String>>()
-            .expect("query default target");
-        assert_eq!(user_default_target, Some("distraction-target3".into()));
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_get_configuration_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set("foo-target".into())
-            .await
-            .expect("default target setting");
-
-        exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
-            &mut writer,
-        )
-        .await
-        .unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "foo-target\n");
-        assert_eq!(stderr, "");
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_get_env_fuchsia_nodename_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .env_var("FUCHSIA_NODENAME", "bar-target")
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
-            &mut writer,
-        )
-        .await
-        .unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "bar-target\n");
-        assert_eq!(stderr, "");
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_get_env_fuchsia_device_addr_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .env_var("FUCHSIA_DEVICE_ADDR", "baz-target")
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
-            &mut writer,
-        )
-        .await
-        .unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "baz-target\n");
-        assert_eq!(stderr, "");
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_get_env_and_configuration_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .env_var("FUCHSIA_NODENAME", "env1-target")
-            .env_var("FUCHSIA_DEVICE_ADDR", "env2-target")
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        env.context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set("config-target".into())
-            .await
-            .expect("default target setting");
-
-        exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand { subcommand: SubCommand::Get(TargetDefaultGetCommand {}) },
-            &mut writer,
-        )
-        .await
-        .unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "config-target\n");
-        assert_eq!(stderr, "");
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_set_oot_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand {
-                subcommand: SubCommand::Set(TargetDefaultSetCommand {
-                    nodename: "foo-set-device".into(),
-                }),
-            },
-            &mut writer,
-        )
-        .await
-        .unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "");
-        assert_eq!(stderr, TARGET_SET_DEPRECATION_OOT_WARNING_MSG);
-
-        let config_default_target = env
-            .context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .get_optional::<Option<String>>()
-            .expect("query default target");
-
-        assert_eq!(config_default_target, Some("foo-set-device".into()));
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_set_in_tree_stateful() -> Result<()> {
-        let test_build_dir = tempdir().expect("output directory");
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .in_tree(test_build_dir.path())
-            .build()
-            .await
-            .unwrap();
-        let test_buffers = TestBuffers::default();
-        let mut writer = SimpleWriter::new_test(&test_buffers);
-
-        exec_target_default_impl(
-            &env.context,
-            TargetDefaultCommand {
-                subcommand: SubCommand::Set(TargetDefaultSetCommand {
-                    nodename: "foo-set-device".into(),
-                }),
-            },
-            &mut writer,
-        )
-        .await
-        .unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "");
-        assert_eq!(stderr, TARGET_SET_DEPRECATION_IN_TREE_WARNING_MSG);
-
-        let config_default_target = env
-            .context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .get_optional::<Option<String>>()
-            .expect("query default target");
-
-        assert_eq!(config_default_target, Some("foo-set-device".into()));
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn test_unset_no_config_no_env_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .build()
-            .await
-            .unwrap();
+    async fn test_unset_no_config_no_env() -> Result<()> {
+        let env = test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -810,13 +708,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_unset_no_config_fuchsia_nodename_isolated_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .env_var("FUCHSIA_NODENAME", "foo-unset-target")
-            .build()
-            .await
-            .unwrap();
+    async fn test_unset_no_config_fuchsia_nodename_isolated() -> Result<()> {
+        let env = test_env().env_var("FUCHSIA_NODENAME", "foo-unset-target").build().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -843,10 +736,9 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_unset_no_config_fuchsia_device_addr_in_tree_stateful() -> Result<()> {
+    async fn test_unset_no_config_fuchsia_device_addr_in_tree() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
         let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
             .env_var("FUCHSIA_DEVICE_ADDR", "bar-unset-target")
             .in_tree(test_build_dir.path())
             .build()
@@ -878,12 +770,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_unset_with_config_no_env_stateful() -> Result<()> {
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .build()
-            .await
-            .unwrap();
+    async fn test_unset_with_config_no_env() -> Result<()> {
+        let env = test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -918,10 +806,9 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_unset_with_config_both_envs_in_tree_stateful() -> Result<()> {
+    async fn test_unset_with_config_both_envs_in_tree() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
         let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
             .env_var("FUCHSIA_NODENAME", "baz-unset-target1")
             .env_var("FUCHSIA_DEVICE_ADDR", "baz-unset-target2")
             .in_tree(test_build_dir.path())
@@ -971,9 +858,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_unset_with_config_both_envs_isolated_stateful() -> Result<()> {
+    async fn test_unset_with_config_both_envs_isolated() -> Result<()> {
         let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
             .env_var("FUCHSIA_NODENAME", "baz-unset-target1")
             .env_var("FUCHSIA_DEVICE_ADDR", "baz-unset-target2")
             .build()
@@ -1022,14 +908,9 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_unset_with_config_all_levels_stateful() -> Result<()> {
+    async fn test_unset_with_config_all_levels() -> Result<()> {
         let test_build_dir = tempdir().expect("output directory");
-        let env = test_env()
-            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, false)
-            .in_tree(&test_build_dir.path())
-            .build()
-            .await
-            .unwrap();
+        let env = test_env().in_tree(&test_build_dir.path()).build().await.unwrap();
         let test_buffers = TestBuffers::default();
         let mut writer = SimpleWriter::new_test(&test_buffers);
 
@@ -1092,6 +973,94 @@ mod test {
             .get_optional::<Option<String>>()
             .expect("query default target");
         assert_eq!(effective_default_target, None);
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_unset_oot_stateless_deprecation_error() -> Result<()> {
+        let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
+            .env_var("FUCHSIA_NODENAME", "distraction-target1")
+            .env_var("FUCHSIA_DEVICE_ADDR", "distraction-target2")
+            .build()
+            .await
+            .unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set("distraction-target3".into())
+            .await
+            .expect("default target setting");
+
+        let result = exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand { subcommand: SubCommand::Unset(TargetDefaultUnsetCommand {}) },
+            &mut writer,
+        )
+        .await;
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, "");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), TARGET_UNSET_DEPRECATION_OOT_ERROR_MSG);
+
+        let user_default_target = env
+            .context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .get_optional::<Option<String>>()
+            .expect("query default target");
+        assert_eq!(user_default_target, Some("distraction-target3".into()));
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_unset_in_tree_stateless_deprecation_error() -> Result<()> {
+        let test_build_dir = tempdir().expect("output directory");
+        let env = test_env()
+            .runtime_config(STATELESS_DEFAULT_TARGET_CONFIGURATION, true)
+            .env_var("FUCHSIA_NODENAME", "distraction-target1")
+            .env_var("FUCHSIA_DEVICE_ADDR", "distraction-target2")
+            .in_tree(test_build_dir.path())
+            .build()
+            .await
+            .unwrap();
+        let test_buffers = TestBuffers::default();
+        let mut writer = SimpleWriter::new_test(&test_buffers);
+
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set("distraction-target3".into())
+            .await
+            .expect("default target setting");
+
+        let result = exec_target_default_impl(
+            &env.context,
+            TargetDefaultCommand { subcommand: SubCommand::Unset(TargetDefaultUnsetCommand {}) },
+            &mut writer,
+        )
+        .await;
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(stdout, "");
+        assert_eq!(stderr, "");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), TARGET_UNSET_DEPRECATION_IN_TREE_ERROR_MSG);
+
+        let user_default_target = env
+            .context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .get_optional::<Option<String>>()
+            .expect("query default target");
+        assert_eq!(user_default_target, Some("distraction-target3".into()));
 
         Ok(())
     }

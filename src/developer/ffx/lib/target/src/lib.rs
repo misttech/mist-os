@@ -483,14 +483,6 @@ pub async fn knock_target_daemonless(
 
 /// Get the target specifier, bypassing stateful configuration
 /// (i.e. ConfigLevel::{User, Build, Global}).
-///
-/// This is typically how ffx ConfigQueries work under
-/// EnvironmentKind::StrictContext, except ffx strict mode also ignores
-/// environment variables like `$FUCHSIA_NODENAME` and `$FUCHSIA_DEVICE_ADDR`.
-/// This implies default targets aren't supported when using `ffx --strict`;
-/// `--target` must be explicitly specified as an IP address when using
-/// `--strict` to interact with any target.
-///
 /// Should be gated behind the `STATELESS_DEFAULT_TARGET_CONFIGURATION`
 /// experimental config flag.
 fn get_target_specifier_stateless(
@@ -603,59 +595,41 @@ mod test {
     use futures_lite::future::{pending, ready};
     use tempfile::tempdir;
 
-    async fn rollback_stateless_feature_flag(env: &TestEnv) {
+    async fn set_stateless_feature_flag(env: &TestEnv) {
         env.context
             .query(STATELESS_DEFAULT_TARGET_CONFIGURATION)
             .level(Some(ConfigLevel::User))
-            .set(Value::Bool(false))
+            .set(Value::Bool(true))
             .await
             .unwrap();
     }
 
     #[fuchsia::test]
-    async fn test_get_target_specifier_unset() {
+    async fn test_get_target_specifier_unset_stateless() {
         // Explicitly initialize the test with no env vars.
         // That way, $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are both unset.
         let env = test_env().build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, None);
     }
 
     #[fuchsia::test]
-    async fn test_get_target_specifier_from_nodename_env() {
-        let env = test_env().env_var("FUCHSIA_NODENAME", "nodename-default").build().await.unwrap();
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("nodename-default".into()));
-    }
-
-    #[fuchsia::test]
-    async fn test_get_target_specifier_from_device_addr_env() {
+    async fn test_get_target_specifier_from_env_stateless() {
         let env =
-            test_env().env_var("FUCHSIA_DEVICE_ADDR", "device-addr-default").build().await.unwrap();
+            test_env().env_var("FUCHSIA_NODENAME", "stateless-default").build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("device-addr-default".into()));
+        assert_eq!(target_spec, Some("stateless-default".into()));
     }
 
     #[fuchsia::test]
-    async fn test_get_target_specifier_from_both_envs() {
-        let env = test_env()
-            .env_var("FUCHSIA_NODENAME", "nodename-default")
-            .env_var("FUCHSIA_DEVICE_ADDR", "device-addr-default")
-            .build()
-            .await
-            .unwrap();
-
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("device-addr-default".into()));
-    }
-
-    #[fuchsia::test]
-    async fn test_get_target_specifier_bypasses_state() {
+    async fn test_get_target_specifier_bypasses_state_stateless() {
         let build_dir = tempdir().expect("temp dir");
         let env = test_env().in_tree(build_dir.path()).build().await.unwrap();
+        set_stateless_feature_flag(&env).await;
 
         // Set stateful configuration.
         env.context
@@ -682,14 +656,15 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_get_target_specifier_from_nodename_env_bypasses_state() {
+    async fn test_get_target_specifier_from_env_bypasses_state_stateless() {
         let build_dir = tempdir().expect("temp dir");
         let env = test_env()
-            .env_var("FUCHSIA_NODENAME", "nodename-default")
+            .env_var("FUCHSIA_NODENAME", "stateless-default")
             .in_tree(build_dir.path())
             .build()
             .await
             .unwrap();
+        set_stateless_feature_flag(&env).await;
 
         // Set stateful configuration.
         env.context
@@ -712,20 +687,20 @@ mod test {
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("nodename-default".into()));
+        assert_eq!(target_spec, Some("stateless-default".into()));
     }
 
     #[fuchsia::test]
-    async fn test_get_target_specifier_from_all_sources() {
+    async fn test_get_target_specifier_from_all_sources_stateless() {
         let build_dir = tempdir().expect("temp dir");
         let env = test_env()
-            .env_var("FUCHSIA_NODENAME", "nodename-default")
-            .env_var("FUCHSIA_DEVICE_ADDR", "device-addr-default")
-            .runtime_config(TARGET_DEFAULT_KEY, "runtime-default")
+            .env_var("FUCHSIA_NODENAME", "stateless-env-default")
+            .runtime_config(TARGET_DEFAULT_KEY, "stateless-runtime-default")
             .in_tree(build_dir.path())
             .build()
             .await
             .unwrap();
+        set_stateless_feature_flag(&env).await;
 
         // Set stateful configuration.
         env.context
@@ -748,33 +723,30 @@ mod test {
             .unwrap();
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
-        assert_eq!(target_spec, Some("runtime-default".into()));
+        assert_eq!(target_spec, Some("stateless-runtime-default".into()));
     }
 
     #[fuchsia::test]
-    async fn test_get_empty_default_target_statefull() {
+    async fn test_get_empty_default_target() {
         // Explicitly initialize the test with no env vars.
         // That way, $FUCHSIA_NODENAME and $FUCHSIA_DEVICE_ADDR are both unset.
         let env = test_env().build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, None);
     }
 
     #[fuchsia::test]
-    async fn test_get_default_target_from_env_statefull() {
+    async fn test_get_default_target_from_env() {
         let env = test_env().env_var("FUCHSIA_NODENAME", "foo-123").build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
 
         let target_spec = get_target_specifier(&env.context).await.unwrap();
         assert_eq!(target_spec, Some("foo-123".to_owned()));
     }
 
     #[fuchsia::test]
-    async fn test_get_default_target_from_config_statefull() {
+    async fn test_get_default_target_from_config() {
         let env = test_init().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
@@ -787,10 +759,9 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_get_default_target_from_runtime_statefull() {
+    async fn test_get_default_target_from_runtime() {
         let env =
             test_env().runtime_config(TARGET_DEFAULT_KEY, "runtime-target").build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
         env.context
             .query(TARGET_DEFAULT_KEY)
             .level(Some(ConfigLevel::User))
@@ -803,9 +774,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_default_first_target_in_array_statefull() {
+    async fn test_default_first_target_in_array() {
         let env = test_init().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
         let ts: Vec<Value> = ["t1", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
         env.context
             .query(TARGET_DEFAULT_KEY)
@@ -819,9 +789,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_default_missing_env_ignored_statefull() {
+    async fn test_default_missing_env_ignored() {
         let env = test_init().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
         let ts: Vec<Value> =
             ["$THIS_BETTER_NOT_EXIST", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
         env.context
@@ -836,9 +805,8 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_default_env_present_statefull() {
+    async fn test_default_env_present() {
         let env = test_env().env_var("MY_LITTLE_TMPKEY", "t1").build().await.unwrap();
-        rollback_stateless_feature_flag(&env).await;
         let ts: Vec<Value> =
             ["$MY_LITTLE_TMPKEY", "t2"].iter().map(|s| Value::String(s.to_string())).collect();
         env.context

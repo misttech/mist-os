@@ -1499,19 +1499,21 @@ Current tracing status:
 
     #[fuchsia::test]
     async fn test_handle_recording_error() {
-        let target = "fuchsia-device";
-        let env = ffx_config::test_env()
-            .env_var("FUCHSIA_NODENAME", target.into())
-            .build()
-            .await
-            .unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let context = &env.context;
         let output_file = "foo_bar_bazzle_wazzle.fxt";
         let log_dir = "important_log_file.log";
+        let target = "fuchsia-device";
         context
             .query("log.dir")
             .level(Some(ffx_config::ConfigLevel::User))
             .set(log_dir.into())
+            .await
+            .unwrap();
+        context
+            .query(ffx_config::keys::TARGET_DEFAULT_KEY)
+            .level(Some(ffx_config::ConfigLevel::User))
+            .set(target.into())
             .await
             .unwrap();
 
