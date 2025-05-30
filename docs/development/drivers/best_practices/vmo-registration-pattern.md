@@ -1,8 +1,5 @@
 # VMO registration pattern
 
-Caution: This page may contain information that is specific to the legacy
-version of the driver framework (DFv1).
-
 ## Summary
 
 When transferring bulk data between applications and peripheral hardware, it
@@ -37,7 +34,7 @@ may not be sufficiently performant for the following two reasons:
   all hardware supports DMA), it must either map the VMO into its process or
   call into the kernel in order to copy the memory.
 
-Since both of these are costly we need a better approach: using pre-registered
+Because both of these are costly we need a better approach: using pre-registered
 VMOs. This works by having the application send a one-time control message in
 order to register a VMO with the final driver in the stack. The response to this
 message returns an identifier which may be used to refer to the VMO in the
@@ -112,13 +109,9 @@ good idea for the following reasons:
   provided by the platform-bus or pci drivers. Passing a BTI handle up the
   driver stack is an anti-pattern.
 * In the case mapping is necessary, this means that raw buffers are passed over
-  FIDL. This is an anti-pattern as it may no longer be possible without a copy
-  in future iterations of in-process inter-driver communication.
+  FIDL. This is an anti-pattern as it is not possible to avoid copying the data
+  when sending between drivers in this case.
 * In either case if the operation is asynchronous (which most are), then the
   core driver becomes responsible for ensuring that it doesn’t unpin/unmap the
   VMO while it’s still in use. This is particularly problematic in situations
   such as shutdown and suspend which aren’t as well tested.
-* In cases such as the block stack, the core driver is bound multiple times
-  recursively in the same driver host. The core driver would need to be aware of
-  whether it is bound directly to the driver which talks to hardware or a filter
-  layer.
