@@ -30,8 +30,7 @@
 // - ANSI/CTA-861-I: A DTV Profile for Uncompressed High Speed Digital
 //   Interfaces, Consumer Technology Association (CTA), dated February 2023.
 //   Referenced as "CTA-861 standard".
-//   Available at
-//   https://shop.cta.tech/collections/standards/products/a-dtv-profile-for-uncompressed-high-speed-digital-interfaces-ansi-cta-861-i
+//   Available at https://shop.cta.tech/products/cta-861 .
 
 namespace display {
 
