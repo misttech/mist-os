@@ -6,7 +6,7 @@ use super::{check_permission, set_cached_sid, superblock, task_effective_sid};
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
-use selinux::{InitialSid, SecurityId, SecurityPermission, SecurityServer};
+use selinux::{InitialSid, SecurityPermission, SecurityServer};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 
@@ -15,7 +15,7 @@ pub(in crate::security) fn selinuxfs_init_null(
     null_file_handle: &FileHandle,
 ) {
     // Apply the "devnull" initial SID to the node.
-    set_cached_sid(null_file_handle.node(), SecurityId::initial(InitialSid::Devnull));
+    set_cached_sid(null_file_handle.node(), InitialSid::Devnull.into());
 
     let kernel_state = current_task
         .kernel()
@@ -66,7 +66,7 @@ pub(in crate::security) fn selinuxfs_check_access(
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
     let source_sid = task_effective_sid(current_task);
-    let target_sid = SecurityId::initial(InitialSid::Security);
+    let target_sid = InitialSid::Security.into();
     let permission_check = security_server.as_permission_check();
     check_permission(
         &permission_check,

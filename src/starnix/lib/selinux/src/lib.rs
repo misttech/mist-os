@@ -25,11 +25,11 @@ pub use policy::ClassId;
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SecurityId(NonZeroU32);
 
-impl SecurityId {
-    /// Returns a `SecurityId` encoding the specified initial Security Context.
-    /// These are used when labeling kernel resources created before policy
-    /// load, allowing the policy to determine the Security Context to use.
-    pub fn initial(initial_sid: InitialSid) -> Self {
+impl From<InitialSid> for SecurityId {
+    fn from(initial_sid: InitialSid) -> Self {
+        // Initial SIDs are used by the kernel as placeholder `SecurityId` values for objects
+        // created prior to the SELinux policy being loaded, and are resolved to the policy-defined
+        // Security Context when referenced after policy load.
         Self(NonZeroU32::new(initial_sid as u32).unwrap())
     }
 }

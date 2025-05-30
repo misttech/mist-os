@@ -622,7 +622,7 @@ impl InitialContextFile {
 impl BytesFileOps for InitialContextFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         profile_duration!("selinuxfs.initial_sid");
-        let sid = SecurityId::initial(self.initial_sid);
+        let sid = self.initial_sid.into();
         if let Some(context) = self.security_server.sid_to_security_context(sid) {
             Ok(context.into())
         } else {

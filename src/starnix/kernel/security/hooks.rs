@@ -1770,7 +1770,7 @@ mod tests {
     };
     use crate::testing::{create_task, spawn_kernel_and_run, spawn_kernel_with_selinux_and_run};
     use linux_uapi::XATTR_NAME_SELINUX;
-    use selinux::{InitialSid, SecurityId};
+    use selinux::InitialSid;
     use starnix_uapi::signals::SIGTERM;
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
@@ -1896,7 +1896,7 @@ mod tests {
         spawn_kernel_and_run(|_locked, current_task| {
             // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
             // in the system.
-            let target_sid = SecurityId::initial(InitialSid::Unlabeled);
+            let target_sid = InitialSid::Unlabeled.into();
             let elf_state = ResolvedElfState { sid: Some(target_sid) };
 
             assert!(selinux_hooks::task_effective_sid(current_task) != target_sid);
@@ -1914,7 +1914,7 @@ mod tests {
             // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
             // in the system.
             let initial_state = current_task.security_state.lock().clone();
-            let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
+            let elf_sid = InitialSid::Unlabeled.into();
             let elf_state = ResolvedElfState { sid: Some(elf_sid) };
             assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
             update_state_on_exec(current_task, &elf_state);
@@ -2198,7 +2198,7 @@ mod tests {
                 let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 let before_sid = selinux_hooks::get_cached_sid(node);
-                assert_ne!(Some(SecurityId::initial(InitialSid::Unlabeled)), before_sid);
+                assert_ne!(Some(InitialSid::Unlabeled.into()), before_sid);
 
                 assert!(fs_node_setsecurity(
                     locked,
@@ -2222,10 +2222,7 @@ mod tests {
                 security_server.set_enforcing(false);
                 let node = &testing::create_test_file(locked, current_task).entry.node;
 
-                assert_ne!(
-                    Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    selinux_hooks::get_cached_sid(node)
-                );
+                assert_ne!(Some(InitialSid::Unlabeled.into()), selinux_hooks::get_cached_sid(node));
 
                 fs_node_setsecurity(
                     locked,
@@ -2237,10 +2234,7 @@ mod tests {
                 )
                 .expect("set_xattr(security.selinux) failed");
 
-                assert_eq!(
-                    Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    selinux_hooks::get_cached_sid(node)
-                );
+                assert_eq!(Some(InitialSid::Unlabeled.into()), selinux_hooks::get_cached_sid(node));
             },
         )
     }

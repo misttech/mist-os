@@ -147,7 +147,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                         Ok(ValueOrSize::Value(security_context)) => Some(
                             security_server
                                 .security_context_to_sid((&security_context).into())
-                                .unwrap_or_else(|_| SecurityId::initial(InitialSid::Unlabeled)),
+                                .unwrap_or_else(|_| InitialSid::Unlabeled.into()),
                         ),
                         Ok(ValueOrSize::Size(_)) => None,
                         Err(err) => {
@@ -201,7 +201,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                         fs.name(),
                         fs_use_type
                     );
-                    SecurityId::initial(InitialSid::Unlabeled)
+                    InitialSid::Unlabeled.into()
                 }
                 _ => {
                     // Ephemeral nodes are then labeled by applying SID computation between their
@@ -248,7 +248,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                     sub_path.as_slice().into(),
                     Some(class_id),
                 )
-                .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled))
+                .unwrap_or_else(|| InitialSid::Unlabeled.into())
         }
     };
 
@@ -490,7 +490,7 @@ pub(in crate::security) fn fs_node_init_anon(
     // TODO: https://fxbug.dev/405062002 - Fold this into the `fs_node_init_with_dentry*()` logic?
     let sid = if is_private_node {
         // TODO: https://fxbug.dev/404773987 - Introduce a new `FsNode` labeling state for this?
-        SecurityId::initial(InitialSid::Unlabeled)
+        InitialSid::Unlabeled.into()
     } else if security_server.has_policy() {
         let task_sid = task_effective_sid(current_task);
         security_server
@@ -499,7 +499,7 @@ pub(in crate::security) fn fs_node_init_anon(
             .expect("Compute label for anon_inode")
     } else {
         // If no policy has been loaded then `anon_inode`s receive the "unlabeled" context.
-        SecurityId::initial(InitialSid::Unlabeled)
+        InitialSid::Unlabeled.into()
     };
 
     let mut state = new_node.security_state.lock();
@@ -563,7 +563,7 @@ fn may_create(
         name.into(),
     )?
     .map(|(sid, _)| sid)
-    .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
+    .unwrap_or_else(|| InitialSid::File.into());
 
     let audit_context = &[current_task.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
@@ -1120,7 +1120,7 @@ where
     // Security Context, which we should return, so return the `get_xattr()` result, unless it indicates
     // that the filesystem does not support the attribute.
     let sid = fs_node_effective_sid_and_class(&fs_node).sid;
-    if sid == SecurityId::initial(InitialSid::Unlabeled) {
+    if sid == InitialSid::Unlabeled.into() {
         let result = fs_node.ops().get_xattr(
             &mut locked.cast_locked::<FileOpsCore>(),
             fs_node,
@@ -1243,8 +1243,7 @@ where
 
     // If the operation succeeded then update the label cached on the file node.
     if result.is_ok() {
-        let effective_new_sid =
-            new_sid.unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled));
+        let effective_new_sid = new_sid.unwrap_or_else(|| InitialSid::Unlabeled.into());
         set_cached_sid(fs_node, effective_new_sid);
     }
 
@@ -1322,7 +1321,7 @@ mod tests {
 
                 // `fs_node_getsecurity()` should now fall-back to the policy's "file" Context.
                 let default_file_context = security_server
-                    .sid_to_security_context(SecurityId::initial(InitialSid::File))
+                    .sid_to_security_context(InitialSid::File.into())
                     .unwrap()
                     .into();
                 let result = fs_node_getsecurity(
@@ -1385,13 +1384,11 @@ mod tests {
                 assert_eq!(result, ValueOrSize::Value(INVALID_CONTEXT.into()));
 
                 // The SID cached for the `node` should be "unlabeled".
-                assert_eq!(Some(SecurityId::initial(InitialSid::Unlabeled)), get_cached_sid(node));
+                let unlabeled_initial_sid = InitialSid::Unlabeled.into();
+                assert_eq!(Some(unlabeled_initial_sid), get_cached_sid(node));
 
                 // The effective SID of the node should be "unlabeled".
-                assert_eq!(
-                    SecurityId::initial(InitialSid::Unlabeled),
-                    fs_node_effective_sid_and_class(node).sid
-                );
+                assert_eq!(unlabeled_initial_sid, fs_node_effective_sid_and_class(node).sid);
             },
         )
     }
