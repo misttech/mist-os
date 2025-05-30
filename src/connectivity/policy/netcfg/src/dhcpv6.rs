@@ -18,7 +18,7 @@ use futures::future::TryFutureExt as _;
 use futures::stream::{Stream, TryStreamExt as _};
 use log::warn;
 
-use crate::{dns, errors, DnsServerWatchers, InterfaceId};
+use crate::{dns, errors, network, DnsServerWatchers, InterfaceId};
 
 // TODO(https://fxbug.dev/329099228): Switch to using DUID-LLT and persisting it to disk.
 pub(super) fn duid(mac: fnet_ext::MacAddress) -> fnet_dhcpv6::Duid {
@@ -315,6 +315,7 @@ pub(super) async fn stop_client(
     lookup_admin: &fnet_name::LookupAdminProxy,
     dns_servers: &mut DnsServers,
     dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
+    netpol_networks_service: &mut network::NetpolNetworksService,
     interface_id: InterfaceId,
     watchers: &mut DnsServerWatchers<'_>,
     prefixes_streams: &mut PrefixesStreamMap,
@@ -343,8 +344,15 @@ pub(super) async fn stop_client(
         );
     }
 
-    dns::update_servers(lookup_admin, dns_servers, dns_server_watch_responders, source, vec![])
-        .await
+    dns::update_servers(
+        lookup_admin,
+        dns_servers,
+        dns_server_watch_responders,
+        netpol_networks_service,
+        source,
+        vec![],
+    )
+    .await
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]

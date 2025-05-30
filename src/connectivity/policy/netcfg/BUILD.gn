@@ -26,6 +26,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.net.masquerade:fuchsia.net.masquerade_rust",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
     "//sdk/fidl/fuchsia.net.ndp:fuchsia.net.ndp_rust",
+    "//sdk/fidl/fuchsia.net.policy.properties:fuchsia.net.policy.properties_rust",
     "//sdk/fidl/fuchsia.net.policy.socketproxy:fuchsia.net.policy.socketproxy_rust",
     "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
@@ -86,6 +87,8 @@ rustc_library("lib") {
     "src/interface.rs",
     "src/lib.rs",
     "src/masquerade.rs",
+    "src/network/mod.rs",
+    "src/network/token_map.rs",
     "src/virtualization.rs",
   ]
 

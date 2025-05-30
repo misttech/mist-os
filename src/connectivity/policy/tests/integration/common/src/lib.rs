@@ -13,6 +13,7 @@ use netstack_testing_common::{
     interfaces, wait_for_component_stopped, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 
+#[derive(Default)]
 pub struct NetcfgOwnedDeviceArgs {
     // Whether to use the out of stack DHCP client.
     pub use_out_of_stack_dhcp_client: bool,

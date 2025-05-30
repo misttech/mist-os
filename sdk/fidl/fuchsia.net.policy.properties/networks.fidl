@@ -1,0 +1,110 @@
+// Copyright 2025 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.net.policy.properties;
+
+using fuchsia.net;
+using fuchsia.net.name;
+using zx;
+
+/// The NetworkToken is an opaque token minted by [`Networks::WatchDefault`]
+/// that represents a logical network for the purpose of accessing network
+/// properties.
+type NetworkToken = resource table {
+    1: value zx.Handle:EVENTPAIR;
+};
+
+/// Protocol to allow `socket-proxy` to report changes in default network and
+/// its associated socket marks. Only one connection to this protocol is
+/// supported at once. If a second connection is made it will be shut down with
+/// a `CONNECTION_ABORTED` error
+@discoverable
+open protocol DefaultNetwork {
+    /// Update the current default network.
+    flexible Update(table {
+        /// The value of the new interface id.
+        /// NOTE: REQUIRED
+        1: interface_id fuchsia.net.InterfaceId;
+
+        /// The socket marks associated with that interface.
+        /// NOTE: REQUIRED
+        2: socket_marks fuchsia.net.Marks;
+    }) -> () error @generated_name("UpdateDefaultNetworkError") flexible enum : uint32 {
+        /// The provided `interface_id` was invalid.
+        INVALID_INTERFACE_ID = 1;
+        /// The provided `socket_marks` were invalid.
+        INVALID_SOCKET_MARKS = 2;
+
+        /// An argument marked above as REQUIRED was not provided.
+        MISSING_REQUIRED_ARGUMENT = 99;
+    };
+};
+
+/// Protocol for acquiring [`NetworkToken`]s, and querying properties of that
+/// network.
+@discoverable
+open protocol Networks {
+    /// Watches for changes in the default network.
+    ///
+    /// The first call always returns a [`NetworkToken`] representing the
+    /// current default network, or if one is not present, blocks until a
+    /// default network is set. Subsequent calls will block until the default
+    /// network has changed, returning a new [`NetworkToken`] for the updated
+    /// default network.
+    ///
+    /// Only one call to this method should be pending per connection.
+    flexible WatchDefault() -> (NetworkToken);
+
+    /// Watches for changes in requested properties for the given [`NetworkToken`]
+    ///
+    /// The first call will always return a snapshot of all requested
+    /// properties. Subsequent calls will block until any property changes, at
+    /// which point the changed property or properties will be sent. If the set
+    /// of requested [`properties`] changes on a subsequent call, the previously
+    /// unreported property will be sent immediately, before future calls will
+    /// return to the hanging get pattern. If the network represented by
+    /// `network` is no longer the default network, the connection will be
+    /// closed with `DEFAULT_NETWORK_CHANGED`.
+    ///
+    /// Only one call to this method should be pending per [`NetworkToken`] per connection.
+    flexible WatchProperties(resource table {
+        /// A network token acquired from [`WatchDefault`].
+        /// NOTE: REQUIRED
+        1: network NetworkToken;
+
+        /// List of properties for which changes should be reported. Must be
+        /// non-empty, duplicates will be ignored.
+        /// NOTE: REQUIRED
+        2: properties vector<@generated_name("Property") flexible enum {
+            SOCKET_MARKS = 1;
+            DNS_CONFIGURATION = 2;
+        }>:MAX;
+    }) -> (struct {
+        /// A list of updates that have happened since the last call to
+        /// `WatchProperties` returned. There is no guarantee of ordering. If a
+        /// property changes multiple times between updates, only the most
+        /// recent version will be reported.
+        updates vector<@generated_name("PropertyUpdate") flexible union {
+            1: socket_marks fuchsia.net.Marks;
+            2: dns_configuration @generated_name("DnsConfiguration") table {
+                1: servers vector<fuchsia.net.name.DnsServer>:MAX;
+            };
+        }>:MAX;
+    }) error @generated_name("WatchError") flexible enum : uint32 {
+        /// The provided `properties` list was empty.
+        NO_PROPERTIES = 1;
+        /// The provided NetworkToken was either not acquired from
+        /// [`WatchDefault`] or is no longer valid.
+        INVALID_NETWORK_TOKEN = 2;
+        /// When the network represented by `network` no longer exists, a new
+        /// [`NetworkToken`] must be acquired.
+        NETWORK_GONE = 3;
+        /// When the network represented by `network` is no longer the default
+        /// network, a new [`NetworkToken`] must be acquired.
+        DEFAULT_NETWORK_CHANGED = 4;
+
+        /// An argument marked above as REQUIRED was not provided.
+        MISSING_REQUIRED_ARGUMENT = 99;
+    };
+};
