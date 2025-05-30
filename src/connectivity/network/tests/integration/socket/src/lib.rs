@@ -1480,6 +1480,7 @@ trait TestIpExt: packet_formats::ip::IpExt {
     const DOMAIN: fposix_socket::Domain;
     const CLIENT_SUBNET: fnet::Subnet;
     const SERVER_SUBNET: fnet::Subnet;
+    #[allow(dead_code)] // TODO(https://fxbug.dev/421408690)
     const CLIENT_ADDR: Self::Addr;
     const SERVER_ADDR: Self::Addr;
 }

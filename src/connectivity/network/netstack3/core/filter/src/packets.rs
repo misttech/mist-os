@@ -2753,6 +2753,7 @@ pub mod testutil {
             const DST_PORT: u16 = 9876;
             const SRC_IP_2: Self::Addr;
             const DST_IP_2: Self::Addr;
+            #[allow(dead_code)] // TODO(https://fxbug.dev/421408690)
             const SRC_IP_3: Self::Addr;
             const DST_IP_3: Self::Addr;
             const IP_OUTSIDE_SUBNET: Self::Addr;

@@ -47,6 +47,7 @@ pub trait Logger {
     fn add_to_array(&mut self, name: &Name, value: &Value);
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409143)
 /// Logger that does nothing.
 pub struct NullLogger;
 

@@ -52,6 +52,7 @@ mod test {
         }
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/421409084)
     #[derive(Debug, Clone)]
     pub struct FailServiceConnector;
 

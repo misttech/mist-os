@@ -78,6 +78,7 @@ impl TryFromEnv for RemoteControlProxyHolder {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409514)
 pub(crate) async fn open_moniker_fdomain<P>(
     rcs: &RemoteControlProxy,
     capability_set: rcs_fdomain::OpenDirType,
