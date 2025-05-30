@@ -254,7 +254,7 @@ impl TunWorker {
                     .id
                     .ok_or_else(|| starnix_uapi::errno!(ENOENT, "got PortInfo with no ID"))?,
                 server_end,
-                &fnet_interfaces_admin::Options {
+                fnet_interfaces_admin::Options {
                     name: Some(name.clone()),
                     metric: None,
                     ..Default::default()

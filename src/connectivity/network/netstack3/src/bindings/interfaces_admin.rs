@@ -129,7 +129,13 @@ async fn run_blackhole_interface(
         return;
     };
 
-    let fnet_interfaces_admin::Options { name, metric, __source_breaking: _ } = options;
+    let fnet_interfaces_admin::Options {
+        name,
+        metric,
+        // TODO(https://fxbug.dev/42083010): Use the designation.
+        netstack_managed_routes_designation: _,
+        __source_breaking: _,
+    } = options;
 
     let (binding_id, binding_id_alloc, name) = match name {
         Some(name) => {
@@ -410,7 +416,13 @@ async fn create_interface(
     handler: &netdevice_worker::DeviceHandler,
 ) {
     debug!("creating interface from {:?} with {:?}", port, options);
-    let fnet_interfaces_admin::Options { name, metric, .. } = options;
+    let fnet_interfaces_admin::Options {
+        name,
+        metric,
+        // TODO(https://fxbug.dev/42083010): Use the designation.
+        netstack_managed_routes_designation: _,
+        __source_breaking: _,
+    } = options;
     let (control_sender, mut control_receiver) =
         OwnedControlHandle::new_channel_with_owned_handle(control).await;
     match handler
@@ -2366,7 +2378,7 @@ mod tests {
             .create_interface(
                 &port_id,
                 control_server_end,
-                &fnet_interfaces_admin::Options::default(),
+                fnet_interfaces_admin::Options::default(),
             )
             .expect("create interface");
 

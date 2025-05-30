@@ -620,7 +620,7 @@ async fn supported_port_frame_types<N: Netstack>(
         .create_interface(
             &port_id,
             server_end,
-            &finterfaces_admin::Options {
+            finterfaces_admin::Options {
                 name: Some("tun-interface".to_string()),
                 ..Default::default()
             },
@@ -1488,7 +1488,7 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
         .create_interface(
             &port_id,
             control_server_end,
-            &fidl_fuchsia_net_interfaces_admin::Options {
+            fidl_fuchsia_net_interfaces_admin::Options {
                 name: Some(IF_NAME.to_string()),
                 metric: None,
                 ..Default::default()
@@ -1626,7 +1626,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
                 .create_interface(
                     &port_id,
                     control_server_end,
-                    &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                    fidl_fuchsia_net_interfaces_admin::Options::default(),
                 )
                 .expect("create interface");
 
@@ -1816,7 +1816,7 @@ async fn control_terminal_events<N: Netstack>(
         let (control, control_server_end) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::ControlMarker>();
         let () = device_control
-            .create_interface(&port_id, control_server_end, &options)
+            .create_interface(&port_id, control_server_end, options)
             .expect("create interface");
         control
     };
@@ -1977,7 +1977,7 @@ async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
         .create_interface(
             &port_id,
             control_server_end,
-            &fidl_fuchsia_net_interfaces_admin::Options::default(),
+            fidl_fuchsia_net_interfaces_admin::Options::default(),
         )
         .expect("create interface");
     let _iface_id: u64 = control.get_id().await.expect("get id");
@@ -2091,7 +2091,7 @@ async fn installer_creates_datapath<N: Netstack, I: Ip>(test_name: &str) {
                 .create_interface(
                     &port_id,
                     control_server_end,
-                    &fidl_fuchsia_net_interfaces_admin::Options {
+                    fidl_fuchsia_net_interfaces_admin::Options {
                         name: Some(name.to_string()),
                         metric: None,
                         ..Default::default()
@@ -2303,7 +2303,7 @@ async fn control_enable_disable<N: Netstack>(name: &str) {
         .create_interface(
             &port_id,
             control_server_end,
-            &fidl_fuchsia_net_interfaces_admin::Options::default(),
+            fidl_fuchsia_net_interfaces_admin::Options::default(),
         )
         .expect("create interface");
     let iface_id = control.get_id().await.expect("get id");
@@ -2797,7 +2797,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
         .create_interface(
             &port_id,
             control_server_end,
-            &fidl_fuchsia_net_interfaces_admin::Options::default(),
+            fidl_fuchsia_net_interfaces_admin::Options::default(),
         )
         .expect("create interface");
     let iface_id = control.get_id().await.expect("get id");
@@ -3201,7 +3201,7 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
             .create_interface(
                 &port_id,
                 control_server_end,
-                &fidl_fuchsia_net_interfaces_admin::Options {
+                fidl_fuchsia_net_interfaces_admin::Options {
                     name: Some(format!("test{}", index)),
                     metric: None,
                     ..Default::default()
@@ -3316,7 +3316,7 @@ async fn epitaph_is_sent_after_interface_removal<N: Netstack>(name: &str) {
             .create_interface(
                 &port_id,
                 server_end,
-                &finterfaces_admin::Options {
+                finterfaces_admin::Options {
                     name: Some("testif".to_string()),
                     ..Default::default()
                 },

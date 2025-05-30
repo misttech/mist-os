@@ -120,6 +120,13 @@ pub(crate) async fn serve_route_table_provider_v4(
                     serve_route_table::<Ipv4, UserRouteTable<Ipv4>>(stream, route_table)
                 });
             }
+            fnet_routes_admin::RouteTableProviderV4Request::GetInterfaceLocalTable {
+                credential: _,
+                responder,
+            } => {
+                responder
+                    .send(Err(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable))?;
+            }
         }
     }
     Ok(())
@@ -151,6 +158,13 @@ pub(crate) async fn serve_route_table_provider_v6(
                 fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
                     serve_route_table::<Ipv6, UserRouteTable<Ipv6>>(stream, route_table)
                 });
+            }
+            fnet_routes_admin::RouteTableProviderV6Request::GetInterfaceLocalTable {
+                credential: _,
+                responder,
+            } => {
+                responder
+                    .send(Err(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable))?;
             }
         }
     }

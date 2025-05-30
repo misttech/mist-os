@@ -133,7 +133,7 @@ async fn install_interface(
     let (control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     device_control
-        .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
+        .create_interface(&port_id, server_end, fnet_interfaces_admin::Options::default())
         .expect("create interface");
     let control = fnet_interfaces_ext::admin::Control::new(control);
     assert!(control.enable().await.expect("call enable").expect("enable interface"));

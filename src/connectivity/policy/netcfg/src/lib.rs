@@ -2501,9 +2501,10 @@ impl<'a> NetCfg<'a> {
         self.installer
             .install_blackhole_interface(
                 control_server_end,
-                &fnet_interfaces_admin::Options {
+                fnet_interfaces_admin::Options {
                     name: Some(name.to_owned()),
                     metric: Some(metric),
+                    netstack_managed_routes_designation: None,
                     __source_breaking: fidl::marker::SourceBreaking,
                 },
             )

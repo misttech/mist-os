@@ -109,7 +109,7 @@ impl TunNetworkInterface {
                 .create_interface(
                     &port_id,
                     control_sync_server.into(),
-                    &fnetifadmin::Options { name: name.clone(), ..Default::default() },
+                    fnetifadmin::Options { name: name.clone(), ..Default::default() },
                 )
                 .context("create_interface failed")?;
 
@@ -118,7 +118,7 @@ impl TunNetworkInterface {
                 .create_interface(
                     &port_id,
                     server_end,
-                    &fnetifadmin::Options { name, ..Default::default() },
+                    fnetifadmin::Options { name, ..Default::default() },
                 )
                 .context("create_interface failed")?;
 

@@ -565,7 +565,7 @@ mod helpers {
                 .create_interface(
                     &port_id,
                     server_end,
-                    &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                    fidl_fuchsia_net_interfaces_admin::Options::default(),
                 )
                 .expect("create_interface failed");
             control

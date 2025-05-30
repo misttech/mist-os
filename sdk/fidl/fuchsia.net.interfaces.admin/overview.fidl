@@ -3,3 +3,5 @@
 // found in the LICENSE file.
 @available(added=HEAD)
 library fuchsia.net.interfaces.admin;
+
+type Empty = struct {};

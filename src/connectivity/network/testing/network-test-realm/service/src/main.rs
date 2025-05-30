@@ -102,7 +102,7 @@ async fn install_netdevice(
         .create_interface(
             &port_id,
             control_server_end,
-            &fnet_interfaces_admin::Options {
+            fnet_interfaces_admin::Options {
                 name: Some(name.to_string()),
                 metric: Some(DEFAULT_METRIC),
                 ..Default::default()

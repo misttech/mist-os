@@ -560,7 +560,7 @@ impl TestSetupBuilder {
                     .create_interface(
                         &port_id,
                         server_end,
-                        &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                        fidl_fuchsia_net_interfaces_admin::Options::default(),
                     )
                     .expect("create interface");
 
@@ -1255,7 +1255,7 @@ async fn shutdown_with_open_resources_netdev(
             .create_interface(
                 &port_id,
                 server_end,
-                &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                fidl_fuchsia_net_interfaces_admin::Options::default(),
             )
             .expect("create interface");
 
@@ -1333,7 +1333,7 @@ async fn shutdown_with_open_resources_blackhole() {
         installer
             .install_blackhole_interface(
                 server_end,
-                &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                fidl_fuchsia_net_interfaces_admin::Options::default(),
             )
             .expect("install interface");
 

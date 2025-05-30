@@ -2375,7 +2375,10 @@ mod tests {
         let route_sets_from_route_table_provider =
             futures::TryStreamExt::map_ok(route_table_provider_request_stream, move |request| {
                 let (server_end, _name) =
-                    fnet_routes_ext::admin::unpack_route_table_provider_request::<I>(request);
+                    fnet_routes_ext::admin::unpack_route_table_provider_new_table_request::<I>(
+                        request,
+                    )
+                    .expect("must be a NewTable request");
                 let table_id =
                     fnet_routes_ext::TableId::new(table_id.fetch_add(1, Ordering::SeqCst));
                 fnet_routes_ext::testutil::admin::serve_all_route_sets_with_table_id::<I>(
@@ -4962,13 +4965,14 @@ mod tests {
                     .fuse();
                 let route_table_fut = async {
                     let (server_end, _name) =
-                        fnet_routes_ext::admin::concretize_route_table_provider_request::<I>(
+                        fnet_routes_ext::admin::concretize_route_table_provider_new_table_request::<I>(
                             route_table_provider_stream
                                 .next()
                                 .await
                                 .expect("should not have ended"),
                         )
-                        .expect("should not get error");
+                        .expect("should not get error")
+                        .expect("should be a NewTable request");
                     let mut route_table_stream = server_end.into_stream().boxed().fuse();
 
                     let request = I::into_route_table_request_result(

@@ -6,8 +6,6 @@ library fuchsia.net.interfaces.admin;
 using zx;
 using fuchsia.net.interfaces;
 
-type Empty = struct {};
-
 /// Properties of an IP address.
 type AddressProperties = table {
     /// Information about the preferred lifetime of the address.

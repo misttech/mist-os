@@ -229,9 +229,9 @@ impl_responder!(
 /// The compiler often fails to infer that an item in the RouteTableProvider request stream is a
 /// Result. This function helps force it to understand this so that the Result can be unwrapped
 /// to get the actual RouteTableProvider request inside.
-pub fn concretize_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
+pub fn concretize_route_table_provider_new_table_request<I: Ip + FidlRouteAdminIpExt>(
     item: <<<I as FidlRouteAdminIpExt>::RouteTableProviderMarker as ProtocolMarker>::RequestStream as futures::Stream>::Item,
-) -> Result<(ServerEnd<I::RouteTableMarker>, Option<String>), fidl::Error> {
+) -> Result<Option<(ServerEnd<I::RouteTableMarker>, Option<String>)>, fidl::Error> {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     struct In<I: FidlRouteAdminIpExt>(<<<I as FidlRouteAdminIpExt>::RouteTableProviderMarker as ProtocolMarker>::RequestStream as futures::Stream>::Item);
@@ -239,19 +239,21 @@ pub fn concretize_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     struct Out<I: FidlRouteAdminIpExt>(
-        Result<(ServerEnd<I::RouteTableMarker>, Option<String>), fidl::Error>,
+        Result<Option<(ServerEnd<I::RouteTableMarker>, Option<String>)>, fidl::Error>,
     );
 
     let Out(result) = net_types::map_ip_twice!(I, In(item), |In(item)| Out(
-        item.map(unpack_route_table_provider_request::<I>)
+        item.map(unpack_route_table_provider_new_table_request::<I>)
     ));
     result
 }
 
-/// Unpacks the `[ServerEnd]` and debug name from a request for a new route table.
-pub fn unpack_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
+/// Unpacks the `[ServerEnd]` and debug name from a NewTable request for a new route table.
+///
+/// Returns [`None`] if the request isn't a NewTable.
+pub fn unpack_route_table_provider_new_table_request<I: Ip + FidlRouteAdminIpExt>(
     request: <<I::RouteTableProviderMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
-) -> (ServerEnd<I::RouteTableMarker>, Option<String>) {
+) -> Option<(ServerEnd<I::RouteTableMarker>, Option<String>)> {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     struct Request<I: FidlRouteAdminIpExt>(
@@ -260,25 +262,27 @@ pub fn unpack_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
 
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
-    struct Contents<I: FidlRouteAdminIpExt>((ServerEnd<I::RouteTableMarker>, Option<String>));
+    struct Contents<I: FidlRouteAdminIpExt>(
+        Option<(ServerEnd<I::RouteTableMarker>, Option<String>)>,
+    );
 
     let Contents(contents) = I::map_ip(
         Request(request),
-        |Request(request)| {
-            let fnet_routes_admin::RouteTableProviderV4Request::NewRouteTable {
+        |Request(request)| match request {
+            fnet_routes_admin::RouteTableProviderV4Request::NewRouteTable {
                 provider,
                 options: fnet_routes_admin::RouteTableOptionsV4 { name, __source_breaking },
                 control_handle: _,
-            } = request;
-            Contents((provider, name))
+            } => Contents(Some((provider, name))),
+            _ => Contents(None),
         },
-        |Request(request)| {
-            let fnet_routes_admin::RouteTableProviderV6Request::NewRouteTable {
+        |Request(request)| match request {
+            fnet_routes_admin::RouteTableProviderV6Request::NewRouteTable {
                 provider,
                 options: fnet_routes_admin::RouteTableOptionsV6 { name, __source_breaking },
                 control_handle: _,
-            } = request;
-            Contents((provider, name))
+            } => Contents(Some((provider, name))),
+            _ => Contents(None),
         },
     );
     contents

@@ -1176,7 +1176,7 @@ impl<'a> TestEndpoint<'a> {
             .create_interface(
                 &port_id,
                 server_end,
-                &fnet_interfaces_admin::Options { name, metric, ..Default::default() },
+                fnet_interfaces_admin::Options { name, metric, ..Default::default() },
             )
             .context("create interface")?;
         if let Some(ipv4_dad_transmits) = ipv4_dad_transmits {
