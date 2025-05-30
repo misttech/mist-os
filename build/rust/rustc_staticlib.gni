@@ -197,7 +197,7 @@ template("rustc_staticlib") {
 
     target_type = "static_library"
     crate_root = source_root
-    rust_crate_type = "staticlib"
+    crate_type = "staticlib"
     crate_name = rustc_target
     output_name = crate_name
     original_target_name = _original_target_name

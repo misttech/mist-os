@@ -3910,7 +3910,6 @@ template("rust_library") {
                              "applicable_licenses",
                              "metadata",
                              "visibility",
-                             "rust_crate_type",
                              "enable_clippy_first_party",
                              "include_rustdoc_first_party",
                              "original_target_name",

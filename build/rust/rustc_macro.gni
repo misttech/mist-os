@@ -193,7 +193,7 @@ template("rustc_macro") {
       configs = invoker.configs
 
       crate_root = source_root
-      rust_crate_type = "proc-macro"
+      crate_type = "proc-macro"
       original_target_name = _original_target_name
       if (!defined(output_name)) {
         output_name = crate_name

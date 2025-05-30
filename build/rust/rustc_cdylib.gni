@@ -200,7 +200,6 @@ template("rustc_cdylib") {
     output_prefix_override = !_use_lib_prefix
 
     crate_root = source_root
-    rust_crate_type = "cdylib"
     crate_type = "cdylib"
     crate_name = rustc_target
     output_name = _lib_output_name

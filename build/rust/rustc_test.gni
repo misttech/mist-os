@@ -120,7 +120,7 @@ template("rustc_test_internal") {
     target_type = "executable"
 
     crate_root = source_root
-    rust_crate_type = "bin"
+    crate_type = "bin"
     original_target_name = _original_target_name
     crate_name = _crate_name
     output_name = _crate_name

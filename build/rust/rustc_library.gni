@@ -282,7 +282,7 @@ template("rustc_library") {
 
     target_type = "rust_library"
     crate_root = source_root
-    rust_crate_type = "rlib"
+    crate_type = "rlib"
     crate_name = _crate_name
     original_target_name = _original_target_name
     if (!defined(output_name)) {

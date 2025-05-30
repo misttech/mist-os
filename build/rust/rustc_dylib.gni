@@ -150,7 +150,6 @@ template("rustc_dylib") {
                            ])
 
     target_type = "shared_library"
-    rust_crate_type = "dylib"
     crate_type = "dylib"
     crate_root = "src/lib.rs"
     if (defined(invoker.source_root)) {
