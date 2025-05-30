@@ -20,19 +20,17 @@ class StarnixUsingStarnixTests(unittest.TestCase):
         super().setUp()
 
         self.mock_ffx = mock.MagicMock(spec=ffx_transport.FFX)
+        self.mock_ffx.run.return_value = (
+            starnix_using_ffx._STARNIX_KERNEL_PREFIX
+        )
 
-        with mock.patch.object(
-            starnix_using_ffx.StarnixUsingFfx,
-            "run_console_shell_cmd",
-            autospec=True,
-        ) as mock_run_console_shell_cmd:
-            self.starnix_obj = starnix_using_ffx.StarnixUsingFfx(
-                ffx=self.mock_ffx,
-                device_name="device",
-            )
+        self.starnix_obj = starnix_using_ffx.StarnixUsingFfx(
+            ffx=self.mock_ffx,
+            device_name="device",
+        )
 
-            # called in verify_supported()
-            mock_run_console_shell_cmd.assert_called_once()
+        # called in verify_supported()
+        self.mock_ffx.run.assert_called_once_with(["component", "list"])
 
     @mock.patch(
         "os.read",

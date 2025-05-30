@@ -11,13 +11,14 @@ import subprocess
 from honeydew import errors
 from honeydew.affordances.starnix import errors as starnix_errors
 from honeydew.affordances.starnix import starnix
+from honeydew.transports.ffx import errors as ffx_errors
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.utils import decorators
 
 _MAX_READ_SIZE: int = 1024
 
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+_STARNIX_KERNEL_PREFIX = "core/starnix_runner/kernels:"
 
 
 class _StarnixCmds:
@@ -28,10 +29,6 @@ class _StarnixCmds:
         "console",
         "/bin/sh",
         "-c",
-    ]
-
-    IS_STARNIX_SUPPORTED: list[str] = [
-        "echo hello",
     ]
 
 
@@ -78,7 +75,22 @@ class StarnixUsingFfx(starnix.Starnix):
             self._device_name,
             self.__class__.__name__,
         )
-        self.run_console_shell_cmd(cmd=_StarnixCmds.IS_STARNIX_SUPPORTED)
+
+        try:
+            component_list = self._ffx.run(["component", "list"])
+            components = component_list.splitlines()
+            if not any(
+                component
+                for component in components
+                if component.startswith(_STARNIX_KERNEL_PREFIX)
+            ):
+                raise errors.NotSupportedError(
+                    f"{self._device_name} does not support Starnix"
+                )
+
+        except ffx_errors.FfxCommandError as err:
+            raise starnix_errors.StarnixError(err)
+
         _LOGGER.debug(
             "%s supports %s affordance...",
             self._device_name,
