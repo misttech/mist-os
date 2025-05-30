@@ -434,7 +434,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   // Handlers for global events posted to the event buffer by the controller HW.
   void HandleResetEvent() __TA_EXCLUDES(lock_);
   void HandleConnectionDoneEvent() __TA_EXCLUDES(lock_);
-  void HandleDisconnectedEvent() __TA_EXCLUDES(lock_);
 
   // Handlers for end-point specific events posted to the event buffer by the controller HW.
   void HandleEpTransferCompleteEvent(uint8_t ep_num) __TA_EXCLUDES(lock_);
