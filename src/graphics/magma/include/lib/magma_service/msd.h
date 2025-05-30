@@ -33,8 +33,6 @@ struct DeviceHandle;
 class Driver {
  public:
   static std::unique_ptr<Driver> MsdCreate();
-  // TODO(b/417848695) - remove when unused
-  static std::unique_ptr<Driver> Create() { return MsdCreate(); }
 
   virtual ~Driver() = 0;
 
@@ -47,10 +45,6 @@ class Driver {
   // Creates a device at system startup. `device_data` is a pointer to a platform-specific device
   // object which is guaranteed to outlive the returned Device.
   virtual std::unique_ptr<Device> MsdCreateDevice(DeviceHandle* device_data) { return {}; }
-  // TODO(b/417848695) - remove when unused
-  std::unique_ptr<Device> CreateDevice(DeviceHandle* device_data) {
-    return MsdCreateDevice(device_data);
-  }
 
   // Creates a buffer that owns the provided handle. Can be called on any thread.
   virtual std::unique_ptr<Buffer> MsdImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }
@@ -63,11 +57,6 @@ class Driver {
   virtual magma_status_t MsdImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
                                             std::unique_ptr<Semaphore>* out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
-  }
-  // TODO(b/417848695) - remove when unused
-  magma_status_t ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                 std::unique_ptr<Semaphore>* out) {
-    return MsdImportSemaphore(std::move(handle), client_id, flags, out);
   }
 };
 
@@ -86,10 +75,6 @@ class Device {
   virtual magma_status_t MsdQuery(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
-  // TODO(b/417848695) - remove when unused
-  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
-    return MsdQuery(id, result_buffer_out, result_out);
-  }
 
   // Outputs a list of ICD components.
   virtual magma_status_t MsdGetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
@@ -107,8 +92,6 @@ class Device {
 
   // Opens a device for the given client. Returns nullptr on failure
   virtual std::unique_ptr<Connection> MsdOpen(msd_client_id_t client_id) { return {}; }
-  // TODO(b/417848695) - remove when unused
-  std::unique_ptr<Connection> Open(msd_client_id_t client_id) { return MsdOpen(client_id); }
 };
 
 struct PerfCounterResult {
@@ -148,11 +131,6 @@ class Connection {
                                       uint64_t length, uint64_t flags) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
-  // TODO(b/417848695) - remove when unused
-  magma_status_t MapBuffer(Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
-                           uint64_t flags) {
-    return MsdMapBuffer(buffer, gpu_va, offset, length, flags);
-  }
 
   virtual magma_status_t MsdUnmapBuffer(Buffer& buffer, uint64_t gpu_va) {
     return MAGMA_STATUS_UNIMPLEMENTED;
@@ -167,10 +145,6 @@ class Connection {
   // In addition to handling client requests, this may be called when a connection is released,
   // in which case |shutting_down| is true and the implementation should not block.
   virtual void MsdReleaseBuffer(Buffer& buffer, bool shutting_down = false) {}
-  // TODO(b/417848695) - remove when unused
-  void ReleaseBuffer(Buffer& buffer, bool shutting_down = false) {
-    return MsdReleaseBuffer(buffer, shutting_down);
-  }
 
   // Sets the callback to be used by a connection for various notifications.
   // This is called when a connection is created, and also called to unset
@@ -180,8 +154,6 @@ class Connection {
   virtual void MsdSetNotificationCallback(NotificationHandler* handler) {}
 
   virtual std::unique_ptr<Context> MsdCreateContext() { return {}; }
-  // TODO(b/417848695) - remove when unused
-  std::unique_ptr<Context> CreateContext() { return MsdCreateContext(); }
 
   virtual std::unique_ptr<Context> MsdCreateContext2(uint64_t priority) {
     return MsdCreateContext();
@@ -252,15 +224,6 @@ class Context {
       std::vector<magma_exec_resource>& resources, std::vector<Buffer*>& buffers,
       std::vector<Semaphore*>& wait_semaphores, std::vector<Semaphore*>& signal_semaphores) {
     return MAGMA_STATUS_UNIMPLEMENTED;
-  }
-  // TODO(b/417848695) - remove when unused
-  magma_status_t ExecuteCommandBuffers(std::vector<magma_exec_command_buffer>& command_buffers,
-                                       std::vector<magma_exec_resource>& resources,
-                                       std::vector<Buffer*>& buffers,
-                                       std::vector<Semaphore*>& wait_semaphores,
-                                       std::vector<Semaphore*>& signal_semaphores) {
-    return MsdExecuteCommandBuffers(command_buffers, resources, buffers, wait_semaphores,
-                                    signal_semaphores);
   }
 
   // Executes a buffer of commands. `semaphores` is a set of semaphores that may be used by the
