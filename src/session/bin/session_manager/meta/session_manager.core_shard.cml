@@ -268,7 +268,6 @@
                 "fuchsia.hardware.thermal.Service", // replaces /dev/class/thermal
                 "fuchsia.hardware.trippoint.TripPointService", // replaces /dev/class/trippoint
                 "fuchsia.input.report.Service", // replaces /dev/class/input-report
-                "fuchsia.power.battery.InfoService", // replaces /dev/class/battery
             ],
             from: "parent",
             to: "#session-manager",
@@ -304,6 +303,13 @@
                 "fuchsia.power.broker.ElementInfoProviderService",
                 "fuchsia.storage.ftl.Service",
             ],
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
+        },
+        {
+            // replaces /dev/class/battery
+            service: [ "fuchsia.power.battery.InfoService" ],
             from: "parent",
             to: "#session-manager",
             availability: "same_as_target",
