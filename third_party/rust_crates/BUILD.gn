@@ -11194,20 +11194,20 @@ rustc_macro("openssl-macros-v0_1_1") {
   applicable_licenses = [ ":openssl-macros-v0_1_1.license" ]
 }
 
-license("openssl-probe-v0_1_2.license") {
+license("openssl-probe-v0_1_6.license") {
   public_package_name = "openssl_probe"
   license_files = [
-    "//third_party/rust_crates/vendor/openssl-probe-0.1.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/openssl-probe-0.1.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/openssl-probe-0.1.6/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/openssl-probe-0.1.6/LICENSE-MIT",
   ]
 }
 
-rustc_library("openssl-probe-v0_1_2") {
+rustc_library("openssl-probe-v0_1_6") {
   crate_name = "openssl_probe"
   source_root =
-      "//third_party/rust_crates/vendor/openssl-probe-0.1.2/src/lib.rs"
-  output_name = "openssl_probe-759570083bb12b65"
-  edition = "2015"
+      "//third_party/rust_crates/vendor/openssl-probe-0.1.6/src/lib.rs"
+  output_name = "openssl_probe-c9338fa264a7af26"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -11218,13 +11218,13 @@ rustc_library("openssl-probe-v0_1_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=759570083bb12b65",
-    "-Cextra-filename=-759570083bb12b65",
+    "-Cmetadata=c9338fa264a7af26",
+    "-Cextra-filename=-c9338fa264a7af26",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":openssl-probe-v0_1_2.license" ]
+  applicable_licenses = [ ":openssl-probe-v0_1_6.license" ]
 }
 
 license("openssl-sys-v0_9_106.license") {
@@ -14955,7 +14955,7 @@ rustc_library("rustls-native-certs-v0_6_3") {
   deps = []
   deps += [ ":rustls-pemfile-v1_0_4" ]
   if (true && !(current_os == "mac")) {
-    deps += [ ":openssl-probe-v0_1_2" ]
+    deps += [ ":openssl-probe-v0_1_6" ]
   }
   if (current_os == "mac") {
     deps += [ ":security-framework-v2_3_1" ]
