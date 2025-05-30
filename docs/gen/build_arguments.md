@@ -6369,7 +6369,7 @@ From //build/config/features.gni:12
 
 **Current value (from the default):** `false`
 
-From //zircon/system/ulib/c/libc.gni:19
+From //sdk/lib/c/libc.gni:19
 
 ### use_null_vulkan_on_host
 
