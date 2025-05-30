@@ -5,7 +5,7 @@ use std::os::unix::ffi::OsStrExt;
 
 use libc;
 
-use {Dir, Entry, SimpleType};
+use crate::{Dir, Entry, SimpleType};
 
 
 // We have such weird constants because C types are ugly
@@ -19,6 +19,13 @@ const DOTDOT: [libc::c_char; 3] = [b'.' as libc::c_char, b'.' as libc::c_char, 0
 #[derive(Debug)]
 pub struct DirIter {
     dir: *mut libc::DIR,
+}
+
+/// Position in a DirIter as obtained by 'DirIter::current_position()'
+///
+/// The position is only valid for the DirIter it was retrieved from.
+pub struct DirPosition {
+    pos: libc::c_long,
 }
 
 impl Entry {
@@ -49,7 +56,7 @@ unsafe fn errno_location() -> *mut libc::c_int {
 
 impl DirIter {
 
-    unsafe fn next_entry(&mut self) -> io::Result<Option<*const libc::dirent>>
+    unsafe fn next_entry(&mut self) -> io::Result<Option<&libc::dirent>>
     {
         // Reset errno to detect if error occurred
         *errno_location() = 0;
@@ -62,7 +69,38 @@ impl DirIter {
                 return Err(io::Error::last_os_error());
             }
         }
-        return Ok(Some(entry));
+        return Ok(Some(&*entry));
+    }
+
+    /// Returns the current directory iterator position. The result should be handled as opaque value
+    pub fn current_position(&self) -> io::Result<DirPosition> {
+        let pos = unsafe { libc::telldir(self.dir) };
+
+        if pos == -1 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(DirPosition { pos })
+        }
+    }
+
+    // note the C-API does not report errors for seekdir/rewinddir, thus we don't do as well.
+    /// Sets the current directory iterator position to some location queried by 'current_position()'
+    pub fn seek(&self, position: DirPosition) {
+        unsafe { libc::seekdir(self.dir, position.pos) };
+    }
+
+    /// Resets the current directory iterator position to the beginning
+    pub fn rewind(&self) {
+        unsafe { libc::rewinddir(self.dir) };
+    }
+}
+
+pub fn open_dirfd(fd: libc::c_int) -> io::Result<DirIter> {
+    let dir = unsafe { libc::fdopendir(fd) };
+    if dir == std::ptr::null_mut() {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(DirIter { dir: dir })
     }
 }
 
@@ -73,12 +111,7 @@ pub fn open_dir(dir: &Dir, path: &CStr) -> io::Result<DirIter> {
     if dir_fd < 0 {
         Err(io::Error::last_os_error())
     } else {
-        let dir = unsafe { libc::fdopendir(dir_fd) };
-        if dir == ptr::null_mut() {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(DirIter { dir: dir })
-        }
+        open_dirfd(dir_fd)
     }
 }
 
@@ -90,13 +123,13 @@ impl Iterator for DirIter {
                 match self.next_entry() {
                     Err(e) => return Some(Err(e)),
                     Ok(None) => return None,
-                    Ok(Some(e)) if (*e).d_name[..2] == DOT => continue,
-                    Ok(Some(e)) if (*e).d_name[..3] == DOTDOT => continue,
+                    Ok(Some(e)) if e.d_name[..2] == DOT => continue,
+                    Ok(Some(e)) if e.d_name[..3] == DOTDOT => continue,
                     Ok(Some(e)) => {
                         return Some(Ok(Entry {
-                            name: CStr::from_ptr((&(*e).d_name).as_ptr())
+                            name: CStr::from_ptr((e.d_name).as_ptr())
                                 .to_owned(),
-                            file_type: match (*e).d_type {
+                            file_type: match e.d_type {
                                 0 => None,
                                 libc::DT_REG => Some(SimpleType::File),
                                 libc::DT_DIR => Some(SimpleType::Dir),

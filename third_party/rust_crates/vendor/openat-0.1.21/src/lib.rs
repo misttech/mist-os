@@ -14,6 +14,9 @@
 //! *Note2: The constructor `Dir::cwd()` is deprecated, and it's recommended
 //! to use `Dir::open(".")` instead.*
 //!
+//! *Note3: Some OS's (e.g., macOS) do not provide `O_PATH`, in which case the
+//! file descriptor is of regular type.*
+//!
 //! Most other operations are done on `Dir` object and are executed relative
 //! to it:
 //!
@@ -49,11 +52,11 @@ mod name;
 mod filetype;
 mod metadata;
 
-pub use list::DirIter;
-pub use name::AsPath;
-pub use dir::{rename, hardlink};
-pub use filetype::SimpleType;
-pub use metadata::Metadata;
+pub use crate::list::DirIter;
+pub use crate::name::AsPath;
+pub use crate::dir::{rename, hardlink};
+pub use crate::filetype::SimpleType;
+pub use crate::metadata::Metadata;
 
 use std::ffi::CString;
 use std::os::unix::io::RawFd;

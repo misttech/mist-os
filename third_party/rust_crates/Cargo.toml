@@ -277,7 +277,7 @@ flagset = "0.4.6"
 getopts = "0.2"
 hyper-rustls = { version = "0.24.2", default-features = false }
 lipsum = "0.6.0"
-openat = "0.1.17"
+openat = "0.1.21"
 openssl = { version = "0.10.71", features = ["unstable_boringssl"] }
 pkcs1 = "0.7.5"
 rust_icu_common = { version = "5.0.0", default-features = false, features = ["renaming"] }

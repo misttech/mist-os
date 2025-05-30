@@ -11,16 +11,18 @@
 # will likely look very different (and much more reasonable)
 
 [package]
+edition = "2018"
 name = "openat"
-version = "0.1.17"
+version = "0.1.21"
 authors = ["paul@colomiets.name"]
 description = "    A wrapper around openat, symlinkat, and similar system calls\n"
-homepage = "http://github.com/tailhook/openat"
+homepage = "https://github.com/tailhook/openat"
 documentation = "http://docs.rs/openat"
 readme = "README.md"
 keywords = ["open", "openat", "filesystem", "fs"]
 categories = ["filesystem", "api-bindings"]
 license = "MIT/Apache-2.0"
+repository = "https://github.com/tailhook/openat"
 [dependencies.libc]
 version = "0.2.34"
 [dev-dependencies.argparse]

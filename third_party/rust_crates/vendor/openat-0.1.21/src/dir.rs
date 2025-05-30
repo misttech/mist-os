@@ -7,10 +7,17 @@ use std::os::unix::ffi::{OsStringExt};
 use std::path::{PathBuf};
 
 use libc;
-use metadata::{self, Metadata};
-use list::{DirIter, open_dir};
+use crate::metadata::{self, Metadata};
+use crate::list::{DirIter, open_dir, open_dirfd};
 
-use {Dir, AsPath};
+use crate::{Dir, AsPath};
+
+#[cfg(target_os="linux")]
+const BASE_OPEN_FLAGS: libc::c_int = libc::O_PATH|libc::O_CLOEXEC;
+#[cfg(target_os="freebsd")]
+const BASE_OPEN_FLAGS: libc::c_int = libc::O_DIRECTORY|libc::O_CLOEXEC;
+#[cfg(not(any(target_os="linux", target_os="freebsd")))]
+const BASE_OPEN_FLAGS: libc::c_int = libc::O_CLOEXEC;
 
 impl Dir {
     /// Creates a directory descriptor that resolves paths relative to current
@@ -34,7 +41,7 @@ impl Dir {
 
     fn _open(path: &CStr) -> io::Result<Dir> {
         let fd = unsafe {
-            libc::open(path.as_ptr(), libc::O_PATH|libc::O_CLOEXEC)
+            libc::open(path.as_ptr(), BASE_OPEN_FLAGS)
         };
         if fd < 0 {
             Err(io::Error::last_os_error())
@@ -45,12 +52,24 @@ impl Dir {
 
     /// List subdirectory of this dir
     ///
-    /// You can list directory itself if `"."` is specified as path.
+    /// You can list directory itself with `list_self`.
     pub fn list_dir<P: AsPath>(&self, path: P) -> io::Result<DirIter> {
         open_dir(self, to_cstr(path)?.as_ref())
     }
 
+    /// List this dir
+    pub fn list_self(&self) -> io::Result<DirIter> {
+        unsafe {
+            open_dirfd(libc::dup(self.0))
+        }
+    }
+
     /// Open subdirectory
+    ///
+    /// Note that this method does not resolve symlinks by default, so you may have to call
+    /// [`read_link`] to resolve the real path first.
+    ///
+    /// [`read_link`]: #method.read_link
     pub fn sub_dir<P: AsPath>(&self, path: P) -> io::Result<Dir> {
         self._sub_dir(to_cstr(path)?.as_ref())
     }
@@ -59,7 +78,7 @@ impl Dir {
         let fd = unsafe {
             libc::openat(self.0,
                         path.as_ptr(),
-                        libc::O_PATH|libc::O_CLOEXEC|libc::O_NOFOLLOW)
+                        BASE_OPEN_FLAGS|libc::O_NOFOLLOW)
         };
         if fd < 0 {
             Err(io::Error::last_os_error())
@@ -89,12 +108,24 @@ impl Dir {
     }
 
     /// Open file for reading in this directory
+    ///
+    /// Note that this method does not resolve symlinks by default, so you may have to call
+    /// [`read_link`] to resolve the real path first.
+    ///
+    /// [`read_link`]: #method.read_link
     pub fn open_file<P: AsPath>(&self, path: P) -> io::Result<File> {
         self._open_file(to_cstr(path)?.as_ref(),
             libc::O_RDONLY, 0)
     }
 
     /// Open file for writing, create if necessary, truncate on open
+    ///
+    /// If there exists a symlink at the destination path, this method will fail. In that case, you
+    /// will need to remove the symlink before calling this method. If you are on Linux, you can
+    /// alternatively create an unnamed file with [`new_unnamed_file`] and then rename it,
+    /// clobbering the symlink at the destination.
+    ///
+    /// [`new_unnamed_file`]: #method.new_unnamed_file
     pub fn write_file<P: AsPath>(&self, path: P, mode: libc::mode_t)
         -> io::Result<File>
     {
@@ -104,6 +135,11 @@ impl Dir {
     }
 
     /// Open file for append, create if necessary
+    ///
+    /// If there exists a symlink at the destination path, this method will fail. In that case, you
+    /// will need to call [`read_link`] to resolve the real path first.
+    ///
+    /// [`read_link`]: #method.read_link
     pub fn append_file<P: AsPath>(&self, path: P, mode: libc::mode_t)
         -> io::Result<File>
     {
@@ -115,6 +151,13 @@ impl Dir {
     /// Create file for writing (and truncate) in this directory
     ///
     /// Deprecated alias for `write_file`
+    ///
+    /// If there exists a symlink at the destination path, this method will fail. In that case, you
+    /// will need to remove the symlink before calling this method. If you are on Linux, you can
+    /// alternatively create an unnamed file with [`new_unnamed_file`] and then rename it,
+    /// clobbering the symlink at the destination.
+    ///
+    /// [`new_unnamed_file`]: #method.new_unnamed_file
     #[deprecated(since="0.1.7", note="please use `write_file` instead")]
     pub fn create_file<P: AsPath>(&self, path: P, mode: libc::mode_t)
         -> io::Result<File>
@@ -239,6 +282,11 @@ impl Dir {
     }
 
     /// Open file for reading and writing without truncation, create if needed
+    ///
+    /// If there exists a symlink at the destination path, this method will fail. In that case, you
+    /// will need to call [`read_link`] to resolve the real path first.
+    ///
+    /// [`read_link`]: #method.read_link
     pub fn update_file<P: AsPath>(&self, path: P, mode: libc::mode_t)
         -> io::Result<File>
     {
@@ -251,6 +299,11 @@ impl Dir {
         -> io::Result<File>
     {
         unsafe {
+            // Note: In below call to `openat`, *mode* must be cast to
+            // `unsigned` because the optional `mode` argument to `openat` is
+            // variadic in the signature. Since integers are not implicitly
+            // promoted as they are in C this would break on Freebsd where
+            // *mode_t* is an alias for `uint16_t`.
             let res = libc::openat(self.0, path.as_ptr(),
                             flags|libc::O_CLOEXEC|libc::O_NOFOLLOW,
                             mode as libc::c_uint);
@@ -313,9 +366,14 @@ impl Dir {
     pub fn local_exchange<P: AsPath, R: AsPath>(&self, old: P, new: R)
         -> io::Result<()>
     {
+        // Workaround https://github.com/tailhook/openat/issues/35
+        // AKA https://github.com/rust-lang/libc/pull/2116
+        // Unfortunately since we made this libc::c_int in our
+        // public API, we can't easily change it right now.
+        let flags = libc::RENAME_EXCHANGE as libc::c_int;
         rename_flags(self, to_cstr(old)?.as_ref(),
             self, to_cstr(new)?.as_ref(),
-            libc::RENAME_EXCHANGE)
+            flags)
     }
 
     /// Remove a subdirectory in this directory
@@ -357,6 +415,12 @@ impl Dir {
     }
 
     /// Returns metadata of an entry in this directory
+    ///
+    /// If the destination path is a symlink, this will return the metadata of the symlink itself.
+    /// If you would like to follow the symlink and return the metadata of the target, you will
+    /// have to call [`read_link`] to resolve the real path first.
+    ///
+    /// [`read_link`]: #method.read_link
     pub fn metadata<P: AsPath>(&self, path: P) -> io::Result<Metadata> {
         self._stat(to_cstr(path)?.as_ref(), libc::AT_SYMLINK_NOFOLLOW)
     }
@@ -373,6 +437,47 @@ impl Dir {
         }
     }
 
+    /// Returns the metadata of the directory itself.
+    pub fn self_metadata(&self) -> io::Result<Metadata> {
+        unsafe {
+            let mut stat = mem::zeroed();
+            let res = libc::fstat(self.0, &mut stat);
+            if res < 0 {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(metadata::new(stat))
+            }
+        }
+    }
+
+    /// Constructs a new `Dir` from a given raw file descriptor,
+    /// ensuring it is a directory file descriptor first.
+    ///
+    /// This function **consumes ownership** of the specified file
+    /// descriptor. The returned `Dir` will take responsibility for
+    /// closing it when it goes out of scope.
+    pub unsafe fn from_raw_fd_checked(fd: RawFd) -> io::Result<Self> {
+        let mut stat = mem::zeroed();
+        let res = libc::fstat(fd, &mut stat);
+        if res < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            match stat.st_mode & libc::S_IFMT {
+                libc::S_IFDIR => Ok(Dir(fd)),
+                _ => Err(io::Error::from_raw_os_error(libc::ENOTDIR))
+            }
+        }
+    }
+
+    /// Creates a new independently owned handle to the underlying directory.
+    pub fn try_clone(&self) -> io::Result<Self> {
+        let fd = unsafe { libc::dup(self.0) };
+        if fd == -1 {
+            Err(io::Error::last_os_error())
+        } else {
+            unsafe { Self::from_raw_fd_checked(fd) }
+        }
+    }
 }
 
 /// Rename (move) a file between directories
@@ -475,6 +580,8 @@ impl AsRawFd for Dir {
 }
 
 impl FromRawFd for Dir {
+    /// The user must guarantee that the passed in `RawFd` is in fact
+    /// a directory file descriptor.
     #[inline]
     unsafe fn from_raw_fd(fd: RawFd) -> Dir {
         Dir(fd)
@@ -514,7 +621,7 @@ mod test {
     use std::io::{Read};
     use std::path::Path;
     use std::os::unix::io::{FromRawFd, IntoRawFd};
-    use {Dir};
+    use crate::{Dir};
 
     #[test]
     fn test_open_ok() {
@@ -522,6 +629,7 @@ mod test {
     }
 
     #[test]
+    #[cfg_attr(target_os="freebsd", should_panic(expected="Not a directory"))]
     fn test_open_file() {
         Dir::open("src/lib.rs").unwrap();
     }
@@ -560,5 +668,24 @@ mod test {
                     x.file_name() == Path::new("lib.rs").as_os_str()
                 })
                 .is_some());
+    }
+
+    #[test]
+    fn test_from_raw_fd_checked() {
+        let fd = Dir::open(".").unwrap().into_raw_fd();
+        let dir = unsafe { Dir::from_raw_fd_checked(fd) }.unwrap();
+        let filefd = dir.open_file("src/lib.rs").unwrap().into_raw_fd();
+        match unsafe { Dir::from_raw_fd_checked(filefd) } {
+            Ok(_) => assert!(false, "from_raw_fd_checked succeeded on a non-directory fd!"),
+            Err(e) => assert_eq!(e.raw_os_error().unwrap(), libc::ENOTDIR)
+        }
+    }
+
+    #[test]
+    fn test_try_clone() {
+        let d = Dir::open(".").unwrap();
+        let d2 = d.try_clone().unwrap();
+        drop(d);
+        let _file = d2.open_file("src/lib.rs").unwrap();
     }
 }

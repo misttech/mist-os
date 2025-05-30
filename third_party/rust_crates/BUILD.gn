@@ -626,7 +626,7 @@ group("once_cell") {
 
 if (current_os == "fuchsia") {
   group("openat") {
-    public_deps = [ ":openat-v0_1_17" ]
+    public_deps = [ ":openat-v0_1_21" ]
   }
 }
 
@@ -1276,11 +1276,8 @@ group("zstd") {
 
 license("adler2-v2_0_0.license") {
   public_package_name = "adler2"
-  license_files = [
-    "//third_party/rust_crates/vendor/adler2-2.0.0/LICENSE-0BSD",
-    "//third_party/rust_crates/vendor/adler2-2.0.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/adler2-2.0.0/LICENSE-MIT",
-  ]
+  license_files =
+      [ "//third_party/rust_crates/vendor/adler2-2.0.0/LICENSE-APACHE" ]
 }
 
 rustc_library("adler2-v2_0_0") {
@@ -11079,19 +11076,19 @@ rustc_library("opaque-debug-v0_3_0") {
   applicable_licenses = [ ":opaque-debug-v0_3_0.license" ]
 }
 
-license("openat-v0_1_17.license") {
+license("openat-v0_1_21.license") {
   public_package_name = "openat"
   license_files = [
-    "//third_party/rust_crates/vendor/openat-0.1.17/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/openat-0.1.17/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/openat-0.1.21/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/openat-0.1.21/LICENSE-MIT",
   ]
 }
 
-rustc_library("openat-v0_1_17") {
+rustc_library("openat-v0_1_21") {
   crate_name = "openat"
-  source_root = "//third_party/rust_crates/vendor/openat-0.1.17/src/lib.rs"
-  output_name = "openat-b3aae38d235053dc"
-  edition = "2015"
+  source_root = "//third_party/rust_crates/vendor/openat-0.1.21/src/lib.rs"
+  output_name = "openat-13e2be81d83be0b1"
+  edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -11103,13 +11100,13 @@ rustc_library("openat-v0_1_17") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=b3aae38d235053dc",
-    "-Cextra-filename=-b3aae38d235053dc",
+    "-Cmetadata=13e2be81d83be0b1",
+    "-Cextra-filename=-13e2be81d83be0b1",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":openat-v0_1_17.license" ]
+  applicable_licenses = [ ":openat-v0_1_21.license" ]
 }
 
 license("openssl-v0_10_71.license") {

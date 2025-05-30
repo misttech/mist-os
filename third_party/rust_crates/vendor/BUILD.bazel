@@ -1699,14 +1699,14 @@ alias(
 )
 
 alias(
-    name = "openat-0.1.17",
-    actual = "//third_party/rust_crates/vendor/openat-0.1.17:openat",
+    name = "openat-0.1.21",
+    actual = "//third_party/rust_crates/vendor/openat-0.1.21:openat",
     tags = ["manual"],
 )
 
 alias(
     name = "openat",
-    actual = "//third_party/rust_crates/vendor/openat-0.1.17:openat",
+    actual = "//third_party/rust_crates/vendor/openat-0.1.21:openat",
     tags = ["manual"],
 )
 

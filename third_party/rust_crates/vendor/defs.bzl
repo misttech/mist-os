@@ -538,7 +538,7 @@ _NORMAL_DEPENDENCIES = {
             "getopts": Label("//third_party/rust_crates/vendor/getopts-0.2.18:getopts"),
             "hyper-rustls": Label("//third_party/rust_crates/vendor/hyper-rustls-0.24.2:hyper_rustls"),
             "lipsum": Label("//third_party/rust_crates/vendor/lipsum-0.6.0:lipsum"),
-            "openat": Label("//third_party/rust_crates/vendor/openat-0.1.17:openat"),
+            "openat": Label("//third_party/rust_crates/vendor/openat-0.1.21:openat"),
             "openssl": Label("//third_party/rust_crates/vendor/openssl-0.10.71:openssl"),
             "pkcs1": Label("//third_party/rust_crates/vendor/pkcs1-0.7.5:pkcs1"),
             "rust_icu_common": Label("//third_party/rust_crates/vendor/rust_icu_common-5.0.0:rust_icu_common"),
