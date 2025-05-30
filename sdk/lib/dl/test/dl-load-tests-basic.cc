@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/self.h>
+
 #include "dl-iterate-phdr-tests.h"
 #include "dl-load-tests.h"
-
 namespace {
 
 using dl::testing::DlTests;
@@ -348,6 +349,36 @@ TYPED_TEST(DlTests, SonameFilenameLoadedDep) {
               Not(Contains(Property(&ModulePhdrInfo::name, TestShlib("libbar-soname")))));
 
   ASSERT_TRUE(this->DlClose(open_has_deps.value()).is_ok());
+}
+
+// Test that passing a NULL or an empty string as the file arg will return a
+// handle to the executable.
+TYPED_TEST(DlTests, NullFileArgBasic) {
+  const std::string kEmpty;
+
+  auto null_open = this->DlOpen(NULL, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(null_open.is_ok()) << null_open.error_value();
+  ASSERT_TRUE(null_open.value());
+
+  // To verify the module handle dlopen() returned is for the executable, we
+  // that the module's link_map.l_ld points to dynamic section of this test
+  // binary.
+  EXPECT_EQ(this->ModuleLinkMap(null_open.value())->l_ld,
+            reinterpret_cast<const Elf64_Dyn*>(elfldltl::Self<>::Dynamic().data()));
+
+  auto empty_str_open = this->DlOpen(kEmpty.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(empty_str_open.is_ok()) << empty_str_open.error_value();
+  EXPECT_TRUE(empty_str_open.value());
+
+  // Expect that the handle for an empty string is the same as the handle for
+  // a NULL argument, which is the executable.
+  EXPECT_EQ(empty_str_open.value(), null_open.value());
+
+  // TODO(https://fxbug.dev/339294119): TODO test that dlsym() will resolve
+  // symbols correctly with this handle.
+
+  ASSERT_TRUE(this->DlClose(null_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(empty_str_open.value()).is_ok());
 }
 
 }  // namespace

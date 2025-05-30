@@ -81,12 +81,13 @@ void DlLoadTestsBase::TearDown() {
   }
 }
 
-void DlLoadTestsBase::TrackModule(void* module, std::string filename) {
+void DlLoadTestsBase::TrackModule(void* module, const char* filename) {
+  std::string file = filename ? filename : "<null>";
   if (auto it = opened_modules_.find(module); it != opened_modules_.end()) {
     // The file has already been opened in this test, just increment the refcount.
     it->second.refcnt++;
   } else {
-    opened_modules_.insert({module, {std::move(filename), 1}});
+    opened_modules_.insert({module, {.name = std::move(file), .refcnt = 1}});
   }
 }
 

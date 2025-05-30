@@ -124,7 +124,7 @@ class DlImplTests : public Base {
       // TODO(https://fxbug.dev/382527519): RuntimeDynamicLinker should have a
       // `RunInitializers` method that will run this with proper synchronization.
       static_cast<RuntimeModule*>(result.value())->InitializeModuleTree();
-      Base::TrackModule(result.value(), std::string{file});
+      Base::TrackModule(result.value(), file);
     }
     return result;
   }
@@ -160,6 +160,13 @@ class DlImplTests : public Base {
   // variable. This function will allocate and initialize TLS data on the
   // thread so the thread can access that data.
   void PrepareForTlsAccess() { DlImplTestsTls::Prepare(*dynamic_linker_); }
+
+  // Return the `link_map` data structure associated with a module. `handle`
+  // should be a valid pointer returned by a successful dlopen() call.
+  const link_map* ModuleLinkMap(const void* handle) {
+    return reinterpret_cast<const link_map*>(
+        &static_cast<const RuntimeModule*>(handle)->module().link_map);
+  }
 
  private:
   std::unique_ptr<RuntimeDynamicLinker> dynamic_linker_;

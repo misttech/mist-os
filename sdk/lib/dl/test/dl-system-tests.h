@@ -5,6 +5,8 @@
 #ifndef LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 #define LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 
+#include <dlfcn.h>  // for dlinfo
+
 #include "dl-load-tests-base.h"
 
 #ifdef __Fuchsia__
@@ -69,6 +71,14 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // This function is a no-op for system tests, since they manage their own TLS
   // setup.
   void PrepareForTlsAccess() {}
+
+  // Call the system's dlinfo to fill in the link map for the given handle, and
+  // return it to the caller.
+  static const link_map* ModuleLinkMap(void* handle) {
+    struct link_map* info = nullptr;
+    EXPECT_EQ(dlinfo(handle, RTLD_DI_LINKMAP, static_cast<void*>(&info)), 0) << dlerror();
+    return info;
+  }
 
  private:
   // This will call the system dlopen in an OS-specific context. This method is

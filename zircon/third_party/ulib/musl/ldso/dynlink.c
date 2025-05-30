@@ -2419,7 +2419,7 @@ static void* dlopen_internal(zx_handle_t vmo, const char* file, int mode) {
 }
 
 void* dlopen(const char* file, int mode) {
-  if (!file)
+  if (!file || file[0] == '\0')
     return head;
   return dlopen_internal(ZX_HANDLE_INVALID, file, mode);
 }
