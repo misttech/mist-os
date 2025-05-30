@@ -1,6 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#![allow(unused_imports)]
+#![allow(dead_code)]
 
 use crate::model::actions::{Action, ActionKey, ActionsManager};
 use crate::model::component::instance::{InstanceState, ResolvedInstanceState};
@@ -16,7 +18,6 @@ use cm_rust::{
 };
 use cm_types::{IterablePath, Name};
 use errors::ActionError;
-use fuchsia_async as fasync;
 use futures::future::select_all;
 use futures::prelude::*;
 use log::*;
@@ -24,6 +25,10 @@ use moniker::ChildName;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::{fmt, iter};
+
+use cm_graph::DependencyNode;
+use directed_graph::DirectedGraph;
+use {fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync};
 
 /// Shuts down all component instances in this component (stops them and guarantees they will never
 /// be started again).
@@ -423,6 +428,37 @@ pub struct Child {
 
     /// Name of the environment associated with this child, if any.
     pub environment_name: Option<Name>,
+}
+
+/// For a given component `decl`, identify capability dependencies between the
+/// component itself and its children. A directed graph of these dependencies is
+/// returned.
+pub fn process_deps<'a>(
+    decl: &'a fdecl::Component,
+    dynamic_children: &Vec<(&'a str, &'a str)>,
+    dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
+) -> directed_graph::DirectedGraph<DependencyNode<'a>> {
+    let mut strong_dependencies: DirectedGraph<DependencyNode<'a>> =
+        directed_graph::DirectedGraph::new();
+    cm_graph::generate_dependency_graph(
+        &mut strong_dependencies,
+        decl,
+        dynamic_children,
+        dynamic_offers,
+    );
+    let self_dep_closure = strong_dependencies.get_closure(DependencyNode::Self_);
+
+    if let Some(children) = decl.children.as_ref() {
+        for child in children {
+            if let Some(child_name) = child.name.as_ref() {
+                let dependency_node = DependencyNode::Child(child_name, None);
+                if !self_dep_closure.contains(&dependency_node) {
+                    strong_dependencies.add_edge(DependencyNode::Self_, dependency_node);
+                }
+            }
+        }
+    }
+    strong_dependencies
 }
 
 /// For a given Component, identify capability dependencies between the
@@ -1024,8 +1060,15 @@ mod tests {
                 ComponentRef::Self_ => hashset![child("childA")],
                 child("childA") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> =
+            vec![DependencyNode::Child("childA", None), DependencyNode::Self_];
+
+        assert_eq!(ans, sorted_map)
     }
 
     #[test_case(DependencyType::Weak)]
@@ -1046,8 +1089,15 @@ mod tests {
                 ComponentRef::Self_ => hashset![child("childA")],
                 child("childA") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> =
+            vec![DependencyNode::Child("childA", None), DependencyNode::Self_];
+
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1067,8 +1117,15 @@ mod tests {
                 ComponentRef::Self_ => hashset![child("childA")],
                 child("childA") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> =
+            vec![DependencyNode::Child("childA", None), DependencyNode::Self_];
+
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1097,8 +1154,18 @@ mod tests {
                 child("childA") => hashset![],
                 child("childB") => hashset![child("childA")],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childA", None),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Self_,
+        ];
+
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1136,8 +1203,19 @@ mod tests {
                 capability("dict") => hashset![child("childB")],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childB", None),
+            DependencyNode::Capability("dict"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1160,8 +1238,18 @@ mod tests {
                 child("childA") => hashset![],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childA", None),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Self_,
+            DependencyNode::Environment("env"),
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1184,8 +1272,18 @@ mod tests {
                 child("childA") => hashset![],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childA", None),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Environment("env"),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1208,8 +1306,18 @@ mod tests {
                 child("childA") => hashset![child("childB")],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childB", None),
+            DependencyNode::Environment("env"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1295,8 +1403,20 @@ mod tests {
                 child("childB") => hashset![child("childC")],
                 child("childC") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childC", None),
+            DependencyNode::Environment("env2"),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Environment("env"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1332,8 +1452,19 @@ mod tests {
                 child("childB") => hashset![child("childC")],
                 child("childC") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childC", None),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Environment("env"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1356,8 +1487,18 @@ mod tests {
                 child("childA") => hashset![],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childA", None),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Self_,
+            DependencyNode::Environment("resolver_env"),
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1380,8 +1521,18 @@ mod tests {
                 child("childA") => hashset![child("childB")],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childB", None),
+            DependencyNode::Environment("resolver_env"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     // add test where B depends on A via environment and C depends on B via environment
@@ -1419,8 +1570,20 @@ mod tests {
                 child("childB") => hashset![child("childC")],
                 child("childC") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childC", None),
+            DependencyNode::Environment("env2"),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Environment("env1"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -1456,8 +1619,19 @@ mod tests {
                 child("childB") => hashset![child("childC")],
                 child("childC") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let sorted_map = process_deps(&fidl_decl, &vec![], None).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childC", None),
+            DependencyNode::Environment("multi_env"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]

@@ -29,10 +29,27 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
         self.0.get(&id).as_ref().map(|node| &node.0)
     }
 
+    /// Given a dependency graph represented as a set of `edges`, find the set of
+    /// all nodes that the `start` node depends on, directly or indirectly. This
+    /// includes `start` itself.
+    pub fn get_closure(&self, start: T) -> HashSet<T> {
+        let mut nodes_to_consider = vec![start];
+        let mut res = HashSet::new();
+        while let Some(node) = nodes_to_consider.pop() {
+            if res.contains(&node) {
+                // We've already visited this node.
+                continue;
+            }
+            res.insert(node);
+            if let Some(targets) = self.get_targets(node) {
+                nodes_to_consider.append(&mut targets.iter().cloned().collect::<Vec<_>>());
+            }
+        }
+        res
+    }
+
     /// Returns the nodes of the graph in reverse topological order, or an error if the graph
     /// contains a cycle.
-    ///
-    /// TODO: //src/devices/tools/banjo/srt/ast.rs can be migrated to use this feature.
     pub fn topological_sort(&self) -> Result<Vec<T>, Error<T>> {
         TarjanSCC::new(self).run()
     }
@@ -102,7 +119,7 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> Default for DirectedGra
 
 /// A graph node. Contents contain the nodes mapped by edges from this node.
 #[derive(Eq, PartialEq)]
-struct DirectedNode<T: PartialEq + Hash + Copy + Ord + Debug + Display>(HashSet<T>);
+pub struct DirectedNode<T: PartialEq + Hash + Copy + Ord + Debug + Display>(HashSet<T>);
 
 impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedNode<T> {
     /// Create an empty node.
