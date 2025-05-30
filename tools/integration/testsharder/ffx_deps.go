@@ -9,7 +9,6 @@ import (
 	"runtime"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
-	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 )
 
@@ -22,11 +21,6 @@ func AddFFXDeps(s *Shard, buildDir string, tools build.Tools, flash bool) error 
 	subtools := []string{"package", "product", "test", "log", "assembly"}
 	if s.Env.TargetsEmulator() {
 		subtools = append(subtools, "emu")
-		deps, err := ffxutil.GetEmuDeps(buildDir, s.TargetCPU(), []string{})
-		if err != nil {
-			return err
-		}
-		s.AddDeps(deps)
 	}
 	platform := hostplatform.MakeName(runtime.GOOS, s.HostCPU())
 	s.AddDeps(getSubtoolDeps(s, tools, platform, subtools))

@@ -73,8 +73,7 @@
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json",
-            "repo_AEMU",
-            "sdk/manifest/core"
+            "repo_AEMU"
         ],
         "pkg_repo": "repo_AEMU",
         "timeout_secs": 0,

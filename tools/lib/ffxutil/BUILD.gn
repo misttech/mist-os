@@ -8,7 +8,6 @@ import("//build/go/go_test.gni")
 go_library("ffxutil") {
   sources = [
     "emu.go",
-    "emu_test.go",
     "ffx.go",
     "ffx_test.go",
     "flash.go",
@@ -20,7 +19,6 @@ go_library("ffxutil") {
     "//tools/bootserver:bootserver_lib",
     "//tools/botanist:constants",
     "//tools/build",
-    "//tools/lib/jsonutil",
     "//tools/lib/retry",
     "//tools/lib/subprocess",
   ]

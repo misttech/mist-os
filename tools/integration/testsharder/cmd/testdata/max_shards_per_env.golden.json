@@ -63,8 +63,7 @@
             "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
-            "product_bundles.json",
-            "sdk/manifest/core"
+            "product_bundles.json"
         ],
         "timeout_secs": 1564,
         "summary": {
@@ -152,8 +151,7 @@
             "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
-            "product_bundles.json",
-            "sdk/manifest/core"
+            "product_bundles.json"
         ],
         "timeout_secs": 1564,
         "summary": {
@@ -241,8 +239,7 @@
             "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
-            "product_bundles.json",
-            "sdk/manifest/core"
+            "product_bundles.json"
         ],
         "timeout_secs": 1564,
         "summary": {

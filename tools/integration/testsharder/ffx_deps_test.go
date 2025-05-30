@@ -5,8 +5,6 @@
 package testsharder
 
 import (
-	"os"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"testing"
@@ -14,14 +12,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
-	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
-	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
 
 func TestAddFFXDeps(t *testing.T) {
-	baseDeps := []string{
-		"sdk/manifest/core",
-	}
+	baseDeps := []string{}
 	testCases := []struct {
 		name       string
 		targetCPU  string
@@ -56,13 +50,6 @@ func TestAddFFXDeps(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			buildDir := t.TempDir()
-			manifestPath := filepath.Join(buildDir, ffxutil.SDKManifestPath)
-			if err := os.MkdirAll(filepath.Dir(manifestPath), os.ModePerm); err != nil {
-				t.Fatalf("failed to mkdirAll %s: %s", filepath.Dir(manifestPath), err)
-			}
-			if err := jsonutil.WriteToFile(manifestPath, ffxutil.SDKManifest{Atoms: []ffxutil.Atom{}}); err != nil {
-				t.Fatalf("failed to write manifest at %s: %s", manifestPath, err)
-			}
 			s := &Shard{
 				Env: build.Environment{
 					Dimensions: build.DimensionSet{

@@ -79,8 +79,7 @@
             "host_x64/zbi",
             "images.json",
             "product_bundle/zbi",
-            "product_bundles.json",
-            "sdk/manifest/core"
+            "product_bundles.json"
         ],
         "timeout_secs": 0,
         "summary": {
