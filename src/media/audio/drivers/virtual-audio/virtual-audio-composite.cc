@@ -392,7 +392,7 @@ void VirtualAudioComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& re
 
 void VirtualAudioComposite::OnRingBufferClosed(fidl::UnbindInfo info) {
   // Do not log canceled cases; these happen particularly frequently in certain test cases.
-  if (info.status() != ZX_ERR_CANCELED) {
+  if (info.status() != ZX_ERR_CANCELED && !info.is_peer_closed() && !info.is_user_initiated()) {
     fdf::info("Ring buffer channel closing: {}", info.FormatDescription().c_str());
   }
   ResetRingBuffer();
@@ -622,9 +622,7 @@ void VirtualAudioComposite::SignalProcessingConnect(
 }
 
 void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
-  if (info.is_peer_closed()) {
-    fdf::info("Client disconnected");
-  } else if (!info.is_user_initiated()) {
+  if (!info.is_user_initiated() && !info.is_peer_closed()) {
     // Do not log canceled cases; these happen particularly frequently in certain test cases.
     if (info.status() != ZX_ERR_CANCELED) {
       fdf::error("Client connection unbound: {}", info.status_string());

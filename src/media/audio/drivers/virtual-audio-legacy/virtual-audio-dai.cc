@@ -210,7 +210,8 @@ void VirtualAudioDai::CreateRingBuffer(CreateRingBufferRequest& request,
       [this](fidl::Server<fuchsia_hardware_audio::RingBuffer>*, fidl::UnbindInfo info,
              fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer>) {
         // Do not log canceled cases which happens too often in particular in test cases.
-        if (info.status() != ZX_ERR_CANCELED) {
+        if (info.status() != ZX_ERR_CANCELED && !info.is_peer_closed() &&
+            !info.is_user_initiated()) {
           zxlogf(INFO, "Ring buffer channel closing: %s", info.FormatDescription().c_str());
         }
         ResetRingBuffer();
