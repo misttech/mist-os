@@ -329,7 +329,7 @@ called whenever someone connects to your service. Fortunately,
 Add the binding group to your server class:
 
 ```cpp
-fidl::ServerBindingGroup<fuchsia_examples::EchoService> bindings_;
+fidl::ServerBindingGroup<fuchsia_examples::Echo> bindings_;
 ```
 
 You can then create a `ServiceInstanceHandler`.  `this` in this example points
