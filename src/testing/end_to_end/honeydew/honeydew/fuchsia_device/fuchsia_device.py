@@ -453,3 +453,14 @@ class FuchsiaDevice(abc.ABC):
     @abc.abstractmethod
     def wait_for_online(self) -> None:
         """Wait for Fuchsia device to go online."""
+
+    @abc.abstractmethod
+    def is_starnix_device(self) -> bool:
+        """Check if the device under test is a starnix device.
+
+        Some operation maybe heavy on starnix device, allow caller to find if running on starnix
+        device.
+
+        Raises:
+            FuchsiaDeviceError: failed to check the device.
+        """

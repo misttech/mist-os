@@ -57,6 +57,7 @@ from honeydew.affordances.power.system_power_state_controller import (
 )
 from honeydew.affordances.rtc import rtc, rtc_using_fc
 from honeydew.affordances.session import session, session_using_ffx
+from honeydew.affordances.starnix import errors as starnix_errors
 from honeydew.affordances.starnix import starnix, starnix_using_ffx
 from honeydew.affordances.tracing import tracing, tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
@@ -939,6 +940,24 @@ class FuchsiaDeviceImpl(
             raise errors.FuchsiaDeviceError(
                 f"'{self.device_name}' failed to go online."
             ) from err
+
+    def is_starnix_device(self) -> bool:
+        """Check if the device under test is a starnix device.
+
+        Some operation maybe heavy on starnix device, allow caller to find if running on starnix
+        device.
+
+        Raises:
+            FuchsiaDeviceError: failed to check the device.
+        """
+
+        try:
+            self.starnix
+            return True
+        except errors.NotSupportedError:
+            return False
+        except starnix_errors.StarnixError as err:
+            raise errors.FuchsiaDeviceError(err)
 
     # List all private properties
     @property

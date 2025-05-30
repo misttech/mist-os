@@ -1943,6 +1943,45 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
 
         mock_fc_connect_device_proxy.assert_called()
 
+    @mock.patch.object(
+        ffx_impl.FfxImpl,
+        "run",
+        return_value="core/starnix_runner/kernels:",
+        autospec=True,
+    )
+    def test_is_starnix_device(self, mock_ffx: mock.Mock) -> None:
+        """Testcase for FuchsiaDevice.is_starnix_device()"""
+        self.assertTrue(self.fd_fc_obj.is_starnix_device())
+
+        mock_ffx.assert_called_once()
+
+    @mock.patch.object(
+        ffx_impl.FfxImpl,
+        "run",
+        return_value="",
+        autospec=True,
+    )
+    def test_is_starnix_device_unsupported_error(
+        self, mock_ffx: mock.Mock
+    ) -> None:
+        """Testcase for FuchsiaDevice.is_starnix_device()"""
+        self.assertFalse(self.fd_fc_obj.is_starnix_device())
+
+        mock_ffx.assert_called_once()
+
+    @mock.patch.object(
+        ffx_impl.FfxImpl,
+        "run",
+        side_effect=ffx_errors.FfxCommandError("error"),
+        autospec=True,
+    )
+    def test_is_starnix_device_error(self, mock_ffx: mock.Mock) -> None:
+        """Testcase for FuchsiaDevice.is_starnix_device()"""
+        with self.assertRaises(errors.FuchsiaDeviceError):
+            self.fd_fc_obj.is_starnix_device()
+
+        mock_ffx.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
