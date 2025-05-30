@@ -57,6 +57,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   // FIDL natural C++ methods for fuchsia.hardware.hrtimer.
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
   void Stop(StopRequest& request, StopCompleter::Sync& completer) override;
+  void ReadTimer(ReadTimerRequest& request, ReadTimerCompleter::Sync& completer) override;
+  void ReadClock(ReadClockRequest& request, ReadClockCompleter::Sync& completer) override;
   void GetTicksLeft(GetTicksLeftRequest& request, GetTicksLeftCompleter::Sync& completer) override;
   void SetEvent(SetEventRequest& request, SetEventCompleter::Sync& completer) override;
   void StartAndWait(StartAndWaitRequest& request, StartAndWaitCompleter::Sync& completer) override;

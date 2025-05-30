@@ -1959,6 +1959,12 @@ mod tests {
                                         })
                                         .expect("");
                                 }
+                                ffhh::DeviceRequest::ReadTimer { responder, .. } => {
+                                    responder.send(Err(ffhh::DriverError::NotSupported)).expect("");
+                                }
+                                ffhh::DeviceRequest::ReadClock { responder, .. } => {
+                                    responder.send(Err(ffhh::DriverError::NotSupported)).expect("");
+                                }
                                 ffhh::DeviceRequest::_UnknownMethod { .. } => todo!(),
                             }
                         }

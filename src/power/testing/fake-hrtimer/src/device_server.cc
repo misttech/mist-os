@@ -108,6 +108,14 @@ void DeviceServer::Stop(StopRequest& _request, StopCompleter::Sync& completer) {
   }
 }
 
+void DeviceServer::ReadTimer(ReadTimerRequest& request, ReadTimerCompleter::Sync& completer) {
+  completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kNotSupported));
+}
+
+void DeviceServer::ReadClock(ReadClockRequest& request, ReadClockCompleter::Sync& completer) {
+  completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kNotSupported));
+}
+
 void DeviceServer::GetTicksLeft(GetTicksLeftRequest& _request,
                                 GetTicksLeftCompleter::Sync& completer) {
   completer.Reply(zx::ok(DeviceGetTicksLeftResponse().ticks(0)));
@@ -242,6 +250,7 @@ void DeviceServer::GetProperties(GetPropertiesCompleter::Sync& completer) {
             .max_ticks(std::numeric_limits<uint16_t>::max())
             .supports_event(true)
             .supports_wait(true)
+            .supports_read(false)
             .supported_resolutions(std::vector<Resolution>{{Resolution::WithDuration(1000000)}});
   }
   Properties properties = {};

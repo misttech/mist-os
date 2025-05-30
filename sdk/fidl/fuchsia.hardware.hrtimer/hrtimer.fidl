@@ -72,6 +72,10 @@ type TimerProperties = table {
     /// Required.
     3: max_ticks uint64;
 
+    // Someday we should re-evaluate the use of these bools to tell the user
+    // what method(s) are supported. They already do that by returning
+    // kNotSupported.
+
     /// If true then the `SetEvent` method is supported, if false or not present it is not
     /// supported.
     ///
@@ -83,6 +87,12 @@ type TimerProperties = table {
     ///
     /// Optional.
     5: supports_wait bool;
+
+    /// If true, then the `TimerRead` and `ClockRead` methods are supported, if
+    /// false or not present, these methods are not supported.
+    ///
+    /// Optional.
+    6: supports_read bool;
 };
 
 /// Driver properties.
@@ -116,6 +126,42 @@ open protocol Device {
         resolution Resolution;
         ticks uint64;
     }) -> () error DriverError;
+
+    /// Read the current timer's set or timeout value.
+    ///
+    /// The returned ticks are in time-units relative to the given resolution.
+    /// Use `GetProperties()` to determine the available resolution(s).
+    ///
+    /// Errors:
+    ///   BAD_STATE: no readable timer currently exists.
+    ///   INVALID_ARGS: `id` or `resolution` are invalid or unsupported values.
+    ///   NOT_SUPPORTED: if `supports_read` is false, or the method is otherwise
+    ///     not implemented.
+    ///   INTERNAL_ERROR: internal runtime error.
+    flexible ReadTimer(struct {
+        id uint64;
+        resolution Resolution;
+    }) -> (struct {
+        ticks uint64;
+    }) error DriverError;
+
+    /// Read the current timer's clock value.
+    ///
+    /// The returned ticks are in time-units relative to the given resolution.
+    /// Use `GetProperties()` to determine the available resolution(s).
+    ///
+    /// Errors:
+    ///   BAD_STATE: no clock is currently running.
+    ///   INVALID_ARGS: `id` or `resolution` are invalid or unsupported values.
+    ///   NOT_SUPPORTED: if `supports_read` is false, or the method is otherwise
+    ///     not implemented.
+    ///   INTERNAL_ERROR: internal runtime error.
+    flexible ReadClock(struct {
+        id uint64;
+        resolution Resolution;
+    }) -> (struct {
+        ticks uint64;
+    }) error DriverError;
 
     /// Stops the timer `id`.
     ///
