@@ -25,15 +25,11 @@ use {fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync};
 /// Max value for inspect event history.
 const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 128;
 
-// TODO: b/388568736 - will be in use shortly.
-#[allow(dead_code)]
 fn to_errno_with_log<T: std::fmt::Debug>(v: T) -> Errno {
     log_error!("hr_timer_manager internal error: {v:?}");
     from_status_like_fdio!(zx::Status::IO)
 }
 
-// TODO: b/388568736 - will be in use shortly.
-#[allow(dead_code)]
 fn signal_handle<H: HandleBased>(
     handle: &H,
     clear_mask: zx::Signals,
@@ -45,22 +41,16 @@ fn signal_handle<H: HandleBased>(
     })
 }
 
-// TODO: b/388568736 - will be in use shortly.
-#[allow(dead_code)]
 fn duplicate_handle<H: HandleBased>(h: &H) -> Result<H, Errno> {
     h.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|status| from_status_like_fdio!(status))
 }
 
 /// Waits forever synchronously for EVENT_SIGNALED.
-// TODO: b/388568736 - will be in use shortly.
-#[allow(dead_code)]
 fn wait_signaled_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
     handle.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE)
 }
 
 /// Waits forever asynchronously for EVENT_SIGNALED.
-// TODO: b/388568736 - will be in use shortly.
-#[allow(dead_code)]
 async fn wait_signaled<H: HandleBased>(handle: &H) -> Result<()> {
     fasync::OnSignals::new(handle, zx::Signals::EVENT_SIGNALED)
         .await
@@ -167,12 +157,8 @@ impl std::fmt::Display for InspectHrTimerEvent {
 }
 
 #[derive(Debug)]
-// TODO: b/388568736 - will be in use shortly.
-#[allow(dead_code)]
 struct TimerState {
     /// The task that waits for the timer to expire.
-    // TODO: b/388568736 - will be in use shortly.
-    #[allow(dead_code)]
     task: fasync::Task<()>,
     /// The desired deadline for the timer.
     deadline: zx::BootInstant,
@@ -205,23 +191,17 @@ impl Drop for SuspendLock {
 impl SuspendLock {
     /// Creates a suspend lock on the provided counter. The counter will be incrementeed
     /// at creation, and decremented at disposition.
-    // TODO: b/388568736 - will be in use shortly.
-    #[allow(dead_code)]
     fn new_with_increment(prototype: Arc<zx::Counter>) -> Self {
         prototype.add(1).expect("increment counter");
         Self::new_internal(prototype)
     }
 
     /// Creates a suspend lock on the provided counter, but does not increase the counter.
-    // TODO: b/388568736 - will be in use shortly.
-    #[allow(dead_code)]
     fn new_without_increment(prototype: Arc<zx::Counter>) -> Self {
         // No increment - the counter was already incremented by the wake proxy
         Self::new_internal(prototype)
     }
 
-    // TODO: b/388568736 - will be in use shortly.
-    #[allow(dead_code)]
     fn new_internal(prototype: Arc<zx::Counter>) -> Self {
         Self { counter: prototype }
     }
