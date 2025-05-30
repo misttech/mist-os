@@ -232,9 +232,8 @@ pub fn new_fuse_fs(
     let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64, 0);
     fuse_node.state.lock().nlookup += 1;
 
-    let mut root_node = FsNode::new_root(fuse_node);
-    root_node.node_id = FUSE_ROOT_ID_U64;
-    fs.set_root_node(root_node);
+    fs.create_root(fuse_node, FUSE_ROOT_ID_U64);
+
     {
         let mut state = connection.lock();
         state.connect();
@@ -258,10 +257,13 @@ pub fn new_fusectl_fs(
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FuseCtlFs, options)?;
-    let root_node = FsNode::new_root_with_properties(FuseCtlConnectionsDirectory {}, |info| {
-        info.chmod(mode!(IFDIR, 0o755));
-    });
-    fs.set_root_node(root_node);
+
+    let root_ino = fs.next_node_id();
+    fs.create_root_with_info(
+        FuseCtlConnectionsDirectory {},
+        FsNodeInfo::new(root_ino, mode!(IFDIR, 0o755), FsCred::root()),
+    );
+
     Ok(fs)
 }
 

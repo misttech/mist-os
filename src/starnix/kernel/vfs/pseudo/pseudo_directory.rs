@@ -119,12 +119,9 @@ impl PseudoDirectoryBuilder {
 
     pub fn build_root(&self, fs: &FileSystemHandle, mode: FileMode, creds: FsCred) {
         assert!(mode.is_dir(), "root directory must be a directory");
-        let node = FsNode::new_root_with_properties(self.build(fs), |info| {
-            info.uid = creds.uid;
-            info.gid = creds.gid;
-            info.mode = mode;
-        });
-        fs.set_root_node(node);
+        let ops = self.build(fs);
+        let root_ino = fs.next_node_id();
+        fs.create_root_with_info(ops, FsNodeInfo::new(root_ino, mode, creds));
     }
 }
 

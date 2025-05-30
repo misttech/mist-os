@@ -1173,15 +1173,12 @@ impl OverlayStack {
             return error!(EINVAL);
         }
 
+        let kernel = current_task.kernel();
         let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Uncached,
-            OverlayFs { stack },
-            options,
-        )?;
-        fs.set_root(OverlayNodeOps { node: root_node });
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, OverlayFs { stack }, options)?;
+        let root_ino = fs.next_node_id();
+        fs.create_root(OverlayNodeOps { node: root_node }, root_ino);
         Ok(fs)
     }
 
@@ -1194,11 +1191,13 @@ impl OverlayStack {
 
         // Create upper and work directories in an invisible tmpfs.
         let invisible_tmp = TmpFs::new_fs(kernel);
-        let create_directory = |fs: &FileSystemHandle| {
+
+        fn create_directory(fs: &FileSystemHandle) -> DirEntryHandle {
             let info = FsNodeInfo::new(fs.next_node_id(), mode!(IFDIR, 0o777), FsCred::root());
-            let node = fs.create_root_node(kernel, TmpfsDirectory::new(), info);
+            let node = fs.create_detached_node_with_info(TmpfsDirectory::new(), info);
             DirEntry::new(node, None, FsString::default())
-        };
+        }
+
         let upper =
             ActiveEntry { entry: create_directory(&invisible_tmp), mount: MountInfo::detached() };
         let work =
@@ -1215,7 +1214,8 @@ impl OverlayStack {
             OverlayFs { stack },
             FileSystemOptions::default(),
         )?;
-        fs.set_root(OverlayNodeOps { node: root_node });
+        let root_ino = fs.next_node_id();
+        fs.create_root(OverlayNodeOps { node: root_node }, root_ino);
         Ok(fs)
     }
 

@@ -118,11 +118,7 @@ fn init_devpts(
 
     let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs { uid, gid }, options)
         .expect("devpts filesystem constructed with valid options");
-    let mut root = FsNode::new_root_with_properties(DevPtsRootDir { state }, |info| {
-        info.ino = ROOT_NODE_ID;
-    });
-    root.node_id = ROOT_NODE_ID;
-    fs.set_root_node(root);
+    fs.create_root(DevPtsRootDir { state }, ROOT_NODE_ID);
     Ok(fs)
 }
 

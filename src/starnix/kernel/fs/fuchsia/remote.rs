@@ -286,11 +286,12 @@ impl RemoteFs {
         let use_remote_ids = remotefs.use_remote_ids;
         let fs =
             FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotefs, options)?;
-        let mut root_node = FsNode::new_root(remote_node);
         if use_remote_ids {
-            root_node.node_id = node_id;
+            fs.create_root(remote_node, node_id);
+        } else {
+            let root_ino = fs.next_node_id();
+            fs.create_root(remote_node, root_ino);
         }
-        fs.set_root_node(root_node);
         Ok(fs)
     }
 

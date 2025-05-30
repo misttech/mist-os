@@ -58,9 +58,8 @@ impl FuchsiaNetworkMonitorFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, FuchsiaNetworkMonitorFs, options)?;
-
-        let node = FsNode::new_root(NetworkDirectoryNode::new());
-        fs.set_root_node(node);
+        let root_ino = fs.next_node_id();
+        fs.create_root(NetworkDirectoryNode::new(), root_ino);
         Ok(fs)
     }
 }

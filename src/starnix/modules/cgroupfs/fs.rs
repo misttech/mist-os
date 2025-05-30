@@ -31,17 +31,15 @@ impl CgroupV1Fs {
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
+        let kernel = current_task.kernel();
         let root = CgroupRoot::new();
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&root));
         let root_dir = dir_nodes.root.clone();
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Uncached,
-            CgroupV1Fs { dir_nodes, root },
-            options,
-        )?;
+        let fs =
+            FileSystem::new(kernel, CacheMode::Uncached, CgroupV1Fs { dir_nodes, root }, options)?;
         root_dir.create_root_interface_files(current_task, &fs);
-        fs.set_root(root_dir);
+        let root_ino = fs.next_node_id();
+        fs.create_root(root_dir, root_ino);
         Ok(fs)
     }
 }
@@ -86,14 +84,10 @@ impl CgroupV2Fs {
         let kernel = current_task.kernel();
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&kernel.cgroups.cgroup2));
         let root = dir_nodes.root.clone();
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Uncached,
-            CgroupV2Fs { dir_nodes },
-            options,
-        )?;
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, CgroupV2Fs { dir_nodes }, options)?;
         root.create_root_interface_files(current_task, &fs);
-        fs.set_root(root);
+        let root_ino = fs.next_node_id();
+        fs.create_root(root, root_ino);
         Ok(fs)
     }
 }

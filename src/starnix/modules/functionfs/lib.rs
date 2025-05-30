@@ -16,6 +16,7 @@ use starnix_core::vfs::{
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
+use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
@@ -233,14 +234,9 @@ impl FunctionFs {
 
         let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
 
-        let mut root = FsNode::new_root_with_properties(FunctionFsRootDir::default(), |info| {
-            info.ino = ROOT_NODE_ID;
-            info.uid = uid;
-            info.gid = gid;
-        });
-        root.node_id = ROOT_NODE_ID;
-        fs.set_root_node(root);
-
+        let creds = FsCred { uid, gid };
+        let info = FsNodeInfo::new(ROOT_NODE_ID, mode!(IFDIR, 0o777), creds);
+        fs.create_root_with_info(FunctionFsRootDir::default(), info);
         Ok(fs)
     }
 }

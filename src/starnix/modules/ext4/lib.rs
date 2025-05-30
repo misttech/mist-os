@@ -104,10 +104,7 @@ impl ExtFilesystem {
             fs,
             options,
         )?;
-        let mut root = FsNode::new_root(ops);
-        root.node_id = ROOT_INODE_NUM as ino_t;
-        fs.set_root_node(root);
-
+        fs.create_root(ops, ROOT_INODE_NUM as ino_t);
         Ok(fs)
     }
 }

@@ -7,7 +7,7 @@ use crate::mm::PAGE_SIZE;
 use crate::security;
 use crate::security::PermissionFlags;
 use crate::signals::{send_standard_signal, SignalInfo};
-use crate::task::{CurrentTask, EncryptionKeyId, Kernel, WaitQueue, Waiter};
+use crate::task::{CurrentTask, EncryptionKeyId, WaitQueue, Waiter};
 use crate::time::utc;
 use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::pipe::{Pipe, PipeHandle};
@@ -1177,21 +1177,8 @@ impl FsNode {
     /// The node identifier and ino will be set by the filesystem on insertion. It will be owned by
     /// root and have a 777 permission.
     pub fn new_root(ops: impl FsNodeOps) -> Self {
-        Self::new_root_with_properties(ops, |_| {})
-    }
-
-    /// Create a new node for the root of a filesystem.
-    ///
-    /// The provided callback allows the caller to set the properties of the node.
-    /// The default value will provided a node owned by root, with permission 0777.
-    /// The ino will be 0. If left as is, it will be set by the filesystem on insertion.
-    pub fn new_root_with_properties<F>(ops: impl FsNodeOps, info_updater: F) -> Self
-    where
-        F: FnOnce(&mut FsNodeInfo),
-    {
-        let mut info = FsNodeInfo::new(0, mode!(IFDIR, 0o777), FsCred::root());
-        info_updater(&mut info);
-        Self::new_internal(Box::new(ops), Weak::new(), Weak::new(), 0, info, None)
+        let info = FsNodeInfo::new(0, mode!(IFDIR, 0o777), FsCred::root());
+        Self::new_internal(Box::new(ops), Weak::new(), 0, info, None)
     }
 
     /// Create a node without inserting it into the FileSystem node cache.
@@ -1206,25 +1193,19 @@ impl FsNode {
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        Self::new_internal(
-            ops,
-            fs.kernel.clone(),
-            Arc::downgrade(fs),
-            node_id,
-            info,
-            Some(current_task),
-        )
-        .into_handle()
+        Self::new_internal(ops, Arc::downgrade(fs), node_id, info, Some(current_task)).into_handle()
     }
 
     /// Create a directory without inserting it into the FileSystem node cache.
     ///
     /// This is usually not what you want!
     ///
-    /// This is used for creating nodes that are not part of the filesystem, like the root of the
-    /// kernel.
+    /// This function is a special-purpose version of [`new_uncached`] that is used for creating
+    /// directories. This function exists because some callers of [`new_uncached`] need to create
+    /// directories, but don't have a [`CurrentTask`] available. These callers lack a
+    /// [`CurrentTask`] because they are creating the root directory for the initial [`FsContext`],
+    /// which needs to exist before we can create a task object.
     pub fn new_uncached_directory(
-        kernel: &Arc<Kernel>,
         ops: impl Into<Box<dyn FsNodeOps>>,
         fs: &FileSystemHandle,
         node_id: ino_t,
@@ -1232,8 +1213,7 @@ impl FsNode {
     ) -> FsNodeHandle {
         assert!(info.mode.is_dir());
         let ops = ops.into();
-        Self::new_internal(ops, Arc::downgrade(kernel), Arc::downgrade(fs), node_id, info, None)
-            .into_handle()
+        Self::new_internal(ops, Arc::downgrade(fs), node_id, info, None).into_handle()
     }
 
     pub fn into_handle(self) -> FsNodeHandle {
@@ -1242,7 +1222,6 @@ impl FsNode {
 
     fn new_internal(
         ops: Box<dyn FsNodeOps>,
-        kernel: Weak<Kernel>,
         fs: Weak<FileSystem>,
         node_id: ino_t,
         info: FsNodeInfo,
@@ -1262,7 +1241,7 @@ impl FsNode {
                 .expect("expected that a CurrentTask would be available when creating a fifo");
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
             if !security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE) {
-                let kernel = kernel.upgrade().expect("Invalid kernel when creating fs node");
+                let kernel = current_task.kernel();
                 let max_size = kernel.system_limits.pipe_max_size.load(Ordering::Relaxed);
                 default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
             }
@@ -1299,21 +1278,8 @@ impl FsNode {
         }
     }
 
-    pub fn set_id(&mut self, node_id: ino_t) {
-        debug_assert!(self.node_id == 0);
-        self.node_id = node_id;
-        if self.info.get_mut().ino == 0 {
-            self.info.get_mut().ino = node_id;
-        }
-    }
-
     pub fn fs(&self) -> FileSystemHandle {
         self.fs.upgrade().expect("FileSystem did not live long enough")
-    }
-
-    pub fn set_fs(&mut self, fs: &FileSystemHandle) {
-        debug_assert!(self.fs.ptr_eq(&Weak::new()));
-        self.fs = Arc::downgrade(fs);
     }
 
     pub fn ops(&self) -> &dyn FsNodeOps {

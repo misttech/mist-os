@@ -16,8 +16,10 @@ use starnix_lifecycle::AtomicU64Counter;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::arc_key::ArcKey;
 use starnix_uapi::as_any::AsAny;
+use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::{error, ino_t, statfs};
 use std::collections::hash_map::Entry;
@@ -164,25 +166,12 @@ impl FileSystem {
         Ok(file_system)
     }
 
-    pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {
-        self.set_root_node(FsNode::new_root(root));
-    }
-
-    /// Set up the root of the filesystem. Must not be called more than once.
-    pub fn set_root_node(self: &FileSystemHandle, root: FsNode) {
-        let root = self.insert_node(root);
-        assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
-    }
-
-    /// Inserts a node in the FsNode cache.
-    fn insert_node(self: &FileSystemHandle, mut node: FsNode) -> DirEntryHandle {
-        if node.node_id == 0 {
-            node.set_id(self.next_node_id());
-        }
-        node.set_fs(self);
-        let handle: FsNodeHandle = node.into_handle();
-        self.nodes.lock().insert(handle.node_id, Arc::downgrade(&handle));
-        DirEntry::new(handle, None, FsString::default())
+    fn set_root(self: &FileSystemHandle, root: FsNodeHandle) {
+        let root_dir = DirEntry::new(root, None, FsString::default());
+        assert!(
+            self.root.set(root_dir).is_ok(),
+            "FileSystem::set_root can't be called more than once"
+        );
     }
 
     pub fn has_permanent_entries(&self) -> bool {
@@ -259,7 +248,7 @@ impl FileSystem {
 
     /// File systems that produce their own IDs for nodes should invoke this
     /// function. The ones who leave to this object to assign the IDs should
-    /// call |create_node|.
+    /// call |create_node_and_allocate_node_id|.
     pub fn create_node_with_info(
         self: &Arc<Self>,
         current_task: &CurrentTask,
@@ -282,16 +271,33 @@ impl FileSystem {
     }
 
     /// Create a node for a directory that has no parent.
-    pub fn create_root_node(
+    pub fn create_detached_node_with_info(
         self: &Arc<Self>,
-        kernel: &Arc<Kernel>,
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         assert!(info.mode.is_dir());
-        let node = FsNode::new_uncached_directory(kernel, ops, self, info.ino, info);
+        let node = FsNode::new_uncached_directory(ops, self, info.ino, info);
         self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
         node
+    }
+
+    /// Create a root node for the filesystem.
+    ///
+    /// This is a convenience function that creates a root node with the default
+    /// directory mode and root credentials.
+    pub fn create_root(self: &Arc<Self>, ops: impl Into<Box<dyn FsNodeOps>>, ino: ino_t) {
+        let info = FsNodeInfo::new(ino, mode!(IFDIR, 0o777), FsCred::root());
+        self.create_root_with_info(ops, info);
+    }
+
+    pub fn create_root_with_info(
+        self: &Arc<Self>,
+        ops: impl Into<Box<dyn FsNodeOps>>,
+        info: FsNodeInfo,
+    ) {
+        let node = self.create_detached_node_with_info(ops, info);
+        self.set_root(node);
     }
 
     /// Remove the given FsNode from the node cache.

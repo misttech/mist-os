@@ -107,15 +107,9 @@ impl<'a> StaticDirectoryBuilder<'a> {
     /// Build the node associated with the static directory and makes it the root of the
     /// filesystem.
     pub fn build_root(self) {
-        let node = FsNode::new_root_with_properties(
-            Arc::new(StaticDirectory { entries: self.entries }),
-            |info| {
-                info.uid = self.creds.uid;
-                info.gid = self.creds.gid;
-                info.mode = self.mode;
-            },
-        );
-        self.fs.set_root_node(node);
+        let ops = Arc::new(StaticDirectory { entries: self.entries });
+        let root_ino = self.fs.next_node_id();
+        self.fs.create_root_with_info(ops, FsNodeInfo::new(root_ino, self.mode, self.creds));
     }
 
     /// Builds [`FsNodeOps`] for this directory.

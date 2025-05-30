@@ -8,7 +8,7 @@ use starnix_core::fs::fuchsia::{RemoteFs, RemoteNode};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     derive_wrapping_key, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsStr,
+    FileSystemOptions, FsNodeHandle, FsStr,
 };
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
@@ -263,11 +263,12 @@ pub fn new_remote_vol(
     let use_remote_ids = remotefs.use_remote_ids();
     let remotevol = RemoteVolume { remotefs, volume_provider };
     let fs =
-        FileSystem::new(&kernel, CacheMode::Cached(CacheConfig::default()), remotevol, options)?;
-    let mut root_node = FsNode::new_root(remote_node);
+        FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotevol, options)?;
     if use_remote_ids {
-        root_node.node_id = node_id;
+        fs.create_root(remote_node, node_id);
+    } else {
+        let root_ino = fs.next_node_id();
+        fs.create_root(remote_node, root_ino);
     }
-    fs.set_root_node(root_node);
     Ok(fs)
 }

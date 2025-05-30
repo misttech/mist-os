@@ -283,10 +283,11 @@ impl BpfFs {
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
-        let node = FsNode::new_root_with_properties(BpfFsDir::new(), |info| {
-            info.mode |= FileMode::ISVTX;
-        });
-        fs.set_root_node(node);
+        let root_ino = fs.next_node_id();
+        fs.create_root_with_info(
+            BpfFsDir::new(),
+            FsNodeInfo::new(root_ino, mode!(IFDIR, 0o777) | FileMode::ISVTX, FsCred::root()),
+        );
         Ok(fs)
     }
 }

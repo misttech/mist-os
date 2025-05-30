@@ -607,7 +607,6 @@
                 "Proc.GetdentsEnoent",
                 "Proc.PidReuse",
                 "Proc.PidTidIOAccounting",
-                "ProcTest.RootInodeNumber",
 
                 // proc_isolated_test
                 "ProcDefaults.PresenceOfSem",

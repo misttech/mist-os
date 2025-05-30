@@ -174,12 +174,10 @@ impl TmpFs {
         } else {
             0
         };
-        let root_node = FsNode::new_root_with_properties(TmpfsDirectory::new(), |info| {
-            info.chmod(mode);
-            info.uid = uid;
-            info.gid = gid;
-        });
-        fs.set_root_node(root_node);
+        let root_ino = fs.next_node_id();
+        let mut info = FsNodeInfo::new(root_ino, mode!(IFDIR, 0o777), FsCred { uid, gid });
+        info.chmod(mode);
+        fs.create_root_with_info(TmpfsDirectory::new(), info);
 
         if !mount_options.is_empty() {
             track_stub!(

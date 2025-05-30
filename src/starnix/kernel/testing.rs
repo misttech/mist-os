@@ -153,8 +153,8 @@ where
 /// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
-pub fn create_kernel_task_and_unlocked<'l>(
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
+pub fn create_kernel_task_and_unlocked<'l>() -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>)
+{
     create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
 }
 
@@ -652,7 +652,7 @@ impl FileSystemOps for TestFs {
 pub fn create_fs(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> FileSystemHandle {
     let test_fs = FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default())
         .expect("testfs constructed with valid options");
-    let bus_dir_node = FsNode::new_root(ops);
-    test_fs.set_root_node(bus_dir_node);
+    let root_ino = test_fs.next_node_id();
+    test_fs.create_root(ops, root_ino);
     test_fs
 }

@@ -5289,7 +5289,9 @@ impl BinderFs {
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
-        fs.set_root(BinderFsDir::new(locked, current_task)?);
+        let ops = BinderFsDir::new(locked, current_task)?;
+        let root_ino = fs.next_node_id();
+        fs.create_root(ops, root_ino);
         Ok(fs)
     }
 }
