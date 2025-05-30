@@ -614,15 +614,6 @@
                     "Unblocking the landing of some Rust crates that have a different LICENSE layout.",
                     "More info in https://fxbug.dev/397749809"
                 ]
-            },
-            {
-                "paths": [
-                    "sdk/lib/c/include/llvm-libc-golden"
-                ],
-                "notes": [
-                  "Files being moved from //zircon/... where they were skipped by blanket rules.",
-                  "https://fxbug.dev/342469121 changes will remove these files soon."
-                ]
             }
         ]
     }
