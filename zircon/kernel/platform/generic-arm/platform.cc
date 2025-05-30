@@ -449,9 +449,12 @@ void platform_init(void) {
         panic("psci_set_suspend_mode failed with unexpected value %d", status);
       }
     }
-    dprintf(INFO, "platform_suspend_cpu support enabled\n");
-    cpu_suspend_supported = true;
+    // TODO(https://fxbug.dev/414456459): Enable based on ZBI and/or detection
+    // of emulator.
+    cpu_suspend_supported = false;
   }
+  dprintf(INFO, "platform_suspend_cpu support %s\n",
+          cpu_suspend_supported ? "enabled" : "disabled");
 
   topology_cpu_init();
 }
