@@ -33,7 +33,6 @@
 namespace {
 
 constexpr bool kEnableRunloopTracing = false;
-constexpr bool kEnablePausingMonotonicClock = true;
 
 constexpr const fxt::InternedString& ToInternedString(IdlePowerThread::State state) {
   using fxt::operator""_intern;
@@ -67,24 +66,30 @@ void IdlePowerThread::UpdateMonotonicClock(cpu_num_t current_cpu,
   // handled appropriately.
   DEBUG_ASSERT(arch_ints_disabled());
 
-  if constexpr (kEnablePausingMonotonicClock) {
-    if (current_cpu == BOOT_CPU_ID) {
-      if (current_state == kActiveToSuspend) {
-        // If we are suspending the system, the boot CPU has to pause the monotonic clock.
-        timer_pause_monotonic();
-      } else if (current_state == kSuspendToWakeup) {
-        // If we are resuming the system, the boot CPU has to unpause the monotonic clock.
-        // It must also update its platform timer to account for any monotonic timers that
-        // are present.
-        timer_unpause_monotonic();
-        VDso::SetMonotonicTicksOffset(timer_get_mono_ticks_offset());
-        percpu::Get(current_cpu).timer_queue.UpdatePlatformTimer();
-      }
-    } else if (current_state == kSuspendToActive) {
-      // If we are resuming the system, the secondary CPUs have to reset their platform
-      // timers to account for any monotonic timers that are present.
-      percpu::Get(current_cpu).timer_queue.UpdatePlatformTimer();
+  if (current_cpu == BOOT_CPU_ID) {
+    if (current_state == kActiveToSuspend) {
+      // If we are suspending the system, the boot CPU has to pause the monotonic clock.
+      timer_pause_monotonic();
+      return;
     }
+
+    if (current_state == kSuspendToWakeup) {
+      // If we are resuming the system, the boot CPU has to unpause the monotonic clock.
+      // It must also update its platform timer to account for any monotonic timers that
+      // are present.
+      timer_unpause_monotonic();
+      VDso::SetMonotonicTicksOffset(timer_get_mono_ticks_offset());
+      percpu::Get(current_cpu).timer_queue.UpdatePlatformTimer();
+      return;
+    }
+
+    return;
+  }
+
+  if (current_state == kSuspendToActive) {
+    // If we are resuming the system, the secondary CPUs have to reset their platform
+    // timers to account for any monotonic timers that are present.
+    percpu::Get(current_cpu).timer_queue.UpdatePlatformTimer();
   }
 }
 
@@ -124,6 +129,23 @@ int IdlePowerThread::Run(void* arg) {
       dprintf(INFO, "CPU %u: %s -> %s\n", cpu_num, ToString(state.current), ToString(state.target));
 
       switch (state.target) {
+        case State::Active:
+        case State::Wakeup:
+        case State::Suspend: {
+          // Update the monotonic clock if we need to.
+          UpdateMonotonicClock(cpu_num, state);
+
+          // Complete the requested transition, which could be interrupted by a wake trigger.
+          StateMachine expected = state;
+          const bool success = this_idle_power_thread.CompareExchangeState(
+              expected, {.current = state.target, .target = state.target});
+          DEBUG_ASSERT_MSG(success || expected == kSuspendToWakeup || expected == kWakeup,
+                           "current=%s target=%s", ToString(expected.current),
+                           ToString(expected.target));
+          this_idle_power_thread.complete_.Signal();
+          break;
+        }
+
         case State::Offline: {
           // Emit the complete event early, since mp_unplug_current_cpu() will not return.
           trace.End();
@@ -138,20 +160,8 @@ int IdlePowerThread::Run(void* arg) {
           break;
         }
 
-        default: {
-          // Update the monotonic clock if we need to.
-          UpdateMonotonicClock(cpu_num, state);
-
-          // Complete the requested transition, which could be interrupted by a wake trigger.
-          StateMachine expected = state;
-          const bool success = this_idle_power_thread.CompareExchangeState(
-              expected, {.current = state.target, .target = state.target});
-          DEBUG_ASSERT_MSG(success || expected == kSuspendToWakeup || expected == kWakeup,
-                           "current=%s target=%s", ToString(expected.current),
-                           ToString(expected.target));
-          this_idle_power_thread.complete_.Signal();
-          break;
-        }
+        default:
+          panic("unexpected case %u", static_cast<uint32_t>(state.target));
       }
 
       // If the power thread just transitioned to Active or Wakeup, reschedule to ensure that the
