@@ -12,7 +12,7 @@ use fidl_fuchsia_bluetooth_sys::{
     AccessMarker, AccessProxy, HostInfo, HostWatcherMarker, HostWatcherProxy, Peer,
     ProcedureTokenProxy,
 };
-use fuchsia_async::{LocalExecutor, TimeoutExt};
+use fuchsia_async::{LocalExecutor, TimeoutExt, Timer};
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
@@ -29,6 +29,7 @@ enum Request {
     Connect(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
     Forget(PeerId, oneshot::Sender<Result<(), anyhow::Error>>),
     ConnectL2cap(PeerId, u16, oneshot::Sender<Result<(), anyhow::Error>>),
+    SetDiscovery(bool, oneshot::Sender<Result<(), anyhow::Error>>),
     SetDiscoverability(bool, oneshot::Sender<Result<(), anyhow::Error>>),
     Stop,
 }
@@ -88,35 +89,14 @@ impl WorkThread {
                     sender.send(Ok(peer_cache.clone())).unwrap();
                 }
                 Request::GetPeerId(address, result_sender) => {
-                    let (_discovery_session, discovery_session_server) =
-                        fidl::endpoints::create_proxy();
-                    if let Err(err) =
-                        proxies.access_proxy.start_discovery(discovery_session_server).await?
+                    if let Some(peer) = proxies
+                        .get_peer(&address, std::time::Duration::from_secs(2), &mut peer_cache)
+                        .await?
                     {
-                        result_sender
-                            .send(Err(anyhow!(
-                                "fuchsia.bluetooth.sys.Access/StartDiscovery error: {err:?}"
-                            )))
-                            .unwrap();
+                        result_sender.send(Ok(peer.id.unwrap())).unwrap();
                         continue;
                     }
-
-                    match proxies
-                        .get_peer(&address, std::time::Duration::from_secs(1), &mut peer_cache)
-                        .await
-                    {
-                        Ok(Some(peer)) => {
-                            result_sender.send(Ok(peer.id.unwrap())).unwrap();
-                        }
-                        Ok(None) => {
-                            result_sender.send(Err(anyhow!("Peer not found"))).unwrap();
-                        }
-                        Err(err) => {
-                            result_sender
-                                .send(Err(anyhow!("wait_for_peer() error: {err}")))
-                                .unwrap();
-                        }
-                    }
+                    result_sender.send(Err(anyhow!("Peer not found"))).unwrap();
                 }
                 Request::Forget(peer_id, sender) => {
                     sender.send(proxies.forget(&peer_id).await).unwrap();
@@ -134,6 +114,9 @@ impl WorkThread {
                             result_sender.send(Err(err)).unwrap();
                         }
                     }
+                }
+                Request::SetDiscovery(discovery, sender) => {
+                    sender.send(proxies.set_discovery(discovery).await).unwrap();
                 }
                 Request::SetDiscoverability(discoverable, sender) => {
                     sender.send(proxies.set_discoverability(discoverable).await).unwrap();
@@ -202,6 +185,13 @@ impl WorkThread {
         receiver.await?
     }
 
+    // Set discovery state.
+    pub async fn set_discovery(&self, discovery: bool) -> Result<(), anyhow::Error> {
+        let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
+        self.sender.clone().unbounded_send(Request::SetDiscovery(discovery, sender))?;
+        receiver.await?
+    }
+
     // Set discoverability state.
     pub async fn set_discoverability(&self, discoverable: bool) -> Result<(), anyhow::Error> {
         let (sender, receiver) = oneshot::channel::<Result<(), anyhow::Error>>();
@@ -215,6 +205,7 @@ struct Proxies {
     profile_proxy: ProfileProxy,
     host_watcher_stream: HangingGetStream<HostWatcherProxy, Vec<HostInfo>>,
     peer_watcher_stream: HangingGetStream<AccessProxy, (Vec<Peer>, Vec<PeerId>)>,
+    discovery_session: Mutex<Option<ProcedureTokenProxy>>,
     discoverability_session: Mutex<Option<ProcedureTokenProxy>>,
 }
 
@@ -228,6 +219,7 @@ impl Proxies {
         );
         let peer_watcher_stream =
             HangingGetStream::new_with_fn_ptr(access_proxy.clone(), AccessProxy::watch_peers);
+        let discovery_session: Mutex<Option<ProcedureTokenProxy>> = Mutex::new(None);
         let discoverability_session: Mutex<Option<ProcedureTokenProxy>> = Mutex::new(None);
 
         Ok(Proxies {
@@ -235,6 +227,7 @@ impl Proxies {
             profile_proxy,
             host_watcher_stream,
             peer_watcher_stream,
+            discovery_session,
             discoverability_session,
         })
     }
@@ -313,13 +306,14 @@ impl Proxies {
     }
 
     // `address` should encode a BD_ADDR as a string of bytes in little-endian order.
+    // If `timeout` >= 1 second, a discovery session will be established.
     // Returns None if peer is not found before `timeout` elapses.
     async fn get_peer<'a>(
         &mut self,
         address: &CString,
-        timeout: std::time::Duration,
+        mut timeout: std::time::Duration,
         peer_cache: &'a mut Vec<Peer>,
-    ) -> Result<Option<&'a Peer>, fidl::Error> {
+    ) -> Result<Option<&'a Peer>, anyhow::Error> {
         let addr_matches =
             |peer: &Peer| peer.address.unwrap().bytes.iter().eq(address.to_bytes().iter().rev());
         // To satisfy borrow checker, must first check if peer exists before generating a reference
@@ -328,6 +322,18 @@ impl Proxies {
         if peer_cache.iter().any(addr_matches) {
             return Ok(Some(peer_cache.iter().find(|peer: &&Peer| addr_matches(peer)).unwrap()));
         }
+
+        let (_token, discovery_session_server) = fidl::endpoints::create_proxy();
+        let second = std::time::Duration::from_secs(1);
+        if timeout >= second {
+            timeout -= second;
+            if let Err(err) = self.access_proxy.start_discovery(discovery_session_server).await? {
+                return Err(anyhow!("fuchsia.bluetooth.sys.Access/StartDiscovery error: {err:?}"));
+            }
+            // Allow discovery session to activate.
+            Timer::new(second).await;
+        }
+
         self.refresh_peer_cache(timeout, peer_cache).await?;
         if peer_cache.iter().any(addr_matches) {
             return Ok(Some(peer_cache.iter().find(|peer: &&Peer| addr_matches(peer)).unwrap()));
@@ -354,6 +360,27 @@ impl Proxies {
                 Err(anyhow!("fuchsia.bluetooth.bredr.Profile/Connect error: {fidl_err}"))
             }
         }
+    }
+
+    async fn set_discovery(&mut self, discovery: bool) -> Result<(), anyhow::Error> {
+        let mut discovery_session = self.discovery_session.lock();
+        if !discovery {
+            if discovery_session.take().is_none() {
+                eprintln!("Asked to revoke nonexistent discovery session.");
+            }
+            return Ok(());
+        }
+        if discovery_session.is_some() {
+            return Ok(());
+        }
+        let (token, discovery_session_server) = fidl::endpoints::create_proxy();
+        if let Err(err) = self.access_proxy.start_discovery(discovery_session_server).await? {
+            return Err(anyhow!("fuchsia.bluetooth.sys.Access/StartDiscovery error: {err:?}"));
+        }
+        *discovery_session = Some(token);
+        // Allow discovery session to activate.
+        Timer::new(std::time::Duration::from_secs(1)).await;
+        Ok(())
     }
 
     async fn set_discoverability(&mut self, discoverable: bool) -> Result<(), anyhow::Error> {
