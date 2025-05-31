@@ -66,6 +66,18 @@ class FuchsiaControllerImpl(fuchsia_controller_interface.FuchsiaController):
                 self._ffx_config_data.isolate_dir
             )
             config: dict[str, str] = {}
+            if self._ffx_config_data.logs_level:
+                level = self._ffx_config_data.logs_level
+                _LOGGER.debug(f"log.level set to {level}")
+                config["log.level"] = level
+            else:
+                _LOGGER.debug("log level not set.")
+            if self._ffx_config_data.logs_dir:
+                log_dir = self._ffx_config_data.logs_dir
+                _LOGGER.debug(f"log.dir set to {log_dir}")
+                config["log.dir"] = log_dir
+            else:
+                _LOGGER.debug("log dir not set.")
             msg: str = (
                 f"Creating Fuchsia-Controller Context with "
                 f"target='{self._target}', config='{config}'"

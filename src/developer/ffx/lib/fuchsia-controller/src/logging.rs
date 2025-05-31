@@ -104,7 +104,14 @@ impl MultiFileLogger {
 
     pub fn add_log_output(&self, ctx: &EnvironmentContext) -> Result<()> {
         // DO NOT RUN THIS AFTER GETTING THE LOCK.
-        let log_dir = log_dir(ctx)?;
+        let log_dir = match log_dir(ctx) {
+            Ok(l) => l,
+            // If no log dir has been set then no logging will happen.
+            Err(e) => {
+                eprintln!(">>> WARNING <<< logging is not enabled for this context: {e:?}");
+                return Ok(());
+            }
+        };
         let log_path = default_log_path(ctx)?;
         // The above code queries the config, which logs, so do not use the config after acquiring
         // the lock, else it will deadlock.
@@ -130,7 +137,10 @@ impl MultiFileLogger {
 
     pub fn remove_log_output(&self, ctx: &EnvironmentContext) -> Result<()> {
         // DO NOT RUN THIS AFTER GETTING THE LOCK.
-        let log_path = default_log_path(ctx)?;
+        let log_path = match default_log_path(ctx) {
+            Ok(l) => l,
+            Err(_) => return Ok(()),
+        };
         let mut sinks = self.sinks.write().unwrap();
         // The above code queries the config, which logs, so do not use the config after acquiring
         // the lock, else it will deadlock.
