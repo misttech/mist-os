@@ -19,6 +19,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/drivers/tests/durations.h"
+
 namespace fhasp = fuchsia::hardware::audio::signalprocessing;
 
 namespace media::audio::drivers::test {
@@ -389,24 +391,6 @@ void AdminTest::ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmas
       EXPECT_GT(set_time.get(), send_time.get());
     }
   }
-}
-
-// When disconnecting a RingBuffer, there's no signal to wait on before proceeding (potentially
-// immediately executing other tests); insert a 100-ms wait. This wait is even more important for
-// error cases that cause the RingBuffer to disconnect: without it, subsequent test cases that use
-// the RingBuffer may receive unexpected errors (e.g. ZX_ERR_PEER_CLOSED or ZX_ERR_INVALID_ARGS).
-//
-// We need this wait when testing a "real hardware" driver (i.e. on realtime-capable systems). For
-// this reason a hardcoded time constant, albeit a test antipattern, is (grudgingly) acceptable.
-//
-// TODO(https://fxbug.dev/42064975): investigate why we fail without this delay, fix the
-// drivers/test as necessary, and eliminate this workaround.
-void AdminTest::CooldownAfterRingBufferDisconnect() {
-  zx::nanosleep(zx::deadline_after(kRingBufferDisconnectCooldownDuration));
-}
-
-void AdminTest::CooldownAfterSignalProcessingDisconnect() {
-  zx::nanosleep(zx::deadline_after(kSignalProcessingDisconnectCooldownDuration));
 }
 
 void AdminTest::RetrieveRingBufferFormats() {
@@ -1265,6 +1249,7 @@ void AdminTest::WatchElementStateUnknownIdAndExpectDisconnect(zx_status_t expect
   ASSERT_TRUE(signal_processing().is_bound())
       << "SignalProcessing disconnected after setting an unknown topology";
   ExpectError(signal_processing(), expected_error);
+  CooldownAfterSignalProcessingDisconnect();
 }
 
 // Validate each ElementState, considering the Element that produced it.

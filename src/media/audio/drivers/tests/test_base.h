@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/drivers/tests/durations.h"
 #include "src/media/audio/lib/test/test_fixture.h"
 
 namespace media::audio::drivers::test {
@@ -211,11 +212,6 @@ class TestBase : public media::audio::test::TestFixture {
   const std::optional<BaseProperties>& properties() const { return properties_; }
 
  private:
-  static constexpr zx::duration kWaitForErrorDuration = zx::msec(100);
-  static constexpr zx::duration kDriverDisconnectCooldownDuration = zx::msec(10);
-
-  static void CooldownAfterDriverDisconnect();
-
   std::optional<BaseProperties> properties_;
 
   std::optional<component_testing::RealmRoot> realm_;
