@@ -225,11 +225,14 @@ class WakeLease {
 // after the `ManualWakeLease` is destroyed.
 class WakeLeaseProvider {
  public:
+  // See comment in ManualWakeLease::Start
   WakeLeaseProvider(async_dispatcher_t* dispatcher, std::string_view name,
                     fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag,
-                    inspect::Node* parent_node = nullptr, bool log = false)
-      : fdf_lease_(std::make_shared<ManualWakeLease>(dispatcher, name, std::move(sag), parent_node,
-                                                     log)) {}
+                    bool ignore_system_state = false, inspect::Node* parent_node = nullptr,
+                    bool log = false)
+      : fdf_lease_(
+            std::make_shared<ManualWakeLease>(dispatcher, name, std::move(sag), parent_node, log)),
+        ignore_system_state_(ignore_system_state) {}
   std::shared_ptr<WakeLease> StartOperation() {
     // WakeLeaseProvider works by holding and owning a
     // fdf_power::WakeLease and creating, but not owning, a WakeLease.
@@ -245,7 +248,7 @@ class WakeLeaseProvider {
       // WakeLease so that it is "active". Any previous WakeLease
       // that destructed would have retrieved and dropped the actual wake lease
       // from the WakeLease object.
-      fdf_lease_->Start();
+      fdf_lease_->Start(ignore_system_state_);
       op = std::make_shared<WakeLease>(fdf_lease_);
       atomic_op_ = op;
     }
@@ -255,6 +258,7 @@ class WakeLeaseProvider {
  private:
   std::weak_ptr<WakeLease> atomic_op_;
   std::shared_ptr<ManualWakeLease> fdf_lease_;
+  const bool ignore_system_state_;
 };
 
 }  // namespace fdf_power
