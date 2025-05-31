@@ -639,8 +639,13 @@ class FuchsiaDeviceImpl(
             errors.HealthCheckError
         """
         try:
+            # TODO(b/421476805): Reduce the timeout back to 60 seconds once
+            # we're able to supply a configuration value for this. The timeout
+            # of 180 is picked to give a sufficiently large amount of time for
+            # devices in infrastructure that currently experience stalls during
+            # boot but eventually settle.
             with common.time_limit(
-                timeout=60,
+                timeout=180,
                 exception_message=f"Timeout occurred during the health check of '{self._device_info.name}'",
             ):
                 _LOGGER.info(
