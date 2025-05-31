@@ -976,7 +976,9 @@ impl TimerConfig {
             let largest_slack_smaller_than_duration = max_tick_at_res < duration_slack;
 
             if smallest_slack_larger_than_duration {
-                if smallest_unit < best_negative_slack {
+                if duration_slack == TimerDuration::zero() {
+                    best_negative_slack = TimerDuration::zero();
+                } else if smallest_unit < best_negative_slack {
                     best_negative_slack = smallest_unit;
                 }
             }
@@ -1024,7 +1026,7 @@ impl TimerConfig {
         };
         debug!("TimerConfig: picked slack: {} for duration: {}", ret, format_duration(duration));
         assert!(
-            ret.duration().into_nanos() > 0,
+            ret.duration().into_nanos() >= 0,
             "ret: {}, p_slack: {}, n_slack: {}, orig.duration: {}\n\tbest_p_slack: {}\n\tbest_n_slack: {}\n\ttarget: {}\n\t 1: {} 2: {:?}, 3: {:?}",
             ret,
             format_duration(p_slack),
@@ -1384,15 +1386,8 @@ async fn schedule_hrtimer(
     mut command_send: mpsc::Sender<Cmd>,
     timer_config: &TimerConfig,
 ) -> TimerState {
-    let timeout = deadline - now;
+    let timeout = std::cmp::max(zx::BootDuration::ZERO, deadline - now);
     trace::duration!(c"alarms", c"schedule_hrtimer", "timeout" => timeout.into_nanos());
-    assert!(
-        now < deadline,
-        "now: {}, deadline: {}, diff: {}",
-        format_timer(now.into()),
-        format_timer(deadline.into()),
-        format_duration(timeout),
-    );
     // When signaled, the hrtimer has been scheduled.
     let hrtimer_scheduled = zx::Event::create();
 
@@ -1720,6 +1715,12 @@ mod tests {
         assert_gt!(one, other);
     }
 
+    #[test_case(
+        vec![zx::BootDuration::from_nanos(1)],
+        100,
+        zx::BootDuration::from_nanos(0),
+        TimerDuration::new(zx::BootDuration::from_nanos(1), 0) ; "Exact at 0x1ns"
+    )]
     #[test_case(
         vec![zx::BootDuration::from_nanos(1)],
         100,
