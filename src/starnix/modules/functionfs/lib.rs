@@ -235,8 +235,8 @@ impl FunctionFs {
         let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
 
         let creds = FsCred { uid, gid };
-        let info = FsNodeInfo::new(ROOT_NODE_ID, mode!(IFDIR, 0o777), creds);
-        fs.create_root_with_info(FunctionFsRootDir::default(), info);
+        let info = FsNodeInfo::new(mode!(IFDIR, 0o777), creds);
+        fs.create_root_with_info(ROOT_NODE_ID, FunctionFsRootDir::default(), info);
         Ok(fs)
     }
 }
@@ -493,18 +493,21 @@ impl FsNodeOps for FunctionFsRootDir {
         match name {
             CONTROL_ENDPOINT => Ok(node.fs().create_node_with_info(
                 current_task,
+                CONTROL_ENDPOINT_NODE_ID,
                 FunctionFsControlEndpoint,
-                FsNodeInfo::new(CONTROL_ENDPOINT_NODE_ID, mode!(IFREG, 0o600), node.info().cred()),
+                FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
             OUTPUT_ENDPOINT => Ok(node.fs().create_node_with_info(
                 current_task,
+                OUTPUT_ENDPOINT_NODE_ID,
                 FunctionFsOutputEndpoint,
-                FsNodeInfo::new(OUTPUT_ENDPOINT_NODE_ID, mode!(IFREG, 0o600), node.info().cred()),
+                FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
             INPUT_ENDPOINT => Ok(node.fs().create_node_with_info(
                 current_task,
+                INPUT_ENDPOINT_NODE_ID,
                 FunctionFsInputEndpoint,
-                FsNodeInfo::new(INPUT_ENDPOINT_NODE_ID, mode!(IFREG, 0o600), node.info().cred()),
+                FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
             _ => error!(ENOENT),
         }

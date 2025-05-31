@@ -55,8 +55,8 @@ impl<'a> StaticDirectoryBuilder<'a> {
         creds: FsCred,
     ) {
         let ops = ops.into();
-        let node = self.fs.create_node_and_allocate_node_id(current_task, ops, |id| {
-            let mut info = FsNodeInfo::new(id, mode, creds);
+        let node = self.fs.create_node_and_allocate_node_id(current_task, ops, |_id| {
+            let mut info = FsNodeInfo::new(mode, creds);
             info.rdev = dev;
             info
         });
@@ -109,7 +109,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     pub fn build_root(self) {
         let ops = Arc::new(StaticDirectory { entries: self.entries });
         let root_ino = self.fs.next_node_id();
-        self.fs.create_root_with_info(ops, FsNodeInfo::new(root_ino, self.mode, self.creds));
+        self.fs.create_root_with_info(root_ino, ops, FsNodeInfo::new(self.mode, self.creds));
     }
 
     /// Builds [`FsNodeOps`] for this directory.
@@ -188,7 +188,7 @@ impl FileOps for StaticDirectory {
         // Subtract 2 from the offset to account for `.` and `..`.
         for (name, node) in self.entries.iter().skip(sink.offset() as usize - 2) {
             sink.add(
-                node.node_id,
+                node.ino,
                 sink.offset() + 1,
                 DirectoryEntryType::from_mode(node.info().mode),
                 name,

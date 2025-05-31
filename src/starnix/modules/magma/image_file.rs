@@ -58,9 +58,9 @@ impl ImageFile {
             Box::new(ImageFile { info, memory: Arc::new(memory) }),
             OpenFlags::RDWR,
             "[fuchsia:image]",
-            |id| {
+            |_id| {
                 let mut info =
-                    FsNodeInfo::new(id, FileMode::from_bits(0o600), current_task.as_fscred());
+                    FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred());
                 info.size = memory_size as usize;
                 info
             },

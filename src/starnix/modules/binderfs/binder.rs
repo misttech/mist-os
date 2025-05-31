@@ -5266,12 +5266,12 @@ impl FsNodeOps for BinderFsDir {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BinderFeaturesDir::new(),
-                |ino| FsNodeInfo::new(ino, mode!(IFDIR, 0o755), FsCred::root()),
+                |_ino| FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
         } else if let Some(dev) = self.devices.get(name) {
             let mode = if name == "remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
-            Ok(node.fs().create_node_and_allocate_node_id(current_task, SpecialNode, |ino| {
-                let mut info = FsNodeInfo::new(ino, mode, FsCred::root());
+            Ok(node.fs().create_node_and_allocate_node_id(current_task, SpecialNode, |_ino| {
+                let mut info = FsNodeInfo::new(mode, FsCred::root());
                 info.rdev = *dev;
                 info
             }))
@@ -5291,7 +5291,7 @@ impl BinderFs {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
         let ops = BinderFsDir::new(locked, current_task)?;
         let root_ino = fs.next_node_id();
-        fs.create_root(ops, root_ino);
+        fs.create_root(root_ino, ops);
         Ok(fs)
     }
 }

@@ -121,7 +121,7 @@ impl PseudoDirectoryBuilder {
         assert!(mode.is_dir(), "root directory must be a directory");
         let ops = self.build(fs);
         let root_ino = fs.next_node_id();
-        fs.create_root_with_info(ops, FsNodeInfo::new(root_ino, mode, creds));
+        fs.create_root_with_info(root_ino, ops, FsNodeInfo::new(mode, creds));
     }
 }
 
@@ -160,8 +160,8 @@ impl FsNodeOps for Arc<PseudoDirectory> {
             .get(name)
             .map(|entry| {
                 let ops = (entry.node_ops_factory)();
-                let info = FsNodeInfo::new(entry.ino, entry.mode, entry.creds);
-                node.fs().create_node_with_info(current_task, ops, info)
+                let info = FsNodeInfo::new(entry.mode, entry.creds);
+                node.fs().create_node_with_info(current_task, entry.ino, ops, info)
             })
             .ok_or_else(|| {
                 errno!(

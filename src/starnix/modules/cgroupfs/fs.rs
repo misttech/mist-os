@@ -39,7 +39,7 @@ impl CgroupV1Fs {
             FileSystem::new(kernel, CacheMode::Uncached, CgroupV1Fs { dir_nodes, root }, options)?;
         root_dir.create_root_interface_files(current_task, &fs);
         let root_ino = fs.next_node_id();
-        fs.create_root(root_dir, root_ino);
+        fs.create_root(root_ino, root_dir);
         Ok(fs)
     }
 }
@@ -87,7 +87,7 @@ impl CgroupV2Fs {
         let fs = FileSystem::new(kernel, CacheMode::Uncached, CgroupV2Fs { dir_nodes }, options)?;
         root.create_root_interface_files(current_task, &fs);
         let root_ino = fs.next_node_id();
-        fs.create_root(root, root_ino);
+        fs.create_root(root_ino, root);
         Ok(fs)
     }
 }

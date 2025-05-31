@@ -192,11 +192,10 @@ impl FsNodeOps for CgroupDirectoryHandle {
                 let Some(node) = maybe_node else {
                     return None;
                 };
-                let ino = node.info().ino;
                 Some(VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
                     name: cgroup.name().into(),
-                    inode: Some(ino),
+                    inode: Some(node.ino),
                 })
             });
 
@@ -204,7 +203,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
         let interface_entries = interface_files.iter().map(|(name, child)| VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: name.clone(),
-            inode: Some(child.info().ino),
+            inode: Some(child.ino),
         });
 
         Ok(VecDirectory::new_file(children_entries.chain(interface_entries).collect()))

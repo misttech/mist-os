@@ -175,9 +175,9 @@ impl TmpFs {
             0
         };
         let root_ino = fs.next_node_id();
-        let mut info = FsNodeInfo::new(root_ino, mode!(IFDIR, 0o777), FsCred { uid, gid });
+        let mut info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred { uid, gid });
         info.chmod(mode);
-        fs.create_root_with_info(TmpfsDirectory::new(), info);
+        fs.create_root_with_info(root_ino, TmpfsDirectory::new(), info);
 
         if !mount_options.is_empty() {
             track_stub!(
@@ -216,8 +216,8 @@ fn create_child_node(
         }
         _ => return error!(EACCES),
     };
-    let child = parent.fs().create_node_and_allocate_node_id(current_task, ops, move |id| {
-        let mut info = FsNodeInfo::new(id, mode, owner);
+    let child = parent.fs().create_node_and_allocate_node_id(current_task, ops, move |_id| {
+        let mut info = FsNodeInfo::new(mode, owner);
         info.rdev = dev;
         // blksize is PAGE_SIZE for in memory node.
         info.blksize = *PAGE_SIZE as usize;

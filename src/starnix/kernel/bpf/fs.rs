@@ -285,8 +285,9 @@ impl BpfFs {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
         let root_ino = fs.next_node_id();
         fs.create_root_with_info(
+            root_ino,
             BpfFsDir::new(),
-            FsNodeInfo::new(root_ino, mode!(IFDIR, 0o777) | FileMode::ISVTX, FsCred::root()),
+            FsNodeInfo::new(mode!(IFDIR, 0o777) | FileMode::ISVTX, FsCred::root()),
         );
         Ok(fs)
     }

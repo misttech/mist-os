@@ -4319,11 +4319,7 @@ fn write_map(
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => 0,
         },
-        if let MappingName::File(filename) = &map.name() {
-            filename.entry.node.info().ino
-        } else {
-            0
-        }
+        if let MappingName::File(filename) = &map.name() { filename.entry.node.ino } else { 0 }
     )?;
     let fill_to_name = |sink: &mut DynamicFileBuf| {
         // The filename goes at >= the 74th column (73rd when zero indexed)

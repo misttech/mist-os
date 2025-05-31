@@ -294,6 +294,7 @@ impl OverlayNode {
         upper: Option<ActiveEntry>,
     ) -> FsNodeHandle {
         let entry = upper.as_ref().or(lower.as_ref()).expect("expect either lower or upper node");
+        let ino = entry.entry().node.ino;
         let info = entry.entry().node.info().clone();
 
         // Parent may be needed to initialize `upper`. We don't need to pass it if we have `upper`.
@@ -301,7 +302,7 @@ impl OverlayNode {
 
         let overlay_node =
             OverlayNodeOps { node: OverlayNode::new(self.stack.clone(), lower, upper, parent) };
-        FsNode::new_uncached(current_task, overlay_node, &node.fs(), info.ino, info)
+        FsNode::new_uncached(current_task, ino, overlay_node, &node.fs(), info)
     }
 
     /// If the file is currently in the lower FS, then promote it to the upper FS. No-op if the
@@ -1178,7 +1179,7 @@ impl OverlayStack {
         let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
         let fs = FileSystem::new(kernel, CacheMode::Uncached, OverlayFs { stack }, options)?;
         let root_ino = fs.next_node_id();
-        fs.create_root(OverlayNodeOps { node: root_node }, root_ino);
+        fs.create_root(root_ino, OverlayNodeOps { node: root_node });
         Ok(fs)
     }
 
@@ -1193,8 +1194,9 @@ impl OverlayStack {
         let invisible_tmp = TmpFs::new_fs(kernel);
 
         fn create_directory(fs: &FileSystemHandle) -> DirEntryHandle {
-            let info = FsNodeInfo::new(fs.next_node_id(), mode!(IFDIR, 0o777), FsCred::root());
-            let node = fs.create_detached_node_with_info(TmpfsDirectory::new(), info);
+            let ino = fs.next_node_id();
+            let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
+            let node = fs.create_detached_node_with_info(ino, TmpfsDirectory::new(), info);
             DirEntry::new(node, None, FsString::default())
         }
 
@@ -1215,7 +1217,7 @@ impl OverlayStack {
             FileSystemOptions::default(),
         )?;
         let root_ino = fs.next_node_id();
-        fs.create_root(OverlayNodeOps { node: root_node }, root_ino);
+        fs.create_root(root_ino, OverlayNodeOps { node: root_node });
         Ok(fs)
     }
 

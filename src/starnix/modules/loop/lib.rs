@@ -477,16 +477,13 @@ impl FileOps for LoopDeviceFile {
             LOOP_GET_STATUS => {
                 let user_info = UserRef::<uapi::loop_info>::from(arg);
                 let node = file.node();
-                let (ino, rdev) = {
-                    let info = node.info();
-                    (info.ino, info.rdev)
-                };
+                let rdev = node.info().rdev;
                 let state = self.device.state.lock();
                 state.check_bound()?;
                 let info = loop_info {
                     lo_number: self.device.number as i32,
                     lo_device: node.dev().bits() as __kernel_old_dev_t,
-                    lo_inode: ino,
+                    lo_inode: node.ino,
                     lo_rdevice: rdev.bits() as __kernel_old_dev_t,
                     lo_offset: state.offset as i32,
                     lo_encrypt_type: state.encrypt_type as i32,
@@ -564,15 +561,12 @@ impl FileOps for LoopDeviceFile {
             LOOP_GET_STATUS64 => {
                 let user_info = UserRef::<uapi::loop_info64>::from(arg);
                 let node = file.node();
-                let (ino, rdev) = {
-                    let info = node.info();
-                    (info.ino, info.rdev)
-                };
+                let rdev = node.info().rdev;
                 let state = self.device.state.lock();
                 state.check_bound()?;
                 let info = loop_info64 {
                     lo_device: node.dev().bits(),
-                    lo_inode: ino,
+                    lo_inode: node.ino,
                     lo_rdevice: rdev.bits(),
                     lo_offset: state.offset as u64,
                     lo_sizelimit: state.size_limit,

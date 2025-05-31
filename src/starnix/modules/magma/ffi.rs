@@ -610,9 +610,9 @@ pub fn query(
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
             "[fuchsia:magma_vmo]",
-            |id| {
+            |_id| {
                 let mut info =
-                    FsNodeInfo::new(id, FileMode::from_bits(0o600), current_task.as_fscred());
+                    FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred());
                 // Enable seek for file size discovery.
                 info.size = memory_size as usize;
                 info

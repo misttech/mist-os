@@ -117,6 +117,9 @@ impl AppendLockStrategy<FileOpsCore> for AlreadyLockedAppendLockStrategy<'_> {
 }
 
 pub struct FsNode {
+    /// The inode number for this FsNode.
+    pub ino: ino_t,
+
     /// The FsNodeOps for this FsNode.
     ///
     /// The FsNodeOps are implemented by the individual file systems to provide
@@ -125,10 +128,6 @@ pub struct FsNode {
 
     /// The FileSystem that owns this FsNode's tree.
     fs: Weak<FileSystem>,
-
-    /// The node idenfier for this FsNode. By default, this will be used as the inode number of
-    /// this node.
-    pub node_id: ino_t,
 
     /// A RwLock to synchronize append operations for this node.
     ///
@@ -188,7 +187,6 @@ pub type WeakFsNodeHandle = Weak<FsNodeReleaser>;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct FsNodeInfo {
-    pub ino: ino_t,
     pub mode: FileMode,
     pub link_count: usize,
     pub uid: uid_t,
@@ -211,10 +209,9 @@ pub struct FsNodeInfo {
 }
 
 impl FsNodeInfo {
-    pub fn new(ino: ino_t, mode: FileMode, owner: FsCred) -> Self {
+    pub fn new(mode: FileMode, owner: FsCred) -> Self {
         let now = utc::utc_now();
         Self {
-            ino,
             mode,
             link_count: if mode.is_dir() { 2 } else { 1 },
             uid: owner.uid,
@@ -232,7 +229,7 @@ impl FsNodeInfo {
     }
 
     pub fn new_factory(mode: FileMode, owner: FsCred) -> impl FnOnce(ino_t) -> Self {
-        move |ino| Self::new(ino, mode, owner)
+        move |_ino| Self::new(mode, owner)
     }
 
     pub fn chmod(&mut self, mode: FileMode) {
@@ -878,6 +875,14 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn internal_name(&self, _node: &FsNode) -> Option<FsString> {
         None
     }
+
+    /// The key used to identify this node in the file system's node cache.
+    ///
+    /// For many file systems, this will be the same as the inode number. However, some file
+    /// systems, such as FUSE, sometimes use different `node_key` and inode numbers.
+    fn node_key(&self, node: &FsNode) -> ino_t {
+        node.ino
+    }
 }
 
 impl<T> From<T> for Box<dyn FsNodeOps>
@@ -1178,13 +1183,13 @@ impl FsNode {
     /// Only use if you're also using get_or_create_node, like ext4.
     pub fn new_uncached(
         current_task: &CurrentTask,
+        ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
         fs: &FileSystemHandle,
-        node_id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        Self::new_internal(ops, Arc::downgrade(fs), node_id, info, Some(current_task)).into_handle()
+        Self::new_internal(ino, ops, Arc::downgrade(fs), info, Some(current_task)).into_handle()
     }
 
     /// Create a directory without inserting it into the FileSystem node cache.
@@ -1197,14 +1202,14 @@ impl FsNode {
     /// [`CurrentTask`] because they are creating the root directory for the initial [`FsContext`],
     /// which needs to exist before we can create a task object.
     pub fn new_uncached_directory(
+        ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
         fs: &FileSystemHandle,
-        node_id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         assert!(info.mode.is_dir());
         let ops = ops.into();
-        Self::new_internal(ops, Arc::downgrade(fs), node_id, info, None).into_handle()
+        Self::new_internal(ino, ops, Arc::downgrade(fs), info, None).into_handle()
     }
 
     pub fn into_handle(self) -> FsNodeHandle {
@@ -1212,9 +1217,9 @@ impl FsNode {
     }
 
     fn new_internal(
+        ino: ino_t,
         ops: Box<dyn FsNodeOps>,
         fs: Weak<FileSystem>,
-        node_id: ino_t,
         info: FsNodeInfo,
         current_task: Option<&CurrentTask>,
     ) -> Self {
@@ -1245,9 +1250,9 @@ impl FsNode {
         #[allow(clippy::let_and_return)]
         {
             let result = Self {
+                ino,
                 ops,
                 fs,
-                node_id,
                 info: RwLock::new(info),
                 append_lock: Default::default(),
                 rare_data,
@@ -2264,7 +2269,7 @@ impl FsNode {
 
         Ok(uapi::stat {
             st_dev: self.dev().bits(),
-            st_ino: info.ino,
+            st_ino: self.ino,
             st_nlink: info.link_count.try_into().map_err(|_| errno!(EINVAL))?,
             st_mode: info.mode.bits(),
             st_uid: info.uid,
@@ -2340,7 +2345,7 @@ impl FsNode {
             stx_uid: info.uid,
             stx_gid: info.gid,
             stx_mode: info.mode.bits().try_into().map_err(|_| errno!(EINVAL))?,
-            stx_ino: info.ino,
+            stx_ino: self.ino,
             stx_size: info.size.try_into().map_err(|_| errno!(EINVAL))?,
             stx_blocks: info.blocks.try_into().map_err(|_| errno!(EINVAL))?,
             stx_attributes_mask,
@@ -2634,7 +2639,15 @@ impl FsNode {
         } else {
             "file"
         };
-        format!("{}:[{}]", class, self.node_id).into()
+        format!("{}:[{}]", class, self.ino).into()
+    }
+
+    /// The key used to identify this node in the file system's node cache.
+    ///
+    /// For many file systems, this will be the same as the inode number. However, some file
+    /// systems, such as FUSE, sometimes use different `node_key` and inode numbers.
+    pub fn node_key(&self) -> ino_t {
+        self.ops().node_key(self)
     }
 
     fn ensure_rare_data(&self) -> &FsNodeRareData {
@@ -2668,7 +2681,6 @@ impl std::fmt::Debug for FsNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("FsNode")
             .field("fs", &self.fs().name())
-            .field("node_id", &self.node_id)
             .field("info", &*self.info())
             .field("ops_ty", &self.ops().type_name())
             .finish()

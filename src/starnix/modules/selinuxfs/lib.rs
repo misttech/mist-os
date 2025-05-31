@@ -240,8 +240,8 @@ impl SeLinuxFs {
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
         let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
-        let null_fs_node = fs.create_node_and_allocate_node_id(current_task, null_ops, |id| {
-            let mut info = FsNodeInfo::new(id, mode!(IFCHR, 0o666), FsCred::root());
+        let null_fs_node = fs.create_node_and_allocate_node_id(current_task, null_ops, |_id| {
+            let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
             info.rdev = DeviceType::NULL;
             info
         });

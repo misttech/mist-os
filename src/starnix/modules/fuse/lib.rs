@@ -39,7 +39,9 @@ use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, errno_from_code, error, mode, off_t, statfs, uapi, FUSE_SUPER_MAGIC};
+use starnix_uapi::{
+    errno, errno_from_code, error, ino_t, mode, off_t, statfs, uapi, FUSE_SUPER_MAGIC,
+};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::ops::{Deref, DerefMut};
@@ -232,7 +234,7 @@ pub fn new_fuse_fs(
     let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64, 0);
     fuse_node.state.lock().nlookup += 1;
 
-    fs.create_root(fuse_node, FUSE_ROOT_ID_U64);
+    fs.create_root(FUSE_ROOT_ID_U64, fuse_node);
 
     {
         let mut state = connection.lock();
@@ -260,8 +262,9 @@ pub fn new_fusectl_fs(
 
     let root_ino = fs.next_node_id();
     fs.create_root_with_info(
+        root_ino,
         FuseCtlConnectionsDirectory {},
-        FsNodeInfo::new(root_ino, mode!(IFDIR, 0o755), FsCred::root()),
+        FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
     );
 
     Ok(fs)
@@ -303,7 +306,7 @@ impl FileSystemOps for FuseFs {
             FuseNode::from_node(&old_parent),
             FuseOperation::Rename {
                 old_name: old_name.to_owned(),
-                new_dir: new_parent.node_id,
+                new_dir: new_parent.node_key(),
                 new_name: new_name.to_owned(),
             },
         )?;
@@ -561,7 +564,15 @@ struct FuseNodeMutableState {
 #[derive(Debug)]
 struct FuseNode {
     connection: Arc<FuseConnection>,
+
+    /// A unique identifier for this node.
+    ///
+    /// This value might not be the same as the inode number ([`FsNodeInfo::ino`]).
+    ///
+    /// See <https://libfuse.github.io/doxygen/structfuse__operations.html#ac39a0b7125a0e5001eb5ff42e05faa5d>
+    /// for more information.
     nodeid: u64,
+
     generation: u64,
     attributes_valid_until: AtomicMonotonicInstant,
     state: Mutex<FuseNodeMutableState>,
@@ -668,7 +679,6 @@ impl FuseNode {
         attr_valid_duration: zx::MonotonicDuration,
         node_attributes_valid_until: &AtomicMonotonicInstant,
     ) -> Result<(), Errno> {
-        info.ino = attributes.ino as uapi::ino_t;
         info.mode = FileMode::from_bits(attributes.mode);
         info.size = attributes.size.try_into().map_err(|_| errno!(EINVAL))?;
         info.blocks = attributes.blocks.try_into().map_err(|_| errno!(EINVAL))?;
@@ -707,12 +717,12 @@ impl FuseNode {
             return error!(ENOENT);
         }
         let node = node.fs().get_and_validate_or_create_node(
-            Some(entry.nodeid),
+            entry.nodeid,
             |node| {
                 let fuse_node = FuseNode::from_node(&node);
                 fuse_node.generation == entry.generation
             },
-            |id| {
+            || {
                 let fuse_node =
                     FuseNode::new(self.connection.clone(), entry.nodeid, entry.generation);
                 let mut info = FsNodeInfo::default();
@@ -722,7 +732,7 @@ impl FuseNode {
                     attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
                     &fuse_node.attributes_valid_until,
                 )?;
-                Ok(FsNode::new_uncached(current_task, fuse_node, &node.fs(), id, info))
+                Ok(FsNode::new_uncached(current_task, entry.attr.ino, fuse_node, &node.fs(), info))
             },
         )?;
         // . and .. do not get their lookup count increased.
@@ -1727,6 +1737,10 @@ impl FsNodeOps for FuseNode {
             )?;
         };
         Ok(())
+    }
+
+    fn node_key(&self, _node: &FsNode) -> ino_t {
+        self.nodeid
     }
 }
 

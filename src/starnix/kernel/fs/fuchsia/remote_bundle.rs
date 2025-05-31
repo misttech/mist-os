@@ -26,7 +26,7 @@ use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, error, from_status_like_fdio, ino_t, off_t, statfs};
+use starnix_uapi::{errno, error, from_status_like_fdio, off_t, statfs};
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
@@ -93,7 +93,7 @@ impl RemoteBundle {
             RemoteBundle { metadata, root, rights },
             options,
         )?;
-        fs.create_root(DirectoryObject, ext4_metadata::ROOT_INODE_NUM);
+        fs.create_root(ext4_metadata::ROOT_INODE_NUM, DirectoryObject);
         Ok(fs)
     }
 
@@ -112,7 +112,7 @@ impl RemoteBundle {
 
     fn get_xattr(&self, node: &FsNode, name: &FsStr) -> Result<ValueOrSize<FsString>, Errno> {
         let value = &self
-            .get_node(node.node_id)
+            .get_node(node.ino)
             .extended_attributes
             .get(&**name)
             .ok_or_else(|| errno!(ENODATA))?[..];
@@ -121,7 +121,7 @@ impl RemoteBundle {
 
     fn list_xattrs(&self, node: &FsNode) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         Ok(self
-            .get_node(node.node_id)
+            .get_node(node.ino)
             .extended_attributes
             .keys()
             .map(|k| FsString::from(&k[..]))
@@ -359,7 +359,7 @@ impl FileOps for DirectoryObject {
 
         let bundle = RemoteBundle::from_fs(&file.fs);
         let child_iter = bundle
-            .get_node(file.node().node_id)
+            .get_node(file.node().ino)
             .directory()
             .ok_or_else(|| errno!(EIO))?
             .children
@@ -407,23 +407,25 @@ impl FsNodeOps for DirectoryObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let metadata = &bundle.metadata;
-        let inode_num = metadata
-            .lookup(node.node_id, name)
+        let ino = metadata
+            .lookup(node.ino, name)
             .map_err(|e| errno!(ENOENT, format!("Error: {e:?} opening {name}")))?;
-        let metadata_node = metadata.get(inode_num).ok_or_else(|| errno!(EIO))?;
-        let info = to_fs_node_info(inode_num, metadata_node);
+        let metadata_node = metadata.get(ino).ok_or_else(|| errno!(EIO))?;
+        let info = to_fs_node_info(metadata_node);
 
         match metadata_node.info() {
-            NodeInfo::Symlink(_) => Ok(fs.create_node_with_info(current_task, SymlinkObject, info)),
+            NodeInfo::Symlink(_) => {
+                Ok(fs.create_node_with_info(current_task, ino, SymlinkObject, info))
+            }
             NodeInfo::Directory(_) => {
-                Ok(fs.create_node_with_info(current_task, DirectoryObject, info))
+                Ok(fs.create_node_with_info(current_task, ino, DirectoryObject, info))
             }
             NodeInfo::File(_) => {
                 let (file, server_end) = fidl::endpoints::create_sync_proxy::<fio::FileMarker>();
                 bundle
                     .root
                     .open(
-                        &format!("{inode_num}"),
+                        &format!("{ino}"),
                         bundle.rights,
                         &Default::default(),
                         server_end.into_channel(),
@@ -431,6 +433,7 @@ impl FsNodeOps for DirectoryObject {
                     .map_err(|_| errno!(EIO))?;
                 Ok(fs.create_node_with_info(
                     current_task,
+                    ino,
                     File { inner: Mutex::new(Inner::NeedsVmo(file)) },
                     info,
                 ))
@@ -477,8 +480,7 @@ impl FsNodeOps for SymlinkObject {
     ) -> Result<SymlinkTarget, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        let target =
-            bundle.get_node(node.node_id).symlink().ok_or_else(|| errno!(EIO))?.target.clone();
+        let target = bundle.get_node(node.ino).symlink().ok_or_else(|| errno!(EIO))?.target.clone();
         Ok(SymlinkTarget::Path(target.into()))
     }
 
@@ -508,10 +510,10 @@ impl FsNodeOps for SymlinkObject {
     }
 }
 
-fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsNodeInfo {
+fn to_fs_node_info(metadata_node: &ext4_metadata::Node) -> FsNodeInfo {
     let mode = FileMode::from_bits(metadata_node.mode.into());
     let owner = FsCred { uid: metadata_node.uid.into(), gid: metadata_node.gid.into() };
-    let mut info = FsNodeInfo::new(inode_num, mode, owner);
+    let mut info = FsNodeInfo::new(mode, owner);
     // Set the information for directory and links. For file, they will be overwritten
     // by the FsNodeOps on first access.
     // For now, we just use some made up values. We might need to revisit this.
@@ -653,10 +655,10 @@ mod test {
         assert_eq!(
             sink.entries,
             [
-                (b".".into(), (test_dir.entry.node.node_id, DirectoryEntryType::DIR)),
-                (b"..".into(), (root.entry.node.node_id, DirectoryEntryType::DIR)),
-                (b"file".into(), (test_file.node().node_id, DirectoryEntryType::REG)),
-                (b"symlink".into(), (test_symlink.entry.node.node_id, DirectoryEntryType::LNK))
+                (b".".into(), (test_dir.entry.node.ino, DirectoryEntryType::DIR)),
+                (b"..".into(), (root.entry.node.ino, DirectoryEntryType::DIR)),
+                (b"file".into(), (test_file.node().ino, DirectoryEntryType::REG)),
+                (b"symlink".into(), (test_symlink.entry.node.ino, DirectoryEntryType::LNK))
             ]
             .into()
         );

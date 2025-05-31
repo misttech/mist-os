@@ -104,7 +104,7 @@ impl ExtFilesystem {
             fs,
             options,
         )?;
-        fs.create_root(ops, ROOT_INODE_NUM as ino_t);
+        fs.create_root(ROOT_INODE_NUM as ino_t, ops);
         Ok(fs)
     }
 }
@@ -169,7 +169,7 @@ impl FsNodeOps for ExtDirectory {
             .ok_or_else(|| errno!(ENOENT, name))?;
         let ext_node = ExtNode::new(fs_ops, entry.e2d_ino.into())?;
         let inode_num = ext_node.inode_num as ino_t;
-        fs.get_or_create_node(Some(inode_num as ino_t), |inode_num| {
+        fs.get_or_create_node(inode_num, || {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
             let owner =
@@ -205,16 +205,10 @@ impl FsNodeOps for ExtDirectory {
 
             let child = FsNode::new_uncached(
                 current_task,
+                inode_num,
                 ops,
                 &fs,
-                inode_num,
-                FsNodeInfo {
-                    ino: inode_num,
-                    mode,
-                    uid: owner.uid,
-                    gid: owner.gid,
-                    ..Default::default()
-                },
+                FsNodeInfo { mode, uid: owner.uid, gid: owner.gid, ..Default::default() },
             );
             child.update_info(|info| {
                 info.size = size;

@@ -118,7 +118,7 @@ fn init_devpts(
 
     let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs { uid, gid }, options)
         .expect("devpts filesystem constructed with valid options");
-    fs.create_root(DevPtsRootDir { state }, ROOT_NODE_ID);
+    fs.create_root(ROOT_NODE_ID, DevPtsRootDir { state });
     Ok(fs)
 }
 
@@ -243,21 +243,19 @@ impl FsNodeOps for DevPtsRootDir {
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         if name == "ptmx" {
-            let mut info = FsNodeInfo::new(PTMX_NODE_ID, mode!(IFCHR, 0o666), FsCred::root());
+            let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
             info.rdev = DeviceType::PTMX;
             info.blksize = BLOCK_SIZE;
-            let node = node.fs().create_node_with_info(current_task, SpecialNode, info);
+            let node =
+                node.fs().create_node_with_info(current_task, PTMX_NODE_ID, SpecialNode, info);
             return Ok(node);
         }
         if let Ok(id) = name.parse::<u32>() {
             let terminal = self.state.terminals.read().get(&id).and_then(Weak::upgrade);
             if let Some(terminal) = terminal {
                 if !terminal.read().is_main_closed() {
-                    let mut info = FsNodeInfo::new(
-                        (id as ino_t) + FIRST_PTS_NODE_ID,
-                        mode!(IFCHR, 0o620),
-                        terminal.fscred.clone(),
-                    );
+                    let ino = (id as ino_t) + FIRST_PTS_NODE_ID;
+                    let mut info = FsNodeInfo::new(mode!(IFCHR, 0o620), terminal.fscred.clone());
                     info.rdev = get_device_type_for_pts(id);
                     info.blksize = BLOCK_SIZE;
                     let fs = node.fs();
@@ -266,7 +264,7 @@ impl FsNodeOps for DevPtsRootDir {
                         .expect("DevPts should only handle `DevPtsFs`s");
                     info.uid = devptsfs.uid.unwrap_or_else(|| current_task.creds().uid);
                     info.gid = devptsfs.gid.unwrap_or_else(|| current_task.creds().gid);
-                    let node = fs.create_node_with_info(current_task, SpecialNode, info);
+                    let node = fs.create_node_with_info(current_task, ino, SpecialNode, info);
                     return Ok(node);
                 }
             }

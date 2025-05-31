@@ -46,7 +46,7 @@ impl LayeredFs {
         )
         .expect("layeredfs constructed with valid options");
         let root_ino = fs.next_node_id();
-        fs.create_root(LayeredNodeOps { fs: layered_fs }, root_ino);
+        fs.create_root(root_ino, LayeredNodeOps { fs: layered_fs });
         fs
     }
 }
@@ -201,12 +201,7 @@ impl FileOps for LayeredFileOps {
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         for (key, fs) in self.fs.mappings.iter().skip(sink.offset() as usize) {
-            sink.add(
-                fs.root().node.info().ino,
-                sink.offset() + 1,
-                DirectoryEntryType::DIR,
-                key.as_ref(),
-            )?;
+            sink.add(fs.root().node.ino, sink.offset() + 1, DirectoryEntryType::DIR, key.as_ref())?;
         }
 
         struct DirentSinkWrapper<'a> {

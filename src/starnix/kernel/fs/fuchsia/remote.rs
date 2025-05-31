@@ -287,10 +287,10 @@ impl RemoteFs {
         let fs =
             FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotefs, options)?;
         if use_remote_ids {
-            fs.create_root(remote_node, node_id);
+            fs.create_root(node_id, remote_node);
         } else {
             let root_ino = fs.next_node_id();
-            fs.create_root(remote_node, root_ino);
+            fs.create_root(root_ino, remote_node);
         }
         Ok(fs)
     }
@@ -341,8 +341,8 @@ pub fn new_remote_file(
     }
     // TODO: https://fxbug.dev/407611229 - Give these nodes valid labels.
     let file_handle =
-        Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", |id| {
-            let mut info = FsNodeInfo::new(id, mode, FsCred::root());
+        Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", |_id| {
+            let mut info = FsNodeInfo::new(mode, FsCred::root());
             update_info_from_attrs(&mut info, &attrs);
             info
         });
@@ -660,8 +660,9 @@ impl FsNodeOps for RemoteNode {
         }
         let child = fs.create_node_with_info(
             current_task,
+            node_id,
             ops,
-            FsNodeInfo { rdev: dev, ..FsNodeInfo::new(node_id, mode, owner) },
+            FsNodeInfo { rdev: dev, ..FsNodeInfo::new(mode, owner) },
         );
         Ok(child)
     }
@@ -719,7 +720,7 @@ impl FsNodeOps for RemoteNode {
             node_id = fs.next_node_id();
         }
         let child =
-            fs.create_node_with_info(current_task, ops, FsNodeInfo::new(node_id, mode, owner));
+            fs.create_node_with_info(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
         Ok(child)
     }
 
@@ -735,15 +736,6 @@ impl FsNodeOps for RemoteNode {
         let fs = node.fs();
         let fs_ops = RemoteFs::from_fs(&fs);
 
-        let zxio;
-        let mode;
-        let node_id;
-        let owner;
-        let rdev;
-        let fsverity_enabled;
-        let time_modify;
-        let time_status_change;
-        let time_access;
         let mut attrs = zxio_node_attributes_t {
             has: zxio_node_attr_has_t {
                 protocols: true,
@@ -770,72 +762,70 @@ impl FsNodeOps for RemoteNode {
         if let Some(buffer) = &mut cached_context {
             options = options.with_selinux_context_read(buffer).unwrap();
         }
-        zxio = self
+        let zxio = self
             .zxio
             .open(name, self.rights, options)
             .map_err(|status| from_status_like_fdio!(status, name))?;
         let symlink_zxio = zxio.clone();
-        mode = get_mode(&attrs);
-        node_id = attrs.id;
-        rdev = DeviceType::from_bits(attrs.rdev);
-        owner = FsCred { uid: attrs.uid, gid: attrs.gid };
-        fsverity_enabled = attrs.fsverity_enabled;
+        let mode = get_mode(&attrs);
+        let node_id = if fs_ops.use_remote_ids {
+            if attrs.id == fio::INO_UNKNOWN {
+                return error!(ENOTSUP);
+            }
+            attrs.id
+        } else {
+            fs.next_node_id()
+        };
+        let owner = FsCred { uid: attrs.uid, gid: attrs.gid };
+        let rdev = DeviceType::from_bits(attrs.rdev);
+        let fsverity_enabled = attrs.fsverity_enabled;
         // fsverity should not be enabled for non-file nodes.
         if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE == 0) {
             return error!(EINVAL);
         }
         let casefold = attrs.casefold;
-        time_modify =
+        let time_modify =
             UtcInstant::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
-        time_status_change =
+        let time_status_change =
             UtcInstant::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
-        time_access = UtcInstant::from_nanos(attrs.access_time.try_into().unwrap_or(i64::MAX));
-        let node = fs.get_or_create_node(
-            if fs_ops.use_remote_ids {
-                if node_id == fio::INO_UNKNOWN {
-                    return error!(ENOTSUP);
-                }
-                Some(node_id)
+        let time_access = UtcInstant::from_nanos(attrs.access_time.try_into().unwrap_or(i64::MAX));
+
+        let node = fs.get_or_create_node(node_id, || {
+            let ops = if mode.is_lnk() {
+                Box::new(RemoteSymlink { zxio: Mutex::new(zxio) }) as Box<dyn FsNodeOps>
+            } else if mode.is_reg() || mode.is_dir() {
+                Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
             } else {
-                None
-            },
-            |node_id| {
-                let ops = if mode.is_lnk() {
-                    Box::new(RemoteSymlink { zxio: Mutex::new(zxio) }) as Box<dyn FsNodeOps>
-                } else if mode.is_reg() || mode.is_dir() {
-                    Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
-                } else {
-                    Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
-                };
-                let child = FsNode::new_uncached(
+                Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
+            };
+            let child = FsNode::new_uncached(
+                current_task,
+                node_id,
+                ops,
+                &fs,
+                FsNodeInfo {
+                    rdev,
+                    casefold,
+                    time_status_change,
+                    time_modify,
+                    time_access,
+                    ..FsNodeInfo::new(mode, owner)
+                },
+            );
+            if fsverity_enabled {
+                *child.fsverity.lock() = FsVerityState::FsVerity;
+            }
+            if let Some(buffer) = cached_context.as_ref().and_then(|buffer| buffer.get()) {
+                // This is valid to fail if we're using mount point labelling or the
+                // provided context string is invalid.
+                let _ = security::fs_node_notify_security_context(
                     current_task,
-                    ops,
-                    &fs,
-                    node_id,
-                    FsNodeInfo {
-                        rdev,
-                        casefold,
-                        time_status_change,
-                        time_modify,
-                        time_access,
-                        ..FsNodeInfo::new(node_id, mode, owner)
-                    },
+                    &child,
+                    FsStr::new(buffer),
                 );
-                if fsverity_enabled {
-                    *child.fsverity.lock() = FsVerityState::FsVerity;
-                }
-                if let Some(buffer) = cached_context.as_ref().and_then(|buffer| buffer.get()) {
-                    // This is valid to fail if we're using mount point labelling or the
-                    // provided context string is invalid.
-                    let _ = security::fs_node_notify_security_context(
-                        current_task,
-                        &child,
-                        FsStr::new(buffer),
-                    );
-                }
-                Ok(child)
-            },
-        )?;
+            }
+            Ok(child)
+        })?;
         if let Some(symlink) = node.downcast_ops::<RemoteSymlink>() {
             let mut zxio_guard = symlink.zxio.lock();
             *zxio_guard = symlink_zxio;
@@ -961,10 +951,11 @@ impl FsNodeOps for RemoteNode {
         };
         let symlink = fs.create_node_with_info(
             current_task,
+            node_id,
             RemoteSymlink { zxio: Mutex::new(zxio) },
             FsNodeInfo {
                 size: target.len(),
-                ..FsNodeInfo::new(node_id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner)
+                ..FsNodeInfo::new(FileMode::IFLNK | FileMode::ALLOW_ALL, owner)
             },
         );
         Ok(symlink)
@@ -1031,7 +1022,7 @@ impl FsNodeOps for RemoteNode {
             node_id = fs.next_node_id();
         }
         let child =
-            fs.create_node_with_info(current_task, ops, FsNodeInfo::new(node_id, mode, owner));
+            fs.create_node_with_info(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
 
         Ok(child)
     }
@@ -1410,10 +1401,10 @@ impl FileOps for RemoteDirectoryObject {
                 }
                 Entry::DotDot => {
                     let inode_num = if let Some(parent) = file.name.parent_within_mount() {
-                        parent.node.node_id
+                        parent.node.ino
                     } else {
                         // For the root .. should have the same inode number as .
-                        file.name.entry.node.node_id
+                        file.name.entry.node.ino
                     };
                     sink.add(inode_num, sink.offset() + 1, DirectoryEntryType::DIR, "..".into())
                 }
@@ -2172,7 +2163,7 @@ mod test {
                     dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the root should be the same as root.
-                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.ino);
 
                     let dir_handle = sub_dir1
                         .entry
@@ -2182,7 +2173,7 @@ mod test {
                     dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the first sub directory should be the same as root.
-                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.ino);
 
                     let dir_handle = sub_dir2
                         .entry
@@ -2192,7 +2183,7 @@ mod test {
                     dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the second sub directory should be the first sub directory.
-                    assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);
+                    assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.ino);
                 }
             })
             .await

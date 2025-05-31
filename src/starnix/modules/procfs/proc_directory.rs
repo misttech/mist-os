@@ -248,7 +248,7 @@ impl FileOps for ProcDirectory {
         // the sink. Subtract 2 from the offset, to account for `.` and `..`.
         for (name, node) in self.nodes.iter().skip((sink.offset() - 2) as usize) {
             sink.add(
-                node.node_id,
+                node.ino,
                 sink.offset() + 1,
                 DirectoryEntryType::from_mode(node.info().mode),
                 name,

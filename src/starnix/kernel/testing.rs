@@ -659,12 +659,12 @@ pub fn create_testfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
 pub fn create_testfs_with_root(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> FileSystemHandle {
     let test_fs = create_testfs(kernel);
     let root_ino = test_fs.next_node_id();
-    test_fs.create_root(ops, root_ino);
+    test_fs.create_root(root_ino, ops);
     test_fs
 }
 
 pub fn create_fs_node_for_testing(fs: &FileSystemHandle, ops: impl FsNodeOps) -> FsNodeHandle {
     let ino = fs.next_node_id();
-    let info = FsNodeInfo::new(ino, mode!(IFDIR, 0o777), FsCred::root());
-    FsNode::new_uncached_directory(ops, fs, ino, info)
+    let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
+    FsNode::new_uncached_directory(ino, ops, fs, info)
 }

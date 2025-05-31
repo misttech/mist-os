@@ -192,13 +192,13 @@ impl FileSystem {
 
     pub fn get_or_create_node<F>(
         &self,
-        node_id: Option<ino_t>,
+        node_key: ino_t,
         create_fn: F,
     ) -> Result<FsNodeHandle, Errno>
     where
-        F: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
+        F: FnOnce() -> Result<FsNodeHandle, Errno>,
     {
-        self.get_and_validate_or_create_node(node_id, |_| true, create_fn)
+        self.get_and_validate_or_create_node(node_key, |_| true, create_fn)
     }
 
     /// Get a node that is validated with the callback, or create an FsNode for
@@ -217,19 +217,18 @@ impl FileSystem {
     /// Returns Err only if create_fn returns Err.
     pub fn get_and_validate_or_create_node<V, C>(
         &self,
-        node_id: Option<ino_t>,
+        node_key: ino_t,
         validate_fn: V,
         create_fn: C,
     ) -> Result<FsNodeHandle, Errno>
     where
         V: FnOnce(&FsNodeHandle) -> bool,
-        C: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
+        C: FnOnce() -> Result<FsNodeHandle, Errno>,
     {
-        let node_id = node_id.unwrap_or_else(|| self.next_node_id());
         let mut nodes = self.nodes.lock();
-        match nodes.entry(node_id) {
+        match nodes.entry(node_key) {
             Entry::Vacant(entry) => {
-                let node = create_fn(node_id)?;
+                let node = create_fn()?;
                 entry.insert(Arc::downgrade(&node));
                 Ok(node)
             }
@@ -239,7 +238,7 @@ impl FileSystem {
                         return Ok(node);
                     }
                 }
-                let node = create_fn(node_id)?;
+                let node = create_fn()?;
                 entry.insert(Arc::downgrade(&node));
                 Ok(node)
             }
@@ -252,11 +251,12 @@ impl FileSystem {
     pub fn create_node_with_info(
         self: &Arc<Self>,
         current_task: &CurrentTask,
+        ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
-        let node = FsNode::new_uncached(current_task, ops, self, info.ino, info);
-        self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
+        let node = FsNode::new_uncached(current_task, ino, ops, self, info);
+        self.nodes.lock().insert(node.node_key(), Arc::downgrade(&node));
         node
     }
 
@@ -266,19 +266,21 @@ impl FileSystem {
         ops: impl Into<Box<dyn FsNodeOps>>,
         create_info_fn: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FsNodeHandle {
-        let info = create_info_fn(self.next_node_id());
-        self.create_node_with_info(current_task, ops, info)
+        let ino = self.next_node_id();
+        let info = create_info_fn(ino);
+        self.create_node_with_info(current_task, ino, ops, info)
     }
 
     /// Create a node for a directory that has no parent.
     pub fn create_detached_node_with_info(
         self: &Arc<Self>,
+        ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         assert!(info.mode.is_dir());
-        let node = FsNode::new_uncached_directory(ops, self, info.ino, info);
-        self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
+        let node = FsNode::new_uncached_directory(ino, ops, self, info);
+        self.nodes.lock().insert(node.node_key(), Arc::downgrade(&node));
         node
     }
 
@@ -286,17 +288,18 @@ impl FileSystem {
     ///
     /// This is a convenience function that creates a root node with the default
     /// directory mode and root credentials.
-    pub fn create_root(self: &Arc<Self>, ops: impl Into<Box<dyn FsNodeOps>>, ino: ino_t) {
-        let info = FsNodeInfo::new(ino, mode!(IFDIR, 0o777), FsCred::root());
-        self.create_root_with_info(ops, info);
+    pub fn create_root(self: &Arc<Self>, ino: ino_t, ops: impl Into<Box<dyn FsNodeOps>>) {
+        let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
+        self.create_root_with_info(ino, ops, info);
     }
 
     pub fn create_root_with_info(
         self: &Arc<Self>,
+        ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) {
-        let node = self.create_detached_node_with_info(ops, info);
+        let node = self.create_detached_node_with_info(ino, ops, info);
         self.set_root(node);
     }
 
@@ -304,10 +307,11 @@ impl FileSystem {
     ///
     /// Called from the Release trait of FsNode.
     pub fn remove_node(&self, node: &FsNode) {
+        let node_key = node.node_key();
         let mut nodes = self.nodes.lock();
-        if let Some(weak_node) = nodes.get(&node.node_id) {
+        if let Some(weak_node) = nodes.get(&node_key) {
             if weak_node.strong_count() == 0 {
-                nodes.remove(&node.node_id);
+                nodes.remove(&node_key);
             }
         }
     }

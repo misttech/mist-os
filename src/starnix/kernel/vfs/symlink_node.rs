@@ -23,8 +23,8 @@ pub struct SymlinkNode {
 impl SymlinkNode {
     pub fn new(target: &FsStr, owner: FsCred) -> (Self, impl FnOnce(ino_t) -> FsNodeInfo) {
         let size = target.len();
-        let info = move |ino| {
-            let mut info = FsNodeInfo::new(ino, mode!(IFLNK, 0o777), owner);
+        let info = move |_ino| {
+            let mut info = FsNodeInfo::new(mode!(IFLNK, 0o777), owner);
             info.size = size;
             info
         };

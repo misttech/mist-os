@@ -455,7 +455,7 @@ impl DirEntry {
 
         let node =
             self.node.create_tmpfile(locked, current_task, mount, mode, owner, link_behavior)?;
-        let local_name = format!("#{}", node.node_id).into();
+        let local_name = format!("#{}", node.ino).into();
         Ok(DirEntry::new_deleted(node, Some(self.clone()), local_name))
     }
 
@@ -1036,12 +1036,7 @@ impl<'a> DirEntryLockedChildren<'a> {
 
     fn get_or_create_child<
         L,
-        F: FnOnce(
-            &mut Locked<L>,
-            &FsNodeHandle,
-            &MountInfo,
-            &FsStr,
-        ) -> Result<FsNodeHandle, Errno>,
+        F: FnOnce(&mut Locked<L>, &FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     >(
         &mut self,
         locked: &mut Locked<L>,
@@ -1148,7 +1143,7 @@ impl<'a> RenameGuard<'a> {
             // biggest.
             if new_parent.is_descendant_of(old_parent)
                 || (!old_parent.is_descendant_of(new_parent)
-                    && old_parent.node.node_id < new_parent.node.node_id)
+                    && old_parent.node.node_key() < new_parent.node.node_key())
             {
                 let old_parent_guard = old_parent.lock_children();
                 let new_parent_guard = new_parent.lock_children();

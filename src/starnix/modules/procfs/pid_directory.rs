@@ -162,7 +162,7 @@ impl FsNodeOps for TaskDirectoryNode {
         let task_weak = self.task_weak.clone();
         let creds = node.info().cred();
         let fs = node.fs();
-        let (mode, inode) = task_entries(self.scope)
+        let (mode, ino) = task_entries(self.scope)
             .into_iter()
             .enumerate()
             .find_map(|(index, (n, mode))| {
@@ -268,7 +268,7 @@ impl FsNodeOps for TaskDirectoryNode {
             ),
         };
 
-        Ok(fs.create_node_with_info(current_task, ops, FsNodeInfo::new(inode, mode, creds)))
+        Ok(fs.create_node_with_info(current_task, ino, ops, FsNodeInfo::new(mode, creds)))
     }
 }
 

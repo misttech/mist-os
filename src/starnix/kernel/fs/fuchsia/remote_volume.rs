@@ -265,10 +265,10 @@ pub fn new_remote_vol(
     let fs =
         FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotevol, options)?;
     if use_remote_ids {
-        fs.create_root(remote_node, node_id);
+        fs.create_root(node_id, remote_node);
     } else {
         let root_ino = fs.next_node_id();
-        fs.create_root(remote_node, root_ino);
+        fs.create_root(root_ino, remote_node);
     }
     Ok(fs)
 }
