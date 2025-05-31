@@ -24,7 +24,7 @@ from memory import profile
 from mobly import asserts, test_runner
 from perf import action_timer
 from perf_publish import publish
-from trace_processing import trace_importing, trace_metrics, trace_model
+from trace_processing import trace_importing, trace_metrics
 from trace_processing.metrics import cpu
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -75,8 +75,8 @@ class SnapshotPerfResults(action_timer.ActionTimer[None, None]):
                 file.write(memory_after_snapshot)
             # get CPU and memory usage
             path = os.path.join(self.test_case_path, "trace.fxt")
-            perf_results = self._get_cpu_results(path)
-            perf_results.extend(
+            processors = [
+                cpu.CpuMetricsProcessor(),
                 profile.capture_and_compute_metrics(
                     process_groups={
                         "feedback": "feedback.cm",
@@ -87,8 +87,12 @@ class SnapshotPerfResults(action_timer.ActionTimer[None, None]):
                         "feedback": "core/feedback",
                         "archivist": "bootstrap/archivist",
                     },
-                ).metrics
-            )
+                ),
+            ]
+            perf_results: list[trace_metrics.TestCaseResult] = []
+            model = trace_importing.create_model_from_trace_file_path(path)
+            for processor in processors:
+                perf_results.extend(processor.process_metrics(model))
 
             perf_path = (
                 pathlib.Path(self._directory.name)
@@ -122,14 +126,6 @@ class SnapshotPerfResults(action_timer.ActionTimer[None, None]):
         with zipfile.ZipFile(final_path) as zf:
             self._validate_inspect(zf)
         self._directory.cleanup()
-
-    def _get_cpu_results(
-        self, path: str | os.PathLike[str]
-    ) -> list[trace_metrics.TestCaseResult]:
-        model: trace_model.Model = (
-            trace_importing.create_model_from_trace_file_path(path)
-        )
-        return list(cpu.CpuMetricsProcessor().process_metrics(model))
 
     def _validate_inspect(self, zf: zipfile.ZipFile) -> None:
         with zf.open("inspect.json") as inspect_file:
