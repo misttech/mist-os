@@ -91,7 +91,7 @@ pub(in crate::security) fn file_receive(
             &[],
             current_task.into(),
         )?;
-        match bpf_handle {
+        match *bpf_handle {
             BpfHandle::Map(ref map) => {
                 check_bpf_map_access(security_server, current_task, map, permission_flags)?
             }

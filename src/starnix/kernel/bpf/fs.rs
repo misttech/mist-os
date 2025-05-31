@@ -271,7 +271,7 @@ impl FileOps for BpfHandle {
 }
 
 pub fn get_bpf_object(task: &Task, fd: FdNumber) -> Result<BpfHandle, Errno> {
-    Ok(task.files.get(fd)?.downcast_file::<BpfHandle>().ok_or_else(|| errno!(EBADF))?.clone())
+    Ok((*task.files.get(fd)?.downcast_file::<BpfHandle>().ok_or_else(|| errno!(EBADF))?).clone())
 }
 
 pub struct BpfFs;

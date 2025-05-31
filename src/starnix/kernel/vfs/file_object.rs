@@ -1570,16 +1570,6 @@ impl FileObject {
         self.ops().type_name()
     }
 
-    /// Returns the `FileObject`'s `FileOps` as a `&T`, or `None` if the downcast fails.
-    ///
-    /// This is useful for syscalls that only operate on a certain type of file.
-    pub fn downcast_file<T>(&self) -> Option<&T>
-    where
-        T: 'static,
-    {
-        self.ops().as_any().downcast_ref::<T>()
-    }
-
     pub fn is_non_blocking(&self) -> bool {
         self.flags().contains(OpenFlags::NONBLOCK)
     }
@@ -2225,6 +2215,43 @@ impl OnWakeOps for FileReleaser {
                 }
             }
         }
+    }
+}
+
+/// A FileObject with the type of its FileOps known. Dereferencing it returns the FileOps.
+pub struct DowncastedFile<'a, Ops> {
+    file: &'a FileObject,
+    ops: &'a Ops,
+}
+impl<'a, Ops> Copy for DowncastedFile<'a, Ops> {}
+impl<'a, Ops> Clone for DowncastedFile<'a, Ops> {
+    fn clone(&self) -> Self { *self }
+}
+
+impl<'a, Ops> DowncastedFile<'a, Ops> {
+    pub fn file(&self) -> &'a FileObject {
+        self.file
+    }
+}
+
+impl<'a, Ops> Deref for DowncastedFile<'a, Ops> {
+    type Target = &'a Ops;
+    fn deref(&self) -> &Self::Target {
+        &self.ops
+    }
+}
+
+impl FileObject {
+    /// Returns the `FileObject`'s `FileOps` as a `DowncastedFile<T>`, or `None` if the downcast
+    /// fails.
+    ///
+    /// This is useful for syscalls that only operate on a certain type of file.
+    pub fn downcast_file<'a, T>(&'a self) -> Option<DowncastedFile<'a, T>>
+    where
+        T: 'static,
+    {
+        let ops = self.ops().as_any().downcast_ref::<T>()?;
+        Some(DowncastedFile { file: self, ops })
     }
 }
 

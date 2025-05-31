@@ -50,7 +50,7 @@ impl CopyOperand {
     }
 
     fn maybe_as_pipe(&self) -> Option<&PipeFileObject> {
-        self.file.downcast_file::<PipeFileObject>()
+        Some(&*self.file.downcast_file::<PipeFileObject>()?)
     }
 
     fn maybe_write_result_offset(
