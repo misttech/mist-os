@@ -1409,11 +1409,17 @@ impl NetstackSeed {
                 }
                 Service::RouteTableProviderV4(stream) => services_handle
                     .spawn_request_stream_handler(stream, |stream| {
-                        routes::admin::serve_route_table_provider_v4(stream, netstack.ctx.clone())
+                        routes::admin::serve_route_table_provider::<Ipv4>(
+                            stream,
+                            netstack.ctx.clone(),
+                        )
                     }),
                 Service::RouteTableProviderV6(stream) => services_handle
                     .spawn_request_stream_handler(stream, |stream| {
-                        routes::admin::serve_route_table_provider_v6(stream, netstack.ctx.clone())
+                        routes::admin::serve_route_table_provider::<Ipv6>(
+                            stream,
+                            netstack.ctx.clone(),
+                        )
                     }),
                 Service::RuleTableV4(rule_table) => services_handle
                     .spawn_request_stream_handler(rule_table, |rs| {

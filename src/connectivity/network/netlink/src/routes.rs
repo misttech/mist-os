@@ -1458,6 +1458,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::future::{Future, FutureExt as _};
+    use futures::stream::TryStreamExt as _;
     use futures::{SinkExt as _, Stream};
     use ip_test_macro::ip_test;
     use linux_uapi::rtnetlink_groups_RTNLGRP_LINK;
@@ -2374,18 +2375,22 @@ mod tests {
 
         let route_sets_from_route_table_provider =
             futures::TryStreamExt::map_ok(route_table_provider_request_stream, move |request| {
-                let (server_end, _name) =
-                    fnet_routes_ext::admin::unpack_route_table_provider_new_table_request::<I>(
-                        request,
-                    )
-                    .expect("must be a NewTable request");
-                let table_id =
-                    fnet_routes_ext::TableId::new(table_id.fetch_add(1, Ordering::SeqCst));
-                fnet_routes_ext::testutil::admin::serve_all_route_sets_with_table_id::<I>(
-                    server_end,
-                    Some(table_id),
-                )
-                .map(move |route_set_request| (table_id, route_set_request))
+                match I::into_route_table_provider_request(request) {
+                    fnet_routes_ext::admin::RouteTableProviderRequest::NewRouteTable {
+                        provider,
+                        options: _,
+                        control_handle: _,
+                    } => {
+                        let table_id =
+                            fnet_routes_ext::TableId::new(table_id.fetch_add(1, Ordering::SeqCst));
+                        fnet_routes_ext::testutil::admin::serve_all_route_sets_with_table_id::<I>(
+                            provider,
+                            Some(table_id),
+                        )
+                        .map(move |route_set_request| (table_id, route_set_request))
+                    }
+                    r => panic!("unexpected request {r:?}"),
+                }
             })
             .map(|result| result.expect("should not get FIDL error"))
             .flatten_unordered(None)
@@ -4874,8 +4879,7 @@ mod tests {
                 .fuse());
 
             let mut watcher_stream = pin!(watcher_stream.fuse());
-            let mut route_table_provider_stream =
-                pin!(route_table_provider_server_end.into_stream().fuse());
+            let mut route_table_provider_stream = route_table_provider_server_end.into_stream();
 
             let mut event_loop = {
                 let included_workers = match I::VERSION {
@@ -4964,15 +4968,20 @@ mod tests {
                     .map(|result| result.expect("event loop should not hit error"))
                     .fuse();
                 let route_table_fut = async {
-                    let (server_end, _name) =
-                        fnet_routes_ext::admin::concretize_route_table_provider_new_table_request::<I>(
-                            route_table_provider_stream
-                                .next()
-                                .await
-                                .expect("should not have ended"),
-                        )
-                        .expect("should not get error")
-                        .expect("should be a NewTable request");
+                    let server_end = match I::into_route_table_provider_request(
+                        route_table_provider_stream
+                            .try_next()
+                            .await
+                            .expect("should not have ended")
+                            .expect("fidl error"),
+                    ) {
+                        fnet_routes_ext::admin::RouteTableProviderRequest::NewRouteTable {
+                            provider,
+                            options: _,
+                            control_handle: _,
+                        } => provider,
+                        r => panic!("unexpected request {r:?}"),
+                    };
                     let mut route_table_stream = server_end.into_stream().boxed().fuse();
 
                     let request = I::into_route_table_request_result(
