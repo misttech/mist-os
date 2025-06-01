@@ -258,6 +258,16 @@ platform(
     )
     repo_ctx.file("BUILD.bazel", build_bazel_content)
 
+    # Create symlinks used to locate host prebuilts without an explicit
+    # fuchsia_host_tag in their path, making the top-level MODULE.bazel easier
+    # to write.
+    prebuilt_host_subdirs = ["go", "clang", "rust"]
+    prebuilt_host_tools = ["ninja", "gn", "buildifier"]
+    for subdir in prebuilt_host_subdirs:
+        repo_ctx.symlink("{}/prebuilt/third_party/{}/{}".format(repo_ctx.workspace_root, subdir, host_tag), "host_prebuilts/{}".format(subdir))
+    for tool in prebuilt_host_tools:
+        repo_ctx.symlink("{}/prebuilt/third_party/{}/{}/{}".format(repo_ctx.workspace_root, tool, host_tag, tool), "host_prebuilts/{}".format(tool))
+
 fuchsia_build_config_repository = repository_rule(
     implementation = _fuchsia_build_config_repository_impl,
     doc = "A repository rule used to create an external repository that " +

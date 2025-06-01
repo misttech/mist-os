@@ -30,8 +30,15 @@ local_path_override(
     path = "third_party/protobuf",
 )
 
-go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+# Create @fuchsia_build_config which contains host_prebuils/xxxx symlinks
+# to access host prebuilts without an explicit fuchsia_host_tag in their path.
+bazel_dep(name = "fuchsia_sdk_common", version = "")
+local_path_override(
+    module_name = "fuchsia_sdk_common",
+    path = "build/bazel/local_repositories/fuchsia_sdk_common",
+)
+fuchsia_build_config_ext = use_extension("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
+use_repo(fuchsia_build_config_ext, "fuchsia_build_config")
 
-# TODO(jayzhuang): Use `fuchsia_host_tag` instead of `linux-x64` from
-# @fuchsia_build_config when @rules_fuchsia is in bzlmod.
-go_sdk.wrap(root_file = "//:prebuilt/third_party/go/linux-x64/README.md")
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.wrap(root_file = "@fuchsia_build_config//:host_prebuilts/go/README.md")

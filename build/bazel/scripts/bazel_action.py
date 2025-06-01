@@ -68,6 +68,9 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "rules_license+",
     "rules_python+",
     "rules_rust",
+    # Created from in-tree top-level module
+    "fuchsia_build_config",
+    "fuchsia_sdk_common",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.

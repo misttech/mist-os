@@ -58,19 +58,6 @@ local_repository(
     path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
-# Create the @fuchsia_build_config repository which contains the defs.bzl file
-# exporting a `build_config` struct of configuration information specific to
-# the Fuchsia platform build.
-# buildifier: disable=load-on-top
-load(
-    "@rules_fuchsia//common:fuchsia_platform_build.bzl",
-    "fuchsia_build_config_repository",
-)
-
-fuchsia_build_config_repository(
-    name = "fuchsia_build_config",
-)
-
 # buildifier: disable=load-on-top
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 
@@ -261,7 +248,7 @@ fuchsia_sdk_repository(
     local_paths = ["@fuchsia_in_tree_idk"],
     # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk.
     local_sdk_version_file = fuchsia_in_tree_idk_hash_label,
-    buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
+    buildifier = "@fuchsia_build_config//:host_prebuilts/buildifier",
     visibility_templates = {
         "hlcpp": [
             # Limit the scope of hlcpp to the sdk itself
