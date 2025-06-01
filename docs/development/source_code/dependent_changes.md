@@ -70,11 +70,12 @@ Depends-on: turquoise-internal:I9916ccaa4b95b6e9babdee33014fa6bd3d478f2e
 
 ## Circular Dependencies (Atomic Changes) {#atomic}
 
-Warning: Circular dependencies are not supported for most repositories.
-Submission of circular dependencies has many edge cases, so circular
-dependencies should only be used for changes that actually need to be landed
-atomically. If the changes can be landed serially, please use a one-way
-dependency.
+Note: Circular dependencies are not supported for most repositories.
+
+Note: Submission of circular dependencies has many edge cases, so circular
+dependencies should only be used for changes that need to be landed atomically.
+If the desired result can be accomplished in the same number of CLs using a
+one-way dependency, please use a one-way dependency.
 
 {% dynamic if user.is_googler %}
 
@@ -91,6 +92,7 @@ To use circular dependencies:
 3. Set **Fuchsia-Auto-Submit +1** on both CLs once you're ready to land them.
 
 The CL Deps Checker robot will take care of the rest, doing a presubmit dry run
-on both CLs and approving them both simultaneously if the dry runs pass. Then
-auto-submit will submit the CLs, and the roller into integration.git will roll
-the CLs in a single commit.
+on both CLs and approving them both simultaneously if the dry runs pass.
+
+Then auto-submit will submit the CLs, and the roller into integration.git will
+roll the CLs in a single commit.
