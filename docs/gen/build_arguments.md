@@ -1162,7 +1162,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
