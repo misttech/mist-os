@@ -15,7 +15,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_inspect::{ArrayProperty, NumericProperty, StringArrayProperty, UintProperty};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use itertools::Itertools;
-use starnix_logging::log_warn;
+use starnix_logging::{log_info, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -286,6 +286,7 @@ impl SuspendResumeManager {
         let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
             .expect("Failed to connect to manager");
         fuchsia_trace::duration!(c"power", c"suspend_container:fidl");
+        log_info!("Asking runner to suspend container.");
         match manager.suspend_container(
             frunner::ManagerSuspendContainerRequest {
                 container_job: Some(
@@ -299,6 +300,7 @@ impl SuspendResumeManager {
             zx::Instant::INFINITE,
         ) {
             Ok(Ok(res)) => {
+                log_info!("Resuming from container suspension.");
                 let wake_time = zx::BootInstant::get();
                 self.update_suspend_stats(|suspend_stats| {
                     suspend_stats.success_count += 1;
@@ -321,6 +323,7 @@ impl SuspendResumeManager {
                 );
             }
             e => {
+                log_warn!(e:?; "Container suspension failed.");
                 let wake_lock_names: Option<Vec<String>> = match e {
                     Ok(Err(frunner::SuspendError::WakeLocksExist)) => {
                         let mut names = vec![];

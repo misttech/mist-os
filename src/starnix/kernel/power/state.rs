@@ -6,7 +6,7 @@ use crate::task::CurrentTask;
 use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::FsNodeOps;
 use fidl_fuchsia_power_broker::PowerLevel;
-use starnix_logging::log_warn;
+use starnix_logging::{log_info, log_warn};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
@@ -76,12 +76,12 @@ impl BytesFileOps for PowerStateFile {
             "freeze" | "mem" => SuspendState::Idle,
             _ => return error!(EINVAL),
         };
-
         let power_manager = &current_task.kernel().suspend_resume_manager;
         let supported_states = power_manager.suspend_states();
         if !supported_states.contains(&state) {
             return error!(EINVAL);
         }
+        log_info!(state:?; "Received write to power state file.");
         // LINT.IfChange
         fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
         // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
