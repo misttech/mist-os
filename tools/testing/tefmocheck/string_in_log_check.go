@@ -891,5 +891,11 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToDeriveSshConnectionMsg),
 			Type:   swarmingOutputType,
 		},
+		// For https://fxbug.dev/421926925
+		&stringInLogCheck{
+			String:             "launching monocle_wm#meta/escher_screensaver.cm",
+			Type:               syslogType,
+			SkipAllPassedTests: true,
+		},
 	}
 }
