@@ -411,6 +411,9 @@ closed protocol Object {
     /// `zx_object_signal()` asserts and deasserts the userspace-accessible signal
     /// bits on an object.
     ///
+    /// The effects of this call on an object's signal bits are guaranteed to become
+    /// visible before the call has completed.
+    ///
     /// Most of the 32 signals are reserved for system use and are assigned to
     /// per-object functions, like `ZX_CHANNEL_READABLE` or `ZX_TASK_TERMINATED`. There
     /// are 8 signal bits available for userspace processes to use as they see fit:
@@ -474,8 +477,11 @@ closed protocol Object {
     /// ## Description
     ///
     /// `zx_object_signal_peer()` asserts and deasserts the userspace-accessible
-    /// signal bits on the object's peer. A object peer is the opposite endpoint of a
+    /// signal bits on the object's peer. An object peer is the opposite endpoint of a
     /// *channel*, *socket*, *fifo*, or *eventpair*.
+    ///
+    /// The effects of this call on the object peer's signal bits are guaranteed to
+    /// become visible before the call has completed.
     ///
     /// Most of the 32 signals are reserved for system use and are assigned to
     /// per-object functions, like `ZX_CHANNEL_READABLE` or `ZX_TASK_TERMINATED`. There
