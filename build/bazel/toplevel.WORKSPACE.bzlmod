@@ -106,7 +106,7 @@ register_toolchains(
 
 # com_google_absl is a dependency of com_google_googletest
 local_repository(
-    name = "com_google_absl",
+    name = "abseil-cpp",
     path = "third_party/abseil-cpp",
 )
 
@@ -118,7 +118,7 @@ local_repository(
 
 # com_googlesource_code_re2 is a dependency of com_google_googletest
 local_repository(
-    name = "com_googlesource_code_re2",
+    name = "re2",
     path = "third_party/re2/src",
 )
 

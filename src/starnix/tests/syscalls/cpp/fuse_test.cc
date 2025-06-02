@@ -1111,7 +1111,7 @@ TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
 
   // Send our (delayed) response to the FUSE_INIT request and make sure that the
   // access request is now completed.
-  server->SendInitResponse(init_hdr, 0);
+  ASSERT_TRUE(server->SendInitResponse(init_hdr, 0));
   thrd.join();
   EXPECT_TRUE(access_done);
 }

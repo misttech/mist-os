@@ -1273,7 +1273,8 @@ TEST(SignalHandling, RaceBetweenTaskReleaseAndThreadRelease) {
       pid_t child = helper.RunInForkedProcess([pid] { kill(pid, SIGUSR1); });
       SAFE_SYSCALL(sigtimedwait(&sigs, &si, NULL));
       SAFE_SYSCALL(kill(child, SIGTERM));
-      helper.WaitForChildren();
+      // Assert result on this WaitForChildren would cause this test to fail.
+      auto unused_result = helper.WaitForChildren();
     });
     ASSERT_TRUE(helper.WaitForChildren());
   }
