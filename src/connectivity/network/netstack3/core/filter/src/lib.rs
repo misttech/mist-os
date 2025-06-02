@@ -60,7 +60,6 @@ pub use state::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::logic::testutil::NoopImpl;
-    pub use crate::packets::testutil::new_filter_egress_ip_packet;
 
     #[cfg(test)]
     pub(crate) trait TestIpExt:

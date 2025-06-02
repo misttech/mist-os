@@ -89,7 +89,6 @@ common_deps = [
 ]
 
 common_test_deps = [
-  ":ebpf_test_progs",
   "core:netstack3-core-testutils",
   "//src/connectivity/lib/ip-test-macro",
   "//src/connectivity/lib/net-declare",
@@ -101,7 +100,6 @@ common_test_deps = [
   "//src/lib/network/fidl_fuchsia_net_ext",
   "//src/lib/proptest-support",
   "//src/lib/testing/fixture",
-  "//src/starnix/lib/ebpf_loader",
   "//third_party/rust_crates:futures-lite",
   "//third_party/rust_crates:itertools",
   "//third_party/rust_crates:log",
@@ -278,12 +276,6 @@ network_unified_binary_regular_and_gub_components("component") {
 fuchsia_structured_config_rust_lib("config_lib") {
   name = "ns3_config"
   cm_label = ":component_manifest"
-}
-
-resource("ebpf_test_progs") {
-  visibility = [ ":*" ]
-  sources = [ "tests/ebpf/ebpf_test_progs.o" ]
-  outputs = [ "data/ebpf_test_progs.o" ]
 }
 
 template("ns3_test_component") {
