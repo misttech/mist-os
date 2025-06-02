@@ -53,7 +53,8 @@ function check-if-we-can-start-package-server {
 function check-for-package-server {
 
   # Check for a server serving the same repo
-  running_info="$(fx-command-run ffx --machine json repository server list | grep "${FUCHSIA_BUILD_DIR}/amber-files")"
+  # Remove the trailing slash to prevent grepping against a directory with two slashes in a row.
+  running_info="$(fx-command-run ffx --machine json repository server list | grep "${FUCHSIA_BUILD_DIR%/}/amber-files")"
   if [[ "${running_info}" == "" ]]; then
         fx-error "It looks like the package repository server is not running."
         fx-error "You probably need to run \"fx serve\""
