@@ -108,36 +108,47 @@ pub async fn pb_create_with_sdk_version(
 
     // Load the partitions config from the boards and product bundle, and
     // ensure they are all identical.
-    let mut partitions: Option<PartitionsConfig> = None;
-    let mut maybe_add_partitions_config = |path: Option<&Utf8PathBuf>| -> Result<()> {
-        if let Some(path) = path {
-            let another_config = PartitionsConfig::from_dir(&path)
-                .with_context(|| format!("Parsing partitions config: {}", &path))?;
+    let mut partitions: Option<(PartitionsConfig, bool)> = None;
+    let mut maybe_add_partitions_config =
+        |path: Option<&Utf8PathBuf>, from_pb: bool| -> Result<()> {
+            if let Some(path) = path {
+                let another_config = PartitionsConfig::from_dir(&path)
+                    .with_context(|| format!("Parsing partitions config: {}", &path))?;
 
-            // If we already found a config, check that this new one is identical.
-            if let Some(current_config) = &partitions {
-                ensure!(
-                    current_config.contents_eq(&another_config)?,
-                    "The partitions config ({}) does not match the partitions config ({})",
-                    another_config.hardware_revision,
-                    current_config.hardware_revision
-                );
+                match (&partitions, from_pb) {
+                    // No previous, so just save it.
+                    (None, _) => partitions = Some((another_config, from_pb)),
+
+                    // Previous was from a PB.
+                    // Always clobber it.
+                    (Some((_, true)), _) => partitions = Some((another_config, from_pb)),
+
+                    // Previous was from a board; this one is from a PB.
+                    // We ignore the one from the PB.
+                    (Some((_, false)), true) => {}
+
+                    // Both are from a board.
+                    // Assert they are equal.
+                    (Some((current_config, false)), false) => {
+                        ensure!(
+                            current_config.contents_eq(&another_config)?,
+                            "The partitions config ({}) does not match the partitions config ({})",
+                            another_config.hardware_revision,
+                            current_config.hardware_revision
+                        );
+                    }
+                }
             }
-            // If this is the first config we found, save it.
-            else {
-                partitions = Some(another_config);
-            }
-        }
-        Ok(())
-    };
-    maybe_add_partitions_config(cmd.partitions.as_ref())?;
-    maybe_add_partitions_config(partitions_from_system(system_a.as_ref()))?;
-    maybe_add_partitions_config(partitions_from_system(system_b.as_ref()))?;
-    maybe_add_partitions_config(partitions_from_system(system_r.as_ref()))?;
+            Ok(())
+        };
+    maybe_add_partitions_config(cmd.partitions.as_ref(), true)?;
+    maybe_add_partitions_config(partitions_from_system(system_a.as_ref()), false)?;
+    maybe_add_partitions_config(partitions_from_system(system_b.as_ref()), false)?;
+    maybe_add_partitions_config(partitions_from_system(system_r.as_ref()), false)?;
 
     let partitions = partitions.ok_or_else(|| anyhow!("Missing a partitions config"))?;
     let partitions =
-        partitions.write_to_dir(&cmd.out_dir.join("partitions"), None::<Utf8PathBuf>)?;
+        partitions.0.write_to_dir(&cmd.out_dir.join("partitions"), None::<Utf8PathBuf>)?;
 
     // We must assert that the board_name for the system of images matches the hardware_revision in
     // the partitions config, otherwise OTAs may not work.
