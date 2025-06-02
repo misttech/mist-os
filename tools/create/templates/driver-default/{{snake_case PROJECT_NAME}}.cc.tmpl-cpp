@@ -2,37 +2,23 @@
 
 #include "{{PROJECT_PATH}}/{{snake_case PROJECT_NAME}}.h"
 
-#include <lib/ddk/binding_driver.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 namespace {{snake_case PROJECT_NAME}} {
 
-zx_status_t {{pascal_case PROJECT_NAME}}::Bind(void* ctx, zx_device_t* dev) {
-  auto driver = std::make_unique<{{pascal_case PROJECT_NAME}}>(dev);
-  zx_status_t status = driver->Bind();
-  if (status != ZX_OK) {
-    return status;
-  }
-  // The DriverFramework now owns driver.
-  [[maybe_unused]] auto ptr = driver.release();
-  return ZX_OK;
+{{pascal_case PROJECT_NAME}}::{{pascal_case PROJECT_NAME}}(fdf::DriverStartArgs start_args,
+                                 fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : DriverBase("{{snake_case PROJECT_NAME}}", std::move(start_args), std::move(driver_dispatcher)) {}
+
+zx::result<> {{pascal_case PROJECT_NAME}}::Start() {
+  return zx::ok();
 }
 
-zx_status_t {{pascal_case PROJECT_NAME}}::Bind() {
-  is_bound.Set(true);
-  return DdkAdd(ddk::DeviceAddArgs("{{snake_case PROJECT_NAME}}").set_inspect_vmo(inspect_.DuplicateVmo()));
+void {{pascal_case PROJECT_NAME}}::PrepareStop(fdf::PrepareStopCompleter completer) {
+  completer(zx::ok());
 }
-
-void {{pascal_case PROJECT_NAME}}::DdkInit(ddk::InitTxn txn) { txn.Reply(ZX_OK); }
-
-void {{pascal_case PROJECT_NAME}}::DdkRelease() { delete this; }
-
-static zx_driver_ops_t {{snake_case PROJECT_NAME}}_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = {{pascal_case PROJECT_NAME}}::Bind;
-  return ops;
-}();
 
 }  // namespace {{snake_case PROJECT_NAME}}
 
-ZIRCON_DRIVER({{pascal_case PROJECT_NAME}}, {{snake_case PROJECT_NAME}}::{{snake_case PROJECT_NAME}}_driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT({{snake_case PROJECT_NAME}}::{{pascal_case PROJECT_NAME}});

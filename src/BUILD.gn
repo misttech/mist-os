@@ -192,6 +192,11 @@ bazel_test_package_group("bazel_tests") {
           "//src/diagnostics/archivist/tests/pipeline_test:pipeline_test"
       test_component_names = [ "pipeline_test" ]
     },
+    {
+      test_package_target = "//tools/create/goldens/my-driver-cpp:test_pkg"
+      test_package_name = "my_driver_cpp_test"
+      test_component_names = [ "my_driver_cpp_test" ]
+    },
   ]
 }
 

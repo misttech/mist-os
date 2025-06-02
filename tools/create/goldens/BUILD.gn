@@ -103,14 +103,17 @@ if (is_host) {
   golden_test("my-driver-cpp") {
     project_type = "driver"
     language = "cpp"
+    year = "2025"
     golden_files = [
       "my-driver-cpp/BUILD.gn",
+      "my-driver-cpp/BUILD.bazel",
       "my-driver-cpp/README.md",
       "my-driver-cpp/meta/my_driver_cpp.bind",
-      "my-driver-cpp/meta/my_driver_cpp-info.json",
+      "my-driver-cpp/meta/my_driver_cpp.cml",
+      "my-driver-cpp/meta/my_driver_cpp_info.json",
       "my-driver-cpp/my_driver_cpp.cc",
       "my-driver-cpp/my_driver_cpp.h",
-      "my-driver-cpp/unit-tests.cc",
+      "my-driver-cpp/tests/my_driver_cpp_test.cc",
     ]
   }
 
