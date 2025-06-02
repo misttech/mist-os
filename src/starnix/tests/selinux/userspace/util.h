@@ -39,9 +39,9 @@ fit::result<int, std::string> GetLabel(int fd);
 /// The trailing NUL, if any, will be stripped before the label is returned.
 fit::result<int, std::string> GetLabel(const std::string& path);
 
-/// Checks whether a file descriptor maps to the `/sys/fs/selinux/null` file.
+/// Checks whether two file descriptors map to the same inode.
 /// Returns an `errno` on failure.
-fit::result<int, bool> IsSelinuxNullInode(int fd);
+fit::result<int, bool> IsSameInode(int fd_1, int fd_2);
 
 /// Runs the given action in a forked process after transitioning to |label|. This requires some
 /// rules to be set-up. For transitions from unconfined_t (the starting label for tests), giving
