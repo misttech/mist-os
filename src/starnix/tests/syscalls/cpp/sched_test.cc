@@ -20,14 +20,13 @@
 namespace {
 
 constexpr uid_t kUser1Uid = 24601;
-constexpr gid_t kUser1Gid = kUser1Uid + 1;
 constexpr uid_t kUser2Uid = 9430;
-constexpr gid_t kUser2Gid = kUser2Uid + 1;
+constexpr gid_t kGid = kUser1Uid + kUser2Uid;
 
-void Become(uid_t user_uid, gid_t group_gid) {
+void Become(uid_t user_uid, uid_t effective_user_uid) {
   SAFE_SYSCALL(setgroups(0, nullptr));  // drop all supplementary groups.
-  SAFE_SYSCALL(setresgid(group_gid, group_gid, group_gid));
-  SAFE_SYSCALL(setresuid(user_uid, user_uid, user_uid));
+  SAFE_SYSCALL(setresgid(kGid, kGid, kGid));
+  SAFE_SYSCALL(setresuid(user_uid, effective_user_uid, user_uid));
 }
 
 class Poker {
@@ -159,7 +158,7 @@ TEST(GetPriorityMinTest, NonRootCanGetMinimumPriorities) {
   }
 
   test_helper::ForkHelper().RunInForkedProcess([]() {
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     EXPECT_TRUE(CheckPriorityMinimums());
   });
@@ -242,7 +241,7 @@ TEST(GetPriorityMaxTest, NonRootCanGetMaximumPriorities) {
   }
 
   test_helper::ForkHelper().RunInForkedProcess([]() {
-    Become(kUser2Uid, kUser2Gid);
+    Become(kUser2Uid, kUser2Uid);
 
     EXPECT_TRUE(CheckPriorityMaximums());
   });
@@ -262,7 +261,7 @@ TEST(GetPriorityTest, NonRootCanGetNicenessOfUnfriendlyProcess) {
 
   pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
       [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser2Uid, kUser2Gid);
+        Become(kUser2Uid, kUser2Uid);
 
         // After poking the rendezvous to indicate that the desired non-root state
         // has been reached, this process blocks forever.
@@ -274,7 +273,7 @@ TEST(GetPriorityTest, NonRootCanGetNicenessOfUnfriendlyProcess) {
 
   testing_process_fork_helper.RunInForkedProcess(
       [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         holder.hold();
 
@@ -283,6 +282,177 @@ TEST(GetPriorityTest, NonRootCanGetNicenessOfUnfriendlyProcess) {
         errno = 0;
         getpriority(PRIO_PROCESS, target_pid);
         EXPECT_EQ(errno, 0);
+      });
+  testing_process_fork_helper.OnlyWaitForForkedChildren();
+  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
+
+  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+}
+
+TEST(SetPriorityTest, NonRootCanSetNicenessOfFriendlyProcess) {
+  // TODO: https://fxbug.dev/317285180 - drop this after another means is
+  // put in place to ensure that this test only ever runs as root.
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  test_helper::ForkHelper testing_process_fork_helper;
+  test_helper::ForkHelper target_process_fork_helper;
+  Rendezvous rendezvous = MakeRendezvous();
+  target_process_fork_helper.ExpectSignal(SIGKILL);
+
+  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+      [poker = std::move(rendezvous.poker)]() mutable {
+        // Remove rlimits from consideration in this test.
+        struct rlimit limit = {
+            .rlim_cur = RLIM_INFINITY,
+            .rlim_max = RLIM_INFINITY,
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+
+        // A target process with a different UID but an effective UID that
+        // matches the effective UID of the effective UID of the
+        // calling-the-setpriority-syscall process counts as "friendly" and
+        // the syscall will succeed.
+        //
+        // See "Linux 2.6.12 and later require the effective user ID of
+        // the caller to match the real or effective user ID of the process
+        // who" at setpriority(2).
+        Become(kUser2Uid, kUser1Uid);
+
+        // After poking the rendezvous to indicate that the desired non-root state
+        // has been reached, this process blocks forever.
+        poker.poke();
+        while (true) {
+          pause();
+        }
+      });
+
+  testing_process_fork_helper.RunInForkedProcess(
+      [holder = std::move(rendezvous.holder), target_pid]() mutable {
+        Become(kUser1Uid, kUser1Uid);
+
+        holder.hold();
+
+        for (int niceness = 19; niceness >= -20; niceness--) {
+          EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
+          errno = 0;
+          EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
+          EXPECT_EQ(errno, 0);
+        }
+      });
+  testing_process_fork_helper.OnlyWaitForForkedChildren();
+  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
+
+  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+}
+
+TEST(SetPriorityTest, OutOfRangeNicenessValuesGetClamped) {
+  // TODO: https://fxbug.dev/317285180 - drop this after another means is
+  // put in place to ensure that this test only ever runs as root.
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    int too_nice = 88;            // Higher than 19.
+    int not_nice_enough = -1337;  // Lower than -20.
+
+    EXPECT_EQ(setpriority(PRIO_PROCESS, 0, too_nice), 0);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, 0), 19);
+
+    EXPECT_EQ(setpriority(PRIO_PROCESS, 0, not_nice_enough), 0);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, 0), -20);
+  });
+}
+
+TEST(SetPriorityTest, RootCanExceedRLimits) {
+  // TODO: https://fxbug.dev/317285180 - drop this after another means is
+  // put in place to ensure that this test only ever runs as root.
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  int niceness_rlimit = 17;
+  test_helper::ForkHelper target_process_fork_helper;
+  Rendezvous rendezvous = MakeRendezvous();
+  target_process_fork_helper.ExpectSignal(SIGKILL);
+
+  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+      [poker = std::move(rendezvous.poker), niceness_rlimit]() mutable {
+        struct rlimit limit = {
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit + 2),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+
+        Become(kUser1Uid, kUser1Uid);
+
+        // After poking the rendezvous to indicate that the desired non-root state
+        // has been reached, this process blocks forever.
+        poker.poke();
+        while (true) {
+          pause();
+        }
+      });
+
+  rendezvous.holder.hold();
+
+  for (int niceness = 19; niceness >= -20; niceness--) {
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
+    errno = 0;
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
+    EXPECT_EQ(errno, 0);
+  }
+
+  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+}
+
+TEST(SetPriorityTest, RLimitedAndUnfriendly) {
+  // TODO: https://fxbug.dev/317285180 - drop this after another means is
+  // put in place to ensure that this test only ever runs as root.
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  int niceness_rlimit = 12;
+  test_helper::ForkHelper testing_process_fork_helper;
+  test_helper::ForkHelper target_process_fork_helper;
+  Rendezvous rendezvous = MakeRendezvous();
+  target_process_fork_helper.ExpectSignal(SIGKILL);
+
+  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+      [poker = std::move(rendezvous.poker), niceness_rlimit]() mutable {
+        struct rlimit limit = {
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit + 2),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+        sched_param param = {.sched_priority = 0};
+        SAFE_SYSCALL(sched_setscheduler(0, SCHED_OTHER, &param));
+        SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, 18));
+
+        Become(kUser2Uid, kUser2Uid);
+
+        // After poking the rendezvous to indicate that the desired non-root
+        // state has been reached, this process blocks forever.
+        poker.poke();
+        while (true) {
+          pause();
+        }
+      });
+
+  testing_process_fork_helper.RunInForkedProcess(
+      [holder = std::move(rendezvous.holder), target_pid]() mutable {
+        Become(kUser1Uid, kUser1Uid);
+
+        holder.hold();
+
+        // It's the unfriendliness that "wins"; attempting to set the niceness fails
+        // with EPERM and the rlimit doesn't get a chance to fail with EACCES.
+        errno = 0;
+        EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, -3), -1);
+        EXPECT_EQ(errno, EPERM);
       });
   testing_process_fork_helper.OnlyWaitForForkedChildren();
   EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
@@ -333,7 +503,7 @@ TEST(GetSchedulerTest, RootCanGetSchedulerOfNonRootOwnedProcess) {
   Rendezvous rendezvous = MakeRendezvous();
   pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
       [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         // After poking the rendezvous to indicate that the desired non-root state
         // has been reached, this process blocks forever.
@@ -359,7 +529,7 @@ TEST(GetSchedulerTest, NonRootCanGetOwnScheduler) {
 
   test_helper::ForkHelper testing_process_fork_helper;
   testing_process_fork_helper.RunInForkedProcess([]() {
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     EXPECT_GE(sched_getscheduler(0), 0);
   });
@@ -374,7 +544,7 @@ TEST(GetSchedulerTest, NonRootCanGetSchedulerOfFriendlyProcess) {
 
   test_helper::ForkHelper testing_process_fork_helper;
   testing_process_fork_helper.RunInForkedProcess([]() {
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
     target_process_fork_helper.ExpectSignal(SIGKILL);
@@ -405,7 +575,7 @@ TEST(GetSchedulerTest, NonRootCanGetSchedulerOfUnfriendlyProcess) {
 
   pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
       [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser2Uid, kUser2Gid);
+        Become(kUser2Uid, kUser2Uid);
 
         // After poking the rendezvous to indicate that the desired non-root state
         // has been reached, this process blocks forever.
@@ -417,7 +587,7 @@ TEST(GetSchedulerTest, NonRootCanGetSchedulerOfUnfriendlyProcess) {
 
   testing_process_fork_helper.RunInForkedProcess(
       [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         holder.hold();
 
@@ -427,6 +597,21 @@ TEST(GetSchedulerTest, NonRootCanGetSchedulerOfUnfriendlyProcess) {
   EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
 
   SAFE_SYSCALL(kill(target_pid, SIGKILL));
+}
+
+TEST(GetSchedulerTest, ResetOnForkAppearsInReturnedValue) {
+  // TODO: https://fxbug.dev/317285180 - drop this after another means is
+  // put in place to ensure that this test only ever runs as root.
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    sched_param param = {.sched_priority = 0};
+    EXPECT_EQ(sched_setscheduler(0, SCHED_BATCH | SCHED_RESET_ON_FORK, &param), 0);
+
+    EXPECT_EQ(sched_getscheduler(0), SCHED_BATCH | SCHED_RESET_ON_FORK);
+  });
 }
 
 testing::AssertionResult SetScheduler(pid_t pid) {
@@ -645,7 +830,7 @@ TEST(SetSchedulerTest, RootCanSetSchedulerOfNonRootOwnedProcess) {
     target_process_fork_helper.ExpectSignal(SIGKILL);
     pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
         [poker = std::move(rendezvous.poker)]() mutable {
-          Become(kUser1Uid, kUser1Gid);
+          Become(kUser1Uid, kUser1Uid);
 
           // After poking the rendezvous to indicate that the desired non-root state
           // has been reached, this process blocks forever.
@@ -678,7 +863,7 @@ TEST(SetSchedulerTest, NonRootCanSetOwnScheduler) {
     };
     SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
 
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     EXPECT_TRUE(SetScheduler(0));
   });
@@ -705,7 +890,7 @@ TEST(SetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
         };
         SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
 
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         // After poking the rendezvous to indicate that the desired non-root state
         // has been reached, this process blocks forever.
@@ -717,7 +902,7 @@ TEST(SetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
 
   testing_process_fork_helper.RunInForkedProcess(
       [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         holder.hold();
 
@@ -727,6 +912,24 @@ TEST(SetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
   EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
 
   SAFE_SYSCALL(kill(target_pid, SIGKILL));
+}
+
+TEST(SetSchedulerTest, RootCanClearResetOnFork) {
+  // TODO: https://fxbug.dev/317285180 - drop this after another means is
+  // put in place to ensure that this test only ever runs as root.
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    sched_param param = {.sched_priority = 2};
+
+    EXPECT_EQ(sched_setscheduler(0, SCHED_FIFO | SCHED_RESET_ON_FORK, &param), 0);
+    EXPECT_EQ(sched_getscheduler(0), SCHED_FIFO | SCHED_RESET_ON_FORK);
+
+    EXPECT_EQ(sched_setscheduler(0, SCHED_FIFO, &param), 0);
+    EXPECT_EQ(sched_getscheduler(0), SCHED_FIFO);
+  });
 }
 
 TEST(SetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicy) {
@@ -740,7 +943,7 @@ TEST(SetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicy) {
     sched_param param = {.sched_priority = 2};
     EXPECT_EQ(sched_setscheduler(0, SCHED_FIFO | SCHED_RESET_ON_FORK, &param), 0);
 
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
     target_process_fork_helper.ExpectSignal(SIGKILL);
@@ -797,7 +1000,7 @@ TEST(SetSchedulerTest, ResetOnForkZeroesNegativeNiceness) {
     EXPECT_EQ(sched_setscheduler(0, SCHED_BATCH | SCHED_RESET_ON_FORK, &param), 0);
     EXPECT_EQ(setpriority(PRIO_PROCESS, 0, -10), 0);
 
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
     target_process_fork_helper.ExpectSignal(SIGKILL);
@@ -867,7 +1070,7 @@ TEST(GetParamTest, RootCanGetParamOfNonRootOwnedProcess) {
 
   pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
       [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         // After poking the rendezvous to indicate that the desired non-root state
         // has been reached, this process blocks forever.
@@ -897,7 +1100,7 @@ TEST(GetParamTest, NonRootCanGetOwnScheduler) {
 
   test_helper::ForkHelper testing_process_fork_helper;
   testing_process_fork_helper.RunInForkedProcess([]() {
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     sched_param observed_param;
     observed_param.sched_priority = -1;
@@ -916,7 +1119,7 @@ TEST(GetParamTest, NonRootCanGetParamOfFriendlyProcess) {
 
   test_helper::ForkHelper testing_process_fork_helper;
   testing_process_fork_helper.RunInForkedProcess([]() {
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
     target_process_fork_helper.ExpectSignal(SIGKILL);
@@ -951,7 +1154,7 @@ TEST(GetParamTest, NonRootCanGetParamOfUnfriendlyProcess) {
 
   pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
       [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser2Uid, kUser2Gid);
+        Become(kUser2Uid, kUser2Uid);
 
         // After poking the rendezvous to indicate that the desired non-root state
         // has been reached, this process blocks forever.
@@ -963,7 +1166,7 @@ TEST(GetParamTest, NonRootCanGetParamOfUnfriendlyProcess) {
 
   testing_process_fork_helper.RunInForkedProcess(
       [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         holder.hold();
 
@@ -1087,29 +1290,31 @@ TEST(SetParamTest, InvalidArguments) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  sched_param param;
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    sched_param param;
 
-  // See "Invalid arguments: param is NULL or pid is negative" at
-  // sched_setparam(2).
-  errno = 0;
-  EXPECT_EQ(sched_setparam(-1, &param), -1);
-  EXPECT_EQ(errno, EINVAL);
-  errno = 0;
-  EXPECT_EQ(sched_setparam(-7, &param), -1);
-  EXPECT_EQ(errno, EINVAL);
-  errno = 0;
-  EXPECT_EQ(sched_setparam(0, nullptr), -1);
-  EXPECT_EQ(errno, EINVAL);
+    // See "Invalid arguments: param is NULL or pid is negative" at
+    // sched_setparam(2).
+    errno = 0;
+    EXPECT_EQ(sched_setparam(-1, &param), -1);
+    EXPECT_EQ(errno, EINVAL);
+    errno = 0;
+    EXPECT_EQ(sched_setparam(-7, &param), -1);
+    EXPECT_EQ(errno, EINVAL);
+    errno = 0;
+    EXPECT_EQ(sched_setparam(0, nullptr), -1);
+    EXPECT_EQ(errno, EINVAL);
 
-  // See "The argument param does not make sense for the current
-  // scheduling policy" at sched_setparam(2).
-  int min_rr_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_RR));
-  param.sched_priority = min_rr_priority;
-  SAFE_SYSCALL(sched_setscheduler(0, SCHED_RR, &param));
-  errno = 0;
-  param.sched_priority = min_rr_priority - 20;
-  EXPECT_EQ(sched_setparam(0, &param), -1);
-  EXPECT_EQ(errno, EINVAL);
+    // See "The argument param does not make sense for the current
+    // scheduling policy" at sched_setparam(2).
+    int min_rr_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_RR));
+    param.sched_priority = min_rr_priority;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_RR, &param));
+    errno = 0;
+    param.sched_priority = min_rr_priority - 20;
+    EXPECT_EQ(sched_setparam(0, &param), -1);
+    EXPECT_EQ(errno, EINVAL);
+  });
 }
 
 TEST(SetParamTest, RootCanSetOwnScheduler) {
@@ -1159,7 +1364,7 @@ TEST(SetParamTest, RootCanSetParamOfNonRootOwnedProcess) {
 
     pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
         [poker = std::move(rendezvous.poker)]() mutable {
-          Become(kUser1Uid, kUser1Gid);
+          Become(kUser1Uid, kUser1Uid);
 
           // After poking the rendezvous to indicate that the desired non-root state
           // has been reached, this process blocks forever.
@@ -1192,7 +1397,7 @@ TEST(SetParamTest, NonRootCanSetOwnParam) {
     };
     SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
 
-    Become(kUser1Uid, kUser1Gid);
+    Become(kUser1Uid, kUser1Uid);
 
     EXPECT_TRUE(SetParam(0));
   });
@@ -1219,7 +1424,7 @@ TEST(SetParamTest, NonRootCanSetParamOfFriendlyProcess) {
         };
         SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
 
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         // After poking the rendezvous to indicate that the desired non-root state
         // has been reached, this process blocks forever.
@@ -1231,7 +1436,7 @@ TEST(SetParamTest, NonRootCanSetParamOfFriendlyProcess) {
 
   testing_process_fork_helper.RunInForkedProcess(
       [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Gid);
+        Become(kUser1Uid, kUser1Uid);
 
         holder.hold();
 
