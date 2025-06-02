@@ -89,17 +89,11 @@ impl TraceObserver {
     }
 }
 
-/// Start a thread that calls the provided callback when trace state changes.
-pub fn start_trace_observer(callback: extern "C" fn()) {
-    unsafe { sys::start_trace_observer_rust(callback) }
-}
-
 mod sys {
     #![allow(non_camel_case_types)]
     use zx::sys::zx_handle_t;
     // From librust-trace-observer.so
     extern "C" {
-        pub fn start_trace_observer_rust(callback: unsafe extern "C" fn());
         pub fn trace_register_observer(event: zx_handle_t);
         pub fn trace_notify_observer_updated(event: zx_handle_t);
         pub fn trace_unregister_observer(event: zx_handle_t);
