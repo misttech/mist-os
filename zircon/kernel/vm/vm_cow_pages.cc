@@ -668,20 +668,25 @@ class VmCowPages::TreeWalkCursor
     // cursor lock to acquire cur_locked_, cur_ could move again.
     Guard<CriticalMutex> guard{&lock_};
     fbl::RefPtr<VmCowPages> cur;
+    // Use a local cur_locked while we are looping and only update cur_locked_ at the end once we
+    // are certain we have the correct lock.
+    LockedPtr cur_locked = ktl::move(cur_locked_);
     do {
       // Clear any previous lock.
-      cur_locked_.release();
+      cur_locked.release();
       // Cursor was deleted.
       if (!cur_) {
         return false;
       }
       cur = fbl::MakeRefPtrUpgradeFromRaw(cur_, lock_);
-      guard.CallUnlocked([&]() { cur_locked_ = LockedPtr(cur.get(), VmLockAcquireMode::First); });
-    } while (cur_locked_.get() != cur_);
+      guard.CallUnlocked(
+          [&cur, &cur_locked]() { cur_locked = LockedPtr(cur.get(), VmLockAcquireMode::First); });
+    } while (cur_locked.get() != cur_);
     // We have the lock to cur_ and so we safely drop the RefPtr, knowing that the object cannot be
     // destroyed without our backlink being updated, which would require someone else to acquire the
     // lock first. All this is only true if the object is presently in the Alive state.
-    DEBUG_ASSERT(cur_locked_.locked().life_cycle_ == LifeCycle::Alive);
+    DEBUG_ASSERT(cur_locked.locked().life_cycle_ == LifeCycle::Alive);
+    cur_locked_ = ktl::move(cur_locked);
     return true;
   }
 
