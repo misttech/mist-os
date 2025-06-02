@@ -76,6 +76,21 @@ pub enum KernelArg {
     /// processes should slow down memory allocations.
     OomWarningMib(u32),
 
+    /// This option specifies the delta (in MiB) above the out-of-memory threshold at which an
+    /// imminent-out-of-memory event will be signaled. 0 disables the event.
+    OomImminentOomDeltaMib(u32),
+
+    /// This option specifies the memory debounce value used when computing the memory pressure
+    /// state based on the free memory thresholds. Transitions between memory availability states
+    /// are debounced by not leaving a state until the amount of free memory is at least this value
+    /// outside of that state.
+    OomDebounceMib(u32),
+
+    /// This option specifies the hysteresis interval (in seconds) between memory pressure state
+    /// transitions. This is only applicable for transitions from a state with less free memory to a
+    /// state with more free memory; transitions in the opposite direction are not delayed.
+    OomHysteresisSeconds(u32),
+
     /// If this option is set, the system will halt on a kernel panic instead
     /// of rebooting.
     HaltOnPanic(bool),
@@ -229,6 +244,9 @@ impl KernelArg {
             Self::OomOutOfMemoryMib(i) => ("kernel.oom.outofmemory-mb", i.to_string()),
             Self::OomCriticalMib(i) => ("kernel.oom.critical-mb", i.to_string()),
             Self::OomWarningMib(i) => ("kernel.oom.warning-mb", i.to_string()),
+            Self::OomImminentOomDeltaMib(i) => ("kernel.oom.imminent-oom-delta-mb", i.to_string()),
+            Self::OomDebounceMib(i) => ("kernel.oom.debounce-mb", i.to_string()),
+            Self::OomHysteresisSeconds(i) => ("kernel.oom.hysteresis-seconds", i.to_string()),
             Self::HaltOnPanic(b) => ("kernel.halt-on-panic", b.to_string()),
             Self::AslrEntropyBits(i) => ("aslr.entropy_bits", i.to_string()),
             Self::CprngSeedRequireJitterEntropy(b) => {
@@ -284,6 +302,9 @@ impl KernelArg {
             | Self::OomOutOfMemoryMib(_)
             | Self::OomCriticalMib(_)
             | Self::OomWarningMib(_)
+            | Self::OomImminentOomDeltaMib(_)
+            | Self::OomDebounceMib(_)
+            | Self::OomHysteresisSeconds(_)
             | Self::AslrEntropyBits(_)
             | Self::MemoryLimitMib(_)
             | Self::Arm64DebugDap(_)

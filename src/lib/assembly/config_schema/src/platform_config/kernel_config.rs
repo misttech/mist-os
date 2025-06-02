@@ -218,6 +218,18 @@ pub struct OomConfig {
     /// signaling that processes should slow down memory allocations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub warning_mb: Option<u32>,
+
+    /// Delta (in MiB) above OOM level at which the Imminent-OOM event is signaled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub imminent_oom_delta_mb: Option<u32>,
+
+    /// Memory pressure state is changed only if free memory is debounce_mb outside of that state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debounce_mb: Option<u32>,
+
+    /// Hysteresis interval (in seconds) between memory pressure state transitions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hysteresis_seconds: Option<u32>,
 }
 
 impl Default for OomConfig {
@@ -232,6 +244,9 @@ impl Default for OomConfig {
             out_of_memory_mb: None,
             critical_mb: None,
             warning_mb: None,
+            imminent_oom_delta_mb: None,
+            debounce_mb: None,
+            hysteresis_seconds: None,
         }
     }
 }
