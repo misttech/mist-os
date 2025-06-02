@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/inspect/contrib/cpp/bounded_list_node.h>
+#include <lib/inspect/cpp/bounded_list_node.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/inspect/cpp/reader.h>
 
@@ -11,8 +11,8 @@
 #include "lib/inspect/cpp/hierarchy.h"
 
 namespace {
+using inspect::BoundedListNode;
 using inspect::Inspector;
-using inspect::contrib::BoundedListNode;
 
 TEST(BoundedListNodeTest, ConstructAList) {
   Inspector inspector;

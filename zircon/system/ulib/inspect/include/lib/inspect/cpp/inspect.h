@@ -5,6 +5,7 @@
 #ifndef LIB_INSPECT_CPP_INSPECT_H_
 #define LIB_INSPECT_CPP_INSPECT_H_
 
+#include <lib/inspect/cpp/bounded_list_node.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/inspect/cpp/vmo/state.h>
 #include <lib/inspect/cpp/vmo/types.h>

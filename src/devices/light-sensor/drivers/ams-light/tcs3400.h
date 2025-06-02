@@ -12,7 +12,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/input_report_reader/reader.h>
-#include <lib/inspect/contrib/cpp/bounded_list_node.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -135,7 +134,7 @@ class Tcs3400Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_I
                                                 fuchsia_input_report::wire::kMaxDeviceReportCount>
       readers_;
   inspect::Inspector inspect_;
-  inspect::contrib::BoundedListNode inspect_reports_;
+  inspect::BoundedListNode inspect_reports_;
 
   zx::result<Tcs3400InputReport> ReadInputRpt();
   zx_status_t InitGain(uint8_t gain);

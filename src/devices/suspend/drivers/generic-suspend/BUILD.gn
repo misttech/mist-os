@@ -47,7 +47,6 @@ _DEPS = [
   "//sdk/lib/driver/logging/cpp:cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//sdk/lib/inspect/component/cpp",
-  "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
   "//zircon/system/ulib/trace",
   "//src/devices/lib/driver:driver_runtime",
   "//src/devices/lib/mmio",

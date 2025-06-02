@@ -8,7 +8,6 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/inspect/component/cpp/component.h>
-#include <lib/inspect/contrib/cpp/bounded_list_node.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <sdk/lib/driver/outgoing/cpp/outgoing_directory.h>

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/inspect/contrib/cpp/bounded_list_node.h>
+#include <lib/inspect/cpp/bounded_list_node.h>
 
-namespace inspect::contrib {
+namespace inspect {
 uint64_t BoundedListNode::capacity() const { return inner_->capacity(); }
 
 void BoundedListNode::CreateEntry(std::function<void(inspect::Node&)> cb) {
@@ -31,4 +31,4 @@ void BoundedListNode::Inner::LockedCreateEntry(std::function<void(inspect::Node&
 }
 
 uint64_t BoundedListNode::Inner::capacity() const { return cap_; }
-}  // namespace inspect::contrib
+}  // namespace inspect

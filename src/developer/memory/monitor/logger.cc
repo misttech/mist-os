@@ -21,7 +21,7 @@ constexpr std::string_view kBucketsKey{"buckets"};
 
 std::once_flag bucket_names_flag;
 
-void PushDigestToInspect(inspect::contrib::BoundedListNode& node, const memory::Digest& digest) {
+void PushDigestToInspect(inspect::BoundedListNode& node, const memory::Digest& digest) {
   node.CreateEntry([&digest](inspect::Node& n) {
     n.RecordUint(kTimestamp, digest.time());
     auto& buckets = digest.buckets();

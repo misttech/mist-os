@@ -1,7 +1,8 @@
 {
+  "pkg/inspect/include/lib/inspect/cpp/bounded_list_node.h": "9bbf350206fb0feb51c2435919bd30eb",
   "pkg/inspect/include/lib/inspect/cpp/health.h": "3ff01014fbfcb63bf0d4d5af227ca923",
   "pkg/inspect/include/lib/inspect/cpp/hierarchy.h": "283d71b7c7cef4dad1e14c60e5337377",
-  "pkg/inspect/include/lib/inspect/cpp/inspect.h": "efced45f09695c94c258206c3254150e",
+  "pkg/inspect/include/lib/inspect/cpp/inspect.h": "29d902a1a880ba5def176eecee0fff3d",
   "pkg/inspect/include/lib/inspect/cpp/inspector.h": "626684d9912b711ebe5ef7e070786d09",
   "pkg/inspect/include/lib/inspect/cpp/reader.h": "813934e9dc4d63b5564e1d5bf7d33944",
   "pkg/inspect/include/lib/inspect/cpp/vmo/block.h": "06a237c3789785afb36737205bc6d499",

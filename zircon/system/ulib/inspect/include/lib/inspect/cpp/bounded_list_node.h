@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_INSPECT_CONTRIB_CPP_BOUNDED_LIST_NODE_H_
-#define LIB_INSPECT_CONTRIB_CPP_BOUNDED_LIST_NODE_H_
+#ifndef LIB_INSPECT_CPP_BOUNDED_LIST_NODE_H_
+#define LIB_INSPECT_CPP_BOUNDED_LIST_NODE_H_
 
 #include <lib/inspect/cpp/vmo/types.h>
 
@@ -11,7 +11,7 @@
 #include <deque>
 #include <mutex>
 
-namespace inspect::contrib {
+namespace inspect {
 
 // `BoundedListNode` is a list of Inspect nodes with a maximum capacity.
 //
@@ -102,6 +102,6 @@ class BoundedListNode {
   // The thread-safe inner list.
   std::unique_ptr<Inner> inner_;
 };
-}  // namespace inspect::contrib
+}  // namespace inspect
 
-#endif  // LIB_INSPECT_CONTRIB_CPP_BOUNDED_LIST_NODE_H_
+#endif  // LIB_INSPECT_CPP_BOUNDED_LIST_NODE_H_
