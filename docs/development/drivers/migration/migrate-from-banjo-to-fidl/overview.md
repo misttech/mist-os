@@ -1,6 +1,6 @@
 # Migrate from Banjo to FIDL
 
-DFv1 drivers communicate with each other using the [Banjo][banjo]
+DFv1 drivers communicate with each other using the Banjo
 protocol. In DFv2 all communications occur over
 [FIDL (Fuchsia Interface Definition Language)][fidl] calls,
 for both drivers and non-drivers. So if your DFv1 driver being
@@ -35,7 +35,6 @@ special conditions or edge cases that may apply to your driver.
 
 <!-- Reference links -->
 
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [fidl]: /docs/concepts/fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md
 [faq]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/faq.md

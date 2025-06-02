@@ -24,8 +24,6 @@ toc:
   path: /docs/development/drivers/concepts/device_driver_model/protocol.md
 - title: "FIDL in drivers"
   path: /docs/development/drivers/concepts/device_driver_model/fidl.md
-- title: "Banjo in drivers"
-  path: /docs/development/drivers/concepts/device_driver_model/banjo.md
 - title: "Composite devices"
   path: /docs/development/drivers/concepts/device_driver_model/composite.md
 - title: "Device firmware"

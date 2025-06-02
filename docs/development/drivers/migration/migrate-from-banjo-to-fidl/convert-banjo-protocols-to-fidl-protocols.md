@@ -798,7 +798,6 @@ All the **source code files** mentioned in this section:
 
 All the **documentation pages** mentioned in this section:
 
-- [Banjo][banjo]
 - [FIDL][fidl]
 - [RFC-0126: Driver Runtime][driver-runtime-rfc]
 - [New C++ bindings tutorials][cpp-tutorial]
@@ -817,7 +816,6 @@ All the **documentation pages** mentioned in this section:
 <!-- Reference links -->
 
 [fidlbolt]: https://fidlbolt-6jq5tlqt6q-uc.a.run.app/
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [fidl-guides]: /docs/development/languages/fidl/README.md
 [fidl]: /docs/concepts/fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2/overview.md

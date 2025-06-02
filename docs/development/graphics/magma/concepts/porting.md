@@ -69,7 +69,7 @@ vendor, there are a couple of possibilities for how to proceed.
 * Make a separate MSD per SoC or SoC vendor.
 
 If the customizations to the SoC are small, it's better to have a unified
-MSD. A vendor-specific driver will bind first and will export [banjo][banjo]
+MSD. A vendor-specific driver will bind first and will export banjo
 interfaces for the MSD to power on/off the GPU, change clocks, etc. This has
 the advantage that it's easier to port the MSD to new hardware without
 modifications by implementing a new vendor-specific driver. See
@@ -88,7 +88,7 @@ driver should ideally be implemented separately from the GPU hardware,
 because then it can be stored in
 [bootfs][glossary.bootfs] and can provide a boot
 console before disk access is possible. The display controller should expose
-a hardware-specific [banjo][banjo] interface and the MSD can bind to the
+a hardware-specific banjo interface and the MSD can bind to the
 display driver.
 
 See [msd-intel-gen][msd-intel-gen] and [intel-display][intel-display] for an
@@ -338,7 +338,6 @@ the system driver using the Zircon DDK.
 [paving]: /docs/development/build/fx.md#what-is-paving
 [boarddriver]: /docs/development/drivers/concepts/device_driver_model/platform-bus.md
 [icdabi]: /docs/concepts/kernel/system.md#vulkan-icd
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [sysmem]: /docs/development/graphics/sysmem/concepts/sysmem.md
 [vkreadback]: /src/graphics/tests/vkreadback
 [hardwareunit]: /src/graphics/drivers/msd-arm-mali/tests/integration/run_unit_tests.cc

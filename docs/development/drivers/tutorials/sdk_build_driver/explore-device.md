@@ -86,7 +86,7 @@ root.sys.platform.pt.PCI0.bus.00_1f_3_
 These are the PCI device nodes in the current emulator instance.
 
 Note: The driver framework team is currently migrating drivers from
-[Banjo][drivers-banjo] to [FIDL][drivers-fidl] interfaces. During the migration,
+Banjo to [FIDL][drivers-fidl] interfaces. During the migration,
 each device node appears twice to represent each interface type.
 
 ## Discover the correct device
@@ -152,6 +152,5 @@ using these properties.
 
 <!-- Reference links -->
 
-[drivers-banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [drivers-fidl]: /docs/development/drivers/concepts/device_driver_model/fidl.md
 [edu-device-spec]: https://fuchsia.googlesource.com/third_party/qemu/+/refs/heads/main/docs/specs/edu.txt

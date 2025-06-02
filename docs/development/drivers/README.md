@@ -115,7 +115,6 @@ section.
   - [Device power management][device-power-management]
   - [Protocols in drivers][protocols-in-drivers]
   - [FIDL in drivers][fidl-in-drivers]
-  - [Banjo in drivers][banjo-in-drivers]
   - [Composite devices][composite-devices]
   - [Device firmware][device-firmware]
 
@@ -195,7 +194,6 @@ section.
 [protocols-in-drivers]: concepts/device_driver_model/protocol.md
 [platform-bus]: concepts/device_driver_model/platform-bus.md
 [fidl-in-drivers]: concepts/device_driver_model/fidl.md
-[banjo-in-drivers]: concepts/device_driver_model/banjo.md
 [composite-devices]: concepts/device_driver_model/composite.md
 [device-firmware]: concepts/device_driver_model/firmware.md
 [driver-architectures-overview]: concepts/driver_architectures/README.md
