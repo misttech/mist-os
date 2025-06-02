@@ -80,7 +80,6 @@ async fn main() -> Result<(), Error> {
     // https://fuchsia.dev/fuchsia-src/concepts/kernel/tracing-system
     // Watch trace category and trace kernel memory stats, until this variable goes out of scope.
     let _kernel_trace_service = fuchsia_async::Task::spawn(traces::kernel::serve_forever(
-        traces::watcher::subscribe(),
         kernel_stats.clone(),
         stall_provider.clone(),
     ));

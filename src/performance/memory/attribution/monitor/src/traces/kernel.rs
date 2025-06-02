@@ -1,10 +1,10 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::watcher::Watcher;
 use anyhow::Result;
 use fuchsia_async::{Interval, MonotonicDuration};
 use fuchsia_trace::{category_enabled, counter};
+use fuchsia_trace_observer::TraceObserver;
 use futures::StreamExt;
 use log::debug;
 use stalls::StallProvider;
@@ -16,12 +16,14 @@ const CATEGORY_MEMORY_KERNEL: &'static CStr = c"memory:kernel";
 // Once enabled, it periodically records memory statistics until the category is disabled.
 // This function runs indefinitely
 pub async fn serve_forever(
-    mut trace_watcher: Watcher,
     kernel_stats: impl fidl_fuchsia_kernel::StatsProxyInterface,
     stall_provider: Arc<impl StallProvider>,
 ) {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+    fuchsia_trace_provider::trace_provider_wait_for_init();
     eprintln!("Start serving traces");
     debug!("Start serving traces");
+    let trace_observer = TraceObserver::new();
     loop {
         let delay_in_secs = 1;
         let mut interval = Interval::new(MonotonicDuration::from_seconds(1));
@@ -33,7 +35,7 @@ pub async fn serve_forever(
             interval.next().await;
         }
         debug!("Trace category {:?} not active. Waiting.", CATEGORY_MEMORY_KERNEL);
-        trace_watcher.recv().await;
+        let _ = trace_observer.on_state_changed().await;
         debug!("Trace event detected");
     }
 }

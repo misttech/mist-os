@@ -10,8 +10,6 @@ use std::future::{self, Ready};
 use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Once};
-use tokio::sync::watch::{self};
-use traces::watcher::Watcher;
 
 struct FakeStallProvider {}
 
@@ -104,10 +102,10 @@ impl StatsProxyInterface for FakeStatsProxy {
     }
 }
 
-async fn actual_main(watcher: Watcher) {
+async fn actual_main() {
     let stall_provider = FakeStallProvider {};
     let kernel_stats = FakeStatsProxy::new();
-    traces::kernel::serve_forever(watcher, kernel_stats, stall_provider.into()).await;
+    traces::kernel::serve_forever(kernel_stats, stall_provider.into()).await;
 }
 
 static LOGGER_ONCE: Once = Once::new();
@@ -121,10 +119,9 @@ pub extern "C" fn rs_init_logs() {
 
 #[no_mangle]
 pub extern "C" fn rs_test_trace_two_records() {
-    let (sender, _) = watch::channel(());
     let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
     let start_time = executor.now();
-    let mut fut = pin!(actual_main(Watcher::new(sender.subscribe())));
+    let mut fut = pin!(actual_main());
     assert!(
         executor.run_until_stalled(&mut fut).is_pending(),
         "Task should be waiting for the timer"
@@ -143,10 +140,9 @@ pub extern "C" fn rs_test_trace_two_records() {
 }
 #[no_mangle]
 pub extern "C" fn rs_test_trace_no_record() {
-    let (sender, _) = watch::channel(());
     let mut executor = fuchsia_async::TestExecutor::new_with_fake_time();
     let start_time = executor.now();
-    let mut fut = pin!(actual_main(Watcher::new(sender.subscribe())));
+    let mut fut = pin!(actual_main());
     assert!(
         executor.run_until_stalled(&mut fut).is_pending(),
         "Task should be waiting for the watcher"
@@ -159,7 +155,6 @@ pub extern "C" fn rs_test_trace_no_record() {
         "No time should be involved as we are waiting on the watcher"
     );
 
-    sender.send(()).expect("There should be a watcher receiving this notification");
     assert!(
         executor.run_until_stalled(&mut fut).is_pending(),
         "Task should be waiting for the watcher"
