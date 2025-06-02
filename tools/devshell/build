@@ -98,7 +98,11 @@ EOF
 function get-ninja-log-timestamp {
   NINJA_LOG_FILE="${FUCHSIA_BUILD_DIR}/.ninja_log"
   if [[ -f "${NINJA_LOG_FILE}" ]]; then
-    stat -c "%Y" "${NINJA_LOG_FILE}"
+    if [[ "$HOST_OS" == "mac" ]]; then
+      stat -f "%Y" "${NINJA_LOG_FILE}"
+    else
+      stat -c "%Y" "${NINJA_LOG_FILE}"
+    fi
   else
     echo -1
   fi
@@ -218,9 +222,8 @@ function main {
   done
 
   if [[ "${HOST_OS}" == "mac" ]]; then
-    fx-error "Building Fuchsia on macOS is not supported and will be removed soon."
+    fx-error "Building Fuchsia on macOS is NOT SUPPORTED and will be removed soon."
     fx-error "Please see http://go/local-platform-support-prd for details."
-    exit 1
   fi
 
   if [[ -n "${fint_params_path}" ]]; then
@@ -392,7 +395,7 @@ function main {
     "${rbe_wrapper[@]}" "$fint" -log-level=error build -static="${fint_params_path}" -context=<(echo "
 checkout_dir: \"${FUCHSIA_DIR}\"
 build_dir: \"${FUCHSIA_BUILD_DIR}\"
-job_count: "$concurrency"
+job_count: $concurrency
 ")
   else
     if [[ "${#fuchsia_targets[@]}" -gt 0 ]]; then
