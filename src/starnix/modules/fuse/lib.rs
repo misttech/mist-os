@@ -673,6 +673,10 @@ impl FuseNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
+    fn invalidate_attributes(&self) {
+        self.attributes_valid_until.store(zx::MonotonicInstant::INFINITE_PAST, Ordering::Relaxed);
+    }
+
     fn update_node_info_from_attr(
         info: &mut FsNodeInfo,
         attributes: uapi::fuse_attr,
@@ -882,6 +886,7 @@ impl FileOps for FuseFileObject {
         } else {
             return error!(EINVAL);
         };
+        node.invalidate_attributes();
 
         let written = write_out.size as usize;
 
