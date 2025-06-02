@@ -2519,6 +2519,31 @@ async fn dhcpv4_client_restarts_after_delay() {
         },
         |client_interface_id, network, client_state, client_realm, sandbox| {
             async move {
+                let client_interface_control = client_realm
+                    .interface_control(client_interface_id)
+                    .expect("get client interface Control");
+
+                // Reduce the number of DAD transmits sent to speed up the test.
+                let client_iface_config = fnet_interfaces_admin::Configuration {
+                    ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                        arp: Some(fnet_interfaces_admin::ArpConfiguration {
+                            dad: Some(fnet_interfaces_admin::DadConfiguration {
+                                transmits: Some(1),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                let _prev: fnet_interfaces_admin::Configuration = client_interface_control
+                    .set_configuration(&client_iface_config)
+                    .await
+                    .expect("calling set_configuration should succeed")
+                    .expect("setting configuration should succeed");
+
                 let server_realm: netemul::TestRealm<'_> = sandbox
                     .create_netstack_realm_with::<Netstack3, _, _>(
                         "server-realm",
@@ -2694,9 +2719,7 @@ async fn dhcpv4_client_restarts_after_delay() {
                 root_routes.global_route_set(server_end).expect("create global RouteSetV4");
 
                 let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
-                    client_realm
-                        .interface_control(client_interface_id)
-                        .expect("get client interface Control")
+                    client_interface_control
                         .get_authorization_for_interface()
                         .await
                         .expect("get authorization");

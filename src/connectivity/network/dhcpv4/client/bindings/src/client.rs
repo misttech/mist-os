@@ -365,6 +365,7 @@ impl Client {
                             ..Default::default()
                         }),
                         add_subnet_route: Some(true),
+                        perform_dad: Some(true),
                         ..Default::default()
                     }),
                     address_state_provider: Some(asp_server_end),

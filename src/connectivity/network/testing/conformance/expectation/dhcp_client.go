@@ -101,57 +101,59 @@ var dhcpClientExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 }
 
 var dhcpClientExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	{1, 1}:   Pass,
-	{2, 1}:   Pass,
-	{2, 2}:   Pass,
-	{2, 3}:   Pass,
-	{4, 1}:   Pass,
-	{4, 2}:   Pass,
-	{4, 3}:   Pass,
-	{4, 4}:   Inconclusive,
-	{4, 5}:   Inconclusive,
-	{4, 6}:   AnvlSkip, // TODO(https://fxbug.dev/42056492): Support DHCPINFORM message.
-	{5, 1}:   Pass,
-	{5, 2}:   Fail,
-	{5, 3}:   Pass,
-	{5, 4}:   Pass,
-	{5, 5}:   Pass,
-	{5, 6}:   Pass,
-	{5, 8}:   Inconclusive,
-	{5, 9}:   Inconclusive,
-	{5, 10}:  Pass,
-	{5, 11}:  Pass,
-	{5, 12}:  Fail,
-	{5, 13}:  Inconclusive,
-	{5, 14}:  Inconclusive,
-	{5, 15}:  Inconclusive,
-	{6, 1}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{6, 2}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{6, 3}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{6, 4}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{6, 5}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{6, 6}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{6, 7}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{6, 8}:   AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
-	{7, 1}:   AnvlSkip, // TODO(https://fxbug.dev/42056492): Support DHCPINFORM message.
-	{8, 1}:   Pass,
-	{8, 2}:   Pass,
-	{8, 3}:   Pass,
-	{8, 4}:   Fail,
-	{8, 5}:   Fail,
-	{9, 1}:   Pass,
-	{10, 1}:  Pass,
-	{11, 1}:  Pass,
-	{11, 2}:  Pass,
-	{11, 3}:  Pass,
-	{11, 4}:  Pass,
-	{11, 5}:  Pass,
-	{11, 6}:  Pass,
+	{1, 1}:  Pass,
+	{2, 1}:  Pass,
+	{2, 2}:  Pass,
+	{2, 3}:  Pass,
+	{4, 1}:  Pass,
+	{4, 2}:  Pass,
+	{4, 3}:  Pass,
+	{4, 4}:  Inconclusive,
+	{4, 5}:  Pass,
+	{4, 6}:  AnvlSkip, // TODO(https://fxbug.dev/42056492): Support DHCPINFORM message.
+	{5, 1}:  Pass,
+	{5, 2}:  Fail,
+	{5, 3}:  Pass,
+	{5, 4}:  Pass,
+	{5, 5}:  Pass,
+	{5, 6}:  Pass,
+	{5, 8}:  Pass,
+	{5, 9}:  Pass,
+	{5, 10}: Pass,
+	{5, 11}: Pass,
+	{5, 12}: Fail,
+	{5, 13}: Inconclusive,
+	{5, 14}: Inconclusive,
+	{5, 15}: Inconclusive,
+	{6, 1}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{6, 2}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{6, 3}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{6, 4}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{6, 5}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{6, 6}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{6, 7}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{6, 8}:  AnvlSkip, // TODO(https://fxbug.dev/42140410): Support forceful lease renewal.
+	{7, 1}:  AnvlSkip, // TODO(https://fxbug.dev/42056492): Support DHCPINFORM message.
+	{8, 1}:  Pass,
+	{8, 2}:  Pass,
+	{8, 3}:  Pass,
+	{8, 4}:  Fail,
+	{8, 5}:  Fail,
+	{9, 1}:  Pass,
+	{10, 1}: Pass,
+	{11, 1}: Pass,
+	{11, 2}: Pass,
+	{11, 3}: Pass,
+	{11, 4}: Pass,
+	// Note: 11.5 and 11.6 fail because ANVL does not wait for the DUT to verify
+	// the address (i.e. allow DAD to finish), before attempting to use it.
+	{11, 5}:  Fail,
+	{11, 6}:  Fail,
 	{11, 8}:  Inconclusive,
-	{11, 9}:  Fail,
+	{11, 9}:  Inconclusive,
 	{11, 10}: Inconclusive,
 	{11, 11}: Inconclusive,
-	{11, 12}: Fail,
+	{11, 12}: Inconclusive,
 	{11, 13}: Pass,
 	{11, 14}: Pass,
 	{11, 15}: Pass,
@@ -174,8 +176,8 @@ var dhcpClientExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseN
 	{13, 5}:  Pass,
 	{13, 6}:  Pass,
 	{13, 7}:  Pass,
-	{13, 8}:  Fail,
-	{13, 9}:  Inconclusive,
+	{13, 8}:  Pass,
+	{13, 9}:  Pass,
 	{13, 10}: Inconclusive,
 	{14, 1}:  AnvlSkip, // TODO(https://fxbug.dev/42056492): Support DHCPINFORM message.
 	{14, 2}:  AnvlSkip, // TODO(https://fxbug.dev/42056492): Support DHCPINFORM message.

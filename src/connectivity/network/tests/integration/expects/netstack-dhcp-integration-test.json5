@@ -29,7 +29,7 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                "acquire_with_dhcpd_bound_device_dup_addr_ns[23]_ns[23]_with_dhcp_out_of_stack",
+                "acquire_with_dhcpd_bound_device_dup_addr_ns[23]_ns2_with_dhcp_out_of_stack",
             ],
         },
     ],
