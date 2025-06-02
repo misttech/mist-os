@@ -66,6 +66,10 @@ pub fn nanohub_device_init(locked: &mut Locked<Unlocked>, current_task: &Current
             dev_node_name: b"nanohub_display".into(),
         },
         Descriptor {
+            socket_label: b"/dev/nanohub_logs".into(),
+            dev_node_name: b"nanohub_logs".into(),
+        },
+        Descriptor {
             socket_label: b"/dev/nanohub_metrics".into(),
             dev_node_name: b"nanohub_metrics".into(),
         },
