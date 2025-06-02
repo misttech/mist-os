@@ -1142,8 +1142,6 @@ mod tests {
 
                             log_debug!("serve_fake_wake_alarms: Cancel: {}", alarm_id);
                         }
-                        fta::WakeRequest::CancelSync { .. } => unreachable!(),
-                        fta::WakeRequest::GetProperties { .. } => unreachable!(),
                         fta::WakeRequest::_UnknownMethod { .. } => unreachable!(),
                     }
                 }

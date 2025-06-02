@@ -450,17 +450,6 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
             // less to schedule the next alarm.
             handle_cancel(alarm_id, cid, &mut cmd).await;
         }
-        // Similar to above, but wait for the cancel to complete.
-        fta::WakeRequest::CancelSync { alarm_id, responder, .. } => {
-            handle_cancel(alarm_id, cid, &mut cmd).await;
-            responder.send(Ok(())).expect("infallible");
-        }
-        fta::WakeRequest::GetProperties { responder, .. } => {
-            let response =
-                fta::WakeGetPropertiesResponse { is_supported: Some(true), ..Default::default() };
-            debug!("sending: Wake.GetProperties: {:?}", &response);
-            responder.send(&response).expect("send success");
-        }
         fta::WakeRequest::_UnknownMethod { .. } => {}
     };
 }
