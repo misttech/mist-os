@@ -330,9 +330,7 @@ impl FileSystemOps for FuseFs {
             &node,
             FuseOperation::Statfs,
         )?;
-        let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
-            statfs_out
-        } else {
+        let FuseResponse::Statfs(statfs_out) = response else {
             return error!(EINVAL);
         };
         Ok(statfs {
@@ -840,9 +838,7 @@ impl FileOps for FuseFileObject {
                 padding: 0,
             }),
         )?;
-        let read_out = if let FuseResponse::Read(read_out) = response {
-            read_out
-        } else {
+        let FuseResponse::Read(read_out) = response else {
             return error!(EINVAL);
         };
         data.write(&read_out)
@@ -881,9 +877,7 @@ impl FileOps for FuseFileObject {
                 content,
             },
         )?;
-        let write_out = if let FuseResponse::Write(write_out) = response {
-            write_out
-        } else {
+        let FuseResponse::Write(write_out) = response else {
             return error!(EINVAL);
         };
         node.invalidate_attributes();
@@ -918,9 +912,7 @@ impl FileOps for FuseFileObject {
             );
             match response {
                 Ok(response) => {
-                    let seek_out = if let FuseResponse::Seek(seek_out) = response {
-                        seek_out
-                    } else {
+                    let FuseResponse::Seek(seek_out) = response else {
                         return error!(EINVAL);
                     };
                     return seek_out.offset.try_into().map_err(|_| errno!(EINVAL));
@@ -970,9 +962,7 @@ impl FileOps for FuseFileObject {
                 events: FdEvents::all().bits(),
             }),
         )?;
-        let poll_out = if let FuseResponse::Poll(poll_out) = response {
-            poll_out
-        } else {
+        let FuseResponse::Poll(poll_out) = response else {
             return error!(EINVAL);
         };
         FdEvents::from_bits(poll_out.revents).ok_or_else(|| errno!(EINVAL))
@@ -1029,9 +1019,7 @@ impl FileOps for FuseFileObject {
             },
         )?;
         std::mem::drop(state);
-        let dirents = if let FuseResponse::Readdir(dirents) = response {
-            dirents
-        } else {
+        let FuseResponse::Readdir(dirents) = response else {
             return error!(EINVAL);
         };
         let mut sink_result = Ok(());
@@ -1253,9 +1241,7 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Open { flags, mode },
         )?;
-        let open_out = if let FuseResponse::Open(open_out) = response {
-            open_out
-        } else {
+        let FuseResponse::Open(open_out) = response else {
             return error!(EINVAL);
         };
         let passthrough_file = if open_out.passthrough_fh != 0 {
@@ -1448,9 +1434,7 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Readlink,
         )?;
-        let read_out = if let FuseResponse::Read(read_out) = response {
-            read_out
-        } else {
+        let FuseResponse::Read(read_out) = response else {
             return error!(EINVAL);
         };
         Ok(SymlinkTarget::Path(read_out.into()))
