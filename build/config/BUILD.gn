@@ -1546,11 +1546,10 @@ tlsdesc = {
   } else if (current_cpu == "riscv64") {
     enable_dialect = "desc"
     disable_dialect = "trad"
-    have_tlsdesc = !is_gcc
+    have_tlsdesc = 1
 
-    # On riscv64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang, but is not currently supported in GCC.
-    can_enable = !is_gcc
-    can_disable = !is_gcc
+    can_enable = true
+    can_disable = true
     compiler_default = !is_gcc
   } else if (current_cpu == "x64") {
     enable_dialect = "gnu2"
