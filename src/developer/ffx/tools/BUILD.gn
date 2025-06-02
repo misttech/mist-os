@@ -14,6 +14,7 @@ _tools = [
   "//src/developer/ffx/plugins/driver",
   "//src/developer/ffx/plugins/debug",
   "//src/developer/ffx/plugins/emulator",
+  "//src/developer/ffx/plugins/forward",
   "//src/developer/ffx/plugins/fuzz",
   "//src/developer/ffx/plugins/inspect",
   "//src/developer/ffx/plugins/log",

@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod client;
-pub mod server;
-pub(crate) mod socket;
-pub(crate) mod throughput;
+use fho::FfxTool;
 
-#[cfg(test)]
-mod test;
-
-pub use throughput::{BytesFormatter, Throughput};
+#[fuchsia_async::run_singlethreaded]
+async fn main() {
+    ffx_forward::ForwardTool::execute_tool().await
+}

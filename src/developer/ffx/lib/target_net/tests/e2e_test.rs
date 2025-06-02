@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use ffx_e2e_emu::IsolatedEmulator;
-use ffx_target_net::{PortForwarder, SocketProvider, TargetTcpStream};
+use ffx_target_net::{Bidirectional, Counters, PortForwarder, SocketProvider, TargetTcpStream};
 use fho::TryFromEnv as _;
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _, StreamExt as _};
 use log::info;
@@ -57,8 +57,8 @@ async fn test_target_tcp_sockets(socket_provider: &SocketProvider) {
 }
 
 async fn assert_working_connection(
-    mut host: tokio::net::TcpStream,
-    mut target: TargetTcpStream,
+    host: &mut tokio::net::TcpStream,
+    target: &mut TargetTcpStream,
     bytes_to_send: usize,
 ) {
     let send_buffer =
@@ -89,9 +89,8 @@ async fn test_forwarding(socket_provider: SocketProvider) {
     let host_addr = host_listener.local_addr().expect("get local addr");
     info!("host server listening on {host_addr}");
 
-    let mut forward_fut = pin!(forwarder.forward(host_listener, target_addr).fuse());
-
-    let tests = futures::stream::iter(1..=3)
+    const CONNECTIONS: usize = 3;
+    let tests = futures::stream::iter(1..=CONNECTIONS)
         .then(|i| async move {
             // Connect and accept in order so we know these are two sides of a
             // forwarded connection.
@@ -109,19 +108,36 @@ async fn test_forwarding(socket_provider: SocketProvider) {
         .collect::<Vec<_>>()
         .then(|tests| {
             // Verify all connections in parallel once they're all established.
-            futures::future::join_all(
-                tests
-                    .into_iter()
-                    .map(|(accepted, conn, i)| assert_working_connection(conn, accepted, i * 100)),
-            )
-            .map(|_: Vec<()>| ())
+            futures::future::join_all(tests.into_iter().map(
+                |(mut accepted, mut conn, i)| async move {
+                    let bytes = i * 100;
+                    assert_working_connection(&mut conn, &mut accepted, bytes).await;
+                    (accepted, conn, bytes)
+                },
+            ))
+            .map(|sockets| {
+                let Counters { active_connections, total_bytes } = forwarder.read_counters();
+                let expect_bytes = sockets.iter().map(|(_, _, bytes)| *bytes).sum();
+                assert_eq!(
+                    active_connections,
+                    Bidirectional { host_to_target: CONNECTIONS, target_to_host: 0 }
+                );
+                assert_eq!(
+                    total_bytes,
+                    Bidirectional { host_to_target: expect_bytes, target_to_host: expect_bytes }
+                );
+            })
         });
 
-    let mut tests = pin!(tests.fuse());
-    futures::select! {
-        r = forward_fut => panic!("should not finish {r:?}"),
-        () = tests => {},
+    {
+        let mut tests = pin!(tests.fuse());
+        let mut forward_fut = pin!(forwarder.forward(host_listener, target_addr).fuse());
+        futures::select! {
+            r = forward_fut => panic!("should not finish {r:?}"),
+            () = tests => {},
+        }
     }
+    assert_eq!(forwarder.read_counters().active_connections, Bidirectional::default());
 }
 
 async fn test_reverse(socket_provider: SocketProvider) {
@@ -139,9 +155,8 @@ async fn test_reverse(socket_provider: SocketProvider) {
     let host_addr = host_listener.local_addr().expect("get local addr");
     info!("host server listening on {host_addr}");
 
-    let mut reverse_fut = pin!(forwarder.reverse(target_listener, host_addr).fuse());
-
-    let tests = futures::stream::iter(1..=3)
+    const CONNECTIONS: usize = 3;
+    let tests = futures::stream::iter(1..=CONNECTIONS)
         .then(|i| async move {
             // Connect and accept in order so we know these are two sides of a
             // forwarded connection.
@@ -159,16 +174,33 @@ async fn test_reverse(socket_provider: SocketProvider) {
         .collect::<Vec<_>>()
         .then(|tests| {
             // Verify all connections in parallel once they're all established.
-            futures::future::join_all(
-                tests
-                    .into_iter()
-                    .map(|(accepted, conn, i)| assert_working_connection(accepted, conn, i * 100)),
-            )
-            .map(|_: Vec<()>| ())
+            futures::future::join_all(tests.into_iter().map(
+                |(mut accepted, mut conn, i)| async move {
+                    let bytes = i * 100;
+                    assert_working_connection(&mut accepted, &mut conn, bytes).await;
+                    (accepted, conn, bytes)
+                },
+            ))
+            .map(|sockets| {
+                let Counters { active_connections, total_bytes } = forwarder.read_counters();
+                let expect_bytes = sockets.iter().map(|(_, _, bytes)| *bytes).sum();
+                assert_eq!(
+                    active_connections,
+                    Bidirectional { host_to_target: 0, target_to_host: CONNECTIONS }
+                );
+                assert_eq!(
+                    total_bytes,
+                    Bidirectional { host_to_target: expect_bytes, target_to_host: expect_bytes }
+                );
+            })
         });
-    let mut tests = pin!(tests.fuse());
-    futures::select! {
-        r = reverse_fut => panic!("should not finish {r:?}"),
-        () = tests => {},
+    {
+        let mut tests = pin!(tests.fuse());
+        let mut reverse_fut = pin!(forwarder.reverse(target_listener, host_addr).fuse());
+        futures::select! {
+            r = reverse_fut => panic!("should not finish {r:?}"),
+            () = tests => {},
+        }
     }
+    assert_eq!(forwarder.read_counters().active_connections, Bidirectional::default());
 }
