@@ -194,7 +194,6 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
     "honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
     "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
-    "honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test($host_toolchain)",
     "honeydew/honeydew/affordances/session/tests/functional_tests:session_test($host_toolchain)",
     "honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
     "honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:screenshot_test($host_toolchain)",
@@ -216,6 +215,9 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
 
     # Note - Intentionally not adding this hello_world_test across all the test groups
     "honeydew/honeydew/affordances/hello_world/tests/functional_tests:hello_world_test($host_toolchain)",
+
+    # Do not run this test in CQ (stable_tests) until b/412361464 is fixed
+    "honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test($host_toolchain)",
   ]
 }
 
