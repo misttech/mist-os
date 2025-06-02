@@ -1,0 +1,9 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+//! Test utilities for interacting with [`ffx_target_net`].
+
+mod fake_netstack;
+
+pub use fake_netstack::FakeNetstack;
