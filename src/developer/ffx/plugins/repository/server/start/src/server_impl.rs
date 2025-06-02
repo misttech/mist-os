@@ -9,7 +9,7 @@ use errors::FfxError;
 use ffx_command_error::{bug, return_bug, return_user_error, Result};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
-use ffx_repository_server_start_args::{default_address, StartCommand};
+use ffx_repository_server_start_args::{default_address, default_tunnel_addr, StartCommand};
 use fuchsia_async as fasync;
 use fuchsia_repo::manager::RepositoryManager;
 use fuchsia_repo::repo_client::RepoClient;
@@ -412,10 +412,11 @@ pub async fn serve_impl<W: Write + 'static>(
 
     // Serve RepositoryManager over a RepositoryServer
     let server_addr = if let Some(addr) = cmd.address.clone() { addr } else { default_address() };
-    let (server_fut, _, server) = RepositoryServer::builder(server_addr, Arc::clone(&repo_manager))
-        .start()
-        .await
-        .with_context(|| format!("starting repository server"))?;
+    let (server_fut, connection_sink, server) =
+        RepositoryServer::builder(server_addr, Arc::clone(&repo_manager))
+            .start()
+            .await
+            .with_context(|| format!("starting repository server"))?;
 
     // Write port file if needed
     if let Some(port_path) = cmd.port_path.clone() {
@@ -509,6 +510,7 @@ pub async fn serve_impl<W: Write + 'static>(
         log::info!("{}", s);
         Ok(())
     } else {
+        let tunnel_addr = cmd.tunnel_addr.clone().unwrap_or_else(|| default_tunnel_addr());
         let r = target::main_connect_loop(
             &cmd,
             &repo_path,
@@ -519,6 +521,8 @@ pub async fn serve_impl<W: Write + 'static>(
             rcs_proxy,
             target_proxy,
             &mut writer,
+            tunnel_addr,
+            connection_sink,
         )
         .await;
         if r.is_err() {
@@ -544,6 +548,7 @@ mod test {
     use ffx_config::{ConfigLevel, TestEnv};
     use ffx_target::fho::{target_interface, FhoConnectionBehavior};
     use ffx_target::TargetProxy;
+    use ffx_target_net_testutil::FakeNetstack;
     use ffx_writer::{Format, SimpleWriter, TestBuffer, TestBuffers};
     use fho::{user_error, FfxMain, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
@@ -577,14 +582,16 @@ mod test {
     use std::time;
     use target_connector::Connector;
     use target_holders::{fake_proxy, FakeInjector};
+    use test_case::test_case;
     use timeout::timeout;
     use tuf::crypto::Ed25519PrivateKey;
     use tuf::metadata::Metadata;
     use url::Url;
 
     const REPO_NAME: &str = "some-repo";
-    const REPO_IPV4_ADDR: [u8; 4] = [127, 0, 0, 1];
-    const REPO_ADDR: &str = "127.0.0.1";
+    const REPO_UNSPECIFIED_IPV4_ADDR: [u8; 4] = [0, 0, 0, 0];
+    const REPO_LOCALHOST_IPV4_ADDR: [u8; 4] = [127, 0, 0, 1];
+    const LOCALHOST: &str = "127.0.0.1";
     const REPO_PORT: u16 = 0;
     const DEVICE_PORT: u16 = 5;
     const HOST_ADDR: &str = "1.2.3.4";
@@ -625,7 +632,11 @@ mod test {
     struct FakeRcs;
 
     impl FakeRcs {
-        fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
+        fn new(
+            repo_manager: FakeRepositoryManager,
+            engine: FakeEngine,
+            netstack: Arc<FakeNetstack>,
+        ) -> RemoteControlProxy {
             let fake_rcs_proxy: RemoteControlProxy = fake_proxy(move |req| match req {
                 frcs::RemoteControlRequest::ConnectCapability {
                     moniker: _,
@@ -634,7 +645,9 @@ mod test {
                     server_channel,
                     responder,
                 } => {
-                    match capability_name.as_str() {
+                    let capability_name =
+                        capability_name.strip_prefix("svc/").unwrap_or(capability_name.as_str());
+                    match capability_name {
                         RepositoryManagerMarker::PROTOCOL_NAME => repo_manager.spawn(
                             fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
                                 server_channel,
@@ -645,8 +658,15 @@ mod test {
                             fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
                                 .into_stream(),
                         ),
-                        _ => {
-                            unreachable!();
+                        fidl_fuchsia_posix_socket::ProviderMarker::PROTOCOL_NAME => {
+                            netstack.connect_socket_provider(fidl::endpoints::ServerEnd::<
+                                fidl_fuchsia_posix_socket::ProviderMarker,
+                            >::new(
+                                server_channel
+                            ))
+                        }
+                        p => {
+                            unimplemented!("unimplemented protocol {p}");
                         }
                     }
                     responder.send(Ok(())).unwrap();
@@ -699,7 +719,10 @@ mod test {
                                     server_channel,
                                     responder,
                                 } => {
-                                    match capability_name.as_str() {
+                                    let capability_name = capability_name
+                                        .strip_prefix("svc/")
+                                        .unwrap_or(capability_name.as_str());
+                                    match capability_name {
                                         RemoteControlMarker::PROTOCOL_NAME => {
                                             // Serve the periodic knock whether the fake target is alive
                                             // By knock_rcs_impl() in
@@ -927,12 +950,14 @@ mod test {
 
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
+        let fake_netstack = Arc::new(FakeNetstack::new());
 
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+                let fake_netstack = fake_netstack.clone();
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
             }),
             target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
@@ -1011,13 +1036,14 @@ mod test {
                 StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some("/some/repo/path".into()),
                     product_bundle: Some(bundle_path.clone()),
                     alias: vec![],
                     storage_type: None,
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
                     port_path: None,
+                    tunnel_addr: None,
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
@@ -1031,8 +1057,9 @@ mod test {
                 StartCommand {
                     repository: Some("repo-with-name".into()),
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
+                    tunnel_addr: None,
                     product_bundle: Some(bundle_path.clone()),
                     alias: vec![],
                     storage_type: None,
@@ -1051,13 +1078,14 @@ mod test {
                 StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
                     product_bundle: Some("/missing/product/bundle".into()),
                     alias: vec![],
                     storage_type: None,
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
                     port_path: None,
+                    tunnel_addr: None,
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
@@ -1071,13 +1099,14 @@ mod test {
                 StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some("/missing/repo/path".into()),
                     product_bundle: None,
                     alias: vec![],
                     storage_type: None,
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
                     port_path: None,
+                    tunnel_addr: None,
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
@@ -1091,8 +1120,9 @@ mod test {
                 StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
+                    tunnel_addr: None,
                     product_bundle: None,
                     alias: vec![],
                     storage_type: None,
@@ -1111,8 +1141,9 @@ mod test {
                 StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: None,
+                    tunnel_addr: None,
                     product_bundle: Some(bundle_path.clone()),
                     alias: vec![],
                     storage_type: None,
@@ -1131,11 +1162,12 @@ mod test {
                 StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some(
                         Utf8PathBuf::from_path_buf(env.isolate_root.path().to_path_buf())
                             .expect("repo path"),
                     ),
+                    tunnel_addr: None,
                     product_bundle: None,
                     alias: vec![],
                     storage_type: None,
@@ -1191,8 +1223,9 @@ mod test {
         let cmd = StartCommand {
             repository: None,
             trusted_root: None,
-            address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+            address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
             repo_path: None,
+            tunnel_addr: None,
             product_bundle: None,
             alias: vec![],
             storage_type: None,
@@ -1260,7 +1293,7 @@ mod test {
 
         let server_info = PkgServerInfo {
             name: instance_name.into(),
-            address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+            address: (REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into(),
             repo_spec: fuchsia_repo::repository::RepositorySpec::Pm {
                 path: Utf8PathBuf::new(),
                 aliases: BTreeSet::new(),
@@ -1281,13 +1314,14 @@ mod test {
          StartCommand {
             repository: Some("another-name".into()),
             trusted_root: None,
-            address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+            address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
             repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
             product_bundle: None,
             alias: vec![],
             storage_type: None,
             alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             port_path: None,
+            tunnel_addr: None,
             no_device: false,
             refresh_metadata: false,
             auto_publish: None,
@@ -1305,13 +1339,14 @@ mod test {
         StartCommand {
            repository: Some(instance_name.into()),
            trusted_root: None,
-           address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+           address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
            repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
            product_bundle: None,
            alias: vec![],
            storage_type: None,
            alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
            port_path: None,
+           tunnel_addr: None,
            no_device: false,
            refresh_metadata: false,
            auto_publish: None,
@@ -1325,13 +1360,14 @@ mod test {
     StartCommand {
        repository: Some(instance_name.into()),
        trusted_root: None,
-       address: Some((REPO_IPV4_ADDR, 8888).into()),
+       address: Some((REPO_LOCALHOST_IPV4_ADDR, 8888).into()),
        repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
        product_bundle: None,
        alias: vec![],
        storage_type: None,
        alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
        port_path: None,
+       tunnel_addr: None,
        no_device: false,
        refresh_metadata: false,
        auto_publish: None,
@@ -1399,13 +1435,14 @@ mod test {
         let cmd = StartCommand {
             repository: Some("some_repo".into()),
             trusted_root: None,
-            address: Some((REPO_IPV4_ADDR, 8888).into()),
+            address: Some((REPO_LOCALHOST_IPV4_ADDR, 8888).into()),
             repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
             product_bundle: None,
             alias: vec![],
             storage_type: None,
             alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             port_path: None,
+            tunnel_addr: None,
             no_device: false,
             refresh_metadata: false,
             auto_publish: None,
@@ -1437,13 +1474,14 @@ mod test {
         let cmd = StartCommand {
             repository: Some("some_repo".into()),
             trusted_root: None,
-            address: Some((REPO_IPV4_ADDR, 8888).into()),
+            address: Some((REPO_LOCALHOST_IPV4_ADDR, 8888).into()),
             repo_path: Some(Utf8PathBuf::from_path_buf(repo_path.clone()).expect("utf8 repo_path")),
             product_bundle: None,
             alias: vec![],
             storage_type: None,
             alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut,
             port_path: None,
+            tunnel_addr: None,
             no_device: false,
             refresh_metadata: false,
             auto_publish: None,
@@ -1462,168 +1500,20 @@ mod test {
         assert_eq!(err.to_string(), expected);
     }
 
+    #[test_case(true, true; "refresh_direct")]
+    #[test_case(true, false; "refresh_tunelled")]
+    #[test_case(false, true; "norefresh_direct")]
+    #[test_case(false, false; "norefresh_tunelled")]
     #[fuchsia::test]
-    async fn test_start_register() {
-        async fn run_test_start_register(refresh_metadata: bool) {
-            let test_env = get_test_env().await;
-            test_env
-                .context
-                .query("repository.process_dir")
-                .level(Some(ConfigLevel::User))
-                .set(test_env.isolate_root.path().to_string_lossy().into())
-                .await
-                .expect("Setting process dir");
-
-            test_env
-                .context
-                .query(TARGET_DEFAULT_KEY)
-                .level(Some(ConfigLevel::User))
-                .set(TARGET_NODENAME.into())
-                .await
-                .unwrap();
-
-            let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
-            let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
-            let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(None);
-
-            let frc = fake_repo.clone();
-            let fec = fake_engine.clone();
-
-            let fake_injector = FakeInjector {
-                remote_factory_closure: Box::new(move || {
-                    let fake_repo = frc.clone();
-                    let fake_engine = fec.clone();
-                    Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
-                }),
-                target_factory_closure: Box::new(move || {
-                    let fake_target_proxy = fake_target_proxy.clone();
-                    Box::pin(async { Ok(fake_target_proxy) })
-                }),
-                ..Default::default()
-            };
-
-            let env = FhoEnvironment::new_with_args(
-                &test_env.context,
-                &["some", "repo", "start", "test"],
-            );
-            let target_env = ffx_target::fho::target_interface(&env);
-            target_env
-                .set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
-
-            let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
-
-            // Use a tmp repo to allow metadata updates
-            let tmp_repo = tempfile::tempdir().unwrap();
-            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
-            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
-
-            let serve_tool = ServerStartTool {
-                cmd: StartCommand {
-                    repository: Some(REPO_NAME.to_string()),
-                    trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
-                    repo_path: Some(tmp_repo_path.into()),
-                    product_bundle: None,
-                    alias: vec!["example.com".into(), "fuchsia.com".into()],
-                    storage_type: Some(RepositoryStorageType::Ephemeral),
-                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-                    port_path: Some(tmp_port_file.path().to_owned()),
-                    no_device: false,
-                    refresh_metadata: refresh_metadata,
-                    auto_publish: None,
-                    background: false,
-                    foreground: true,
-                    disconnected: false,
-                },
-                context: env.environment_context().clone(),
-                target_proxy_connector: Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make target proxy test connector"),
-                rcs_proxy_connector: Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make RCS test connector"),
-            };
-
-            let buffers = TestBuffers::default();
-            let writer =
-                <ServerStartTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
-
-            // Run main in background
-            let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
-
-            // Future resolves once repo server communicates with them.
-            let _timeout = timeout(time::Duration::from_secs(10), async {
-                let _ = fake_target_rx.next().await.unwrap();
-                let _ = fake_repo_rx.next().await.unwrap();
-                let _ = fake_engine_rx.next().await.unwrap();
-            })
-            .await
-            .unwrap();
-
-            // Get dynamic port
-            let dynamic_repo_port =
-                fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
-            tmp_port_file.close().unwrap();
-
-            let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
-
-            assert_eq!(
-                fake_repo.take_events(),
-                vec![RepositoryManagerEvent::Add {
-                    repo: RepositoryConfig {
-                        mirrors: Some(vec![MirrorConfig {
-                            mirror_url: Some(repo_url.clone()),
-                            subscribe: Some(true),
-                            ..Default::default()
-                        }]),
-                        repo_url: Some(format!("fuchsia-pkg://{}", REPO_NAME)),
-                        root_keys: Some(vec![fuchsia_repo::test_utils::repo_key().into()]),
-                        root_version: Some(1),
-                        root_threshold: Some(1),
-                        use_local_mirror: Some(false),
-                        storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
-                        ..Default::default()
-                    }
-                }],
-            );
-
-            assert_eq!(
-                fake_engine.take_events(),
-                vec![
-                    RewriteEngineEvent::ListDynamic,
-                    RewriteEngineEvent::IteratorNext,
-                    RewriteEngineEvent::ResetAll,
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
-                    },
-                    RewriteEngineEvent::EditTransactionAdd {
-                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
-                    },
-                    RewriteEngineEvent::EditTransactionCommit,
-                ],
-            );
-
-            // Check repository state.
-            let http_repo = HttpRepository::new(
-                fuchsia_hyper::new_client(),
-                Url::parse(&repo_url).unwrap(),
-                Url::parse(&format!("{repo_url}/blobs")).unwrap(),
-                BTreeSet::new(),
-            );
-            let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
-
-            assert_matches!(repo_client.update().await, Ok(true));
-        }
-
-        let test_cases = [false, true];
-        for tc in test_cases {
-            run_test_start_register(tc).await;
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_auto_reconnect() {
+    async fn test_start_register(refresh_metadata: bool, direct_target_connection: bool) {
         let test_env = get_test_env().await;
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
 
         test_env
             .context
@@ -1635,18 +1525,18 @@ mod test {
 
         let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
         let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
-        // Create a target where the second and third knock requests are not answered, triggering the reconnect
-        // loops in both the repository serve plugin and the Connect<TargetProxy>.
-        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(Some(vec![2, 3]));
+        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(None);
 
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
+        let fake_netstack = Arc::new(FakeNetstack::new());
 
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+                let fake_netstack = fake_netstack.clone();
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
             }),
             target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
@@ -1661,47 +1551,51 @@ mod test {
         target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
-        let tmp_port_file_path = tmp_port_file.path().to_owned();
 
-        let test_stdout = TestBuffer::default();
-        let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
+        // Use a tmp repo to allow metadata updates
+        let tmp_repo = tempfile::tempdir().unwrap();
+        let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+        test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
+        let (listen_addr, repo_host) = if direct_target_connection {
+            (REPO_UNSPECIFIED_IPV4_ADDR, HOST_ADDR)
+        } else {
+            (REPO_LOCALHOST_IPV4_ADDR, LOCALHOST)
+        };
+
+        let serve_tool = ServerStartTool {
+            cmd: StartCommand {
+                repository: Some(REPO_NAME.to_string()),
+                trusted_root: None,
+                address: Some((listen_addr, REPO_PORT).into()),
+                repo_path: Some(tmp_repo_path.into()),
+                product_bundle: None,
+                alias: vec!["example.com".into(), "fuchsia.com".into()],
+                storage_type: Some(RepositoryStorageType::Ephemeral),
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                port_path: Some(tmp_port_file.path().to_owned()),
+                tunnel_addr: Some((REPO_LOCALHOST_IPV4_ADDR, DEVICE_PORT).into()),
+                no_device: false,
+                refresh_metadata: refresh_metadata,
+                auto_publish: None,
+                background: false,
+                foreground: true,
+                disconnected: false,
+            },
+            context: env.environment_context().clone(),
+            target_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make target proxy test connector"),
+            rcs_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make RCS test connector"),
+        };
+
+        let buffers = TestBuffers::default();
+        let writer = <ServerStartTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
         // Run main in background
-        let _task = fasync::Task::local(async move {
-            // Use a tmp repo to allow metadata updates
-            let tmp_repo = tempfile::tempdir().unwrap();
-            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
-            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
-
-            serve_impl(
-                Connector::try_from_env(&env)
-                    .await
-                    .expect("Could not make target proxy test connector"),
-                Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
-                StartCommand {
-                    repository: Some(REPO_NAME.to_string()),
-                    trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
-                    repo_path: Some(tmp_repo_path.into()),
-                    product_bundle: None,
-                    alias: vec!["example.com".into(), "fuchsia.com".into()],
-                    storage_type: Some(RepositoryStorageType::Ephemeral),
-                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-                    port_path: Some(tmp_port_file_path),
-                    no_device: false,
-                    refresh_metadata: false,
-                    auto_publish: None,
-                    background: false,
-                    foreground: true,
-                    disconnected: false,
-                },
-                env.environment_context().clone(),
-                writer,
-                ServerMode::Foreground,
-            )
-            .await
-            .unwrap()
-        });
+        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
 
         // Future resolves once repo server communicates with them.
         let _timeout = timeout(time::Duration::from_secs(10), async {
@@ -1717,14 +1611,17 @@ mod test {
             fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
         tmp_port_file.close().unwrap();
 
-        let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
+        let target_repo_port =
+            if direct_target_connection { dynamic_repo_port } else { DEVICE_PORT };
+
+        let target_repo_url = format!("http://{repo_host}:{target_repo_port}/{REPO_NAME}");
 
         assert_eq!(
             fake_repo.take_events(),
             vec![RepositoryManagerEvent::Add {
                 repo: RepositoryConfig {
                     mirrors: Some(vec![MirrorConfig {
-                        mirror_url: Some(repo_url.clone()),
+                        mirror_url: Some(target_repo_url),
                         subscribe: Some(true),
                         ..Default::default()
                     }]),
@@ -1755,11 +1652,180 @@ mod test {
             ],
         );
 
+        let host_repo_url = format!("http://{LOCALHOST}:{dynamic_repo_port}/{REPO_NAME}");
         // Check repository state.
         let http_repo = HttpRepository::new(
             fuchsia_hyper::new_client(),
-            Url::parse(&repo_url).unwrap(),
-            Url::parse(&format!("{repo_url}/blobs")).unwrap(),
+            Url::parse(&host_repo_url).unwrap(),
+            Url::parse(&format!("{host_repo_url}/blobs")).unwrap(),
+            BTreeSet::new(),
+        );
+        let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
+
+        assert_matches!(repo_client.update().await, Ok(true));
+    }
+
+    #[test_case(true; "direct")]
+    #[test_case(false; "tunnelled")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_auto_reconnect(direct_target_connection: bool) {
+        let test_env = get_test_env().await;
+
+        test_env
+            .context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(TARGET_NODENAME.into())
+            .await
+            .unwrap();
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
+
+        let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
+        let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
+        // Create a target where the second and third knock requests are not answered, triggering the reconnect
+        // loops in both the repository serve plugin and the Connect<TargetProxy>.
+        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(Some(vec![2, 3]));
+
+        let frc = fake_repo.clone();
+        let fec = fake_engine.clone();
+        let fake_netstack = Arc::new(FakeNetstack::new());
+
+        let fake_injector = FakeInjector {
+            remote_factory_closure: Box::new(move || {
+                let fake_repo = frc.clone();
+                let fake_engine = fec.clone();
+                let fake_netstack = fake_netstack.clone();
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
+            }),
+            target_factory_closure: Box::new(move || {
+                let fake_target_proxy = fake_target_proxy.clone();
+                Box::pin(async { Ok(fake_target_proxy) })
+            }),
+            ..Default::default()
+        };
+
+        let env =
+            FhoEnvironment::new_with_args(&test_env.context, &["some", "repo", "start", "test"]);
+        let target_env = ffx_target::fho::target_interface(&env);
+        target_env.set_behavior(FhoConnectionBehavior::DaemonConnector(Arc::new(fake_injector)));
+
+        let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+        let tmp_port_file_path = tmp_port_file.path().to_owned();
+
+        let test_stdout = TestBuffer::default();
+        let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
+
+        let (listen_addr, repo_host) = if direct_target_connection {
+            (REPO_UNSPECIFIED_IPV4_ADDR, HOST_ADDR)
+        } else {
+            (REPO_LOCALHOST_IPV4_ADDR, LOCALHOST)
+        };
+
+        // Run main in background
+        let _task = fasync::Task::local(async move {
+            // Use a tmp repo to allow metadata updates
+            let tmp_repo = tempfile::tempdir().unwrap();
+            let tmp_repo_path = Utf8Path::from_path(tmp_repo.path()).unwrap();
+            test_utils::make_empty_pm_repo_dir(tmp_repo_path);
+
+            serve_impl(
+                Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make target proxy test connector"),
+                Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
+                StartCommand {
+                    repository: Some(REPO_NAME.to_string()),
+                    trusted_root: None,
+                    address: Some((listen_addr, REPO_PORT).into()),
+                    repo_path: Some(tmp_repo_path.into()),
+                    product_bundle: None,
+                    alias: vec!["example.com".into(), "fuchsia.com".into()],
+                    storage_type: Some(RepositoryStorageType::Ephemeral),
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                    port_path: Some(tmp_port_file_path),
+                    tunnel_addr: Some((REPO_LOCALHOST_IPV4_ADDR, DEVICE_PORT).into()),
+                    no_device: false,
+                    refresh_metadata: false,
+                    auto_publish: None,
+                    background: false,
+                    foreground: true,
+                    disconnected: false,
+                },
+                env.environment_context().clone(),
+                writer,
+                ServerMode::Foreground,
+            )
+            .await
+            .unwrap()
+        });
+
+        // Future resolves once repo server communicates with them.
+        let _timeout = timeout(time::Duration::from_secs(10), async {
+            let _ = fake_target_rx.next().await.unwrap();
+            let _ = fake_repo_rx.next().await.unwrap();
+            let _ = fake_engine_rx.next().await.unwrap();
+        })
+        .await
+        .unwrap();
+
+        // Get dynamic port
+        let dynamic_repo_port =
+            fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
+        tmp_port_file.close().unwrap();
+
+        let target_repo_port =
+            if direct_target_connection { dynamic_repo_port } else { DEVICE_PORT };
+
+        let target_repo_url = format!("http://{repo_host}:{target_repo_port}/{REPO_NAME}");
+
+        assert_eq!(
+            fake_repo.take_events(),
+            vec![RepositoryManagerEvent::Add {
+                repo: RepositoryConfig {
+                    mirrors: Some(vec![MirrorConfig {
+                        mirror_url: Some(target_repo_url),
+                        subscribe: Some(true),
+                        ..Default::default()
+                    }]),
+                    repo_url: Some(format!("fuchsia-pkg://{}", REPO_NAME)),
+                    root_keys: Some(vec![fuchsia_repo::test_utils::repo_key().into()]),
+                    root_version: Some(1),
+                    root_threshold: Some(1),
+                    use_local_mirror: Some(false),
+                    storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
+                    ..Default::default()
+                }
+            }],
+        );
+
+        assert_eq!(
+            fake_engine.take_events(),
+            vec![
+                RewriteEngineEvent::ListDynamic,
+                RewriteEngineEvent::IteratorNext,
+                RewriteEngineEvent::ResetAll,
+                RewriteEngineEvent::EditTransactionAdd {
+                    rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                },
+                RewriteEngineEvent::EditTransactionAdd {
+                    rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                },
+                RewriteEngineEvent::EditTransactionCommit,
+            ],
+        );
+
+        let host_repo_url = format!("http://{LOCALHOST}:{dynamic_repo_port}/{REPO_NAME}");
+        // Check repository state.
+        let http_repo = HttpRepository::new(
+            fuchsia_hyper::new_client(),
+            Url::parse(&host_repo_url).unwrap(),
+            Url::parse(&format!("{host_repo_url}/blobs")).unwrap(),
             BTreeSet::new(),
         );
         let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
@@ -1806,12 +1872,14 @@ mod test {
 
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
+        let fake_netstack = Arc::new(FakeNetstack::new());
 
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+                let fake_netstack = fake_netstack.clone();
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
             }),
             target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
@@ -1843,13 +1911,14 @@ mod test {
                 StartCommand {
                     repository: Some(REPO_NAME.to_string()),
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
                     repo_path: Some(tmp_repo_path.into()),
                     product_bundle: None,
                     alias: vec!["example.com".into(), "fuchsia.com".into()],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
                     port_path: Some(tmp_port_file_path),
+                    tunnel_addr: None,
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
@@ -1878,7 +1947,7 @@ mod test {
             fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
         tmp_port_file.close().unwrap();
 
-        let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
+        let repo_url = format!("http://{LOCALHOST}:{dynamic_repo_port}/{REPO_NAME}");
 
         // Check repository state.
         let http_repo = HttpRepository::new(
@@ -1931,8 +2000,10 @@ mod test {
         pb.write(&pb_dir).unwrap();
     }
 
+    #[test_case(true; "direct")]
+    #[test_case(false; "tunnelled")]
     #[fuchsia::test]
-    async fn test_serve_product_bundle() {
+    async fn test_serve_product_bundle(direct_target_connection: bool) {
         let test_env = get_test_env().await;
 
         test_env
@@ -1942,6 +2013,14 @@ mod test {
             .set(TARGET_NODENAME.into())
             .await
             .unwrap();
+
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
 
         let tmp_pb_dir = tempfile::tempdir().unwrap();
         let pb_dir = Utf8Path::from_path(tmp_pb_dir.path()).unwrap().canonicalize_utf8().unwrap();
@@ -1957,12 +2036,15 @@ mod test {
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
         let ftpc = fake_target_proxy.clone();
+        let fake_netstack = Arc::new(FakeNetstack::new());
+        let socket_provider = fake_netstack.new_socket_provider();
 
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+                let fake_netstack = fake_netstack.clone();
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
             }),
             target_factory_closure: Box::new(move || {
                 let fake_target_proxy = ftpc.clone();
@@ -1987,6 +2069,12 @@ mod test {
         let test_stdout = TestBuffer::default();
         let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
 
+        let (listen_addr, repo_host) = if direct_target_connection {
+            (REPO_UNSPECIFIED_IPV4_ADDR, HOST_ADDR)
+        } else {
+            (REPO_LOCALHOST_IPV4_ADDR, LOCALHOST)
+        };
+
         // Run main in background
         let _task = fasync::Task::local(async move {
             serve_impl(
@@ -1997,13 +2085,14 @@ mod test {
                 StartCommand {
                     repository: None,
                     trusted_root: None,
-                    address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+                    address: Some((listen_addr, REPO_PORT).into()),
                     repo_path: None,
                     product_bundle: Some(pb_dir),
                     alias: vec![],
                     storage_type: Some(RepositoryStorageType::Ephemeral),
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
                     port_path: Some(tmp_port_file_path),
+                    tunnel_addr: Some((REPO_LOCALHOST_IPV4_ADDR, DEVICE_PORT).into()),
                     no_device: false,
                     refresh_metadata: false,
                     auto_publish: None,
@@ -2031,13 +2120,15 @@ mod test {
             fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
         tmp_port_file.close().unwrap();
         let repo_base_name = "devhost";
+        let target_repo_port =
+            if direct_target_connection { dynamic_repo_port } else { DEVICE_PORT };
         assert_eq!(
             fake_repo.take_events(),
             ["example.com", "fuchsia.com"].map(|repo_name| RepositoryManagerEvent::Add {
                 repo: RepositoryConfig {
                     mirrors: Some(vec![MirrorConfig {
                         mirror_url: Some(format!(
-                            "http://{REPO_ADDR}:{dynamic_repo_port}/{repo_base_name}.{repo_name}"
+                            "http://{repo_host}:{target_repo_port}/{repo_base_name}.{repo_name}"
                         )),
                         subscribe: Some(true),
                         ..Default::default()
@@ -2056,7 +2147,7 @@ mod test {
         // Check repository state.
         for repo_name in ["example.com", "fuchsia.com"] {
             let repo_url =
-                format!("http://{REPO_ADDR}:{dynamic_repo_port}/{repo_base_name}.{repo_name}");
+                format!("http://{LOCALHOST}:{dynamic_repo_port}/{repo_base_name}.{repo_name}");
             let http_repo = HttpRepository::new(
                 fuchsia_hyper::new_client(),
                 Url::parse(&repo_url).unwrap(),
@@ -2066,6 +2157,24 @@ mod test {
             let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
 
             assert_matches!(repo_client.update().await, Ok(true));
+        }
+
+        // Check repository state from the tunnel as well.
+        if !direct_target_connection {
+            for repo_name in ["example.com", "fuchsia.com"] {
+                let repo_url =
+                    format!("http://{repo_host}:{target_repo_port}/{repo_base_name}.{repo_name}");
+                let http_repo = HttpRepository::new(
+                    ffx_target_net_testutil::TargetHyperConnector::new(socket_provider.clone())
+                        .into_client(),
+                    Url::parse(&repo_url).unwrap(),
+                    Url::parse(&format!("{repo_url}/blobs")).unwrap(),
+                    BTreeSet::new(),
+                );
+                let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
+
+                assert_matches!(repo_client.update().await, Ok(true));
+            }
         }
     }
 
@@ -2136,12 +2245,14 @@ mod test {
         let (_, fake_target_proxy, _) = FakeTarget::new(None);
         let frc = fake_repo.clone();
         let fec = fake_engine.clone();
+        let fake_netstack = Arc::new(FakeNetstack::new());
 
         let fake_injector = FakeInjector {
             remote_factory_closure: Box::new(move || {
                 let fake_repo = frc.clone();
                 let fake_engine = fec.clone();
-                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine)) })
+                let fake_netstack = fake_netstack.clone();
+                Box::pin(async move { Ok(FakeRcs::new(fake_repo, fake_engine, fake_netstack)) })
             }),
             target_factory_closure: Box::new(move || {
                 let fake_target_proxy = fake_target_proxy.clone();
@@ -2159,13 +2270,14 @@ mod test {
         let serve_cmd_without_root = StartCommand {
             repository: Some(REPO_NAME.to_string()),
             trusted_root: None,
-            address: Some((REPO_IPV4_ADDR, REPO_PORT).into()),
+            address: Some((REPO_LOCALHOST_IPV4_ADDR, REPO_PORT).into()),
             repo_path: Some(tmp_repo_path.into()),
             product_bundle: None,
             alias: vec![],
             storage_type: None,
             alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             port_path: Some(tmp_port_file.path().to_owned()),
+            tunnel_addr: None,
             no_device: true,
             refresh_metadata: false,
             auto_publish: None,
@@ -2226,7 +2338,7 @@ mod test {
             fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
         tmp_port_file.close().unwrap();
 
-        let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
+        let repo_url = format!("http://{LOCALHOST}:{dynamic_repo_port}/{REPO_NAME}");
 
         // Check repository state.
         let http_repo = HttpRepository::new(

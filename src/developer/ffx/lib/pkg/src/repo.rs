@@ -4,6 +4,7 @@
 
 use crate::PkgServerInfo;
 use async_lock::RwLock;
+use ffx_target_net::{SocketProvider, TargetTcpListener};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_ext::{
@@ -83,33 +84,16 @@ pub async fn register_target_with_repo_instance(
     repo_proxy: RepositoryManagerProxy,
     rewrite_engine_proxy: EngineProxy,
     repo_target_info: &RepositoryTarget,
-    target: &ffx::TargetInfo,
-    repo_server_listen_addr: SocketAddr,
+    repo_host: &str,
     repo_instance: &PkgServerInfo,
     alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
 ) -> Result<(), RepositoryError> {
     let repo_name: &str = &repo_target_info.repo_name;
-    let target_ssh_host_address = target.ssh_host_address.clone();
 
     log::info!(
         "Registering repository {:?} for target {:?}",
         repo_name,
         repo_target_info.target_identifier
-    );
-
-    // Before we register the repository, we need to decide which address the
-    // target device should use to reach the repository. If the server is
-    // running on a loopback device, then a tunnel will be created for the
-    // device to access the server.
-    let (_, repo_host_addr) = create_repo_host(
-        repo_server_listen_addr,
-        target_ssh_host_address.ok_or_else(|| {
-            log::error!(
-                "target {:?} does not have a host address",
-                repo_target_info.target_identifier
-            );
-            RepositoryError::TargetCommunicationFailure
-        })?,
     );
 
     let aliases = {
@@ -146,7 +130,7 @@ pub async fn register_target_with_repo_instance(
         subscribe = subscribe || m.subscribe();
     }
     // now add repo_host_addr as the mirror
-    let mirror_url = format!("http://{repo_host_addr}/{}", repo_instance.name);
+    let mirror_url = format!("http://{repo_host}/{}", repo_instance.name);
     let mirror_url: http::Uri = mirror_url.parse().map_err(|err| {
         log::error!("failed to parse mirror url {}: {:#}", mirror_url, err);
         RepositoryError::InvalidUrl
@@ -234,33 +218,16 @@ pub async fn register_target_with_fidl_proxies(
     repo_proxy: RepositoryManagerProxy,
     rewrite_engine_proxy: EngineProxy,
     repo_target_info: &RepositoryTarget,
-    target: &ffx::TargetInfo,
-    repo_server_listen_addr: SocketAddr,
+    repo_host: &str,
     repo: &Arc<RwLock<RepoClient<Box<dyn RepoProvider>>>>,
     _alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
 ) -> Result<(), RepositoryError> {
     let repo_name: &str = &repo_target_info.repo_name;
-    let target_ssh_host_address = target.ssh_host_address.clone();
 
     log::info!(
         "Registering repository {:?} for target {:?}",
         repo_name,
         repo_target_info.target_identifier
-    );
-
-    // Before we register the repository, we need to decide which address the
-    // target device should use to reach the repository. If the server is
-    // running on a loopback device, then a tunnel will be created for the
-    // device to access the server.
-    let (_, repo_host) = create_repo_host(
-        repo_server_listen_addr,
-        target_ssh_host_address.ok_or_else(|| {
-            log::error!(
-                "target {:?} does not have a host address",
-                repo_target_info.target_identifier
-            );
-            RepositoryError::TargetCommunicationFailure
-        })?,
     );
 
     // Make sure the repository is up to date.
@@ -389,19 +356,32 @@ async fn create_aliases_fidl(
     Ok(())
 }
 
+pub enum RepoHostAddr {
+    Direct(String),
+    Tunnel,
+}
+
 /// Decide which repo host we should use when creating a repository config, and
 /// whether or not we need to create a tunnel in order for the device to talk to
 /// the repository.
 pub fn create_repo_host(
     listen_addr: SocketAddr,
-    host_address: ffx::SshHostAddrInfo,
-) -> (bool, String) {
+    host_address: Option<&ffx::SshHostAddrInfo>,
+) -> Result<RepoHostAddr, RepositoryError> {
     // We need to decide which address the target device should use to reach the
     // repository. If the server is running on a loopback device, then we need
     // to create a tunnel for the device to access the server.
     if listen_addr.ip().is_loopback() {
-        return (true, listen_addr.to_string());
+        return Ok(RepoHostAddr::Tunnel);
     }
+
+    let Some(host_address) = host_address else {
+        if !listen_addr.ip().is_unspecified() {
+            // No way to set up a tunnel that we can use for sure.
+            return Err(RepositoryError::TargetCommunicationFailure);
+        }
+        return Ok(RepoHostAddr::Tunnel);
+    };
 
     // However, if it's not a loopback address, then configure the device to
     // communicate by way of the ssh host's address. This is helpful when the
@@ -425,7 +405,29 @@ pub fn create_repo_host(
         format!("{}:{}", host_address.address, listen_addr.port())
     };
 
-    (false, repo_host)
+    Ok(RepoHostAddr::Direct(repo_host))
+}
+
+/// Like [`create_repo_host`] but resolves the [`RepoHostAddr::Tunnel`] case to
+/// create a [`TargetTcpListener`] for tunneling connections from the target
+/// when needed.
+pub async fn create_repo_host_and_listener(
+    listen_addr: SocketAddr,
+    host_address: Option<&ffx::SshHostAddrInfo>,
+    socket_provider: &SocketProvider,
+    tunnel_addr: SocketAddr,
+) -> Result<(String, Option<TargetTcpListener>), RepositoryError> {
+    match create_repo_host(listen_addr, host_address)? {
+        RepoHostAddr::Direct(d) => Ok((d, None)),
+        RepoHostAddr::Tunnel => {
+            let listener = socket_provider.listen(tunnel_addr, None).await.map_err(|err| {
+                log::error!("failed to create TCP listener with target: {:#}", err);
+                RepositoryError::TargetCommunicationFailure
+            })?;
+            let addr = listener.local_addr().to_string();
+            Ok((addr, Some(listener)))
+        }
+    }
 }
 
 #[cfg(test)]

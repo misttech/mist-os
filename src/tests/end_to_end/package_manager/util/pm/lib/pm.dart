@@ -91,8 +91,12 @@ class PackageManagerRepo {
   /// server` has successfully started.
   ///
   /// Returns `true` if serve startup was successful.
-  Future<bool> tryServe(String repoName, int port) async {
+  Future<bool> tryServe(String repoName, bool bindLoopback, int port) async {
     await stopServer();
+    var address = '[::]';
+    if (bindLoopback) {
+      address = '[::1]';
+    }
     final port_path = _repoPath + '/port';
     final process = await Process.start(
         _ffxPath + "/ffx",
@@ -106,7 +110,7 @@ class PackageManagerRepo {
           '--repo-path',
           _repoPath,
           '--address',
-          '[::]:$port',
+          '$address:$port',
           '--port-path',
           port_path,
         ]));
@@ -137,18 +141,20 @@ class PackageManagerRepo {
   /// Start a package server using `ffx repository server` with serve-selected
   /// port.
   ///
-  /// Passes in `--address [::]:0` to tell `ffx repository` to choose its own
+  /// Passes in `--address <address>:0` to tell `ffx repository` to choose its own
   /// port.
   ///
   /// Does not return until the serve begins listening, or times out.
   ///
+  /// Address is `[::]` or `[::1]` depending on bindLoopback.
+  ///
   /// Uses these commands:
-  /// `ffx repository server start --foreground --address [::]:0`
-  Future<void> startServer(String repoName) async {
+  /// `ffx repository server start --foreground --address <address>>:0`
+  Future<void> startServer(String repoName, {bool bindLoopback = false}) async {
     _log.info('Server is starting.');
     final retryOptions = RetryOptions(maxAttempts: 5);
     await retryOptions.retry(() async {
-      if (!await tryServe(repoName, 0)) {
+      if (!await tryServe(repoName, bindLoopback, 0)) {
         throw Exception(
             'Attempt to bringup `ffx repository server` has failed.');
       }
@@ -160,13 +166,16 @@ class PackageManagerRepo {
   ///
   /// Does not return until the serve begins listening, or times out.
   ///
+  /// Address is `[::]` or `[::1]` depending on bindLoopback.
+  ///
   /// Uses these commands:
-  /// `ffx repository server start --foreground --address [::]:<port number>`
-  Future<void> startServerUnusedPort(String repoName) async {
+  /// `ffx repository server start --foreground --address <address>:<port number>`
+  Future<void> startServerUnusedPort(String repoName,
+      {bool bindLoopback = false}) async {
     await getUnusedPort<bool>((unusedPort) async {
       _log.info('Serve is starting on port: $unusedPort');
       try {
-        if (await tryServe(repoName, unusedPort)) {
+        if (await tryServe(repoName, bindLoopback, unusedPort)) {
           return true;
         }
       } catch (e) {
@@ -355,10 +364,10 @@ class PackageManagerRepo {
     return true;
   }
 
-  Future<bool> setupServe(
-      String farPath, String manifestPath, String repoName) async {
+  Future<bool> setupServe(String farPath, String manifestPath, String repoName,
+      {bool bindLoopback = false}) async {
     await setupRepo(farPath, manifestPath);
-    await startServerUnusedPort(repoName);
+    await startServerUnusedPort(repoName, bindLoopback: bindLoopback);
     return true;
   }
 

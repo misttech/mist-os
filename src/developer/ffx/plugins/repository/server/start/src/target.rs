@@ -9,6 +9,7 @@ use camino::Utf8Path;
 use ffx_command_error::{return_user_error, Result};
 use ffx_repository_server_start_args::StartCommand;
 use ffx_target::knock_target;
+use ffx_target_net::TargetTcpStream;
 use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
@@ -17,10 +18,13 @@ use fidl_fuchsia_pkg_ext::{
 };
 use fidl_fuchsia_pkg_rewrite::EngineMarker;
 use fuchsia_repo::manager::RepositoryManager;
-use futures::{pin_mut, select, FutureExt, StreamExt};
-use pkg::repo::register_target_with_fidl_proxies;
+use fuchsia_repo::server::ConnectionStream;
+use futures::channel::mpsc;
+use futures::{pin_mut, select, FutureExt, SinkExt, Stream, StreamExt};
+use pkg::repo;
 use std::collections::BTreeSet;
 use std::io::Write;
+use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
 use target_connector::Connector;
@@ -41,7 +45,8 @@ async fn connect_to_target(
     repo_manager: Arc<RepositoryManager>,
     rcs_proxy: &RemoteControlProxy,
     alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
-) -> Result<(), anyhow::Error> {
+    tunnel_addr: std::net::SocketAddr,
+) -> Result<impl Stream<Item = anyhow::Result<TargetTcpStream>>, anyhow::Error> {
     let repo_proxy = rcs::connect_to_protocol::<RepositoryManagerMarker>(
         connect_timeout,
         REPOSITORY_MANAGER_MONIKER,
@@ -54,6 +59,19 @@ async fn connect_to_target(
         rcs::connect_to_protocol::<EngineMarker>(connect_timeout, ENGINE_MONIKER, &rcs_proxy)
             .await
             .with_context(|| format!("binding engine to stream on {:?}", target_spec))?;
+
+    let port_forward = ffx_target_net::SocketProvider::new_with_rcs(connect_timeout, &rcs_proxy)
+        .await
+        .with_context(|| format!("connecting to socket provider protocols {:?}", target_spec))?;
+
+    let (repo_host, forwarding_stream) = repo::create_repo_host_and_listener(
+        repo_server_listen_addr,
+        target_info.ssh_host_address.as_ref(),
+        &port_forward,
+        tunnel_addr,
+    )
+    .await
+    .with_context(|| format!("resolving repository rost on {:?}", target_spec))?;
 
     for (repo_name, repo) in repo_manager.repositories() {
         let repo_spec = repo.read().await.spec();
@@ -72,19 +90,20 @@ async fn connect_to_target(
         let repo_target_info = RepositoryTarget::try_from(repo_target)
             .map_err(|e| anyhow!("Failed to build RepositoryTarget: {:?}", e))?;
 
-        register_target_with_fidl_proxies(
+        repo::register_target_with_fidl_proxies(
             repo_proxy.clone(),
             engine_proxy.clone(),
             &repo_target_info,
-            &target_info,
-            repo_server_listen_addr,
+            &repo_host,
             &repo,
             alias_conflict_mode.clone(),
         )
         .await
         .map_err(|e| anyhow!("Failed to register repository: {:?}", e))?;
     }
-    Ok(())
+    Ok(forwarding_stream
+        .map(|s| s.into_stream().map(|r| r.context("target tcp listener")).left_stream())
+        .unwrap_or_else(|| futures::stream::pending().right_stream()))
 }
 
 async fn inner_connect_loop(
@@ -96,6 +115,8 @@ async fn inner_connect_loop(
     rcs_proxy: &Connector<RemoteControlProxyHolder>,
     target_proxy: &Connector<TargetProxyHolder>,
     writer: &mut impl Write,
+    tunnel_addr: core::net::SocketAddr,
+    connection_sink: &mut mpsc::UnboundedSender<anyhow::Result<ConnectionStream>>,
 ) -> Result<()> {
     let mut target_spec_from_rcs_proxy: Option<String> = None;
     let rcs_proxy = timeout(
@@ -161,10 +182,11 @@ async fn inner_connect_loop(
         Arc::clone(&repo_manager),
         &rcs_proxy,
         cmd.alias_conflict_mode.clone(),
+        tunnel_addr,
     )
     .await;
     match connection {
-        Ok(()) => {
+        Ok(proxy_stream) => {
             let s = match target_spec_from_rcs_proxy {
                 Some(t) => format!(
                     "Serving repository '{repo_path}' to target '{t}' over address '{}'.",
@@ -178,20 +200,34 @@ async fn inner_connect_loop(
                 log::error!("Failed to write to output: {:?}", e);
             }
             log::info!("{}", s);
-            loop {
-                fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
-                match knock_target(&target_proxy).await {
-                    Ok(()) => {
-                        // Nothing to do, continue checking connection
-                    }
-                    Err(e) => {
-                        let s = format!("Connection to target lost, retrying. Error: {}", e);
-                        if let Err(e) = writeln!(writer, "{}", s) {
-                            log::error!("Failed to write to output: {:?}", e);
+
+            let mut timer_knock = pin!(async {
+                loop {
+                    fuchsia_async::Timer::new(std::time::Duration::from_secs(10)).await;
+                    match knock_target(&target_proxy).await {
+                        Ok(()) => {
+                            // Nothing to do, continue checking connection
                         }
-                        log::warn!("{}", s);
-                        break;
+                        Err(e) => {
+                            let s = format!("Connection to target lost, retrying. Error: {}", e);
+                            if let Err(e) = writeln!(writer, "{}", s) {
+                                log::error!("Failed to write to output: {:?}", e);
+                            }
+                            log::warn!("{}", s);
+                            break;
+                        }
                     }
+                }
+            }
+            .fuse());
+            let mut proxy_drive = pin!(proxy_stream
+                .map(|t| Ok(t.map(ConnectionStream::TargetTcp)))
+                .forward(connection_sink.sink_map_err(|e| anyhow!("connection sink error: {e:?}")),)
+                .fuse());
+            select! {
+                () = timer_knock => {},
+                r = proxy_drive => {
+                    log::error!("driving forwarded connections exited unexpectedly: {r:?}")
                 }
             }
         }
@@ -212,6 +248,8 @@ pub(crate) async fn main_connect_loop(
     rcs_proxy: Connector<RemoteControlProxyHolder>,
     target_proxy: Connector<TargetProxyHolder>,
     writer: &mut (impl Write + 'static),
+    tunnel_addr: core::net::SocketAddr,
+    mut connection_sink: mpsc::UnboundedSender<anyhow::Result<ConnectionStream>>,
 ) -> Result<()> {
     // We try to reconnect unless MAX_CONSECUTIVE_CONNECT_ATTEMPTS reconnect
     // attempts in immediate succession fail.
@@ -242,6 +280,8 @@ pub(crate) async fn main_connect_loop(
             &rcs_proxy,
             &target_proxy,
             writer,
+            tunnel_addr,
+            &mut connection_sink,
         )
         .fuse();
 

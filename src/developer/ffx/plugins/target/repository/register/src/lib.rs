@@ -11,7 +11,7 @@ use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
 use fidl_fuchsia_pkg_ext::RepositoryTarget;
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
-use pkg::repo::register_target_with_repo_instance;
+use pkg::repo::{register_target_with_repo_instance, RepoHostAddr};
 use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -67,6 +67,8 @@ impl FfxMain for RegisterTool {
         }
     }
 }
+
+const TUNNEL_REQUIRED_ERROR: &'static str = "Tunnel required";
 
 impl RegisterTool {
     pub async fn register_cmd(&self) -> Result<()> {
@@ -140,19 +142,34 @@ impl RegisterTool {
             Some(aliases) => Some(aliases),
         };
 
-        let target_info: TargetInfo = timeout(Duration::from_secs(2), self.target_proxy.identity())
-            .await
-            .bug_context("Timed out getting target identity")?
-            .bug_context("Failed to get target identity")?;
+        let repo_host_addr = match &self.cmd.address_override {
+            Some(addr_override) => addr_override.to_string(),
+            None => {
+                let target_info: TargetInfo =
+                    timeout(Duration::from_secs(2), self.target_proxy.identity())
+                        .await
+                        .bug_context("Timed out getting target identity")?
+                        .bug_context("Failed to get target identity")?;
 
-        let repo_server_listen_addr = info.address;
+                match pkg::repo::create_repo_host(
+                    info.address,
+                    target_info.ssh_host_address.as_ref(),
+                )
+                .bug_context("Failed to discover repository host")?
+                {
+                    RepoHostAddr::Direct(addr) => addr,
+                    RepoHostAddr::Tunnel => {
+                        return Err(fho::user_error!(TUNNEL_REQUIRED_ERROR));
+                    }
+                }
+            }
+        };
 
         register_target_with_repo_instance(
             self.repo_proxy.clone(),
             self.engine_proxy.clone(),
             &repo_target_info,
-            &target_info,
-            repo_server_listen_addr,
+            &repo_host_addr,
             &info,
             self.cmd.alias_conflict_mode.clone(),
         )
@@ -184,7 +201,7 @@ mod test {
     use futures::TryStreamExt;
     use pkg::ServerMode;
     use std::collections::BTreeSet;
-    use std::net::IpAddr;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use target_holders::fake_proxy;
 
     const REPO_NAME: &str = "some-name";
@@ -337,7 +354,9 @@ mod test {
         (repos, receiver)
     }
 
-    async fn setup_fake_target_proxy() -> (TargetProxy, Receiver<Result<(), i32>>) {
+    fn setup_fake_target_proxy_with(
+        ssh_host_address: Option<SshHostAddrInfo>,
+    ) -> (TargetProxy, Receiver<Result<(), i32>>) {
         let (sender, receiver) = channel();
         let mut _sender = Some(sender);
         let repos = fake_proxy(move |req| match req {
@@ -352,7 +371,7 @@ mod test {
                     .send(&TargetInfo {
                         nodename: Some("target-nodename".into()),
                         addresses: Some(vec![addr.into()]),
-                        ssh_host_address: Some(SshHostAddrInfo { address: "127.7.7.1:22".into() }),
+                        ssh_host_address: ssh_host_address.clone(),
                         age_ms: Some(101),
                         ..Default::default()
                     })
@@ -361,6 +380,10 @@ mod test {
             other => panic!("Unexpected request: {:?}", other),
         });
         (repos, receiver)
+    }
+
+    fn setup_fake_target_proxy() -> (TargetProxy, Receiver<Result<(), i32>>) {
+        setup_fake_target_proxy_with(Some(SshHostAddrInfo { address: "127.7.7.1".into() }))
     }
 
     async fn make_server_instance(
@@ -385,7 +408,7 @@ mod test {
 
         mgr.write_instance(&PkgServerInfo {
             name: name.into(),
-            address: ([127, 0, 0, 1], 8888).into(),
+            address: ([0, 0, 0, 0], 8888).into(),
             repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::from("/some/repo/path"), aliases },
             registration_storage_type: fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut
@@ -403,7 +426,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         let aliases = vec![String::from("my-alias")];
 
@@ -431,6 +454,7 @@ mod test {
                 alias: aliases.clone(),
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -451,7 +475,7 @@ mod test {
             repo_url: Some("fuchsia-pkg://test-repo.fuchsia.com".into()),
             root_keys: Some(vec![]),
             mirrors: Some(vec![MirrorConfig {
-                mirror_url: Some("http://127.0.0.1:8888/test-repo.fuchsia.com".into()),
+                mirror_url: Some("http://127.7.7.1:8888/test-repo.fuchsia.com".into()),
                 subscribe: Some(false),
                 blob_mirror_url: None,
                 ..Default::default()
@@ -472,7 +496,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(Some(expected_config), false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(Some(expected_rule)).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         let mut aliases = BTreeSet::new();
         aliases.insert("fuchsia.com".into());
@@ -507,6 +531,7 @@ mod test {
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -547,7 +572,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         let tool = RegisterTool {
             cmd: RegisterCommand {
@@ -556,6 +581,7 @@ mod test {
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -574,7 +600,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         let aliases = vec![String::from("my-alias")];
 
@@ -602,6 +628,7 @@ mod test {
                 alias: aliases.clone(),
                 storage_type: Some(RepositoryStorageType::Persistent),
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -620,7 +647,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         env.context
             .query(TARGET_DEFAULT_KEY)
@@ -646,6 +673,7 @@ mod test {
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -679,7 +707,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(None, true).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         let tool = RegisterTool {
             cmd: RegisterCommand {
@@ -688,6 +716,7 @@ mod test {
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -724,7 +753,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(None, true).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         let tool = RegisterTool {
             cmd: RegisterCommand {
@@ -733,6 +762,7 @@ mod test {
                 alias: vec![],
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -761,7 +791,7 @@ mod test {
 
         let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
         let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
-        let (target_proxy, _) = setup_fake_target_proxy().await;
+        let (target_proxy, _) = setup_fake_target_proxy();
 
         make_server_instance(
             env.isolate_root.path(),
@@ -789,6 +819,7 @@ mod test {
                 alias: aliases.clone(),
                 storage_type: None,
                 alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
             },
             context: env.context.clone(),
             repo_proxy,
@@ -809,5 +840,109 @@ mod test {
         <RegisterTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
 
         assert_eq!(json, serde_json::json!({"ok":{}}));
+    }
+
+    #[fuchsia::test]
+    async fn test_tunnel_required() {
+        let env = ffx_config::test_init().await.expect("test env");
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(TARGET_NAME.into())
+            .await
+            .expect("set default target");
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
+
+        let (repo_proxy, _) = setup_fake_repo_proxy(None, false).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
+        let (target_proxy, _) = setup_fake_target_proxy_with(None);
+
+        let tool = RegisterTool {
+            cmd: RegisterCommand {
+                repository: Some(REPO_NAME.to_string()),
+                port: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: None,
+            },
+            context: env.context.clone(),
+            repo_proxy,
+            engine_proxy,
+            target_proxy: target_proxy.into(),
+        };
+        let buffers = TestBuffers::default();
+        let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
+
+        let err = tool.main(writer).await.expect_err("register error");
+        assert_eq!(err.to_string(), TUNNEL_REQUIRED_ERROR);
+    }
+
+    #[fuchsia::test]
+    async fn test_address_override() {
+        let env = ffx_config::test_init().await.expect("test env");
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(TARGET_NAME.into())
+            .await
+            .expect("set default target");
+
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
+
+        let addr_override = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1313);
+        let expected_config = RepositoryConfig {
+            repo_url: Some("fuchsia-pkg://some-name".into()),
+            root_keys: Some(vec![]),
+            mirrors: Some(vec![MirrorConfig {
+                mirror_url: Some(format!("http://{addr_override}/some-name")),
+                subscribe: Some(false),
+                blob_mirror_url: None,
+                ..Default::default()
+            }]),
+            root_version: Some(1),
+            root_threshold: Some(1),
+            use_local_mirror: Some(false),
+            storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
+            ..Default::default()
+        };
+
+        let (repo_proxy, _) = setup_fake_repo_proxy(Some(expected_config), false).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
+        // A target with no ssh host address would require a tunnel.
+        let (target_proxy, _) = setup_fake_target_proxy_with(None);
+        let tool = RegisterTool {
+            cmd: RegisterCommand {
+                repository: Some(REPO_NAME.to_string()),
+                port: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                address_override: Some(addr_override),
+            },
+            context: env.context.clone(),
+            repo_proxy,
+            engine_proxy,
+            target_proxy: target_proxy.into(),
+        };
+        let buffers = TestBuffers::default();
+        let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
+        tool.main(writer).await.expect("succeeds");
     }
 }

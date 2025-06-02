@@ -5,5 +5,7 @@
 //! Test utilities for interacting with [`ffx_target_net`].
 
 mod fake_netstack;
+mod hyper_connector;
 
 pub use fake_netstack::FakeNetstack;
+pub use hyper_connector::TargetHyperConnector;
