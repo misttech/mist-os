@@ -118,6 +118,19 @@ fit::result<int, std::string> GetLabel(const std::string& path) {
   return fit::ok(RemoveTrailingNul(std::string(buf, result)));
 }
 
+fit::result<int, bool> IsSelinuxNullInode(int fd) {
+  struct stat null_file_info;
+  if (stat("/sys/fs/selinux/null", &null_file_info) < 0) {
+    return fit::error(errno);
+  }
+  struct stat fd_info;
+  if (fstat(fd, &fd_info) < 0) {
+    return fit::error(errno);
+  }
+  return fit::ok(null_file_info.st_dev == fd_info.st_dev &&
+                 null_file_info.st_ino == fd_info.st_ino);
+}
+
 ScopedEnforcement ScopedEnforcement::SetEnforcing() {
   return ScopedEnforcement(/*enforcing=*/true);
 }

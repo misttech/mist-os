@@ -39,6 +39,10 @@ fit::result<int, std::string> GetLabel(int fd);
 /// The trailing NUL, if any, will be stripped before the label is returned.
 fit::result<int, std::string> GetLabel(const std::string& path);
 
+/// Checks whether a file descriptor maps to the `/sys/fs/selinux/null` file.
+/// Returns an `errno` on failure.
+fit::result<int, bool> IsSelinuxNullInode(int fd);
+
 /// Runs the given action in a forked process after transitioning to |label|. This requires some
 /// rules to be set-up. For transitions from unconfined_t (the starting label for tests), giving
 /// them the `test_a` attribute from `test_policy.conf` is sufficient.
