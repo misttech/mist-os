@@ -1183,13 +1183,12 @@ fn trim_to_last_char_boundary(string: &str, max_len: usize) -> &[u8] {
 // The resulting `trace_string_ref_t` only lives as long as the input `string`.
 #[inline]
 fn trace_make_inline_string_ref(string: &str) -> sys::trace_string_ref_t {
-    let len = string.len() as u32;
+    let len = string.len() as u16;
     if len == 0 {
         return trace_make_empty_string_ref();
     }
 
-    let string =
-        trim_to_last_char_boundary(string, sys::TRACE_ENCODED_STRING_REF_MAX_LENGTH as usize);
+    let string = trim_to_last_char_boundary(string, sys::TRACE_ENCODED_STRING_REF_MAX_LENGTH);
 
     sys::trace_string_ref_t {
         encoded_value: sys::TRACE_ENCODED_STRING_REF_INLINE_FLAG | len,
@@ -1637,11 +1636,11 @@ mod sys {
     pub type trace_context_t = libc::c_void;
     pub type trace_prolonged_context_t = libc::c_void;
 
-    pub type trace_encoded_string_ref_t = u32;
+    pub type trace_encoded_string_ref_t = u16;
     pub const TRACE_ENCODED_STRING_REF_EMPTY: trace_encoded_string_ref_t = 0;
     pub const TRACE_ENCODED_STRING_REF_INLINE_FLAG: trace_encoded_string_ref_t = 0x8000;
     pub const TRACE_ENCODED_STRING_REF_LENGTH_MASK: trace_encoded_string_ref_t = 0x7fff;
-    pub const TRACE_ENCODED_STRING_REF_MAX_LENGTH: trace_encoded_string_ref_t = 32000;
+    pub const TRACE_ENCODED_STRING_REF_MAX_LENGTH: usize = 32000;
     pub const TRACE_ENCODED_STRING_REF_MIN_INDEX: trace_encoded_string_ref_t = 0x1;
     pub const TRACE_ENCODED_STRING_REF_MAX_INDEX: trace_encoded_string_ref_t = 0x7fff;
 
