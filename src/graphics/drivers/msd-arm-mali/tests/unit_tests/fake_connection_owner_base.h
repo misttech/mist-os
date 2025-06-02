@@ -9,22 +9,22 @@
 
 class FakeConnectionOwnerBase : public MsdArmConnection::Owner {
  public:
-  ArmMaliCacheCoherencyStatus cache_coherency_status() override {
+  ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() override {
     return kArmMaliCacheCoherencyNone;
   }
-  bool IsProtectedModeSupported() override { return false; }
-  void DeregisterConnection() override {}
-  void SetCurrentThreadToDefaultPriority() override {}
+  bool NdtIsProtectedModeSupported() override { return false; }
+  void NdtDeregisterConnection() override {}
+  void NdtSetCurrentThreadToDefaultPriority() override {}
   PerformanceCounters* performance_counters() override { return nullptr; }
-  std::shared_ptr<DeviceRequest::Reply> RunTaskOnDeviceThread(FitCallbackTask task) override {
+  std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) override {
     // This implementation runs the callback immediately.
     auto real_task = std::make_unique<DeviceRequest>();
     auto reply = real_task->GetReply();
     reply->Signal(task(nullptr));
     return reply;
   }
-  std::thread::id GetDeviceThreadId() override { return std::this_thread::get_id(); }
-  msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
+  std::thread::id NdtGetDeviceThreadId() override { return std::this_thread::get_id(); }
+  msd::MagmaMemoryPressureLevel NdtGetCurrentMemoryPressureLevel() override {
     // Only for testing.
     return msd::MAGMA_MEMORY_PRESSURE_LEVEL_NORMAL;
   }

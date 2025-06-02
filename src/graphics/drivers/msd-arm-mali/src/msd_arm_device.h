@@ -73,7 +73,7 @@ class MsdArmDevice : public msd::Device,
   bool Init(msd::DeviceHandle* device_handle);
   bool Init(ParentDevice* platform_device, std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
 
-  std::shared_ptr<MsdArmConnection> OpenArmConnection(msd::msd_client_id_t client_id);
+  std::shared_ptr<MsdArmConnection> NdtOpenArmConnection(msd::msd_client_id_t client_id);
 
   uint64_t GpuId() { return gpu_features_.gpu_id.reg_value(); }
 
@@ -135,7 +135,7 @@ class MsdArmDevice : public msd::Device,
   void Dump(DumpState* dump_state, bool from_device_thread);
   void DumpToString(std::vector<std::string>* dump_string, bool from_device_thread);
   void FormatDump(DumpState& dump_state, std::vector<std::string>* dump_string);
-  void DumpStatusToLog();
+  void NdtPostDumpStatusToLog();
   magma::Status ProcessTimestampRequest(std::shared_ptr<magma::PlatformBuffer> buffer);
 
   // FuchsiaPowerManager::Owner implementation.
@@ -145,8 +145,6 @@ class MsdArmDevice : public msd::Device,
   void RefCycleCounter();
   void DerefCycleCounter();
 
-  magma::Status QueryTimestamp(std::unique_ptr<magma::PlatformBuffer> buffer);
-
   FuchsiaPowerManager::PowerGoals GetPowerGoals() {
     if (fuchsia_power_manager_) {
       return fuchsia_power_manager_->GetPowerGoals();
@@ -155,18 +153,27 @@ class MsdArmDevice : public msd::Device,
   }
 
   // MsdArmConnection::Owner implementation.
-  void ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override;
-  void CancelAtoms(std::shared_ptr<MsdArmConnection> connection) override;
-  AddressSpaceObserver* GetAddressSpaceObserver() override { return address_manager_.get(); }
-  ArmMaliCacheCoherencyStatus cache_coherency_status() override { return cache_coherency_status_; }
+  void NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override;
+  void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) override;
+  AddressSpaceObserver* NdtGetAddressSpaceObserver() override {
+    // The AddressSpaceObserver implementation must be threadsafe.
+    return address_manager_.get();
+  }
+  ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() override {
+    // Only mutated during device initialization.
+    return cache_coherency_status_;
+  }
   magma::PlatformBusMapper* GetBusMapper() override { return bus_mapper_.get(); }
-  bool IsProtectedModeSupported() override;
-  void DeregisterConnection() override;
-  void SetCurrentThreadToDefaultPriority() override;
+  bool NdtIsProtectedModeSupported() override;
+  void NdtDeregisterConnection() override;
+  void NdtSetCurrentThreadToDefaultPriority() override;
   PerformanceCounters* performance_counters() override { return perf_counters_.get(); }
-  std::shared_ptr<DeviceRequest::Reply> RunTaskOnDeviceThread(FitCallbackTask task) override;
-  std::thread::id GetDeviceThreadId() override { return device_thread_.get_id(); }
-  msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
+  std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) override;
+  std::thread::id NdtGetDeviceThreadId() override {
+    // Only mutated during device init and shutdown.
+    return device_thread_.get_id();
+  }
+  msd::MagmaMemoryPressureLevel NdtGetCurrentMemoryPressureLevel() override {
     std::lock_guard lock(connection_list_mutex_);
     return current_memory_pressure_level_;
   }
@@ -174,8 +181,9 @@ class MsdArmDevice : public msd::Device,
   // PowerManager::Owner implementation
   void ReportPowerChangeComplete(bool powered_on, bool success) override;
 
-  magma_status_t QueryInfo(uint64_t id, uint64_t* value_out);
-  magma_status_t QueryReturnsBuffer(uint64_t id, uint32_t* buffer_out);
+  magma_status_t NdtQueryInfo(uint64_t id, uint64_t* value_out);
+  magma_status_t NdtQueryReturnsBuffer(uint64_t id, uint32_t* buffer_out);
+  magma::Status NdtPostTimestampQuery(std::unique_ptr<magma::PlatformBuffer> buffer);
 
   // PerformanceCounters::Owner implementation.
   AddressManager* address_manager() override { return address_manager_.get(); }
@@ -339,11 +347,13 @@ class MsdArmDevice : public msd::Device,
   std::unique_ptr<magma::PlatformInterrupt> job_interrupt_;
   std::unique_ptr<magma::PlatformInterrupt> mmu_interrupt_;
 
+  // The following are mutated only during device init.
   MaliProperties mali_properties_{};
-  GpuFeatures gpu_features_;
   ArmMaliCacheCoherencyStatus cache_coherency_status_ = kArmMaliCacheCoherencyNone;
-  std::unique_ptr<magma::PlatformBuffer> device_properties_buffer_;
+  // TODO(b/417848695) - refactor, currently this is written by device thread and read from Ndt
+  GpuFeatures gpu_features_;
 
+  std::unique_ptr<magma::PlatformBuffer> device_properties_buffer_;
   std::unique_ptr<PowerManager> power_manager_;
   std::unique_ptr<AddressManager> address_manager_;
   std::unique_ptr<JobScheduler> scheduler_;

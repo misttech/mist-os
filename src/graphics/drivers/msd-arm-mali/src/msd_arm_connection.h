@@ -44,20 +44,24 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
  public:
   class Owner {
    public:
-    virtual void ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) = 0;
-    virtual void CancelAtoms(std::shared_ptr<MsdArmConnection> connection) = 0;
-    virtual AddressSpaceObserver* GetAddressSpaceObserver() = 0;
-    virtual ArmMaliCacheCoherencyStatus cache_coherency_status() = 0;
+    // Method names should be Ndt (Not Device Thread) prefixed to indicate that these
+    // are called from a connection thread and their implementation must be threadsafe.
+    virtual void NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) = 0;
+    virtual void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) = 0;
+    virtual AddressSpaceObserver* NdtGetAddressSpaceObserver() = 0;
+    virtual ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() = 0;
+    // TODO(b/417848695): refactor this to NdtMapPageRangeBus
     virtual magma::PlatformBusMapper* GetBusMapper() = 0;
-    virtual bool IsProtectedModeSupported() = 0;
+    virtual bool NdtIsProtectedModeSupported() = 0;
     // Called after the connection's destructor has been called, so the
     // refcount should be 0.
-    virtual void DeregisterConnection() = 0;
-    virtual void SetCurrentThreadToDefaultPriority() = 0;
+    virtual void NdtDeregisterConnection() = 0;
+    virtual void NdtSetCurrentThreadToDefaultPriority() = 0;
+    // TODO(b/417848695): refactor this so it's passed into the lambda functions where it's used?
     virtual PerformanceCounters* performance_counters() = 0;
-    virtual std::shared_ptr<DeviceRequest::Reply> RunTaskOnDeviceThread(FitCallbackTask task) = 0;
-    virtual std::thread::id GetDeviceThreadId() = 0;
-    virtual msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() = 0;
+    virtual std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) = 0;
+    virtual std::thread::id NdtGetDeviceThreadId() = 0;
+    virtual msd::MagmaMemoryPressureLevel NdtGetCurrentMemoryPressureLevel() = 0;
   };
 
   static std::shared_ptr<MsdArmConnection> Create(msd::msd_client_id_t client_id, Owner* owner);
@@ -104,7 +108,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   bool address_space_lost() const { return address_space_lost_; }
 
   AddressSpaceObserver* GetAddressSpaceObserver() override {
-    return owner_->GetAddressSpaceObserver();
+    return owner_->NdtGetAddressSpaceObserver();
   }
   std::shared_ptr<AddressSpace::Owner> GetSharedPtr() override { return shared_from_this(); }
 
@@ -134,7 +138,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   magma_status_t RemovePerformanceCounterBufferFromPool(std::shared_ptr<MsdArmPerfCountPool> pool,
                                                         std::shared_ptr<MsdArmBuffer> buffer);
 
-  std::thread::id GetDeviceThreadId() { return owner_->GetDeviceThreadId(); }
+  std::thread::id GetDeviceThreadId() { return owner_->NdtGetDeviceThreadId(); }
 
  private:
   static const uint32_t kMagic = 0x636f6e6e;  // "conn" (Connection)

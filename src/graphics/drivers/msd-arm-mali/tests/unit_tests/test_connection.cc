@@ -55,18 +55,20 @@ class FakeConnectionOwner : public FakeConnectionOwnerBase {
  public:
   FakeConnectionOwner() {}
 
-  void ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override { atoms_list_.push_back(atom); }
-  void CancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {
+  void NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override {
+    atoms_list_.push_back(atom);
+  }
+  void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {
     cancel_atoms_list_.push_back(connection.get());
   }
-  AddressSpaceObserver* GetAddressSpaceObserver() override { return &observer_; }
+  AddressSpaceObserver* NdtGetAddressSpaceObserver() override { return &observer_; }
   TestAddressSpaceObserver* GetTestAddressSpaceObserver() { return &observer_; }
   magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
-  ArmMaliCacheCoherencyStatus cache_coherency_status() override {
+  ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() override {
     return kArmMaliCacheCoherencyAce;
   }
-  void SetCurrentThreadToDefaultPriority() override { got_set_to_default_priority_ = true; }
-  virtual msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
+  void NdtSetCurrentThreadToDefaultPriority() override { got_set_to_default_priority_ = true; }
+  virtual msd::MagmaMemoryPressureLevel NdtGetCurrentMemoryPressureLevel() override {
     return memory_pressure_level_;
   }
 
@@ -89,7 +91,7 @@ class FakeConnectionOwner : public FakeConnectionOwnerBase {
 class DeregisterConnectionOwner : public FakeConnectionOwner {
  public:
   void set_connection(std::weak_ptr<MsdArmConnection> connection) { connection_ = connection; }
-  void DeregisterConnection() override { EXPECT_TRUE(connection_.expired()); }
+  void NdtDeregisterConnection() override { EXPECT_TRUE(connection_.expired()); }
 
  private:
   std::weak_ptr<MsdArmConnection> connection_;

@@ -227,7 +227,7 @@ bool MsdArmConnection::ExecuteAtom(
 #if defined(ENABLE_PROTECTED_DEBUG_SWAP_MODE)
     flags ^= kAtomFlagProtected;
 #endif
-    if ((flags & kAtomFlagProtected) && !owner_->IsProtectedModeSupported()) {
+    if ((flags & kAtomFlagProtected) && !owner_->NdtIsProtectedModeSupported()) {
       MAGMA_LOG(WARNING, "Client %" PRIu64 ": Attempting to use protected mode when not supported",
                 client_id_);
       return false;
@@ -272,7 +272,7 @@ bool MsdArmConnection::ExecuteAtom(
     outstanding_atoms_[atom_number] = msd_atom;
   }
   TRACE_FLOW_BEGIN("magma", "atom", msd_atom->trace_nonce());
-  owner_->ScheduleAtom(std::move(msd_atom));
+  owner_->NdtPostScheduleAtom(std::move(msd_atom));
   return true;
 }
 
@@ -334,7 +334,7 @@ bool MsdArmConnection::Init() {
   // If coherent memory is supported, use it for page tables to avoid
   // unnecessary cache flushes.
   address_space_ =
-      AddressSpace::Create(this, owner_->cache_coherency_status() == kArmMaliCacheCoherencyAce);
+      AddressSpace::Create(this, owner_->NdtGetCacheCoherencyStatus() == kArmMaliCacheCoherencyAce);
   if (!address_space_)
     return DRETF(false, "Couldn't create address space");
   return true;
@@ -346,7 +346,7 @@ MsdArmConnection::MsdArmConnection(msd::msd_client_id_t client_id, Owner* owner)
 MsdArmConnection::~MsdArmConnection() {
   if (perf_count_manager_) {
     auto* perf_count = performance_counters();
-    owner_->RunTaskOnDeviceThread(
+    owner_->NdtPostTask(
         [perf_count_manager = perf_count_manager_, perf_count](MsdArmDevice* device) {
           perf_count->RemoveManager(perf_count_manager.get());
           perf_count->Update();
@@ -359,7 +359,7 @@ MsdArmConnection::~MsdArmConnection() {
   if (address_space_) {
     address_space_->ReleaseSpaceMappings();
   }
-  owner_->DeregisterConnection();
+  owner_->NdtDeregisterConnection();
   jit_memory_regions_.clear();
 }
 
@@ -428,8 +428,9 @@ bool MsdArmConnection::AddMapping(std::unique_ptr<GpuMapping> mapping) {
     return DRETF(false, "Buffer size %lx too small for map start %lx count %lx",
                  buffer->platform_buffer()->size(), mapping->page_offset(), page_count);
 
-  if (!access_flags_from_flags(
-          mapping->flags(), owner_->cache_coherency_status() == kArmMaliCacheCoherencyAce, nullptr))
+  if (!access_flags_from_flags(mapping->flags(),
+                               owner_->NdtGetCacheCoherencyStatus() == kArmMaliCacheCoherencyAce,
+                               nullptr))
     return false;
 
   if (!UpdateCommittedMemory(mapping.get()))
@@ -464,7 +465,7 @@ bool MsdArmConnection::RemoveMappingLocked(uint64_t gpu_va) {
 bool MsdArmConnection::UpdateCommittedMemory(GpuMapping* mapping) __TA_NO_THREAD_SAFETY_ANALYSIS {
   uint64_t access_flags = 0;
   if (!access_flags_from_flags(mapping->flags(),
-                               owner_->cache_coherency_status() == kArmMaliCacheCoherencyAce,
+                               owner_->NdtGetCacheCoherencyStatus() == kArmMaliCacheCoherencyAce,
                                &access_flags))
     return false;
 
@@ -905,7 +906,7 @@ void MsdArmConnection::ReleaseJitMemory(const std::shared_ptr<MsdArmSoftAtom>& a
 }
 
 size_t MsdArmConnection::FreeUnusedJitRegionsIfNeeded() {
-  auto memory_pressure_level = owner_->GetCurrentMemoryPressureLevel();
+  auto memory_pressure_level = owner_->NdtGetCurrentMemoryPressureLevel();
   if (memory_pressure_level != msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL) {
     return 0;
   }
@@ -999,8 +1000,8 @@ void MsdArmConnection::SendNotificationData(MsdArmAtom* atom) {
 }
 
 void MsdArmConnection::MarkDestroyed() {
-  owner_->SetCurrentThreadToDefaultPriority();
-  owner_->CancelAtoms(shared_from_this());
+  owner_->NdtSetCurrentThreadToDefaultPriority();
+  owner_->NdtPostCancelAtoms(shared_from_this());
   uint64_t received_atom_count = received_atom_count_;
   uint64_t notified_atom_count = notified_atom_count_;
   if (received_atom_count != notified_atom_count) {
@@ -1076,9 +1077,9 @@ magma_status_t MsdArmConnection::EnablePerformanceCounters(std::vector<uint64_t>
     start_managing = true;
   }
   auto* perf_count = performance_counters();
-  auto reply = owner_->RunTaskOnDeviceThread([perf_count_manager = perf_count_manager_, perf_count,
-                                              flags = std::move(flags), client_id = client_id_,
-                                              start_managing](MsdArmDevice* device) {
+  auto reply = owner_->NdtPostTask([perf_count_manager = perf_count_manager_, perf_count,
+                                    flags = std::move(flags), client_id = client_id_,
+                                    start_managing](MsdArmDevice* device) {
     perf_count_manager->enabled_performance_counters_ = std::move(flags);
     if (start_managing) {
       if (!perf_count->AddManager(perf_count_manager.get())) {
@@ -1103,7 +1104,7 @@ magma_status_t MsdArmConnection::EnablePerformanceCounters(std::vector<uint64_t>
 magma_status_t MsdArmConnection::DumpPerformanceCounters(std::shared_ptr<MsdArmPerfCountPool> pool,
                                                          uint32_t trigger_id) {
   auto* perf_count = performance_counters();
-  owner_->RunTaskOnDeviceThread([pool, perf_count, trigger_id](MsdArmDevice* device) {
+  owner_->NdtPostTask([pool, perf_count, trigger_id](MsdArmDevice* device) {
     perf_count->AddClient(pool.get());
     pool->AddTriggerId(trigger_id);
     perf_count->TriggerRead();
@@ -1115,7 +1116,7 @@ magma_status_t MsdArmConnection::DumpPerformanceCounters(std::shared_ptr<MsdArmP
 magma_status_t MsdArmConnection::ReleasePerformanceCounterBufferPool(
     std::shared_ptr<MsdArmPerfCountPool> pool) {
   auto* perf_count = performance_counters();
-  auto reply = owner_->RunTaskOnDeviceThread([pool, perf_count](MsdArmDevice* device) {
+  auto reply = owner_->NdtPostTask([pool, perf_count](MsdArmDevice* device) {
     pool->set_valid(false);
     perf_count->RemoveClient(pool.get());
     return MAGMA_STATUS_OK;
@@ -1129,17 +1130,16 @@ magma_status_t MsdArmConnection::ReleasePerformanceCounterBufferPool(
 magma_status_t MsdArmConnection::AddPerformanceCounterBufferOffsetToPool(
     std::shared_ptr<MsdArmPerfCountPool> pool, std::shared_ptr<MsdArmBuffer> buffer,
     uint64_t buffer_id, uint64_t buffer_offset, uint64_t buffer_size) {
-  owner_->RunTaskOnDeviceThread(
-      [pool, buffer, buffer_id, buffer_offset, buffer_size](MsdArmDevice* device) {
-        pool->AddBuffer(buffer, buffer_id, buffer_offset, buffer_size);
-        return MAGMA_STATUS_OK;
-      });
+  owner_->NdtPostTask([pool, buffer, buffer_id, buffer_offset, buffer_size](MsdArmDevice* device) {
+    pool->AddBuffer(buffer, buffer_id, buffer_offset, buffer_size);
+    return MAGMA_STATUS_OK;
+  });
   return MAGMA_STATUS_OK;
 }
 
 magma_status_t MsdArmConnection::RemovePerformanceCounterBufferFromPool(
     std::shared_ptr<MsdArmPerfCountPool> pool, std::shared_ptr<MsdArmBuffer> buffer) {
-  auto reply = owner_->RunTaskOnDeviceThread([pool, buffer](MsdArmDevice* device) {
+  auto reply = owner_->NdtPostTask([pool, buffer](MsdArmDevice* device) {
     pool->RemoveBuffer(buffer);
     return MAGMA_STATUS_OK;
   });

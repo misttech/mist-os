@@ -84,7 +84,7 @@ class MaliDriver : public msd::MagmaDriverBase {
 
     msd::Device* dev = magma_system_device()->msd_dev();
 
-    static_cast<MsdArmDevice*>(dev)->RunTaskOnDeviceThread(
+    static_cast<MsdArmDevice*>(dev)->NdtPostTask(
         [completer = completer.ToAsync()](MsdArmDevice* dev) mutable -> magma::Status {
           auto power_goals = dev->GetPowerGoals();
           fidl::Arena arena;

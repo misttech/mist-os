@@ -31,9 +31,9 @@ class TestConnectionOwner : public FakeConnectionOwnerBase {
  public:
   TestConnectionOwner(AddressManager* manager) : manager_(manager) {}
 
-  void ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override {}
-  void CancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {}
-  AddressSpaceObserver* GetAddressSpaceObserver() override { return manager_; }
+  void NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override {}
+  void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {}
+  AddressSpaceObserver* NdtGetAddressSpaceObserver() override { return manager_; }
   magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
 
  private:
