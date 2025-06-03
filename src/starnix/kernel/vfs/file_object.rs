@@ -20,7 +20,7 @@ use crate::vfs::{
     FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
     FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
-use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
+use starnix_uapi::user_address::ArchSpecific;
 
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -985,7 +985,7 @@ pub fn default_ioctl(
         }
         uapi::FS_IOC_GETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322874935"), "FS_IOC_GETFLAGS");
-            let arg = MultiArchUserRef::<u64, u32>::new(current_task, arg);
+            let arg = UserRef::<u32>::from(arg);
             let mut flags: u32 = 0;
             if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
                 flags |= FS_VERITY_FL;
@@ -993,12 +993,12 @@ pub fn default_ioctl(
             if file.node().info().casefold {
                 flags |= FS_CASEFOLD_FL;
             }
-            current_task.write_multi_arch_object(arg, flags.into())?;
+            current_task.write_object(arg, &flags)?;
             Ok(SUCCESS)
         }
         uapi::FS_IOC_SETFLAGS => {
             track_stub!(TODO("https://fxbug.dev/322875367"), "FS_IOC_SETFLAGS");
-            let arg = UserAddress::from(arg).into();
+            let arg = UserRef::<u32>::from(arg);
             let flags: u32 = current_task.read_object(arg)?;
             file.node().update_attributes(locked, current_task, |info| {
                 info.casefold = flags & FS_CASEFOLD_FL != 0;
