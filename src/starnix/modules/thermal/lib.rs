@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_hardware_temperature as ftemperature;
 use fuchsia_async::TimeoutExt;

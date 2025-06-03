@@ -20,12 +20,22 @@ pub struct FsNodeCache {
     nodes: Mutex<HashMap<ino_t, WeakFsNodeHandle>>,
 }
 
+impl Default for FsNodeCache {
+    fn default() -> Self {
+        Self::new(false)
+    }
+}
+
 impl FsNodeCache {
     pub fn new(uses_external_node_ids: bool) -> Self {
         Self {
             next_ino: if uses_external_node_ids { None } else { Some(AtomicU64Counter::new(1)) },
             nodes: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub fn uses_external_node_ids(&self) -> bool {
+        self.next_ino.is_none()
     }
 
     pub fn allocate_ino(&self) -> Option<ino_t> {

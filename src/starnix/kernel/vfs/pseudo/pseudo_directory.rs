@@ -6,7 +6,7 @@ use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
     fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -114,7 +114,8 @@ impl PseudoDirectoryBuilder {
                 }
             })
             .collect();
-        Arc::new(PseudoDirectory { entries })
+        let ops = Arc::new(BtreePseudoDirectory { entries });
+        Arc::new(PseudoDirectory { ops })
     }
 
     pub fn build_root(&self, fs: &FileSystemHandle, mode: FileMode, creds: FsCred) {
@@ -132,8 +133,58 @@ struct PseudoDirectoryEntry {
     node_ops_factory: NodeOpsFactory,
 }
 
-pub struct PseudoDirectory {
+struct BtreePseudoDirectory {
     entries: BTreeMap<&'static FsStr, PseudoDirectoryEntry>,
+}
+
+impl PseudoDirectoryOps for BtreePseudoDirectory {
+    fn get_node(&self, name: &FsStr) -> Result<PseudoNode, Errno> {
+        let entry = self.entries.get(name).ok_or_else(|| errno!(ENOENT))?;
+        let ops = (entry.node_ops_factory)();
+        let ino = entry.ino;
+        let info = FsNodeInfo::new(entry.mode, entry.creds);
+        Ok(PseudoNode { ops, ino, info })
+    }
+
+    fn list_entries(&self) -> Vec<PseudoDirEntry> {
+        self.entries
+            .iter()
+            .map(|(name, entry)| PseudoDirEntry {
+                ino: entry.ino,
+                mode: entry.mode,
+                name: (*name).into(),
+            })
+            .collect()
+    }
+}
+
+pub struct PseudoDirEntry {
+    pub ino: ino_t,
+    pub mode: FileMode,
+    pub name: FsString,
+}
+
+pub struct PseudoNode {
+    pub ino: ino_t,
+    pub ops: Box<dyn FsNodeOps>,
+    pub info: FsNodeInfo,
+}
+
+pub trait PseudoDirectoryOps: Send + Sync + 'static {
+    fn get_node(&self, name: &FsStr) -> Result<PseudoNode, Errno>;
+
+    fn list_entries(&self) -> Vec<PseudoDirEntry>;
+}
+
+#[derive(Clone)]
+pub struct PseudoDirectory {
+    ops: Arc<dyn PseudoDirectoryOps>,
+}
+
+impl PseudoDirectory {
+    pub fn new(ops: Arc<dyn PseudoDirectoryOps>) -> Arc<Self> {
+        Arc::new(Self { ops })
+    }
 }
 
 impl FsNodeOps for Arc<PseudoDirectory> {
@@ -156,22 +207,9 @@ impl FsNodeOps for Arc<PseudoDirectory> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        self.entries
-            .get(name)
-            .map(|entry| {
-                let ops = (entry.node_ops_factory)();
-                let info = FsNodeInfo::new(entry.mode, entry.creds);
-                node.fs().create_node(current_task, entry.ino, ops, info)
-            })
-            .ok_or_else(|| {
-                errno!(
-                    ENOENT,
-                    format!(
-                        "looking for {name} in {:?}",
-                        self.entries.keys().map(|e| e.to_string()).collect::<Vec<_>>()
-                    )
-                )
-            })
+        self.ops.get_node(name).map(|pseudo_node| {
+            node.fs().create_node(current_task, pseudo_node.ino, pseudo_node.ops, pseudo_node.info)
+        })
     }
 }
 
@@ -191,8 +229,14 @@ impl FileOps for PseudoDirectory {
 
         // Skip through the entries until the current offset is reached.
         // Subtract 2 from the offset to account for `.` and `..`.
-        for (name, node) in self.entries.iter().skip(sink.offset() as usize - 2) {
-            sink.add(node.ino, sink.offset() + 1, DirectoryEntryType::from_mode(node.mode), name)?;
+        let entries = self.ops.list_entries();
+        for entry in entries.iter().skip(sink.offset() as usize - 2) {
+            sink.add(
+                entry.ino,
+                sink.offset() + 1,
+                DirectoryEntryType::from_mode(entry.mode),
+                entry.name.as_ref(),
+            )?;
         }
         Ok(())
     }

@@ -10,14 +10,18 @@ use crate::fs::sysfs::{
     BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK, SYSFS_BUS,
     SYSFS_CLASS, SYSFS_DEV, SYSFS_DEVICES,
 };
+use crate::vfs::fs_node_cache::FsNodeCache;
 use crate::vfs::{FsNodeOps, FsStr, FsString};
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
 /// The owner of all the KObjects in sysfs.
 ///
 /// This structure holds strong references to the KObjects that are visible in sysfs. These
 /// objects are organized into hierarchies that make it easier to implement sysfs.
 pub struct KObjectStore {
+    /// The node cache used to allocate inode numbers for the kobjects in this store.
+    pub node_cache: Arc<FsNodeCache>,
+
     /// All of the devices added to the system.
     ///
     /// Used to populate the /sys/devices directory.
@@ -236,15 +240,20 @@ impl KObjectStore {
 
 impl Default for KObjectStore {
     fn default() -> Self {
-        let devices = KObject::new_root(SYSFS_DEVICES.into());
-        let class = KObject::new_root(SYSFS_CLASS.into());
-        let block = KObject::new_root_with_dir(SYSFS_BLOCK.into(), KObjectSymlinkDirectory::new);
-        let bus = KObject::new_root(SYSFS_BUS.into());
-        let dev = KObject::new_root(SYSFS_DEV.into());
+        let node_cache = Arc::new(FsNodeCache::default());
+        let devices = KObject::new_root(SYSFS_DEVICES.into(), node_cache.clone());
+        let class = KObject::new_root(SYSFS_CLASS.into(), node_cache.clone());
+        let block = KObject::new_root_with_dir(
+            SYSFS_BLOCK.into(),
+            node_cache.clone(),
+            KObjectSymlinkDirectory::new,
+        );
+        let bus = KObject::new_root(SYSFS_BUS.into(), node_cache.clone());
+        let dev = KObject::new_root(SYSFS_DEV.into(), node_cache.clone());
 
         let dev_block = dev.get_or_create_child("block".into(), KObjectSymlinkDirectory::new);
         let dev_char = dev.get_or_create_child("char".into(), KObjectSymlinkDirectory::new);
 
-        Self { devices, class, block, bus, dev, dev_block, dev_char }
+        Self { node_cache, devices, class, block, bus, dev, dev_block, dev_char }
     }
 }

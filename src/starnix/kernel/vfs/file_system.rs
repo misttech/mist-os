@@ -60,7 +60,7 @@ pub struct FileSystem {
     /// Rather than calling FsNode::new directly, file systems should call
     /// FileSystem::get_or_create_node to see if the FsNode already exists in
     /// the cache.
-    node_cache: FsNodeCache,
+    node_cache: Arc<FsNodeCache>,
 
     /// DirEntryHandle cache for the filesystem. Holds strong references to DirEntry objects. For
     /// filesystems with permanent entries, this will hold a strong reference to every node to make
@@ -132,11 +132,24 @@ impl FileSystem {
         kernel: &Arc<Kernel>,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
-        mut options: FileSystemOptions,
+        options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
+        let uses_external_node_ids = ops.uses_external_node_ids();
+        let node_cache = Arc::new(FsNodeCache::new(uses_external_node_ids));
+        Self::new_with_node_cache(kernel, cache_mode, ops, options, node_cache)
+    }
+
+    pub fn new_with_node_cache(
+        kernel: &Arc<Kernel>,
+        cache_mode: CacheMode,
+        ops: impl FileSystemOps,
+        mut options: FileSystemOptions,
+        node_cache: Arc<FsNodeCache>,
+    ) -> Result<FileSystemHandle, Errno> {
+        assert_eq!(ops.uses_external_node_ids(), node_cache.uses_external_node_ids());
+
         let mount_options = security::sb_eat_lsm_opts(&kernel, &mut options.params)?;
         let security_state = security::file_system_init_security(ops.name(), &mount_options)?;
-        let uses_external_node_ids = ops.uses_external_node_ids();
 
         let file_system = Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
@@ -145,7 +158,7 @@ impl FileSystem {
             options,
             dev_id: kernel.device_registry.next_anonymous_dev_id(),
             rename_mutex: Mutex::new(()),
-            node_cache: FsNodeCache::new(uses_external_node_ids),
+            node_cache,
             entries: match cache_mode {
                 CacheMode::Permanent => Entries::Permanent(Mutex::new(HashSet::new())),
                 CacheMode::Cached(CacheConfig { capacity }) => {

@@ -79,6 +79,7 @@ mod tests {
     use crate::fs::sysfs::{KObjectDirectory, KObjectSymlinkDirectory};
     use crate::task::CurrentTask;
     use crate::testing::{create_kernel_task_and_unlocked, create_testfs_with_root};
+    use crate::vfs::fs_node_cache::FsNodeCache;
     use crate::vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode};
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
@@ -97,7 +98,8 @@ mod tests {
     #[::fuchsia::test]
     async fn kobject_symlink_directory_contains_device_links() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_kobject = KObject::new_root(Default::default());
+        let node_cache = Arc::new(FsNodeCache::default());
+        let root_kobject = KObject::new_root(Default::default(), node_cache);
         root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
         root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
         let test_fs = create_testfs_with_root(

@@ -46,7 +46,7 @@ impl FileSystemOps for SysFs {
 }
 
 impl SysFs {
-    pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
+    fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
         const DIR_MODE: FileMode = mode!(IFDIR, 0o755);
         const REG_MODE: FileMode = mode!(IFREG, 0o444);
         const CREDS: FsCred = FsCred::root();
@@ -119,8 +119,14 @@ impl SysFs {
             .get_or_create_child("cpu".into(), CpuClassDirectory::new)
             .get_or_create_child("vulnerabilities".into(), VulnerabilitiesClassDirectory::new);
 
-        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options)
-            .expect("sysfs constructed with valid options");
+        let fs = FileSystem::new_with_node_cache(
+            kernel,
+            CacheMode::Cached(CacheConfig::default()),
+            SysFs,
+            options,
+            registry.objects.node_cache.clone(),
+        )
+        .expect("sysfs constructed with valid options");
         dir.build_root(&fs, mode!(IFDIR, 0o777), CREDS);
         fs
     }
