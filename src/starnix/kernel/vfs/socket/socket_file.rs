@@ -64,7 +64,7 @@ impl SocketFile {
         let node = fs.create_node_and_allocate_node_id(
             current_task,
             Anon::new_for_socket(kernel_private),
-            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
+            FsNodeInfo::new(mode, current_task.as_fscred()),
         );
         socket.set_fs_node(&node);
         security::socket_post_create(&socket);

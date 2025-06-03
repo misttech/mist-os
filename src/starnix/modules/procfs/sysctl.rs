@@ -51,7 +51,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"0\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
@@ -59,7 +59,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"Linux Kernel Cryptographic API\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
@@ -67,7 +67,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
     });
@@ -77,7 +77,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(|| Ok(format!("{}\n", CAP_LAST_CAP))),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
@@ -86,7 +86,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
                 current_task,
                 // TODO(https://fxbug.dev/322873960): Use the core pattern when generating a core dump.
                 BytesFile::new_node(b"core".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.entry(
@@ -346,7 +346,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_RELEASE))),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
@@ -354,7 +354,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"Linux\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
@@ -362,7 +362,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.node(
@@ -370,7 +370,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.node(
@@ -378,7 +378,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"4\t4\t1\t7\n".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.node(
@@ -386,7 +386,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"4194304".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.subdir(current_task, "random", 0o555, |dir| {
@@ -425,7 +425,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         fs.create_node_and_allocate_node_id(
             current_task,
             BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
         ),
     );
     dir.subdir(current_task, "vm", 0o555, |dir| {

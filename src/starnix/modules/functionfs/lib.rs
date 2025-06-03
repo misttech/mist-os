@@ -491,19 +491,19 @@ impl FsNodeOps for FunctionFsRootDir {
     ) -> Result<starnix_core::vfs::FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         match name {
-            CONTROL_ENDPOINT => Ok(node.fs().create_node_with_info(
+            CONTROL_ENDPOINT => Ok(node.fs().create_node(
                 current_task,
                 CONTROL_ENDPOINT_NODE_ID,
                 FunctionFsControlEndpoint,
                 FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
-            OUTPUT_ENDPOINT => Ok(node.fs().create_node_with_info(
+            OUTPUT_ENDPOINT => Ok(node.fs().create_node(
                 current_task,
                 OUTPUT_ENDPOINT_NODE_ID,
                 FunctionFsOutputEndpoint,
                 FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
-            INPUT_ENDPOINT => Ok(node.fs().create_node_with_info(
+            INPUT_ENDPOINT => Ok(node.fs().create_node(
                 current_task,
                 INPUT_ENDPOINT_NODE_ID,
                 FunctionFsInputEndpoint,

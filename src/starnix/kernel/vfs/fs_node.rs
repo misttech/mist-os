@@ -228,10 +228,6 @@ impl FsNodeInfo {
         self.blksize.saturating_mul(self.blocks)
     }
 
-    pub fn new_factory(mode: FileMode, owner: FsCred) -> impl FnOnce(ino_t) -> Self {
-        move |_ino| Self::new(mode, owner)
-    }
-
     pub fn chmod(&mut self, mode: FileMode) {
         self.mode = (self.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
     }

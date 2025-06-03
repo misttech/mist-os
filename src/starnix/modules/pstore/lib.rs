@@ -66,7 +66,7 @@ impl PstoreFs {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     BytesFile::new_node(ramoops_contents_0),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
                 ),
             );
             dir.node(
@@ -74,7 +74,7 @@ impl PstoreFs {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     BytesFile::new_node(ramoops_contents),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
                 ),
             );
         }

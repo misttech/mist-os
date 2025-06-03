@@ -71,7 +71,7 @@ impl TraceFs {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 TraceFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.subdir(current_task, "per_cpu", 0o755, |dir| {
@@ -97,7 +97,7 @@ impl TraceFs {
                         fs.create_node_and_allocate_node_id(
                             current_task,
                             ops,
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                            FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                         ),
                     );
                     dir.entry(current_task, "trace", TraceFile::new_node(), mode!(IFREG, 0o444));
@@ -126,7 +126,7 @@ impl TraceFs {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     TraceBytesFile::new_node(),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
                 ),
             );
         });
@@ -138,7 +138,7 @@ impl TraceFs {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 TracingOnFile::new_node(trace_event_queue.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
@@ -146,7 +146,7 @@ impl TraceFs {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 ConstFile::new_node("nop".into()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
@@ -154,7 +154,7 @@ impl TraceFs {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 TraceMarkerFile::new_node(trace_event_queue.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
@@ -162,7 +162,7 @@ impl TraceFs {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 TraceBytesFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
@@ -172,7 +172,7 @@ impl TraceFs {
                 ConstFile::new_node(
                     "[local] global counter uptime perf mono mono_raw boot tai x86-tsc ".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
@@ -180,7 +180,7 @@ impl TraceFs {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 ConstFile::new_node("7".into()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.build_root();

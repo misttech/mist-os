@@ -42,7 +42,7 @@ pub fn new_null_file(current_task: &CurrentTask, flags: OpenFlags) -> FileHandle
         Box::new(DevNull),
         flags,
         "[fuchsia:null]",
-        FsNodeInfo::new_factory(FileMode::from_bits(0o666), FsCred::root()),
+        FsNodeInfo::new(FileMode::from_bits(0o666), FsCred::root()),
     )
 }
 

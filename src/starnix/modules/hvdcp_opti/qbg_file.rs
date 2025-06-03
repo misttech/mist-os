@@ -88,7 +88,7 @@ impl FsNodeOps for QbgClassDirectory {
             b"qbg_context" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 ReadWriteBytesFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o666), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o666), FsCred::root()),
             )),
             _ => self.base_dir.lookup(locked, node, current_task, name),
         }

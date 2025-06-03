@@ -216,13 +216,11 @@ fn create_child_node(
         }
         _ => return error!(EACCES),
     };
-    let child = parent.fs().create_node_and_allocate_node_id(current_task, ops, move |_id| {
-        let mut info = FsNodeInfo::new(mode, owner);
-        info.rdev = dev;
-        // blksize is PAGE_SIZE for in memory node.
-        info.blksize = *PAGE_SIZE as usize;
-        info
-    });
+    let mut info = FsNodeInfo::new(mode, owner);
+    info.rdev = dev;
+    // blksize is PAGE_SIZE for in memory node.
+    info.blksize = *PAGE_SIZE as usize;
+    let child = parent.fs().create_node_and_allocate_node_id(current_task, ops, info);
     if mode.fmt() == FileMode::IFREG {
         // For files created in tmpfs, forbid sealing, by sealing the seal operation.
         child.write_guard_state.lock().enable_sealing(SealFlags::SEAL);
@@ -259,7 +257,7 @@ impl FsNodeOps for TmpfsDirectory {
         Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             TmpfsDirectory::new(),
-            FsNodeInfo::new_factory(mode, owner),
+            FsNodeInfo::new(mode, owner),
         ))
     }
 

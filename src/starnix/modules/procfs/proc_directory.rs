@@ -161,7 +161,7 @@ fn read_only_file(
     fs.create_node_and_allocate_node_id(
         current_task,
         ops,
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+        FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
     )
 }
 
@@ -174,7 +174,7 @@ fn root_writable_file(
     fs.create_node_and_allocate_node_id(
         current_task,
         ops,
-        FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
+        FsNodeInfo::new(mode!(IFREG, 0o200), FsCred::root()),
     )
 }
 
@@ -186,7 +186,7 @@ fn symlink_file(
     fs.create_node_and_allocate_node_id(
         current_task,
         ops,
-        FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
+        FsNodeInfo::new(mode!(IFLNK, 0o777), FsCred::root()),
     )
 }
 

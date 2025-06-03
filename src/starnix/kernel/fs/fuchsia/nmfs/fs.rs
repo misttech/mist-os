@@ -162,7 +162,7 @@ impl FsNodeOps for NetworkDirectoryNode {
         let child = node.fs().create_node_and_allocate_node_id(
             current_task,
             ops,
-            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
+            FsNodeInfo::new(mode, current_task.as_fscred()),
         );
 
         Ok(child)

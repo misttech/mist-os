@@ -134,7 +134,7 @@ impl TaskDirectory {
                 scope,
                 inode_range: fs.allocate_node_id(task_entries(scope).len()),
             })),
-            FsNodeInfo::new_factory(mode!(IFDIR, 0o777), creds),
+            FsNodeInfo::new(mode!(IFDIR, 0o777), creds),
         )
     }
 }
@@ -268,7 +268,7 @@ impl FsNodeOps for TaskDirectoryNode {
             ),
         };
 
-        Ok(fs.create_node_with_info(current_task, ino, ops, FsNodeInfo::new(mode, creds)))
+        Ok(fs.create_node(current_task, ino, ops, FsNodeInfo::new(mode, creds)))
     }
 }
 
@@ -378,7 +378,7 @@ impl FsNodeOps for FdDirectory {
                 let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
                 Ok(SymlinkTarget::Node(file.name.to_passive()))
             }),
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFLNK, 0o777), task.as_fscred()),
         ))
     }
 }
@@ -483,7 +483,7 @@ impl FsNodeOps for NsDirectory {
             if !NS_IDENTIFIER_RE.is_match(id) {
                 return error!(ENOENT);
             }
-            let node_info = || FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred());
+            let node_info = || FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred());
             let fallback = || {
                 node.fs().create_node_and_allocate_node_id(
                     current_task,
@@ -546,7 +546,7 @@ impl FsNodeOps for NsDirectory {
                 CallbackSymlinkNode::new(move || {
                     Ok(SymlinkTarget::Path(format!("{name}:[{id}]").into()))
                 }),
-                FsNodeInfo::new_factory(mode!(IFLNK, 0o7777), task.as_fscred()),
+                FsNodeInfo::new(mode!(IFLNK, 0o7777), task.as_fscred()),
             ))
         }
     }
@@ -598,7 +598,7 @@ impl FsNodeOps for FdInfoDirectory {
         Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             BytesFile::new_node(data),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred()),
         ))
     }
 }

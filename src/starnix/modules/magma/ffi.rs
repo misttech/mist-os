@@ -605,18 +605,15 @@ pub fn query(
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) });
         let memory_size = memory.get_size();
         // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
+        let mut info = FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred());
+        // Enable seek for file size discovery.
+        info.size = memory_size as usize;
         let file = Anon::new_private_file_extended(
             current_task,
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
             "[fuchsia:magma_vmo]",
-            |_id| {
-                let mut info =
-                    FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred());
-                // Enable seek for file size discovery.
-                info.size = memory_size as usize;
-                info
-            },
+            info,
         );
         let fd = current_task.add_file(file, FdFlags::empty())?;
         response.result_buffer_out = fd.raw() as u64;

@@ -55,11 +55,9 @@ impl<'a> StaticDirectoryBuilder<'a> {
         creds: FsCred,
     ) {
         let ops = ops.into();
-        let node = self.fs.create_node_and_allocate_node_id(current_task, ops, |_id| {
-            let mut info = FsNodeInfo::new(mode, creds);
-            info.rdev = dev;
-            info
-        });
+        let mut info = FsNodeInfo::new(mode, creds);
+        info.rdev = dev;
+        let node = self.fs.create_node_and_allocate_node_id(current_task, ops, info);
         self.node(name, node);
     }
 
@@ -100,7 +98,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
         self.fs.create_node_and_allocate_node_id(
             current_task,
             Arc::new(StaticDirectory { entries: self.entries }),
-            FsNodeInfo::new_factory(self.mode, self.creds),
+            FsNodeInfo::new(self.mode, self.creds),
         )
     }
 

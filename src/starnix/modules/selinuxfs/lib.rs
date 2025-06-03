@@ -240,11 +240,9 @@ impl SeLinuxFs {
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
         let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
-        let null_fs_node = fs.create_node_and_allocate_node_id(current_task, null_ops, |_id| {
-            let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
-            info.rdev = DeviceType::NULL;
-            info
-        });
+        let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
+        info.rdev = DeviceType::NULL;
+        let null_fs_node = fs.create_node_and_allocate_node_id(current_task, null_ops, info);
         dir.node("null", null_fs_node.clone());
 
         dir.build_root();
@@ -725,7 +723,7 @@ impl FsNodeOps for BooleansDirectory {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BooleanFile::new_node(self.security_server.clone(), utf8_name),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), current_task.as_fscred()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), current_task.as_fscred()),
             ))
         } else {
             error!(ENOENT)
@@ -944,7 +942,7 @@ impl FsNodeOps for PermsDirectory {
         Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), current_task.as_fscred()),
         ))
     }
 }

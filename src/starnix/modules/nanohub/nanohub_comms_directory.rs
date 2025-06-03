@@ -108,47 +108,47 @@ impl FsNodeOps for NanohubCommsDirectory {
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_panel_name".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"display_select" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_select".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o660), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o660), FsCred::root()),
             )),
             b"display_state" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_state".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"download_firmware" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 FirmwareFile::new(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"firmware_name" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_name".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"firmware_version" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_version".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"hw_reset" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/hw_reset".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"time_sync" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
@@ -157,21 +157,21 @@ impl FsNodeOps for NanohubCommsDirectory {
                 ),
                 // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
                 // should be set to FsCred::root().
-                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
             )),
             b"wakeup_event_msec" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/wakeup_event_msec".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o660), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o660), FsCred::root()),
             )),
             b"wake_lock" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/wake_lock".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
             )),
             _ => self.base_dir.lookup(locked, node, current_task, name),
         }

@@ -58,7 +58,7 @@ impl FsNodeOps for BusCollectionDirectory {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BusDevicesDirectory::new(self.kobject.clone()),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
         } else {
             error!(ENOENT)

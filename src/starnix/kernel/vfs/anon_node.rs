@@ -13,7 +13,7 @@ use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{error, ino_t, statfs, ANON_INODE_FS_MAGIC};
+use starnix_uapi::{error, statfs, ANON_INODE_FS_MAGIC};
 use std::sync::Arc;
 
 pub struct Anon {
@@ -59,7 +59,7 @@ impl Anon {
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
-        info: impl FnOnce(ino_t) -> FsNodeInfo,
+        info: FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node_and_allocate_node_id(
@@ -83,7 +83,7 @@ impl Anon {
             ops,
             flags,
             name,
-            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
         )
     }
 
@@ -100,7 +100,7 @@ impl Anon {
             ops,
             flags,
             name,
-            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
         )
     }
 
@@ -110,7 +110,7 @@ impl Anon {
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
-        info: impl FnOnce(ino_t) -> FsNodeInfo,
+        info: FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node_and_allocate_node_id(

@@ -28,7 +28,7 @@ macro_rules! file_match_and_create {
             Ok($node.fs().create_node_and_allocate_node_id(
                 $current_task,
                 BytesFile::new_node(content.as_bytes().to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         } else {
             error!(ENOENT)
@@ -95,7 +95,7 @@ impl FsNodeOps for VulnerabilitiesClassDirectory {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 TmpfsDirectory::new(),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
         } else {
             file_match_and_create!(node, current_task, name, self.vulnerability_files)

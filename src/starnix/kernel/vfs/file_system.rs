@@ -248,7 +248,7 @@ impl FileSystem {
     /// File systems that produce their own IDs for nodes should invoke this
     /// function. The ones who leave to this object to assign the IDs should
     /// call |create_node_and_allocate_node_id|.
-    pub fn create_node_with_info(
+    pub fn create_node(
         self: &Arc<Self>,
         current_task: &CurrentTask,
         ino: ino_t,
@@ -264,15 +264,14 @@ impl FileSystem {
         self: &Arc<Self>,
         current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
-        create_info_fn: impl FnOnce(ino_t) -> FsNodeInfo,
+        info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ino = self.next_node_id();
-        let info = create_info_fn(ino);
-        self.create_node_with_info(current_task, ino, ops, info)
+        self.create_node(current_task, ino, ops, info)
     }
 
     /// Create a node for a directory that has no parent.
-    pub fn create_detached_node_with_info(
+    pub fn create_detached_node(
         self: &Arc<Self>,
         ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
@@ -299,7 +298,7 @@ impl FileSystem {
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) {
-        let node = self.create_detached_node_with_info(ino, ops, info);
+        let node = self.create_detached_node(ino, ops, info);
         self.set_root(node);
     }
 

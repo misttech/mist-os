@@ -13,6 +13,6 @@ pub fn cgroups_file(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNode
     fs.create_node_and_allocate_node_id(
         current_task,
         BytesFile::new_node(vec![]),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+        FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
     )
 }

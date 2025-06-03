@@ -80,7 +80,7 @@ impl FsNodeOps for IioDirectory0 {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(value),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         };
         let iio_create_file_int =
@@ -105,7 +105,7 @@ impl FsNodeOps for IioDirectory0 {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 InvalidFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         };
 
@@ -187,7 +187,7 @@ impl FsNodeOps for IioDirectory1 {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(value),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         };
         let iio_create_file_int =

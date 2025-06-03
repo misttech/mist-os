@@ -351,7 +351,7 @@ impl BpfFsDir {
                 Ok(dir.fs().create_node_and_allocate_node_id(
                     current_task,
                     BpfFsObject::new(object),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
+                    FsNodeInfo::new(mode!(IFREG, 0o600), current_task.as_fscred()),
                 ))
             },
         )?;
@@ -384,7 +384,7 @@ impl FsNodeOps for BpfFsDir {
         Ok(node.fs().create_node_and_allocate_node_id(
             current_task,
             BpfFsDir::new(),
-            FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),
+            FsNodeInfo::new(mode | FileMode::ISVTX, owner),
         ))
     }
 

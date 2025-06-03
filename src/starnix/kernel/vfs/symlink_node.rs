@@ -11,7 +11,6 @@ use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
-use starnix_uapi::ino_t;
 
 /// A node that represents a symlink to another node.
 pub struct SymlinkNode {
@@ -21,13 +20,10 @@ pub struct SymlinkNode {
 }
 
 impl SymlinkNode {
-    pub fn new(target: &FsStr, owner: FsCred) -> (Self, impl FnOnce(ino_t) -> FsNodeInfo) {
+    pub fn new(target: &FsStr, owner: FsCred) -> (Self, FsNodeInfo) {
         let size = target.len();
-        let info = move |_ino| {
-            let mut info = FsNodeInfo::new(mode!(IFLNK, 0o777), owner);
-            info.size = size;
-            info
-        };
+        let mut info = FsNodeInfo::new(mode!(IFLNK, 0o777), owner);
+        info.size = size;
         (Self { target: target.to_owned(), xattrs: Default::default() }, info)
     }
 }

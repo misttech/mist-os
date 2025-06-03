@@ -340,13 +340,9 @@ pub fn new_remote_file(
         mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
     }
     // TODO: https://fxbug.dev/407611229 - Give these nodes valid labels.
-    let file_handle =
-        Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", |_id| {
-            let mut info = FsNodeInfo::new(mode, FsCred::root());
-            update_info_from_attrs(&mut info, &attrs);
-            info
-        });
-    Ok(file_handle)
+    let mut info = FsNodeInfo::new(mode, FsCred::root());
+    update_info_from_attrs(&mut info, &attrs);
+    Ok(Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", info))
 }
 
 // Create a FileOps from a zx::Handle.
@@ -658,7 +654,7 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
-        let child = fs.create_node_with_info(
+        let child = fs.create_node(
             current_task,
             node_id,
             ops,
@@ -719,8 +715,7 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
-        let child =
-            fs.create_node_with_info(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
+        let child = fs.create_node(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
         Ok(child)
     }
 
@@ -949,7 +944,7 @@ impl FsNodeOps for RemoteNode {
         } else {
             fs.next_node_id()
         };
-        let symlink = fs.create_node_with_info(
+        let symlink = fs.create_node(
             current_task,
             node_id,
             RemoteSymlink { zxio: Mutex::new(zxio) },
@@ -1021,8 +1016,7 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
-        let child =
-            fs.create_node_with_info(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
+        let child = fs.create_node(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
 
         Ok(child)
     }

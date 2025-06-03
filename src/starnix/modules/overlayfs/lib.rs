@@ -1196,7 +1196,7 @@ impl OverlayStack {
         fn create_directory(fs: &FileSystemHandle) -> DirEntryHandle {
             let ino = fs.next_node_id();
             let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
-            let node = fs.create_detached_node_with_info(ino, TmpfsDirectory::new(), info);
+            let node = fs.create_detached_node(ino, TmpfsDirectory::new(), info);
             DirEntry::new(node, None, FsString::default())
         }
 

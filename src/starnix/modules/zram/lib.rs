@@ -113,14 +113,14 @@ impl FsNodeOps for ZramDeviceDirectory {
             b"idle" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 StubEmptyFile::new_node("zram idle file", bug_ref!("https://fxbug.dev/322892951")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o664), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o664), FsCred::root()),
             )),
             b"mm_stat" => {
                 let device = self.device.upgrade().ok_or_else(|| errno!(EINVAL))?;
                 Ok(node.fs().create_node_and_allocate_node_id(
                     current_task,
                     MmStatFile::new_node(device),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ))
             }
             _ => self.base_dir.lookup(locked, node, current_task, name),

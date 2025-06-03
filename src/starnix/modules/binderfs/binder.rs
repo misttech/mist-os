@@ -5266,15 +5266,13 @@ impl FsNodeOps for BinderFsDir {
             Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BinderFeaturesDir::new(),
-                |_ino| FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
         } else if let Some(dev) = self.devices.get(name) {
             let mode = if name == "remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
-            Ok(node.fs().create_node_and_allocate_node_id(current_task, SpecialNode, |_ino| {
-                let mut info = FsNodeInfo::new(mode, FsCred::root());
-                info.rdev = *dev;
-                info
-            }))
+            let mut info = FsNodeInfo::new(mode, FsCred::root());
+            info.rdev = *dev;
+            Ok(node.fs().create_node_and_allocate_node_id(current_task, SpecialNode, info))
         } else {
             error!(ENOENT, format!("looking for {name}"))
         }
@@ -5339,7 +5337,7 @@ impl FsNodeOps for BinderFeaturesDir {
             return Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(if *enable { b"1\n" } else { b"0\n" }.to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ));
         }
         error!(ENOENT, format!("looking for {name}"))
@@ -7869,7 +7867,7 @@ pub mod tests {
         let node = fs.create_node_and_allocate_node_id(
             &current_task,
             Anon::new_for_binder_device(),
-            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
 
         let mut locked = locked.cast_locked::<DeviceOpen>();

@@ -18,7 +18,7 @@ pub fn kmsg_file(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHan
     fs.create_node_and_allocate_node_id(
         current_task,
         SimpleFileNode::new(|| Ok(KmsgFile)),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root()),
+        FsNodeInfo::new(mode!(IFREG, 0o100), FsCred::root()),
     )
 }
 

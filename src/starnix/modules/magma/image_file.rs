@@ -52,21 +52,16 @@ impl ImageFile {
     ) -> FileHandle {
         let memory_size = memory.get_size();
 
+        let mut node_info = FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred());
+        node_info.size = memory_size as usize;
         // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
-        let file = Anon::new_private_file_extended(
+        Anon::new_private_file_extended(
             current_task,
             Box::new(ImageFile { info, memory: Arc::new(memory) }),
             OpenFlags::RDWR,
             "[fuchsia:image]",
-            |_id| {
-                let mut info =
-                    FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred());
-                info.size = memory_size as usize;
-                info
-            },
-        );
-
-        file
+            node_info,
+        )
     }
 }
 

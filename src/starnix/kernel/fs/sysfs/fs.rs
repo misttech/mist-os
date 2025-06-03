@@ -22,7 +22,7 @@ use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
-use starnix_uapi::{ino_t, statfs, SYSFS_MAGIC};
+use starnix_uapi::{statfs, SYSFS_MAGIC};
 
 pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";
@@ -147,7 +147,7 @@ pub fn sysfs_create_link(
     from: KObjectHandle,
     to: KObjectHandle,
     owner: FsCred,
-) -> (SymlinkNode, impl FnOnce(ino_t) -> FsNodeInfo) {
+) -> (SymlinkNode, FsNodeInfo) {
     let mut path = PathBuilder::new();
     path.prepend_element(to.path().as_ref());
     // Escape one more level from its subsystem to the root of sysfs.
@@ -168,7 +168,7 @@ pub fn sysfs_create_bus_link(
     from: KObjectHandle,
     to: KObjectHandle,
     owner: FsCred,
-) -> (SymlinkNode, impl FnOnce(ino_t) -> FsNodeInfo) {
+) -> (SymlinkNode, FsNodeInfo) {
     let mut path = PathBuilder::new();
     path.prepend_element(to.path().as_ref());
     // Escape two more levels from its subsystem to the root of sysfs.

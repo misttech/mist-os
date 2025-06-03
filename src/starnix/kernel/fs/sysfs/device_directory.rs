@@ -89,7 +89,7 @@ impl FsNodeOps for DeviceDirectory {
                     Ok(node.fs().create_node_and_allocate_node_id(
                         current_task,
                         BytesFile::new_node(format!("{}\n", device_type).into_bytes()),
-                        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                        FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                     ))
                 } else {
                     error!(ENOENT)
@@ -98,7 +98,7 @@ impl FsNodeOps for DeviceDirectory {
             b"uevent" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 UEventFsNode::new(self.device.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             _ => error!(ENOENT),
         }
@@ -166,12 +166,12 @@ impl FsNodeOps for BlockDeviceDirectory {
             b"queue" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BlockDeviceQueueDirectory::new(self.kobject()),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             )),
             b"size" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 BlockDeviceSizeFile::new_node(self.block_info.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
             _ => self.base_dir.lookup(locked, node, current_task, name),
         }
@@ -231,12 +231,12 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
                     "/sys/block/DEVICE/queue/nr_requests",
                     bug_ref!("https://fxbug.dev/322906857"),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             b"read_ahead_kb" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
                 ReadAheadKbNode,
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             b"scheduler" => Ok(node.fs().create_node_and_allocate_node_id(
                 current_task,
@@ -244,7 +244,7 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
                     "/sys/block/DEVICE/queue/scheduler",
                     bug_ref!("https://fxbug.dev/322907749"),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             _ => {
                 error!(ENOENT)

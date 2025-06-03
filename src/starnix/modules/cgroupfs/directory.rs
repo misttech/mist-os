@@ -79,7 +79,7 @@ impl CgroupDirectory {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 ControlGroupNode::new(self.cgroup.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
         interface_files.insert(
@@ -87,7 +87,7 @@ impl CgroupDirectory {
             fs.create_node_and_allocate_node_id(
                 current_task,
                 BytesFile::new_node(b"".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
     }
@@ -105,7 +105,7 @@ impl CgroupDirectory {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     ControlGroupNode::new(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
                 ),
             ),
             (
@@ -113,7 +113,7 @@ impl CgroupDirectory {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     BytesFile::new_node(b"".to_vec()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ),
             ),
             (
@@ -121,7 +121,7 @@ impl CgroupDirectory {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     FreezeFile::new_node(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
                 ),
             ),
             (
@@ -129,7 +129,7 @@ impl CgroupDirectory {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     EventsFile::new_node(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ),
             ),
             (
@@ -137,7 +137,7 @@ impl CgroupDirectory {
                 fs.create_node_and_allocate_node_id(
                     current_task,
                     KillFile::new_node(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o200), FsCred::root()),
                 ),
             ),
         ]);

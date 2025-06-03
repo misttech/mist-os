@@ -149,7 +149,7 @@ impl DirectoryNodes {
         let node = fs.create_node_and_allocate_node_id(
             current_task,
             directory,
-            FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+            FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
         );
         let mut nodes = self.nodes.lock();
         nodes.insert(id, node.clone());
