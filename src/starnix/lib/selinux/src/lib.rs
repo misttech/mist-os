@@ -1258,6 +1258,8 @@ class_permission_enum! {
         ExecHeap("execheap"),
         /// Permission to execute arbitrary code from memory.
         ExecMem("execmem"),
+        /// Permission to execute arbitrary code from the stack.
+        ExecStack("execstack"),
         /// Permission to fork the current running process.
         Fork("fork"),
         /// Permission to get the process group ID.

@@ -20,10 +20,6 @@
 
                 // TODO: https://fxbug.dev/364569703 - Implement correct SO_PEERSEC for socketpair() sockets.
                 "SocketPeerSecTest.SocketPairUnixStream",
-
-                // TODO: https://fxbug.dev/415257144 - Support `execstack` permission check.
-                "MProtectTest.ExecStackInSignal",
-                "MProtectSuccessAndFailure/MProtectSuccessAndFailure.MakeInitialStackExecFromOtherThread/1",
             ],
         },
     ],

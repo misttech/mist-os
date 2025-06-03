@@ -1422,8 +1422,8 @@ impl MemoryManagerState {
         // TODO(https://fxbug.dev/411617451): `mprotect` should apply the protection flags
         // until it encounters a mapping that doesn't allow it, rather than not apply the protection
         // flags at all if a single mapping doesn't allow it.
-        for (_range, mapping) in self.mappings.range(prot_range.clone()) {
-            security::file_mprotect(current_task, mapping, prot_flags)?;
+        for (range, mapping) in self.mappings.range(prot_range.clone()) {
+            security::file_mprotect(current_task, range, mapping, prot_flags)?;
         }
 
         // Make one call to mprotect to update all the zircon protections.

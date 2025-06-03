@@ -34,7 +34,9 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{bpf_cmd, error, rlimit, BPF_F_RDONLY, BPF_F_WRONLY};
+use std::ops::Range;
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
 use zerocopy::FromBytes;
@@ -290,12 +292,13 @@ pub fn mmap_file(
 /// Corresponds to the `file_mprotect` LSM hook.
 pub fn file_mprotect(
     current_task: &CurrentTask,
+    range: &Range<UserAddress>,
     mapping: &Mapping,
     prot: ProtectionFlags,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.file_mprotect");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::file::file_mprotect(security_server, current_task, mapping, prot)
+        selinux_hooks::file::file_mprotect(security_server, current_task, range, mapping, prot)
     })
 }
 
