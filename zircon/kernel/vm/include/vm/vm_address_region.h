@@ -1024,10 +1024,10 @@ class VmMapping final : public VmAddressRegionOrMapping {
     return size_;
   }
 
-  Lock<VmoLockType>* object_lock() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+  Lock<CriticalMutex>* object_lock() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
     return object_->lock();
   }
-  Lock<VmoLockType>& object_lock_ref() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+  Lock<CriticalMutex>& object_lock_ref() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
     return object_->lock_ref();
   }
 

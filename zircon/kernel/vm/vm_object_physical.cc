@@ -27,12 +27,9 @@
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
-VmObjectPhysical::VmObjectPhysical(fbl::RefPtr<VmHierarchyState> state, paddr_t base, uint64_t size,
-                                   bool is_slice, uint64_t parent_user_id)
-    : VmObject(VMOType::Physical, ktl::move(state)),
-#if VMO_USE_LOCAL_LOCK && VMO_USE_SHARED_LOCK
-      lock_(hierarchy_state_ptr_->lock()->lock()),
-#endif
+VmObjectPhysical::VmObjectPhysical(paddr_t base, uint64_t size, bool is_slice,
+                                   uint64_t parent_user_id)
+    : VmObject(VMOType::Physical),
       size_(size),
       base_(base),
       is_slice_(is_slice),
@@ -74,16 +71,9 @@ zx_status_t VmObjectPhysical::Create(paddr_t base, uint64_t size,
   }
 
   fbl::AllocChecker ac;
-  fbl::RefPtr<VmHierarchyState> state;
-  if constexpr (VMO_USE_SHARED_LOCK) {
-    state = fbl::AdoptRef<VmHierarchyState>(new (&ac) VmHierarchyState);
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-  }
 
-  auto vmo = fbl::AdoptRef<VmObjectPhysical>(new (&ac) VmObjectPhysical(
-      ktl::move(state), base, size, /*is_slice=*/false, /*parent_user_id=*/0));
+  auto vmo = fbl::AdoptRef<VmObjectPhysical>(
+      new (&ac) VmObjectPhysical(base, size, /*is_slice=*/false, /*parent_user_id=*/0));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -126,7 +116,7 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
     // allowing this operation on resizable vmo's, we should still be holding the lock to
     // correctly read size_. Unfortunately we must also drop then drop the lock in order to
     // perform the allocation.
-    Guard<VmoLockType> guard{lock()};
+    Guard<CriticalMutex> guard{lock()};
     our_size = size_;
   }
   if (!InRange(offset, size, our_size)) {
@@ -137,19 +127,15 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
   // nothing is resizable and the slice must be wholly contained.
   // We can read and store the user_id here since for a slice to be being created the dispatcher
   // side of this object must have completed, and hence the user_id has been set.
-  fbl::RefPtr<VmHierarchyState> state;
-#if VMO_USE_SHARED_LOCK
-  state = hierarchy_state_ptr_;
-#endif
   fbl::AllocChecker ac;
-  auto vmo = fbl::AdoptRef<VmObjectPhysical>(new (&ac) VmObjectPhysical(
-      ktl::move(state), base_ + offset, size, /*is_slice=*/true, user_id()));
+  auto vmo = fbl::AdoptRef<VmObjectPhysical>(
+      new (&ac) VmObjectPhysical(base_ + offset, size, /*is_slice=*/true, user_id()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
   {
-    Guard<VmoLockType> guard{lock()};
+    Guard<CriticalMutex> guard{lock()};
 
     // Inherit the current cache policy
     vmo->mapping_cache_flags_ = mapping_cache_flags_;
@@ -172,7 +158,7 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
 void VmObjectPhysical::Dump(uint depth, bool verbose) {
   canary_.Assert();
 
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
@@ -188,7 +174,7 @@ zx_status_t VmObjectPhysical::Lookup(uint64_t offset, uint64_t len,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (unlikely(!InRange(offset, len, size_))) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -215,7 +201,7 @@ zx_status_t VmObjectPhysical::CommitRangePinned(uint64_t offset, uint64_t len, b
   if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (unlikely(!InRange(offset, len, size_))) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -236,7 +222,7 @@ zx_status_t VmObjectPhysical::PrefetchRange(uint64_t offset, uint64_t len) {
 }
 
 zx_status_t VmObjectPhysical::LookupContiguous(uint64_t offset, uint64_t len, paddr_t* out_paddr) {
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return LookupContiguousLocked(offset, len, out_paddr);
 }
 
@@ -263,7 +249,7 @@ zx_status_t VmObjectPhysical::SetMappingCachePolicy(const uint32_t cache_policy)
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
 
   // If the cache policy is already configured on this VMO and matches
   // the requested policy then this is a no-op. This is a common practice

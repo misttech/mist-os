@@ -714,7 +714,7 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
       VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(vmo.get());
       DEBUG_ASSERT(paged);
       {
-        Guard<VmoLockType> vmo_guard{paged->lock()};
+        Guard<CriticalMutex> vmo_guard{paged->lock()};
 
         auto stream_size = paged->saturating_stream_size_locked();
         DEBUG_ASSERT(stream_size);

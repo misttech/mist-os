@@ -779,7 +779,7 @@ void DumpVmObjectCowTree(zx_koid_t id) {
   while (auto parent = cow_pages->DebugGetParent()) {
     cow_pages = parent;
   }
-  Guard<VmoLockType> guard{cow_pages->lock()};
+  Guard<CriticalMutex> guard{cow_pages->lock()};
   cow_pages->DebugForEachDescendant([](const VmCowPages* cur, uint depth) {
     AssertHeld(cur->lock_ref());
     cur->DumpLocked(depth, false);

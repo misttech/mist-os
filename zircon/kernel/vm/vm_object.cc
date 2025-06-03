@@ -36,10 +36,7 @@ fbl::WAVLTreeNodeState<VmMapping*>& VmObject::MappingTreeTraits::node_state(VmMa
 
 VmObject::GlobalList VmObject::all_vmos_ = {};
 
-VmObject::VmObject(VMOType type, fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr)
-    : VmHierarchyBase(ktl::move(hierarchy_state_ptr)), type_(type) {
-  LTRACEF("%p\n", this);
-}
+VmObject::VmObject(VMOType type) : type_(type) { LTRACEF("%p\n", this); }
 
 VmObject::~VmObject() {
   canary_.Assert();
@@ -98,13 +95,13 @@ void VmObject::RemoveMappingLocked(VmMapping* r) {
 
 uint32_t VmObject::num_mappings() const {
   canary_.Assert();
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return num_mappings_locked();
 }
 
 bool VmObject::IsMappedByUser() const {
   canary_.Assert();
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return ktl::any_of(mapping_list_.cbegin(), mapping_list_.cend(),
                      [](const VmMapping& m) -> bool { return m.aspace()->is_user(); });
 }
@@ -112,7 +109,7 @@ bool VmObject::IsMappedByUser() const {
 uint32_t VmObject::share_count() const {
   canary_.Assert();
 
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (mapping_list_len_ < 2) {
     return 1;
   }
@@ -404,13 +401,6 @@ void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, Ra
     node = node.parent();
   }
 }
-
-#if VMO_USE_SHARED_LOCK
-VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
-    : hierarchy_state_ptr_(ktl::move(state)) {}
-#else
-VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state) { DEBUG_ASSERT(!state); }
-#endif
 
 // TODO(https://fxbug.dev/408878701): add option to dump by koid.
 static int cmd_vm_object(int argc, const cmd_args* argv, uint32_t flags) {

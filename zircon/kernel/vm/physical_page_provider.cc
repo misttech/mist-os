@@ -413,7 +413,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
       // First take the VMO lock before taking our lock to ensure lock ordering is correct. As we
       // hold a RefPtr we know that even if racing with OnClose this is a valid object.
       VmCowPages::DeferredOps deferred(cow_pages_);
-      Guard<VmoLockType> cow_lock{cow_pages_->lock()};
+      Guard<CriticalMutex> cow_lock{cow_pages_->lock()};
       bool detached;
       // Now take our lock and check to see if we have been detached.
       {
