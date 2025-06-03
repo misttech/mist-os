@@ -98,6 +98,26 @@ void ResumeException(ThreadContext* context, ExceptionReport* report) {
   report->exception.reset();
 }
 
+bool WaitForThreadBlocked(const zx::thread& thread) {
+  while (true) {
+    zx_info_thread_t info;
+    uint64_t actual, actual_count;
+    if (thread.get_info(ZX_INFO_THREAD, &info, sizeof(info), &actual, &actual_count) != ZX_OK) {
+      return false;
+    }
+    switch (ZX_THREAD_STATE_BASIC(info.state)) {
+      case ZX_THREAD_STATE_BLOCKED:
+        return true;
+      case ZX_THREAD_STATE_RUNNING:
+        break;
+      default:
+        return false;
+    }
+    // There's no signal to wait on, so just poll
+    zx_nanosleep(zx_deadline_after(ZX_USEC(100)));
+  }
+}
+
 // Thread Functions --------------------------------------------------------------------------------
 
 int LoopThread(void* user) {
@@ -237,6 +257,11 @@ TEST(Inspector, PrintDebugInfoForManyThreads) {
   // Wait until all the loop threads are done.
   for (int i = 0; i < kLoopThreadCount; i++) {
     context.loop_threads_ready[i].wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), 0);
+    zx::unowned<zx::thread> thread = zx::unowned<zx::thread>(thrd_get_zx_handle(loop_threads[i]));
+    // Wait for the thread to actually block, this ensures that when inspect goes to suspend it
+    // later it can happen synchronously in the suspend call, ensuring that the limited timeout does
+    // not exceed.
+    ASSERT_TRUE(WaitForThreadBlocked(*thread));
   }
 
   // Create the main crash thread.
