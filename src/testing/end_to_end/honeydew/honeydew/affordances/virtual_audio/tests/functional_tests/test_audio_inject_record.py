@@ -5,6 +5,7 @@
 
 import asyncio
 import logging
+import os
 import time
 
 from fuchsia_base_test import fuchsia_base_test
@@ -12,7 +13,7 @@ from mobly import test_runner
 
 from honeydew.fuchsia_device import fuchsia_device
 
-_AUDIO_FILE_INPUT = "audio_runtime_deps/sine-wave.wav"
+_AUDIO_FILE_INPUT = "audio_runtime_deps/sine_wave.wav"
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
@@ -43,7 +44,17 @@ class AudioAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         time.sleep(5)
 
         data = asyncio.run(responseAudio.stop_and_extract_response())
+        output_path = os.path.join(
+            os.getenv("FUCHSIA_TEST_OUTDIR") or "", "response.wav"
+        )
         _LOGGER.info("Got %d bytes", len(data))
+        _LOGGER.info("Writing to %s", output_path)
+
+        with open(
+            output_path,
+            "wb",
+        ) as f:
+            f.write(data)
 
 
 if __name__ == "__main__":

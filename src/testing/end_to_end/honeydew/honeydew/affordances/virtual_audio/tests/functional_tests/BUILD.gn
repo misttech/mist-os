@@ -8,7 +8,7 @@ import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   host_test_data("audio_runtime_deps") {
-    sources = [ "sine-wave.wav" ]
+    sources = [ "sine_wave.wav" ]
     outputs = [ "$root_build_dir/audio_runtime_deps/{{source_file_part}}" ]
   }
 
