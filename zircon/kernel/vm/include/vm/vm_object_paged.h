@@ -221,6 +221,9 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   zx_status_t WriteUser(user_in_ptr<const char> ptr, uint64_t offset, size_t len,
                         VmObjectReadWriteOptions options, size_t* out_actual,
                         const OnWriteBytesTransferredCallback& on_bytes_transferred) override;
+  zx_status_t ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len, size_t* out_actual);
+  zx_status_t WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len, size_t* out_actual,
+                              const OnWriteBytesTransferredCallback& on_bytes_transferred);
 
   zx_status_t TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) override;
   zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,

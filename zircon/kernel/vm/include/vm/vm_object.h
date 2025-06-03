@@ -412,8 +412,6 @@ class VmObject : public VmHierarchyBase,
                                VmObjectReadWriteOptions options, size_t* out_actual) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  virtual zx_status_t ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len,
-                                     size_t* out_actual);
 
   // |OnWriteBytesTransferredCallback| is guaranteed to be called after bytes have been successfully
   // transferred from the user source to the VMO and will be called before the VMO lock is dropped.
@@ -425,9 +423,6 @@ class VmObject : public VmHierarchyBase,
                                 const OnWriteBytesTransferredCallback& on_bytes_transferred) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  virtual zx_status_t WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
-                                      size_t* out_actual,
-                                      const OnWriteBytesTransferredCallback& on_bytes_transferred);
 
   // Removes the pages from this vmo in the range [offset, offset + len) and returns
   // them in pages.  This vmo must be a paged vmo with no parent, and it cannot have any
