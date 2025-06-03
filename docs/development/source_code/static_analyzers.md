@@ -44,8 +44,8 @@ def http_links(ctx):
 
 Learn more about shac’s implementation of [emit.findings].
 
-Note: Shac does not automatically discover checks. In order for a check to run,
-a check function must be passed to `shac.register_check()` in
+Note that Shac does not automatically discover checks. In order for a check to
+run, a check function must be passed to `shac.register_check()` in
 `//scripts/shac/main.star`:
 
 ```python
@@ -59,12 +59,11 @@ def register_all_checks():
     ...
 ```
 
-Note: When implementing a new check in a file that already contains other
-checks, you may be able to register the new check within that file. For
-example, `//scripts/shac/fidl.star` has a `register_fidl_checks()` function
-that gets called from `//scripts/shac/main.star`. Add new FIDL
-checks to `fidl.star` and register them in the `register_fidl_checks()`
-function in the same file.
+When implementing a new check in a file that already contains other checks, you
+may be able to register the new check within that file. For example,
+`//scripts/shac/fidl.star` has a `register_fidl_checks()` function that gets
+called from `//scripts/shac/main.star`. Add new FIDL checks to `fidl.star` and
+register them in the `register_fidl_checks()` function in the same file.
 
 ### Advanced example
 
