@@ -3687,11 +3687,11 @@ impl BinderDriver {
                 }
                 uapi::BINDER_SET_CONTEXT_MGR | uapi::BINDER_SET_CONTEXT_MGR_EXT => {
                     // A process is registering itself as the context manager.
-                    if user_arg.is_null() {
-                        return error!(EINVAL);
-                    }
 
                     let flags = if request == uapi::BINDER_SET_CONTEXT_MGR_EXT {
+                        if user_arg.is_null() {
+                            return error!(EINVAL);
+                        }
                         let user_ref = UserRef::<flat_binder_object>::new(user_arg);
                         let flat_binder_object = binder_proc
                             .get_resource_accessor(current_task)
