@@ -21,7 +21,7 @@ sdk_source_set("default") {
   public = [ "default.h" ]
   include_base = "//sdk"
 
-  non_sdk_local_deps =
+  non_sdk_deps =
       [ "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp" ]
 
   deps = [

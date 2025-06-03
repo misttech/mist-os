@@ -12,7 +12,7 @@ sdk_source_set("bind-property") {
     "bind-property.cc",
     "bind-property.h",
   ]
-  non_sdk_local_deps =
+  non_sdk_deps =
       [ "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp" ]
 
   deps = [
