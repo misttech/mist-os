@@ -533,7 +533,7 @@
              path="third_party/openthread"
              remote="https://fuchsia.googlesource.com/third_party/openthread"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="083000835a307054c5d6b8b24ba5b54893fa1950"/>
+             revision="758b260f06fe2e48842db3fe832b9c181b1590b4"/>
     <project name="third_party/openweave-core"
              path="third_party/openweave-core"
              remote="https://fuchsia.googlesource.com/third_party/openweave-core"
