@@ -400,6 +400,57 @@
     }
   },
   {
+    "atom_actual": "//sdk/lib/fdio:fdio_sdk_manifest",
+    "atom_label": "//sdk/lib/fdio:fdio_sdk",
+    "atom_type": "alias"
+  },
+  {
+    "atom_files": [
+      {
+        "dest": "pkg/driver_fake_object_cpp/include/lib/driver/fake-object/cpp/fake-object.h",
+        "source": "../../sdk/lib/driver/fake-object/cpp/fake-object.h"
+      },
+      {
+        "dest": "pkg/driver_fake_object_cpp/fake-handle.cc",
+        "source": "../../sdk/lib/driver/fake-object/cpp/fake-handle.cc"
+      },
+      {
+        "dest": "pkg/driver_fake_object_cpp/fake-object.cc",
+        "source": "../../sdk/lib/driver/fake-object/cpp/fake-object.cc"
+      },
+      {
+        "dest": "pkg/driver_fake_object_cpp/internal.h",
+        "source": "../../sdk/lib/driver/fake-object/cpp/internal.h"
+      }
+    ],
+    "atom_id": "sdk://pkg/driver_fake_object_cpp",
+    "atom_label": "//sdk/lib/driver/fake-object/cpp:cpp_sdk",
+    "atom_meta": {
+      "dest": "pkg/driver_fake_object_cpp/meta.json",
+      "stable": true,
+      "type": "cc_source_library"
+    },
+    "atom_meta_json_file": "gen/sdk/lib/driver/fake-object/cpp/cpp_sdk.meta.json",
+    "atom_type": "cc_source_library",
+    "is_stable": true,
+    "prebuild_info": {
+      "deps": [
+        "//sdk/lib/fdio:fdio_sdk"
+      ],
+      "file_base": "pkg/driver_fake_object_cpp",
+      "headers": [
+        "pkg/driver_fake_object_cpp/include/lib/driver/fake-object/cpp/fake-object.h"
+      ],
+      "include_dir": "pkg/driver_fake_object_cpp/include",
+      "library_name": "driver_fake_object_cpp",
+      "sources": [
+        "pkg/driver_fake_object_cpp/fake-handle.cc",
+        "pkg/driver_fake_object_cpp/fake-object.cc",
+        "pkg/driver_fake_object_cpp/internal.h"
+      ]
+    }
+  },
+  {
     "atom_files": [
       {
         "dest": "fidl/zx/overview.fidl",
