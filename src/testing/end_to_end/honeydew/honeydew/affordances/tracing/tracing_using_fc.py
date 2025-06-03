@@ -273,7 +273,7 @@ class TracingUsingFc(tracing.Tracing):
     def terminate(self) -> None:
         """Terminates the trace session without saving the trace."""
         if self._trace_controller_proxy is not None:
-            self._trace_controller_proxy.close_cleanly()
+            self._trace_controller_proxy.channel.close()
         self._reset_state()
 
     def terminate_and_download(
@@ -337,9 +337,8 @@ class TracingUsingFc(tracing.Tracing):
         socket_task = asyncio.get_running_loop().create_task(
             self._trace_socket.read_all()
         )
-        if self._trace_controller_proxy is not None:
-            self._trace_controller_proxy.close_cleanly()
+        self.terminate()
+
         trace_buffer: bytes = await socket_task
-        self._reset_state()
 
         return trace_buffer

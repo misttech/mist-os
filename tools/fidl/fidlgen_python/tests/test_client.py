@@ -27,9 +27,9 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         proxy = ffx.EchoClient(channel)
         proxy.pending_txids.add(1)
         proxy.pending_txids.add(2)
-        proxy._channel_waker.handle_ready_queues = {}
-        proxy._channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
-        proxy._channel_waker.handle_ready_queues[0].put_nowait(0)
+        proxy.channel_waker.handle_ready_queues = {}
+        proxy.channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
+        proxy.channel_waker.handle_ready_queues[0].put_nowait(0)
         proxy._decode = Mock()  # type: ignore[method-assign]
         proxy._decode.return_value = (bytearray([1, 2, 3]), [])
         loop = asyncio.get_running_loop()
@@ -49,11 +49,11 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         ]
         proxy = ffx.EchoClient(channel)
         proxy.pending_txids.add(1)
-        proxy._channel_waker.handle_ready_queues = {}
-        proxy._channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
-        proxy._channel_waker.handle_ready_queues[0].put_nowait(0)
-        proxy._channel_waker.handle_ready_queues[0].put_nowait(0)
-        proxy._channel_waker.handle_ready_queues[0].put_nowait(0)
+        proxy.channel_waker.handle_ready_queues = {}
+        proxy.channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
+        proxy.channel_waker.handle_ready_queues[0].put_nowait(0)
+        proxy.channel_waker.handle_ready_queues[0].put_nowait(0)
+        proxy.channel_waker.handle_ready_queues[0].put_nowait(0)
         proxy._decode = Mock()  # type: ignore[method-assign]
         proxy._decode.return_value = (bytearray([1, 2, 3]), [])
         await proxy._read_and_decode(1)
@@ -68,9 +68,9 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         ]
         proxy = ffx.EchoClient(channel)
         proxy.pending_txids.add(1)
-        proxy._channel_waker.handle_ready_queues = {}
-        proxy._channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
-        proxy._channel_waker.handle_ready_queues[0].put_nowait(0)
+        proxy.channel_waker.handle_ready_queues = {}
+        proxy.channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
+        proxy.channel_waker.handle_ready_queues[0].put_nowait(0)
         proxy.staged_messages[1] = asyncio.Queue(1)
         proxy.staged_messages[1].put_nowait((bytearray([1, 0, 0, 0]), []))
         proxy._decode = Mock()  # type: ignore[method-assign]
@@ -83,12 +83,12 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         channel.as_int.return_value = 0
         channel.read.side_effect = [(bytearray([1, 0, 0, 0]), ())]
         proxy = ffx.EchoClient(channel)
-        proxy._channel_waker.handle_ready_queues = {}
-        proxy._channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
-        proxy._channel_waker.handle_ready_queues[0].put_nowait(0)
+        proxy.channel_waker.handle_ready_queues = {}
+        proxy.channel_waker.handle_ready_queues[0] = asyncio.Queue()  # type: ignore[assignment]
+        proxy.channel_waker.handle_ready_queues[0].put_nowait(0)
         with self.assertRaises(RuntimeError):
             await proxy._read_and_decode(10)
-        self.assertEqual(proxy._channel, None)
+        self.assertEqual(proxy.channel, None)
 
     async def test_staging_stages(self) -> None:
         channel = Mock()

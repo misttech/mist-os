@@ -46,13 +46,13 @@ class FidlClient(metaclass=FidlMeta):
         self.id = _CLIENT_ID
         _CLIENT_ID += 1
         if type(channel) is int:
-            self._channel = fc.Channel(channel)
+            self.channel = fc.Channel(channel)
         else:
-            self._channel = channel
+            self.channel = channel
         if channel_waker is None:
-            self._channel_waker = GlobalHandleWaker()
+            self.channel_waker = GlobalHandleWaker()
         else:
-            self._channel_waker = channel_waker
+            self.channel_waker = channel_waker
         self.pending_txids: Set[TXID_Type] = set({})
         self.staged_messages: Dict[TXID_Type, asyncio.Queue[FidlMessage]] = {}
         self.epitaph_received: EpitaphError | None = None
@@ -62,27 +62,13 @@ class FidlClient(metaclass=FidlMeta):
             f"{self} instantiated from {caller.filename}:{caller.lineno}"
         )
 
-    def close_cleanly(self):
-        """Closes the underlying channel safely.
-
-        This is so-named to avoid name conflicts with existing FIDL methods.
-        A potential other method here is to make this appear private (leading underscore).
-        """
-        _LOGGER.debug(f"{self} closing from caller")
-        self._close()
-
     def __str__(self):
         return f"client:{type(self).__name__}:{self.id}"
 
     def __del__(self):
-        _LOGGER.debug(f"{self} closing from GC")
-        self._close()
-
-    def _close(self):
-        if self._channel is not None:
-            self._channel_waker.unregister(self._channel)
-            self._channel.close()
-            self._channel = None
+        _LOGGER.debug(f"{self} closing")
+        if self.channel is not None:
+            self.channel_waker.unregister(self.channel)
 
     async def _get_staged_message(self, txid: TXID_Type):
         res = await self.staged_messages[txid].get()
@@ -120,14 +106,14 @@ class FidlClient(metaclass=FidlMeta):
         """
         # TODO(awdavies): Raise an exception if there are no events supported for this client.
         try:
-            self._channel_waker.register(self._channel)
+            self.channel_waker.register(self.channel)
             return await self._read_and_decode(0)
         except fc.ZxStatus as e:
             if e.args[0] != fc.ZxStatus.ZX_ERR_PEER_CLOSED:
                 _LOGGER.warning(
                     f"{self} received error waiting for next event: {e}"
                 )
-                self._channel_waker.unregister(self._channel)
+                self.channel_waker.unregister(self.channel)
                 raise e
         return None
 
@@ -168,7 +154,7 @@ class FidlClient(metaclass=FidlMeta):
             try:
                 if self.epitaph_received is not None:
                     raise self.epitaph_received
-                msg = self._channel.read()
+                msg = self.channel.read()
                 self._epitaph_check(msg)
                 recvd_txid = parse_txid(msg)
                 if recvd_txid == txid:
@@ -180,8 +166,8 @@ class FidlClient(metaclass=FidlMeta):
                         self._clean_staging(txid)
                         return msg
                 if recvd_txid != 0 and recvd_txid not in self.pending_txids:
-                    self._channel_waker.unregister(self._channel)
-                    self._channel = None
+                    self.channel_waker.unregister(self.channel)
+                    self.channel = None
                     _LOGGER.warning(
                         f"{self} received unexpected TXID: {recvd_txid}"
                     )
@@ -199,12 +185,12 @@ class FidlClient(metaclass=FidlMeta):
                 raise ep
             except fc.ZxStatus as e:
                 if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
-                    self._channel_waker.unregister(self._channel)
+                    self.channel_waker.unregister(self.channel)
                     _LOGGER.warning(f"{self} received channel error: {e}")
                     raise e
             loop = asyncio.get_running_loop()
             channel_waker_task = loop.create_task(
-                self._channel_waker.wait_ready(self._channel)
+                self.channel_waker.wait_ready(self.channel)
             )
             staged_msg_task = loop.create_task(self._get_staged_message(txid))
             epitaph_event_task = loop.create_task(self._epitaph_event_wait())
@@ -236,7 +222,7 @@ class FidlClient(metaclass=FidlMeta):
                 # the staged message. To ensure another task can be awoken, we must post an event
                 # saying the channel still needs to be read, since we've essentilly stolen it from
                 # another task.
-                self._channel_waker.post_ready(self._channel)
+                self.channel_waker.post_ready(self.channel)
                 return self._decode(txid, msg)
             # Only one notification came in.
             msg = done.pop().result()
@@ -259,14 +245,14 @@ class FidlClient(metaclass=FidlMeta):
         """
         global TXID
         TXID += 1
-        self._channel_waker.register(self._channel)
+        self.channel_waker.register(self.channel)
         self.pending_txids.add(TXID)
         self._send_one_way_fidl_request(TXID, ordinal, library, msg_obj)
 
         async def result(txid):
             # This is called a second time because the first attempt may have been in a sync context
             # and would not have added a reader.
-            self._channel_waker.register(self._channel)
+            self.channel_waker.register(self.channel)
             res = await self._read_and_decode(txid)
             return self.construct_response_object(response_ident, res)
 
@@ -292,7 +278,7 @@ class FidlClient(metaclass=FidlMeta):
             txid=txid,
             type_name=type_name,
         )
-        self._channel.write(encoded_fidl_message)
+        self.channel.write(encoded_fidl_message)
 
 
 class EventHandlerBase(
@@ -313,7 +299,7 @@ class EventHandlerBase(
 
     def __init__(self, client: FidlClient):
         self.client = client
-        self.client._channel_waker.register(self.client._channel)
+        self.client.channel_waker.register(self.client.channel)
 
     def __str__(self):
         return f"event:{type(self.client).__name__}:{self.client.id}"

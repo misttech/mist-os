@@ -57,13 +57,13 @@ class ServerBase(
 
     def __init__(self, channel: fc.Channel, channel_waker=None):
         global _SERVER_ID
-        self._channel = channel
+        self.channel = channel
         self.id = _SERVER_ID
         _SERVER_ID += 1
         if channel_waker is None:
-            self._channel_waker = GlobalHandleWaker()
+            self.channel_waker = GlobalHandleWaker()
         else:
-            self._channel_waker = channel_waker
+            self.channel_waker = channel_waker
         caller = getframeinfo(stack()[1][0])
         _LOGGER.debug(
             f"{self} instantiated from {caller.filename}:{caller.lineno}"
@@ -71,18 +71,18 @@ class ServerBase(
 
     def __del__(self):
         _LOGGER.debug(f"{self} closing")
-        if self._channel is not None:
-            self._channel_waker.unregister(self._channel)
-            self._channel = None
+        if self.channel is not None:
+            self.channel_waker.unregister(self.channel)
+            self.channel = None
 
     def close(self):
         self.__del__()
 
     def serve(self):
-        self._channel_waker.register(self._channel)
+        self.channel_waker.register(self.channel)
 
         async def _serve():
-            self._channel_waker.register(self._channel)
+            self.channel_waker.register(self.channel)
             while await self.handle_next_request():
                 pass
 
@@ -93,15 +93,15 @@ class ServerBase(
             # TODO(b/299946378): Handle case where ordinal is unknown.
             return await self._handle_request_helper()
         except StopServer:
-            self._channel.close()
+            self.channel.close()
             return False
         except Exception as e:
             # It's very important to close the channel, because if this is run inside a task,
             # then it isn't possible for the exception to get raised in time. So if another
             # coroutine depends on this server functioning (like a client), then it'll hang
             # forever. So, we must close the channel in order to make progress.
-            self._channel.close()
-            self._channel = None
+            self.channel.close()
+            self.channel = None
             _LOGGER.debug(f"{self} request handling error: {e}")
             raise e
 
@@ -165,7 +165,7 @@ class ServerBase(
                 txid=txid,
                 type_name=res.__fidl_raw_type__,
             )
-            self._channel.write(encoded_fidl_message)
+            self.channel.write(encoded_fidl_message)
         elif info.empty_response:
             encoded_fidl_message = encode_fidl_message(
                 ordinal=ordinal,
@@ -174,21 +174,21 @@ class ServerBase(
                 txid=txid,
                 type_name=None,
             )
-            self._channel.write(encoded_fidl_message)
+            self.channel.write(encoded_fidl_message)
         return True
 
     async def _channel_read(self) -> FidlMessage:
         while True:
             try:
-                return self._channel.read()
+                return self.channel.read()
             except fc.ZxStatus as e:
                 # Any number of spurious wakeups are possible. Stay in the loop if the error
                 # is ZX_ERR_SHOULD_WAIT.
                 if e.args[0] == fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
                     _LOGGER.debug(f"{self} channel spurious wakeup")
-                    await self._channel_waker.wait_ready(self._channel)
+                    await self.channel_waker.wait_ready(self.channel)
                     continue
-                self._channel_waker.unregister(self._channel)
+                self.channel_waker.unregister(self.channel)
                 _LOGGER.warning(f"{self} channel received error: {e}")
                 raise e
 
@@ -214,4 +214,4 @@ class ServerBase(
             txid=0,
             type_name=type_name,
         )
-        self._channel.write(encoded_fidl_message)
+        self.channel.write(encoded_fidl_message)
