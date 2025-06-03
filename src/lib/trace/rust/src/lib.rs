@@ -966,14 +966,14 @@ pub fn flow_step(
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instaflow_begin!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_begin!(c"category", c"flow", c"step", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! instaflow_begin {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -982,8 +982,8 @@ macro_rules! instaflow_begin {
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_begin(
                     &context,
-                    $event_name,
                     $flow_name,
+                    $step_name,
                     $flow_id,
                     &[$($crate::ArgValue::of($key, $val)),*],
                 )
@@ -1003,14 +1003,14 @@ macro_rules! instaflow_begin {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instaflow_end!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_end!(c"category", c"flow", c"step", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! instaflow_end {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -1019,8 +1019,8 @@ macro_rules! instaflow_end {
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_end(
                     &context,
-                    $event_name,
                     $flow_name,
+                    $step_name,
                     $flow_id,
                     &[$($crate::ArgValue::of($key, $val)),*],
                 )
@@ -1040,14 +1040,14 @@ macro_rules! instaflow_end {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instaflow_step!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_step!(c"category", c"flow", c"step", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! instaflow_step {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -1056,8 +1056,8 @@ macro_rules! instaflow_step {
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_step(
                     &context,
-                    $event_name,
                     $flow_name,
+                    $step_name,
                     $flow_id,
                     &[$($crate::ArgValue::of($key, $val)),*],
                 )
@@ -1079,20 +1079,20 @@ macro_rules! instaflow_step {
 /// end events are combined together in the trace; it is not necessary to repeat them.
 pub fn instaflow_begin(
     context: &TraceCategoryContext,
-    event_name: &'static CStr,
     flow_name: &'static CStr,
+    step_name: &'static CStr,
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
     let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    let event_name_ref = context.register_string_literal(event_name);
     let flow_name_ref = context.register_string_literal(flow_name);
+    let step_name_ref = context.register_string_literal(step_name);
 
-    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_duration_begin(ticks, step_name_ref, args);
     context.write_flow_begin(ticks, flow_name_ref, flow_id, args);
-    context.write_duration_end(ticks, event_name_ref, args);
+    context.write_duration_end(ticks, step_name_ref, args);
 }
 
 /// Convenience function to the end of a flow attached to an instant event.
@@ -1108,20 +1108,20 @@ pub fn instaflow_begin(
 /// end events are combined together in the trace; it is not necessary to repeat them.
 pub fn instaflow_end(
     context: &TraceCategoryContext,
-    event_name: &'static CStr,
     flow_name: &'static CStr,
+    step_name: &'static CStr,
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
     let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    let event_name_ref = context.register_string_literal(event_name);
     let flow_name_ref = context.register_string_literal(flow_name);
+    let step_name_ref = context.register_string_literal(step_name);
 
-    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_duration_begin(ticks, step_name_ref, args);
     context.write_flow_end(ticks, flow_name_ref, flow_id, args);
-    context.write_duration_end(ticks, event_name_ref, args);
+    context.write_duration_end(ticks, step_name_ref, args);
 }
 
 /// Convenience function to emit a step in a flow attached to an instant event.
@@ -1137,20 +1137,20 @@ pub fn instaflow_end(
 /// end events are combined together in the trace; it is not necessary to repeat them.
 pub fn instaflow_step(
     context: &TraceCategoryContext,
-    event_name: &'static CStr,
     flow_name: &'static CStr,
+    step_name: &'static CStr,
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
     let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    let event_name_ref = context.register_string_literal(event_name);
     let flow_name_ref = context.register_string_literal(flow_name);
+    let step_name_ref = context.register_string_literal(step_name);
 
-    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_duration_begin(ticks, step_name_ref, args);
     context.write_flow_step(ticks, flow_name_ref, flow_id, args);
-    context.write_duration_end(ticks, event_name_ref, args);
+    context.write_duration_end(ticks, step_name_ref, args);
 }
 
 // translated from trace-engine/types.h for inlining

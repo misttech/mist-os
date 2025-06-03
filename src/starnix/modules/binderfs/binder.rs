@@ -2432,7 +2432,7 @@ impl CommandTraceGuard {
     fn begin(kind: &'static CStr) -> Self {
         if starnix_logging::regular_trace_category_enabled(TRACE_CATEGORY) {
             let id = fuchsia_trace::Id::random();
-            trace_instaflow_begin!(TRACE_CATEGORY, kind, c"BinderFlow", id);
+            trace_instaflow_begin!(TRACE_CATEGORY, c"BinderFlow", kind, id);
             Self(Some(CommandTraceGuardInner { id, kind }))
         } else {
             Self(None)
@@ -2443,7 +2443,7 @@ impl CommandTraceGuard {
 impl Drop for CommandTraceGuard {
     fn drop(&mut self) {
         if let Some(CommandTraceGuardInner { id, kind }) = self.0.take() {
-            trace_instaflow_end!(TRACE_CATEGORY, kind, c"BinderFlow", id);
+            trace_instaflow_end!(TRACE_CATEGORY, c"BinderFlow", kind, id);
         }
     }
 }
