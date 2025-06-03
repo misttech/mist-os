@@ -87,21 +87,17 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
     case Ep0::State::Setup: {
       void* const vaddr = ep0_.buffer->virt();
       const zx_paddr_t paddr = ep0_.buffer->phys();
-      fdescriptor::wire::UsbSetup setup = ep0_.cur_setup;
+      fdescriptor::wire::UsbSetup& setup = ep0_.cur_setup;
 
       memcpy(&setup, vaddr, sizeof(setup));
 
       FDF_LOG(DEBUG, "got setup: type: 0x%02X req: %d value: %d index: %d length: %d",
               setup.bm_request_type, setup.b_request, setup.w_value, setup.w_index, setup.w_length);
 
-      const bool is_out = ((setup.bm_request_type & USB_DIR_MASK) == USB_DIR_OUT);
-      if (setup.w_length > 0 && is_out) {
-        CacheFlushInvalidate(ep0_.buffer.get(), 0, ep0_.buffer->size());
-        EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr,
-                        ep0_.buffer->size());
-        ep0_.state = Ep0::State::DataOut;
-      } else {
-        zx::result<size_t> status = HandleEp0Setup(setup, vaddr, ep0_.buffer->size());
+      const bool is_three_stage = setup.w_length > 0;
+      // Two stage.
+      if (!is_three_stage) {
+        zx::result<size_t> status = HandleEp0Setup(setup, nullptr, 0);
         if (status.is_error()) {
           FDF_LOG(DEBUG, "HandleSetup returned %s", zx_status_get_string(status.error_value()));
           CmdEpSetStall(ep0_.out);
@@ -109,17 +105,36 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
           break;
         }
 
-        const size_t actual = status.value();
-        FDF_LOG(DEBUG, "HandleSetup success: actual %zu", actual);
-        if (setup.w_length > 0) {
-          // queue a write for the data phase
-          CacheFlush(ep0_.buffer.get(), 0, actual);
-          EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr, actual);
-          ep0_.state = Ep0::State::DataIn;
-        } else {
-          ep0_.state = Ep0::State::WaitNrdyIn;
-        }
+        ep0_.state = Ep0::State::WaitNrdyIn;
+        break;
       }
+
+      // Three stage.
+      const bool is_out = ((setup.bm_request_type & USB_DIR_MASK) == USB_DIR_OUT);
+      if (is_out) {
+        // Out.
+        CacheFlushInvalidate(ep0_.buffer.get(), 0, ep0_.buffer->size());
+        EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr,
+                        ep0_.buffer->size());
+        ep0_.state = Ep0::State::DataOut;
+        break;
+      }
+
+      // In.
+      zx::result<size_t> status = HandleEp0Setup(setup, vaddr, ep0_.buffer->size());
+      if (status.is_error()) {
+        FDF_LOG(DEBUG, "HandleSetup returned %s", status.status_string());
+        // Go to Setup state so that the next not ready event will trigger a STALL.
+        ep0_.state = Ep0::State::Setup;
+        break;
+      }
+
+      const size_t actual = status.value();
+      FDF_LOG(DEBUG, "HandleSetup success: actual %zu", actual);
+      // queue a write for the data phase
+      CacheFlush(ep0_.buffer.get(), 0, actual);
+      EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr, actual);
+      ep0_.state = Ep0::State::DataIn;
       break;
     }
     case Ep0::State::DataOut: {
@@ -168,7 +183,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       if ((ep_num == kEp0In) && (stage == DEPEVT_XFER_NOT_READY_STAGE_DATA)) {
         // end transfer and stall if we receive xfer not ready in the opposite direction
         CmdEpEndTransfer(ep0_.out);
-        CmdEpSetStall(ep0_.in);
+        CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
       }
       break;
@@ -203,16 +218,17 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
 
 zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup, void* buffer,
                                         size_t length) {
-  auto DoControlCall = [this](const fdescriptor::wire::UsbSetup& setup, const uint8_t* in_buf,
-                              size_t in_len, uint8_t* out_buf,
-                              size_t out_len) -> zx::result<size_t> {
+  auto DoControlCall = [this](const fdescriptor::wire::UsbSetup& setup, const uint8_t* write_buffer,
+                              size_t write_size, uint8_t* read_buffer,
+                              size_t read_size) -> zx::result<size_t> {
     std::lock_guard<std::mutex> lock(dci_lock_);
 
     if (!dci_intf_.is_valid()) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
-    zx::result<size_t> result = DciIntfControl(&setup, in_buf, in_len, out_buf, out_len);
+    zx::result<size_t> result =
+        DciIntfControl(&setup, write_buffer, write_size, read_buffer, read_size);
     if (result.is_error()) {
       return result.take_error();
     }
@@ -248,7 +264,7 @@ zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup
   if ((setup.bm_request_type & USB_DIR_MASK) == USB_DIR_IN) {
     return DoControlCall(setup, nullptr, 0, reinterpret_cast<uint8_t*>(buffer), length);
   } else {
-    return DoControlCall(setup, nullptr, 0, nullptr, 0);
+    return DoControlCall(setup, reinterpret_cast<uint8_t*>(buffer), length, nullptr, 0);
   }
 }
 
