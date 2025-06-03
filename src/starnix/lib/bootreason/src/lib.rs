@@ -45,8 +45,20 @@ pub fn get_android_bootreason() -> Result<&'static str, Error> {
 /// Get contents for the pstore/console-ramoops* file.
 ///
 /// In Linux it contains a limited amount of some of the previous boot's kernel logs.
+/// The ramoops won't be created after a normal reboot.
 pub fn get_console_ramoops() -> Option<Vec<u8>> {
     debug!("Getting console-ramoops contents");
-    // Placeholder while we figure out how to get the proper logs.
-    Some("Fuchsia Console Ramoops\n".as_bytes().to_vec())
+    match get_android_bootreason() {
+        Ok(reason) => match reason {
+            "kernel_panic" | "watchdog" | "watchdog,sw" => {
+                // Placeholder while we figure out how to get the proper logs.
+                Some("Fuchsia Console Ramoops\n".as_bytes().to_vec())
+            }
+            _ => None,
+        },
+        Err(e) => {
+            info!("Failed to get android bootreason for console_ramoops: {:?}", e);
+            None
+        }
+    }
 }
