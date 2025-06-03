@@ -5,7 +5,7 @@
 use fuchsia_async::{DurationExt, Task, TimeoutExt};
 use fuchsia_bluetooth::types::{A2dpDirection, Channel};
 use fuchsia_sync::Mutex;
-use futures::stream::Stream;
+use futures::stream::{FusedStream, Stream};
 use futures::{io, FutureExt};
 use log::warn;
 use std::fmt;
@@ -443,11 +443,12 @@ impl StreamEndpoint {
 pub struct MediaStream {
     in_use: Arc<Mutex<bool>>,
     channel: Weak<RwLock<Channel>>,
+    terminated: bool,
 }
 
 impl MediaStream {
     pub fn new(in_use: Arc<Mutex<bool>>, channel: Weak<RwLock<Channel>>) -> Self {
-        Self { in_use, channel }
+        Self { in_use, channel, terminated: false }
     }
 
     fn try_upgrade(&self) -> Result<Arc<RwLock<Channel>>, io::Error> {
@@ -474,22 +475,31 @@ impl Drop for MediaStream {
 impl Stream for MediaStream {
     type Item = AvdtpResult<Vec<u8>>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let arc_chan = match self.try_upgrade() {
-            Err(_e) => return Poll::Ready(None),
-            Ok(c) => c,
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let Ok(arc_chan) = self.try_upgrade() else {
+            self.terminated = true;
+            return Poll::Ready(None);
         };
-        let lock = match arc_chan.try_write() {
-            Err(_e) => return Poll::Ready(None),
-            Ok(lock) => lock,
+        let Ok(lock) = arc_chan.try_write() else {
+            self.terminated = true;
+            return Poll::Ready(None);
         };
         let mut pin_chan = Pin::new(lock);
         match pin_chan.as_mut().poll_next(cx) {
             Poll::Ready(Some(Ok(res))) => Poll::Ready(Some(Ok(res))),
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(Error::PeerRead(e)))),
-            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Ready(None) => {
+                self.terminated = true;
+                Poll::Ready(None)
+            }
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+impl FusedStream for MediaStream {
+    fn is_terminated(&self) -> bool {
+        self.terminated
     }
 }
 
@@ -856,6 +866,8 @@ mod tests {
         // After the stream is gone, the stream should be fused done.
         let mut next_fut = media_stream.next();
         assert_matches!(exec.run_until_stalled(&mut next_fut), Poll::Ready(None));
+
+        assert!(media_stream.is_terminated(), "should be terminated");
 
         // And the Max TX should be an error.
         assert_matches!(media_stream.max_tx_size(), Err(_));
