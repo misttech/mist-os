@@ -289,7 +289,7 @@ service capability from the driver under test to the test code.
         async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
         std::vector<fuchsia_component_test::Capability> exposes = { {
             fuchsia_component_test::Capability::WithService(
-                fuchsia_component_test::Service{{.name = fuchsia_examples::EchoService::Name}}),
+                fuchsia_component_test::Service{ {.name = fuchsia_examples::EchoService::Name}}),
         }};
         driver_test_realm::AddDtrExposes(realm_builder, exposes);
         auto realm = realm_builder.Build(loop.dispatcher());
@@ -315,7 +315,7 @@ service capability from the driver under test to the test code.
     *  {C++}
 
         ```cpp
-        fuchsia_driver_test::RealmArgs realm_args{{.dtr_exposes = std::move(exposes)}};
+        fuchsia_driver_test::RealmArgs realm_args{ {.dtr_exposes = std::move(exposes)}};
         fidl::Result result = fidl::Call(*client)->Start(std::move(realm_args));
         ```
 
