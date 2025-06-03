@@ -240,17 +240,18 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     // query features
     dprintf(INFO, "PSCI supported features:\n");
 
-    auto probe_feature = [](uint32_t feature, const char* feature_name) -> bool {
+    // Prints info about the features and returns supported flags or nullopt if not supported.
+    auto probe_feature = [](uint32_t feature, const char* feature_name) -> ktl::optional<uint32_t> {
       uint32_t result = psci_get_feature(feature);
       if (static_cast<int32_t>(result) < 0) {
         // Not supported
-        return false;
+        return ktl::nullopt;
       }
-      dprintf(INFO, "\t%s\n", feature_name);
-      return true;
+      dprintf(INFO, "\t%s (0x%x)\n", feature_name, result);
+      return result;
     };
 
-    psci_cpu_suspend_supported = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND");
+    psci_cpu_suspend_supported = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND").has_value();
     probe_feature(PSCI64_CPU_OFF, "CPU_OFF");
     probe_feature(PSCI64_CPU_ON, "CPU_ON");
     probe_feature(PSCI64_AFFINITY_INFO, "CPU_AFFINITY_INFO");
@@ -259,8 +260,7 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     probe_feature(PSCI64_MIGRATE_INFO_UP_CPU, "CPU_MIGRATE_INFO_UP_CPU");
     probe_feature(PSCI64_SYSTEM_OFF, "SYSTEM_OFF");
     probe_feature(PSCI64_SYSTEM_RESET, "SYSTEM_RESET");
-    const bool system_reset2_supported = probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2");
-    if (system_reset2_supported) {
+    if (probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2").has_value()) {
       // Prefer RESET2 if present. It explicitly supports arguments, but some vendors have
       // extended RESET to behave the same way.
       reset_command = PSCI64_SYSTEM_RESET2;
@@ -270,7 +270,7 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     probe_feature(PSCI64_NODE_HW_STATE, "CPU_NODE_HW_STATE");
     probe_feature(PSCI64_SYSTEM_SUSPEND, "CPU_SYSTEM_SUSPEND");
     psci_set_suspend_mode_supported =
-        probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "CPU_PSCI_SET_SUSPEND_MODE");
+        probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "CPU_PSCI_SET_SUSPEND_MODE").has_value();
     probe_feature(PSCI64_PSCI_STAT_RESIDENCY, "CPU_PSCI_STAT_RESIDENCY");
     probe_feature(PSCI64_PSCI_STAT_COUNT, "CPU_PSCI_STAT_COUNT");
     probe_feature(PSCI64_MEM_PROTECT, "CPU_MEM_PROTECT");
