@@ -11,6 +11,7 @@ use std::process::Command;
 use utf8_path::PathToStringExt;
 
 /// A provider for tools from a platform artifacts directory.
+#[derive(Clone)]
 pub struct PlatformToolProvider {
     tools_dir: Utf8PathBuf,
     log: ToolCommandLog,
@@ -39,7 +40,7 @@ impl ToolProvider for PlatformToolProvider {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct PlatformTool {
     path: PathBuf,
     log: ToolCommandLog,

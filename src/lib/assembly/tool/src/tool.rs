@@ -5,13 +5,14 @@
 use crate::serde_arc;
 
 use anyhow::Result;
+use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 /// A producer of `Tool`s that can be run, and log their execution.
-pub trait ToolProvider {
+pub trait ToolProvider: DynClone {
     /// Access a tool from the provider by name.
     fn get_tool(&self, name: &str) -> Result<Box<dyn Tool>>;
 
@@ -23,10 +24,13 @@ pub trait ToolProvider {
 }
 
 /// A single tool that can be run.
-pub trait Tool {
+pub trait Tool: DynClone {
     /// Run the tool with the |args|.
     fn run(&self, args: &[String]) -> Result<()>;
 }
+
+dyn_clone::clone_trait_object!(ToolProvider);
+dyn_clone::clone_trait_object!(Tool);
 
 /// Log that holds the commands run for several tools.
 #[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq)]

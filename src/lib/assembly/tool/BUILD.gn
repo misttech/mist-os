@@ -17,6 +17,7 @@ rustc_library("tool") {
     "//src/lib/utf8_path",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
   ]

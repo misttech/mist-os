@@ -28,14 +28,14 @@ If you are developing in the fuchsia tree, ensure \
 that you are running the `ffx` command (in $FUCHSIA_DIR/.jiri_root) or `fx ffx`, not a built binary.
 Running the binary directly is not supported in the fuchsia tree.\n\n";
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SdkVersion {
     Version(String),
     InTree,
     Unknown,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Sdk {
     path_prefix: PathBuf,
     module: Option<String>,

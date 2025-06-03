@@ -11,6 +11,7 @@ use std::process::Command;
 use utf8_path::PathToStringExt;
 
 /// Implementation of ToolProvider that fetches tools from the SDK.
+#[derive(Clone)]
 pub struct SdkToolProvider {
     /// The SDK object that can find the tools based on a manifest.
     sdk: Sdk,
@@ -47,7 +48,7 @@ impl ToolProvider for SdkToolProvider {
 }
 
 /// A tool in the SDK that can be executed with a list of arguments.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct SdkTool {
     /// Path to the tool.
     path: PathBuf,
