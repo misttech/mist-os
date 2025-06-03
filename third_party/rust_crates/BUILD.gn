@@ -1235,7 +1235,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("walkdir") {
-  public_deps = [ ":walkdir-v2_3_1" ]
+  public_deps = [ ":walkdir-v2_5_0" ]
 }
 
 group("which") {
@@ -4213,7 +4213,7 @@ rustc_library("criterion-v0_2_11") {
 
   deps = []
   deps += [ ":csv-v1_3_1" ]
-  deps += [ ":walkdir-v2_3_1" ]
+  deps += [ ":walkdir-v2_5_0" ]
   deps += [ ":atty-v0_2_11" ]
   deps += [ ":cast-v0_2_2" ]
   deps += [ ":clap-v2_34_0" ]
@@ -10414,7 +10414,7 @@ rustc_library("notify-v5_2_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":walkdir-v2_3_1" ]
+  deps += [ ":walkdir-v2_5_0" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":filetime-v0_2_14" ]
   deps += [ ":libc-v0_2_171" ]
@@ -19996,15 +19996,15 @@ rustc_library("waker-fn-v1_1_0") {
   applicable_licenses = [ ":waker-fn-v1_1_0.license" ]
 }
 
-license("walkdir-v2_3_1.license") {
+license("walkdir-v2_5_0.license") {
   public_package_name = "walkdir"
   license_files = [ "//third_party/rust_crates/ask2patch/walkdir/LICENSE-MIT" ]
 }
 
-rustc_library("walkdir-v2_3_1") {
+rustc_library("walkdir-v2_5_0") {
   crate_name = "walkdir"
   source_root = "//third_party/rust_crates/ask2patch/walkdir/src/lib.rs"
-  output_name = "walkdir-3afd3201e5295e86"
+  output_name = "walkdir-ecda539c7cb1d284"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -20013,7 +20013,6 @@ rustc_library("walkdir-v2_3_1") {
   deps = []
   deps += [ ":same-file-v1_0_4" ]
   if (false) {
-    deps += [ ":winapi-v0_3_9" ]
     deps += [ ":winapi-util-v0_1_5" ]
   }
 
@@ -20021,13 +20020,13 @@ rustc_library("walkdir-v2_3_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=3afd3201e5295e86",
-    "-Cextra-filename=-3afd3201e5295e86",
+    "-Cmetadata=ecda539c7cb1d284",
+    "-Cextra-filename=-ecda539c7cb1d284",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":walkdir-v2_3_1.license" ]
+  applicable_licenses = [ ":walkdir-v2_5_0.license" ]
 }
 
 license("want-v0_3_0.license") {

@@ -3223,14 +3223,14 @@ alias(
 )
 
 alias(
-    name = "walkdir-2.3.1",
-    actual = "//third_party/rust_crates/vendor/walkdir-2.3.1:walkdir",
+    name = "walkdir-2.5.0",
+    actual = "//third_party/rust_crates/vendor/walkdir-2.5.0:walkdir",
     tags = ["manual"],
 )
 
 alias(
     name = "walkdir",
-    actual = "//third_party/rust_crates/vendor/walkdir-2.3.1:walkdir",
+    actual = "//third_party/rust_crates/vendor/walkdir-2.5.0:walkdir",
     tags = ["manual"],
 )
 

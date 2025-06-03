@@ -106,13 +106,14 @@ for entry in walker.filter_entry(|e| !is_hidden(e)) {
 #![deny(missing_docs)]
 #![allow(unknown_lints)]
 
-#[cfg(test)]
+#[cfg(doctest)]
 doc_comment::doctest!("../README.md");
 
 use std::cmp::{min, Ordering};
 use std::fmt;
 use std::fs::{self, ReadDir};
 use std::io;
+use std::iter;
 use std::path::{Path, PathBuf};
 use std::result;
 use std::vec;
@@ -237,6 +238,7 @@ pub struct WalkDir {
 
 struct WalkDirOptions {
     follow_links: bool,
+    follow_root_links: bool,
     max_open: usize,
     min_depth: usize,
     max_depth: usize,
@@ -265,6 +267,7 @@ impl fmt::Debug for WalkDirOptions {
         };
         f.debug_struct("WalkDirOptions")
             .field("follow_links", &self.follow_links)
+            .field("follow_root_link", &self.follow_root_links)
             .field("max_open", &self.max_open)
             .field("min_depth", &self.min_depth)
             .field("max_depth", &self.max_depth)
@@ -287,6 +290,7 @@ impl WalkDir {
         WalkDir {
             opts: WalkDirOptions {
                 follow_links: false,
+                follow_root_links: true,
                 max_open: 10,
                 min_depth: 0,
                 max_depth: ::std::usize::MAX,
@@ -344,6 +348,25 @@ impl WalkDir {
         self
     }
 
+    /// Follow symbolic links if these are the root of the traversal.
+    /// By default, this is enabled.
+    ///
+    /// When `yes` is `true`, symbolic links on root paths are followed
+    /// which is effective if the symbolic link points to a directory.
+    /// If a symbolic link is broken or is involved in a loop, an error is yielded
+    /// as the first entry of the traversal.
+    ///
+    /// When enabled, the yielded [`DirEntry`] values represent the target of
+    /// the link while the path corresponds to the link. See the [`DirEntry`]
+    /// type for more details, and all future entries will be contained within
+    /// the resolved directory behind the symbolic link of the root path.
+    ///
+    /// [`DirEntry`]: struct.DirEntry.html
+    pub fn follow_root_links(mut self, yes: bool) -> Self {
+        self.opts.follow_root_links = yes;
+        self
+    }
+
     /// Set the maximum number of simultaneously open file descriptors used
     /// by the iterator.
     ///
@@ -377,13 +400,14 @@ impl WalkDir {
         self
     }
 
-    /// Set a function for sorting directory entries.
+    /// Set a function for sorting directory entries with a comparator
+    /// function.
     ///
     /// If a compare function is set, the resulting iterator will return all
     /// paths in sorted order. The compare function will be called to compare
     /// entries from the same directory.
     ///
-    /// ```rust,no-run
+    /// ```rust,no_run
     /// use std::cmp;
     /// use std::ffi::OsString;
     /// use walkdir::WalkDir;
@@ -396,6 +420,41 @@ impl WalkDir {
     {
         self.opts.sorter = Some(Box::new(cmp));
         self
+    }
+
+    /// Set a function for sorting directory entries with a key extraction
+    /// function.
+    ///
+    /// If a compare function is set, the resulting iterator will return all
+    /// paths in sorted order. The compare function will be called to compare
+    /// entries from the same directory.
+    ///
+    /// ```rust,no_run
+    /// use std::cmp;
+    /// use std::ffi::OsString;
+    /// use walkdir::WalkDir;
+    ///
+    /// WalkDir::new("foo").sort_by_key(|a| a.file_name().to_owned());
+    /// ```
+    pub fn sort_by_key<K, F>(self, mut cmp: F) -> Self
+    where
+        F: FnMut(&DirEntry) -> K + Send + Sync + 'static,
+        K: Ord,
+    {
+        self.sort_by(move |a, b| cmp(a).cmp(&cmp(b)))
+    }
+
+    /// Sort directory entries by file name, to ensure a deterministic order.
+    ///
+    /// This is a convenience function for calling `Self::sort_by()`.
+    ///
+    /// ```rust,no_run
+    /// use walkdir::WalkDir;
+    ///
+    /// WalkDir::new("foo").sort_by_file_name();
+    /// ```
+    pub fn sort_by_file_name(self) -> Self {
+        self.sort_by(|a, b| a.file_name().cmp(b.file_name()))
     }
 
     /// Yield a directory's contents before the directory itself. By default,
@@ -565,7 +624,7 @@ impl Ancestor {
     #[cfg(windows)]
     fn new(dent: &DirEntry) -> io::Result<Ancestor> {
         let handle = Handle::from_path(dent.path())?;
-        Ok(Ancestor { path: dent.path().to_path_buf(), handle: handle })
+        Ok(Ancestor { path: dent.path().to_path_buf(), handle })
     }
 
     /// Create a new ancestor from the given directory path.
@@ -775,7 +834,7 @@ impl IntoIter {
     where
         P: FnMut(&DirEntry) -> bool,
     {
-        FilterEntry { it: self, predicate: predicate }
+        FilterEntry { it: self, predicate }
     }
 
     fn handle_entry(
@@ -794,7 +853,10 @@ impl IntoIter {
             } else {
                 itry!(self.push(&dent));
             }
-        } else if dent.depth() == 0 && dent.file_type().is_symlink() {
+        } else if dent.depth() == 0
+            && dent.file_type().is_symlink()
+            && self.opts.follow_root_links
+        {
             // As a special case, if we are processing a root entry, then we
             // always follow it even if it's a symlink and follow_links is
             // false. We are careful to not let this change the semantics of
@@ -940,6 +1002,8 @@ impl IntoIter {
     }
 }
 
+impl iter::FusedIterator for IntoIter {}
+
 impl DirList {
     fn close(&mut self) {
         if let DirList::Opened { .. } = *self {
@@ -1022,6 +1086,11 @@ where
     }
 }
 
+impl<P> iter::FusedIterator for FilterEntry<IntoIter, P> where
+    P: FnMut(&DirEntry) -> bool
+{
+}
+
 impl<P> FilterEntry<IntoIter, P>
 where
     P: FnMut(&DirEntry) -> bool,
@@ -1073,7 +1142,7 @@ where
     /// [`min_depth`]: struct.WalkDir.html#method.min_depth
     /// [`max_depth`]: struct.WalkDir.html#method.max_depth
     pub fn filter_entry(self, predicate: P) -> FilterEntry<Self, P> {
-        FilterEntry { it: self, predicate: predicate }
+        FilterEntry { it: self, predicate }
     }
 
     /// Skips the current directory.

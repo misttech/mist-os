@@ -5326,10 +5326,9 @@ checksum = "9d5b2c62b4012a3e1eca5a7e077d13b3bf498c4073e33ccd58626607748ceeca"
 
 [[package]]
 name = "walkdir"
-version = "2.3.1"
+version = "2.5.0"
 dependencies = [
  "same-file",
- "winapi",
  "winapi-util",
 ]
 
