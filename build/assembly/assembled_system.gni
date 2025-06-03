@@ -72,15 +72,10 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     assembly.  This is only for use by tests of assembly.
 #
 #   kernel_zbi (optional; default: "//zircon/kernel")
-#     [label] Label of the zircon kernel to use.  This needs to use the `images`
-#     metadata key to provide the `path` and `name` fields (see the
-#     build_api_module("images")` in `//BUILD.gn`).  The default value is most likely
-#     the correct one.  This should only be overridden in special circumstances.
-#
-#   kernel_image_name (optional; default: "kernel")
-#     [string] The image name of the 'kernel_zbi' as seen in images.json. This is used
-#     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
-#     image as the kernel zbi.
+#     [label] Label of the zircon kernel to use. This label complies with
+#     `kernel_aib_input` metadata protocol, see `Metadata Protocol` below.
+#     The default value is most likely the correct one.  This should only be
+#     overridden in special circumstances.
 #
 #   qemu_kernel (optional; default: null)
 #     [label] Label of a custom boot shim for kernel tests
@@ -134,6 +129,13 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 #   output_name (optional; default: <target_name>.zbi)
 #     [string] The name of the final system ZBI file.
+#
+# Metadata Protocol:
+#
+#    kernel_aib_input: Performing a metadata walk with `kernel_aib_input` as data key
+#    and `kernel_aib_input_barrier` as walk key MUST yield exactly one entry. The entry
+#    contains a `zbi` member which is the relative path from `$root_out_dir`
+#    to the kernel's ZBI.
 #
 template("assembled_system") {
   assert(current_toolchain == default_toolchain,
@@ -430,7 +432,6 @@ template("assembled_system") {
       forward_variables_from(invoker,
                              [
                                "kernel_zbi",
-                               "kernel_image_name",
                                "testonly",
                              ])
       bundles_dir = files.gendir

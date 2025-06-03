@@ -100,17 +100,12 @@ template("_cuckoo_product_bundle") {
 
   # Generate the assembled system with the provided kernel_zbi.
   assembly_kernel_zbi = invoker.kernel_zbi
-  assembly_kernel_image_name = get_label_info(assembly_kernel_zbi, "name")
-  if (defined(invoker.kernel_image_name)) {
-    assembly_kernel_image_name = invoker.kernel_image_name
-  }
 
   assembled_system(assembled_system_target) {
     testonly = true
     namespace = assembled_system_namespace
     image_name = "fuchsia"
     kernel_zbi = assembly_kernel_zbi
-    kernel_image_name = assembly_kernel_image_name
     board_config_label = board_configuration_label
 
     product_assembly_config_label = ":${main_target}.product_config"
@@ -196,7 +191,6 @@ template("kernel_zbi_test") {
                                  "timeout",
                                ])
         kernel_zbi = ":$main_target.zbi"
-        kernel_image_name = "$main_target"
       }
     } else {
       group(cuckoo_target_name) {

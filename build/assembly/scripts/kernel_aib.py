@@ -27,9 +27,10 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "--kernel-image-metadata", type=argparse.FileType("r"), required=True
+        "--kernel-aib-input-metadata",
+        type=argparse.FileType("r"),
+        required=True,
     )
-    parser.add_argument("--kernel-image-name", required=True)
     parser.add_argument("--outdir", required=True)
     parser.add_argument(
         "--export-manifest",
@@ -37,16 +38,19 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    kernel_metadata = json.load(args.kernel_image_metadata)
+    kernel_metadata = json.load(args.kernel_aib_input_metadata)
 
     # The build_api_module("images") entry with name "kernel" and type "zbi"
     # is the kernel ZBI to include in the bootable ZBI.  There can be only one.
-    [kernel_path] = [
-        image["path"]
-        for image in kernel_metadata
-        if image["name"] == args.kernel_image_name.removesuffix(".zbi")
-        and image["type"] == "zbi"
-    ]
+
+    if len(kernel_metadata) != 1:
+        raise AssemblyInputBundleCreationException(
+            "There must be exactly 1 `kernel_aib_input` in input metadata file. Path: "
+            + args.kernel_aib_input_metadata.name
+        )
+
+    # The `zbi` entry in the `kernel_aib_input` metadata.
+    kernel_path = kernel_metadata[0]["zbi"]
     kernel = KernelInfo()
     kernel.path = kernel_path
 
