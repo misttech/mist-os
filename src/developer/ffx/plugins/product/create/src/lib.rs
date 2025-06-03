@@ -25,9 +25,8 @@ use fuchsia_pkg::PackageManifest;
 use fuchsia_repo::repo_builder::RepoBuilder;
 use fuchsia_repo::repo_keys::RepoKeys;
 use fuchsia_repo::repository::FileSystemRepository;
-use sdk_metadata::{
-    ProductBundle, ProductBundleV2, Repository, VirtualDevice, VirtualDeviceManifest,
-};
+use product_bundle::{ProductBundle, ProductBundleV2, Repository};
+use sdk_metadata::{VirtualDevice, VirtualDeviceManifest};
 use std::fs::File;
 use tempfile::TempDir;
 

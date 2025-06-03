@@ -202,7 +202,7 @@ pub async fn serve_impl_validate_args(
             if !product_bundle.exists() {
                 return_user_error!("product bundle {product_bundle:?} does not exist");
             }
-            let repositories = sdk_metadata::get_repositories(product_bundle.clone())
+            let repositories = product_bundle::get_repositories(product_bundle.clone())
                 .with_context(|| {
                     format!("getting repositories from product bundle {product_bundle}")
                 })?;
@@ -349,7 +349,7 @@ pub async fn serve_impl<W: Write + 'static>(
             return_user_error!("Cannot specify both --repo-path and --product-bundle");
         }
         (None, Some(product_bundle)) => {
-            let repositories = sdk_metadata::get_repositories(product_bundle.clone())
+            let repositories = product_bundle::get_repositories(product_bundle.clone())
                 .with_context(|| {
                     format!("getting repositories from product bundle {product_bundle}")
                 })?;
@@ -1973,7 +1973,7 @@ mod test {
                 None,
             )
             .await;
-            repositories.push(sdk_metadata::Repository {
+            repositories.push(product_bundle::Repository {
                 name: repo_name.into(),
                 metadata_path,
                 blobs_path: blobs_dir.clone(),
@@ -1985,7 +1985,7 @@ mod test {
             });
         }
 
-        let pb = sdk_metadata::ProductBundle::V2(sdk_metadata::ProductBundleV2 {
+        let pb = product_bundle::ProductBundle::V2(product_bundle::ProductBundleV2 {
             product_name: "test".into(),
             product_version: "test-product-version".into(),
             partitions: assembly_partitions_config::PartitionsConfig::default(),

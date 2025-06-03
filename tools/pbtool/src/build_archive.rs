@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use argh::FromArgs;
 use assembled_system::{AssembledSystem, Image};
 use camino::Utf8PathBuf;
-use sdk_metadata::ProductBundle;
+use product_bundle::ProductBundle;
 
 use flate2::read::GzDecoder;
 use std::fs::File;
@@ -255,7 +255,7 @@ mod tests {
     use assembly_container::AssemblyContainer;
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
-    use sdk_metadata::ProductBundleV2;
+    use product_bundle::ProductBundleV2;
     use serde_json::Value;
     use std::io::Write;
     use tempfile::tempdir;

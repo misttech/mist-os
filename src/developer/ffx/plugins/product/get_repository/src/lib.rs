@@ -9,7 +9,7 @@ use camino::Utf8PathBuf;
 use ffx_product_get_repository_args::GetRepositoryCommand;
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{bug, user_error, FfxMain, FfxTool};
-use sdk_metadata::ProductBundle;
+use product_bundle::ProductBundle;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use utf8_path::path_relative_from;
@@ -76,7 +76,7 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
 
     use camino::Utf8Path;
-    use sdk_metadata::{ProductBundleV2, Repository};
+    use product_bundle::{ProductBundleV2, Repository};
 
     #[test]
     fn test_get_repository() {

@@ -16,7 +16,7 @@ use errors::ffx_bail;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use ffx_flash_manifest::{BootParams, Command, FlashManifestVersion, ManifestParams};
 use pbms::load_product_bundle;
-use sdk_metadata::ProductBundle;
+use product_bundle::ProductBundle;
 use serde::Deserialize;
 use std::fs::File;
 use std::io::BufReader;
@@ -250,7 +250,7 @@ mod test {
     use camino::Utf8PathBuf;
     use ffx_flash_manifest::v3::{FlashManifest as FlashManifestV3, Partition};
     use ffx_flash_manifest::ManifestFile;
-    use sdk_metadata::ProductBundleV2;
+    use product_bundle::ProductBundleV2;
     use serde_json::from_str;
 
     const UNKNOWN_VERSION: &'static str = r#"{

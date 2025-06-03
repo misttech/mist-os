@@ -18,7 +18,7 @@ use fuchsia_repo::repository::{Error as RepoError, PmRepository, RepoProvider as
 use fuchsia_repo::util::copy_dir;
 use futures::{AsyncReadExt as _, StreamExt as _};
 use log::{error, info, warn};
-use sdk_metadata::get_repositories;
+use product_bundle::get_repositories;
 use std::collections::BTreeSet;
 use std::fs::{create_dir_all, File};
 use std::io::{BufReader, BufWriter};
@@ -513,7 +513,7 @@ mod tests {
     use fuchsia_repo::test_utils;
     use futures::FutureExt;
     use pretty_assertions::assert_eq;
-    use sdk_metadata::{ProductBundle, ProductBundleV2, Repository};
+    use product_bundle::{ProductBundle, ProductBundleV2, Repository};
     use std::io::Write;
     use tuf::metadata::Metadata as _;
 

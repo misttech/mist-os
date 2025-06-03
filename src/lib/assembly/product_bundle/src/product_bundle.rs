@@ -4,20 +4,17 @@
 
 //! Representation of the product_bundle metadata.
 
-mod v2;
+use crate::v2::{Canonicalizer, ProductBundleV2, Type};
 
-use crate::{VirtualDevice, VirtualDeviceManifest, VirtualDeviceV1};
 use anyhow::{anyhow, bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
+use sdk_metadata::{VirtualDevice, VirtualDeviceManifest, VirtualDeviceV1};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufRead;
 use std::ops::Deref;
-use v2::Canonicalizer;
 use zip::read::ZipArchive;
-
-pub use v2::{ProductBundleV2, Repository, Type};
 
 fn try_load_product_bundle(r: impl BufRead) -> Result<ProductBundle> {
     let helper: SerializationHelper =
@@ -32,12 +29,14 @@ fn try_load_product_bundle(r: impl BufRead) -> Result<ProductBundle> {
     }
 }
 
+/// A product bundle that was read from a zip file.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ZipLoadedProductBundle {
     product_bundle: ProductBundle,
 }
 
 impl ZipLoadedProductBundle {
+    /// Read a prdouct bundle from a zip file.
     pub fn try_load_from(product_bundle_zip_path: impl AsRef<Utf8Path>) -> Result<Self> {
         let path = product_bundle_zip_path.as_ref();
         let file =
@@ -47,6 +46,7 @@ impl ZipLoadedProductBundle {
         Self::load_from(zip)
     }
 
+    /// Load a product bundle from an already parsed ZipArchive.
     pub fn load_from(mut zip: ZipArchive<File>) -> Result<Self> {
         let product_bundle_manifest_name = zip
             .file_names()
@@ -76,6 +76,7 @@ impl ZipLoadedProductBundle {
         }
     }
 
+    /// Construct a new product bundle.
     pub fn new(product_bundle: ProductBundle) -> Self {
         Self { product_bundle }
     }
@@ -185,6 +186,7 @@ impl Into<ProductBundle> for LoadedProductBundle {
 /// Versioned product bundle.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProductBundle {
+    /// Version 2 of the product bundle format.
     V2(ProductBundleV2),
 }
 
@@ -209,6 +211,8 @@ enum SerializationHelperVersioned {
 }
 
 impl ProductBundle {
+    /// Read a product bundle from a path, whether it be a zip file or a
+    /// directory.
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
         let path = path.as_ref();
         if path.is_file() && path.extension() == Some("zip") {
@@ -333,7 +337,7 @@ mod tests {
     use zip::{CompressionMethod, ZipWriter};
 
     const VIRTUAL_DEVICE_VALID: &str =
-        include_str!("../../../../build/sdk/meta/test_data/virtual_device.json");
+        include_str!("../../../../../build/sdk/meta/test_data/virtual_device.json");
 
     fn make_sample_pbv1(name: &str) -> serde_json::Value {
         json!({

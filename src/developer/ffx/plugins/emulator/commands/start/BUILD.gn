@@ -48,6 +48,7 @@ if (is_host) {
       "//src/developer/ffx/lib/writer:lib",
       "//src/lib/assembly/assembled_system",
       "//src/lib/assembly/partitions_config",
+      "//src/lib/assembly/product_bundle",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:camino",

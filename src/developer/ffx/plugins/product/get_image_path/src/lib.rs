@@ -10,8 +10,8 @@ use ffx_config::EnvironmentContext;
 use ffx_product_get_image_path_args::{GetImagePathCommand, ImageType, Slot};
 use ffx_writer::VerifiedMachineWriter;
 use fho::{bug, return_user_error, user_error, Error, FfxMain, FfxTool, Result};
+use product_bundle::ProductBundle;
 use schemars::JsonSchema;
-use sdk_metadata::ProductBundle;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use utf8_path::path_relative_from;
@@ -167,7 +167,7 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
     use ffx_writer::{Format, TestBuffers};
-    use sdk_metadata::ProductBundleV2;
+    use product_bundle::ProductBundleV2;
     use std::fs;
     use std::fs::File;
     use std::io::Write;

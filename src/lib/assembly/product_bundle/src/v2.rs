@@ -139,12 +139,18 @@ impl Repository {
     }
 }
 
+/// The use-case a particular image is needed for.
 #[derive(Clone, Debug, Copy, Hash, PartialEq, Eq)]
 pub enum Type {
+    /// No use-case.
     None,
+    /// This image is needed for flashing.
     Flash,
+    /// This image is needed for emulating.
     Emu,
+    /// This image is needed for OTA updates.
     Update,
+    /// This image is a bootloader image.
     Bootloader,
 }
 

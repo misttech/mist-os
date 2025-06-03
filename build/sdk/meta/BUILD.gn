@@ -63,26 +63,18 @@ if (is_host) {
     edition = "2021"
 
     deps = [
-      "//src/lib/assembly/assembled_system",
-      "//src/lib/assembly/partitions_config",
-      "//src/sys/pkg/lib/fuchsia-merkle",
-      "//src/sys/pkg/lib/fuchsia-repo",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:camino",
-      "//third_party/rust_crates:log",
-      "//third_party/rust_crates:pathdiff",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:url-v1_7_2",
       "//third_party/rust_crates:valico",
-      "//third_party/rust_crates:zip",
     ]
 
     test_deps = [
       "//src/developer/ffx/lib/pkg:empty-repo-keys",
       "//src/developer/ffx/lib/pkg:empty-repo-metadata",
-      "//src/lib/fuchsia",
       "//third_party/rust_crates:tempfile",
     ]
 
@@ -95,8 +87,6 @@ if (is_host) {
       "src/json.rs",
       "src/lib.rs",
       "src/manifest.rs",
-      "src/product_bundle.rs",
-      "src/product_bundle/v2.rs",
       "src/testing.rs",
       "src/virtual_device.rs",
       "src/virtual_device/manifest.rs",

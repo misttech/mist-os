@@ -12,7 +12,8 @@ use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
 
-use sdk_metadata::{ProductBundle, ProductBundleV2, VirtualDeviceV1};
+use product_bundle::{ProductBundle, ProductBundleV2};
+use sdk_metadata::VirtualDeviceV1;
 use std::path::PathBuf;
 
 pub async fn convert_bundle_to_configs(

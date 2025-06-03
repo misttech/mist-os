@@ -8,7 +8,7 @@ use crate::v3::{Condition, FlashManifest as FlashManifestV3, Partition, Product}
 use anyhow::{bail, Context, Error, Result};
 use assembly_partitions_config::{PartitionAndImage, PartitionImageMapper, Slot};
 use errors::ffx_bail;
-use sdk_metadata::{ProductBundle, ProductBundleV2};
+use product_bundle::{ProductBundle, ProductBundleV2};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value, Value};
 use std::default::Default;

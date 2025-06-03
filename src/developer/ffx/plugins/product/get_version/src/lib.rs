@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use ffx_product_get_version_args::GetVersionCommand;
 use ffx_writer::SimpleWriter;
 use fho::{FfxContext, FfxMain, FfxTool};
-use sdk_metadata::ProductBundle;
+use product_bundle::ProductBundle;
 use std::io::Write;
 
 /// This plugin will get the the product version of a Product Bundle.

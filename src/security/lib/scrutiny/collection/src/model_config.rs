@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use camino::Utf8PathBuf;
-use sdk_metadata::ProductBundle;
+use product_bundle::ProductBundle;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
