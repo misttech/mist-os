@@ -13,9 +13,15 @@
 #include <unordered_set>
 
 #if defined(__Fuchsia__)
+#include <fidl/fuchsia.gpu.magma.test/cpp/wire.h>
+#include <fidl/fuchsia.gpu.magma/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.logger/cpp/wire.h>
+#include <fidl/fuchsia.tracing.provider/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
+#include <lib/fdio/io.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/magma/magma_sysmem.h>
@@ -27,11 +33,6 @@
 #include <zircon/availability.h>
 
 #include <filesystem>
-
-#include "fidl/fuchsia.gpu.magma.test/cpp/wire.h"
-#include "fidl/fuchsia.gpu.magma/cpp/wire.h"
-#include "fidl/fuchsia.logger/cpp/wire.h"
-#include "fidl/fuchsia.tracing.provider/cpp/wire.h"
 #endif
 
 #if defined(__linux__)
@@ -2014,3 +2015,87 @@ TEST_F(Magma, BufferWriteCombining) {
 }
 
 TEST_F(Magma, BufferNaming) { TestConnection().BufferNaming(); }
+
+class MagmaEnumerate : public Magma {
+ public:
+#if defined(__Fuchsia__)
+  MagmaEnumerate() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+
+ protected:
+  void SetUp() override {
+    Magma::SetUp();
+
+    ASSERT_EQ(ZX_OK, loop_.StartThread("server-loop"));
+
+    endpoints_ = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+    ASSERT_EQ(ZX_OK, fdio_open3("/pkg/data/devices-for-enumeration-test",
+                                uint64_t{fuchsia_io::wire::kPermReadable |
+                                         fuchsia_io::Flags::kProtocolDirectory},
+                                endpoints_.server.TakeChannel().release()));
+  }
+
+  async::Loop loop_;
+  fidl::Endpoints<fuchsia_io::Directory> endpoints_;
+#endif
+};
+
+TEST_F(MagmaEnumerate, Ok) {
+  uint32_t device_path_count = 4;
+  uint32_t device_path_size = PATH_MAX;
+
+  auto device_paths = std::vector<char>(device_path_count * device_path_size);
+
+#if defined(__Fuchsia__)
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_enumerate_devices(
+                                 MAGMA_DEVICE_NAMESPACE, endpoints_.client.TakeChannel().release(),
+                                 &device_path_count, device_path_size, device_paths.data()));
+  EXPECT_EQ(device_path_count, 2u);
+  {
+    std::string expected = std::string(MAGMA_DEVICE_NAMESPACE) +
+                           "abcd1234";  // MAGMA_DEVICE_NAMESPACE is slash terminated
+    EXPECT_STREQ(device_paths.data(), expected.c_str());
+  }
+  {
+    std::string expected =
+        std::string(MAGMA_DEVICE_NAMESPACE) +
+        "slightly-longer-entry-name";  // MAGMA_DEVICE_NAMESPACE is slash terminated
+    EXPECT_STREQ(device_paths.data() + device_path_size, expected.c_str());
+  }
+#else
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_enumerate_devices(MAGMA_DEVICE_NAMESPACE, 0, &device_path_count,
+                                                     device_path_size, device_paths.data()));
+  EXPECT_EQ(device_path_count, 1u);
+
+  std::string expected = "/dev/magma0";
+  EXPECT_STREQ(device_paths.data(), expected.c_str());
+#endif
+}
+
+#if defined(__Fuchsia__)
+TEST_F(MagmaEnumerate, BadParam1) {
+  uint32_t device_path_count = 1;
+  uint32_t device_path_size = PATH_MAX;
+
+  auto device_paths = std::vector<char>(device_path_count * device_path_size);
+
+  EXPECT_EQ(
+      MAGMA_STATUS_MEMORY_ERROR,
+      magma_enumerate_devices(MAGMA_DEVICE_NAMESPACE, endpoints_.client.TakeChannel().release(),
+                              &device_path_count, device_path_size, device_paths.data()));
+}
+#endif
+
+#if defined(__Fuchsia__)
+TEST_F(MagmaEnumerate, BadParam2) {
+  uint32_t device_path_count = 4;
+  uint32_t device_path_size = 10;
+
+  auto device_paths = std::vector<char>(device_path_count * device_path_size);
+
+  EXPECT_EQ(
+      MAGMA_STATUS_INVALID_ARGS,
+      magma_enumerate_devices(MAGMA_DEVICE_NAMESPACE, endpoints_.client.TakeChannel().release(),
+                              &device_path_count, device_path_size, device_paths.data()));
+}
+#endif

@@ -109,6 +109,7 @@ source_set("test_magma_source") {
   if (is_fuchsia) {
     deps += [
       "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
       "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
       "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
@@ -225,6 +226,23 @@ cc_test_executable("virtmagma_sync_file_tests") {
   ]
 }
 
+group("test-device-resources") {
+  deps = [
+    ":test-device-1",
+    ":test-device-2",
+  ]
+}
+
+resource("test-device-1") {
+  sources = [ "resources/test-device" ]
+  outputs = [ "data/devices-for-enumeration-test/abcd1234" ]
+}
+
+resource("test-device-2") {
+  sources = [ "resources/test-device" ]
+  outputs = [ "data/devices-for-enumeration-test/slightly-longer-entry-name" ]
+}
+
 fuchsia_component("magma-conformance-tests-child-component") {
   testonly = true
   cm_label = ":conformance_child_manifest"
@@ -245,13 +263,19 @@ fuchsia_package("magma-conformance-tests-child") {
   testonly = true
   visibility = visibility_list
   package_name = "test-magma"
-  deps = [ ":magma-conformance-tests-child-component" ]
+  deps = [
+    ":magma-conformance-tests-child-component",
+    ":test-device-resources",
+  ]
 }
 
 fuchsia_package("magma-conformance-tests-child-hermetic") {
   testonly = true
   package_name = "test-magma"
-  deps = [ ":magma-conformance-tests-child-hermetic-component" ]
+  deps = [
+    ":magma-conformance-tests-child-hermetic-component",
+    ":test-device-resources",
+  ]
 }
 
 #

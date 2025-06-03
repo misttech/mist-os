@@ -285,6 +285,26 @@ magma_status_t magma_initialize_logging(magma_handle_t channel) {
   return MAGMA_STATUS_OK;
 }
 
+magma_status_t magma_enumerate_devices(const char*, magma_handle_t, uint32_t* device_count_out,
+                                       uint32_t device_path_size, char* device_paths_out) {
+  if (*device_count_out < 1) {
+    return MAGMA_STATUS_INVALID_ARGS;
+  }
+
+  constexpr char kPath[] = "/dev/magma0";
+  constexpr size_t kPathLength = sizeof(kPath);  // includes the null terminator
+  static_assert(kPathLength == 12);
+
+  if (device_path_size < kPathLength) {
+    return MAGMA_STATUS_INVALID_ARGS;
+  }
+
+  *device_count_out = 1;
+  strncpy(device_paths_out, kPath, kPathLength);
+
+  return MAGMA_STATUS_OK;
+}
+
 magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
                                                   magma_image_create_info_t* create_info,
                                                   uint64_t* size_out, magma_buffer_t* image_out,

@@ -58,6 +58,7 @@ Symbols:
   - { Name: magma_device_import, Type: Func }
   - { Name: magma_device_query, Type: Func }
   - { Name: magma_device_release, Type: Func }
+  - { Name: magma_enumerate_devices, Type: Func }
   - { Name: magma_fuchsia_log, Type: Func }
   - { Name: magma_initialize_logging, Type: Func }
   - { Name: magma_initialize_tracing, Type: Func }

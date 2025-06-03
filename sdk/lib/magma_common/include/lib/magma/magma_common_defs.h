@@ -12,9 +12,15 @@
 #define MAGMA_AVAILABLE_SINCE(level_added) ZX_AVAILABLE_SINCE(level_added)
 #define MAGMA_DEPRECATED_SINCE(level_added, level_deprecated, msg) \
   ZX_DEPRECATED_SINCE(level_added, level_deprecated, msg)
+
+// Ends in slash to ensure it's opened with directory permission
+#define MAGMA_DEVICE_NAMESPACE "/loader-gpu-devices/svc/magma/"
+
 #else
 #define MAGMA_AVAILABLE_SINCE(level_added)
 #define MAGMA_DEPRECATED_SINCE(level_added, level_deprecated, msg)
+
+#define MAGMA_DEVICE_NAMESPACE ""
 #endif
 
 #if defined(__cplusplus)
@@ -26,7 +32,7 @@ extern "C" {
 
 // LINT.IfChange(version)
 // This version should be incremented whenever the Magma API changes.
-#define MAGMA_API_VERSION 9
+#define MAGMA_API_VERSION 10
 // LINT.ThenChange(magma_common_defs.h)
 
 // LINT.IfChange

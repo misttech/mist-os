@@ -34,6 +34,40 @@
                 ]
             },
             {
+                "ordinal": 48,
+                "name": "magma_enumerate_devices",
+                "type": "magma_status_t",
+                "description": "Returns information describing the magma devices that are available.  Returns: MAGMA_STATUS_MEMORY_ERROR if |device_count_inout| is insufficient; MAGMA_STATUS_INVALID_ARGS if |device_path_size| is insufficient.",
+                "attributes": "MAGMA_AVAILABLE_SINCE(NEXT)",
+                "arguments": [
+                    {
+                        "name": "device_namespace",
+                        "type": "const char*",
+                        "description": "Namespace corresponding to the |device_directory_channel|; this should be MAGMA_DEVICE_NAMESPACE.  Used only on Fuchsia."
+                    },
+                    {
+                        "name": "device_directory_channel",
+                        "type": "magma_handle_t",
+                        "description": "Channel used for reading devices from |device_namespace|.  Used only on Fuchsia."
+                    },
+                    {
+                        "name": "device_count_inout",
+                        "type": "uint32_t*",
+                        "description": "The number of array elements in |device_paths_out|. On success, will be set to the number of elements written."
+                    },
+                    {
+                        "name": "device_path_size",
+                        "type": "uint32_t",
+                        "description": "Size of each entry in |device_paths_out|.  PATH_MAX should be sufficient."
+                    },
+                    {
+                        "name": "device_paths_out",
+                        "type": "char*",
+                        "description": "Pointer to storage for magma device paths.  The buffer's size in bytes should be |*device_count_inout| * |device_path_size|."
+                    }
+                ]
+            },
+            {
                 "ordinal": 81,
                 "name": "magma_device_query",
                 "type": "magma_status_t",
