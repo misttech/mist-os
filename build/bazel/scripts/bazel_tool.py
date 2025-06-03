@@ -347,7 +347,11 @@ up-to-date artifacts in the Ninja build directory.
         # Assume this script is under //scripts/
         args.fuchsia_dir = Path(__file__).parent.parent.resolve()
 
-    return args.func(args)
+    try:
+        return args.func(args)
+    except AttributeError:
+        # See https://bugs.python.org/issue16308
+        parser.error("Too few arguments.")
 
 
 if __name__ == "__main__":
