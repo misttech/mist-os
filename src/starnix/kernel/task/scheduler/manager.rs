@@ -181,6 +181,10 @@ impl SchedulerPolicy {
         self == &Self::default()
     }
 
+    pub fn kind(&self) -> SchedulerPolicyKind {
+        self.kind
+    }
+
     fn from_raw(mut policy: u32, priority: u8) -> Result<Self, Errno> {
         let reset_on_fork = (policy & SCHED_RESET_ON_FORK) != 0;
         if reset_on_fork {
@@ -317,7 +321,7 @@ impl SchedulerPolicy {
 }
 
 impl SchedulerPolicyKind {
-    fn is_realtime(&self) -> bool {
+    pub fn is_realtime(&self) -> bool {
         matches!(self, Self::Fifo { .. } | Self::RoundRobin { .. })
     }
 

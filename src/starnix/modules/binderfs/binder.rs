@@ -4219,17 +4219,24 @@ impl BinderDriver {
                         .into(),
                     );
 
-                    // The object flags have 2 ways to declare a scheduler policy for the
-                    // transaction.
-                    // 1. It might contains a specific minimal policy to use.
-                    // 2. It might declare that the transaction supports priority inheritance.
+                    // There are 2 ways to declare a scheduler policy for the transaction.
+                    // 1. The object might contain a specific minimal policy to use.
+                    // 2. The current task has a non-realtime priority[0] or the object has been
+                    //    configured to inherit realtime priorities from callers.
+                    //
                     // The results must always be the best policy according to these rules.
+                    //
+                    // [0]: "The binder driver has always supported nice priority inheritance." from
+                    // https://source.android.com/docs/core/architecture/hidl/binder-ipc#rt-priority
                     let mut scheduler_policy = object.flags.get_scheduler_policy();
-                    if object.flags.contains(BinderObjectFlags::INHERIT_RT) {
-                        let current_policy = current_task.read().scheduler_policy;
-                        scheduler_policy = scheduler_policy
-                            .map(|p| if p > current_policy { p } else { current_policy })
-                            .or(Some(current_policy));
+                    let current_policy = current_task.read().scheduler_policy;
+                    if !current_policy.kind().is_realtime()
+                        || object.flags.contains(BinderObjectFlags::INHERIT_RT)
+                    {
+                        // Only supercede the policy from the object if this task's is higher.
+                        if scheduler_policy.map(|p| current_policy > p).unwrap_or(true) {
+                            scheduler_policy = Some(current_policy);
+                        }
                     }
 
                     (
