@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/llvm-profdata/llvm-profdata.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <functional>
+#include <span>
 
 #ifndef HAVE_LLVM_PROFDATA
 #error "build system regression"
@@ -23,9 +23,9 @@
 // If not compiled with instrumentation at all, then all the link-time
 // references in the real implementation below won't work.  So provide stubs.
 
-void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {}
+void LlvmProfdata::Init(std::span<const std::byte> build_id) {}
 
-LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
+LlvmProfdata::LiveData LlvmProfdata::DoFixedData(std::span<std::byte> data, bool match) {
   return {};
 }
 
@@ -260,11 +260,11 @@ constexpr size_t PaddingSize(size_t chunk_size_bytes) {
   return (kAlignAfterBuildId - (chunk_size_bytes % kAlignAfterBuildId)) % kAlignAfterBuildId;
 }
 
-constexpr size_t PaddingSize(cpp20::span<const std::byte> chunk) {
+constexpr size_t PaddingSize(std::span<const std::byte> chunk) {
   return PaddingSize(chunk.size_bytes());
 }
 
-constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
+constexpr size_t BinaryIdsSize(std::span<const std::byte> build_id) {
   if (build_id.empty()) {
     return 0;
   }
@@ -272,7 +272,7 @@ constexpr size_t BinaryIdsSize(cpp20::span<const std::byte> build_id) {
 }
 
 template <typename T>
-[[gnu::const]] cpp20::span<T> GetArray(T* begin, T* end) {
+[[gnu::const]] std::span<T> GetArray(T* begin, T* end) {
   auto begin_bytes = reinterpret_cast<const std::byte*>(begin);
   auto end_bytes = reinterpret_cast<const std::byte*>(end);
   size_t size_bytes = end_bytes - begin_bytes;
@@ -287,12 +287,12 @@ template <typename T>
 
 // This is the .bss data that gets updated live by instrumented code when the
 // bias is set to zero.
-[[gnu::const]] cpp20::span<char> ProfCountersData() {
-  return cpp20::span<char>(&CountersBegin[0], CountersEnd - CountersBegin);
+[[gnu::const]] std::span<char> ProfCountersData() {
+  return std::span<char>(&CountersBegin[0], CountersEnd - CountersBegin);
 }
 
-[[gnu::const]] cpp20::span<char> ProfBitmapData() {
-  return cpp20::span<char>(&BitmapBegin[0], BitmapEnd - BitmapBegin);
+[[gnu::const]] std::span<char> ProfBitmapData() {
+  return std::span<char>(&BitmapBegin[0], BitmapEnd - BitmapBegin);
 }
 
 [[gnu::const]] size_t CountersSize() {
@@ -301,7 +301,7 @@ template <typename T>
   return sizeof(uint64_t);
 }
 
-[[gnu::const]] ProfRawHeader GetHeader(cpp20::span<const std::byte> build_id) {
+[[gnu::const]] ProfRawHeader GetHeader(std::span<const std::byte> build_id) {
   // These are used by the INSTR_PROF_RAW_HEADER initializers.
   const uint64_t NumData = ProfDataArray().size();
   const uint64_t PaddingBytesBeforeCounters = 0;
@@ -340,13 +340,13 @@ template <typename T>
 [[gnu::const]] bool NoData() { return ProfCountersData().empty() && ProfBitmapData().empty(); }
 
 template <typename T, template <typename> class Op>
-void MergeData(cpp20::span<std::byte> to, cpp20::span<const std::byte> from) {
+void MergeData(std::span<std::byte> to, std::span<const std::byte> from) {
   ZX_ASSERT(to.size_bytes() == from.size_bytes());
   ZX_ASSERT(to.size_bytes() % sizeof(T) == 0);
 
-  cpp20::span to_data{reinterpret_cast<T*>(to.data()), to.size_bytes() / sizeof(T)};
+  std::span to_data{reinterpret_cast<T*>(to.data()), to.size_bytes() / sizeof(T)};
 
-  cpp20::span from_data{reinterpret_cast<const T*>(from.data()), from.size_bytes() / sizeof(T)};
+  std::span from_data{reinterpret_cast<const T*>(from.data()), from.size_bytes() / sizeof(T)};
 
   constexpr Op<T> op;
   for (size_t i = 0; i < to_data.size(); ++i) {
@@ -355,22 +355,22 @@ void MergeData(cpp20::span<std::byte> to, cpp20::span<const std::byte> from) {
 }
 
 template <typename T, template <typename> class Op, typename FromT>
-void MergeSelfData(cpp20::span<std::byte> to, cpp20::span<FromT> from, const char* what) {
+void MergeSelfData(std::span<std::byte> to, std::span<FromT> from, const char* what) {
   ZX_ASSERT_MSG(to.size_bytes() >= from.size_bytes(),
                 "merging %zu bytes of %s with only %zu bytes left!", from.size_bytes(), what,
                 to.size_bytes());
-  MergeData<T, Op>(to.subspan(0, from.size_bytes()), cpp20::as_bytes(from));
+  MergeData<T, Op>(to.subspan(0, from.size_bytes()), std::as_bytes(from));
 }
 
-void MergeCounters(cpp20::span<std::byte> to, cpp20::span<const std::byte> from) {
+void MergeCounters(std::span<std::byte> to, std::span<const std::byte> from) {
   if (LlvmProfdata::UsingSingleByteCounters())
     MergeData<uint8_t, std::logical_and>(to, from);
   else
     MergeData<uint64_t, std::plus>(to, from);
 }
 
-void UseData(cpp20::span<std::byte> self_data, uintptr_t& bias_var, const char* what,
-             size_t alignment, cpp20::span<std::byte> data) {
+void UseData(std::span<std::byte> self_data, uintptr_t& bias_var, const char* what,
+             size_t alignment, std::span<std::byte> data) {
   ZX_ASSERT_MSG(data.size_bytes() >= self_data.size_bytes(),
                 "cannot relocate %zu bytes of %s with only %zu bytes left!", self_data.size_bytes(),
                 what, data.size_bytes());
@@ -390,7 +390,7 @@ void UseData(cpp20::span<std::byte> self_data, uintptr_t& bias_var, const char* 
 
 }  // namespace
 
-void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
+void LlvmProfdata::Init(std::span<const std::byte> build_id) {
   build_id_ = build_id;
 
   if (NoData()) {
@@ -425,7 +425,7 @@ bool LlvmProfdata::UsingSingleByteCounters() {
   return INSTR_PROF_RAW_VERSION_VAR & VARIANT_MASK_BYTE_COVERAGE;
 }
 
-LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
+LlvmProfdata::LiveData LlvmProfdata::DoFixedData(std::span<std::byte> data, bool match) {
   if (size_bytes_ == 0) {
     return {};
   }
@@ -434,7 +434,7 @@ LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
   // subspan where the next call will write its data.  When merging, this
   // doesn't actually write but instead asserts that the destination already
   // has identical contents.
-  auto write_bytes = [&](cpp20::span<const std::byte> bytes, const char* what) {
+  auto write_bytes = [&](std::span<const std::byte> bytes, const char* what) {
     ZX_ASSERT_MSG(data.size_bytes() >= bytes.size_bytes(),
                   "%s of %zu bytes with only %zu bytes left!", what, bytes.size_bytes(),
                   data.size_bytes());
@@ -448,23 +448,23 @@ LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
   };
 
   constexpr std::array<std::byte, sizeof(uint64_t)> kPaddingBytes{};
-  const cpp20::span kPadding(kPaddingBytes);
+  const std::span kPadding(kPaddingBytes);
   constexpr const char* kPaddingDoc = "alignment padding";
 
   // These are all the chunks to be written.
   // The sequence and sizes here must match the size_bytes() code.
 
   const ProfRawHeader header = GetHeader(build_id_);
-  write_bytes(cpp20::as_bytes(cpp20::span{&header, 1}), "INSTR_PROF_RAW_HEADER");
+  write_bytes(std::as_bytes(std::span{&header, 1}), "INSTR_PROF_RAW_HEADER");
 
   const uint64_t build_id_size = build_id_.size_bytes();
   if (build_id_size > 0) {
-    write_bytes(cpp20::as_bytes(cpp20::span{&build_id_size, 1}), "build ID size");
-    write_bytes(cpp20::as_bytes(build_id_), "build ID");
+    write_bytes(std::as_bytes(std::span{&build_id_size, 1}), "build ID size");
+    write_bytes(std::as_bytes(build_id_), "build ID");
     write_bytes(kPadding.subspan(0, PaddingSize(build_id_)), kPaddingDoc);
   }
 
-  write_bytes(cpp20::as_bytes(ProfDataArray()), INSTR_PROF_DATA_SECT_NAME);
+  write_bytes(std::as_bytes(ProfDataArray()), INSTR_PROF_DATA_SECT_NAME);
   write_bytes(kPadding.subspan(0, static_cast<size_t>(header.PaddingBytesBeforeCounters)),
               kPaddingDoc);
 
@@ -473,12 +473,12 @@ LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
   ZX_ASSERT_MSG(data.size_bytes() >= counters_size_bytes_,
                 "%zu bytes of counters with only %zu bytes left!", counters_size_bytes_,
                 data.size_bytes());
-  cpp20::span counters_data = data.subspan(0, counters_size_bytes_);
+  std::span counters_data = data.subspan(0, counters_size_bytes_);
   data = data.subspan(counters_size_bytes_);
   write_bytes(kPadding.subspan(0, static_cast<size_t>(header.PaddingBytesAfterCounters)),
               kPaddingDoc);
 
-  cpp20::span<std::byte> bitmap_data;
+  std::span<std::byte> bitmap_data;
 #if INSTR_PROF_RAW_VERSION >= 9
   // Skip over the space in the data blob for the bitmap bytes.
   ZX_ASSERT(bitmap_size_bytes_ == ProfBitmapData().size_bytes());
@@ -491,18 +491,18 @@ LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bo
               kPaddingDoc);
 #endif
 
-  auto prof_names = cpp20::span(NamesBegin, NamesEnd - NamesBegin);
+  auto prof_names = std::span(NamesBegin, NamesEnd - NamesBegin);
   const size_t PaddingBytesAfterNames = PaddingSize(static_cast<size_t>(header.NamesSize));
-  write_bytes(cpp20::as_bytes(prof_names), INSTR_PROF_NAME_SECT_NAME);
+  write_bytes(std::as_bytes(prof_names), INSTR_PROF_NAME_SECT_NAME);
   write_bytes(kPadding.subspan(0, PaddingBytesAfterNames), kPaddingDoc);
 
 #if INSTR_PROF_RAW_VERSION >= 10
   auto vtable_data = VTableDataArray();
-  write_bytes(cpp20::as_bytes(vtable_data), INSTR_PROF_VTAB_SECT_NAME);
+  write_bytes(std::as_bytes(vtable_data), INSTR_PROF_VTAB_SECT_NAME);
   write_bytes(kPadding.subspan(0, PaddingSize(vtable_data.size_bytes())), kPaddingDoc);
 
-  auto vnames = cpp20::span(VNamesBegin, VNamesEnd - VNamesBegin);
-  write_bytes(cpp20::as_bytes(vnames), INSTR_PROF_VNAME_SECT_NAME);
+  auto vnames = std::span(VNamesBegin, VNamesEnd - VNamesBegin);
+  write_bytes(std::as_bytes(vnames), INSTR_PROF_VNAME_SECT_NAME);
   write_bytes(kPadding.subspan(0, PaddingSize(vnames.size_bytes())), kPaddingDoc);
 #endif
 
@@ -535,7 +535,7 @@ void LlvmProfdata::MergeLiveData(LiveData data) {
   ZX_ASSERT_MSG(data_counters.size_bytes() >= prof_counters.size_bytes(),
                 "merging %zu bytes of counters with only %zu bytes left!",
                 prof_counters.size_bytes(), data_counters.size_bytes());
-  MergeCounters(data_counters, cpp20::as_bytes(ProfCountersData()));
+  MergeCounters(data_counters, std::as_bytes(ProfCountersData()));
   MergeSelfData<char, std::bit_or>(data.bitmap, ProfBitmapData(), "bitmap");
 }
 
@@ -546,12 +546,12 @@ void LlvmProfdata::MergeLiveData(LiveData to, LiveData from) {
 
 void LlvmProfdata::UseLiveData(LiveData data) {
 #ifdef INSTR_PROF_PROFILE_BITMAP_BIAS_VAR
-  UseData(cpp20::as_writable_bytes(ProfBitmapData()), INSTR_PROF_PROFILE_BITMAP_BIAS_VAR, "bitmap",
-          1, data.bitmap);
+  UseData(std::as_writable_bytes(ProfBitmapData()), INSTR_PROF_PROFILE_BITMAP_BIAS_VAR, "bitmap", 1,
+          data.bitmap);
 #else
   ZX_ASSERT_MSG(data.bitmap.empty(), "bitmap bytes cannot be relocated");
 #endif
-  UseData(cpp20::as_writable_bytes(ProfCountersData()), INSTR_PROF_PROFILE_COUNTER_BIAS_VAR,
+  UseData(std::as_writable_bytes(ProfCountersData()), INSTR_PROF_PROFILE_COUNTER_BIAS_VAR,
           "counters", LiveDataCountersAlignment(), data.counters);
 }
 
@@ -561,8 +561,7 @@ void LlvmProfdata::UseLinkTimeLiveData() {
   std::atomic_signal_fence(std::memory_order_seq_cst);
 }
 
-cpp20::span<const std::byte> LlvmProfdata::BuildIdFromRawProfile(
-    cpp20::span<const std::byte> data) {
+std::span<const std::byte> LlvmProfdata::BuildIdFromRawProfile(std::span<const std::byte> data) {
   ProfRawHeader header;
   if (data.size() < sizeof(header)) {
     return {};
@@ -592,8 +591,8 @@ cpp20::span<const std::byte> LlvmProfdata::BuildIdFromRawProfile(
   return data.subspan(0, static_cast<size_t>(build_id_size));
 }
 
-bool LlvmProfdata::Match(cpp20::span<const std::byte> data) {
-  cpp20::span id = BuildIdFromRawProfile(data);
+bool LlvmProfdata::Match(std::span<const std::byte> data) {
+  std::span id = BuildIdFromRawProfile(data);
   return !id.empty() && id.size_bytes() == build_id_.size_bytes() &&
          !memcmp(id.data(), build_id_.data(), build_id_.size_bytes());
 }

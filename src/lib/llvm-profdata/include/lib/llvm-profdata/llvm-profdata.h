@@ -5,15 +5,14 @@
 #ifndef SRC_LIB_LLVM_PROFDATA_INCLUDE_LIB_LLVM_PROFDATA_LLVM_PROFDATA_H_
 #define SRC_LIB_LLVM_PROFDATA_INCLUDE_LIB_LLVM_PROFDATA_LLVM_PROFDATA_H_
 
-#include <lib/stdcompat/span.h>
-
-#include <cstdint>
+#include <cstddef>
+#include <span>
 #include <string_view>
 
 class LlvmProfdata {
  public:
   struct LiveData {
-    cpp20::span<std::byte> counters, bitmap;
+    std::span<std::byte> counters, bitmap;
   };
 
   // This is the minimum alignment required for LiveData::counters::data().
@@ -29,7 +28,7 @@ class LlvmProfdata {
 
   // This initializes the object based on the current module's own
   // instrumentation data.  This must be called before other methods below.
-  void Init(cpp20::span<const std::byte> build_id);
+  void Init(std::span<const std::byte> build_id);
 
   // This returns the size of the data blob to be published.
   // The return value is zero if there is no data to publish.
@@ -54,23 +53,23 @@ class LlvmProfdata {
   // return an empty span.  This does only minimal format validation that is
   // sufficient to find the build ID safely, and does not guarantee that the
   // other sizes in the header are valid.
-  static cpp20::span<const std::byte> BuildIdFromRawProfile(cpp20::span<const std::byte> data);
+  static std::span<const std::byte> BuildIdFromRawProfile(std::span<const std::byte> data);
 
   // Return true if data appears to be a valid llvm-profdata dump whose build
   // ID matches the one passed to Init.
-  bool Match(cpp20::span<const std::byte> data);
+  bool Match(std::span<const std::byte> data);
 
   // This must be passed a span of at least size_bytes() whose pointer must be
   // aligned to kAlign bytes.  Write the fixed metadata into the buffer, but
   // leave the live data areas in the buffer untouched.  Returns the subspans
   // covering the live data.
-  LiveData WriteFixedData(cpp20::span<std::byte> data) { return DoFixedData(data, false); }
+  LiveData WriteFixedData(std::span<std::byte> data) { return DoFixedData(data, false); }
 
   // Verify the contents after Match(data) is true, causing assertion failures
   // if the data was corrupted.  After this, the data is verified to match what
   // WriteFixedData would have written.  Returns the subspans covering the
   // live data, just as WriteFixedData would have done.
-  LiveData VerifyMatch(cpp20::span<std::byte> data) { return DoFixedData(data, true); }
+  LiveData VerifyMatch(std::span<std::byte> data) { return DoFixedData(data, true); }
 
   // Copy out the current live data values from their link-time locations where
   // they have accumulated since startup.  The data.counters buffer must be at
@@ -107,9 +106,9 @@ class LlvmProfdata {
   static constexpr std::string_view kAnnounce = "LLVM Profile";
 
  private:
-  LiveData DoFixedData(cpp20::span<std::byte> data, bool match);
+  LiveData DoFixedData(std::span<std::byte> data, bool match);
 
-  cpp20::span<const std::byte> build_id_;
+  std::span<const std::byte> build_id_;
   size_t size_bytes_ = 0;
   size_t counters_offset_ = 0;
   size_t counters_size_bytes_ = 0;
