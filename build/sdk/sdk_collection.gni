@@ -16,7 +16,7 @@ import("sdk_molecule.gni")
 # will follow the standard IDK layout, including a top-level meta/manifest.json
 # file describing all atoms in the collection using the standard IDK schema.
 #
-# It also writes the $BUILD_DIR/sdk/manifest/{collection_name} file, as an
+# It may write the $BUILD_DIR/sdk/manifest/{collection_name} file, as an
 # internal SDK manifest describing all atoms. Note that this format is internal
 # to the build system, and should not be used outside of it (though it is
 # ok for `ffx` to use that from a Fuchsia checkout).
@@ -225,7 +225,7 @@ template("sdk_collection") {
 
     binary_label = "//build/sdk:generate_archive_manifest_from_sdk_manifest"
 
-    inputs = [ files.final_manifest ]
+    inputs = [ files.local_manifest ]
 
     outputs = [ files.tarmaker_manifest ]
 
@@ -236,7 +236,7 @@ template("sdk_collection") {
       rebase_path(outputs[0], root_build_dir),
     ]
 
-    deps = [ ":${targets.final_manifest}" ]
+    deps = [ ":${targets.local_manifest}" ]
 
     foreach(file, additional_archive_files) {
       inputs += [ file.source ]
@@ -332,13 +332,27 @@ template("sdk_collection") {
     deps = [
       ":${targets.prebuild_manifest}",
       ":${targets.verify_idk_meta_manifest_json}",
-      ":${targets.verify_manifest}",
     ]
 
-    public_deps = [
-      ":${targets.export}",
-      ":${targets.final_manifest}",
+    public_deps = [ ":${targets.export}" ]
+
+    # The build manifest is only needed by legacy use cases.
+    _collections_needing_build_manifest = [
+      # TODO(https://fxbug.dev/317385989): Remove when ffx no longer depends on
+      # the core manifest.
+      "core",
+
+      # TODO(https://fxbug.dev/407083737): Remove when clidoc_run.py no longer
+      # uses this format.
+      "idk_host_tools_collection",
     ]
+    if (_collections_needing_build_manifest + [ collection_name ] -
+        [ collection_name ] != _collections_needing_build_manifest) {
+      deps += [ ":${targets.verify_manifest}" ]
+      public_deps += [ ":${targets.final_manifest}" ]
+    } else {
+      assert_no_deps = [ ":${targets.final_manifest}" ]
+    }
 
     # TODO(https://fxbug.dev/42174965): Block all metadata traversals such as the following:
     # metadata = {
