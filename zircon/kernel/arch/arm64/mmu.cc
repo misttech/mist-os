@@ -595,14 +595,14 @@ class ArmArchVmAspace::ConsistencyManager {
   // The aspace we are invalidating TLBs for.
   const ArmArchVmAspace& aspace_;
 
-  // Pending ISB
-  bool isb_pending_ = false;
-
   // vm_page_t's to release to the PMM after the TLB invalidation occurs.
   list_node to_free_ = LIST_INITIAL_VALUE(to_free_);
 
+  // Pending ISB
+  bool isb_pending_ = false;
+
   // The main list of pending TLBs.
-  size_t num_pending_tlbs_ = 0;
+  uint32_t num_pending_tlbs_ = 0;
   PendingTlbs pending_tlbs_[kMaxPendingTlbs];
 };
 
@@ -1486,7 +1486,7 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     }
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     MappingCursor cursor(/*paddrs=*/&paddr, /*paddr_count=*/1, /*page_size=*/count * PAGE_SIZE,
                          /*vaddr=*/vaddr);
     if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
@@ -1570,7 +1570,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     }
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
                          /*vaddr=*/vaddr);
     if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
@@ -1624,7 +1624,7 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions
   Guard<CriticalMutex> a{&lock_};
 
   ASSERT(updates_enabled_);
-  ConsistencyManager cm(*this);
+  __UNINITIALIZED ConsistencyManager cm(*this);
   VirtualAddressCursor cursor(vaddr, count * PAGE_SIZE);
   if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
     return ZX_ERR_OUT_OF_RANGE;
@@ -1693,7 +1693,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
   {
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     ret = ProtectPages(vaddr, count * PAGE_SIZE, attrs, enlarge, vaddr_base_, cm);
   }
 
@@ -1747,7 +1747,7 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
     ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
         LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
     size_t entry_limit = kHarvestEntriesBetweenUnlocks;
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     const size_t harvested_size = HarvestAccessedPageTable(
         &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
         non_terminal_action, terminal_action, tt_virt_, cm);
