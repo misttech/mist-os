@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/code-patching/code-patches.h>
 #include <zircon/assert.h>
 
 #include <phys/arch/arch-handoff.h>
