@@ -475,20 +475,6 @@ void gic_shutdown() {
   return false;
 }
 
-zx_status_t gic_suspend_cpu() {
-  DEBUG_ASSERT(arch_ints_disabled());
-
-  // Disable group 1 interrupts at the CPU interface.
-  gic_write_igrpen(0);
-
-  // Mark the PE as offline. This will keep the redistributor from routing
-  // interrupts and for any interrupts targeting it, trigger a wake-request to
-  // the power controller.
-  gic_redistributor_sleep(true);
-
-  return ZX_OK;
-}
-
 void gic_shutdown_cpu() {
   DEBUG_ASSERT(arch_ints_disabled());
 
@@ -504,8 +490,21 @@ void gic_shutdown_cpu() {
   DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID || !is_spi_enabled());
   // TODO(maniscalco): If/when we start using LPIs, make sure none are targeted at this CPU.
 
-  const zx_status_t status = gic_suspend_cpu();
-  DEBUG_ASSERT_MSG(status == ZX_OK, "%d\n", status);
+  // Disable group 1 interrupts at the CPU interface.
+  gic_write_igrpen(0);
+
+  // Mark the PE as offline. This will keep the redistributor from routing
+  // interrupts and for any interrupts targeting it, trigger a wake-request to
+  // the power controller.
+  gic_redistributor_sleep(true);
+}
+
+zx_status_t gic_suspend_cpu() {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  gic_redistributor_sleep(true);
+
+  return ZX_OK;
 }
 
 zx_status_t gic_resume_cpu() {

@@ -167,16 +167,13 @@ zx_status_t platform_suspend_cpu() {
 
   // TODO(https://fxbug.dev/414456459): Plumb in the available PSCI power_state
   // values to this point using the recently added ZBI item.
-  constexpr uint32_t kPsciPowerStateBootCpu = 0;
-  constexpr uint32_t kPsciPowerStateOther = 0;
-  const uint32_t psci_power_state =
-      (arch_curr_cpu_num() == 0) ? kPsciPowerStateBootCpu : kPsciPowerStateOther;
+  const uint32_t psci_power_state = 0;
 
   // TODO(https://fxbug.dev/414456459): Expose a PSCI function that looks at the
   // power_state value and determines if it's considered a "power down state" in
   // the PSCI sense of the term.  Or perhaps make that an attribute that's
   // supplied by the PSCI driver.
-  const bool is_power_down = false;
+  const bool is_power_down = true;
 
   if (is_power_down) {
     lockup_percpu_shutdown();
