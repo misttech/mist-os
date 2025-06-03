@@ -65,6 +65,11 @@ static void dump_double_fault(iframe_t* frame) {
 #else
   printf("no unsafe stack.\n");
 #endif
+
+  printf("attempting to backtrace initially faulting thread:\n");
+  Backtrace bt;
+  Thread::Current::GetBacktrace(main_stack_base, bt);
+  bt.PrintWithoutVersion();
 }
 
 static void dump_fault_frame(iframe_t* frame) {
