@@ -65,10 +65,7 @@ impl FileOps for TraceMarkerFile {
         let input_data = String::from_utf8_lossy(&bytes);
         if let Some(atrace_event) = ATraceEvent::parse(&input_data) {
             if self.queue.is_enabled() {
-                let timestamp = zx::BootInstant::get();
                 let trace_event = TraceEvent::new(
-                    self.queue.prev_timestamp(),
-                    timestamp,
                     // This pid is a Kernel pid (do not confuse with userspace pid aka tgid), so we use
                     // the task thread id, the pid and tid are equal when the thread is the "main thread"
                     // of the thread group/process.
@@ -76,7 +73,7 @@ impl FileOps for TraceMarkerFile {
                     current_task.get_tid(),
                     &bytes,
                 );
-                self.queue.push_event(trace_event, timestamp)?;
+                self.queue.push_event(trace_event)?;
             }
             // TODO(https://fxbug.dev/357665908): Remove forwarding of atrace events to trace
             // manager when dependencies have been migrated.
