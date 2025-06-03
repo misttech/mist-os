@@ -1079,7 +1079,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -2469,7 +2469,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:138
+From //zircon/kernel/params.gni:135
 
 ### enable_mdns_trace
 
@@ -6603,14 +6603,6 @@ zero add increasing details at the cost of increased trace buffer use.
 **Current value (from the default):** `0`
 
 From //zircon/kernel/params.gni:78
-
-### vmo_fine_grained_locking
-
-Use fine grained (per VMO) locks instead of a single lock for the entire clone hierarchy.
-
-**Current value (from the default):** `true`
-
-From //zircon/kernel/params.gni:130
 
 ### vulkan_host_runtime_dir
 
