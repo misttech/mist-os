@@ -1,0 +1,42 @@
+# Use cargo to test the project
+test:cargo:
+  stage: test
+  tags:
+    - openbsd
+  script:
+    - rustc --version && cargo --version  # Print version info for debugging
+    - cargo install cargo2junit
+    - cargo fmt -- --check
+    - cargo clippy --all-targets --all-features -- -D warnings
+    - cargo test --workspace --verbose -- -Z unstable-options --format json --report-time | tee results.json
+    - ~/.cargo/bin/cargo2junit < results.json > results.xml
+  variables:
+    RUST_BACKTRACE: 1
+    RUSTFLAGS: "-C link-args=-L/usr/local/lib"
+  artifacts:
+    reports:
+      junit: results.xml
+
+cross:cargo:
+  image: rust:1.54-slim
+  stage: build
+  tags:
+    - docker
+  parallel:
+    matrix:
+      - TARGET: x86_64-unknown-netbsd
+      - TARGET: x86_64-unknown-freebsd
+      - TARGET: i686-unknown-freebsd
+      - TARGET: x86_64-apple-darwin
+  before_script:
+    - rustup target add $TARGET
+  script:
+    - rustc --version && cargo --version  # Print version info for debugging
+    - cargo build --target $TARGET
+
+include:
+  - template: Code-Quality.gitlab-ci.yml
+
+code_quality:
+  tags:
+    - docker

@@ -9909,7 +9909,7 @@ rustc_library("mockall-v0_9_0") {
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":mockall_derive-v0_9_0($host_toolchain)" ]
   deps += [ ":predicates-tree-v1_0_2" ]
-  deps += [ ":predicates-v1_0_7" ]
+  deps += [ ":predicates-v1_0_8" ]
   deps += [ "//build/validate:non_production_tag" ]
   rustenv = []
 
@@ -12458,18 +12458,18 @@ rustc_library("ppv-lite86-v0_2_10") {
   applicable_licenses = [ ":ppv-lite86-v0_2_10.license" ]
 }
 
-license("predicates-v1_0_7.license") {
+license("predicates-v1_0_8.license") {
   public_package_name = "predicates"
   license_files = [
-    "//third_party/rust_crates/vendor/predicates-1.0.7/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/predicates-1.0.7/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/predicates-1.0.8/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/predicates-1.0.8/LICENSE-MIT",
   ]
 }
 
-rustc_library("predicates-v1_0_7") {
+rustc_library("predicates-v1_0_8") {
   crate_name = "predicates"
-  source_root = "//third_party/rust_crates/vendor/predicates-1.0.7/src/lib.rs"
-  output_name = "predicates-18699c217c61a73d"
+  source_root = "//third_party/rust_crates/vendor/predicates-1.0.8/src/lib.rs"
+  output_name = "predicates-800197c7ca1923da"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -12486,8 +12486,8 @@ rustc_library("predicates-v1_0_7") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=18699c217c61a73d",
-    "-Cextra-filename=-18699c217c61a73d",
+    "-Cmetadata=800197c7ca1923da",
+    "-Cextra-filename=-800197c7ca1923da",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"difference\"",
     "--cfg=feature=\"float-cmp\"",
@@ -12497,7 +12497,7 @@ rustc_library("predicates-v1_0_7") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":predicates-v1_0_7.license" ]
+  applicable_licenses = [ ":predicates-v1_0_8.license" ]
 }
 
 license("predicates-core-v1_0_2.license") {

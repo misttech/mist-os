@@ -1,0 +1,7 @@
+# Use cargo to test the project
+test:cargo:
+  script:
+    - rustc --version && cargo --version  # Print version info for debugging
+    - cargo fmt -- --check
+    - cargo clippy
+    - cargo test --workspace --verbose

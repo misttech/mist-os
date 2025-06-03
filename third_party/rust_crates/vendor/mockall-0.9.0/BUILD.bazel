@@ -81,7 +81,7 @@ rust_library(
         "//third_party/rust_crates/vendor/downcast-0.10.0:downcast",
         "//third_party/rust_crates/vendor/fragile-1.0.0:fragile",
         "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
-        "//third_party/rust_crates/vendor/predicates-1.0.7:predicates",
+        "//third_party/rust_crates/vendor/predicates-1.0.8:predicates",
         "//third_party/rust_crates/vendor/predicates-tree-1.0.2:predicates_tree",
     ],
 )

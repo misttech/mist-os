@@ -1,0 +1,71 @@
+name: lint
+
+env:
+  # It's really `--all-features`, but not adding the mutually exclusive features from rkyv
+  ALL_NON_EXCLUSIVE_FEATURES: --features "default unstable-locales rkyv-64 rkyv-validation rustc-serialize serde arbitrary"
+
+on:
+  push:
+    branches: [main, 0.4.x]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu, x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check -- --color=always
+      - run: cargo fmt --check --manifest-path fuzz/Cargo.toml
+      - run: cargo fmt --check --manifest-path bench/Cargo.toml
+      - run: |
+          cargo clippy ${{ env.ALL_NON_EXCLUSIVE_FEATURES }} --all-targets --color=always \
+            -- -D warnings
+      - run: |
+          cargo clippy --manifest-path fuzz/Cargo.toml --color=always \
+            -- -D warnings
+      - run: |
+          cargo clippy --manifest-path bench/Cargo.toml --color=always \
+            -- -D warnings
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+  toml:
+    runs-on: ubuntu-latest
+    container:
+      image: tamasfe/taplo:0.8.0
+    steps:
+      - uses: actions/checkout@v4
+      - run: taplo lint
+      - run: taplo fmt --check --diff
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v1
+
+  check-doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-deadlinks
+      - run: cargo deadlinks -- ${{ env.ALL_NON_EXCLUSIVE_FEATURES }}
+      - run: cargo doc ${{ env.ALL_NON_EXCLUSIVE_FEATURES }} --no-deps
+        env:
+          RUSTDOCFLAGS: -Dwarnings
+
+  cffconvert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: citation-file-format/cffconvert-github-action@2.0.0
+        with:
+          args: --validate

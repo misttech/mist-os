@@ -1,0 +1,43 @@
+dist: trusty
+language: rust
+services: docker
+sudo: required
+
+rust: stable
+
+env:       TARGET=x86_64-unknown-linux-gnu
+matrix:
+  include:
+    - env: TARGET=i686-unknown-linux-gnu
+    - env: TARGET=x86_64-unknown-linux-gnu
+      rust: beta
+    - env: TARGET=i686-unknown-linux-gnu
+      rust: beta
+    - env: TARGET=x86_64-unknown-linux-gnu
+      rust: nightly
+    - env: TARGET=i686-unknown-linux-gnu
+      rust: nightly
+
+before_install: set -e
+
+install:
+  - sh ci/install.sh
+  - source ~/.cargo/env || true
+
+script:
+  - bash ci/script.sh
+
+after_script: set +e
+
+cache: cargo
+before_cache:
+  - chmod -R a+r $HOME/.cargo
+
+branches:
+  only:
+    - auto
+    - try
+
+notifications:
+  email:
+    on_success: never
