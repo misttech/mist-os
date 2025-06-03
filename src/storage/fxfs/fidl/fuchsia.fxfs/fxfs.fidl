@@ -17,24 +17,24 @@ type KeyPurpose = flexible enum {
     DATA = 2;
 };
 
-type FscryptInoLblk32DirKey = struct {
+type FxfsKey = struct {
+    wrapping_key_id array<uint8, 16>;
+    wrapped_key array<uint8, 48>;
+};
+
+type FscryptKeyIdentifierAndNonce = struct {
     key_identifier array<uint8, 16>;
-    filesystem_uuid array<uint8, 16>;
     nonce array<uint8, 16>;
 };
-type FscryptInoLblk32FileKey = struct {
+type FscryptKeyIdentifier = struct {
     key_identifier array<uint8, 16>;
-    filesystem_uuid array<uint8, 16>;
 };
 
 type WrappedKey = flexible union {
-    /// Fxfs's default crypto.
+    /// Fxfs's default crypto (AES256GCM-SIV wrapped key using AES256XTS encryption)
     ///   In: 16-byte wrapping_key_id + 48-byte wrapped key.
     ///   Out: 32-byte unwrapped key.
-    1: fxfs_wrapped struct {
-        wrapping_key_id array<uint8, 16>;
-        wrapped_key array<uint8, 48>;
-    };
+    1: fxfs FxfsKey;
 
     /// Zxcrypt (For use with FVM/Minfs only)
     ///   In: 132-byte request blob.
@@ -44,17 +44,20 @@ type WrappedKey = flexible union {
     /// Fscrypt INO_LBLK32 directory (For use with starnix only)
     ///   In: 16-byte key_identifier + 16-byte UUID + 16-byte nonce.
     ///   Out: 32-byte xts_key1, 32-byte xts_key2, 16-byte ino_hash, 16-byte dirhash.
-    3: fscrypt_ino_lblk32_dir FscryptInoLblk32DirKey;
+    3: fscrypt_ino_lblk32_dir FscryptKeyIdentifierAndNonce;
 
     /// Fscrypt INO_LBLK32 file (For use with starnix only)
     ///   In: 16-byte key_identifier + 16-byte UUID.
     ///   Out: 32-byte xts_key1, 32-byte xts_key2, 16-byte ino_hash.
-    4: fscrypt_ino_lblk32_file FscryptInoLblk32FileKey;
+    4: fscrypt_ino_lblk32_file FscryptKeyIdentifier;
 
     /// Devicemapper DefaultKey (For use with starnix only)
     ///   In: None. This is a singleton. wrapping_key_id should be set to 0.
     ///   Out: 32-byte xts_key1, 32-byte xts_key2.
     5: dm_default_key EmptyStruct;
+
+    /// fscrypt default per-file encryption.
+    6: fscrypt_per_file FscryptKeyIdentifierAndNonce;
 };
 
 @discoverable

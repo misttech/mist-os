@@ -2,15 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use aes::cipher::generic_array::GenericArray;
-use aes::cipher::inout::InOut;
-use aes::cipher::typenum::consts::U16;
-use aes::cipher::{
-    BlockBackend, BlockClosure, BlockDecrypt, BlockEncrypt, BlockSizeUser, KeyInit, KeyIvInit,
-    StreamCipher as _, StreamCipherSeek,
-};
-use aes::Aes256;
-use anyhow::{anyhow, Error};
+use aes::cipher::{KeyIvInit, StreamCipher as _, StreamCipherSeek};
+use anyhow::anyhow;
 use arbitrary::Arbitrary;
 use async_trait::async_trait;
 use chacha20::{self, ChaCha20};
@@ -20,54 +13,49 @@ use futures::TryStreamExt as _;
 use fxfs_macros::{migrate_nodefault, Migrate};
 use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use static_assertions::assert_cfg;
-use std::sync::Arc;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use std::collections::BTreeMap;
 use zx_status as zx;
 
+mod cipher;
 pub mod ff1;
 
-pub const KEY_SIZE: usize = 256 / 8;
-pub const WRAPPED_KEY_SIZE: usize = KEY_SIZE + 16;
-// TODO(https://fxbug.dev/375700939): Support different padding sizes based on SET_ENCRYPTION_POLICY
-// flags.
-pub const FSCRYPT_PADDING: usize = 16;
+pub use cipher::fxfs::FxfsCipher;
+pub use cipher::{Cipher, CipherSet, FindKeyResult};
+pub use fidl_fuchsia_fxfs::{
+    EmptyStruct, FscryptKeyIdentifier, FscryptKeyIdentifierAndNonce, WrappedKey,
+};
 
-// Fxfs will always use a block size >= 512 bytes, so we just assume a sector size of 512 bytes,
-// which will work fine even if a different block size is used by Fxfs or the underlying device.
-const SECTOR_SIZE: u64 = 512;
+pub use cipher::FSCRYPT_PADDING;
+pub const FXFS_KEY_SIZE: usize = 256 / 8;
+pub const FXFS_WRAPPED_KEY_SIZE: usize = FXFS_KEY_SIZE + 16;
 
-pub type KeyBytes = [u8; KEY_SIZE];
-
+/// Essentially just a vector by another name to indicate that it holds unwrapped key material.
+/// The length of an unwrapped key depends on the type of key that is wrapped.
 #[derive(Debug)]
-pub struct UnwrappedKey {
-    key: KeyBytes,
-}
-
+pub struct UnwrappedKey(Vec<u8>);
 impl UnwrappedKey {
-    pub fn new(key: KeyBytes) -> Self {
-        UnwrappedKey { key }
+    pub fn new(key: Vec<u8>) -> Self {
+        UnwrappedKey(key)
     }
-
-    pub fn key(&self) -> &KeyBytes {
-        &self.key
+}
+impl std::ops::Deref for UnwrappedKey {
+    type Target = Vec<u8>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-pub type UnwrappedKeys = Vec<(u64, Option<UnwrappedKey>)>;
-
+/// A fixed length array of 48 bytes that holds an AES-256-GCM-SIV wrapped key.
+// TODO(b/419723745): Move this to Fxfs and keep fxfs-crypto free of versioned types.
 pub type WrappedKeyBytes = WrappedKeyBytesV32;
-
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq)]
-pub struct WrappedKeyBytesV32(pub [u8; WRAPPED_KEY_SIZE]);
-
+pub struct WrappedKeyBytesV32(pub [u8; FXFS_WRAPPED_KEY_SIZE]);
 impl Default for WrappedKeyBytes {
     fn default() -> Self {
-        Self([0u8; WRAPPED_KEY_SIZE])
+        Self([0u8; FXFS_WRAPPED_KEY_SIZE])
     }
 }
-
 impl TryFrom<Vec<u8>> for WrappedKeyBytes {
     type Error = anyhow::Error;
 
@@ -75,13 +63,11 @@ impl TryFrom<Vec<u8>> for WrappedKeyBytes {
         Ok(Self(buf.try_into().map_err(|_| anyhow!("wrapped key wrong length"))?))
     }
 }
-
-impl From<[u8; WRAPPED_KEY_SIZE]> for WrappedKeyBytes {
-    fn from(buf: [u8; WRAPPED_KEY_SIZE]) -> Self {
+impl From<[u8; FXFS_WRAPPED_KEY_SIZE]> for WrappedKeyBytes {
+    fn from(buf: [u8; FXFS_WRAPPED_KEY_SIZE]) -> Self {
         Self(buf)
     }
 }
-
 impl TypeFingerprint for WrappedKeyBytes {
     fn fingerprint() -> String {
         "WrappedKeyBytes".to_owned()
@@ -89,7 +75,7 @@ impl TypeFingerprint for WrappedKeyBytes {
 }
 
 impl std::ops::Deref for WrappedKeyBytes {
-    type Target = [u8; WRAPPED_KEY_SIZE];
+    type Target = [u8; FXFS_WRAPPED_KEY_SIZE];
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -138,7 +124,7 @@ impl<'de> Deserialize<'de> for WrappedKeyBytes {
                 E: SerdeError,
             {
                 let orig_len = bytes.len();
-                let bytes: [u8; WRAPPED_KEY_SIZE] =
+                let bytes: [u8; FXFS_WRAPPED_KEY_SIZE] =
                     bytes.try_into().map_err(|_| SerdeError::invalid_length(orig_len, &self))?;
                 Ok(WrappedKeyBytes::from(bytes))
             }
@@ -147,10 +133,13 @@ impl<'de> Deserialize<'de> for WrappedKeyBytes {
     }
 }
 
-pub type WrappedKey = WrappedKeyV40;
+// TODO(b/419723745): Move this to Fxfs and keep fxfs-crypto free of versioned types.
+pub type FxfsKey = FxfsKeyV40;
 
+/// An Fxfs encryption key wrapped in AES-256-GCM-SIV and the associated wrapping key ID.
+/// This can be provided to Crypt::unwrap_key to obtain the unwrapped key.
 #[derive(Clone, Default, Debug, Serialize, Deserialize, TypeFingerprint, PartialEq)]
-pub struct WrappedKeyV40 {
+pub struct FxfsKeyV40 {
     /// The identifier of the wrapping key.  The identifier has meaning to whatever is doing the
     /// unwrapping.
     pub wrapping_key_id: u128,
@@ -162,215 +151,48 @@ pub struct WrappedKeyV40 {
     pub key: WrappedKeyBytesV32,
 }
 
+impl Into<fidl_fuchsia_fxfs::FxfsKey> for FxfsKey {
+    fn into(self) -> fidl_fuchsia_fxfs::FxfsKey {
+        fidl_fuchsia_fxfs::FxfsKey {
+            wrapping_key_id: self.wrapping_key_id.to_le_bytes(),
+            wrapped_key: self.key.0.into(),
+        }
+    }
+}
+
 #[derive(Default, Clone, Migrate, Debug, Serialize, Deserialize, TypeFingerprint)]
 #[migrate_nodefault]
-pub struct WrappedKeyV32 {
+pub struct FxfsKeyV32 {
     pub wrapping_key_id: u64,
     pub key: WrappedKeyBytesV32,
 }
 
-impl<'a> arbitrary::Arbitrary<'a> for WrappedKey {
+impl<'a> arbitrary::Arbitrary<'a> for FxfsKey {
     fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         // There doesn't seem to be much point to randomly generate crypto keys.
-        return Ok(WrappedKey::default());
+        return Ok(FxfsKey::default());
     }
 }
 
-/// To support key rolling and clones, a file can have more than one key.  Each key has an ID that
-/// unique to the file.
-pub type WrappedKeys = WrappedKeysV40;
-
 #[derive(Arbitrary, Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
-pub struct WrappedKeysV40(pub Vec<(u64, WrappedKeyV40)>);
-
+pub struct WrappedKeysV40(pub Vec<(u64, FxfsKeyV40)>);
 impl From<WrappedKeysV32> for WrappedKeysV40 {
     fn from(value: WrappedKeysV32) -> Self {
         Self(value.0.into_iter().map(|(id, key)| (id, key.into())).collect())
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
-pub struct WrappedKeysV32(pub Vec<(u64, WrappedKeyV32)>);
-
-impl From<Vec<(u64, WrappedKey)>> for WrappedKeys {
-    fn from(buf: Vec<(u64, WrappedKey)>) -> Self {
+pub struct WrappedKeysV32(pub Vec<(u64, FxfsKeyV32)>);
+impl From<Vec<(u64, FxfsKeyV40)>> for WrappedKeysV40 {
+    fn from(buf: Vec<(u64, FxfsKeyV40)>) -> Self {
         Self(buf)
     }
 }
-
-impl std::ops::Deref for WrappedKeys {
-    type Target = Vec<(u64, WrappedKey)>;
+impl std::ops::Deref for WrappedKeysV40 {
+    type Target = Vec<(u64, FxfsKeyV40)>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
-}
-
-impl std::ops::DerefMut for WrappedKeys {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl WrappedKeys {
-    pub fn get_wrapping_key_with_id(&self, key_id: u64) -> Option<[u8; 16]> {
-        let wrapped_key_entry = self.0.iter().find(|(x, _)| *x == key_id);
-        wrapped_key_entry.map(|(_, wrapped_key)| wrapped_key.wrapping_key_id.to_le_bytes())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Cipher {
-    id: u64,
-    // This is None if the key isn't present.
-    cipher: Option<Aes256>,
-}
-
-impl Cipher {
-    pub fn new(id: u64, key: &UnwrappedKey) -> Self {
-        Self { id, cipher: Some(Aes256::new(GenericArray::from_slice(key.key()))) }
-    }
-
-    pub fn unavailable(id: u64) -> Self {
-        Cipher { id, cipher: None }
-    }
-
-    pub fn key(&self) -> Option<&Aes256> {
-        self.cipher.as_ref()
-    }
-}
-
-/// References a specific key in the cipher set.
-pub struct Key {
-    keys: Arc<CipherSet>,
-    // Index in the CipherSet array for the key.
-    index: usize,
-}
-
-impl Key {
-    pub fn new(keys: Arc<CipherSet>, index: usize) -> Self {
-        Self { keys, index }
-    }
-
-    fn key(&self) -> &Aes256 {
-        self.keys.0[self.index].cipher.as_ref().unwrap()
-    }
-
-    pub fn key_id(&self) -> u64 {
-        self.keys.0[self.index].id
-    }
-
-    /// Encrypts data in the `buffer`.
-    ///
-    /// * `offset` is the byte offset within the file.
-    /// * `buffer` is mutated in place.
-    ///
-    /// `buffer` *must* be 16 byte aligned.
-    pub fn encrypt(&self, offset: u64, buffer: &mut [u8]) -> Result<(), Error> {
-        fxfs_trace::duration!(c"encrypt", "len" => buffer.len());
-        assert_eq!(offset % SECTOR_SIZE, 0);
-        let cipher = &self.key();
-        let mut sector_offset = offset / SECTOR_SIZE;
-        for sector in buffer.chunks_exact_mut(SECTOR_SIZE as usize) {
-            let mut tweak = Tweak(sector_offset as u128);
-            // The same key is used for encrypting the data and computing the tweak.
-            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_mut_bytes()));
-            cipher.encrypt_with_backend(XtsProcessor::new(tweak, sector));
-            sector_offset += 1;
-        }
-        Ok(())
-    }
-
-    /// Decrypt the data in `buffer`.
-    ///
-    /// * `offset` is the byte offset within the file.
-    /// * `buffer` is mutated in place.
-    ///
-    /// `buffer` *must* be 16 byte aligned.
-    pub fn decrypt(&self, offset: u64, buffer: &mut [u8]) -> Result<(), Error> {
-        fxfs_trace::duration!(c"decrypt", "len" => buffer.len());
-        assert_eq!(offset % SECTOR_SIZE, 0);
-        let cipher = &self.key();
-        let mut sector_offset = offset / SECTOR_SIZE;
-        for sector in buffer.chunks_exact_mut(SECTOR_SIZE as usize) {
-            let mut tweak = Tweak(sector_offset as u128);
-            // The same key is used for encrypting the data and computing the tweak.
-            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_mut_bytes()));
-            cipher.decrypt_with_backend(XtsProcessor::new(tweak, sector));
-            sector_offset += 1;
-        }
-        Ok(())
-    }
-
-    /// Encrypts the filename contained in `buffer`.
-    pub fn encrypt_filename(&self, object_id: u64, buffer: &mut Vec<u8>) -> Result<(), Error> {
-        // Pad the buffer such that its length is a multiple of FSCRYPT_PADDING.
-        buffer.resize(buffer.len().next_multiple_of(FSCRYPT_PADDING), 0);
-        let cipher = self.key();
-        cipher.encrypt_with_backend(CbcEncryptProcessor::new(Tweak(object_id as u128), buffer));
-        Ok(())
-    }
-
-    /// Decrypts the filename contained in `buffer`.
-    pub fn decrypt_filename(&self, object_id: u64, buffer: &mut Vec<u8>) -> Result<(), Error> {
-        let cipher = self.key();
-        cipher.decrypt_with_backend(CbcDecryptProcessor::new(Tweak(object_id as u128), buffer));
-        // Remove the padding
-        if let Some(i) = buffer.iter().rposition(|x| *x != 0) {
-            let new_len = i + 1;
-            buffer.truncate(new_len);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct CipherSet(Vec<Cipher>);
-
-impl From<Vec<Cipher>> for CipherSet {
-    fn from(value: Vec<Cipher>) -> Self {
-        Self(value)
-    }
-}
-
-impl CipherSet {
-    pub fn new(keys: &UnwrappedKeys) -> Self {
-        Self(
-            keys.iter()
-                .map(|(id, k)| match k {
-                    Some(k) => Cipher::new(*id, k),
-                    None => Cipher::unavailable(*id),
-                })
-                .collect(),
-        )
-    }
-
-    pub fn ciphers(&self) -> &[Cipher] {
-        &self.0
-    }
-
-    pub fn cipher(&self, id: u64) -> Option<(usize, &Cipher)> {
-        self.0.iter().enumerate().find(|(_, x)| x.id == id)
-    }
-
-    pub fn contains_key_id(&self, id: u64) -> bool {
-        self.0.iter().find(|x| x.id == id).is_some()
-    }
-
-    pub fn find_key(self: &Arc<Self>, id: u64) -> FindKeyResult {
-        let Some((index, cipher)) = self.0.iter().enumerate().find(|(_, x)| x.id == id) else {
-            return FindKeyResult::NotFound;
-        };
-        if cipher.key().is_some() {
-            FindKeyResult::Key(Key { keys: self.clone(), index })
-        } else {
-            FindKeyResult::Unavailable
-        }
-    }
-}
-
-pub enum FindKeyResult {
-    NotFound,
-    Unavailable,
-    Key(Key),
 }
 
 /// A thin wrapper around a ChaCha20 stream cipher.  This will use a zero nonce. **NOTE**: Great
@@ -380,10 +202,8 @@ pub struct StreamCipher(ChaCha20);
 
 impl StreamCipher {
     pub fn new(key: &UnwrappedKey, offset: u64) -> Self {
-        let mut cipher = Self(ChaCha20::new(
-            chacha20::Key::from_slice(&key.key),
-            /* nonce: */ &[0; 12].into(),
-        ));
+        let mut cipher =
+            Self(ChaCha20::new(chacha20::Key::from_slice(key), /* nonce: */ &[0; 12].into()));
         cipher.0.seek(offset);
         cipher
     }
@@ -426,7 +246,7 @@ pub trait Crypt: Send + Sync {
         &self,
         owner: u64,
         purpose: KeyPurpose,
-    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status>;
+    ) -> Result<(FxfsKey, UnwrappedKey), zx::Status>;
 
     /// `owner` is intended to be used such that when the key is wrapped, it appears to be different
     /// to that of the same key wrapped by a different owner.  In this way, keys can be shared
@@ -436,153 +256,53 @@ pub trait Crypt: Send + Sync {
         &self,
         owner: u64,
         wrapping_key_id: u128,
-    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status>;
+    ) -> Result<(FxfsKey, UnwrappedKey), zx::Status>;
 
-    // Unwraps a single key.
+    /// Unwraps a single key, returning a raw unwrapped key.
+    /// This method is generally only used with StreamCipher and FF1.
     async fn unwrap_key(
         &self,
         wrapped_key: &WrappedKey,
         owner: u64,
     ) -> Result<UnwrappedKey, zx::Status>;
 
-    /// Unwraps the keys and stores the result in UnwrappedKeys.
+    /// Unwraps object keys and stores the result as a CipherSet mapping key_id to:
+    ///   - Some(cipher) if unwrapping key was found or
+    ///   - None if unwrapping key was missing.
+    /// The cipher can be used directly to encrypt/decrypt data.
     async fn unwrap_keys(
         &self,
-        keys: &WrappedKeys,
+        keys: &BTreeMap<u64, WrappedKey>,
         owner: u64,
-    ) -> Result<UnwrappedKeys, zx::Status> {
-        let futures = FuturesUnordered::new();
-        for (key_id, key) in keys.iter() {
-            futures.push(async move {
-                match self.unwrap_key(key, owner).await {
-                    Ok(unwrapped_key) => Ok((*key_id, Some(unwrapped_key))),
-                    Err(zx::Status::NOT_FOUND) => Ok((*key_id, None)),
-                    Err(e) => Err(e),
+    ) -> Result<CipherSet, zx::Status> {
+        let futures: FuturesUnordered<_> = keys
+            .iter()
+            .map(|(key_id, key)| {
+                let key_id = *key_id;
+                let owner = owner;
+                async move {
+                    let unwrapped_key = match self.unwrap_key(&key, owner).await {
+                        Ok(unwrapped_key) => unwrapped_key,
+                        Err(zx::Status::NOT_FOUND) => return Ok((key_id, None)),
+                        Err(e) => return Err(e),
+                    };
+
+                    cipher::key_to_cipher(&key, &unwrapped_key).map(|c| (key_id, c))
                 }
-            });
-        }
-        Ok(futures.try_collect::<UnwrappedKeys>().await?)
-    }
-}
-
-// This assumes little-endianness which is likely to always be the case.
-assert_cfg!(target_endian = "little");
-#[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
-#[repr(C)]
-struct Tweak(u128);
-
-pub fn xor_in_place(a: &mut [u8], b: &[u8]) {
-    for (b1, b2) in a.iter_mut().zip(b.iter()) {
-        *b1 ^= *b2;
-    }
-}
-
-// To be used with encrypt_with_backend.
-struct CbcEncryptProcessor<'a> {
-    tweak: Tweak,
-    data: &'a mut [u8],
-}
-
-impl<'a> CbcEncryptProcessor<'a> {
-    fn new(tweak: Tweak, data: &'a mut [u8]) -> Self {
-        Self { tweak, data }
-    }
-}
-
-impl BlockSizeUser for CbcEncryptProcessor<'_> {
-    type BlockSize = U16;
-}
-
-impl BlockClosure for CbcEncryptProcessor<'_> {
-    fn call<B: BlockBackend<BlockSize = Self::BlockSize>>(self, backend: &mut B) {
-        let Self { mut tweak, data } = self;
-        for block in data.chunks_exact_mut(16) {
-            xor_in_place(block, &tweak.0.to_le_bytes());
-            let chunk: &mut GenericArray<u8, _> = GenericArray::from_mut_slice(block);
-            backend.proc_block(InOut::from(chunk));
-            tweak.0 = u128::from_le_bytes(block.try_into().unwrap())
-        }
-    }
-}
-
-// To be used with decrypt_with_backend.
-struct CbcDecryptProcessor<'a> {
-    tweak: Tweak,
-    data: &'a mut [u8],
-}
-
-impl<'a> CbcDecryptProcessor<'a> {
-    fn new(tweak: Tweak, data: &'a mut [u8]) -> Self {
-        Self { tweak, data }
-    }
-}
-
-impl BlockSizeUser for CbcDecryptProcessor<'_> {
-    type BlockSize = U16;
-}
-
-impl BlockClosure for CbcDecryptProcessor<'_> {
-    fn call<B: BlockBackend<BlockSize = Self::BlockSize>>(self, backend: &mut B) {
-        let Self { mut tweak, data } = self;
-        for block in data.chunks_exact_mut(16) {
-            let ciphertext = block.to_vec();
-            let chunk = GenericArray::from_mut_slice(block);
-            backend.proc_block(InOut::from(chunk));
-            xor_in_place(block, &tweak.0.to_le_bytes());
-            tweak.0 = u128::from_le_bytes(ciphertext.try_into().unwrap());
-        }
-    }
-}
-
-// To be used with encrypt|decrypt_with_backend.
-struct XtsProcessor<'a> {
-    tweak: Tweak,
-    data: &'a mut [u8],
-}
-
-impl<'a> XtsProcessor<'a> {
-    // `tweak` should be encrypted.  `data` should be a single sector and *must* be 16 byte aligned.
-    fn new(tweak: Tweak, data: &'a mut [u8]) -> Self {
-        assert_eq!(data.as_ptr() as usize & 15, 0, "data must be 16 byte aligned");
-        Self { tweak, data }
-    }
-}
-
-impl BlockSizeUser for XtsProcessor<'_> {
-    type BlockSize = U16;
-}
-
-impl BlockClosure for XtsProcessor<'_> {
-    fn call<B: BlockBackend<BlockSize = Self::BlockSize>>(self, backend: &mut B) {
-        let Self { mut tweak, data } = self;
-        for chunk in data.chunks_exact_mut(16) {
-            let ptr = chunk.as_mut_ptr() as *mut u128;
-            // SAFETY: We know each chunk is exactly 16 bytes and it should be safe to transmute to
-            // u128 and GenericArray<u8, U16>.  There are safe ways of doing the following, but this
-            // is extremely performance sensitive, and even seemingly innocuous changes here can
-            // have an order-of-magnitude impact on what the compiler produces and that can be seen
-            // in our benchmarks.  This assumes little-endianness which is likely to always be the
-            // case.
-            unsafe {
-                *ptr ^= tweak.0;
-                let chunk = ptr as *mut GenericArray<u8, U16>;
-                backend.proc_block(InOut::from_raw(chunk, chunk));
-                *ptr ^= tweak.0;
-            }
-            tweak.0 = (tweak.0 << 1) ^ ((tweak.0 as i128 >> 127) as u128 & 0x87);
-        }
+            })
+            .collect();
+        let result = futures.try_collect::<BTreeMap<u64, _>>().await?;
+        Ok(result.into())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{Cipher, CipherSet, Key};
-
     use super::{StreamCipher, UnwrappedKey};
 
     #[test]
     fn test_stream_cipher_offset() {
-        let key = UnwrappedKey::new([
+        let key = UnwrappedKey::new(vec![
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
             25, 26, 27, 28, 29, 30, 31, 32,
         ]);
@@ -607,40 +327,5 @@ mod tests {
         xor_fn(&mut c1, &c2);
         xor_fn(&mut p1, &p2);
         assert_ne!(c1, p1);
-    }
-
-    /// Output produced via:
-    /// echo -n filename > in.txt ; truncate -s 16 in.txt
-    /// openssl aes-256-cbc -e -iv 02000000000000000000000000000000 -nosalt -K 1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b -in in.txt -out out.txt -nopad
-    /// hexdump out.txt -e "16/1 \"%02x\" \"\n\"" -v
-    #[test]
-    fn test_encrypt_filename() {
-        let raw_key_hex = "1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b";
-        let raw_key_bytes: [u8; 32] =
-            hex::decode(raw_key_hex).expect("decode failed").try_into().unwrap();
-        let unwrapped_key = UnwrappedKey::new(raw_key_bytes);
-        let cipher_set = CipherSet::from(vec![Cipher::new(0, &unwrapped_key)]);
-        let key = Key { keys: std::sync::Arc::new(cipher_set), index: 0 };
-        let object_id = 2;
-        let mut text = "filename".to_string().as_bytes().to_vec();
-        key.encrypt_filename(object_id, &mut text).expect("encrypt filename failed");
-        assert_eq!(text, hex::decode("52d56369103a39b3ea1e09c85dd51546").expect("decode failed"));
-    }
-
-    /// Output produced via:
-    /// openssl aes-256-cbc -d -iv 02000000000000000000000000000000 -nosalt -K 1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b -in out.txt -out in.txt
-    /// cat in.txt
-    #[test]
-    fn test_decrypt_filename() {
-        let raw_key_hex = "1fcdf30b7d191bd95d3161fe08513b864aa15f27f910f1c66eec8cfa93e9893b";
-        let raw_key_bytes: [u8; 32] =
-            hex::decode(raw_key_hex).expect("decode failed").try_into().unwrap();
-        let unwrapped_key = UnwrappedKey::new(raw_key_bytes);
-        let cipher_set = CipherSet::from(vec![Cipher::new(0, &unwrapped_key)]);
-        let key = Key { keys: std::sync::Arc::new(cipher_set), index: 0 };
-        let object_id = 2;
-        let mut text = hex::decode("52d56369103a39b3ea1e09c85dd51546").expect("decode failed");
-        key.decrypt_filename(object_id, &mut text).expect("encrypt filename failed");
-        assert_eq!(text, "filename".to_string().as_bytes().to_vec());
     }
 }

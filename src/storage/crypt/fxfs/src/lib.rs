@@ -9,7 +9,7 @@ use fidl_fuchsia_fxfs::{
     CryptCreateKeyResult, CryptCreateKeyWithIdResult, CryptManagementAddWrappingKeyResult,
     CryptManagementForgetWrappingKeyResult, CryptManagementRequest, CryptManagementRequestStream,
     CryptManagementSetActiveKeyResult, CryptRequest, CryptRequestStream, CryptUnwrapKeyResult,
-    FxfsWrapped, KeyPurpose, WrappedKey,
+    FxfsKey, KeyPurpose, WrappedKey,
 };
 
 use fuchsia_sync::Mutex;
@@ -88,7 +88,7 @@ impl CryptService {
 
     fn unwrap_key(&self, owner: u64, wrapped_key: WrappedKey) -> CryptUnwrapKeyResult {
         match wrapped_key {
-            WrappedKey::FxfsWrapped(FxfsWrapped { wrapping_key_id, wrapped_key }) => {
+            WrappedKey::Fxfs(FxfsKey { wrapping_key_id, wrapped_key }) => {
                 let wrapping_key_id = u128::from_le_bytes(wrapping_key_id);
                 let inner = self.inner.lock();
                 let cipher = inner
@@ -101,6 +101,7 @@ impl CryptService {
                     .decrypt(&nonce, &wrapped_key[..])
                     .map_err(|_| zx::Status::IO_DATA_INTEGRITY.into_raw())?)
             }
+
             _ => Err(zx::Status::NOT_SUPPORTED.into_raw()),
         }
     }
@@ -275,7 +276,7 @@ impl CryptService {
 #[cfg(test)]
 mod tests {
     use super::CryptService;
-    use fidl_fuchsia_fxfs::{FxfsWrapped, KeyPurpose, WrappedKey};
+    use fidl_fuchsia_fxfs::{FxfsKey, KeyPurpose, WrappedKey};
 
     #[test]
     fn wrap_unwrap_key() {
@@ -291,7 +292,7 @@ mod tests {
         let unwrap_result = service
             .unwrap_key(
                 0,
-                WrappedKey::FxfsWrapped(FxfsWrapped {
+                WrappedKey::Fxfs(FxfsKey {
                     wrapping_key_id,
                     wrapped_key: wrapped_key.try_into().unwrap(),
                 }),
@@ -307,7 +308,7 @@ mod tests {
         let unwrap_result = service
             .unwrap_key(
                 1,
-                WrappedKey::FxfsWrapped(FxfsWrapped {
+                WrappedKey::Fxfs(FxfsKey {
                     wrapping_key_id,
                     wrapped_key: wrapped_key.try_into().unwrap(),
                 }),
@@ -327,7 +328,7 @@ mod tests {
         let unwrap_result = service
             .unwrap_key(
                 0,
-                WrappedKey::FxfsWrapped(FxfsWrapped {
+                WrappedKey::Fxfs(FxfsKey {
                     wrapping_key_id: 2u128.to_le_bytes(),
                     wrapped_key: wrapped_key.try_into().unwrap(),
                 }),
@@ -341,7 +342,7 @@ mod tests {
         let unwrap_result = service
             .unwrap_key(
                 1,
-                WrappedKey::FxfsWrapped(FxfsWrapped {
+                WrappedKey::Fxfs(FxfsKey {
                     wrapping_key_id: 2u128.to_le_bytes(),
                     wrapped_key: wrapped_key.try_into().unwrap(),
                 }),
@@ -365,7 +366,7 @@ mod tests {
         let unwrap_result = service
             .unwrap_key(
                 0,
-                WrappedKey::FxfsWrapped(FxfsWrapped {
+                WrappedKey::Fxfs(FxfsKey {
                     wrapping_key_id: 2u128.to_le_bytes(),
                     wrapped_key: wrapped_key.try_into().unwrap(),
                 }),
@@ -389,7 +390,7 @@ mod tests {
         service
             .unwrap_key(
                 0,
-                WrappedKey::FxfsWrapped(FxfsWrapped {
+                WrappedKey::Fxfs(FxfsKey {
                     wrapping_key_id,
                     wrapped_key: wrapped_key.try_into().unwrap(),
                 }),
@@ -409,7 +410,7 @@ mod tests {
         service
             .unwrap_key(
                 1,
-                WrappedKey::FxfsWrapped(FxfsWrapped {
+                WrappedKey::Fxfs(FxfsKey {
                     wrapping_key_id,
                     wrapped_key: wrapped_key.try_into().unwrap(),
                 }),

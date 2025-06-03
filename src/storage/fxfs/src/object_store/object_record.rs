@@ -14,13 +14,13 @@ use crate::object_store::extent_record::{
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use fprint::TypeFingerprint;
-use fxfs_crypto::{WrappedKeyV40, WrappedKeysV32, WrappedKeysV40};
+use fxfs_crypto::{FxfsKeyV40, WrappedKey, WrappedKeysV32, WrappedKeysV40};
 use fxfs_unicode::CasefoldString;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::default::Default;
 use std::hash::{Hash, Hasher as _};
-use std::ops::Deref;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// ObjectDescriptor is the set of possible records in the object store.
@@ -628,7 +628,7 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeysV40 {
                 keys.push(<(u64, u128)>::arbitrary(u).map(|(id, wrapping_key_id)| {
                     (
                         id,
-                        fxfs_crypto::WrappedKey {
+                        fxfs_crypto::FxfsKey {
                             wrapping_key_id,
                             // There doesn't seem to be much point to randomly generate crypto keys.
                             key: fxfs_crypto::WrappedKeyBytes::default(),
@@ -636,7 +636,7 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeysV40 {
                     )
                 })?);
             }
-            Ok(EncryptionKeysV40::AES256XTS(fxfs_crypto::WrappedKeys::from(keys)))
+            Ok(EncryptionKeysV40::AES256XTS(WrappedKeysV40::from(keys)))
         })
     }
 }
@@ -727,43 +727,43 @@ pub struct FsverityMetadataV33 {
 }
 
 pub type EncryptionKey = EncryptionKeyV47;
+impl From<EncryptionKey> for WrappedKey {
+    fn from(value: EncryptionKeyV47) -> Self {
+        match value {
+            EncryptionKeyV47::Fxfs(key) => WrappedKey::Fxfs(key.into()),
+        }
+    }
+}
 
-/// This specifies a single key to be used to encrypt/decrypt, identified by key_id
-/// (See `KeySpecs` for the associative container).
+/// This specifies a single key to be used to encrypt/decrypt.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum EncryptionKeyV47 {
-    Native(WrappedKeyV40),
+    Fxfs(FxfsKeyV40),
 }
 
 pub type EncryptionKeys = EncryptionKeysV47;
-
-#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
-#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub struct EncryptionKeysV47(Vec<(u64, EncryptionKeyV47)>);
-
-impl From<Vec<(u64, EncryptionKeyV47)>> for EncryptionKeysV47 {
-    fn from(value: Vec<(u64, EncryptionKeyV47)>) -> Self {
-        EncryptionKeysV47(value)
+impl From<EncryptionKeys> for BTreeMap<u64, WrappedKey> {
+    fn from(keys: EncryptionKeys) -> Self {
+        keys.0.into_iter().map(|(id, key)| (id, key.into())).collect()
     }
 }
 
-impl From<EncryptionKeysV47> for WrappedKeysV40 {
-    fn from(value: EncryptionKeysV47) -> Self {
-        let EncryptionKeysV47(keys) = value;
-        keys.into_iter()
-            .map(|(id, EncryptionKeyV47::Native(key))| (id, key))
-            .collect::<Vec<_>>()
-            .into()
+impl From<Vec<(u64, EncryptionKey)>> for EncryptionKeys {
+    fn from(value: Vec<(u64, EncryptionKey)>) -> Self {
+        Self(value)
     }
 }
-
-impl Deref for EncryptionKeysV47 {
+impl std::ops::Deref for EncryptionKeys {
     type Target = Vec<(u64, EncryptionKeyV47)>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
+
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct EncryptionKeysV47(Vec<(u64, EncryptionKeyV47)>);
 
 impl EncryptionKeys {
     pub fn get(&self, id: u64) -> Option<&EncryptionKey> {
@@ -786,7 +786,7 @@ impl EncryptionKeys {
 impl From<EncryptionKeysV40> for EncryptionKeysV47 {
     fn from(EncryptionKeysV40::AES256XTS(WrappedKeysV40(keys)): EncryptionKeysV40) -> Self {
         EncryptionKeysV47(
-            keys.into_iter().map(|(id, key)| (id, EncryptionKeyV47::Native(key))).collect(),
+            keys.into_iter().map(|(id, key)| (id, EncryptionKeyV47::Fxfs(key))).collect(),
         )
     }
 }
@@ -834,7 +834,7 @@ pub enum ObjectValueV47 {
 }
 
 #[derive(Migrate, Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
-#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+#[migrate_to_version(ObjectValueV47)]
 pub enum ObjectValueV46 {
     None,
     Some,

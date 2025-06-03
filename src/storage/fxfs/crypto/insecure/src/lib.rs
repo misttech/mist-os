@@ -6,7 +6,7 @@ use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
 use async_trait::async_trait;
 use fuchsia_sync::Mutex;
-use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes};
+use fxfs_crypto::{Crypt, FxfsKey, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes};
 use log::error;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
@@ -66,7 +66,7 @@ impl Crypt for InsecureCrypt {
         &self,
         owner: u64,
         purpose: KeyPurpose,
-    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+    ) -> Result<(FxfsKey, UnwrappedKey), zx::Status> {
         if self.shutdown.load(Ordering::Relaxed) {
             error!("Crypt was shut down");
             return Err(zx::Status::INTERNAL);
@@ -89,14 +89,17 @@ impl Crypt for InsecureCrypt {
             zx::Status::INTERNAL
         })?;
         let wrapped = WrappedKeyBytes::try_from(wrapped).map_err(|_| zx::Status::INTERNAL)?;
-        Ok((WrappedKey { wrapping_key_id: *wrapping_key_id, key: wrapped }, UnwrappedKey::new(key)))
+        Ok((
+            FxfsKey { wrapping_key_id: *wrapping_key_id, key: wrapped },
+            UnwrappedKey::new(key.to_vec()),
+        ))
     }
 
     async fn create_key_with_id(
         &self,
         owner: u64,
         wrapping_key_id: u128,
-    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+    ) -> Result<(FxfsKey, UnwrappedKey), zx::Status> {
         if self.shutdown.load(Ordering::Relaxed) {
             error!("Crypt was shut down");
             return Err(zx::Status::INTERNAL);
@@ -115,8 +118,8 @@ impl Crypt for InsecureCrypt {
         })?;
         let wrapped = WrappedKeyBytes::try_from(wrapped).map_err(|_| zx::Status::BAD_STATE)?;
         Ok((
-            WrappedKey { wrapping_key_id: wrapping_key_id as u128, key: wrapped },
-            UnwrappedKey::new(key),
+            FxfsKey { wrapping_key_id: wrapping_key_id as u128, key: wrapped },
+            UnwrappedKey::new(key.to_vec()),
         ))
     }
     async fn unwrap_key(
@@ -129,21 +132,31 @@ impl Crypt for InsecureCrypt {
             return Err(zx::Status::INTERNAL);
         }
         let ciphers = self.ciphers.lock();
-        let cipher = ciphers.get(&wrapped_key.wrapping_key_id).ok_or(zx::Status::NOT_FOUND)?;
-        let mut nonce = Nonce::default();
-        nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
-        Ok(UnwrappedKey::new(
-            cipher
-                .decrypt(&nonce, &wrapped_key.key.0[..])
-                .map_err(|e| {
-                    error!("unwrap keys failed: {:?}", e);
-                    zx::Status::INTERNAL
-                })?
-                .try_into()
-                .map_err(|_| {
-                    error!("Unexpected wrapped key length");
-                    zx::Status::INTERNAL
-                })?,
-        ))
+        Ok(match wrapped_key {
+            WrappedKey::Fxfs(fxfs_key) => {
+                let cipher = ciphers
+                    .get(&u128::from_le_bytes(fxfs_key.wrapping_key_id))
+                    .ok_or(zx::Status::NOT_FOUND)?;
+                let mut nonce = Nonce::default();
+                nonce.as_mut_slice()[..8].copy_from_slice(&owner.to_le_bytes());
+                UnwrappedKey::new(
+                    cipher
+                        .decrypt(&nonce, &fxfs_key.wrapped_key[..])
+                        .map_err(|e| {
+                            error!("unwrap keys failed: {:?}", e);
+                            zx::Status::INTERNAL
+                        })?
+                        .try_into()
+                        .map_err(|_| {
+                            error!("Unexpected wrapped key length");
+                            zx::Status::INTERNAL
+                        })?,
+                )
+            }
+            _ => {
+                error!("Unsupported wrapped key type");
+                return Err(zx::Status::NOT_SUPPORTED);
+            }
+        })
     }
 }

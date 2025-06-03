@@ -62,7 +62,8 @@ use fuchsia_inspect::ArrayProperty;
 use fuchsia_sync::Mutex;
 use fxfs_crypto::ff1::Ff1;
 use fxfs_crypto::{
-    Crypt, KeyPurpose, StreamCipher, UnwrappedKey, WrappedKey, WrappedKeyV32, WrappedKeyV40,
+    Cipher, Crypt, FxfsCipher, FxfsKey, FxfsKeyV32, FxfsKeyV40, KeyPurpose, StreamCipher,
+    UnwrappedKey,
 };
 use mundane::hash::{Digest, Hasher, Sha256};
 use once_cell::sync::OnceCell;
@@ -150,7 +151,7 @@ pub struct StoreInfoV40 {
     object_count: u64,
 
     /// The (wrapped) key that encrypted mutations should use.
-    mutations_key: Option<WrappedKeyV40>,
+    mutations_key: Option<FxfsKeyV40>,
 
     /// Mutations for the store are encrypted using a stream cipher.  To decrypt the mutations, we
     /// need to know the offset in the cipher stream to start it.
@@ -164,7 +165,7 @@ pub struct StoreInfoV40 {
     /// reveal (such as the number of files in the system and the ordering of their creation in
     /// time).  Only the bottom 32 bits of the object ID are encrypted whilst the top 32 bits will
     /// increment after 2^32 object IDs have been used and this allows us to roll the key.
-    object_id_key: Option<WrappedKeyV40>,
+    object_id_key: Option<FxfsKeyV40>,
 
     /// A directory for storing internal files in a directory structure. Holds INVALID_OBJECT_ID
     /// when the directory doesn't yet exist.
@@ -180,10 +181,10 @@ pub struct StoreInfoV36 {
     root_directory_object_id: u64,
     graveyard_directory_object_id: u64,
     object_count: u64,
-    mutations_key: Option<WrappedKeyV32>,
+    mutations_key: Option<FxfsKeyV32>,
     mutations_cipher_offset: u64,
     pub encrypted_mutations_object_id: u64,
-    object_id_key: Option<WrappedKeyV32>,
+    object_id_key: Option<FxfsKeyV32>,
     internal_directory_object_id: u64,
 }
 
@@ -196,10 +197,10 @@ pub struct StoreInfoV32 {
     root_directory_object_id: u64,
     graveyard_directory_object_id: u64,
     object_count: u64,
-    mutations_key: Option<WrappedKeyV32>,
+    mutations_key: Option<FxfsKeyV32>,
     mutations_cipher_offset: u64,
     pub encrypted_mutations_object_id: u64,
-    object_id_key: Option<WrappedKeyV32>,
+    object_id_key: Option<FxfsKeyV32>,
 }
 
 impl StoreInfo {
@@ -247,7 +248,7 @@ pub struct ObjectEncryptionOptions {
     /// child store.  Generally, most objects should have this set to `false`.
     pub permanent: bool,
     pub key_id: u64,
-    pub key: WrappedKey,
+    pub key: FxfsKey,
     pub unwrapped_key: UnwrappedKey,
 }
 
@@ -285,7 +286,7 @@ pub struct EncryptedMutationsV40 {
 
     // If the mutations key was rolled, this holds the offset in `data` where the new key should
     // apply.
-    mutations_key_roll: Vec<(usize, WrappedKeyV40)>,
+    mutations_key_roll: Vec<(usize, FxfsKeyV40)>,
 }
 
 impl std::fmt::Debug for EncryptedMutations {
@@ -1044,10 +1045,15 @@ impl ObjectStore {
                 store.store_object_id(),
                 Mutation::insert_object(
                     ObjectKey::keys(object_id),
-                    ObjectValue::keys(vec![(key_id, EncryptionKey::Native(key))].into()),
+                    ObjectValue::keys(vec![(key_id, EncryptionKey::Fxfs(key))].into()),
                 ),
             );
-            store.key_manager.insert(object_id, &vec![(key_id, Some(unwrapped_key))], permanent);
+            let cipher: Arc<dyn Cipher> = Arc::new(FxfsCipher::new(&unwrapped_key));
+            store.key_manager.insert(
+                object_id,
+                Arc::new(vec![(key_id, Some(cipher))].into()),
+                permanent,
+            );
         }
         transaction.add(
             store.store_object_id(),
@@ -1116,7 +1122,7 @@ impl ObjectStore {
         mut transaction: &mut Transaction<'_>,
         object_id: u64,
         options: HandleOptions,
-        key: WrappedKey,
+        key: FxfsKey,
         unwrapped_key: UnwrappedKey,
     ) -> Result<DataObjectHandle<S>, Error> {
         ObjectStore::create_object_with_id(
@@ -1680,8 +1686,10 @@ impl ObjectStore {
             .await
             .context("Failed to read object tree layer file contents")?;
 
+        let wrapped_key =
+            fxfs_crypto::WrappedKey::Fxfs(store_info.mutations_key.clone().unwrap().into());
         let unwrapped_key = crypt
-            .unwrap_key(store_info.mutations_key.as_ref().unwrap(), self.store_object_id)
+            .unwrap_key(&wrapped_key, self.store_object_id)
             .await
             .context("Failed to unwrap mutations keys")?;
         // The ChaCha20 stream cipher we use supports up to 64 GiB.  By default we'll roll the key
@@ -1691,9 +1699,11 @@ impl ObjectStore {
         let mut mutations_cipher =
             StreamCipher::new(&unwrapped_key, store_info.mutations_cipher_offset);
 
-        let wrapped_key = store_info.object_id_key.as_ref().ok_or(FxfsError::Inconsistent)?;
+        let wrapped_key = fxfs_crypto::WrappedKey::Fxfs(
+            store_info.object_id_key.clone().ok_or(FxfsError::Inconsistent)?.into(),
+        );
         let object_id_cipher =
-            Ff1::new(&crypt.unwrap_key(wrapped_key, self.store_object_id).await?);
+            Ff1::new(&crypt.unwrap_key(&wrapped_key, self.store_object_id).await?);
         {
             let mut last_object_id = self.last_object_id.lock();
             last_object_id.cipher = Some(object_id_cipher);
@@ -1769,7 +1779,7 @@ impl ObjectStore {
             let (old, new) = slice.split_at_mut(split_offset);
             mutations_cipher.decrypt(old);
             let unwrapped_key = crypt
-                .unwrap_key(&key, self.store_object_id)
+                .unwrap_key(&fxfs_crypto::WrappedKey::Fxfs(key.into()), self.store_object_id)
                 .await
                 .context("Failed to unwrap mutations keys")?;
             mutations_cipher = StreamCipher::new(&unwrapped_key, 0);
@@ -2523,7 +2533,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
     use futures::join;
-    use fxfs_crypto::{Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE};
+    use fxfs_crypto::{Crypt, FxfsKey, WrappedKeyBytes, FXFS_WRAPPED_KEY_SIZE};
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::Arc;
     use std::time::Duration;
@@ -3358,15 +3368,15 @@ mod tests {
             root_directory_object_id: 0x1234567812345678,
             graveyard_directory_object_id: 0x1234567812345678,
             object_count: 0x1234567812345678,
-            mutations_key: Some(WrappedKey {
+            mutations_key: Some(FxfsKey {
                 wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes::from([0xff; WRAPPED_KEY_SIZE]),
+                key: WrappedKeyBytes::from([0xff; FXFS_WRAPPED_KEY_SIZE]),
             }),
             mutations_cipher_offset: 0x1234567812345678,
             encrypted_mutations_object_id: 0x1234567812345678,
-            object_id_key: Some(WrappedKey {
+            object_id_key: Some(FxfsKey {
                 wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes::from([0xff; WRAPPED_KEY_SIZE]),
+                key: WrappedKeyBytes::from([0xff; FXFS_WRAPPED_KEY_SIZE]),
             }),
             internal_directory_object_id: INVALID_OBJECT_ID,
         };

@@ -22,7 +22,7 @@ use fprint::TypeFingerprint;
 use fuchsia_sync::Mutex;
 use futures::future::poll_fn;
 use futures::pin_mut;
-use fxfs_crypto::{WrappedKey, WrappedKeyV32, WrappedKeyV40};
+use fxfs_crypto::{FxfsKey, FxfsKeyV32, FxfsKeyV40};
 use rustc_hash::FxHashMap as HashMap;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -186,7 +186,7 @@ impl Mutation {
         })
     }
 
-    pub fn update_mutations_key(key: WrappedKey) -> Self {
+    pub fn update_mutations_key(key: FxfsKey) -> Self {
         Mutation::UpdateMutationsKey(key.into())
     }
 }
@@ -197,7 +197,6 @@ impl Mutation {
 pub type ObjectStoreMutation = ObjectStoreMutationV47;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-#[migrate_nodefault]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ObjectStoreMutationV47 {
     pub item: ObjectItemV47,
@@ -353,10 +352,10 @@ pub enum AllocatorMutationV32 {
 pub type UpdateMutationsKey = UpdateMutationsKeyV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
-pub struct UpdateMutationsKeyV40(pub WrappedKeyV40);
+pub struct UpdateMutationsKeyV40(pub FxfsKeyV40);
 
 #[derive(Serialize, Deserialize, TypeFingerprint)]
-pub struct UpdateMutationsKeyV32(pub WrappedKeyV32);
+pub struct UpdateMutationsKeyV32(pub FxfsKeyV32);
 
 impl From<UpdateMutationsKeyV32> for UpdateMutationsKeyV40 {
     fn from(value: UpdateMutationsKeyV32) -> Self {
@@ -364,14 +363,14 @@ impl From<UpdateMutationsKeyV32> for UpdateMutationsKeyV40 {
     }
 }
 
-impl From<UpdateMutationsKey> for WrappedKey {
+impl From<UpdateMutationsKey> for FxfsKey {
     fn from(outer: UpdateMutationsKey) -> Self {
         outer.0
     }
 }
 
-impl From<WrappedKey> for UpdateMutationsKey {
-    fn from(inner: WrappedKey) -> Self {
+impl From<FxfsKey> for UpdateMutationsKey {
+    fn from(inner: FxfsKey) -> Self {
         Self(inner)
     }
 }
@@ -379,13 +378,7 @@ impl From<WrappedKey> for UpdateMutationsKey {
 #[cfg(fuzz)]
 impl<'a> arbitrary::Arbitrary<'a> for UpdateMutationsKey {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        <u128>::arbitrary(u).map(|wrapping_key_id| {
-            UpdateMutationsKey::from(WrappedKey {
-                wrapping_key_id,
-                // There doesn't seem to be much point to randomly generate crypto keys.
-                key: fxfs_crypto::WrappedKeyBytes::default(),
-            })
-        })
+        Ok(UpdateMutationsKey::from(FxfsKey::arbitrary(u).unwrap()))
     }
 }
 

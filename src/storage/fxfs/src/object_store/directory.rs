@@ -7,7 +7,6 @@ use crate::lsm_tree::merge::{Merger, MergerIterator};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
-use crate::object_store::key_manager::ToCipherSet;
 use crate::object_store::object_record::{
     ChildValue, EncryptionKey, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
     ObjectKeyData, ObjectKind, ObjectValue, Timestamp,
@@ -23,7 +22,7 @@ use anyhow::{anyhow, bail, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
 use fscrypt::proxy_filename::ProxyFilename;
 use fuchsia_sync::Mutex;
-use fxfs_crypto::{Cipher, CipherSet, Key};
+use fxfs_crypto::Cipher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -81,7 +80,7 @@ impl MutableAttributesInternal {
 /// the encryption key to decrypt filenames. In these cases, we embed the hash in the base64
 /// encoded proxy filenames we generate which we leverage to jump closer
 /// to records of interest in lookups and iterators.
-fn get_casefold_hash(key: Option<&Key>, name: &str, casefold: bool) -> u32 {
+fn get_casefold_hash(key: Option<&Arc<dyn Cipher>>, name: &str, casefold: bool) -> u32 {
     // Special case for empty string. This means start from beginning of the directory.
     if name == "" {
         return 0;
@@ -96,20 +95,24 @@ fn get_casefold_hash(key: Option<&Key>, name: &str, casefold: bool) -> u32 {
     }
     let mut hash = hasher.finish() as u32;
     if let Some(key) = key {
-        key.encrypt(0, hash.as_mut_bytes()).unwrap();
+        key.encrypt(0, 0, 0, hash.as_mut_bytes()).unwrap();
     }
     hash
 }
 
 /// Encrypts a unicode `name` into a sequence of bytes using the fscrypt key.
-fn encrypt_filename(key: &Key, object_id: u64, name: &str) -> Result<Vec<u8>, Error> {
+fn encrypt_filename(key: &Arc<dyn Cipher>, object_id: u64, name: &str) -> Result<Vec<u8>, Error> {
     let mut name_bytes = name.to_string().into_bytes();
     key.encrypt_filename(object_id, &mut name_bytes)?;
     Ok(name_bytes)
 }
 
 /// Decrypts a unicode `name` from a sequence of bytes using the fscrypt key.
-fn decrypt_filename(key: &Key, object_id: u64, data: &Vec<u8>) -> Result<String, Error> {
+fn decrypt_filename(
+    key: &Arc<dyn Cipher>,
+    object_id: u64,
+    data: &Vec<u8>,
+) -> Result<String, Error> {
     let mut raw = data.clone();
     key.decrypt_filename(object_id, &mut raw)?;
     Ok(String::from_utf8(raw)?)
@@ -156,7 +159,7 @@ impl<S: HandleOwner> Directory<S> {
     /// Retrieves keys from the key manager or unwraps the wrapped keys in the directory's key
     /// record.  Returns None if the key is currently unavailable due to the wrapping key being
     /// unavailable.
-    pub async fn get_fscrypt_key(&self) -> Result<Option<Key>, Error> {
+    pub async fn get_fscrypt_key(&self) -> Result<Option<Arc<dyn Cipher>>, Error> {
         let object_id = self.object_id();
         let store = self.store();
         store
@@ -262,18 +265,18 @@ impl<S: HandleOwner> Directory<S> {
                     store.store_object_id(),
                     Mutation::insert_object(
                         ObjectKey::keys(object_id),
-                        ObjectValue::keys(
-                            vec![(FSCRYPT_KEY_ID, EncryptionKey::Native(key))].into(),
-                        ),
+                        ObjectValue::keys(vec![(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(key))].into()),
                     ),
                 );
                 // Note that it's possible that this entry gets inserted into the key manager but
                 // this transaction doesn't get committed. This shouldn't be a problem because
                 // unused keys get purged on a standard timeout interval and this key shouldn't
                 // conflict with any other keys.
+                let cipher: Arc<dyn Cipher> =
+                    Arc::new(fxfs_crypto::FxfsCipher::new(&unwrapped_key));
                 store.key_manager.insert(
                     object_id,
-                    &vec![(FSCRYPT_KEY_ID, Some(unwrapped_key))],
+                    Arc::new(vec![(FSCRYPT_KEY_ID, Some(cipher))].into()),
                     false,
                 );
             } else {
@@ -287,7 +290,7 @@ impl<S: HandleOwner> Directory<S> {
         &self,
         transaction: &mut Transaction<'_>,
         id: u128,
-    ) -> Result<Cipher, Error> {
+    ) -> Result<Arc<dyn Cipher>, Error> {
         let object_id = self.object_id();
         let store = self.store();
         if let Some(crypt) = store.crypt() {
@@ -338,13 +341,13 @@ impl<S: HandleOwner> Directory<S> {
                         Mutation::insert_object(
                             ObjectKey::keys(object_id),
                             ObjectValue::keys(
-                                vec![(FSCRYPT_KEY_ID, EncryptionKey::Native(key))].into(),
+                                vec![(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(key))].into(),
                             ),
                         ),
                     );
                 }
                 Some(Item { value: ObjectValue::Keys(mut keys), .. }) => {
-                    keys.insert(FSCRYPT_KEY_ID, EncryptionKey::Native(key));
+                    keys.insert(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(key));
                     transaction.add(
                         store.store_object_id(),
                         Mutation::replace_or_insert_object(
@@ -355,7 +358,7 @@ impl<S: HandleOwner> Directory<S> {
                 }
                 Some(item) => bail!("Unexpected item in lookup: {item:?}"),
             }
-            Ok(Cipher::new(FSCRYPT_KEY_ID, &unwrapped_key))
+            Ok(Arc::new(fxfs_crypto::FxfsCipher::new(&unwrapped_key)))
         } else {
             Err(anyhow!("No crypt"))
         }
@@ -868,16 +871,20 @@ impl<S: HandleOwner> Directory<S> {
 
         if let Some(wrapping_key_id) = wrapping_key_id {
             if let Some(crypt) = self.store().crypt() {
-                let (wrapped_key, unwrapped_key) =
+                let (fxfs_key, unwrapped_key) =
                     crypt.create_key_with_id(symlink_id, wrapping_key_id).await?;
 
                 // Note that it's possible that this entry gets inserted into the key manager but
                 // this transaction doesn't get committed. This shouldn't be a problem because
                 // unused keys get purged on a standard timeout interval and this key shouldn't
                 // conflict with any other keys.
-                let unwrapped_keys = vec![(FSCRYPT_KEY_ID, Some(unwrapped_key))];
-                self.store().key_manager.insert(symlink_id, &unwrapped_keys, false);
-                let symlink_key = Key::new(unwrapped_keys.to_cipher_set(), 0);
+                let cipher: Arc<dyn Cipher> =
+                    Arc::new(fxfs_crypto::FxfsCipher::new(&unwrapped_key));
+                self.store().key_manager.insert(
+                    symlink_id,
+                    Arc::new(vec![(FSCRYPT_KEY_ID, Some(cipher.clone()))].into()),
+                    false,
+                );
 
                 let dir_key = if let Some(key) = self.get_fscrypt_key().await? {
                     key
@@ -886,7 +893,7 @@ impl<S: HandleOwner> Directory<S> {
                 };
                 let casefold_hash = get_casefold_hash(Some(&dir_key), name, self.casefold());
                 let encrypted_name = encrypt_filename(&dir_key, self.object_id(), name)?;
-                symlink_key.encrypt_filename(symlink_id, &mut link)?;
+                cipher.encrypt_filename(symlink_id, &mut link)?;
 
                 transaction.add(
                     self.store().store_object_id(),
@@ -900,7 +907,7 @@ impl<S: HandleOwner> Directory<S> {
                     Mutation::insert_object(
                         ObjectKey::keys(symlink_id),
                         ObjectValue::keys(
-                            vec![(FSCRYPT_KEY_ID, EncryptionKey::Native(wrapped_key))].into(),
+                            vec![(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(fxfs_key))].into(),
                         ),
                     ),
                 );
@@ -1084,12 +1091,15 @@ impl<S: HandleOwner> Directory<S> {
         }
         transaction
             .commit_with_callback(|_| {
-                if let Some((key_id, unwrapped_key)) = wrapping_key {
-                    *self.wrapping_key_id.lock() = Some(key_id);
-                    self.store().key_manager.merge(self.object_id(), |existing| {
-                        let mut new = existing.map_or(Vec::new(), |e| e.ciphers().to_vec());
-                        new.push(unwrapped_key);
-                        Arc::new(CipherSet::from(new))
+                if let Some((wrapping_key_id, cipher)) = wrapping_key {
+                    *self.wrapping_key_id.lock() = Some(wrapping_key_id);
+                    self.store().key_manager.merge(self.object_id(), |existing| match existing {
+                        Some(existing) => {
+                            let mut cipher_set = (**existing).clone();
+                            cipher_set.add_key(FSCRYPT_KEY_ID, Some(cipher));
+                            Arc::new(cipher_set)
+                        }
+                        None => Arc::new(vec![(FSCRYPT_KEY_ID, Some(cipher))].into()),
                     });
                 }
             })
@@ -1346,7 +1356,7 @@ impl<S: HandleOwner> fmt::Debug for Directory<S> {
 pub struct DirectoryIterator<'a, 'b> {
     object_id: u64,
     iter: MergerIterator<'a, 'b, ObjectKey, ObjectValue>,
-    key: Option<Key>,
+    key: Option<Arc<dyn Cipher>>,
     // Holds decrypted or proxy filenames so we can return a reference from get().
     filename: Option<String>,
 }
@@ -1660,7 +1670,7 @@ mod tests {
     };
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
-    use fxfs_crypto::Crypt;
+    use fxfs_crypto::{Cipher, Crypt};
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::collections::HashSet;
     use std::future::poll_fn;
@@ -3941,7 +3951,7 @@ mod tests {
     #[allow(dead_code)]
     fn find_out_of_order_sha256_long_prefix_pair(
         object_id: u64,
-        key: &fxfs_crypto::Key,
+        key: &Arc<dyn Cipher>,
     ) -> Option<[String; 2]> {
         let mut collision_map: std::collections::HashMap<u32, (usize, ProxyFilename, Vec<u8>)> =
             std::collections::HashMap::new();

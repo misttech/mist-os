@@ -5,11 +5,8 @@
 use super::errors::map_to_status;
 use async_trait::async_trait;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_fxfs::{
-    CryptMarker, CryptProxy, FxfsWrapped, KeyPurpose as FidlKeyPurpose,
-    WrappedKey as FidlWrappedKey,
-};
-use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, KEY_SIZE};
+use fidl_fuchsia_fxfs::{CryptMarker, CryptProxy, KeyPurpose as FidlKeyPurpose};
+use fxfs_crypto::{Crypt, FxfsKey, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes};
 use zx;
 
 pub struct RemoteCrypt {
@@ -41,7 +38,7 @@ impl Crypt for RemoteCrypt {
         &self,
         owner: u64,
         purpose: KeyPurpose,
-    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+    ) -> Result<(FxfsKey, UnwrappedKey), zx::Status> {
         let (wrapping_key_id, key, unwrapped_key) = self
             .client
             .create_key(owner, purpose.into_fidl())
@@ -49,7 +46,7 @@ impl Crypt for RemoteCrypt {
             .map_err(|e| map_to_status(e.into()))?
             .map_err(|e| zx::Status::from_raw(e))?;
         Ok((
-            WrappedKey {
+            FxfsKey {
                 wrapping_key_id: u128::from_le_bytes(wrapping_key_id),
                 key: WrappedKeyBytes::try_from(key).map_err(map_to_status)?,
             },
@@ -61,7 +58,7 @@ impl Crypt for RemoteCrypt {
         &self,
         owner: u64,
         wrapping_key_id: u128,
-    ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+    ) -> Result<(FxfsKey, UnwrappedKey), zx::Status> {
         let (key, unwrapped_key) = self
             .client
             .create_key_with_id(owner, &wrapping_key_id.to_le_bytes())
@@ -69,7 +66,7 @@ impl Crypt for RemoteCrypt {
             .map_err(|e| map_to_status(e.into()))?
             .map_err(|e| zx::Status::from_raw(e))?;
         Ok((
-            WrappedKey {
+            FxfsKey {
                 wrapping_key_id,
                 key: WrappedKeyBytes::try_from(key).map_err(map_to_status)?,
             },
@@ -84,19 +81,10 @@ impl Crypt for RemoteCrypt {
     ) -> Result<UnwrappedKey, zx::Status> {
         let unwrapped = self
             .client
-            .unwrap_key(
-                owner,
-                &FidlWrappedKey::FxfsWrapped(FxfsWrapped {
-                    wrapping_key_id: wrapped_key.wrapping_key_id.to_le_bytes(),
-                    wrapped_key: wrapped_key.key.as_slice().try_into().unwrap(),
-                }),
-            )
+            .unwrap_key(owner, &wrapped_key)
             .await
             .map_err(|e| map_to_status(e.into()))?
             .map_err(|e| zx::Status::from_raw(e))?;
-        if unwrapped.len() != KEY_SIZE {
-            return Err(zx::Status::INTERNAL);
-        }
         Ok(UnwrappedKey::new(unwrapped.try_into().unwrap()))
     }
 }

@@ -248,7 +248,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .mark_allocated(transaction, self.store().store_object_id(), device_range.clone())
             .await?;
         self.txn_update_size(transaction, new_size, None).await?;
-        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
+        let key_id = self.get_key(None).await?.0;
         transaction.add(
             self.store().store_object_id,
             Mutation::merge_object(
@@ -484,7 +484,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let mut transaction = self.new_transaction().await?;
         let mut to_allocate = Vec::new();
         let mut to_switch = Vec::new();
-        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
+        let key_id = self.get_key(None).await?.0;
 
         {
             let tree = &self.store().tree;
@@ -829,7 +829,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         assert_eq!((buf.len() as u32) % self.store().device.block_size(), 0);
         let end = offset + buf.len() as u64;
 
-        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
+        let key_id = self.get_key(None).await?.0;
 
         // The transaction only ends up being used if allow_allocations is true
         let mut transaction =
@@ -1233,7 +1233,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             )))
             .await?;
         let mut allocated = 0;
-        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
+        let key_id = self.get_key(None).await?.0;
         'outer: while file_range.start < file_range.end {
             let allocate_end = loop {
                 match iter.get() {

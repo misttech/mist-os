@@ -258,8 +258,8 @@ impl FxFile {
                 .map_err(map_to_status)?
                 .get(FSCRYPT_KEY_ID)
             {
-                let EncryptionKeyV47::Native(wrapped_key) = key;
-                return Ok(Some(wrapped_key.wrapping_key_id.to_le_bytes()));
+                let EncryptionKeyV47::Fxfs(fxfs_key) = key;
+                return Ok(Some(fxfs_key.wrapping_key_id.to_le_bytes()));
             }
         }
         Ok(None)
