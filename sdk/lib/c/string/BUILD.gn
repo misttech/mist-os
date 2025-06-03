@@ -71,6 +71,12 @@ foreach(funcs,
       cflags += [ "-fno-builtin" ]
     }
 
+    if (is_gcc) {
+      # GCC imputes some attributes to the standard string functions implicitly
+      # and then complains when the declarations don't match.
+      cflags += [ "-Wno-missing-attributes" ]
+    }
+
     foreach(func, funcs) {
       cflags += [ "-fno-builtin-$func" ]
 
