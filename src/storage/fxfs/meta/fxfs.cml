@@ -41,9 +41,11 @@
         },
     ],
     use: [
-        { protocol: "fuchsia.scheduler.RoleManager" },
         {
-            protocol: "fuchsia.memorypressure.Provider",
+            protocol: [
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.scheduler.RoleManager",
+            ],
             availability: "optional",
         },
 

@@ -65,15 +65,13 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.memorypressure.Provider",
+            protocol: [
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "parent",
             to: "#fxfs",
             availability: "optional",
-        },
-        {
-            protocol: "fuchsia.scheduler.RoleManager",
-            from: "parent",
-            to: "#fxfs",
         },
         {
             service: "fuchsia.fxfs.CryptService",
