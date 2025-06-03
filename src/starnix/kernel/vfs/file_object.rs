@@ -1509,8 +1509,7 @@ impl FileObject {
             None
         };
         let fs = name.entry.node.fs();
-        let kernel = fs.kernel.upgrade().ok_or_else(|| errno!(ENOENT))?;
-        let id = FileObjectId(kernel.next_file_object_id.next());
+        let id = FileObjectId(current_task.kernel.next_file_object_id.next());
         let security_state = security::file_alloc_security(current_task);
         let file = FileHandle::new_cyclic(|weak_handle| {
             Self {
@@ -2225,7 +2224,9 @@ pub struct DowncastedFile<'a, Ops> {
 }
 impl<'a, Ops> Copy for DowncastedFile<'a, Ops> {}
 impl<'a, Ops> Clone for DowncastedFile<'a, Ops> {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl<'a, Ops> DowncastedFile<'a, Ops> {
