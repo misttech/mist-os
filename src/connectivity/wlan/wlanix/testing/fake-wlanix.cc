@@ -204,6 +204,11 @@ void FakeWlanix::GetCapabilities(GetCapabilitiesCompleter::Sync& completer) {
   completer.Reply(builder.Build());
 }
 
+void FakeWlanix::TriggerSubsystemRestart(TriggerSubsystemRestartCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWifiChipTriggerSubsystemRestart});
+  completer.ReplySuccess();
+}
+
 void FakeWlanix::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::WifiChip> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

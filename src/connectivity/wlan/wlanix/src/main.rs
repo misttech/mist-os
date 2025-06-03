@@ -214,6 +214,10 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             };
             responder.send(&response).context("send GetCapabilities response")?;
         }
+        fidl_wlanix::WifiChipRequest::TriggerSubsystemRestart { responder } => {
+            info!("fidl_wlanix::WifiChipRequest::TriggerSubsystemRestart");
+            responder.send(Ok(())).context("send TriggerSubsystemRestart response")?;
+        }
         fidl_wlanix::WifiChipRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown WifiChipRequest ordinal: {}", ordinal);
         }

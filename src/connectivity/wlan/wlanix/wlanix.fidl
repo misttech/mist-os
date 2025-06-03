@@ -118,6 +118,9 @@ open protocol WifiChip {
     flexible GetCapabilities() -> (table {
         1: capabilities_mask uint32;
     });
+    /// Restart the subsystem. This is called to attempt recovery when there
+    /// is a persistent issue with WiFi.
+    flexible TriggerSubsystemRestart() -> () error zx.Status;
 };
 
 open protocol WifiStaIface {
