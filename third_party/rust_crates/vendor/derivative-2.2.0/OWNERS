@@ -14,6 +14,7 @@ include /src/connectivity/network/testing/network-test-realm/OWNERS
 include /src/connectivity/network/tests/integration/OWNERS
 include /src/connectivity/policy/OWNERS
 include /src/connectivity/wlan/OWNERS
+include /src/developer/ffx/lib/target_net/OWNERS
 include /src/developer/ffx/plugins/log/OWNERS
 include /src/diagnostics/OWNERS
 include /src/diagnostics/iquery/OWNERS
