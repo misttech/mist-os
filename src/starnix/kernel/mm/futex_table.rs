@@ -3,10 +3,9 @@
 // found in the LICENSE file.
 
 use crate::mm::memory::MemoryObject;
-use crate::mm::{ProtectionFlags, PAGE_SIZE};
+use crate::mm::{CompareExchangeResult, ProtectionFlags};
 use crate::task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, Waiter};
 use futures::channel::oneshot;
-use starnix_logging::log_error;
 use starnix_sync::{InterruptibleEvent, Locked, Mutex, Unlocked};
 use starnix_types::futex_address::FutexAddress;
 use starnix_uapi::errors::Errno;
@@ -15,7 +14,6 @@ use starnix_uapi::{errno, error, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK, FUTEX_W
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Weak};
 
 /// A table of futexes.
@@ -59,7 +57,7 @@ impl<Key: FutexKey> FutexTable<Key> {
             return error!(EAGAIN);
         }
 
-        let key = Key::get_key(current_task, addr)?;
+        let key = Key::get(current_task, addr)?;
         let waiter = Arc::new(Waiter::new());
         let timer = zx::BootTimer::create();
         let signal_handler = SignalHandler {
@@ -101,7 +99,7 @@ impl<Key: FutexKey> FutexTable<Key> {
             return error!(EAGAIN);
         }
 
-        let key = Key::get_key(current_task, addr)?;
+        let key = Key::get(current_task, addr)?;
         let event = InterruptibleEvent::new();
         let guard = event.begin_wait();
         state.get_waiters_or_default(key).add(FutexWaiter {
@@ -125,7 +123,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         mask: u32,
     ) -> Result<usize, Errno> {
         let addr = FutexAddress::try_from(addr)?;
-        let key = Key::get_key(task, addr)?;
+        let key = Key::get(task, addr)?;
         Ok(self.state.lock().wake(key, count, mask))
     }
 
@@ -143,8 +141,8 @@ impl<Key: FutexKey> FutexTable<Key> {
     ) -> Result<usize, Errno> {
         let addr = FutexAddress::try_from(addr)?;
         let new_addr = FutexAddress::try_from(new_addr)?;
-        let key = Key::get_key(current_task, addr)?;
-        let new_key = Key::get_key(current_task, new_addr)?;
+        let key = Key::get(current_task, addr)?;
+        let new_key = Key::get(current_task, new_addr)?;
         let mut state = self.state.lock();
         if let Some(expected) = expected_value {
             let value = Self::load_futex_value(current_task, addr)?;
@@ -191,64 +189,50 @@ impl<Key: FutexKey> FutexTable<Key> {
         let mut state = self.state.lock();
         // As the state is locked, no unlock can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex unlock.
-        let (operand, key) = Key::get_operand_and_key(
-            current_task,
-            addr,
-            ProtectionFlags::READ | ProtectionFlags::WRITE,
-        )?;
+        let key = Key::get(current_task, addr)?;
 
         let tid = current_task.get_tid() as u32;
+        let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
 
-        let new_owner_tid = {
-            // Unfortunately, we need these operations to actually be atomic, which means we need
-            // to create a mapping for this memory in the kernel address space. Churning these
-            // mappings is painfully slow. We should be able to optimize this operation with
-            // co-resident mappings.
-            let mapping = FutexOperandMapping::painfully_slow_create(&operand)?;
-            let value = mapping.value();
-
-            let mut current_value = value.load(Ordering::Relaxed);
-            loop {
-                let new_owner_tid = current_value & FUTEX_TID_MASK;
-                if new_owner_tid == tid {
-                    // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
-                    //
-                    //   EDEADLK
-                    //          (FUTEX_LOCK_PI, FUTEX_LOCK_PI2, FUTEX_TRYLOCK_PI,
-                    //          FUTEX_CMP_REQUEUE_PI) The futex word at uaddr is already
-                    //          locked by the caller.
-                    return error!(EDEADLOCK);
-                }
-
-                if current_value == 0 {
-                    match value.compare_exchange_weak(
-                        current_value,
-                        tid,
-                        Ordering::Relaxed,
-                        Ordering::Relaxed,
-                    ) {
-                        Ok(_) => return Ok(()),
-                        Err(observed_state) => {
-                            current_value = observed_state;
-                            continue;
-                        }
-                    }
-                }
-
-                let target_value = current_value | FUTEX_WAITERS;
-                if let Err(observed_state) = value.compare_exchange(
-                    current_value,
-                    target_value,
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                ) {
-                    current_value = observed_state;
-                    continue;
-                }
-                break new_owner_tid;
+        // Use acquire to synchronize with the release ordering used in mutex impl's lock path.
+        let mut current_value = mm.atomic_load_u32_acquire(addr)?;
+        let new_owner_tid = loop {
+            let new_owner_tid = current_value & FUTEX_TID_MASK;
+            if new_owner_tid == tid {
+                // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
+                //
+                //   EDEADLK
+                //          (FUTEX_LOCK_PI, FUTEX_LOCK_PI2, FUTEX_TRYLOCK_PI,
+                //          FUTEX_CMP_REQUEUE_PI) The futex word at uaddr is already
+                //          locked by the caller.
+                return error!(EDEADLOCK);
             }
 
-            // We will drop the mapping when we leave this scope.
+            if current_value == 0 {
+                // Use acq/rel ordering to synchronize with acquire ordering on userspace lock ops
+                // and with the release ordering on userspace unlock ops.
+                match mm.atomic_compare_exchange_weak_u32_acq_rel(addr, current_value, tid) {
+                    CompareExchangeResult::Success => return Ok(()),
+                    CompareExchangeResult::Stale { observed } => {
+                        current_value = observed;
+                        continue;
+                    }
+                    CompareExchangeResult::Error(e) => return Err(e),
+                }
+            }
+
+            // Use acq/rel ordering to synchronize with acquire ordering on userspace lock ops and
+            // with the release ordering on userspace unlock ops.
+            let target_value = current_value | FUTEX_WAITERS;
+            match mm.atomic_compare_exchange_u32_acq_rel(addr, current_value, target_value) {
+                CompareExchangeResult::Success => (),
+                CompareExchangeResult::Stale { observed } => {
+                    current_value = observed;
+                    continue;
+                }
+                CompareExchangeResult::Error(e) => return Err(e),
+            }
+            break new_owner_tid;
         };
 
         let event = InterruptibleEvent::new();
@@ -276,75 +260,61 @@ impl<Key: FutexKey> FutexTable<Key> {
         let addr = FutexAddress::try_from(addr)?;
         let mut state = self.state.lock();
         let tid = current_task.get_tid() as u32;
+        let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
 
-        let (operand, key) = Key::get_operand_and_key(
-            current_task,
-            addr,
-            ProtectionFlags::READ | ProtectionFlags::WRITE,
-        )?;
+        let key = Key::get(current_task, addr)?;
+        // Use acquire to synchronize with the release ordering used in mutex impl's lock path.
+        let current_value = mm.atomic_load_u32_acquire(addr)?;
+        if current_value & FUTEX_TID_MASK != tid {
+            // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
+            //
+            //   EPERM  (FUTEX_UNLOCK_PI) The caller does not own the lock
+            //          represented by the futex word.
+            return error!(EPERM);
+        }
 
-        {
-            // Unfortunately, we need these operations to actually be atomic, which means we need
-            // to create a mapping for this memory in the kernel address space. Churning these
-            // mappings is painfully slow. We should be able to optimize this operation with
-            // co-resident mappings.
-            let mapping = FutexOperandMapping::painfully_slow_create(&operand)?;
-            let value = mapping.value();
+        loop {
+            let maybe_waiter = state.pop_rt_mutex_waiter(key.clone());
+            let target_value = if let Some(waiter) = &maybe_waiter { waiter.tid } else { 0 };
 
-            let current_value = value.load(Ordering::Relaxed);
-            if current_value & FUTEX_TID_MASK != tid {
+            // Use acq/rel ordering to synchronize with acquire ordering on userspace lock ops and
+            // with the release ordering on userspace unlock ops.
+            match mm.atomic_compare_exchange_u32_acq_rel(addr, current_value, target_value) {
+                CompareExchangeResult::Success => (),
                 // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
                 //
-                //   EPERM  (FUTEX_UNLOCK_PI) The caller does not own the lock
-                //          represented by the futex word.
-                return error!(EPERM);
+                //   EINVAL (FUTEX_LOCK_PI, FUTEX_LOCK_PI2, FUTEX_TRYLOCK_PI,
+                //       FUTEX_UNLOCK_PI) The kernel detected an inconsistency
+                //       between the user-space state at uaddr and the kernel
+                //       state.  This indicates either state corruption or that the
+                //       kernel found a waiter on uaddr which is waiting via
+                //       FUTEX_WAIT or FUTEX_WAIT_BITSET.
+                CompareExchangeResult::Stale { .. } => return error!(EINVAL),
+                // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
+                //
+                //   EACCES No read access to the memory of a futex word.
+                CompareExchangeResult::Error(_) => return error!(EACCES),
             }
 
-            loop {
-                let maybe_waiter = state.pop_rt_mutex_waiter(key.clone());
-                let target_value = if let Some(waiter) = &maybe_waiter { waiter.tid } else { 0 };
+            let Some(mut waiter) = maybe_waiter else {
+                // We can stop trying to notify a thread if there are no more waiters.
+                break;
+            };
 
-                if value
-                    .compare_exchange(
-                        current_value,
-                        target_value,
-                        Ordering::Relaxed,
-                        Ordering::Relaxed,
-                    )
-                    .is_err()
-                {
-                    // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
-                    //
-                    //   EINVAL (FUTEX_LOCK_PI, FUTEX_LOCK_PI2, FUTEX_TRYLOCK_PI,
-                    //       FUTEX_UNLOCK_PI) The kernel detected an inconsistency
-                    //       between the user-space state at uaddr and the kernel
-                    //       state.  This indicates either state corruption or that the
-                    //       kernel found a waiter on uaddr which is waiting via
-                    //       FUTEX_WAIT or FUTEX_WAIT_BITSET.
-                    return error!(EINVAL);
-                }
-
-                let Some(mut waiter) = maybe_waiter else {
-                    // We can stop trying to notify a thread if there is are no more waiters.
-                    break;
-                };
-
-                if waiter.notifiable.notify() {
-                    break;
-                }
-
-                // If we couldn't notify the waiter, then we need to pull the next thread off the
-                // waiter list.
+            if waiter.notifiable.notify() {
+                break;
             }
 
-            // We will drop the mapping when we leave this scope.
+            // If we couldn't notify the waiter, then we need to pull the next thread off the
+            // waiter list.
         }
 
         Ok(())
     }
 
     fn load_futex_value(current_task: &CurrentTask, addr: FutexAddress) -> Result<u32, Errno> {
-        current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_relaxed(addr)
+        // Use acquire ordering here to synchronize with mutex impls that store w/ release ordering.
+        current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_acquire(addr)
     }
 }
 
@@ -359,7 +329,7 @@ impl FutexTable<SharedFutexKey> {
         value: u32,
         mask: u32,
     ) -> Result<oneshot::Receiver<()>, Errno> {
-        let key = SharedFutexKey::new(&memory, offset)?;
+        let key = SharedFutexKey::new(&memory, offset);
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
         Self::external_check_futex_value(&memory, offset, value)?;
@@ -382,7 +352,7 @@ impl FutexTable<SharedFutexKey> {
         count: usize,
         mask: u32,
     ) -> Result<usize, Errno> {
-        Ok(self.state.lock().wake(SharedFutexKey::new(&memory, offset)?, count, mask))
+        Ok(self.state.lock().wake(SharedFutexKey::new(&memory, offset), count, mask))
     }
 
     fn external_check_futex_value(
@@ -403,84 +373,8 @@ impl FutexTable<SharedFutexKey> {
     }
 }
 
-pub struct FutexOperand {
-    memory: Arc<MemoryObject>,
-    offset: u64,
-}
-
-struct FutexOperandMapping {
-    kernel_address: *const u8,
-    length: usize,
-    value_offset: usize,
-}
-
-impl FutexOperandMapping {
-    /// Create a mapping for this futex operand in kernel memory.
-    ///
-    /// This operation is painfully slow because churning the kernel mappings requires coordination
-    /// across all the page tables for all the userspace processes.
-    ///
-    /// TODO(b/276973344): Once we have coresident mappings, we should investigate using the
-    /// restricted mapping of this memory instead of creating a kernel mapping.
-    fn painfully_slow_create(operand: &FutexOperand) -> Result<Self, Errno> {
-        let page_size: u64 = *PAGE_SIZE;
-        let value_offset = operand.offset % page_size;
-        let mapping_start = operand.offset - value_offset;
-
-        let value_offset = value_offset as usize;
-        let length = page_size as usize;
-
-        // This assert always passes because `value_offset` is four-byte aligned according to
-        // the checks in `{Private,Shared}FutexKey::get_key`.
-        assert!(value_offset + std::mem::size_of::<AtomicU32>() <= length);
-
-        let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
-        let kernel_address = operand
-            .memory
-            .map_in_vmar(
-                &kernel_root_vmar,
-                0,
-                mapping_start,
-                length,
-                zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
-            )
-            .map_err(|_| errno!(EFAULT))?;
-        Ok(Self { kernel_address: kernel_address as *const u8, length, value_offset })
-    }
-
-    fn value(&self) -> &AtomicU32 {
-        let value_ptr = (self.kernel_address.wrapping_add(self.value_offset)) as *const AtomicU32;
-        // SAFETY: This object ensures that the kernel_address remains valid for its own lifetime.
-        // We also know that `value_ptr` is properly aligned because of the checks in
-        // `{Private,Shared}FutexKey::get_key`.
-        unsafe { &*value_ptr }
-    }
-}
-
-impl Drop for FutexOperandMapping {
-    fn drop(&mut self) {
-        let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
-
-        // SAFETY: This object hands out references to the mapped memory, but the borrow checker
-        // ensures correct lifetimes.
-        match unsafe { kernel_root_vmar.unmap(self.kernel_address as usize, self.length) } {
-            Ok(()) => {}
-            Err(status) => {
-                log_error!("failed to unmap futex value from kernel: {:?}", status);
-            }
-        }
-    }
-}
-
 pub trait FutexKey: Sized + Ord + Hash + Clone {
-    fn get_key(task: &Task, addr: FutexAddress) -> Result<Self, Errno>;
-
-    fn get_operand_and_key(
-        task: &Task,
-        addr: FutexAddress,
-        perms: ProtectionFlags,
-    ) -> Result<(FutexOperand, Self), Errno>;
-
+    fn get(task: &Task, addr: FutexAddress) -> Result<Self, Errno>;
     fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno>;
 }
 
@@ -490,19 +384,8 @@ pub struct PrivateFutexKey {
 }
 
 impl FutexKey for PrivateFutexKey {
-    fn get_key(_task: &Task, addr: FutexAddress) -> Result<Self, Errno> {
+    fn get(_task: &Task, addr: FutexAddress) -> Result<Self, Errno> {
         Ok(PrivateFutexKey { addr })
-    }
-
-    fn get_operand_and_key(
-        task: &Task,
-        addr: FutexAddress,
-        perms: ProtectionFlags,
-    ) -> Result<(FutexOperand, Self), Errno> {
-        let (memory, offset) =
-            task.mm().ok_or_else(|| errno!(EINVAL))?.get_mapping_memory(addr.into(), perms)?;
-        let key = PrivateFutexKey { addr };
-        Ok((FutexOperand { memory, offset }, key))
     }
 
     fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
@@ -519,19 +402,12 @@ pub struct SharedFutexKey {
 }
 
 impl FutexKey for SharedFutexKey {
-    fn get_key(task: &Task, addr: FutexAddress) -> Result<Self, Errno> {
-        Self::get_operand_and_key(task, addr, ProtectionFlags::READ).map(|(_, key)| key)
-    }
-
-    fn get_operand_and_key(
-        task: &Task,
-        addr: FutexAddress,
-        perms: ProtectionFlags,
-    ) -> Result<(FutexOperand, Self), Errno> {
-        let (memory, offset) =
-            task.mm().ok_or_else(|| errno!(EINVAL))?.get_mapping_memory(addr.into(), perms)?;
-        let key = SharedFutexKey::new(&memory, offset)?;
-        Ok((FutexOperand { memory, offset }, key))
+    fn get(task: &Task, addr: FutexAddress) -> Result<Self, Errno> {
+        let (memory, offset) = task
+            .mm()
+            .ok_or_else(|| errno!(EINVAL))?
+            .get_mapping_memory(addr.into(), ProtectionFlags::READ)?;
+        Ok(SharedFutexKey::new(&memory, offset))
     }
 
     fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
@@ -540,9 +416,8 @@ impl FutexKey for SharedFutexKey {
 }
 
 impl SharedFutexKey {
-    fn new(memory: &MemoryObject, offset: u64) -> Result<Self, Errno> {
-        let koid = memory.get_koid();
-        Ok(Self { koid, offset })
+    fn new(memory: &MemoryObject, offset: u64) -> Self {
+        Self { koid: memory.get_koid(), offset }
     }
 }
 

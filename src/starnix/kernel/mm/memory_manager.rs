@@ -4226,6 +4226,14 @@ impl MemoryManager {
         stats
     }
 
+    pub fn atomic_load_u32_acquire(&self, futex_addr: FutexAddress) -> Result<u32, Errno> {
+        if let Some(usercopy) = usercopy() {
+            usercopy.atomic_load_u32_relaxed(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
+        } else {
+            unreachable!("can only control memory ordering of atomics with usercopy");
+        }
+    }
+
     pub fn atomic_load_u32_relaxed(&self, futex_addr: FutexAddress) -> Result<u32, Errno> {
         if let Some(usercopy) = usercopy() {
             usercopy.atomic_load_u32_relaxed(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
@@ -4256,12 +4264,72 @@ impl MemoryManager {
         }
     }
 
+    pub fn atomic_compare_exchange_u32_acq_rel(
+        &self,
+        futex_addr: FutexAddress,
+        current: u32,
+        new: u32,
+    ) -> CompareExchangeResult<u32> {
+        let Some(usercopy) = usercopy() else {
+            unreachable!("Atomic compare/exchange requires usercopy.");
+        };
+        CompareExchangeResult::from_usercopy(usercopy.atomic_compare_exchange_u32_acq_rel(
+            futex_addr.ptr(),
+            current,
+            new,
+        ))
+    }
+
+    pub fn atomic_compare_exchange_weak_u32_acq_rel(
+        &self,
+        futex_addr: FutexAddress,
+        current: u32,
+        new: u32,
+    ) -> CompareExchangeResult<u32> {
+        let Some(usercopy) = usercopy() else {
+            unreachable!("Atomic compare/exchange requires usercopy.");
+        };
+        CompareExchangeResult::from_usercopy(usercopy.atomic_compare_exchange_weak_u32_acq_rel(
+            futex_addr.ptr(),
+            current,
+            new,
+        ))
+    }
+
     pub fn get_restricted_vmar_info(&self) -> Option<VmarInfo> {
         use zx::HandleBased;
         if self.root_vmar.is_invalid_handle() {
             return None;
         }
         Some(VmarInfo { base: RESTRICTED_ASPACE_BASE, len: RESTRICTED_ASPACE_SIZE })
+    }
+}
+
+/// The result of an atomic compare/exchange operation on user memory.
+#[derive(Debug, Clone)]
+pub enum CompareExchangeResult<T> {
+    /// The current value provided matched the one observed in memory and the new value provided
+    /// was written.
+    Success,
+    /// The provided current value did not match the current value in memory.
+    Stale { observed: T },
+    /// There was a general error while accessing the requested memory.
+    Error(Errno),
+}
+
+impl<T> CompareExchangeResult<T> {
+    fn from_usercopy(usercopy_res: Result<Result<T, T>, ()>) -> Self {
+        match usercopy_res {
+            Ok(Ok(_)) => Self::Success,
+            Ok(Err(observed)) => Self::Stale { observed },
+            Err(()) => Self::Error(errno!(EFAULT)),
+        }
+    }
+}
+
+impl<T> From<Errno> for CompareExchangeResult<T> {
+    fn from(e: Errno) -> Self {
+        Self::Error(e)
     }
 }
 
