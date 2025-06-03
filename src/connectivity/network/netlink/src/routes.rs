@@ -63,6 +63,14 @@ pub(crate) enum GetRouteArgs {
     Dump,
 }
 
+/// This is constant for the double-written main table route. The value is chosen
+/// because of the following reasons:
+///   1. Large enough so that it will override the routes provisioned by Fuchsia.
+///   2. A fixed value so that we can track the double-written route and skip
+///      reporting them in the main table.
+// TODO(https://fxbug.dev/418849362): Remove once unused.
+const DOUBLE_WRITE_MAIN_TABLE_METRIC_DELTA: u32 = 100000000;
+
 /// Arguments for an RTM_NEWROUTE unicast route.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -495,16 +503,15 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                 }
             };
 
-        let route: I::Route =
-            route.try_into().expect("should not have constructed unknown route action");
-
-        // TODO(https://fxbug.dev/358649849): Until rules are fully supported in netlink and
+        // TODO(https://fxbug.dev/418849362): Until rules are fully supported in netlink and
         // netstack, routes are installed into BOTH the main table and the "real" table in order to
         // be able to exercise the install-routes-in-separate-tables path as part of transitioning
         // to full PBR support while preserving existing functionality.
         if let Some(backup_route_set) = backup_route_set {
             let _added_to_main_table_as_backup: bool = Self::dispatch_route_proxy_fn(
-                &route,
+                &create_backup_route(route)
+                    .try_into()
+                    .expect("should not have unknown route action"),
                 interface_id,
                 &interfaces_proxy,
                 backup_route_set,
@@ -513,6 +520,8 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             .await?;
         }
 
+        let route: I::Route =
+            route.try_into().expect("should not have constructed unknown route action");
         let added_to_real_table: bool = Self::dispatch_route_proxy_fn(
             &route,
             interface_id,
@@ -575,14 +584,15 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         };
 
         let route: fnet_routes_ext::Route<I> = route_to_delete.to_owned().into();
-        let route: I::Route = route.try_into().expect("route should be converted");
 
-        // TODO(https://fxbug.dev/358649849): Until rules are fully supported in netlink and
+        // TODO(https://fxbug.dev/418849362): Until rules are fully supported in netlink and
         // netstack, routes are installed into BOTH the main table and the "real" table in order to
         // be able to exercise both.
         if let Some(route_set) = backup_route_set {
             let _backup_copy_removed_from_main_table: bool = Self::dispatch_route_proxy_fn(
-                &route,
+                &create_backup_route(route)
+                    .try_into()
+                    .expect("should not have unknown route action"),
                 interface_id,
                 &interfaces_proxy,
                 route_set,
@@ -591,6 +601,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             .await?;
         }
 
+        let route: I::Route = route.try_into().expect("route should be converted");
         let real_instance_removed: bool = Self::dispatch_route_proxy_fn(
             &route,
             interface_id,
@@ -714,7 +725,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                                 // suppress the main table version from the dump, as we installed it
                                 // there in order to support the transition to netlink supporting
                                 // rules-based routing.
-                                // TODO(https://fxbug.dev/358649849): Remove this hack once netlink
+                                // TODO(https://fxbug.dev/418849362): Remove this hack once netlink
                                 // supports PBR rules.
                                 let suppress_main_table = tables.len() >= 2;
                                 tables
@@ -911,6 +922,58 @@ pub(crate) enum RouteEventHandlerError<I: Ip> {
     NonAddOrRemoveEventReceived(fnet_routes_ext::Event<I>),
 }
 
+/// Recreates the original route from the backup route.
+///
+/// A backup route is deprioritized by [`create_backup_route`] when added to the main table.
+/// This method recreates the original route for netlink to track.
+// TODO(https://fxbug.dev/418849362): Remove once unused.
+fn maybe_fix_backup_route<I: Ip>(installed_route: &mut fnet_routes_ext::InstalledRoute<I>) {
+    let fnet_routes_ext::InstalledRoute { route, effective_properties, table_id: _ } =
+        installed_route;
+    let fnet_routes_ext::Route {
+        properties:
+            fnet_routes_ext::RouteProperties {
+                specified_properties: fnet_routes_ext::SpecifiedRouteProperties { metric },
+            },
+        destination: _,
+        action: _,
+    } = route;
+    match metric {
+        fnet_routes::SpecifiedMetric::ExplicitMetric(metric)
+            if *metric >= DOUBLE_WRITE_MAIN_TABLE_METRIC_DELTA =>
+        {
+            *metric -= DOUBLE_WRITE_MAIN_TABLE_METRIC_DELTA;
+            effective_properties.metric = *metric;
+        }
+        _ => {}
+    }
+}
+
+/// Creates a backup copy to be installed in the main table.
+///
+/// This route is deprioritized by an increased metric so that it will not take
+/// precedence over existing routes in the main table.
+/// Use [`maybe_fix_backup_route`] to recreate the original route and track in
+/// netlink.
+// TODO(https://fxbug.dev/418849362): Remove once unused.
+fn create_backup_route<I: Ip>(mut route: fnet_routes_ext::Route<I>) -> fnet_routes_ext::Route<I> {
+    let fnet_routes_ext::Route {
+        properties:
+            fnet_routes_ext::RouteProperties {
+                specified_properties: fnet_routes_ext::SpecifiedRouteProperties { metric },
+            },
+        destination: _,
+        action: _,
+    } = &mut route;
+    match metric {
+        fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => {
+            *metric += DOUBLE_WRITE_MAIN_TABLE_METRIC_DELTA;
+        }
+        _ => {}
+    }
+    route
+}
+
 fn handle_route_watcher_event<
     I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,
     S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
@@ -921,7 +984,9 @@ fn handle_route_watcher_event<
     event: fnet_routes_ext::Event<I>,
 ) -> Result<Option<TableNeedsCleanup>, RouteEventHandlerError<I>> {
     let (message_for_clients, table_no_routes) = match event {
-        fnet_routes_ext::Event::Added(added_installed_route) => {
+        fnet_routes_ext::Event::Added(mut added_installed_route) => {
+            // TODO(https://fxbug.dev/418849362): Remove once unused.
+            maybe_fix_backup_route(&mut added_installed_route);
             let fnet_routes_ext::InstalledRoute { route, table_id, effective_properties } =
                 added_installed_route;
 
@@ -964,7 +1029,9 @@ fn handle_route_watcher_event<
                 }
             }
         }
-        fnet_routes_ext::Event::Removed(removed_installed_route) => {
+        fnet_routes_ext::Event::Removed(mut removed_installed_route) => {
+            // TODO(https://fxbug.dev/418849362): Remove once unused.
+            maybe_fix_backup_route(&mut removed_installed_route);
             let fnet_routes_ext::InstalledRoute { route, table_id, effective_properties: _ } =
                 removed_installed_route;
 
@@ -2992,7 +3059,14 @@ mod tests {
         let route: fnet_routes_ext::Route<I> = route.try_into().unwrap();
 
         let metric = match route.properties.specified_properties.metric {
-            fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => metric,
+            fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => {
+                // The only routes written in the main table are backup routes which have
+                // very high metrics.
+                if table_id == MAIN_FIDL_TABLE_ID {
+                    assert!(metric >= DOUBLE_WRITE_MAIN_TABLE_METRIC_DELTA);
+                }
+                metric
+            }
             fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty) => {
                 panic!("metric should be explicit")
             }
@@ -3745,7 +3819,7 @@ mod tests {
 
                 let route_message_in_managed_table = build_message(MANAGED_ROUTE_TABLE_ID);
 
-                // TODO(https://fxbug.dev/358649849): Remove this "double-written" route once rules
+                // TODO(https://fxbug.dev/418849362): Remove this "double-written" route once rules
                 // are properly supported.
                 let route_message_in_unmanaged_table =
                     build_message(UNMANAGED_ROUTE_TABLE_INDEX.get());

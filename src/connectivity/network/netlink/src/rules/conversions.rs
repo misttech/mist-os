@@ -227,7 +227,7 @@ pub(super) fn fidl_rule_from_rule_message<I: Ip>(
             between: fwmark..=fwmark,
         })
         // If no mark selector is specified, default to checking that a mark is present.
-        // TODO(https://fxbug.dev/358649849): Remove this once we fully support PBR such that
+        // TODO(https://fxbug.dev/418849362): Remove this once we fully support PBR such that
         // Fuchsia components can acquire marked sockets that comply with the routing rules.
         .or(Some(fnet_routes_ext::rules::MarkMatcher::Marked { mask: 0, between: 0..=0 }));
 

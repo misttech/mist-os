@@ -136,7 +136,7 @@ pub(crate) struct RouteTable<
 
     /// A route set derived from the main route table, used to install a "backup" copy of the
     /// route in the main table to facilitate the transition to PBR rules support in netlink.
-    // TODO(https://fxbug.dev/358649849): Remove this once netlink supports PBR.
+    // TODO(https://fxbug.dev/418849362): Remove this once netlink supports PBR.
     #[derivative(Debug = "ignore")]
     pub(crate) route_set_from_main_table_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
 
