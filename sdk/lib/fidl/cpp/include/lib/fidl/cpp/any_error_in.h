@@ -14,6 +14,10 @@
 #include <array>
 #include <string>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif
+
 namespace fidl {
 namespace internal {
 
@@ -123,5 +127,14 @@ class ErrorsIn : public internal::ErrorsInImpl<internal::NaturalDomainError<Fidl
 };
 
 }  // namespace fidl
+
+#if __cplusplus >= 202002L
+template <typename FidlMethod>
+struct std::formatter<fidl::ErrorsIn<FidlMethod>> : std::formatter<std::string_view> {
+  auto format(const fidl::ErrorsIn<FidlMethod>& result, std::format_context& ctx) const {
+    return std::formatter<std::string_view>::format(result.FormatDescription(), ctx);
+  }
+};
+#endif
 
 #endif  // LIB_FIDL_CPP_ANY_ERROR_IN_H_
