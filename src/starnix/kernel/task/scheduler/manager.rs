@@ -191,6 +191,10 @@ impl SchedulerPolicy {
             SCHED_NORMAL => SchedulerPolicyKind::Normal { priority },
             SCHED_BATCH => SchedulerPolicyKind::Batch { priority },
             SCHED_IDLE => SchedulerPolicyKind::Idle { priority },
+            SCHED_DEADLINE => {
+                track_stub!(TODO("https://fxbug.dev/409349496"), "SCHED_DEADLINE");
+                return error!(EINVAL);
+            }
             _ => return error!(EINVAL),
         };
 
