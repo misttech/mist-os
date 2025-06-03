@@ -378,6 +378,38 @@ TEST(DevicetreeTest, MemoryReservations) {
   EXPECT_EQ(i, 4, "wrong number of entries");
 }
 
+TEST(DevicetreeTest, NulTerminatedStringProperty) {
+  using namespace std::literals;
+
+  constexpr std::string_view kNulTerminated = "nul-terminated\0"sv;
+  ASSERT_EQ('\0', kNulTerminated.back());
+
+  devicetree::PropertyValue prop(
+      std::span{reinterpret_cast<const uint8_t*>(kNulTerminated.data()), kNulTerminated.size()});
+
+  std::optional<std::string_view> decoded = prop.AsString();
+  ASSERT_TRUE(decoded);
+  EXPECT_EQ(kNulTerminated.substr(0, kNulTerminated.size() - 1), *decoded);  // Trim NUL
+}
+
+// A string property must be NUL-terminated, per the spec - but we are lenient
+// on this point for pragmatism's sake (as we have encountered devicetrees in
+// the wild that fail to meet this requirement, and letting this slide doesn't
+// actual complicate any parsing logic).
+TEST(DevicetreeTest, NonNulTerminatedStringProperty) {
+  using namespace std::literals;
+
+  constexpr std::string_view kNonNulTerminated = "non-nul-terminated"sv;
+  ASSERT_NE('\0', kNonNulTerminated.back());
+
+  devicetree::PropertyValue prop(std::span{
+      reinterpret_cast<const uint8_t*>(kNonNulTerminated.data()), kNonNulTerminated.size()});
+
+  std::optional<std::string_view> decoded = prop.AsString();
+  ASSERT_TRUE(decoded);
+  EXPECT_EQ(kNonNulTerminated, *decoded);
+}
+
 TEST(DevicetreeTest, StringList) {
   using namespace std::literals;
 
