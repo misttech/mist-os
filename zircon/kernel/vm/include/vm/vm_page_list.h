@@ -796,23 +796,32 @@ class VMPLCursor {
 // by TakePages. The list include information about uncommitted pages and markers.
 // Every splice list is expected to go through the following series of states:
 // 1. The splice list is created.
-// 2. Pages are added to the splice list.
-// 3. The list is `Finalize`d, meaning that it can no longer be modified by `Append`.
-// 4. Pages are then `Pop`d from the list. Once all the pages are popped, the list is considered
+// 2. List is Initialized with the desired range and skew.
+// 3. Pages are added to the splice list.
+// 4. The list is `Finalize`d, meaning that it can no longer be modified by `Append`.
+// 5. Pages are then `Pop`d from the list. Once all the pages are popped, the list is considered
 //    "processed".
-// 5. The list is then considered `Processed` and can be destroyed.
+// 6. The list is then considered `Processed` and can be destroyed.
 class VmPageSpliceList final {
  public:
-  VmPageSpliceList();
-  VmPageSpliceList(uint64_t offset, uint64_t length, uint64_t list_skew);
-  VmPageSpliceList(VmPageSpliceList&& other);
-  VmPageSpliceList& operator=(VmPageSpliceList&& other_tree);
+  VmPageSpliceList() = default;
+  // Convenience constructor that calls Initialize.
+  VmPageSpliceList(uint64_t offset, uint64_t length) { Initialize(offset, length); }
   ~VmPageSpliceList();
 
   // For use by PhysicalPageProvider.  The user-pager path doesn't use this. This returns a
   // finalized list.
   static zx_status_t CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
                                         VmPageSpliceList* splice);
+
+  // Initialize the list with the given range and skew. Can only be done once, and must be done
+  // before providing pages.
+  void Initialize(uint64_t offset, uint64_t length) {
+    DEBUG_ASSERT(IsEmpty() && state_ == State::Constructed);
+    offset_ = offset;
+    length_ = length;
+    state_ = State::Initialized;
+  }
 
   // Pops the next page off of the splice list. It is invalid to pop a page from a non-finalized
   // splice list.
@@ -828,7 +837,10 @@ class VmPageSpliceList final {
   zx_status_t Append(VmPageOrMarker content);
 
   // Returns true after the whole collection has been processed by Pop.
-  bool IsProcessed() const { return pos_ >= length_; }
+  bool IsProcessed() const { return state_ == State::Processed; }
+
+  // Returns true if the collection has been Initialized.
+  bool IsInitialized() const { return state_ == State::Initialized; }
 
   // Returns true if this list is empty.
   bool IsEmpty() const;
@@ -836,11 +848,15 @@ class VmPageSpliceList final {
   // Marks the list as finalized.
   // See the comment at `VmPageSpliceList`'s declaration for more info on what this means and when
   // to call it. Note that it is invalid to call `Finalize` twice on the same list.
-  void Finalize();
+  void Finalize() {
+    DEBUG_ASSERT(IsInitialized());
+    pos_ = 0;
+    state_ = State::Finalized;
+  }
 
   // Returns true if the splice list is finalized.
   // See the comment at `VmPageSpliceList`'s declaration for more info on what this means.
-  bool IsFinalized() const { return finalized_; }
+  bool IsFinalized() const { return state_ == State::Finalized; }
 
   // Returns the current position in the list.
   uint64_t Position() const { return pos_; }
@@ -857,11 +873,30 @@ class VmPageSpliceList final {
     return VmPageListNode::NodeIndex(offset, list_skew_);
   }
 
-  uint64_t offset_;
-  uint64_t length_;
+  // Initialize the skew. Must be done after calling Initialize, but before adding any content. Only
+  // necessary if directly moving list nodes where the skew has an impact.
+  void InitializeSkew(uint64_t skew) {
+    DEBUG_ASSERT(IsInitialized() && IsEmpty());
+    // Checking list_skew_ doesn't catch all instances of double-initialization, but
+    // it should catch some of them.
+    DEBUG_ASSERT(list_skew_ == 0);
+    list_skew_ = skew;
+  }
+
+  uint64_t offset_ = 0;
+  uint64_t length_ = 0;
   uint64_t pos_ = 0;
   uint64_t list_skew_ = 0;
-  bool finalized_ = false;
+
+  // States used to represent the life cycle of the VmPageSpliceList, as per the comment at the
+  // declaration.
+  enum class State : uint8_t {
+    Constructed,
+    Initialized,
+    Finalized,
+    Processed,
+  };
+  State state_ = State::Constructed;
 
   VmPageListNode head_ = VmPageListNode(0);
   fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>> middle_;
@@ -1263,10 +1298,10 @@ class VmPageList final {
     list_.clear();
   }
 
-  // Takes the pages, references and markers in the range [offset, length) out of this page list.
-  // This method calls `Finalize` on the splice list prior to returning it, meaning that no more
-  // pages, references, or markers can be added to it.
-  VmPageSpliceList TakePages(uint64_t offset, uint64_t length);
+  // Takes the content out of this page list and places them in the provided |splice| list, which
+  // must have already been initialized but still be empty. The range to be taken is the range
+  // specified by the |splice| list, and will be |Finalize|d before returning.
+  void TakePages(VmPageSpliceList* splice);
 
   uint64_t HeapAllocationBytes() const { return list_.size() * sizeof(VmPageListNode); }
 

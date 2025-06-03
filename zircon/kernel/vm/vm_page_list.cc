@@ -24,19 +24,6 @@
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
-namespace {
-
-inline void move_vm_page_list_node(VmPageListNode* dest, VmPageListNode* src) {
-  // Called by move ctor/assignment. Move assignment clears the dest node first.
-  ASSERT(dest->IsEmpty());
-
-  for (unsigned i = 0; i < VmPageListNode::kPageFanOut; i++) {
-    dest->Lookup(i) = ktl::move(src->Lookup(i));
-  }
-}
-
-}  // namespace
-
 VmPageListNode::~VmPageListNode() {
   LTRACEF("%p offset %#" PRIx64 "\n", this, obj_offset_);
   canary_.Assert();
@@ -1182,9 +1169,11 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
   return ZX_OK;
 }
 
-VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
-  VmPageSpliceList res(offset, length, list_skew_);
-  const uint64_t end = offset + length;
+void VmPageList::TakePages(VmPageSpliceList* splice) {
+  splice->InitializeSkew(list_skew_);
+
+  uint64_t offset = splice->offset_;
+  const uint64_t end = offset + splice->length_;
 
   // We should not be starting or ending partway inside an interval. Entire intervals that fall
   // completely inside the range will be checked for later while we're taking the pages below.
@@ -1194,10 +1183,10 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
   // If we can't take the whole node at the start of the range,
   // the shove the pages into the splice list head_ node.
   while (NodeIndex(offset) != 0 && offset < end) {
-    res.head_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
+    splice->head_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
-  DEBUG_ASSERT(res.head_.HasNoIntervalSentinel());
+  DEBUG_ASSERT(splice->head_.HasNoIntervalSentinel());
 
   // As long as the current and end node offsets are different, we
   // can just move the whole node into the splice list.
@@ -1205,59 +1194,34 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
     ktl::unique_ptr<VmPageListNode> node = list_.erase(NodeOffset(offset));
     if (node) {
       DEBUG_ASSERT(node->HasNoIntervalSentinel());
-      res.middle_.insert(ktl::move(node));
+      splice->middle_.insert(ktl::move(node));
     }
     offset += (PAGE_SIZE * VmPageListNode::kPageFanOut);
   }
 
   // Move any remaining pages into the splice list tail_ node.
   while (offset < end) {
-    res.tail_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
+    splice->tail_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
-  DEBUG_ASSERT(res.tail_.HasNoIntervalSentinel());
-  res.Finalize();
-  return res;
+  DEBUG_ASSERT(splice->tail_.HasNoIntervalSentinel());
+  splice->Finalize();
 }
 
-VmPageSpliceList::VmPageSpliceList() : VmPageSpliceList(0, 0, 0) {}
-
-VmPageSpliceList::VmPageSpliceList(uint64_t offset, uint64_t length, uint64_t list_skew)
-    : offset_(offset), length_(length), list_skew_(list_skew) {}
-
-VmPageSpliceList::VmPageSpliceList(VmPageSpliceList&& other)
-    : offset_(other.offset_),
-      length_(other.length_),
-      pos_(other.pos_),
-      list_skew_(other.list_skew_),
-      finalized_(other.finalized_),
-      middle_(ktl::move(other.middle_)) {
-  move_vm_page_list_node(&head_, &other.head_);
-  move_vm_page_list_node(&tail_, &other.tail_);
-
-  other.offset_ = other.length_ = other.pos_ = 0;
+VmPageSpliceList::~VmPageSpliceList() {
+  switch (state_) {
+    case State::Constructed:
+      break;
+    case State::Initialized:
+      Finalize();
+      __FALLTHROUGH;
+    case State::Finalized:
+      FreeAllPages();
+      break;
+    case State::Processed:
+      break;
+  }
 }
-
-VmPageSpliceList& VmPageSpliceList::operator=(VmPageSpliceList&& other) {
-  // FreeAllPages expects this splice list to be finalized, so do so here.
-  Finalize();
-  FreeAllPages();
-
-  offset_ = other.offset_;
-  length_ = other.length_;
-  list_skew_ = other.list_skew_;
-  pos_ = other.pos_;
-  finalized_ = other.finalized_;
-  move_vm_page_list_node(&head_, &other.head_);
-  move_vm_page_list_node(&tail_, &other.tail_);
-  middle_ = ktl::move(other.middle_);
-
-  other.offset_ = other.length_ = other.pos_ = 0;
-
-  return *this;
-}
-
-VmPageSpliceList::~VmPageSpliceList() { FreeAllPages(); }
 
 // static
 zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
@@ -1265,7 +1229,7 @@ zx_status_t VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t lengt
   // TODO(https://fxbug.dev/42170136): This method needs coverage in vmpl_unittests.
   DEBUG_ASSERT(pages);
   DEBUG_ASSERT(list_length(pages) == length / PAGE_SIZE);
-  *splice = VmPageSpliceList(offset, length, 0);
+  splice->Initialize(offset, length);
   while (vm_page_t* page = list_remove_head_type(pages, vm_page_t, queue_node)) {
     zx_status_t status = splice->Append(VmPageOrMarker::Page(page));
     if (status != ZX_OK) {
@@ -1290,19 +1254,13 @@ void VmPageSpliceList::FreeAllPages() {
   }
 }
 
-void VmPageSpliceList::Finalize() {
-  DEBUG_ASSERT(!finalized_);
-  pos_ = 0;
-  finalized_ = true;
-}
-
 bool VmPageSpliceList::IsEmpty() const {
   return head_.IsEmpty() && tail_.IsEmpty() && middle_.is_empty();
 }
 
 zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
   ASSERT(pos_ < length_);
-  ASSERT(!IsFinalized());
+  ASSERT(IsInitialized());
   ASSERT(!content.IsInterval());
 
   const uint64_t cur_offset = offset_ + pos_;
@@ -1353,10 +1311,6 @@ VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
     DEBUG_ASSERT_MSG(false, "attempted to PeekReference on a non-finalized splice list\n");
     return VmPageOrMarkerRef(nullptr);
   }
-  if (IsProcessed()) {
-    DEBUG_ASSERT_MSG(false, "peeked at fully processed splice list");
-    return VmPageOrMarkerRef(nullptr);
-  }
 
   const uint64_t cur_offset = offset_ + pos_;
   const auto cur_node_idx = NodeIndex(cur_offset);
@@ -1390,10 +1344,6 @@ VmPageOrMarker VmPageSpliceList::Pop() {
     DEBUG_ASSERT_MSG(false, "attempted to Pop from a non-finalized splice list\n");
     return VmPageOrMarker::Empty();
   }
-  if (IsProcessed()) {
-    DEBUG_ASSERT_MSG(false, "Popped from fully processed splice list");
-    return VmPageOrMarker::Empty();
-  }
 
   VmPageOrMarker res;
   const uint64_t cur_offset = offset_ + pos_;
@@ -1418,5 +1368,8 @@ VmPageOrMarker VmPageSpliceList::Pop() {
   DEBUG_ASSERT(!res.IsInterval());
 
   pos_ += PAGE_SIZE;
+  if (pos_ >= length_) {
+    state_ = State::Processed;
+  }
   return res;
 }
