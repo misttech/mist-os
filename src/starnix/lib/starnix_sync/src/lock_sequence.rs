@@ -299,7 +299,10 @@ impl<L> Locked<L> {
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
     #[inline(always)]
-    pub fn read_lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::ReadGuard<'a>, &mut Locked<M>)
+    pub fn read_lock_and<'a, M, S>(
+        &'a mut self,
+        source: &'a S,
+    ) -> (S::ReadGuard<'a>, &mut Locked<M>)
     where
         M: 'a,
         S: RwLockFor<M>,

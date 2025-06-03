@@ -404,10 +404,7 @@ pub fn execute_task_with_prerun_result<L, F, R, G>(
 ) -> Result<R, Errno>
 where
     L: LockBefore<TaskRelease>,
-    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<R, Errno>
-        + Send
-        + Sync
-        + 'static,
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<R, Errno> + Send + Sync + 'static,
     R: Send + Sync + 'static,
     G: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
 {
@@ -443,10 +440,7 @@ pub fn execute_task<L, F, G>(
 ) -> Result<(), Errno>
 where
     L: LockBefore<TaskRelease>,
-    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<(), Errno>
-        + Send
-        + Sync
-        + 'static,
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<(), Errno> + Send + Sync + 'static,
     G: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
 {
     // Set the process handle to the new task's process, so the new thread is spawned in that

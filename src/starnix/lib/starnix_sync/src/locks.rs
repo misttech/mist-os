@@ -195,10 +195,7 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedRwLock<T, L> {
         Self { rwlock: RwLock::new(t), _phantom: PhantomData }
     }
 
-    pub fn read<'a, P>(
-        &'a self,
-        locked: &'a mut Locked<P>,
-    ) -> <Self as RwLockFor<L>>::ReadGuard<'a>
+    pub fn read<'a, P>(&'a self, locked: &'a mut Locked<P>) -> <Self as RwLockFor<L>>::ReadGuard<'a>
     where
         P: LockBefore<L>,
     {

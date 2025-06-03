@@ -331,10 +331,7 @@ pub fn sys_open(
     sys_openat(locked, current_task, FdNumber::AT_FDCWD, user_path, flags, mode)
 }
 
-pub fn sys_pause(
-    _locked: &mut Locked<Unlocked>,
-    current_task: &CurrentTask,
-) -> Result<(), Errno> {
+pub fn sys_pause(_locked: &mut Locked<Unlocked>, current_task: &CurrentTask) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();
     let guard = event.begin_wait();
     let result = current_task.run_in_state(RunState::Event(event.clone()), || {

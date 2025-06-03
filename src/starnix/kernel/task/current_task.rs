@@ -1806,11 +1806,7 @@ impl CurrentTask {
 
     /// Causes the current thread's thread group to exit, notifying any ptracer
     /// of this task first.
-    pub fn thread_group_exit(
-        &mut self,
-        locked: &mut Locked<Unlocked>,
-        exit_status: ExitStatus,
-    ) {
+    pub fn thread_group_exit(&mut self, locked: &mut Locked<Unlocked>, exit_status: ExitStatus) {
         self.ptrace_event(
             locked,
             PtraceOptions::TRACEEXIT,

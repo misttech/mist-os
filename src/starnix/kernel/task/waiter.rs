@@ -689,11 +689,7 @@ impl Waiter {
     /// Wait until the waiter is woken up.
     ///
     /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
-    pub fn wait<L>(
-        &self,
-        locked: &mut Locked<L>,
-        current_task: &CurrentTask,
-    ) -> Result<(), Errno>
+    pub fn wait<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask) -> Result<(), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {

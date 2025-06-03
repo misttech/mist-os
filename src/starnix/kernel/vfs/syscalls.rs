@@ -2714,10 +2714,7 @@ pub fn sys_flock(
     file.flock(locked, current_task, operation)
 }
 
-pub fn sys_sync(
-    _locked: &mut Locked<Unlocked>,
-    _current_task: &CurrentTask,
-) -> Result<(), Errno> {
+pub fn sys_sync(_locked: &mut Locked<Unlocked>, _current_task: &CurrentTask) -> Result<(), Errno> {
     track_stub!(TODO("https://fxbug.dev/322875826"), "sync()");
     Ok(())
 }
