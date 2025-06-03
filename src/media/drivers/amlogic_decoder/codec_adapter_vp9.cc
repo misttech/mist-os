@@ -5,6 +5,7 @@
 #include "codec_adapter_vp9.h"
 
 #include <lib/fidl/cpp/clone.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/trace/event.h>
 #include <lib/zx/bti.h>
 #include <zircon/threads.h>
@@ -19,7 +20,6 @@
 #include "device_ctx.h"
 #include "hevcdec.h"
 #include "pts_manager.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "thread_role.h"
 #include "vp9_configuration.h"
 #include "vp9_decoder.h"

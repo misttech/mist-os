@@ -6,6 +6,7 @@
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_DECODER_CORE_H_
 
 #include <lib/ddk/io-buffer.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/zx/handle.h>
 #include <zircon/status.h>
 
@@ -13,7 +14,6 @@
 
 #include "macros.h"
 #include "registers.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "src/media/lib/internal_buffer/internal_buffer.h"
 
 namespace amlogic_decoder {

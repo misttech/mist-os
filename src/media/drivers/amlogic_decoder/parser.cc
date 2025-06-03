@@ -4,6 +4,7 @@
 
 #include "parser.h"
 
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/trace/event.h>
 #include <zircon/threads.h>
 
@@ -11,7 +12,6 @@
 
 #include "decoder_core.h"
 #include "decoder_instance.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "stream_buffer.h"
 #include "util.h"
 

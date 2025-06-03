@@ -31,12 +31,12 @@ fuchsia_cc_driver("aml-g12-pdm-driver") {
   deps = [
     ":aml_g12_pdm_bind",
     "//sdk/lib/driver/platform-device/cpp",
+    "//sdk/lib/memory_barriers",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//src/lib/memory_barriers",
     "//src/media/audio/drivers/lib/audio-driver-proto",
     "//src/media/audio/drivers/lib/audio-proto-utils",
     "//src/media/audio/lib/simple-audio-stream",

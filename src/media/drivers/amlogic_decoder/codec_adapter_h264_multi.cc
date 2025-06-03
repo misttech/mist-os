@@ -6,6 +6,7 @@
 
 #include <lib/fidl/cpp/clone.h>
 #include <lib/fit/defer.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/sync/completion.h>
 #include <lib/trace/event.h>
 #include <lib/zx/bti.h>
@@ -20,7 +21,6 @@
 #include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
 #include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
-#include <src/lib/memory_barriers/memory_barriers.h>
 
 #include "device_ctx.h"
 #include "h264_multi_decoder.h"

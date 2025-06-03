@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/trace/event_args.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
@@ -17,7 +18,6 @@
 
 #include <fbl/algorithm.h>
 
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "src/media/audio/drivers/aml-g12-tdm/recorder.h"
 
 namespace audio::aml_g12 {

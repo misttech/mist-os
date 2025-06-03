@@ -10,6 +10,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/zx/clock.h>
 #include <math.h>
 #include <threads.h>
@@ -18,8 +19,6 @@
 #include <numeric>
 #include <optional>
 #include <utility>
-
-#include "src/lib/memory_barriers/memory_barriers.h"
 
 namespace audio::aml_g12 {
 

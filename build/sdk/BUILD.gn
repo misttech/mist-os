@@ -120,7 +120,7 @@ _partner_idk_source_sets_list = [
 # Contains all non-test unstable source sets distributed with the partner IDK.
 _partner_idk_unstable_source_sets_list = [
   # keep-sorted: begin
-  "//src/lib/memory_barriers:memory_barriers",
+  "//sdk/lib/memory_barriers:memory_barriers",
   "//sdk/lib/driver/fake-gpio/cpp",
   "//sdk/lib/driver/fake-platform-device/cpp",
   "//sdk/lib/driver/fake-resource/cpp",
