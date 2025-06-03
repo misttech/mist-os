@@ -49,8 +49,8 @@ impl FileSystemOps for RemoteVolume {
         self.remotefs.name()
     }
 
-    fn generate_node_ids(&self) -> bool {
-        self.remotefs.generate_node_ids()
+    fn uses_external_node_ids(&self) -> bool {
+        self.remotefs.uses_external_node_ids()
     }
 
     fn rename(
@@ -267,7 +267,7 @@ pub fn new_remote_vol(
     if use_remote_ids {
         fs.create_root(node_id, remote_node);
     } else {
-        let root_ino = fs.next_node_id();
+        let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, remote_node);
     }
     Ok(fs)

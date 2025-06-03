@@ -1178,7 +1178,7 @@ impl OverlayStack {
         let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
         let fs = FileSystem::new(kernel, CacheMode::Uncached, OverlayFs { stack }, options)?;
-        let root_ino = fs.next_node_id();
+        let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, OverlayNodeOps { node: root_node });
         Ok(fs)
     }
@@ -1194,7 +1194,7 @@ impl OverlayStack {
         let invisible_tmp = TmpFs::new_fs(kernel);
 
         fn create_directory(fs: &FileSystemHandle) -> DirEntryHandle {
-            let ino = fs.next_node_id();
+            let ino = fs.allocate_ino();
             let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
             let node = fs.create_detached_node(ino, TmpfsDirectory::new(), info);
             DirEntry::new(node, None, FsString::default())
@@ -1216,7 +1216,7 @@ impl OverlayStack {
             OverlayFs { stack },
             FileSystemOptions::default(),
         )?;
-        let root_ino = fs.next_node_id();
+        let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, OverlayNodeOps { node: root_node });
         Ok(fs)
     }

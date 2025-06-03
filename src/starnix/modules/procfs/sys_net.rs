@@ -29,7 +29,7 @@ fn netstack_devices_readdir(
 
     if sink.offset() == 2 {
         sink.add(
-            file.fs.next_node_id(),
+            file.fs.allocate_ino(),
             sink.offset() + 1,
             DirectoryEntryType::from_mode(FILE_MODE),
             "all".into(),
@@ -38,7 +38,7 @@ fn netstack_devices_readdir(
 
     if sink.offset() == 3 {
         sink.add(
-            file.fs.next_node_id(),
+            file.fs.allocate_ino(),
             sink.offset() + 1,
             DirectoryEntryType::from_mode(FILE_MODE),
             "default".into(),
@@ -47,7 +47,7 @@ fn netstack_devices_readdir(
 
     let devices = current_task.kernel().netstack_devices.snapshot_devices();
     for (name, _) in devices.iter().skip(sink.offset() as usize - 4) {
-        let inode_num = file.fs.next_node_id();
+        let inode_num = file.fs.allocate_ino();
         sink.add(
             inode_num,
             sink.offset() + 1,

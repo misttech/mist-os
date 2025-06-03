@@ -174,7 +174,7 @@ impl TmpFs {
         } else {
             0
         };
-        let root_ino = fs.next_node_id();
+        let root_ino = fs.allocate_ino();
         let mut info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred { uid, gid });
         info.chmod(mode);
         fs.create_root_with_info(root_ino, TmpfsDirectory::new(), info);

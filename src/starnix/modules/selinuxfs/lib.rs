@@ -751,7 +751,7 @@ impl FileOps for BooleansDirectory {
         let iter_offset = sink.offset() - 2;
         for name in self.security_server.conditional_booleans().iter().skip(iter_offset as usize) {
             sink.add(
-                file.fs.next_node_id(),
+                file.fs.allocate_ino(),
                 /* next offset = */ sink.offset() + 1,
                 DirectoryEntryType::REG,
                 FsString::from(name.as_bytes()).as_ref(),

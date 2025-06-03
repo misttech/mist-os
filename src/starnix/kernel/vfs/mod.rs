@@ -28,6 +28,7 @@ pub mod crypt_service;
 pub mod eventfd;
 pub mod file_server;
 pub mod fs_args;
+pub mod fs_node_cache;
 pub mod fs_registry;
 pub mod fsverity;
 pub mod inotify;

@@ -260,7 +260,7 @@ pub fn new_fusectl_fs(
 ) -> Result<FileSystemHandle, Errno> {
     let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FuseCtlFs, options)?;
 
-    let root_ino = fs.next_node_id();
+    let root_ino = fs.allocate_ino();
     fs.create_root_with_info(
         root_ino,
         FuseCtlConnectionsDirectory {},
@@ -313,7 +313,7 @@ impl FileSystemOps for FuseFs {
         Ok(())
     }
 
-    fn generate_node_ids(&self) -> bool {
+    fn uses_external_node_ids(&self) -> bool {
         true
     }
 

@@ -283,7 +283,7 @@ impl BpfFs {
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
-        let root_ino = fs.next_node_id();
+        let root_ino = fs.allocate_ino();
         fs.create_root_with_info(
             root_ino,
             BpfFsDir::new(),

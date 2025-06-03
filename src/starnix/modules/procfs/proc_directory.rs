@@ -269,7 +269,7 @@ impl FileOps for ProcDirectory {
             for pid in &pids[start..] {
                 // TODO: Figure out if this inode number is fine, given the content of the task
                 // directories.
-                let inode_num = file.fs.next_node_id();
+                let inode_num = file.fs.allocate_ino();
                 let name = FsString::from(format!("{pid}"));
 
                 // The + 1 is to set the offset to the next possible pid for subsequent reads.

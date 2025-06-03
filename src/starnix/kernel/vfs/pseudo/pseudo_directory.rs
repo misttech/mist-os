@@ -86,7 +86,7 @@ impl PseudoDirectoryBuilder {
             .entries
             .iter()
             .map(|(name, entry)| {
-                let ino = fs.next_node_id();
+                let ino = fs.allocate_ino();
                 match entry {
                     PseudoEntry::Node(node) => (
                         *name,
@@ -120,7 +120,7 @@ impl PseudoDirectoryBuilder {
     pub fn build_root(&self, fs: &FileSystemHandle, mode: FileMode, creds: FsCred) {
         assert!(mode.is_dir(), "root directory must be a directory");
         let ops = self.build(fs);
-        let root_ino = fs.next_node_id();
+        let root_ino = fs.allocate_ino();
         fs.create_root_with_info(root_ino, ops, FsNodeInfo::new(mode, creds));
     }
 }

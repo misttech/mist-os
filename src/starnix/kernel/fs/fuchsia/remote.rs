@@ -190,7 +190,7 @@ impl FileSystemOps for RemoteFs {
         "remotefs".into()
     }
 
-    fn generate_node_ids(&self) -> bool {
+    fn uses_external_node_ids(&self) -> bool {
         self.use_remote_ids
     }
 
@@ -289,7 +289,7 @@ impl RemoteFs {
         if use_remote_ids {
             fs.create_root(node_id, remote_node);
         } else {
-            let root_ino = fs.next_node_id();
+            let root_ino = fs.allocate_ino();
             fs.create_root(root_ino, remote_node);
         }
         Ok(fs)
@@ -652,7 +652,7 @@ impl FsNodeOps for RemoteNode {
         };
 
         if !fs_ops.use_remote_ids {
-            node_id = fs.next_node_id();
+            node_id = fs.allocate_ino();
         }
         let child = fs.create_node(
             current_task,
@@ -713,7 +713,7 @@ impl FsNodeOps for RemoteNode {
 
         let ops = RemoteNode { zxio, rights: self.rights };
         if !fs_ops.use_remote_ids {
-            node_id = fs.next_node_id();
+            node_id = fs.allocate_ino();
         }
         let child = fs.create_node(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
         Ok(child)
@@ -769,7 +769,7 @@ impl FsNodeOps for RemoteNode {
             }
             attrs.id
         } else {
-            fs.next_node_id()
+            fs.allocate_ino()
         };
         let owner = FsCred { uid: attrs.uid, gid: attrs.gid };
         let rdev = DeviceType::from_bits(attrs.rdev);
@@ -942,7 +942,7 @@ impl FsNodeOps for RemoteNode {
                 .map_err(|status| from_status_like_fdio!(status))?;
             attrs.id
         } else {
-            fs.next_node_id()
+            fs.allocate_ino()
         };
         let symlink = fs.create_node(
             current_task,
@@ -1014,7 +1014,7 @@ impl FsNodeOps for RemoteNode {
         let ops = Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>;
 
         if !fs_ops.use_remote_ids {
-            node_id = fs.next_node_id();
+            node_id = fs.allocate_ino();
         }
         let child = fs.create_node(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
 

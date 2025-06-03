@@ -45,7 +45,7 @@ impl LayeredFs {
             options,
         )
         .expect("layeredfs constructed with valid options");
-        let root_ino = fs.next_node_id();
+        let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, LayeredNodeOps { fs: layered_fs });
         fs
     }

@@ -190,7 +190,7 @@ impl FileSystemOps for DevPtsFs {
         "devpts".into()
     }
 
-    fn generate_node_ids(&self) -> bool {
+    fn uses_external_node_ids(&self) -> bool {
         false
     }
 }

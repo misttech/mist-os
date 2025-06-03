@@ -132,7 +132,7 @@ impl TaskDirectory {
             TaskDirectoryNode(Arc::new(TaskDirectory {
                 task_weak,
                 scope,
-                inode_range: fs.allocate_node_id(task_entries(scope).len()),
+                inode_range: fs.allocate_ino_range(task_entries(scope).len()),
             })),
             FsNodeInfo::new(mode!(IFDIR, 0o777), creds),
         )

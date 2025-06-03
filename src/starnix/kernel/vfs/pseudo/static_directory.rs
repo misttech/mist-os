@@ -106,7 +106,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     /// filesystem.
     pub fn build_root(self) {
         let ops = Arc::new(StaticDirectory { entries: self.entries });
-        let root_ino = self.fs.next_node_id();
+        let root_ino = self.fs.allocate_ino();
         self.fs.create_root_with_info(root_ino, ops, FsNodeInfo::new(self.mode, self.creds));
     }
 
