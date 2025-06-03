@@ -2,7 +2,7 @@
   "name": "explore",
   "description": "Resolves a package and then spawns a shell with said package loaded into the namespace at /pkg.",
   "examples": [
-    "To explore the update package interactively:\n\n> ffx target-package explore 'fuchsia-pkg://fuchsia.com/update'\n$ ls\nsvc\npkg\n$ exit\nConnection to terminal closed\n\nTo run a command directly from the command line:\n> ffx target package explore 'fuchsia-pkg://fuchsia.com/update' -c 'printenv'\nPATH=/.dash/tools/debug-dash-launcher\nPWD=/\n"
+    "To explore the update package interactively:\n\n> ffx target package explore 'fuchsia-pkg://fuchsia.com/update'\n$ ls\nsvc\npkg\n$ exit\nConnection to terminal closed\n\nTo run a command directly from the command line:\n> ffx target package explore 'fuchsia-pkg://fuchsia.com/update' -c 'printenv'\nPATH=/.dash/tools/debug-dash-launcher\nPWD=/\n"
   ],
   "flags": [
     {

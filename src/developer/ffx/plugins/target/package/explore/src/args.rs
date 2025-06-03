@@ -14,7 +14,7 @@ use fidl_fuchsia_dash as fdash;
     description = "Resolves a package and then spawns a shell with said package loaded into the namespace at /pkg.",
     example = "To explore the update package interactively:
 
-> ffx target-package explore 'fuchsia-pkg://fuchsia.com/update'
+> ffx target package explore 'fuchsia-pkg://fuchsia.com/update'
 $ ls
 svc
 pkg

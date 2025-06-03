@@ -19,7 +19,7 @@ pub enum PackageSubcommand {
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "explore", description = "Same as `ffx target-package explore`")]
+#[argh(subcommand, name = "explore", description = "Same as `ffx target package explore`")]
 pub struct ExploreArgs {
     #[argh(positional)]
     /// the package URL to resolve. If `subpackages` is empty the resolved package directory will
