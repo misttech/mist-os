@@ -230,6 +230,34 @@ class Dfv2NodeTest : public DriverManagerTestBase {
   fidl::ServerBindingGroup<fuchsia_device::Controller> device_controller_bindings_;
 };
 
+TEST_F(Dfv2NodeTest, AddChildWithDuplicatePropertyKey) {
+  auto node = CreateNode("test");
+  StartTestDriver(node);
+  ASSERT_TRUE(node->HasDriverComponent());
+  ASSERT_EQ(driver_manager::NodeState::kRunning, node->GetNodeState());
+
+  // Add child with two properties that share the same key. It should fail.
+  zx::result node_controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  ASSERT_EQ(node_controller_endpoints.status_value(), ZX_OK);
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  ASSERT_EQ(node_endpoints.status_value(), ZX_OK);
+
+  fuchsia_driver_framework::NodeAddArgs args{
+      {.name = "child",
+       .properties2 = {{fdf::MakeProperty2("key", "value"), fdf::MakeProperty2("key", "value2")}}}};
+  node->AddChild(std::move(args), std::move(node_controller_endpoints->server),
+                 std::move(node_endpoints->server),
+                 [](fit::result<fuchsia_driver_framework::wire::NodeError,
+                                std::shared_ptr<driver_manager::Node>>
+                        result) {
+                   ASSERT_TRUE(result.is_error());
+                   ASSERT_EQ(result.error_value(),
+                             fuchsia_driver_framework::wire::NodeError::kDuplicatePropertyKeys);
+                 });
+}
+
 TEST_F(Dfv2NodeTest, AddChildWithDuplicatePropertyArgs) {
   auto node = CreateNode("test");
   StartTestDriver(node);

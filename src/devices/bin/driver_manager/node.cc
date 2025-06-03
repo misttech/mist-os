@@ -1086,6 +1086,28 @@ void Node::AddChild(fuchsia_driver_framework::NodeAddArgs args,
     callback(fit::as_error(fdf::wire::NodeError::kNameMissing));
     return;
   }
+
+  // Verify the properties.
+  if (args.properties().has_value() && args.properties2().has_value()) {
+    LOGF(ERROR, "Failed to add Node, both properties and properties2 fields were set");
+    callback(fit::as_error(fdf::wire::NodeError::kUnsupportedArgs));
+    return;
+  }
+
+  // Only check for unique property keys for properties2 since properties is deprecated.
+  if (args.properties2().has_value()) {
+    std::unordered_set<std::string> property_keys;
+    for (auto& property : args.properties2().value()) {
+      if (property_keys.contains(property.key())) {
+        LOGF(ERROR,
+             "Failed to add Node since properties2 contain multiple properties with the same key");
+        callback(fit::as_error(fdf::wire::NodeError::kDuplicatePropertyKeys));
+        return;
+      }
+      property_keys.insert(property.key());
+    }
+  }
+
   std::string name = args.name().value();
   WaitForChildToExit(
       name, [self = shared_from_this(), args = std::move(args), controller = std::move(controller),
