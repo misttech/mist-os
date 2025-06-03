@@ -262,7 +262,7 @@ def compilation_mode(args: Sequence[str]) -> str:
     opt = _OPT_PATTERN.sub("", args.optimization)
     if opt == "debug":
         return "--compilation_mode=dbg"
-    elif opt in ["size", "speed", "profile", "size_lto"]:
+    elif opt in ["size", "speed", "profile", "size_lto", "size_thinlto"]:
         return "--compilation_mode=opt"
     else:
         return "--compilation_mode=fastbuild"
