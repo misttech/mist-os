@@ -107,7 +107,6 @@ enum class CompressionStrategy {
 
 enum class CompressionStorageStrategy {
   kNone,
-  kTriPage,
   kSlot,
 };
 

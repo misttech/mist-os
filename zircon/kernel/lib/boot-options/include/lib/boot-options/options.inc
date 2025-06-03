@@ -716,7 +716,6 @@ DEFINE_OPTION("kernel.compression.storage-strategy", CompressionStorageStrategy,
               compression_storage_strategy, {CompressionStorageStrategy::kNone}, R"""(
 Supported compression storage strategies are:
 - `none`
-- `tri_page`
 - `slot`
 
 This option selects the desired storage strategy to be used for storing data that has been
