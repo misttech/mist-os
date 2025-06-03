@@ -1283,11 +1283,21 @@ class AsyncMain:
 
         device_environment: environment.DeviceEnvironment | None = None
         if tests.has_device_test():
-            device_environment = (
-                await execution.get_device_environment_from_exec_env(
-                    exec_env, recorder=recorder
+            try:
+                device_environment = (
+                    await execution.get_device_environment_from_exec_env(
+                        exec_env, recorder=recorder
+                    )
                 )
-            )
+            except execution.DeviceConfigError as e:
+                # Allow missing device configuration error if we don't have end
+                # to end tests. This allows us to run against devices that don't
+                # have an SSH address (like USB and vsock).
+                # TODO(https://fxbug.dev/417777659): Remove this allowance once
+                # we have a good strategy for how to forward non-ssh-connected
+                # devices.
+                if tests.has_e2e_test():
+                    raise e
 
         test_group = recorder.emit_test_group(len(tests.selected) * flags.count)
 
