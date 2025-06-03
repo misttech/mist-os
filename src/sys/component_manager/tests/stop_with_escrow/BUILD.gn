@@ -22,11 +22,13 @@ rustc_test("stop_with_escrow_integration_test_bin") {
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/rust/zx",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-runtime",
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [ "stop_with_escrow_integration_test.rs" ]

@@ -6,12 +6,16 @@ use assert_matches::assert_matches;
 use component_events::events::{EventStream, ExitStatus, Started, Stopped};
 use component_events::matcher::EventMatcher;
 use fidl_fidl_test_components::TriggerMarker;
+use fidl_fuchsia_component::{Event, EventHeader, EventType, StoppedPayload};
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route, ScopedInstanceFactory,
 };
+use futures::future::{self, Either};
+use futures::StreamExt;
+use std::pin::pin;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
 };
 
 /// Tests a component can stop with a request buffered in its outgoing dir,
@@ -219,13 +223,21 @@ async fn stop_with_dynamic_dictionary() {
         .unwrap();
 
     let instance = builder.build().await.unwrap();
-
-    // Observe the component start then stop due to being idle.
     let moniker =
         format!("realm_builder:{}/stop_with_dynamic_dictionary", instance.root.child_name());
-    let mut event_stream = EventStream::open().await.unwrap();
-    let event_matcher = EventMatcher::ok().moniker(moniker.clone());
-    event_matcher.clone().wait::<Started>(&mut event_stream).await.unwrap();
+
+    // Wait for the component to start.
+    let mut event_stream = EventStream::open().await.unwrap().filter(|ev| {
+        future::ready(matches!(
+            &ev.header,
+            Some(EventHeader { moniker: Some(m), .. }) if m == &moniker
+        ))
+    });
+    while let Some(ev) = event_stream.next().await {
+        if matches!(ev.header, Some(EventHeader { event_type: Some(EventType::Started), .. })) {
+            break;
+        }
+    }
 
     let trigger = instance
         .root
@@ -236,36 +248,51 @@ async fn stop_with_dynamic_dictionary() {
 
     // Simulate a delay between opening the client channel and sending a
     // request. This should cause the component to go idle.
-    assert_eq!(
-        event_matcher
-            .clone()
-            .wait::<Stopped>(&mut event_stream)
-            .await
-            .expect("failed to observe Stopped event")
-            .result()
-            .expect("failed to extract Stopped result")
-            .status,
-        ExitStatus::Clean
+    assert_matches!(
+        event_stream.next().await.unwrap(),
+        Event {
+            header: Some(EventHeader { event_type: Some(EventType::Stopped), .. }),
+            payload: Some(fcomponent::EventPayload::Stopped(StoppedPayload {
+                status: Some(0),
+                ..
+            })),
+            ..
+        }
     );
 
-    assert_matches!(&trigger.run().await, Ok(m) if m == "hello from fidl.test.components.Trigger-static");
+    assert_matches!(
+        &trigger.run().await,
+        Ok(m) if m == "hello from fidl.test.components.Trigger-static"
+    );
 
     // Calling fidl.test.components.Trigger will cause Component Manager to
     // start the component and reconnect the server-end channel to the
     // component, which has a `use` declaration for the escrowed version of both
     // `fuchsia.component.sandbox.Receiver` and the Trigger protocols.
-    event_matcher.clone().wait::<Started>(&mut event_stream).await.unwrap();
+    assert_matches!(
+        event_stream.next().await.unwrap().header,
+        Some(EventHeader { event_type: Some(EventType::Started), .. })
+    );
+
     // The component can be escrowed again by idling the client-end
     // fidl.test.components.Trigger channel.
-    assert_eq!(
-        event_matcher
-            .clone()
-            .wait::<Stopped>(&mut event_stream)
-            .await
-            .expect("failed to observe Stopped event")
-            .result()
-            .expect("failed to extract Stopped result")
-            .status,
-        ExitStatus::Clean
+    assert_matches!(
+        event_stream.next().await.unwrap(),
+        Event {
+            header: Some(EventHeader { event_type: Some(EventType::Stopped), .. }),
+            payload: Some(fcomponent::EventPayload::Stopped(StoppedPayload {
+                status: Some(0),
+                ..
+            })),
+            ..
+        }
     );
+
+    // Ensure there are no missed events.
+    let event = pin!(event_stream.next());
+    let timeout = pin!(fasync::Timer::new(fasync::MonotonicDuration::from_millis(100)));
+    match futures::future::select(event, timeout).await {
+        Either::Left((e, _)) => panic!("unexpectedly event: {:?}", e),
+        Either::Right(_) => {}
+    }
 }

@@ -18,8 +18,10 @@ rustc_library("component-events") {
     "//src/lib/fuchsia-component",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:pin-project-lite",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:thiserror",
   ]
@@ -27,7 +29,6 @@ rustc_library("component-events") {
   test_deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
   ]
 
   sources = [
