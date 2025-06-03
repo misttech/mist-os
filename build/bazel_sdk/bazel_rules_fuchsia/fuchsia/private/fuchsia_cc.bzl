@@ -303,7 +303,10 @@ def _fuchsia_cc_test_manifest_impl(ctx):
     # Detect googletest.
     is_gtest = False
     for dep in ctx.attr.deps:
-        if dep.label.workspace_name == ctx.attr._googletest.label.workspace_name:
+        # NOTE: googletest can have different repo names depending on user's
+        # setup (e.g. WORKSPACE vs MODULE, and googletest version). This check
+        # tries to catch all known googletest repo names.
+        if dep.label.repo_name in ("com_google_googletest", "googletest", "googletest+"):
             is_gtest = True
             break
 
@@ -347,11 +350,6 @@ _fuchsia_cc_test_manifest = rule(
         "death_unittest": attr.bool(
             doc = "Whether the test is a gtest unit test and uses ASSERT_DEATH.",
             mandatory = True,
-        ),
-        "_googletest": attr.label(
-            doc = "Any googletest label.",
-            allow_single_file = True,
-            default = "@com_google_googletest//:BUILD.bazel",
         ),
         "_template_file": attr.label(
             doc = "The template cml file.",
