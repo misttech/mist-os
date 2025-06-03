@@ -133,7 +133,7 @@ if (is_fuchsia) {
 
   generated_partitions_config("partitions_config") {
     testonly = true
-    hw_revision = board_name
+    hw_revision = "test"
   }
 
   update_package("update") {

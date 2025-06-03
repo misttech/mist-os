@@ -4,7 +4,7 @@
 
 use crate::{common, BoardArgs, HybridBoardArgs};
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use assembly_config_schema::release_info::{BoardReleaseInfo, ReleaseInfo};
 use assembly_config_schema::{BoardInformation, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
@@ -14,10 +14,22 @@ use std::collections::BTreeMap;
 pub fn new(args: &BoardArgs) -> Result<()> {
     let mut config = BoardInformation::from_config_path(&args.config)?;
     if let Some(partitions_config) = &args.partitions_config {
-        let _ = PartitionsConfig::from_dir(partitions_config)
+        config.partitions_config = Some(DirectoryPathBuf::new(partitions_config.clone()));
+
+        // We must assert that the board name matches the hardware_revision in
+        // the partitions config, otherwise OTAs may not work.
+        let partitions = PartitionsConfig::from_dir(partitions_config)
             .context("Validating partitions config")?;
+        if partitions.hardware_revision != "" {
+            ensure!(
+                &config.name == &partitions.hardware_revision,
+                format!(
+                    "The board name ({}) does not match the partitions.hardware_revision ({})",
+                    &config.name, &partitions.hardware_revision
+                )
+            );
+        }
     }
-    config.partitions_config = args.partitions_config.clone().map(DirectoryPathBuf::new);
 
     for (i, board_input_bundle) in args.board_input_bundles.iter().enumerate() {
         let key = format!("tmp{}", i);

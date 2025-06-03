@@ -100,7 +100,7 @@ if (is_fuchsia) {
 
   generated_partitions_config("partitions") {
     testonly = true
-    hw_revision = "board"
+    hw_revision = "test"
   }
 
   generated_file("version") {

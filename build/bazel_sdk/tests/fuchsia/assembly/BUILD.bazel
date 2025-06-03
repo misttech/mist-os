@@ -393,7 +393,7 @@ fuchsia_partitions_configuration(
         ":bootstrap_partition_3776",
         ":bootstrap_partition_3728",
     ],
-    hardware_revision = "workstation",
+    hardware_revision = "x64",
     partitions = [
         ":zbi_partition",
         ":vbmeta_partition",

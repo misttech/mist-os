@@ -24,7 +24,7 @@
             "name": "gpt"
         }
     ],
-    "hardware_revision": "workstation",
+    "hardware_revision": "x64",
     "partitions": [
         {
             "name": "zircon_a",
