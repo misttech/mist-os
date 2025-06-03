@@ -411,8 +411,7 @@ def _generate_sysroot_build_rules(
         parent_sdk_contents):
     ctx = runtime.ctx
     files = []
-    for ifs_file in meta.get("ifs_files", []):
-        files.append("pkg/sysroot/" + ifs_file)
+    files += meta.get("ifs_files", [])
     arch_list = process_context.constants.target_cpus
 
     # TODO(https://fxbug.dev/385408047): Prefer API level-specific "variants"
@@ -1056,7 +1055,7 @@ def _generate_cc_prebuilt_library_build_rules(
     }
     files = meta["headers"]
     if "ifs" in meta:
-        files.append(lib_base_path + meta["ifs"])
+        files.append(meta["ifs"])
     process_context.files_to_copy[meta_sdk_root].extend(files)
 
     prebuilt_select = {}

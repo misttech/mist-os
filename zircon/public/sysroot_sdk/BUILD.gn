@@ -119,8 +119,8 @@ _sysroot_meta = {
   type = "sysroot"
   name = "sysroot"
   ifs_files = [
-    "libc.ifs",
-    "zircon.ifs",
+    "pkg/sysroot/libc.ifs",
+    "pkg/sysroot/zircon.ifs",
   ]
   if (current_build_target_api_level == "PLATFORM") {
     versions = {

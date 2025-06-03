@@ -471,7 +471,7 @@ template("sdk_shared_library") {
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
-    args += [ "--ifs" ] + [ ifs_file_name ]
+    args += [ "--ifs" ] + [ packaged_ifs_file ]
     if (current_build_target_api_level != "PLATFORM") {
       args += [
         "--api-level",
