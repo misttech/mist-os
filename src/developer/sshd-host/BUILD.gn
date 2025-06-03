@@ -12,7 +12,20 @@ group("tests") {
 }
 
 source_set("sshd_constants") {
-  sources = [ "constants.h" ]
+  public = [ "constants.h" ]
+}
+
+source_set("authorized_keys") {
+  sources = [
+    "authorized_keys.cc",
+    "authorized_keys.h",
+  ]
+  public_deps = [ "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp" ]
+  deps = [
+    ":sshd_constants",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/fbl",
+  ]
 }
 
 source_set("lib") {
@@ -21,6 +34,7 @@ source_set("lib") {
     "service.h",
   ]
   deps = [
+    ":authorized_keys",
     ":sshd_constants",
     "//sdk/fidl/fuchsia.process:fuchsia.process_cpp",
     "//sdk/lib/fdio",
@@ -43,6 +57,7 @@ executable("bin") {
   output_name = "sshd-host"
   sources = [ "sshd-host.cc" ]
   deps = [
+    ":authorized_keys",
     ":lib",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
@@ -101,6 +116,7 @@ cc_test_executable("test") {
   output_name = "sshd-host-test"
   sources = [ "test.cc" ]
   deps = [
+    ":authorized_keys",
     ":lib",
     ":sshd_constants",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",

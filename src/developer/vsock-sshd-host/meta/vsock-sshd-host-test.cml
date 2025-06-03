@@ -7,7 +7,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/sshd-host-test",
+        binary: "bin/vsock-sshd-host-test",
     },
     use: [
         {

@@ -11,6 +11,8 @@ namespace sshd_host {
 
 inline constexpr std::string_view kAuthorizedKeyPathInData = "ssh/authorized_keys";
 inline constexpr std::string_view kAuthorizedKeysBootloaderFileName = "ssh.authorized_keys";
+inline constexpr char kSshDirectory[] = "/data/ssh";
+inline constexpr char kAuthorizedKeysPath[] = "/data/ssh/authorized_keys";
 
 }  // namespace sshd_host
 

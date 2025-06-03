@@ -26,13 +26,8 @@
 
 namespace sshd_host {
 
-inline constexpr char kSshDirectory[] = "/data/ssh";
-inline constexpr char kAuthorizedKeysPath[] = "/data/ssh/authorized_keys";
 // Name of the collection that contains sshd shell child components.
 inline constexpr std::string_view kShellCollection = "shell";
-
-zx_status_t provision_authorized_keys_from_bootloader_file(
-    fidl::SyncClient<fuchsia_boot::Items>& boot_items);
 
 class Service;
 

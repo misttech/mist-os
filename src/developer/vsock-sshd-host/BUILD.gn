@@ -8,7 +8,7 @@ import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":sshd-host-tests" ]
+  deps = [ ":vsock-sshd-host-tests" ]
 }
 
 source_set("service") {
@@ -104,7 +104,7 @@ bootfs_files_for_assembly("bootfs") {
 
 cc_test_executable("test") {
   testonly = true
-  output_name = "sshd-host-test"
+  output_name = "vsock-sshd-host-test"
   sources = [ "test.cc" ]
   deps = [
     ":service",
@@ -113,14 +113,16 @@ cc_test_executable("test") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
+    "//src/developer/sshd-host:authorized_keys",
+    "//src/developer/sshd-host:sshd_constants",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//zircon/system/ulib/zx",
   ]
 }
 
-fuchsia_unittest_package("sshd-host-tests") {
-  manifest = "meta/sshd-host-test.cml"
+fuchsia_unittest_package("vsock-sshd-host-tests") {
+  manifest = "meta/vsock-sshd-host-test.cml"
   deps = [ ":test" ]
   test_specs = {
     log_settings = {
