@@ -157,16 +157,7 @@ pub enum SchedulerPolicyKind {
 
 impl PartialOrd for SchedulerPolicyKind {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let o1 = self.ordering();
-        let o2 = other.ordering();
-        if o1 != o2 {
-            o1.partial_cmp(&o2)
-        } else if self == other {
-            Some(Ordering::Equal)
-        } else {
-            // FIFO and RR are not comparable
-            None
-        }
+        self.ordering().partial_cmp(&other.ordering())
     }
 }
 
