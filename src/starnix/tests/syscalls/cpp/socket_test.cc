@@ -626,6 +626,25 @@ TEST(Socket, ConcurrentCreate) {
   child.join();
 }
 
+TEST(Socket, SocketCookie) {
+  fbl::unique_fd fd;
+
+  // Create a socket and get its cookie.
+  EXPECT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0))) << strerror(errno);
+  uint64_t cookie1 = 0;
+  socklen_t optlen = sizeof(cookie1);
+  ASSERT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_COOKIE, &cookie1, &optlen), 0) << strerror(errno);
+  EXPECT_EQ(optlen, sizeof(cookie1));
+
+  // Create another socket verify that it has a different cookie value.
+  EXPECT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_DGRAM, 0))) << strerror(errno);
+  uint64_t cookie2 = 0;
+  ASSERT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_COOKIE, &cookie2, &optlen), 0) << strerror(errno);
+  EXPECT_EQ(optlen, sizeof(cookie2));
+
+  EXPECT_NE(cookie1, cookie2);
+}
+
 class SocketFault : public FaultTest, public testing::WithParamInterface<std::pair<int, int>> {
  protected:
   void SetUp() override {

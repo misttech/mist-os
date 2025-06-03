@@ -205,6 +205,12 @@ closed protocol BaseSocket {
     }) -> (struct {
         mark OptionalUint32;
     }) error fuchsia.posix.Errno;
+
+    /// Get `SOL_SOCKET` -> `SO_COOKIE`.
+    @available(added=HEAD)
+    strict GetCookie() -> (struct {
+        value uint64;
+    }) error fuchsia.posix.Errno;
 };
 
 /// A network socket.

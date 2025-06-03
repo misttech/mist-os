@@ -451,13 +451,16 @@ group("tests") {
   testonly = true
   public_deps = all_packages
   if (host_os == "linux") {
+    # Use Linux toolchain instead of $host_toolchain - it has newer sysroot.
+    linux_toolchain = "//build/toolchain:linux_$host_cpu"
+
     public_deps += [
-      ":netstack_${bsdsocket_label}_test($host_toolchain)",
-      ":netstack_${dgramsocket_label}_test($host_toolchain)",
-      ":netstack_${if_nameindex_label}_test($host_toolchain)",
-      ":netstack_${packetsocket_label}_test($host_toolchain)",
-      ":netstack_${rawsocket_label}_test($host_toolchain)",
-      ":netstack_${streamsocket_label}_test($host_toolchain)",
+      ":netstack_${bsdsocket_label}_test($linux_toolchain)",
+      ":netstack_${dgramsocket_label}_test($linux_toolchain)",
+      ":netstack_${if_nameindex_label}_test($linux_toolchain)",
+      ":netstack_${packetsocket_label}_test($linux_toolchain)",
+      ":netstack_${rawsocket_label}_test($linux_toolchain)",
+      ":netstack_${streamsocket_label}_test($linux_toolchain)",
     ]
   }
 }

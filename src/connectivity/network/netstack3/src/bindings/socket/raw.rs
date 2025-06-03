@@ -560,6 +560,10 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
                     ctx.api().raw_ip_socket().get_mark(&data.id, domain.into_core()).into_fidl();
                 responder.send(Ok(&mark)).unwrap_or_log("failed to respond");
             }
+            fpraw::SocketRequest::GetCookie { responder } => {
+                let cookie = data.id.socket_cookie();
+                responder.send(Ok(cookie.export_value())).unwrap_or_log("failed to respond")
+            }
         }
         ControlFlow::Continue(None)
     }

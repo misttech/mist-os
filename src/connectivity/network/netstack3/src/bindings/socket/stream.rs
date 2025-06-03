@@ -1367,6 +1367,10 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 let mark = self.ctx.api().tcp().get_mark(&self.data.id, domain.into_core());
                 responder.send(Ok(&mark.into_fidl())).unwrap_or_log("failed to respond")
             }
+            fposix_socket::StreamSocketRequest::GetCookie { responder } => {
+                let cookie = self.data.id.socket_cookie();
+                responder.send(Ok(cookie.export_value())).unwrap_or_log("failed to respond")
+            }
         }
         ControlFlow::Continue(None)
     }

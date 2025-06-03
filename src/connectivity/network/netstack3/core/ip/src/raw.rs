@@ -12,7 +12,9 @@ use derivative::Derivative;
 use log::debug;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker, Mtu};
 use net_types::{SpecifiedAddr, ZonedAddr};
-use netstack3_base::socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _};
+use netstack3_base::socket::{
+    DualStackIpExt, DualStackRemoteIp, SocketCookie, SocketZonedAddrExt as _,
+};
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, InspectorExt,
@@ -467,6 +469,14 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> Debug
 pub struct RawIpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>(
     StrongRc<RawIpSocketState<I, D, BT>>,
 );
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSocketId<I, D, BT> {
+    /// Returns [`SocketCookie`] for this socket.
+    pub fn socket_cookie(&self) -> SocketCookie {
+        let Self(rc) = self;
+        SocketCookie::new(rc.resource_token())
+    }
+}
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSocketId<I, D, BT> {
     /// Return the bindings state associated with this socket.

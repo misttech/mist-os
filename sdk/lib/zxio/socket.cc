@@ -275,6 +275,11 @@ SockOptResult GetSockOptProcessor::StoreOption(const int32_t& value) {
 }
 
 template <>
+SockOptResult GetSockOptProcessor::StoreOption(const uint64_t& value) {
+  return StoreRaw(&value, sizeof(uint64_t));
+}
+
+template <>
 SockOptResult GetSockOptProcessor::StoreOption(const uint32_t& value) {
   return StoreRaw(&value, sizeof(uint32_t));
 }
@@ -966,6 +971,9 @@ class base_socket {
           return FidlSocketMarkWithDomain(response.mark, fidl_domain);
         });
       }
+      case SO_COOKIE:
+        return proc.Process(client()->GetCookie(),
+                            [](const auto& response) { return response.value; });
 #endif
       case SO_SNDTIMEO:
       case SO_RCVTIMEO:

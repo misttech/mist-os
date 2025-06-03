@@ -30,7 +30,7 @@ use netstack3_core::socket::{
     self as core_socket, ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError,
     ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
     NotDualStackCapableError, SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
-    SocketInfo,
+    SocketCookie, SocketInfo,
 };
 use netstack3_core::sync::Mutex as CoreMutex;
 use netstack3_core::trace::trace_duration;
@@ -310,6 +310,8 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     fn set_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain, mark: Mark);
 
     fn get_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain) -> Mark;
+
+    fn get_cookie(ctx: &mut Ctx, id: &Self::SocketId) -> SocketCookie;
 
     fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize);
     fn get_send_buffer(ctx: &mut Ctx, id: &Self::SocketId) -> usize;
@@ -640,6 +642,10 @@ where
 
     fn get_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain) -> Mark {
         ctx.api().udp().get_mark(id, domain)
+    }
+
+    fn get_cookie(_ctx: &mut Ctx, id: &Self::SocketId) -> SocketCookie {
+        id.socket_cookie()
     }
 
     fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize) {
@@ -1046,6 +1052,10 @@ where
 
     fn get_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain) -> Mark {
         ctx.api().icmp_echo().get_mark(id, domain)
+    }
+
+    fn get_cookie(_ctx: &mut Ctx, id: &Self::SocketId) -> SocketCookie {
+        id.socket_cookie()
     }
 
     fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize) {
@@ -1822,6 +1832,9 @@ where
             Request::GetMark { domain, responder } => {
                 responder.send(Ok(&self.get_mark(domain))).unwrap_or_log("failed to respond")
             }
+            Request::GetCookie { responder } => responder
+                .send(Ok(self.get_cookie().export_value()))
+                .unwrap_or_log("failed to respond"),
         }
         ControlFlow::Continue(None)
     }
@@ -2569,6 +2582,11 @@ where
     fn get_mark(self, domain: fnet::MarkDomain) -> fposix_socket::OptionalUint32 {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_mark(ctx, id, domain.into_core()).into_fidl()
+    }
+
+    fn get_cookie(self) -> SocketCookie {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_cookie(ctx, id)
     }
 
     fn set_send_buffer(self, send_buffer: u64) {

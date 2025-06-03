@@ -1237,6 +1237,10 @@ func (ep *endpoint) GetMark(_ fidl.Context, domain fnet.MarkDomain) (socket.Base
 	return socket.BaseSocketGetMarkResultWithErr(posix.ErrnoEopnotsupp), nil
 }
 
+func (ep *endpoint) GetCookie(_ fidl.Context) (socket.BaseSocketGetCookieResult, error) {
+	return socket.BaseSocketGetCookieResultWithErr(posix.ErrnoEopnotsupp), nil
+}
+
 // endpointWithSocket implements a network socket that uses a zircon socket for
 // its data plane. This structure creates a pair of goroutines which are
 // responsible for moving data and signals between the underlying
