@@ -59,8 +59,8 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
-        "--relative-manifest",
-        help="Relative path to the build manifest within each subbuild directory",
+        "--collection-relative-path",
+        help="Relative path to the collection from the root of each subbuild directory.",
         type=pathlib.Path,
         required=True,
     )
@@ -115,7 +115,7 @@ def main() -> int:
     merged = generate_idk.MergedIDK()
     for build_dir in args.subbuild_directory:
         manifest = generate_idk.PartialIDK.load(
-            build_dir, args.relative_manifest
+            build_dir / args.collection_relative_path
         )
         input_files |= manifest.input_files()
         merged = merged.merge_with(manifest)

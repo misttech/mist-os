@@ -39,20 +39,20 @@ TYPES_SUPPORTING_UNSTABLE_ATOMS = [
 ]
 
 
-class BuildManifestJson(TypedDict):
-    """A type description of a subset of the fields in a build manifest.
+class IdkManifestJson(TypedDict):
+    """A type description of a subset of the fields in the IDK manifest.
 
     We don't explicitly check that the manifests in question actually match this
     schema - we just assume it.
     """
 
-    atoms: list[ManifestAtom]
+    parts: list[IdkManifestAtom]
 
 
-class ManifestAtom(TypedDict):
-    type: str
+class IdkManifestAtom(TypedDict):
     meta: str
-    files: list[AtomFile]
+    stable: bool
+    type: str
 
 
 class AtomFile(TypedDict):
@@ -156,62 +156,239 @@ class PartialIDK:
     atoms: dict[pathlib.Path, PartialAtom]
 
     @staticmethod
-    def load(
-        build_dir: pathlib.Path, relative_manifest_path: pathlib.Path
-    ) -> PartialIDK:
-        """Load relevant information about a piece of the IDK from a subbuild
-        dir."""
+    def load(collection_path: pathlib.Path) -> PartialIDK:
+        """Load relevant information about a piece of the IDK from a collection
+        in a subbuild directory.
+
+        Args:
+            collection_path: Path to the directory containing the collection.
+        Returns:
+            A PartialIDK representing the collection.
+        """
+
         result = PartialIDK(
-            manifest_src=(build_dir / relative_manifest_path), atoms={}
+            manifest_src=(collection_path / "meta/manifest.json"), atoms={}
         )
-        with (build_dir / relative_manifest_path).open() as f:
-            build_manifest: BuildManifestJson = json.load(f)
+        with (result.manifest_src).open() as f:
+            idk_manifest: IdkManifestJson = json.load(f)
 
-        for atom in build_manifest["atoms"]:
-            # sdk_noop_atoms have no metadata specified. Skip them.
-            if not atom["meta"]:
-                continue
-
+        for atom in idk_manifest["parts"]:
             meta_dest = pathlib.Path(atom["meta"])
-            meta_src = None
+            meta_src = collection_path / meta_dest
             dest_to_src = {}
-            for file in atom["files"]:
-                src_path = build_dir / file["source"]
-                dest_path = pathlib.Path(file["destination"])
 
-                # Determine if this file is the metadata file for this atom.
-                if dest_path == meta_dest:
-                    meta_src = src_path
-                else:
-                    assert dest_path not in dest_to_src, (
-                        "File specified multiple times in atom: %s" % dest_path
-                    )
-                    dest_to_src[dest_path] = src_path
-
-            assert meta_src, (
-                "Atom does not include its metadata file in 'files': %s" % atom
-            )
+            atom_type = atom["type"]
 
             with meta_src.open() as f:
-                assert meta_dest not in result.atoms, (
-                    "Atom metadata file specified multiple times: %s"
-                    % meta_dest
-                )
-
                 atom_meta = json.load(f)
-                if meta_dest == VERSION_HISTORY_PATH:
-                    # version_history.json doesn't have a 'type' field, so set
-                    # it. See https://fxbug.dev/409622622.
-                    assert "type" not in atom_meta.keys()
-                    atom_meta["type"] = "version_history"
 
-                result.atoms[meta_dest] = PartialAtom(
-                    meta=atom_meta,
-                    meta_src=meta_src,
-                    dest_to_src=dest_to_src,
+            if meta_dest == VERSION_HISTORY_PATH:
+                # version_history.json doesn't have a 'type' field, so set
+                # it. See https://fxbug.dev/409622622.
+                assert "type" not in atom_meta.keys()
+                atom_meta["type"] = "version_history"
+
+            files_list = result._get_file_list(atom_type, atom_meta)
+
+            for file in files_list:
+                src_path = collection_path / file
+                dest_path = pathlib.Path(file)
+
+                assert dest_path not in dest_to_src, (
+                    "File specified multiple times in atom: %s" % dest_path
                 )
+                dest_to_src[dest_path] = src_path
+
+            assert meta_dest not in result.atoms, (
+                "Atom metadata file specified multiple times: %s" % meta_dest
+            )
+
+            result.atoms[meta_dest] = PartialAtom(
+                meta=atom_meta,
+                meta_src=meta_src,
+                dest_to_src=dest_to_src,
+            )
 
         return result
+
+    @staticmethod
+    def _get_file_list(atom_type: str, atom_meta: dict[str, Any]) -> list[str]:
+        """Obtains a list of files from `atom_meta`.
+
+        Atom types specify the files corresponding to the atom in various ways.
+        This function handles all of them.
+
+        Args:
+            atom_type: The atom type as used in the IDK manifest.
+            atom_meta: The atom metadata from its meta.json file.
+        Returns:
+            A list of the file path for the atom. Paths are relative to the IDK
+            root directory.
+        """
+        files_list = []
+
+        # First handle common fields that can coexist with others.
+        if "headers" in atom_meta:
+            assert atom_type in [
+                "cc_prebuilt_library",
+                "cc_source_library",
+            ], f"Unexpected entry for {atom_type}"
+
+            # Contains a list of files.
+            files_list += atom_meta["headers"]
+
+        # The following fields are mutually exclusive.
+        if atom_type == "version_history":
+            # Version history is special. It contains "data", so we must
+            # avoid matching that case.
+            pass
+        elif "sources" in atom_meta:
+            assert atom_type in [
+                "dart_library",
+                "cc_source_library",
+                "fidl_library",
+                "bind_library",
+            ], f"Unexpected entry for {atom_type}"
+
+            # Contains a list of files.
+            files_list += atom_meta["sources"]
+        elif "files" in atom_meta:
+            assert atom_type in [
+                "host_tool",
+                "companion_host_tool",
+                "experimental_python_e2e_test",
+                "ffx_tool",
+            ], f"Unexpected entry for {atom_type}"
+
+            # Contains a list of files.
+            files_list += atom_meta["files"]
+
+            # Handle ffx_tool, which has another entry.
+            if "target_files" in atom_meta:
+                assert (
+                    atom_type == "ffx_tool"
+                ), f"Unexpected entry for {atom_type}"
+                # Contains a dictionary of variants.
+                assert (
+                    len(atom_meta["target_files"]) == 1
+                ), "Expected only one variant per sub-build."
+                variant = list(atom_meta["target_files"].values())[0]
+
+                # The variant contains a dictionary of file entries.
+                files_list += []
+                for label, file in variant.items():
+                    files_list.append(file)
+        elif "data" in atom_meta:
+            assert atom_type == "data", f"Unexpected entry for {atom_type}"
+
+            # Contains a list of files.
+            files_list += atom_meta["data"]
+        elif "docs" in atom_meta:
+            assert (
+                atom_type == "documentation"
+            ), f"Unexpected entry for {atom_type}"
+
+            # Contains a list of files.
+            files_list += atom_meta["docs"]
+        elif "variants" in atom_meta:
+            assert (
+                len(atom_meta["variants"]) == 1
+            ), "Expected only one variant per sub-build."
+
+            # Contains an array of items of various possible types.
+            variant = atom_meta["variants"][0]
+
+            if atom_type == "package":
+                # The variant contains a list of files.
+                files_list += variant["files"]
+            elif atom_type == "sysroot":
+                # The variant contains a dictionary of file lists
+                files_list += []
+                for label, file_list in variant["values"].items():
+                    if label not in [
+                        "include_dir",
+                        "root",
+                        "sysroot_dir",
+                    ]:
+                        files_list += file_list
+
+                # The IFS files are listed separately outside the variant and
+                # not versioned.
+                # TODO(https://fxbug.dev/339884866): Version libzircon and get
+                # its IFS file from the variant.
+                # TODO(https://fxbug.dev/388856587): Version libc and get
+                # its IFS file from the variant.
+                files_list += atom_meta["ifs_files"]
+            elif atom_type == "cc_prebuilt_library":
+                files_list += []
+                for label, file in variant["values"].items():
+                    if label not in ["dist_lib_dest"]:
+                        files_list.append(file)
+            else:
+                assert False, f"Unexpected entry for {atom_type}"
+        elif "binaries" in atom_meta:
+            # TODO(https://fxbug.dev/310006516): Remove this case when no longer
+            # distributing API-level-agnostic prebuilts (arch/) in the IDK.
+
+            assert (
+                len(atom_meta["binaries"]) == 1
+            ), "Expected only one variant per sub-build."
+
+            # Contains a dictionary of variants.
+            variant = list(atom_meta["binaries"].values())[0]
+
+            if atom_type in ["cc_prebuilt_library"]:
+                files_list += []
+                for label, file in variant.items():
+                    if label != "dist_path":
+                        files_list.append(file)
+
+                # There may be another entry, which is a file.
+                format = atom_meta["format"]
+                if "ifs" in atom_meta:
+                    assert (
+                        format == "shared"
+                    ), f"Unexpected entry for {atom_type} format {format}"
+                    files_list.append(atom_meta["ifs"])
+                else:
+                    assert (
+                        format == "static"
+                    ), f"Unexpected format {format} for {atom_type}"
+            elif atom_type == "loadable_module":
+                # The variant is just a list of files.
+                files_list += variant
+
+                # There is another entry, which is a list of files.
+                files_list += atom_meta["resources"]
+            else:
+                assert False, f"Unexpected entry for {atom_type}"
+        elif "versions" in atom_meta:
+            # TODO(https://fxbug.dev/310006516): Remove this case when no longer
+            # distributing API-level-agnostic prebuilts (arch/) in the IDK.
+
+            assert atom_type == "sysroot", f"Unexpected entry for {atom_type}"
+
+            # Contains a dictionary of variants.
+            assert (
+                len(atom_meta["versions"]) == 1
+            ), "Expected only one variant per sub-build."
+            variant = list(atom_meta["versions"].values())[0]
+
+            # The variant contains a dictionary of file lists
+            for label, file_list in variant.items():
+                if label not in [
+                    "dist_dir",
+                    "include_dir",
+                    "root",
+                ]:
+                    files_list += file_list
+
+            # The IFS files are listed separately outside the variant.
+            files_list += atom_meta["ifs_files"]
+        else:
+            assert False, f"Unhandleld atom type {atom_type}"
+
+        return files_list
 
     def input_files(self) -> set[pathlib.Path]:
         """Return the set of input files in this PartialIDK for generating a

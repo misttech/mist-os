@@ -123,7 +123,7 @@ template("idk") {
     _subbuilds_target_prefix = ":${_subbuilds_target}"
   }
 
-  _relative_collection_build_manifest = "sdk/manifest/${_sdk_collection_name}"
+  _collection_relative_path = "sdk/exported/${_sdk_collection_name}"
 
   # Targets that must be built before producing the final IDK.
   _subbuild_targets = []
@@ -220,8 +220,8 @@ template("idk") {
     }
 
     args += [
-      "--relative-manifest",
-      _relative_collection_build_manifest,
+      "--collection-relative-path",
+      _collection_relative_path,
       "--output-directory",
       rebase_path(_exported_dir, root_build_dir),
       "--schema-directory",
