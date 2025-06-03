@@ -204,7 +204,10 @@ impl StorageHostService {
         *state = match GptManager::new(device.clone(), self.partitions_dir.clone()).await {
             Ok(runner) => State::Running(runner),
             Err(err) => {
-                log::error!(err:?; "Failed to load GPT.  Reformatting may be required.");
+                // This is a warning because, as described above, we can't return an error from
+                // here, so there are normal flows that can print this error message that don't
+                // indicate a bug or incorrect behavior.
+                log::warn!(err:?; "Failed to load GPT.  Reformatting may be required.");
                 State::NeedsFormatting(device)
             }
         };

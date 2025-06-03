@@ -245,7 +245,9 @@ impl Filesystem {
                 serving_fs.unwrap().shutdown_volume(&volume_name).await.context("shutdown failed")
             }
             Filesystem::ServingGpt(fs) => fs.shutdown().await.context("shutdown failed"),
-            Filesystem::Shutdown => Err(anyhow!("double shutdown!")),
+            // Getting shut down when we are already shut down is fine. We are already in the
+            // desired state!
+            Filesystem::Shutdown => Ok(()),
         }
     }
 }
