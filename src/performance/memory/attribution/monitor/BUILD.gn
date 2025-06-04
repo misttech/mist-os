@@ -224,7 +224,6 @@ rustc_staticlib("memory-monitor2-trace-rust-cpp-lib") {
     ":stalls",
     ":traces",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//sdk/rust/zx",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

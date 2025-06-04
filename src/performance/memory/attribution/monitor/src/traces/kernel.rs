@@ -106,8 +106,8 @@ async fn publish_one_sample(
     counter!(
         CATEGORY_MEMORY_KERNEL,
         c"memory_stall",0,
-        "stall_time_some_ns"=>stall_info.stall_time_some,
-        "stall_time_full_ns"=>stall_info.stall_time_full
+        "stall_time_some_ns"=>u64::try_from(stall_info.some.as_nanos())?,
+        "stall_time_full_ns"=>u64::try_from(stall_info.full.as_nanos())?
     );
 
     Ok(())

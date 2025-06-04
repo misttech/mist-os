@@ -7,7 +7,7 @@ use std::sync::Arc;
 use cobalt_client::traits::AsEventCode;
 use futures::StreamExt;
 use memory_metrics_registry::cobalt_registry;
-use stalls::StallProvider;
+use stalls::{MemoryStallMetrics, StallProvider};
 use zx::MonotonicInstant;
 use {anyhow, fidl_fuchsia_metrics as fmetrics};
 
@@ -18,7 +18,7 @@ pub async fn collect_stalls_forever(
     stalls_provider: Arc<impl StallProvider + 'static>,
     metric_event_logger: fmetrics::MetricEventLoggerProxy,
 ) -> Result<(), anyhow::Error> {
-    let mut last_stall = zx::MemoryStall::default();
+    let mut last_stall = MemoryStallMetrics::default();
 
     // Wait for one hour after device start to get the first stall value. We don't use the one-hour
     // timer as we may have been started later than at boot exactly.
@@ -28,18 +28,19 @@ pub async fn collect_stalls_forever(
     loop {
         let new_stall = stalls_provider.get_stall_info()?;
 
+        // The Cobalt metrics for stalls expect milliseconds, as defined in the Cobalt registry.
         let stall_some_event = fmetrics::MetricEvent {
             metric_id: cobalt_registry::MEMORY_STALLS_PER_HOUR_METRIC_ID,
-            payload: fmetrics::MetricEventPayload::IntegerValue(
-                new_stall.stall_time_some - last_stall.stall_time_some,
-            ),
+            payload: fmetrics::MetricEventPayload::IntegerValue(i64::try_from(
+                (new_stall.some - last_stall.some).as_millis(),
+            )?),
             event_codes: vec![cobalt_registry::MemoryMetricDimensionStallType::Some.as_event_code()],
         };
         let stall_full_event = fmetrics::MetricEvent {
             metric_id: cobalt_registry::MEMORY_STALLS_PER_HOUR_METRIC_ID,
-            payload: fmetrics::MetricEventPayload::IntegerValue(
-                new_stall.stall_time_full - last_stall.stall_time_full,
-            ),
+            payload: fmetrics::MetricEventPayload::IntegerValue(i64::try_from(
+                (new_stall.full - last_stall.full).as_millis(),
+            )?),
             event_codes: vec![cobalt_registry::MemoryMetricDimensionStallType::Full.as_event_code()],
         };
 
@@ -58,7 +59,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::task::Poll;
     use std::sync::atomic::{AtomicU32, Ordering};
-    use zx::Duration;
+    use std::time::Duration;
 
     fn get_stall_provider() -> Arc<impl StallProvider + 'static> {
         struct FakeStallProvider {
@@ -72,11 +73,11 @@ mod tests {
         }
 
         impl StallProvider for FakeStallProvider {
-            fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
+            fn get_stall_info(&self) -> Result<MemoryStallMetrics, anyhow::Error> {
                 let count = self.count.fetch_add(1, Ordering::Relaxed);
-                let memory_stall = zx::MemoryStall {
-                    stall_time_some: (count * 10) as i64,
-                    stall_time_full: (count * 20) as i64,
+                let memory_stall = MemoryStallMetrics {
+                    some: Duration::from_millis((count * 10).into()),
+                    full: Duration::from_millis((count * 20).into()),
                 };
                 Ok(memory_stall)
             }
@@ -98,7 +99,9 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fmetrics::MetricEventLoggerMarker>();
 
         // Set the time to shortly after boot
-        exec.set_fake_time((zx::MonotonicInstant::ZERO + Duration::from_seconds(3 * 60)).into());
+        exec.set_fake_time(
+            (zx::MonotonicInstant::ZERO + zx::Duration::from_seconds(3 * 60)).into(),
+        );
 
         // Service under test.
         let mut stalls_collector =
@@ -120,7 +123,7 @@ mod tests {
         // Fake the passage of time, so that collect_metrics may do a capture.
         assert!(
             exec.run_until_stalled(&mut std::pin::pin!(fasync::TestExecutor::advance_to(
-                exec.now() + Duration::from_seconds(60 * 60 + 10)
+                exec.now() + zx::Duration::from_seconds(60 * 60 + 10)
             )))
             .is_ready(),
             "Failed to advance time"
@@ -169,7 +172,7 @@ mod tests {
         // Advance to the next hour
         assert!(
             exec.run_until_stalled(&mut std::pin::pin!(fasync::TestExecutor::advance_to(
-                (zx::MonotonicInstant::ZERO + Duration::from_seconds(60 * 60 * 2 + 10)).into()
+                (zx::MonotonicInstant::ZERO + zx::Duration::from_seconds(60 * 60 * 2 + 10)).into()
             )))
             .is_ready(),
             "Failed to advance time"

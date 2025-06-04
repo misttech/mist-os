@@ -10,12 +10,16 @@ use std::future::{self, Ready};
 use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Once};
+use std::time::Duration;
 
 struct FakeStallProvider {}
 
 impl StallProvider for FakeStallProvider {
-    fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
-        Ok(zx::MemoryStall { stall_time_some: 1, stall_time_full: 2 })
+    fn get_stall_info(&self) -> Result<stalls::MemoryStallMetrics, anyhow::Error> {
+        Ok(stalls::MemoryStallMetrics {
+            some: Duration::from_nanos(1),
+            full: Duration::from_nanos(2),
+        })
     }
 }
 struct FakeStatsProxy {

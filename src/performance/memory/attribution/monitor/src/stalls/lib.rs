@@ -2,11 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::num::TryFromIntError;
 use std::sync::Arc;
+
+#[derive(Default)]
+pub struct MemoryStallMetrics {
+    pub some: std::time::Duration,
+    pub full: std::time::Duration,
+}
+
+impl TryFrom<zx::MemoryStall> for MemoryStallMetrics {
+    type Error = TryFromIntError;
+
+    fn try_from(stall: zx::MemoryStall) -> Result<Self, Self::Error> {
+        Ok(Self {
+            some: std::time::Duration::from_nanos(stall.stall_time_some.try_into()?),
+            full: std::time::Duration::from_nanos(stall.stall_time_full.try_into()?),
+        })
+    }
+}
 
 pub trait StallProvider: Sync + Send + 'static {
     /// Return the current memory stall values from the kernel.
-    fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error>;
+    fn get_stall_info(&self) -> Result<MemoryStallMetrics, anyhow::Error>;
 }
 
 pub struct StallProviderImpl {
@@ -34,7 +52,7 @@ impl StallProviderImpl {
 }
 
 impl StallProvider for StallProviderImpl {
-    fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
-        Ok(self.stall_resource.get_memory_stall()?)
+    fn get_stall_info(&self) -> Result<MemoryStallMetrics, anyhow::Error> {
+        Ok(self.stall_resource.get_memory_stall()?.try_into()?)
     }
 }

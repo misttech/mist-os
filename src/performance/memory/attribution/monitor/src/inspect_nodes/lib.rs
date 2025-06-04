@@ -14,6 +14,7 @@ use log::debug;
 use memory_monitor2_config::Config;
 use stalls::StallProvider;
 use std::sync::Arc;
+use std::u64;
 use {
     fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memorypressure as fpressure, fuchsia_inspect as _,
     inspect_runtime as _,
@@ -190,8 +191,14 @@ fn build_inspect_tree(
             let stall_info = stall_provider.get_stall_info().unwrap();
             async move {
                 let inspector = Inspector::default();
-                inspector.root().record_int("some", stall_info.stall_time_some);
-                inspector.root().record_int("full", stall_info.stall_time_full);
+                inspector.root().record_uint(
+                    "some_ms",
+                    stall_info.some.as_millis().try_into().unwrap_or(u64::MAX),
+                );
+                inspector.root().record_uint(
+                    "full_ms",
+                    stall_info.full.as_millis().try_into().unwrap_or(u64::MAX),
+                );
                 Ok(inspector)
             }
             .boxed()
@@ -318,8 +325,14 @@ fn digest_service(
                 }
                 n.record(ia);
                 n.record_child("stalls", |child| {
-                    child.record_int("some", stall_values.stall_time_some);
-                    child.record_int("full", stall_values.stall_time_full);
+                    child.record_uint(
+                        "some_ms",
+                        stall_values.some.as_millis().try_into().unwrap_or(u64::MAX),
+                    );
+                    child.record_uint(
+                        "full_ms",
+                        stall_values.full.as_millis().try_into().unwrap_or(u64::MAX),
+                    );
                 });
             });
         }
@@ -338,6 +351,7 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use futures::task::Poll;
     use futures::TryStreamExt;
+    use stalls::MemoryStallMetrics;
     use std::time::Duration;
     use {
         fidl_fuchsia_memory_attribution_plugin as fplugin,
@@ -442,8 +456,11 @@ mod tests {
 
     struct FakeStallProvider {}
     impl StallProvider for FakeStallProvider {
-        fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
-            Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
+        fn get_stall_info(&self) -> Result<MemoryStallMetrics, anyhow::Error> {
+            Ok(MemoryStallMetrics {
+                some: Duration::from_millis(10),
+                full: Duration::from_millis(20),
+            })
         }
     }
 
@@ -518,8 +535,8 @@ mod tests {
                 ]
             },
             stalls: {
-                some: 10i64,
-                full: 20i64,
+                some_ms: 10u64,
+                full_ms: 20u64,
             },
             config: {
                 capture_on_pressure_change: true,
@@ -640,8 +657,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
                     // Corresponds to the capture after the passage of time
@@ -660,8 +677,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
                 },
@@ -773,8 +790,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
             },
@@ -897,8 +914,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
             },
@@ -1037,8 +1054,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
                 },
