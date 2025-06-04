@@ -20,6 +20,7 @@ constexpr std::string_view kTtyPrefix = "tty";
 constexpr std::string_view kSerialType = "S";
 constexpr std::string_view kAmlType = "AML";
 constexpr std::string_view kMsmType = "MSM";
+constexpr std::string_view kSacType = "SAC";
 constexpr std::string_view kConsoleArg = "console=";
 
 constexpr std::string_view TtyVendor(TtyType type) {
@@ -33,6 +34,9 @@ constexpr std::string_view TtyVendor(TtyType type) {
 
     case boot_shim::TtyType::kAml:
       return "amlogic";
+
+    case boot_shim::TtyType::kSac:
+      return "samsung";
   }
 
   __UNREACHABLE;
@@ -82,6 +86,8 @@ std::optional<Tty> TtyFromCmdline(std::string_view cmdline) {
     type = TtyType::kAml;
   } else if (type_str == kMsmType) {
     type = TtyType::kMsm;
+  } else if (type_str == kSacType) {
+    type = TtyType::kSac;
   } else if (!type_str.empty()) {
     return std::nullopt;
   }

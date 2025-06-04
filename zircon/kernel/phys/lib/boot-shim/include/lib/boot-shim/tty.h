@@ -24,6 +24,7 @@ enum class TtyType : uint8_t {
   // Used in arm.
   kAml,
   kMsm,
+  kSac,
 };
 
 // Parses `console=` option, for example "console=ttyS0" would yield `{TtyType::kSerial, 0}`.
