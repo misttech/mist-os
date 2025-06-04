@@ -208,7 +208,8 @@ pub mod sync {
 
     pub use netstack3_base::sync::{
         DebugReferences, DynDebugReferences, LockGuard, MapRcNotifier, Mutex, PrimaryRc,
-        RcNotifier, ResourceToken, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
+        RcNotifier, ResourceToken, ResourceTokenValue, RwLock, RwLockReadGuard, RwLockWriteGuard,
+        StrongRc, WeakRc,
     };
     pub use netstack3_base::{RemoveResourceResult, RemoveResourceResultWithContext};
 }

@@ -3221,6 +3221,16 @@ pub mod testutil {
             }
         }
     }
+
+    /// Creates a new `IpPacket` with the specified addresses and body.
+    pub fn new_filter_egress_ip_packet<I: FilterIpExt, S: TransportPacketSerializer<I>>(
+        src_addr: I::Addr,
+        dst_addr: I::Addr,
+        protocol: I::Proto,
+        body: &'_ mut S,
+    ) -> impl IpPacket<I> + PartialSerializer + use<'_, I, S> {
+        TxPacket::new(src_addr, dst_addr, protocol, body)
+    }
 }
 
 #[cfg(test)]

@@ -23,11 +23,14 @@ group("tests") {
 
 _common_sources = [
   "src/device_mapper_test.rs",
+  "src/ebpf.rs",
   "src/fscrypt_shared.rs",
   "src/fscrypt_test.rs",
   "src/lib.rs",
 ]
 _common_deps = [
+  "//src/starnix/lib/ebpf",
+  "//src/starnix/lib/ebpf_loader",
   "//src/starnix/lib/linux_uapi",
   "//third_party/rust_crates:hex",
   "//third_party/rust_crates:libc",
@@ -93,6 +96,11 @@ resource("simple_ext4_image") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
+resource("ebpf_test_progs") {
+  sources = [ "data/ebpf/ebpf_test_progs.o" ]
+  outputs = [ "data/ebpf/ebpf_test_progs.o" ]
+}
+
 _fscrypt_bin_label = ":fscrypt_test_bin($target_linux_toolchain)"
 _fscrypt_binary_path =
     get_label_info(_fscrypt_bin_label, "root_out_dir") + "/fscrypt_test"
@@ -106,7 +114,10 @@ resource("fscrypt_test_resource") {
 starnix_linux_test_component("syscalls_rust_test") {
   test_label = ":syscalls_rust_test_bin"
   test_binary = "syscalls_rust_test_bin"
-  deps = [ ":simple_ext4_image" ]
+  deps = [
+    ":ebpf_test_progs",
+    ":simple_ext4_image",
+  ]
   test_type = "starnix"
 }
 
