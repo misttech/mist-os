@@ -133,8 +133,8 @@ class PageQueues {
   // Externally locked variant of CHangeObjectOffset that can be used for more efficient batch
   // operations. In addition to the annotated lock_, the VMO lock of the owner is also required to
   // be held.
-  void ChangeObjectOffsetLocked(vm_page_t* page, VmCowPages* object, uint64_t page_offset)
-      TA_REQ(lock_);
+  void ChangeObjectOffsetLockedList(vm_page_t* page, VmCowPages* object, uint64_t page_offset)
+      TA_REQ(list_lock_);
 
   // Removes the page from any page list and returns ownership of the queue_node.
   void Remove(vm_page_t* page);
@@ -149,7 +149,7 @@ class PageQueues {
   // highly discouraged as the underlying lock is a CriticalMutex which disables preemption.
   // Preferably *Array variations should be used, but this provides a higher performance mechanism
   // when needed.
-  Lock<SpinLock>* get_lock() TA_RET_CAP(lock_) { return &lock_; }
+  Lock<SpinLock>* get_lock() TA_RET_CAP(list_lock_) { return &list_lock_; }
 
   // Used to identify the reason that aging is triggered, mostly for debugging and informational
   // purposes.
@@ -326,15 +326,6 @@ class PageQueues {
   void SetAgingEvent(Event* event);
 
  private:
-  // An enumeration of the various types of signals which could become
-  // pending-dispatch while we are holding the main PageQueues lock.
-  enum class PendingSignal : uint32_t {
-    None = 0x0,
-    AgingToken = 0x1,
-    AgingActiveRatioEvent = 0x2,
-    LruEvent = 0x4,
-  };
-
   // Specifies the indices for both the page_queues_ and the page_queue_counts_
   enum PageQueue : uint8_t {
     PageQueueNone = 0,
@@ -349,119 +340,6 @@ class PageQueues {
     PageQueueReclaimLast = PageQueueReclaimBase + kNumReclaim - 1,
     PageQueueNumQueues,
   };
-
-  // A "DeferPendingSignals" is a small RAII-style helper which assists with
-  // following the rules for properly handling the Events in `PageQueues`
-  //
-  // As pages are added to, removed from, and moved between, various page
-  // queues, it may become necessary to signal and wake up one of the background
-  // threads responsible for maintaining the queues.  Most of the time, however,
-  // this happens while we are holding the PagesQueues spinlock.  Unfortunately,
-  // it is illegal to signal an Event while holding a spinlock, so the
-  // signalling operation must be deferred until just after the lock has been
-  // dropped..
-  //
-  // A DeferPendingSignals is used to accumulate the set of Events which
-  // need to be signalled when we (eventually) drop the lock.  Methods which
-  // might need to have a signal asserted demand that callers pass a reference
-  // to a DeferPendingSignals in order to accumulate any pending signals, if
-  // needed.
-  //
-  // PageQueues Events have been wrapped in a thin wrapper class which allows
-  // them to be waited on, but not signalled by anything but a
-  // DeferPendingSignals.  The PSDs themselves cannot be constructed while
-  // the main `lock_` is being held, nor can they be copied, moved, or heap
-  // allocated.  Provided that scope based guards are being used to manage the
-  // `lock_`, this makes it very difficult for a PSD instance to destruct and
-  // flush pending signals while `lock_` is being held.
-  //
-  // Any time that a user wants to call a locked method which might need a
-  // signal to fire, all they need to do is to put a PSD instance on the stack
-  // outside of the scope of the lock guard, and pass it to the method they want
-  // to call.  For example:
-  //
-  // ```
-  // {
-  //   DeferPendingSignals dps{*this};
-  //   Guard<SpinLock, IrqSave> guard{&lock_};
-  //   RecalculateActiveInactiveLocked(dps);
-  // }  // pending signals auto-flushed here, after dropping the lock
-  //
-  // ```
-  //
-  class DeferPendingSignals {
-   public:
-    // We cannot create a PSD while holding its PageQueues' lock instance.
-    [[nodiscard]] explicit DeferPendingSignals(PageQueues& page_queues) TA_EXCL(page_queues.lock_)
-        : page_queues_(page_queues) {}
-
-    // No move, no copy.
-    DeferPendingSignals(const DeferPendingSignals&) = delete;
-    DeferPendingSignals(DeferPendingSignals&&) = delete;
-    DeferPendingSignals& operator=(const DeferPendingSignals&) = delete;
-    DeferPendingSignals& operator=(DeferPendingSignals&&) = delete;
-
-    // When the PSD destructs, fire any pending signals.
-    ~DeferPendingSignals() {
-      using T = ktl::underlying_type_t<PendingSignal>;
-      T pending = static_cast<T>(pending_signals_);
-
-      if (pending) {
-        if (pending & static_cast<T>(PendingSignal::AgingToken)) {
-          page_queues_.aging_token_.Signal();
-        }
-
-        if (pending & static_cast<T>(PendingSignal::AgingActiveRatioEvent)) {
-          page_queues_.aging_active_ratio_event_.Signal();
-        }
-
-        if (pending & static_cast<T>(PendingSignal::LruEvent)) {
-          page_queues_.lru_event_.Signal();
-        }
-      }
-    }
-
-    // Accumulate `signal` into the set of currently pending signals for this
-    // dispatcher instance.
-    void Pend(PendingSignal signal) {
-      using T = ktl::underlying_type_t<PendingSignal>;
-      pending_signals_ =
-          static_cast<PendingSignal>(static_cast<T>(pending_signals_) | static_cast<T>(signal));
-    }
-
-   private:
-    // PSDs may not be heap allocated.  We want their scopes to always be
-    // defined to a function/stack scope, and never extend outside of that.
-    static void* operator new(size_t) = delete;
-    static void* operator new[](size_t) = delete;
-    static void operator delete(void*) = delete;
-    static void operator delete[](void*) = delete;
-
-    PageQueues& page_queues_;
-    PendingSignal pending_signals_{PendingSignal::None};
-  };
-
-  // a PendingSignalEvent is a thin wrapper around an AutounsignalEvent.  It
-  // restricts the API of the AutounsignalEvent just a bit, allowing
-  // DeferPendingSignalss to signal events (outside of the `lock_`, as the
-  // PSD goes out of scope), but not other code.  This should make it more
-  // difficult for someone to accidentally signal one of the events while
-  // holding the PageQueues' spinlock.
-  class PendingSignalEvent : protected AutounsignalEvent {
-   public:
-    PendingSignalEvent() = default;
-    explicit PendingSignalEvent(bool initial_state) : AutounsignalEvent(initial_state) {}
-
-    using AutounsignalEvent::Unsignal;
-    using AutounsignalEvent::Wait;
-    using AutounsignalEvent::WaitDeadline;
-
-   private:
-    friend class DeferPendingSignals;
-  };
-
-  // A DeferPendingSignals is allowed to access the various Event signals.
-  friend class DeferPendingSignals;
 
   // Ensure that the reclaim queue counts are always at the end.
   static_assert(PageQueueReclaimLast + 1 == PageQueueNumQueues);
@@ -565,16 +443,16 @@ class PageQueues {
 
   // Helpers for adding and removing to the queues. All of the public Set/Move/Remove operations
   // are convenience wrappers around these.
-  void RemoveLocked(vm_page_t* page, DeferPendingSignals& dps) TA_REQ(lock_);
-  void SetQueueBacklinkLocked(vm_page_t* page, void* object, uintptr_t page_offset, PageQueue queue,
-                              DeferPendingSignals& dps) TA_REQ(lock_);
-  void MoveToQueueLocked(vm_page_t* page, PageQueue queue, DeferPendingSignals& dps) TA_REQ(lock_);
+  void RemoveLockedList(vm_page_t* page) TA_REQ(list_lock_);
+  void SetQueueBacklinkLockedList(vm_page_t* page, void* object, uintptr_t page_offset,
+                                  PageQueue queue) TA_REQ(list_lock_);
+  void MoveToQueueLockedList(vm_page_t* page, PageQueue queue) TA_REQ(list_lock_);
 
   // Potentially calls |CheckActiveRatioAgingLocked| based on the kActiveInactiveErrorMargin.
   // |pages| indicates how many pages might have changed queue, and hence how much the ratio could
   // have changed by.
   void MaybeCheckActiveRatioAging(size_t pages) TA_EXCL(lock_);
-  void MaybeCheckActiveRatioAgingLocked(size_t pages, DeferPendingSignals& dps) TA_REQ(lock_);
+  void MaybeCheckActiveRatioAgingLocked(size_t pages) TA_REQ(lock_);
 
   // Internal helper for shutting down any threads created in |StartThreads|.
   void StopThreads();
@@ -584,7 +462,7 @@ class PageQueues {
 
   // Checks if the active ratio has exceeded the threshold to cause aging, and if so signals the
   // event.
-  void CheckActiveRatioAgingLocked(DeferPendingSignals& dps) TA_REQ(lock_);
+  void CheckActiveRatioAgingLocked() TA_REQ(lock_);
 
   // Consumes any pending age reason and either returns the reason, or how long till aging will
   // happen. This timeout does not take into account that other changes, namely the active ratio,
@@ -620,7 +498,7 @@ class PageQueues {
   template <typename F>
   bool DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue, F validator) const;
 
-  void AdvanceIsolateCursorIf(vm_page_t* page) TA_REQ(lock_) {
+  void AdvanceIsolateCursorIf(vm_page_t* page) TA_REQ(list_lock_) {
     if (page == isolate_cursor_) {
       isolate_cursor_ = list_next_type(&page_queues_[PageQueueReclaimIsolate], &page->queue_node,
                                        vm_page_t, queue_node);
@@ -644,20 +522,25 @@ class PageQueues {
     return true;
   }
 
-  // The lock_ is needed to protect the linked lists queues as these cannot be implemented with
-  // atomics.
-  DECLARE_SPINLOCK(PageQueues) mutable lock_;
+  // The list_lock_ is used to protect the linked lists queues as these cannot be implemented with
+  // atomics. A few related members are also protected with this lock, such as the isolate_cursor.
+  // The purpose of this separate spinlock, compared to the general lock_, is so that latency
+  // sensitive operations, such as adding / removing pages, that only need to modify the list, can
+  // happen without false contention with other page queues operations.
+  DECLARE_SPINLOCK(PageQueues) mutable list_lock_;
 
-  // Declare a separate mutex for the aging event. This is a separate lock both because signalling
-  // the event does not need to contend with other page queues operations, and so that it can be a
-  // Mutex instead of a SpinLock allowing us to signal an event whilst holding said lock.
-  DECLARE_CRITICAL_MUTEX(PageQueues) aging_event_mutex_;
-  Event* aging_event_ TA_GUARDED(aging_event_mutex_) = nullptr;
+  // General lock used to protect all logic and members that are not part of critical latency
+  // sensitive operations.
+  // Where both locks need to be acquire lock_, being a mutex, must be acquired prior to the
+  // list_lock_.
+  DECLARE_CRITICAL_MUTEX(PageQueues) mutable lock_;
+
+  Event* aging_event_ TA_GUARDED(lock_) = nullptr;
 
   // This Event is a binary semaphore and is used to control aging. Is acquired by the aging thread
   // when it performs aging, and can be acquired separately to block aging. For this purpose it
   // needs to start as being initially signalled.
-  PendingSignalEvent aging_token_{true};
+  AutounsignalEvent aging_token_{true};
   // Flag used to catch programming errors related to double enabling or disabling aging.
   ktl::atomic<bool> aging_disabled_ = false;
 
@@ -669,7 +552,7 @@ class PageQueues {
   // Used to signal the aging thread that the active ratio has changed sufficiently that aging might
   // be required. Due to other factors, such as a min timeouts, races, etc, this being signaled does
   // not mean aging will happen.
-  PendingSignalEvent aging_active_ratio_event_;
+  AutounsignalEvent aging_active_ratio_event_;
   // Tracks whether the active ratio has been tripped and should contribute as an aging trigger.
   // This is stored as a boolean so that it is sticky in the advent of a race with additional
   // modifications to the page queues. Were this not sticky then, in the absence of a debounce
@@ -678,7 +561,7 @@ class PageQueues {
   bool active_ratio_triggered_ TA_GUARDED(lock_) = false;
   // Used to signal the lru thread that it should wake up and check if the lru queue needs
   // processing.
-  PendingSignalEvent lru_event_;
+  AutounsignalEvent lru_event_;
 
   // Tracks whether there is a pending aging event that will happen that can be waited on. This is a
   // raw Event, and not an AutounsignalEvent, as it is a level triggered signal. The signal itself,
@@ -733,7 +616,7 @@ class PageQueues {
   //
   // For specifics on how LRU and MRU generations map to LRU and MRU queues, see comments on
   // |lru_gen_| and |mru_gen_|.
-  ktl::array<list_node_t, PageQueueNumQueues> page_queues_ TA_GUARDED(lock_);
+  ktl::array<list_node_t, PageQueueNumQueues> page_queues_ TA_GUARDED(list_lock_);
 
   // The generation counts are monotonic increasing counters and used to represent the effective age
   // of the oldest and newest reclaimable queues. The page queues themselves are treated as a fixed
@@ -786,7 +669,7 @@ class PageQueues {
   // Debug compressor is only available when debug asserts are also enabled. This ensures it can
   // never have an impact on production builds.
 #if DEBUG_ASSERT_IMPLEMENTED
-  ktl::unique_ptr<VmDebugCompressor> debug_compressor_ TA_GUARDED(lock_);
+  ktl::unique_ptr<VmDebugCompressor> debug_compressor_ TA_GUARDED(list_lock_);
 #endif
 
   // Queue rotation parameters. These are not locked as they are only read by the mru thread, and
@@ -810,7 +693,7 @@ class PageQueues {
   // being examined. Any operation that removes a page from the Isolate list must check if its
   // removing this page, and advance it to the next page in the list if it is. This is automated by
   // calling AdvanceDontNeedCursorIf.
-  vm_page_t* isolate_cursor_ TA_GUARDED(lock_) = nullptr;
+  vm_page_t* isolate_cursor_ TA_GUARDED(list_lock_) = nullptr;
 
   // There is only a single cursor and this lock acts as a resource control for it. This process
   // needs to be done on LRU rotation / when peeking pages for reclamation, which need to be
