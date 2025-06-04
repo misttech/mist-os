@@ -1,4 +1,4 @@
-// Copyright 2018 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -20,10 +20,16 @@
 
 namespace {
 
-class VkPriorityTest {
+struct Device {
+  VkDevice device;
+  VkQueue queue;
+  VkCommandPool command_pool;
+  VkCommandBuffer command_buffer;
+};
+
+class VkGlobalPriorityTest {
  public:
-  explicit VkPriorityTest(bool different_priority, bool use_global_priority = false)
-      : different_priority_(different_priority), use_global_priority_(use_global_priority) {}
+  VkGlobalPriorityTest() = default;
 
   bool Initialize();
   bool Exec();
@@ -31,23 +37,16 @@ class VkPriorityTest {
  private:
   bool InitVulkan();
   bool InitCommandPool();
-  bool InitCommandBuffer(VkCommandBuffer* command_buffer, uint32_t executions);
+  bool InitCommandBuffer(Device* device);
 
   bool is_initialized_ = false;
   VkPhysicalDevice vk_physical_device_;
-  VkDevice vk_device_;
-  VkQueue low_prio_vk_queue_;
-  VkQueue high_prio_vk_queue_;
-  bool different_priority_;
-  bool use_global_priority_;
 
-  VkCommandPool vk_command_pool_;
-  VkCommandBuffer low_prio_vk_command_buffer_;
-  VkCommandBuffer high_prio_vk_command_buffer_;
-  uint32_t low_priority_execution_count_ = 1000;
+  Device high_prio_device_;
+  Device low_prio_device_;
 };
 
-bool VkPriorityTest::Initialize() {
+bool VkGlobalPriorityTest::Initialize() {
   if (is_initialized_)
     return false;
 
@@ -61,12 +60,12 @@ bool VkPriorityTest::Initialize() {
     return false;
   }
 
-  if (!InitCommandBuffer(&low_prio_vk_command_buffer_, low_priority_execution_count_)) {
+  if (!InitCommandBuffer(&low_prio_device_)) {
     PRINT_STDERR("InitImage failed");
     return false;
   }
 
-  if (!InitCommandBuffer(&high_prio_vk_command_buffer_, 1)) {
+  if (!InitCommandBuffer(&high_prio_device_)) {
     PRINT_STDERR("InitImage failed");
     return false;
   }
@@ -76,7 +75,7 @@ bool VkPriorityTest::Initialize() {
   return true;
 }
 
-bool VkPriorityTest::InitVulkan() {
+bool VkGlobalPriorityTest::InitVulkan() {
   VkInstanceCreateInfo create_info{
       VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,  // VkStructureType             sType;
       nullptr,                                 // const void*                 pNext;
@@ -117,12 +116,6 @@ bool VkPriorityTest::InitVulkan() {
 
   VkPhysicalDeviceProperties properties;
   vkGetPhysicalDeviceProperties(physical_devices[0], &properties);
-  if (properties.vendorID == 0x13b5 && properties.deviceID >= 0x1000) {
-    printf("Upping low priority execution count for ARM Bifrost GPU\n");
-    // With the default execution count the test completes too quickly and
-    // the commands won't be preempted.
-    low_priority_execution_count_ = 100000;
-  }
 
   uint32_t queue_family_count;
   vkGetPhysicalDeviceQueueFamilyProperties(physical_devices[0], &queue_family_count, nullptr);
@@ -154,56 +147,56 @@ bool VkPriorityTest::InitVulkan() {
     return false;
   }
 
-  float queue_priorities[2] = {1.0, 1.0};
-  if (different_priority_) {
-    queue_priorities[0] = 0.0;
+  VkQueueGlobalPriority priorities[2] = {VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT,
+                                         VK_QUEUE_GLOBAL_PRIORITY_LOW_EXT};
+  Device* devices[2] = {&high_prio_device_, &low_prio_device_};
+
+  for (int i = 0; i < 2; i++) {
+    VkDeviceQueueGlobalPriorityCreateInfoEXT global_create_info{
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_EXT,
+        .pNext = nullptr,
+        .globalPriority = priorities[i],
+    };
+
+    float queue_priorities[1] = {1.0};
+    VkDeviceQueueCreateInfo queue_create_info = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .pNext = &global_create_info,
+        .flags = 0,
+        .queueFamilyIndex = 0,
+        .queueCount = 1,
+        .pQueuePriorities = queue_priorities};
+
+    std::vector<const char*> enabled_extension_names{VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME};
+
+    VkDeviceCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
+        .queueCreateInfoCount = 1,
+        .pQueueCreateInfos = &queue_create_info,
+        .enabledLayerCount = 0,
+        .ppEnabledLayerNames = nullptr,
+        .enabledExtensionCount = static_cast<uint32_t>(enabled_extension_names.size()),
+        .ppEnabledExtensionNames = enabled_extension_names.data(),
+        .pEnabledFeatures = nullptr};
+    VkDevice vkdevice;
+
+    if ((result = vkCreateDevice(physical_devices[0], &createInfo,
+                                 nullptr /* allocationcallbacks */, &vkdevice)) != VK_SUCCESS) {
+      PRINT_STDERR("vkCreateDevice failed: %d", result);
+      return false;
+    }
+
+    devices[i]->device = vkdevice;
+    vkGetDeviceQueue(vkdevice, queue_family_index, 0, &devices[i]->queue);
   }
-
-  VkDeviceQueueGlobalPriorityCreateInfoEXT global_create_info{
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_EXT,
-      .pNext = nullptr,
-      .globalPriority = VK_QUEUE_GLOBAL_PRIORITY_HIGH_EXT,
-  };
-
-  VkDeviceQueueCreateInfo queue_create_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .pNext = use_global_priority_ ? &global_create_info : nullptr,
-      .flags = 0,
-      .queueFamilyIndex = 0,
-      .queueCount = 2,
-      .pQueuePriorities = queue_priorities};
-
-  std::vector<const char*> enabled_extension_names{VK_EXT_GLOBAL_PRIORITY_EXTENSION_NAME};
-
-  VkDeviceCreateInfo createInfo = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-      .queueCreateInfoCount = 1,
-      .pQueueCreateInfos = &queue_create_info,
-      .enabledLayerCount = 0,
-      .ppEnabledLayerNames = nullptr,
-      .enabledExtensionCount = static_cast<uint32_t>(enabled_extension_names.size()),
-      .ppEnabledExtensionNames = enabled_extension_names.data(),
-      .pEnabledFeatures = nullptr};
-  VkDevice vkdevice;
-
-  if ((result = vkCreateDevice(physical_devices[0], &createInfo, nullptr /* allocationcallbacks */,
-                               &vkdevice)) != VK_SUCCESS) {
-    PRINT_STDERR("vkCreateDevice failed: %d", result);
-    return false;
-  }
-
   vk_physical_device_ = physical_devices[0];
-  vk_device_ = vkdevice;
-
-  vkGetDeviceQueue(vkdevice, queue_family_index, 0, &low_prio_vk_queue_);
-  vkGetDeviceQueue(vkdevice, queue_family_index, 1, &high_prio_vk_queue_);
 
   return true;
 }
 
-bool VkPriorityTest::InitCommandPool() {
+bool VkGlobalPriorityTest::InitCommandPool() {
   VkCommandPoolCreateInfo command_pool_create_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = nullptr,
@@ -211,24 +204,29 @@ bool VkPriorityTest::InitCommandPool() {
       .queueFamilyIndex = 0,
   };
   VkResult result;
-  if ((result = vkCreateCommandPool(vk_device_, &command_pool_create_info, nullptr,
-                                    &vk_command_pool_)) != VK_SUCCESS) {
+  if ((result = vkCreateCommandPool(high_prio_device_.device, &command_pool_create_info, nullptr,
+                                    &high_prio_device_.command_pool)) != VK_SUCCESS) {
+    PRINT_STDERR("vkCreateCommandPool failed: %d", result);
+    return false;
+  }
+  if ((result = vkCreateCommandPool(low_prio_device_.device, &command_pool_create_info, nullptr,
+                                    &low_prio_device_.command_pool)) != VK_SUCCESS) {
     PRINT_STDERR("vkCreateCommandPool failed: %d", result);
     return false;
   }
   return true;
 }
 
-bool VkPriorityTest::InitCommandBuffer(VkCommandBuffer* command_buffer, uint32_t executions) {
+bool VkGlobalPriorityTest::InitCommandBuffer(Device* device) {
   VkCommandBufferAllocateInfo command_buffer_create_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext = nullptr,
-      .commandPool = vk_command_pool_,
+      .commandPool = device->command_pool,
       .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
       .commandBufferCount = 1};
   VkResult result;
-  if ((result = vkAllocateCommandBuffers(vk_device_, &command_buffer_create_info,
-                                         command_buffer)) != VK_SUCCESS) {
+  if ((result = vkAllocateCommandBuffers(device->device, &command_buffer_create_info,
+                                         &device->command_buffer)) != VK_SUCCESS) {
     PRINT_STDERR("vkAllocateCommandBuffers failed: %d", result);
     return false;
   }
@@ -239,7 +237,7 @@ bool VkPriorityTest::InitCommandBuffer(VkCommandBuffer* command_buffer, uint32_t
       .flags = 0,
       .pInheritanceInfo = nullptr,  // ignored for primary buffers
   };
-  if ((result = vkBeginCommandBuffer(*command_buffer, &begin_info)) != VK_SUCCESS) {
+  if ((result = vkBeginCommandBuffer(device->command_buffer, &begin_info)) != VK_SUCCESS) {
     PRINT_STDERR("vkBeginCommandBuffer failed: %d", result);
     return false;
   }
@@ -251,7 +249,7 @@ bool VkPriorityTest::InitCommandBuffer(VkCommandBuffer* command_buffer, uint32_t
 #include "priority.comp.h"
   sh_info.codeSize = sizeof(priority_comp);
   sh_info.pCode = priority_comp;
-  if ((result = vkCreateShaderModule(vk_device_, &sh_info, NULL, &compute_shader_module_)) !=
+  if ((result = vkCreateShaderModule(device->device, &sh_info, NULL, &compute_shader_module_)) !=
       VK_SUCCESS) {
     PRINT_STDERR("vkCreateShaderModule failed: %d", result);
     return false;
@@ -268,7 +266,7 @@ bool VkPriorityTest::InitCommandBuffer(VkCommandBuffer* command_buffer, uint32_t
       .pushConstantRangeCount = 0,
       .pPushConstantRanges = nullptr};
 
-  if ((result = vkCreatePipelineLayout(vk_device_, &pipeline_create_info, nullptr, &layout)) !=
+  if ((result = vkCreatePipelineLayout(device->device, &pipeline_create_info, nullptr, &layout)) !=
       VK_SUCCESS) {
     PRINT_STDERR("vkCreatePipelineLayout failed: %d", result);
     return false;
@@ -291,16 +289,16 @@ bool VkPriorityTest::InitCommandBuffer(VkCommandBuffer* command_buffer, uint32_t
       .basePipelineHandle = VK_NULL_HANDLE,
       .basePipelineIndex = 0};
 
-  if ((result = vkCreateComputePipelines(vk_device_, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
+  if ((result = vkCreateComputePipelines(device->device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr,
                                          &compute_pipeline)) != VK_SUCCESS) {
     PRINT_STDERR("vkCreateComputePipelines failed: %d", result);
     return false;
   }
 
-  vkCmdBindPipeline(*command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
-  vkCmdDispatch(*command_buffer, 1000, executions, 10);
+  vkCmdBindPipeline(device->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
+  vkCmdDispatch(device->command_buffer, 1000, 1000, 10);
 
-  if ((result = vkEndCommandBuffer(*command_buffer)) != VK_SUCCESS) {
+  if ((result = vkEndCommandBuffer(device->command_buffer)) != VK_SUCCESS) {
     PRINT_STDERR("vkEndCommandBuffer failed: %d", result);
     return false;
   }
@@ -308,33 +306,39 @@ bool VkPriorityTest::InitCommandBuffer(VkCommandBuffer* command_buffer, uint32_t
   return true;
 }
 
-bool VkPriorityTest::Exec() {
+bool VkGlobalPriorityTest::Exec() {
   VkResult result;
-  result = vkQueueWaitIdle(low_prio_vk_queue_);
+  result = vkQueueWaitIdle(low_prio_device_.queue);
   if (result != VK_SUCCESS) {
     PRINT_STDERR("vkQueueWaitIdle failed with result %d", result);
     return false;
   }
-  result = vkQueueWaitIdle(high_prio_vk_queue_);
+  result = vkQueueWaitIdle(high_prio_device_.queue);
   if (result != VK_SUCCESS) {
     PRINT_STDERR("vkQueueWaitIdle failed with result %d", result);
     return false;
   }
 
-  VkSubmitInfo submit_info = {
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .pNext = nullptr,
-      .waitSemaphoreCount = 0,
-      .pWaitSemaphores = nullptr,
-      .pWaitDstStageMask = nullptr,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &low_prio_vk_command_buffer_,
-      .signalSemaphoreCount = 0,
-      .pSignalSemaphores = nullptr,
-  };
+  // Submit multiple times so we have multiple commands to schedule.
+  constexpr int kCommitNum = 10;
+  VkSubmitInfo submit_info[kCommitNum];
+  for (int i = 0; i < kCommitNum; i++) {
+    submit_info[i] = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = nullptr,
+        .pWaitDstStageMask = nullptr,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &low_prio_device_.command_buffer,
+        .signalSemaphoreCount = 0,
+        .pSignalSemaphores = nullptr,
+    };
+  }
 
   auto low_prio_start_time = std::chrono::steady_clock::now();
-  if ((result = vkQueueSubmit(low_prio_vk_queue_, 1, &submit_info, VK_NULL_HANDLE)) != VK_SUCCESS) {
+  if ((result = vkQueueSubmit(low_prio_device_.queue, kCommitNum, submit_info, VK_NULL_HANDLE)) !=
+      VK_SUCCESS) {
     PRINT_STDERR("vkQueueSubmit failed: %d", result);
     return false;
   }
@@ -343,30 +347,31 @@ bool VkPriorityTest::Exec() {
   auto low_priority_future = std::async(std::launch::async, [this, &low_prio_end_time]() {
     VkResult result;
 
-    if ((result = vkQueueWaitIdle(low_prio_vk_queue_)) != VK_SUCCESS) {
+    if ((result = vkQueueWaitIdle(low_prio_device_.queue)) != VK_SUCCESS) {
       PRINT_STDERR("vkQueueWaitIdle failed: %d", result);
       return false;
     }
     low_prio_end_time = std::chrono::steady_clock::now();
     return true;
   });
-  // Should be enough time for the first queue to start executing.
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  VkSubmitInfo high_prio_submit_info = {
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .pNext = nullptr,
-      .waitSemaphoreCount = 0,
-      .pWaitSemaphores = nullptr,
-      .pWaitDstStageMask = nullptr,
-      .commandBufferCount = 1,
-      .pCommandBuffers = &high_prio_vk_command_buffer_,
-      .signalSemaphoreCount = 0,
-      .pSignalSemaphores = nullptr,
-  };
+  VkSubmitInfo high_prio_submit_info[kCommitNum];
+  for (int i = 0; i < kCommitNum; i++) {
+    high_prio_submit_info[i] = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = nullptr,
+        .pWaitDstStageMask = nullptr,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &high_prio_device_.command_buffer,
+        .signalSemaphoreCount = 0,
+        .pSignalSemaphores = nullptr,
+    };
+  }
 
   auto high_prio_start_time = std::chrono::steady_clock::now();
-  if ((result = vkQueueSubmit(high_prio_vk_queue_, 1, &high_prio_submit_info, VK_NULL_HANDLE)) !=
-      VK_SUCCESS) {
+  if ((result = vkQueueSubmit(high_prio_device_.queue, kCommitNum, high_prio_submit_info,
+                              VK_NULL_HANDLE)) != VK_SUCCESS) {
     PRINT_STDERR("vkQueueSubmit failed: %d", result);
     return false;
   }
@@ -374,7 +379,7 @@ bool VkPriorityTest::Exec() {
   std::chrono::steady_clock::time_point high_prio_end_time;
   auto high_priority_future = std::async(std::launch::async, [this, &high_prio_end_time]() {
     VkResult result;
-    if ((result = vkQueueWaitIdle(high_prio_vk_queue_)) != VK_SUCCESS) {
+    if ((result = vkQueueWaitIdle(high_prio_device_.queue)) != VK_SUCCESS) {
       PRINT_STDERR("vkQueueWaitIdle failed: %d", result);
       return false;
     }
@@ -395,32 +400,18 @@ bool VkPriorityTest::Exec() {
   printf("low priority vkQueueWaitIdle finished duration: %lld\n",
          std::chrono::duration_cast<std::chrono::milliseconds>(low_prio_duration).count());
 
-  if (different_priority_) {
-    // Depends on the precise scheduling, so may sometimes fail.
-    EXPECT_LE(high_prio_duration, low_prio_duration / 10);
-  } else {
-    // In this case they actually have equal priorities, but the "low priority" one has more
-    // work and should be context-switched away from.
-    EXPECT_LE(high_prio_duration, low_prio_duration);
-  }
+  // Depends on the precise scheduling, so may sometimes fail.
+  EXPECT_LE(high_prio_duration, low_prio_duration);
 
   return true;
 }
 
-TEST(Vulkan, Priority) {
-  VkPriorityTest test(true);
-  ASSERT_TRUE(test.Initialize());
-  ASSERT_TRUE(test.Exec());
-}
-
-TEST(Vulkan, EqualPriority) {
-  VkPriorityTest test(false);
-  ASSERT_TRUE(test.Initialize());
-  ASSERT_TRUE(test.Exec());
-}
-
-TEST(Vulkan, GlobalPriority) {
-  VkPriorityTest test(true, true);
+// This test creates two devices with different global priorities and schedules the same amount
+// of work on each. The higher priority device should finish faster even though it is scheduled
+// second.
+// TODO(fxbug.dev/402461734): Enable on GPUs that support global priority
+TEST(Vulkan, DISABLED_GlobalPriorityTest) {
+  VkGlobalPriorityTest test = {};
   ASSERT_TRUE(test.Initialize());
   ASSERT_TRUE(test.Exec());
 }
