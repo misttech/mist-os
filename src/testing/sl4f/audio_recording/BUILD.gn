@@ -20,15 +20,13 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/testing/sl4f/fidl:fuchsia.test.audio_rust",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
   ]
   sources = [
     "src/audio_facade.rs",
-    "src/input_worker.rs",
     "src/main.rs",
-    "src/output_worker.rs",
     "src/server.rs",
-    "src/util.rs",
   ]
 }

@@ -8,6 +8,7 @@ use fidl_fuchsia_test_audio::{
     INJECTED_AUDIO_MAXIMUM_FILE_SIZE,
 };
 use fuchsia_async as fasync;
+use futures::channel::oneshot;
 use futures::stream::TryStreamExt;
 use futures::{AsyncReadExt, AsyncWriteExt};
 use log::{debug, error, warn};
@@ -26,8 +27,15 @@ pub async fn handle_injection_request(
                 match request {
                     InjectionRequest::ClearInputAudio { index, responder } => {
                         debug!("ClearInputAudio({})", index);
-                        facade_clone.clear_input_audio(index.try_into().unwrap()).await;
-                        responder.send(Ok(())).context("error sending response").unwrap();
+                        let result =
+                            match facade_clone.clear_input_audio(index.try_into().unwrap()).await {
+                                Ok(_) => Ok(()),
+                                Err(e) => {
+                                    error!("ClearInputAudio failed: {:?}", e);
+                                    Err(AudioTestError::Fail)
+                                }
+                            };
+                        responder.send(result).context("error sending response").unwrap();
                     }
                     InjectionRequest::StartInputInjection { index, responder } => {
                         debug!("StartInputInjection({})", index);
@@ -75,7 +83,7 @@ pub async fn handle_injection_request(
 
                         debug!("Done reading audio stream");
 
-                        facade_clone.put_input_audio( index.try_into().unwrap(), audio_data)
+                        facade_clone.put_input_audio(audio_data, index.try_into().unwrap())
                         .await
                         .context("put_input_audio errored")
                         .unwrap();
@@ -94,14 +102,21 @@ pub async fn handle_injection_request(
                     }
                     InjectionRequest::WaitUntilInputIsDone { responder } => {
                         debug!("WaitUntilInputIsDone...");
-                        let response = match facade_clone.wait_until_input_playing_is_finished().await {
-                            Ok(_) => Ok(()),
-                            Err(e) => {
-                                error!("WaitUntilInputIsDone failed: {:?}", e);
-                                Err(AudioTestError::Fail)
+                        fasync::Task::spawn(async move {
+                            let (tx, rx) = oneshot::channel();
+                            facade_clone.set_notify_on_finished_playing_input(tx).await.ok();
+
+                            match rx.await {
+                                Ok(_) => {
+                                    debug!("...input completed!");
+                                    responder.send(Ok(())).context("failed to send response").unwrap();
+                                }
+                                Err(_) => {
+                                    warn!("Failed to WaitUntilInputIsDone because notification was cancelled.");
+                                    responder.send(Err(AudioTestError::Fail)).context("failed to send response").unwrap();
+                                }
                             }
-                        };
-                        responder.send(response).context("error sending response").unwrap();
+                        }).detach();
                     }
                     InjectionRequest::_UnknownMethod { ordinal, .. } => {
                         error!("Unknown method received, ordinal {ordinal}");
@@ -157,7 +172,7 @@ pub async fn handle_capture_request(
                     }
                     CaptureRequest::StartOutputCapture { responder } => {
                         debug!("StartOutputSave");
-                        let result = match facade_clone.start_output_capture().await {
+                        let result = match facade_clone.start_output_save().await {
                             Ok(_) => Ok(()),
                             Err(e) => {
                                 error!("StartOutputSave failed: {:?}", e);
@@ -168,7 +183,7 @@ pub async fn handle_capture_request(
                     }
                     CaptureRequest::StopOutputCapture { responder } => {
                         debug!("StopOutputSave");
-                        let result = match facade_clone.stop_output_capture().await {
+                        let result = match facade_clone.stop_output_save().await {
                             Ok(_) => Ok(()),
                             Err(e) => {
                                 error!("StopOutputSave failed: {:?}", e);

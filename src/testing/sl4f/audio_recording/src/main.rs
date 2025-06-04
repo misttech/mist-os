@@ -10,17 +10,14 @@ use log::error;
 use std::sync::Arc;
 
 mod audio_facade;
-mod input_worker;
-mod output_worker;
 mod server;
-mod util;
 
 use crate::audio_facade::AudioFacade;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
-    let audio_facade = Arc::new(AudioFacade::new().await?);
+    let audio_facade = Arc::new(AudioFacade::new()?);
 
     let facade_one = audio_facade.clone();
     fs.dir("svc").add_fidl_service(move |stream| {
