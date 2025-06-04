@@ -399,8 +399,8 @@ pub fn new_pipe(
         .ok_or_else(|| errno!(EINVAL))??;
     let mut info = FsNodeInfo::new(mode!(IFIFO, 0o600), current_task.as_fscred());
     info.blksize = ATOMIC_IO_BYTES.into();
-    let node = fs.create_node_and_allocate_node_id(current_task, SpecialNode, info);
-    let pipe = node.fifo().unwrap();
+    let node = fs.create_node_and_allocate_node_id(SpecialNode, info);
+    let pipe = node.fifo(current_task);
     {
         let mut state = pipe.lock();
         state.add_reader();

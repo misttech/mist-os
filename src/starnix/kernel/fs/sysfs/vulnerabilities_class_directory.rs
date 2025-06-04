@@ -23,10 +23,9 @@ use std::sync::Weak;
 
 // Matches file names and creates corresponding files with specified content.
 macro_rules! file_match_and_create {
-    ($node:expr, $current_task:expr, $name:expr, $files:expr) => {
+    ($node:expr, $name:expr, $files:expr) => {
         if let Some(content) = $files.get(&std::str::from_utf8(&**$name).unwrap()) {
             Ok($node.fs().create_node_and_allocate_node_id(
-                $current_task,
                 BytesFile::new_node(content.as_bytes().to_vec()),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
@@ -88,17 +87,16 @@ impl FsNodeOps for VulnerabilitiesClassDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         if name.starts_with(b"vulnerabilities") {
             Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 TmpfsDirectory::new(),
                 FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
         } else {
-            file_match_and_create!(node, current_task, name, self.vulnerability_files)
+            file_match_and_create!(node, name, self.vulnerability_files)
         }
     }
 }

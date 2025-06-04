@@ -156,7 +156,7 @@ impl FsNodeOps for ExtDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let fs = node.fs();
@@ -204,7 +204,6 @@ impl FsNodeOps for ExtDirectory {
             };
 
             let child = FsNode::new_uncached(
-                current_task,
                 inode_num,
                 ops,
                 &fs,

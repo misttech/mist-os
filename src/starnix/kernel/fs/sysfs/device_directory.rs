@@ -80,14 +80,13 @@ impl FsNodeOps for DeviceDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
             b"dev" => {
                 if let Some(device_type) = self.device_type() {
                     Ok(node.fs().create_node_and_allocate_node_id(
-                        current_task,
                         BytesFile::new_node(format!("{}\n", device_type).into_bytes()),
                         FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                     ))
@@ -96,7 +95,6 @@ impl FsNodeOps for DeviceDirectory {
                 }
             }
             b"uevent" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 UEventFsNode::new(self.device.clone()),
                 FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
@@ -164,12 +162,10 @@ impl FsNodeOps for BlockDeviceDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
             b"queue" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BlockDeviceQueueDirectory::new(self.kobject()),
                 FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             )),
             b"size" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BlockDeviceSizeFile::new_node(self.block_info.clone()),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
@@ -221,12 +217,11 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
             b"nr_requests" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 StubEmptyFile::new_node(
                     "/sys/block/DEVICE/queue/nr_requests",
                     bug_ref!("https://fxbug.dev/322906857"),
@@ -234,12 +229,10 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
                 FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             b"read_ahead_kb" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 ReadAheadKbNode,
                 FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             b"scheduler" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 StubEmptyFile::new_node(
                     "/sys/block/DEVICE/queue/scheduler",
                     bug_ref!("https://fxbug.dev/322907749"),

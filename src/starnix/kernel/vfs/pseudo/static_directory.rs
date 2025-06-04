@@ -47,7 +47,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
     pub fn entry_etc(
         &mut self,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &'static str,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
@@ -57,7 +57,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
         let ops = ops.into();
         let mut info = FsNodeInfo::new(mode, creds);
         info.rdev = dev;
-        let node = self.fs.create_node_and_allocate_node_id(current_task, ops, info);
+        let node = self.fs.create_node_and_allocate_node_id(ops, info);
         self.node(name, node);
     }
 
@@ -94,9 +94,8 @@ impl<'a> StaticDirectoryBuilder<'a> {
     }
 
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
-    pub fn build(self, current_task: &CurrentTask) -> FsNodeHandle {
+    pub fn build(self, _current_task: &CurrentTask) -> FsNodeHandle {
         self.fs.create_node_and_allocate_node_id(
-            current_task,
             Arc::new(StaticDirectory { entries: self.entries }),
             FsNodeInfo::new(self.mode, self.creds),
         )

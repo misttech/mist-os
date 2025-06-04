@@ -288,7 +288,6 @@ impl OverlayNode {
 
     fn init_fs_node_for_child(
         self: &Arc<OverlayNode>,
-        current_task: &CurrentTask,
         node: &FsNode,
         lower: Option<ActiveEntry>,
         upper: Option<ActiveEntry>,
@@ -302,7 +301,7 @@ impl OverlayNode {
 
         let overlay_node =
             OverlayNodeOps { node: OverlayNode::new(self.stack.clone(), lower, upper, parent) };
-        FsNode::new_uncached(current_task, ino, overlay_node, &node.fs(), info)
+        FsNode::new_uncached(ino, overlay_node, &node.fs(), info)
     }
 
     /// If the file is currently in the lower FS, then promote it to the upper FS. No-op if the
@@ -634,7 +633,7 @@ impl FsNodeOps for OverlayNodeOps {
             return error!(ENOENT);
         }
 
-        Ok(self.node.init_fs_node_for_child(current_task, node, lower, upper))
+        Ok(self.node.init_fs_node_for_child(node, lower, upper))
     }
 
     fn mknod(
@@ -658,7 +657,7 @@ impl FsNodeOps for OverlayNodeOps {
                     },
                 )
             })?;
-        Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
+        Ok(self.node.init_fs_node_for_child(node, None, Some(new_upper_node)))
     }
 
     fn mkdir(
@@ -695,7 +694,7 @@ impl FsNodeOps for OverlayNodeOps {
                 Ok(entry)
             })?;
 
-        Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
+        Ok(self.node.init_fs_node_for_child(node, None, Some(new_upper_node)))
     }
 
     fn create_symlink(
@@ -725,7 +724,7 @@ impl FsNodeOps for OverlayNodeOps {
                     },
                 )
             })?;
-        Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
+        Ok(self.node.init_fs_node_for_child(node, None, Some(new_upper_node)))
     }
 
     fn readlink(

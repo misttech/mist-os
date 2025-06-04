@@ -51,12 +51,11 @@ impl FsNodeOps for BusCollectionDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         if name == "devices" {
             Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BusDevicesDirectory::new(self.kobject.clone()),
                 FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
@@ -107,14 +106,14 @@ impl FsNodeOps for BusDevicesDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let kobject = self.kobject();
         match kobject.get_child(name) {
             Some(child_kobject) => {
                 let (link, info) = sysfs_create_bus_link(kobject, child_kobject, FsCred::root());
-                Ok(node.fs().create_node_and_allocate_node_id(current_task, link, info))
+                Ok(node.fs().create_node_and_allocate_node_id(link, info))
             }
             None => error!(ENOENT),
         }

@@ -654,12 +654,8 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.allocate_ino();
         }
-        let child = fs.create_node(
-            current_task,
-            node_id,
-            ops,
-            FsNodeInfo { rdev: dev, ..FsNodeInfo::new(mode, owner) },
-        );
+        let child =
+            fs.create_node(node_id, ops, FsNodeInfo { rdev: dev, ..FsNodeInfo::new(mode, owner) });
         Ok(child)
     }
 
@@ -715,7 +711,7 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.allocate_ino();
         }
-        let child = fs.create_node(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
+        let child = fs.create_node(node_id, ops, FsNodeInfo::new(mode, owner));
         Ok(child)
     }
 
@@ -794,7 +790,6 @@ impl FsNodeOps for RemoteNode {
                 Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
             };
             let child = FsNode::new_uncached(
-                current_task,
                 node_id,
                 ops,
                 &fs,
@@ -945,7 +940,6 @@ impl FsNodeOps for RemoteNode {
             fs.allocate_ino()
         };
         let symlink = fs.create_node(
-            current_task,
             node_id,
             RemoteSymlink { zxio: Mutex::new(zxio) },
             FsNodeInfo {
@@ -963,7 +957,7 @@ impl FsNodeOps for RemoteNode {
     fn create_tmpfile(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
@@ -1016,7 +1010,7 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.allocate_ino();
         }
-        let child = fs.create_node(current_task, node_id, ops, FsNodeInfo::new(mode, owner));
+        let child = fs.create_node(node_id, ops, FsNodeInfo::new(mode, owner));
 
         Ok(child)
     }

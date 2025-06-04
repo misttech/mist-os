@@ -119,16 +119,10 @@ impl Deref for TaskDirectoryNode {
 }
 
 impl TaskDirectory {
-    fn new(
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-        task: &TempRef<'_, Task>,
-        scope: TaskEntryScope,
-    ) -> FsNodeHandle {
+    fn new(fs: &FileSystemHandle, task: &TempRef<'_, Task>, scope: TaskEntryScope) -> FsNodeHandle {
         let creds = task.creds().euid_as_fscred();
         let task_weak = WeakRef::from(task);
         fs.create_node_and_allocate_node_id(
-            current_task,
             TaskDirectoryNode(Arc::new(TaskDirectory {
                 task_weak,
                 scope,
@@ -268,7 +262,7 @@ impl FsNodeOps for TaskDirectoryNode {
             ),
         };
 
-        Ok(fs.create_node(current_task, ino, ops, FsNodeInfo::new(mode, creds)))
+        Ok(fs.create_node(ino, ops, FsNodeInfo::new(mode, creds)))
     }
 }
 
@@ -315,19 +309,15 @@ pub fn pid_directory(
 ) -> FsNodeHandle {
     // proc(5): "The files inside each /proc/pid directory are normally
     // owned by the effective user and effective group ID of the process."
-    let fs_node = TaskDirectory::new(current_task, fs, task, TaskEntryScope::ThreadGroup);
+    let fs_node = TaskDirectory::new(fs, task, TaskEntryScope::ThreadGroup);
 
     security::task_to_fs_node(current_task, task, &fs_node);
     fs_node
 }
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>/task/<tid>` directory for `task`.
-fn tid_directory(
-    current_task: &CurrentTask,
-    fs: &FileSystemHandle,
-    task: &TempRef<'_, Task>,
-) -> FsNodeHandle {
-    TaskDirectory::new(current_task, fs, task, TaskEntryScope::Task)
+fn tid_directory(fs: &FileSystemHandle, task: &TempRef<'_, Task>) -> FsNodeHandle {
+    TaskDirectory::new(fs, task, TaskEntryScope::Task)
 }
 
 /// `FdDirectory` implements the directory listing operations for a `proc/<pid>/fd` directory.
@@ -363,7 +353,7 @@ impl FsNodeOps for FdDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let fd = FdNumber::from_fs_str(name).map_err(|_| errno!(ENOENT))?;
@@ -372,7 +362,6 @@ impl FsNodeOps for FdDirectory {
         let _ = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
         let task_reference = self.task.clone();
         Ok(node.fs().create_node_and_allocate_node_id(
-            current_task,
             CallbackSymlinkNode::new(move || {
                 let task = Task::from_weak(&task_reference)?;
                 let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
@@ -485,11 +474,7 @@ impl FsNodeOps for NsDirectory {
             }
             let node_info = || FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred());
             let fallback = || {
-                node.fs().create_node_and_allocate_node_id(
-                    current_task,
-                    BytesFile::new_node(vec![]),
-                    node_info(),
-                )
+                node.fs().create_node_and_allocate_node_id(BytesFile::new_node(vec![]), node_info())
             };
             Ok(match ns {
                 "cgroup" => {
@@ -501,7 +486,6 @@ impl FsNodeOps for NsDirectory {
                     fallback()
                 }
                 "mnt" => node.fs().create_node_and_allocate_node_id(
-                    current_task,
                     current_task.task.fs().namespace(),
                     node_info(),
                 ),
@@ -542,7 +526,6 @@ impl FsNodeOps for NsDirectory {
             // The name is {namespace}, link to the correct one of the current task.
             let id = current_task.task.fs().namespace().id;
             Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 CallbackSymlinkNode::new(move || {
                     Ok(SymlinkTarget::Path(format!("{name}:[{id}]").into()))
                 }),
@@ -586,7 +569,7 @@ impl FsNodeOps for FdInfoDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let task = Task::from_weak(&self.task)?;
@@ -596,7 +579,6 @@ impl FsNodeOps for FdInfoDirectory {
         let flags = file.flags();
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
         Ok(node.fs().create_node_and_allocate_node_id(
-            current_task,
             BytesFile::new_node(data),
             FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred()),
         ))
@@ -651,7 +633,7 @@ impl FsNodeOps for TaskListDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let thread_group = self.thread_group()?;
@@ -669,7 +651,7 @@ impl FsNodeOps for TaskListDirectory {
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
         std::mem::drop(pid_state);
 
-        Ok(tid_directory(current_task, &node.fs(), &task))
+        Ok(tid_directory(&node.fs(), &task))
     }
 }
 

@@ -242,7 +242,7 @@ impl SeLinuxFs {
         let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
         let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
         info.rdev = DeviceType::NULL;
-        let null_fs_node = fs.create_node_and_allocate_node_id(current_task, null_ops, info);
+        let null_fs_node = fs.create_node_and_allocate_node_id(null_ops, info);
         dir.node("null", null_fs_node.clone());
 
         dir.build_root();
@@ -721,7 +721,6 @@ impl FsNodeOps for BooleansDirectory {
         if self.security_server.conditional_booleans().contains(&utf8_name) {
             profile_duration!("selinuxfs.booleans.lookup");
             Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BooleanFile::new_node(self.security_server.clone(), utf8_name),
                 FsNodeInfo::new(mode!(IFREG, 0o644), current_task.as_fscred()),
             ))
@@ -940,7 +939,6 @@ impl FsNodeOps for PermsDirectory {
             .0;
 
         Ok(node.fs().create_node_and_allocate_node_id(
-            current_task,
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
             FsNodeInfo::new(mode!(IFREG, 0o444), current_task.as_fscred()),
         ))

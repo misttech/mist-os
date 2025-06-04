@@ -71,13 +71,12 @@ impl CgroupDirectory {
     /// Can only be called on a newly initialized root directory created by `new_root`, and can only
     /// be called once. Creates interface files for the root directory, which can only be done after
     /// the `FileSystem` is initialized.
-    pub fn create_root_interface_files(&self, current_task: &CurrentTask, fs: &FileSystemHandle) {
+    pub fn create_root_interface_files(&self, fs: &FileSystemHandle) {
         let mut interface_files = self.interface_files.lock();
         assert!(interface_files.is_empty(), "init is only called once");
         interface_files.insert(
             PROCS_FILE.into(),
             fs.create_node_and_allocate_node_id(
-                current_task,
                 ControlGroupNode::new(self.cgroup.clone()),
                 FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             ),
@@ -85,7 +84,6 @@ impl CgroupDirectory {
         interface_files.insert(
             CONTROLLERS_FILE.into(),
             fs.create_node_and_allocate_node_id(
-                current_task,
                 BytesFile::new_node(b"".to_vec()),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
@@ -93,9 +91,8 @@ impl CgroupDirectory {
     }
 
     /// Creates a new non-root directory, along with its core interface files.
-    pub fn new(
+    fn new(
         cgroup: Weak<dyn CgroupOps>,
-        current_task: &CurrentTask,
         fs: &FileSystemHandle,
         dir_nodes: Weak<DirectoryNodes>,
     ) -> CgroupDirectoryHandle {
@@ -103,7 +100,6 @@ impl CgroupDirectory {
             (
                 PROCS_FILE.into(),
                 fs.create_node_and_allocate_node_id(
-                    current_task,
                     ControlGroupNode::new(cgroup.clone()),
                     FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
                 ),
@@ -111,7 +107,6 @@ impl CgroupDirectory {
             (
                 CONTROLLERS_FILE.into(),
                 fs.create_node_and_allocate_node_id(
-                    current_task,
                     BytesFile::new_node(b"".to_vec()),
                     FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ),
@@ -119,7 +114,6 @@ impl CgroupDirectory {
             (
                 FREEZE_FILE.into(),
                 fs.create_node_and_allocate_node_id(
-                    current_task,
                     FreezeFile::new_node(cgroup.clone()),
                     FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
                 ),
@@ -127,7 +121,6 @@ impl CgroupDirectory {
             (
                 EVENTS_FILE.into(),
                 fs.create_node_and_allocate_node_id(
-                    current_task,
                     EventsFile::new_node(cgroup.clone()),
                     FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ),
@@ -135,7 +128,6 @@ impl CgroupDirectory {
             (
                 KILL_FILE.into(),
                 fs.create_node_and_allocate_node_id(
-                    current_task,
                     KillFile::new_node(cgroup.clone()),
                     FsNodeInfo::new(mode!(IFREG, 0o200), FsCred::root()),
                 ),
@@ -213,7 +205,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
         _mode: FileMode,
         _owner: FsCred,
@@ -222,11 +214,10 @@ impl FsNodeOps for CgroupDirectoryHandle {
         let cgroup = self.cgroup()?.new_child(name)?;
         let directory = CgroupDirectory::new(
             Arc::downgrade(&cgroup) as Weak<dyn CgroupOps>,
-            current_task,
             &node.fs(),
             self.dir_nodes.clone(),
         );
-        let child = dir_nodes.add_node(&cgroup, directory, current_task, &node.fs());
+        let child = dir_nodes.add_node(&cgroup, directory, &node.fs());
 
         node.update_info(|info| {
             info.link_count += 1;

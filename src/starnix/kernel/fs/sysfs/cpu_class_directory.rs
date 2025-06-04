@@ -85,22 +85,19 @@ impl FsNodeOps for CpuClassDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
             name if name.starts_with(b"cpu") => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 TmpfsDirectory::new(),
                 FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             )),
             b"online" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
             b"possible" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
@@ -109,7 +106,6 @@ impl FsNodeOps for CpuClassDirectory {
                     self.kobject().get_child(name);
                 if let Some(kobject) = child_kobject.take() {
                     Ok(node.fs().create_node_and_allocate_node_id(
-                        current_task,
                         kobject.ops(),
                         FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
                     ))

@@ -70,7 +70,6 @@ impl FsNodeOps for UsbPowerSupply {
     ) -> Result<FsNodeHandle, Errno> {
         let iio_create_file = |value| {
             Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BytesFile::new_node(value),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
@@ -151,7 +150,6 @@ impl FsNodeOps for BatteryPowerSupply {
     ) -> Result<FsNodeHandle, Errno> {
         let iio_create_file = |value| {
             Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 BytesFile::new_node(value),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))

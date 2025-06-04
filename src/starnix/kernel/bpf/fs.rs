@@ -349,7 +349,6 @@ impl BpfFsDir {
             name,
             |_locked, dir, _mount, _name| {
                 Ok(dir.fs().create_node_and_allocate_node_id(
-                    current_task,
                     BpfFsObject::new(object),
                     FsNodeInfo::new(mode!(IFREG, 0o600), current_task.as_fscred()),
                 ))
@@ -376,13 +375,12 @@ impl FsNodeOps for BpfFsDir {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         Ok(node.fs().create_node_and_allocate_node_id(
-            current_task,
             BpfFsDir::new(),
             FsNodeInfo::new(mode | FileMode::ISVTX, owner),
         ))

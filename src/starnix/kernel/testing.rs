@@ -662,5 +662,5 @@ pub fn create_testfs_with_root(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> Fil
 pub fn create_fs_node_for_testing(fs: &FileSystemHandle, ops: impl FsNodeOps) -> FsNodeHandle {
     let ino = fs.allocate_ino();
     let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
-    FsNode::new_uncached_directory(ino, ops, fs, info)
+    FsNode::new_uncached(ino, ops, fs, info)
 }

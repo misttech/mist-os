@@ -396,7 +396,7 @@ impl FsNodeOps for DirectoryObject {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| {
@@ -414,8 +414,8 @@ impl FsNodeOps for DirectoryObject {
         let info = to_fs_node_info(metadata_node);
 
         match metadata_node.info() {
-            NodeInfo::Symlink(_) => Ok(fs.create_node(current_task, ino, SymlinkObject, info)),
-            NodeInfo::Directory(_) => Ok(fs.create_node(current_task, ino, DirectoryObject, info)),
+            NodeInfo::Symlink(_) => Ok(fs.create_node(ino, SymlinkObject, info)),
+            NodeInfo::Directory(_) => Ok(fs.create_node(ino, DirectoryObject, info)),
             NodeInfo::File(_) => {
                 let (file, server_end) = fidl::endpoints::create_sync_proxy::<fio::FileMarker>();
                 bundle
@@ -427,12 +427,7 @@ impl FsNodeOps for DirectoryObject {
                         server_end.into_channel(),
                     )
                     .map_err(|_| errno!(EIO))?;
-                Ok(fs.create_node(
-                    current_task,
-                    ino,
-                    File { inner: Mutex::new(Inner::NeedsVmo(file)) },
-                    info,
-                ))
+                Ok(fs.create_node(ino, File { inner: Mutex::new(Inner::NeedsVmo(file)) }, info))
             }
         }
     }

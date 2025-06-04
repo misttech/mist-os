@@ -160,7 +160,7 @@ struct FsNodeRareData {
     /// The pipe located at this node, if any.
     ///
     /// Used if, and only if, the node has a mode of FileMode::IFIFO.
-    fifo: Option<PipeHandle>,
+    fifo: OnceLock<PipeHandle>,
 
     /// The UNIX domain socket bound to this node, if any.
     bound_socket: OnceLock<SocketHandle>,
@@ -180,6 +180,20 @@ struct FsNodeRareData {
 
     /// Inotify watchers on this node. See inotify(7).
     watchers: inotify::InotifyWatchers,
+}
+
+impl FsNodeRareData {
+    fn ensure_fifo(&self, current_task: &CurrentTask) -> &PipeHandle {
+        self.fifo.get_or_init(|| {
+            let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
+            if !security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE) {
+                let kernel = current_task.kernel();
+                let max_size = kernel.system_limits.pipe_max_size.load(Ordering::Relaxed);
+                default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
+            }
+            Pipe::new(default_pipe_capacity)
+        })
+    }
 }
 
 pub type FsNodeHandle = Arc<FsNodeReleaser>;
@@ -282,12 +296,6 @@ impl FsNodeInfo {
             check_access(current_task, Access::EXEC, self.uid, self.gid, self.mode)?;
         }
         Ok(maybe_set_id)
-    }
-}
-
-impl FsNodeRareData {
-    fn new(fifo: PipeHandle) -> Self {
-        Self { fifo: Some(fifo), ..Default::default() }
     }
 }
 
@@ -1178,38 +1186,13 @@ impl FsNode {
     /// This is usually not what you want!
     /// Only use if you're also using get_or_create_node, like ext4.
     pub fn new_uncached(
-        current_task: &CurrentTask,
         ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
         fs: &FileSystemHandle,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        Self::new_internal(ino, ops, Arc::downgrade(fs), info, Some(current_task)).into_handle()
-    }
-
-    /// Create a directory without inserting it into the FileSystem node cache.
-    ///
-    /// This is usually not what you want!
-    ///
-    /// This function is a special-purpose version of [`new_uncached`] that is used for creating
-    /// directories. This function exists because some callers of [`new_uncached`] need to create
-    /// directories, but don't have a [`CurrentTask`] available. These callers lack a
-    /// [`CurrentTask`] because they are creating the root directory for the initial [`FsContext`],
-    /// which needs to exist before we can create a task object.
-    pub fn new_uncached_directory(
-        ino: ino_t,
-        ops: impl Into<Box<dyn FsNodeOps>>,
-        fs: &FileSystemHandle,
-        info: FsNodeInfo,
-    ) -> FsNodeHandle {
-        assert!(info.mode.is_dir());
-        let ops = ops.into();
-        Self::new_internal(ino, ops, Arc::downgrade(fs), info, None).into_handle()
-    }
-
-    pub fn into_handle(self) -> FsNodeHandle {
-        FsNodeHandle::new(self.into())
+        FsNodeHandle::new(Self::new_internal(ino, ops, Arc::downgrade(fs), info).into())
     }
 
     fn new_internal(
@@ -1217,7 +1200,6 @@ impl FsNode {
         ops: Box<dyn FsNodeOps>,
         fs: Weak<FileSystem>,
         info: FsNodeInfo,
-        current_task: Option<&CurrentTask>,
     ) -> Self {
         // Allow the FsNodeOps to populate initial info.
         let info = {
@@ -1225,22 +1207,6 @@ impl FsNode {
             ops.initial_info(&mut info);
             info
         };
-
-        let rare_data = OnceLock::new();
-
-        if info.mode.is_fifo() {
-            let current_task = current_task
-                .expect("expected that a CurrentTask would be available when creating a fifo");
-            let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
-            if !security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE) {
-                let kernel = current_task.kernel();
-                let max_size = kernel.system_limits.pipe_max_size.load(Ordering::Relaxed);
-                default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
-            }
-
-            let fifo = Pipe::new(default_pipe_capacity);
-            assert!(rare_data.set(Box::new(FsNodeRareData::new(fifo))).is_ok());
-        }
 
         // The linter will fail in non test mode as it will not see the lock check.
         #[allow(clippy::let_and_return)]
@@ -1251,7 +1217,7 @@ impl FsNode {
                 fs,
                 info: RwLock::new(info),
                 append_lock: Default::default(),
-                rare_data,
+                rare_data: Default::default(),
                 write_guard_state: Default::default(),
                 fsverity: Mutex::new(FsVerityState::None),
                 security_state: Default::default(),
@@ -1421,7 +1387,7 @@ impl FsNode {
                     DeviceMode::Block,
                 )
             }
-            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo().unwrap(), flags),
+            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo(current_task), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
             _ => self.create_file_ops(locked, current_task, flags),
@@ -2033,12 +1999,9 @@ impl FsNode {
         Ok(())
     }
 
-    pub fn fifo(&self) -> Option<&PipeHandle> {
-        if let Some(rare_data) = self.rare_data.get() {
-            rare_data.fifo.as_ref()
-        } else {
-            None
-        }
+    pub fn fifo(&self, current_task: &CurrentTask) -> &PipeHandle {
+        assert!(self.is_fifo());
+        self.ensure_rare_data().ensure_fifo(current_task)
     }
 
     /// Returns the UNIX domain socket bound to this node, if any.

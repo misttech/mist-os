@@ -64,7 +64,6 @@ impl PstoreFs {
             dir.node(
                 "console-ramoops-0",
                 fs.create_node_and_allocate_node_id(
-                    current_task,
                     BytesFile::new_node(ramoops_contents_0),
                     FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
                 ),
@@ -72,7 +71,6 @@ impl PstoreFs {
             dir.node(
                 "console-ramoops",
                 fs.create_node_and_allocate_node_id(
-                    current_task,
                     BytesFile::new_node(ramoops_contents),
                     FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
                 ),

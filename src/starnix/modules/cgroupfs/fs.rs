@@ -37,7 +37,7 @@ impl CgroupV1Fs {
         let root_dir = dir_nodes.root.clone();
         let fs =
             FileSystem::new(kernel, CacheMode::Uncached, CgroupV1Fs { dir_nodes, root }, options)?;
-        root_dir.create_root_interface_files(current_task, &fs);
+        root_dir.create_root_interface_files(&fs);
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, root_dir);
         Ok(fs)
@@ -85,7 +85,7 @@ impl CgroupV2Fs {
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&kernel.cgroups.cgroup2));
         let root = dir_nodes.root.clone();
         let fs = FileSystem::new(kernel, CacheMode::Uncached, CgroupV2Fs { dir_nodes }, options)?;
-        root.create_root_interface_files(current_task, &fs);
+        root.create_root_interface_files(&fs);
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, root);
         Ok(fs)
@@ -142,12 +142,10 @@ impl DirectoryNodes {
         &self,
         cgroup: &Arc<Cgroup>,
         directory: CgroupDirectoryHandle,
-        current_task: &CurrentTask,
         fs: &FileSystemHandle,
     ) -> FsNodeHandle {
         let id = cgroup.id();
         let node = fs.create_node_and_allocate_node_id(
-            current_task,
             directory,
             FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
         );

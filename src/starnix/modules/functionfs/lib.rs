@@ -486,25 +486,22 @@ impl FsNodeOps for FunctionFsRootDir {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<starnix_core::vfs::FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         match name {
             CONTROL_ENDPOINT => Ok(node.fs().create_node(
-                current_task,
                 CONTROL_ENDPOINT_NODE_ID,
                 FunctionFsControlEndpoint,
                 FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
             OUTPUT_ENDPOINT => Ok(node.fs().create_node(
-                current_task,
                 OUTPUT_ENDPOINT_NODE_ID,
                 FunctionFsOutputEndpoint,
                 FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
             INPUT_ENDPOINT => Ok(node.fs().create_node(
-                current_task,
                 INPUT_ENDPOINT_NODE_ID,
                 FunctionFsInputEndpoint,
                 FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),

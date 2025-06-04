@@ -243,24 +243,22 @@ impl FileSystem {
     /// call |create_node_and_allocate_node_id|.
     pub fn create_node(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
         ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
-        let node = FsNode::new_uncached(current_task, ino, ops, self, info);
+        let node = FsNode::new_uncached(ino, ops, self, info);
         self.node_cache.insert_node(&node);
         node
     }
 
     pub fn create_node_and_allocate_node_id(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ino = self.allocate_ino();
-        self.create_node(current_task, ino, ops, info)
+        self.create_node(ino, ops, info)
     }
 
     /// Create a node for a directory that has no parent.
@@ -271,7 +269,7 @@ impl FileSystem {
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         assert!(info.mode.is_dir());
-        let node = FsNode::new_uncached_directory(ino, ops, self, info);
+        let node = FsNode::new_uncached(ino, ops, self, info);
         self.node_cache.insert_node(&node);
         node
     }

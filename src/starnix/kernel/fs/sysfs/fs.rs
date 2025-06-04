@@ -70,7 +70,6 @@ impl SysFs {
                     dir.node(
                         "fuse_bpf",
                         fs.create_node_and_allocate_node_id(
-                            current_task,
                             BytesFile::new_node(b"supported\n".to_vec()),
                             FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                         ),
@@ -79,7 +78,6 @@ impl SysFs {
                 dir.node(
                     "bpf_prog_type_fuse",
                     fs.create_node_and_allocate_node_id(
-                        current_task,
                         BytesFile::new_node(format!("{}\n", BPF_PROG_TYPE_FUSE).into_bytes()),
                         FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                     ),

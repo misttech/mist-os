@@ -203,7 +203,6 @@ impl TmpfsDirectory {
 }
 
 fn create_child_node(
-    current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
     dev: DeviceType,
@@ -220,7 +219,7 @@ fn create_child_node(
     info.rdev = dev;
     // blksize is PAGE_SIZE for in memory node.
     info.blksize = *PAGE_SIZE as usize;
-    let child = parent.fs().create_node_and_allocate_node_id(current_task, ops, info);
+    let child = parent.fs().create_node_and_allocate_node_id(ops, info);
     if mode.fmt() == FileMode::IFREG {
         // For files created in tmpfs, forbid sealing, by sealing the seal operation.
         child.write_guard_state.lock().enable_sealing(SealFlags::SEAL);
@@ -245,7 +244,7 @@ impl FsNodeOps for TmpfsDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -254,24 +253,22 @@ impl FsNodeOps for TmpfsDirectory {
             info.link_count += 1;
         });
         self.child_count.fetch_add(1, Ordering::Release);
-        Ok(node.fs().create_node_and_allocate_node_id(
-            current_task,
-            TmpfsDirectory::new(),
-            FsNodeInfo::new(mode, owner),
-        ))
+        Ok(node
+            .fs()
+            .create_node_and_allocate_node_id(TmpfsDirectory::new(), FsNodeInfo::new(mode, owner)))
     }
 
     fn mknod(
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let child = create_child_node(current_task, node, mode, dev, owner)?;
+        let child = create_child_node(node, mode, dev, owner)?;
         self.child_count.fetch_add(1, Ordering::Release);
         Ok(child)
     }
@@ -280,25 +277,25 @@ impl FsNodeOps for TmpfsDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         self.child_count.fetch_add(1, Ordering::Release);
         let (link, info) = SymlinkNode::new(target, owner);
-        Ok(node.fs().create_node_and_allocate_node_id(current_task, link, info))
+        Ok(node.fs().create_node_and_allocate_node_id(link, info))
     }
 
     fn create_tmpfile(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         assert!(mode.is_reg());
-        create_child_node(current_task, node, mode, DeviceType::NONE, owner)
+        create_child_node(node, mode, DeviceType::NONE, owner)
     }
 
     fn link(

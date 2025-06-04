@@ -471,7 +471,6 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
         dir.node(
             "abort",
             fs.create_node_and_allocate_node_id(
-                current_task,
                 AbortFile::new_node(connection.clone()),
                 FsNodeInfo::new(mode!(IFREG, 0o200), connection.creds),
             ),
@@ -479,7 +478,6 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
         dir.node(
             "waiting",
             fs.create_node_and_allocate_node_id(
-                current_task,
                 WaitingFile::new_node(connection.clone()),
                 FsNodeInfo::new(mode!(IFREG, 0o400), connection.creds),
             ),
@@ -710,7 +708,6 @@ impl FuseNode {
     /// Build a FsNodeHandle from a FuseResponse that is expected to be a FuseResponse::Entry.
     fn fs_node_from_entry(
         &self,
-        current_task: &CurrentTask,
         node: &FsNode,
         name: &FsStr,
         entry: &uapi::fuse_entry_out,
@@ -734,7 +731,7 @@ impl FuseNode {
                     attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
                     &fuse_node.attributes_valid_until,
                 )?;
-                Ok(FsNode::new_uncached(current_task, entry.attr.ino, fuse_node, &node.fs(), info))
+                Ok(FsNode::new_uncached(entry.attr.ino, fuse_node, &node.fs(), info))
             },
         )?;
         // . and .. do not get their lookup count increased.
@@ -1027,9 +1024,7 @@ impl FileOps for FuseFileObject {
             if let Some(entry) = entry {
                 // nodeid == 0 means the server doesn't want to send entry info.
                 if entry.nodeid != 0 {
-                    if let Err(e) =
-                        node.fs_node_from_entry(current_task, file.node(), name.as_ref(), &entry)
-                    {
+                    if let Err(e) = node.fs_node_from_entry(file.node(), name.as_ref(), &entry) {
                         log_error!("Unable to prefill entry: {e:?}");
                     }
                 }
@@ -1274,12 +1269,7 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Lookup { name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(
-            current_task,
-            node,
-            name,
-            response.entry().ok_or_else(|| errno!(EINVAL))?,
-        )
+        self.fs_node_from_entry(node, name, response.entry().ok_or_else(|| errno!(EINVAL))?)
     }
 
     fn mknod(
@@ -1367,7 +1357,7 @@ impl FsNodeOps for FuseNode {
         };
 
         let entry = get_entry(locked)?;
-        self.fs_node_from_entry(current_task, node, name, &entry)
+        self.fs_node_from_entry(node, name, &entry)
     }
 
     fn mkdir(
@@ -1391,12 +1381,7 @@ impl FsNodeOps for FuseNode {
                 name: name.to_owned(),
             },
         )?;
-        self.fs_node_from_entry(
-            current_task,
-            node,
-            name,
-            response.entry().ok_or_else(|| errno!(EINVAL))?,
-        )
+        self.fs_node_from_entry(node, name, response.entry().ok_or_else(|| errno!(EINVAL))?)
     }
 
     fn create_symlink(
@@ -1414,12 +1399,7 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(
-            current_task,
-            node,
-            name,
-            response.entry().ok_or_else(|| errno!(EINVAL))?,
-        )
+        self.fs_node_from_entry(node, name, response.entry().ok_or_else(|| errno!(EINVAL))?)
     }
 
     fn readlink(

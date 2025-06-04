@@ -86,7 +86,6 @@ impl FsNodeOps for QbgClassDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
             b"qbg_context" => Ok(node.fs().create_node_and_allocate_node_id(
-                current_task,
                 ReadWriteBytesFile::new_node(),
                 FsNodeInfo::new(mode!(IFREG, 0o666), FsCred::root()),
             )),

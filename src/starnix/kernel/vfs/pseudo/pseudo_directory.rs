@@ -60,11 +60,11 @@ impl FsNodeOps for Arc<PseudoDirectory> {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         self.ops.get_node(name).map(|pseudo_node| {
-            node.fs().create_node(current_task, pseudo_node.ino, pseudo_node.ops, pseudo_node.info)
+            node.fs().create_node(pseudo_node.ino, pseudo_node.ops, pseudo_node.info)
         })
     }
 }
