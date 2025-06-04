@@ -51,10 +51,51 @@ template("rustc_test_internal") {
 
   if (is_host) {
     exe_target_name = "${target_name}_executable"
+
+    if (defined(invoker.args)) {
+      args = invoker.args
+    }
+
+    # Disable using the unstripped binary if this is a builder or toolchain that may not
+    # actually produce unstripped executables in the known location.
+    use_unstripped_binary_for_host_tests =
+        !defined(invoker.output_dir) && !is_asan && !is_coverage &&
+        zircon_toolchain == ""
+
+    # This target copies unstripped binaries from their output directory to the root out directory
+    # for the host toolchain. It is only used if we decide to run the unstripped version below
+    # (for better backtraces).
+    #
+    # This is needed because many tests assume they are run from a directory adjacent to their
+    # installed host_test_data files. Running from the nested directory would break this
+    # assumption, so we run from the expected directory using a copy of the test binary.
+    if (use_unstripped_binary_for_host_tests) {
+      unstripped_copy_target_name = "${target_name}_copy_unstripped"
+      copy(unstripped_copy_target_name) {
+        testonly = true
+        sources = [ "${root_out_dir}/exe.unstripped/${_crate_name}" ]
+        outputs = [ "${root_out_dir}/${_crate_name}_unstripped" ]
+        deps = [ ":${exe_target_name}" ]
+      }
+    }
+
     host_test(target_name) {
       if (defined(invoker.output_dir)) {
         binary_path = "${invoker.output_dir}/${_crate_name}"
+      } else if (use_unstripped_binary_for_host_tests) {
+        # Default to using the unstripped binary so that stack traces are easier to read.
+        # Override the name to still use the old path for consistency with previous test results.
+        # For instance, if the stripped binary is host_x64/foo_test and unstripped is
+        # host_x64/foo_test_unstripped, name should still be host_x64/foo_test.
+        binary_path = "${root_out_dir}/${_crate_name}_unstripped"
+        name =
+            rebase_path("${root_out_dir}/${_crate_name}", "${root_out_dir}/..")
+        if (!defined(args)) {
+          args = []
+        }
+        args += [ "env RUST_BACKTRACE=1" ]
       } else {
+        # For asan targets use the normal binary path.
         binary_path = "${root_out_dir}/${_crate_name}"
       }
 
@@ -71,6 +112,10 @@ template("rustc_test_internal") {
       # it doesn't depend on any other deps.
       deps = [ ":${exe_target_name}" ]
 
+      if (use_unstripped_binary_for_host_tests) {
+        deps += [ ":${unstripped_copy_target_name}" ]
+      }
+
       # However, if there is host-test-data, then that should be passed via
       # data_deps, so include those here
       if (defined(invoker.data_deps)) {
@@ -82,7 +127,6 @@ template("rustc_test_internal") {
       }
       forward_variables_from(invoker,
                              [
-                               "args",
                                "package_deps",
                                "visibility",
                              ])
