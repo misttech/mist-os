@@ -1441,6 +1441,16 @@ async fn schedule_hrtimer(
 
     // We must wait here to ensure that the wake alarm has been scheduled.
     wait_signaled(&hrtimer_scheduled).await;
+    let now_after_signaled = fasync::BootInstant::now();
+    let duration_until_scheduled: zx::BootDuration = (now_after_signaled - now).into();
+    if duration_until_scheduled > zx::BootDuration::from_nanos(1000 * MSEC_IN_NANOS) {
+        trace::duration!(c"alarms", c"schedule_hrtimer:unusual_duration",
+            "duration" => duration_until_scheduled.into_nanos());
+        warn!(
+            "unusual duration until hrtimer scheduled: {}",
+            format_duration(duration_until_scheduled)
+        );
+    }
     debug!("schedule_hrtimer: hrtimer wake alarm has been scheduled.");
     TimerState { task: hrtimer_task, deadline }
 }
@@ -1469,6 +1479,15 @@ fn notify_all(
         let alarm_id = timer_node.get_alarm_id().to_string();
         let cid = timer_node.get_cid().clone();
         let slack: zx::BootDuration = deadline - now;
+        if slack < zx::BootDuration::from_nanos(-1000 * MSEC_IN_NANOS) {
+            trace::duration!(c"alarms", c"schedule_hrtimer:unusual_slack", "slack" => slack.into_nanos());
+            // This alarm triggered noticeably later than it should have.
+            warn!(
+                "alarm id: {} had an unusually large slack: {}",
+                alarm_id,
+                format_duration(slack)
+            );
+        }
         debug!(
             concat!(
                 "wake_alarm_loop: ALARM alarm_id: \"{}\"\n\tdeadline: {},\n\tcid: {:?},\n\t",
