@@ -29,6 +29,12 @@ struct AllocCheckerContainer {
     using typename Base::size_type;
     using typename Base::value_type;
 
+    // Callers may use the base class methods with this container instance.
+    using Base::insert;
+    using Base::push_back;
+    using Base::reserve;
+    using Base::resize;
+
     constexpr Container(Container&&) noexcept = default;
 
     constexpr Container& operator=(Container&&) noexcept = default;
@@ -76,13 +82,6 @@ struct AllocCheckerContainer {
       }
       return true;
     }
-
-   private:
-    // Make the original methods unavailable.
-    using Base::insert;
-    using Base::push_back;
-    using Base::reserve;
-    using Base::resize;
   };
 };
 

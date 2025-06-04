@@ -290,7 +290,7 @@ TYPED_TEST(DlTests, LocalPrecedence) {
 //   - has-foo-v1:
 //     - foo-v1 -> foo() returns 2
 //   - foo-v2 -> foo() returns 7
-// call foo() from multiple-transitive-foo-deps and expect 7 from foo-v2 because
+// call foo() from transitive-foo-deps and expect 7 from foo-v2 because
 // it is first in multiple-transitive-foo-dep's local scope.
 TYPED_TEST(DlTests, LocalPrecedenceTransitiveDeps) {
   const std::string kTransitiveFooDepFile = TestModule("transitive-foo-dep");
@@ -352,7 +352,7 @@ TYPED_TEST(DlTests, LocalPrecedenceTransitiveDeps) {
 // Call foo() from multiple-transitive-foo-deps and expect 2 from foo-v1,
 // because it is first in multiple-transitive-foo-dep's local scope.
 TYPED_TEST(DlTests, LoadedTransitiveDepOrder) {
-  const std::string kMultipleTransitiveFooDepsFile = TestModule("multiple-transitive-foo-deps");
+  const std::string kMultipleTransitiveFooDepsFile = TestShlib("libmultiple-transitive-foo-deps");
   const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
   const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
   const std::string kHasFooV1File = TestShlib("libhas-foo-v1");
@@ -384,7 +384,7 @@ TYPED_TEST(DlTests, LoadedTransitiveDepOrder) {
 
   EXPECT_EQ(RunFunction<int64_t>(has_foo_v1_call_foo.value()), kFooV1ReturnValue);
 
-  this->ExpectRootModule(kMultipleTransitiveFooDepsFile);
+  this->Needed({kMultipleTransitiveFooDepsFile});
 
   auto open_multiple_transitive_foo_deps =
       this->DlOpen(kMultipleTransitiveFooDepsFile.c_str(), RTLD_NOW | RTLD_LOCAL);

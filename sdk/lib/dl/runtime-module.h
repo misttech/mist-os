@@ -135,7 +135,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   // This is called if the RuntimeModule is created from a startup module (i.e.
   // a module that was linked and loaded with the running program). This sets
-  // the abi and TLS information onto the RuntimeModule.
+  // the abi, TLS, and direct_deps information onto the RuntimeModule.
   void SetStartupModule(const AbiModule& abi_module, const ld::abi::Abi<>& abi) {
     abi_module_ = abi_module;
     no_delete_ = true;
@@ -216,9 +216,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // module implies that none of its dependencies can be unloaded either: since
   // this module will live for the lifetime of the main program, so will its
   // dependencies.
-  constexpr void set_no_delete() {
-    no_delete_ = true;
-  }
+  constexpr void set_no_delete() { no_delete_ = true; }
 
   // This is the list of TlsDesc objects (see tls-desc-resolver.h) that was set
   // during TLS relocation for this module. The RuntimeModule owns this list:

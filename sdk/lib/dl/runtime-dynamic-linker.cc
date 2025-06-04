@@ -99,9 +99,36 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
       return;
     }
     module->SetStartupModule(abi_module, abi);
-    // TODO(https://fxbug.dev/379766260): Fill out the direct_deps of
-    // startup modules.
     startup_modules.push_back(std::move(module));
+  }
+
+  // In a second pass, set the direct dependencies for each startup module.
+  // This loop will get each DT_NEEDED offset from the ABI module's PT_DYNAMIC
+  // (provided by `link_map.ld`) and look the offset up in the ABI module's
+  // symbol table to get the name of the dependency. The module for the dep
+  // (which should also be in the `startup_modules` list) is then added to the
+  // depending module's `direct_deps` list.
+  for (RuntimeModule& module : startup_modules) {
+    const AbiModule& abi_module = module.module();
+    for (const Elf::Dyn* dyn_entry = abi_module.link_map.ld.get();
+         dyn_entry->tag != elfldltl::ElfDynTag::kNull; ++dyn_entry) {
+      // Skip any entries that are not a DT_NEEDED.
+      if (dyn_entry->tag != elfldltl::ElfDynTag::kNeeded) {
+        continue;
+      }
+      const char* dep_name = abi_module.symbols.string(dyn_entry->val);
+      auto found = std::ranges::find_if(startup_modules, Soname{dep_name}.equal_to());
+      // The ABI should include all the dependencies of every startup module in
+      // its .loaded_modules list.
+      assert(found != startup_modules.end());
+
+      fbl::AllocChecker ac;
+      module.direct_deps().push_back(&*found, &ac);
+      if (!ac.check()) [[unlikely]] {
+        set_result(false);
+        return;
+      }
+    }
   }
 
   AddNewModules(std::move(startup_modules));
@@ -109,6 +136,7 @@ void RuntimeDynamicLinker::PopulateStartupModules(fbl::AllocChecker& func_ac,
   set_result(true);
 }
 
+// TODO(https://fxbug.dev/342484765): Have this function return fit::result<Error::OutOfMemory>.
 std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi::Abi<>& abi,
                                                                    fbl::AllocChecker& ac) {
   assert(abi.loaded_modules);

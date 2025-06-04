@@ -8,6 +8,7 @@
 #include "suffixed-symbol.h"
 
 extern "C" [[gnu::visibility("default")]] int64_t SUFFIXED_SYMBOL(foo)();
+extern "C" [[gnu::visibility("default")]] int64_t SUFFIXED_SYMBOL(foo_v2)();
 
 extern "C" int64_t SUFFIXED_SYMBOL(foo)() { return 7; }
 extern "C" int64_t SUFFIXED_SYMBOL(foo_v2)() { return 7; }

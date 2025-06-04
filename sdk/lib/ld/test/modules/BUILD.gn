@@ -20,7 +20,6 @@ import("//sdk/lib/ld/testing/test_elf_object.gni")
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
-  ":multiple-transitive-foo-deps",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
   ":soname-filename-loaded-dep",
@@ -41,6 +40,8 @@ per_test_executables = [
   ":missing-transitive-dep",
   ":cyclic-dep-parent",
 ]
+
+per_test_shlibs = [ ":multiple-transitive-foo-deps" ]
 
 per_test_suffices = [
   "NotFound",
@@ -80,6 +81,8 @@ per_test_suffices = [
   "PrecedenceInDepResolution",
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
+  "StartupModulesDep",
+  "StartupModulesDepOrder",
   "RtldNoLoadBasic",
   "RtldNoDeleteBasic",
   "RtldNoDeletePromotion",
@@ -112,6 +115,9 @@ group("dl-test-data.deps") {
     ":tls-ld-dep-module",
   ]
   foreach(suffix, per_test_suffices) {
+    foreach(test, per_test_shlibs) {
+      deps += [ "$test.$suffix" ]
+    }
     foreach(test, per_test_modules + per_test_executables) {
       # Note this isn't the .test-data subtarget, it's just the main target.
       # The .test-data subtarget places the module and its runtime deps into a
@@ -130,10 +136,12 @@ group("dl-unittest.deps") {
   visibility = [ "//sdk/lib/dl/test:*" ]
   testonly = true
   deps = [
+    ":has-foo-v1.StartupModulesDep",
     ":has-foo-v1.StartupModulesPriorityOverGlobal",
     ":init-fini-var",
     ":ld-dep-foo-v1.StartupModulesBasic",
     ":ld-dep-foo-v2.StartupModulesBasic",
+    ":multiple-transitive-foo-deps.StartupModulesDepOrder",
     ":static-tls-var",
   ]
 }
@@ -1533,7 +1541,7 @@ foreach(test, [ "" ] + per_test_suffices) {
   #     - foo-v1 -> foo() returns 2
   #   - has-foo-v2:
   #    - foo-v2 -> foo() returns 7
-  test_loadable_module("multiple-transitive-foo-deps$suffix.module") {
+  test_shared_library("multiple-transitive-foo-deps$suffix") {
     deps = [
       ":has-foo-v1$suffix",
       ":has-foo-v2$suffix",
