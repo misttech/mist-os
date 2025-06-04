@@ -158,19 +158,39 @@ type DcfgArmGenericTimerDriver = struct {
     freq_override uint32;
 };
 
+type DcfgArmGenericTimerMmioFrame = struct {
+    /// Base address for the frame's EL1 view.
+    mmio_phys_el1 uint64;
+    /// Base address for the frame's EL0 view.
+    /// This is optional.
+    mmio_phys_el0 uint64;
+    /// IRQ information for physical timer. This is mandatory.
+    irq_phys uint32;
+    /// Same scheme as `DcfgSimple::irq`. This is mandatory.
+    irq_phys_flags uint32;
+    /// IRQ information for virtual timer.
+    /// This is optional.
+    /// When is not present both `irq_virt` and `irq_virt_flags` will be zero.
+    irq_virt uint32;
+    /// Same scheme as `DcfgSimple::irq`.
+    irq_virt_flags uint32;
+};
+
 /// for ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER_MMIO
 type DcfgArmGenericTimerMmioDriver = struct {
     /// Base address of `CNTCTLBase` frame.
-    base_addr uint64;
+    mmio_phys uint64;
     /// The frequency of the main counter for the timer.
     frequency uint32;
     /// Bitmask containing the set of active frames.
-    //// The `i-th` frame is considered active iff the `i`-th bit is set.
+    /// The `i-th` frame is considered active iff the `i`-th bit is set.
+    /// Note: While there may be up to 8 frames, both missing and disabled frames are treated
+    /// as inactive. Disabled frame information will be present, while missing frames will be zeroed.
     active_frames_mask uint8;
     reserved0 array<uint8, 3>;
     /// Information for each individual frame.
     /// Inactive frames must be zero-filled.
-    frames array<DcfgSimple, 8>;
+    frames array<DcfgArmGenericTimerMmioFrame, 8>;
 };
 
 /// for ZBI_KERNEL_DRIVER_AMLOGIC_HDCP
