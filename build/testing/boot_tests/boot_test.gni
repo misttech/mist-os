@@ -203,6 +203,24 @@ template("_boot_test") {
 #  * assert_no_deps, data_deps, metadata, visibility
 #    - Optional: Usual GN meanings.
 #
+#  Metadata Protocol:
+#
+#  * efi_input
+#    - Optional: Protocol for identifying the presence of a EFI disk, that shall be used
+#      instead of a ZBI. Using `efi_input` data key and `efi_input_barrier`, a single entry must
+#      be provided. This entry will be used to generated the partition configuration for the product
+#      bundle of this `boot_test()`.
+#    - Type: list[scope]
+#      * name
+#        - Required: partition name assigned to the bootloader partition entries in the partitionconfig.
+#        - Type: string
+#      * path
+#        - Required: relative path to $root_build_dir of the image of the partition.
+#        - Type: string
+#      * type
+#        - Required: type of the partition as defined in the bootloader partition entry.
+#        - Type: string
+#
 template("boot_test") {
   assert(defined(invoker.environments),
          "boot_test(\"$target_name\") must define `environments`")
@@ -224,8 +242,8 @@ template("boot_test") {
     generated_file(efi_disk_manifest_target) {
       testonly = true
 
-      data_keys = [ "images" ]
-      walk_keys = [ "images_barrier" ]
+      data_keys = [ "efi_input" ]
+      walk_keys = [ "efi_input_barrier" ]
       output_conversion = "json"
 
       deps = [ invoker.efi_disk ]

@@ -17,7 +17,7 @@ def main():
     parser.add_argument(
         "--metadata",
         metavar="FILE",
-        help="Path at which to find the image metadata JSON file",
+        help="Path at which to find the efi_input metadata JSON file",
         required=True,
     )
     parser.add_argument(
