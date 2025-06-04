@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use attribution_processing::digest::{self};
-use attribution_processing::kernel_statistics::KernelStatistics;
+use attribution_processing::fplugin_serde::KernelStatistics;
 use attribution_processing::summary::{ComponentProfileResult, PrincipalSummary, VmoSummary};
 use attribution_processing::ZXName;
 use fidl_fuchsia_memory_attribution_plugin as fplugin;

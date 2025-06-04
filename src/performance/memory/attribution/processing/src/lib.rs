@@ -12,10 +12,10 @@ use summary::MemorySummary;
 mod name;
 
 pub mod digest;
-pub mod kernel_statistics;
-pub mod summary;
+pub mod fkernel_serde;
+pub mod fplugin_serde;
 pub use name::ZXName;
-pub mod plugin_fidl_serde;
+pub mod summary;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct PrincipalIdentifier(pub u64);

@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use crate::digest::Digest;
-use crate::kernel_statistics::KernelStatistics;
 use crate::{
-    plugin_fidl_serde, InflatedPrincipal, InflatedResource, PrincipalIdentifier, PrincipalType,
+    fplugin_serde, InflatedPrincipal, InflatedResource, PrincipalIdentifier, PrincipalType,
     ResourceReference, ZXName,
 };
 use core::default::Default;
@@ -20,11 +19,11 @@ const FLOAT_COMPARISON_EPSILON: f64 = 1e-10;
 
 #[derive(Debug, Default, PartialEq, Serialize)]
 pub struct ComponentProfileResult {
-    pub kernel: KernelStatistics,
+    pub kernel: fplugin_serde::KernelStatistics,
     pub principals: Vec<PrincipalSummary>,
     /// Amount, in bytes, of memory that is known but remained unclaimed. Should be equal to zero.
     pub unclaimed: u64,
-    #[serde(with = "plugin_fidl_serde::PerformanceImpactMetricsDef")]
+    #[serde(with = "fplugin_serde::PerformanceImpactMetricsDef")]
     pub performance: fplugin::PerformanceImpactMetrics,
     pub digest: Digest,
 }

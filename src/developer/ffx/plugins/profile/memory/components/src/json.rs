@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use attribution_processing::kernel_statistics::{MemoryStatsCompressionDef, MemoryStatsDef};
+use attribution_processing::fkernel_serde::{MemoryStatsCompressionDef, MemoryStatsDef};
 use attribution_processing::ZXName;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
