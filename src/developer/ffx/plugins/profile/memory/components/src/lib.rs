@@ -9,7 +9,6 @@ mod output;
 extern crate prettytable;
 use anyhow::Result;
 use async_trait::async_trait;
-use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{ComponentProfileResult, MemorySummary};
 use attribution_processing::{
     digest, AttributionData, AttributionDataProvider, Principal, Resource, ResourcesVisitor, ZXName,
@@ -99,25 +98,13 @@ impl MemoryComponentsTool {
             return Ok(());
         }
 
-        let (summary, kernel_statistics, thrashing_metrics, digest) = process_snapshot(snapshot);
+        let profile_result = process_snapshot(snapshot);
         if writer.is_machine() {
-            writer.machine(ComponentProfileResult {
-                kernel: kernel_statistics,
-                principals: summary.principals,
-                unclaimed: summary.unclaimed,
-                digest,
-            })?;
+            writer.machine(profile_result)?;
         } else {
-            output::write_summary(
-                &mut writer.stdout(),
-                self.cmd.csv,
-                &summary,
-                kernel_statistics,
-                thrashing_metrics,
-                &digest,
-            )
-            .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
-            .map_err(|e| fho::Error::Unexpected(e.into()))?;
+            output::write_summary(&mut writer.stdout(), self.cmd.csv, &profile_result)
+                .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
+                .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }
         Ok(())
     }
@@ -185,9 +172,7 @@ impl<'a> AttributionDataProvider for SnapshotAttributionDataProvider<'a> {
     }
 }
 
-fn process_snapshot(
-    snapshot: fplugin::Snapshot,
-) -> (MemorySummary, KernelStatistics, fplugin::PerformanceImpactMetrics, digest::Digest) {
+fn process_snapshot(snapshot: fplugin::Snapshot) -> ComponentProfileResult {
     // Map from moniker token ID to Principal struct.
     let principals: Vec<Principal> =
         snapshot.principals.into_iter().flatten().map(|p| p.into()).collect();
@@ -220,7 +205,7 @@ fn process_snapshot(
         &bucket_definitions,
     )
     .expect("Digest computation should succeed");
-    (
+    let MemorySummary { principals, unclaimed } =
         attribution_processing::attribute_vmos(AttributionData {
             principals_vec: principals,
             resources_vec: resources,
@@ -232,11 +217,14 @@ fn process_snapshot(
                 .collect(),
             attributions,
         })
-        .summary(),
-        snapshot.kernel_statistics.unwrap().into(),
-        snapshot.performance_metrics.unwrap(),
+        .summary();
+    ComponentProfileResult {
+        kernel: snapshot.kernel_statistics.unwrap().into(),
+        principals,
+        unclaimed,
         digest,
-    )
+        performance: snapshot.performance_metrics.unwrap(),
+    }
 }
 
 #[cfg(test)]
@@ -608,15 +596,16 @@ mod tests {
             ..Default::default()
         };
 
-        let (output, _, performance_metrics, digest) = process_snapshot(snapshot);
+        let ComponentProfileResult { principals, unclaimed, performance, digest, .. } =
+            process_snapshot(snapshot);
 
         // VMO 1011 is the parent of VMO 1010, but not claimed by any Principal; it is thus
         // unclaimed.
-        assert_eq!(output.unclaimed, 2048);
-        assert_eq!(output.principals.len(), 4);
+        assert_eq!(unclaimed, 2048);
+        assert_eq!(principals.len(), 4);
 
         let principals: HashMap<u64, PrincipalSummary> =
-            output.principals.into_iter().map(|p| (p.id, p)).collect();
+            principals.into_iter().map(|p| (p.id, p)).collect();
 
         assert_eq!(
             principals.get(&0).unwrap(),
@@ -805,7 +794,7 @@ mod tests {
         );
 
         assert_eq!(
-            performance_metrics,
+            performance,
             fplugin::PerformanceImpactMetrics {
                 some_memory_stalls_ns: Some(10),
                 full_memory_stalls_ns: Some(5),
@@ -994,13 +983,13 @@ mod tests {
             ..Default::default()
         };
 
-        let (output, _, _, _) = process_snapshot(snapshot);
+        let ComponentProfileResult { principals, unclaimed, .. } = process_snapshot(snapshot);
 
-        assert_eq!(output.unclaimed, 0);
-        assert_eq!(output.principals.len(), 3);
+        assert_eq!(unclaimed, 0);
+        assert_eq!(principals.len(), 3);
 
         let principals: HashMap<u64, PrincipalSummary> =
-            output.principals.into_iter().map(|p| (p.id, p)).collect();
+            principals.into_iter().map(|p| (p.id, p)).collect();
 
         assert_eq!(
             principals.get(&0).unwrap(),

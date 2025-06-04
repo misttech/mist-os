@@ -5,8 +5,8 @@
 use crate::digest::Digest;
 use crate::kernel_statistics::KernelStatistics;
 use crate::{
-    InflatedPrincipal, InflatedResource, PrincipalIdentifier, PrincipalType, ResourceReference,
-    ZXName,
+    plugin_fidl_serde, InflatedPrincipal, InflatedResource, PrincipalIdentifier, PrincipalType,
+    ResourceReference, ZXName,
 };
 use core::default::Default;
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
@@ -15,16 +15,17 @@ use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-
 /// Consider that two floats are equals if they differ less than [FLOAT_COMPARISON_EPSILON].
 const FLOAT_COMPARISON_EPSILON: f64 = 1e-10;
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, Default, PartialEq, Serialize)]
 pub struct ComponentProfileResult {
     pub kernel: KernelStatistics,
     pub principals: Vec<PrincipalSummary>,
     /// Amount, in bytes, of memory that is known but remained unclaimed. Should be equal to zero.
     pub unclaimed: u64,
+    #[serde(with = "plugin_fidl_serde::PerformanceImpactMetricsDef")]
+    pub performance: fplugin::PerformanceImpactMetrics,
     pub digest: Digest,
 }
 

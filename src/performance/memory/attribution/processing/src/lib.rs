@@ -9,11 +9,13 @@ use futures::future::BoxFuture;
 use std::collections::{HashMap, HashSet};
 use summary::MemorySummary;
 
+mod name;
+
 pub mod digest;
 pub mod kernel_statistics;
-mod name;
 pub mod summary;
 pub use name::ZXName;
+pub mod plugin_fidl_serde;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct PrincipalIdentifier(pub u64);

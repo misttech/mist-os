@@ -92,6 +92,8 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         )
 
         profile = json.loads(cmd_output)
+        asserts.assert_in("performance", set(profile))
+
         (mm2,) = [
             p
             for p in profile["principals"]
