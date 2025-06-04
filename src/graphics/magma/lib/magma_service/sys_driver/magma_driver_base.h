@@ -94,7 +94,6 @@ class MagmaDriverBase : public fdf::DriverBase,
 
   zx::result<zx::resource> GetInfoResource();
 
-  fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client() { return node_client_; }
   std::mutex& magma_mutex() FIT_RETURN_CAPABILITY(magma_->magma_mutex) {
     return magma_->magma_mutex;
   }
@@ -130,9 +129,6 @@ class MagmaDriverBase : public fdf::DriverBase,
   // DependencyInjection::Owner implementation.
   void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override;
 
-  // Node representing this device; given from the parent.
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_client_;
-
   fit::deferred_callback teardown_logger_callback_;
 
   std::shared_ptr<MagmaObjects> magma_;
@@ -140,11 +136,10 @@ class MagmaDriverBase : public fdf::DriverBase,
   MagmaCombinedDeviceServer trusted_combined_device_server_;
   driver_devfs::Connector<fuchsia_gpu_magma::CombinedDevice> magma_devfs_connector_;
   // Node representing /dev/class/gpu/<id>.
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> gpu_node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> gpu_node_controller_;
+  fdf::OwnedChildNode gpu_node_;
 
-  internal::PerformanceCountersServer perf_counter_;
-  internal::DependencyInjectionServer dependency_injection_{this};
+  internal::PerformanceCountersServer perf_counter_{dispatcher()};
+  internal::DependencyInjectionServer dependency_injection_{this, dispatcher()};
 };
 
 class MagmaTestServer : public fidl::WireServer<fuchsia_gpu_magma::TestDevice2> {

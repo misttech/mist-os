@@ -17,11 +17,7 @@ zx::result<> MagmaDriverBase::Start() {
 
   InitializeInspector();
 
-  node_client_.Bind(std::move(node()));
-
-  auto defer_teardown = fit::defer([this]() { node_client_ = {}; });
-
-  if (zx::result result = perf_counter_.Create(node_client_); result.is_error()) {
+  if (zx::result result = perf_counter_.Create(node().borrow()); result.is_error()) {
     return result.take_error();
   }
   {
@@ -29,7 +25,7 @@ zx::result<> MagmaDriverBase::Start() {
     magma_->magma_system_device->set_perf_count_access_token_id(perf_counter_.GetEventKoid());
   }
 
-  if (zx::result result = dependency_injection_.Create(node_client_); result.is_error()) {
+  if (zx::result result = dependency_injection_.Create(node().borrow()); result.is_error()) {
     return result.take_error();
   }
 
@@ -40,7 +36,6 @@ zx::result<> MagmaDriverBase::Start() {
     return result.take_error();
   }
   MAGMA_LOG(INFO, "MagmaDriverBase::Start completed for MSD %s", std::string(name()).c_str());
-  defer_teardown.cancel();
   return zx::ok();
 }
 
@@ -133,30 +128,21 @@ zx::result<> MagmaDriverBase::CreateTestService(MagmaTestServer& test_server) {
 }
 
 zx::result<> MagmaDriverBase::CreateDevfsNode() {
-  fidl::Arena arena;
   zx::result connector = magma_devfs_connector_.Bind(dispatcher());
   if (connector.is_error()) {
-    node_client_ = {};
     return connector.take_error();
   }
 
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
-                   .connector(std::move(connector.value()))
-                   .class_name("gpu");
+  fuchsia_driver_framework::DevfsAddArgs devfs{
+      {.connector{std::move(connector.value())}, .class_name{"gpu"}}};
 
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, "magma_gpu")
-                  .devfs_args(devfs.Build())
-                  .Build();
+  zx::result gpu_node = AddOwnedChild("magma_gpu", devfs);
+  if (gpu_node.is_error()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", gpu_node.status_string());
+    return gpu_node.take_error();
+  }
+  gpu_node_ = std::move(gpu_node.value());
 
-  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
-
-  fidl::WireResult result = node_client_->AddChild(args, std::move(controller_endpoints.server),
-                                                   std::move(node_endpoints->server));
-  gpu_node_controller_.Bind(std::move(controller_endpoints.client));
-  gpu_node_.Bind(std::move(node_endpoints->client));
   // Add the gpu service.
   {
     auto power_protocol =

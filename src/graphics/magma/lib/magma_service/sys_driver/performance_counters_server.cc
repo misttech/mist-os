@@ -6,34 +6,27 @@
 
 namespace msd::internal {
 zx::result<> PerformanceCountersServer::Create(
-    fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client) {
+    fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent) {
   zx_status_t status = zx::event::create(0, &event_);
   if (status != ZX_OK) {
     return zx::error(status);
   }
-  fidl::Arena arena;
-  zx::result connector = devfs_connector_.Bind(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  zx::result connector = devfs_connector_.Bind(dispatcher_);
   if (connector.is_error()) {
     return connector.take_error();
   }
 
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
-                   .connector(std::move(connector.value()))
-                   .class_name("gpu-performance-counters");
+  fuchsia_driver_framework::DevfsAddArgs devfs{
+      {.connector{std::move(connector.value())}, .class_name{"gpu-performance-counters"}}};
 
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, "gpu-performance-counters")
-                  .devfs_args(devfs.Build())
-                  .Build();
+  zx::result child =
+      fdf::AddOwnedChild(parent, *fdf::Logger::GlobalInstance(), "gpu-performance-counters", devfs);
+  if (child.is_error()) {
+    MAGMA_LOG(ERROR, "Failed to add child: %s", child.status_string());
+    return child.take_error();
+  }
+  child_ = std::move(child.value());
 
-  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
-
-  fidl::WireResult result = node_client->AddChild(args, std::move(controller_endpoints.server),
-                                                  std::move(node_endpoints->server));
-  node_controller_.Bind(std::move(controller_endpoints.client));
-  node_.Bind(std::move(node_endpoints->client));
   return zx::ok();
 }
 

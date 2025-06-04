@@ -6,30 +6,23 @@
 
 namespace msd::internal {
 zx::result<> DependencyInjectionServer::Create(
-    fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client) {
-  fidl::Arena arena;
-  zx::result connector = devfs_connector_.Bind(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent) {
+  zx::result connector = devfs_connector_.Bind(dispatcher_);
   if (connector.is_error()) {
     return connector.take_error();
   }
 
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
-                   .connector(std::move(connector.value()))
-                   .class_name("gpu-dependency-injection");
+  fuchsia_driver_framework::DevfsAddArgs devfs{
+      {.connector{std::move(connector.value())}, .class_name{"gpu-dependency-injection"}}};
 
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, "gpu-dependency-injection")
-                  .devfs_args(devfs.Build())
-                  .Build();
+  zx::result child =
+      fdf::AddOwnedChild(parent, *fdf::Logger::GlobalInstance(), "gpu-dependency-injection", devfs);
+  if (child.is_error()) {
+    MAGMA_LOG(ERROR, "Failed to add child: %s", child.status_string());
+    return child.take_error();
+  }
+  child_ = std::move(child.value());
 
-  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
-
-  fidl::WireResult result = node_client->AddChild(args, std::move(controller_endpoints.server),
-                                                  std::move(node_endpoints->server));
-  node_controller_.Bind(std::move(controller_endpoints.client));
-  node_.Bind(std::move(node_endpoints->client));
   return zx::ok();
 }
 
@@ -44,8 +37,7 @@ void DependencyInjectionServer::SetMemoryPressureProvider(
     MAGMA_LOG(WARNING, "Failed to create fidl Endpoints");
     return;
   }
-  pressure_server_ = fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                      std::move(endpoints->server), this);
+  pressure_server_ = fidl::BindServer(dispatcher_, std::move(endpoints->server), this);
 
   fidl::WireSyncClient provider{std::move(request->provider)};
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
