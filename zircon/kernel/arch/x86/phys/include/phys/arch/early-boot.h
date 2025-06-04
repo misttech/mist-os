@@ -10,13 +10,14 @@
 #include <cstddef>
 #include <cstdint>
 
-// This is a placeholder on other architectures for preparing access to an
-// address range in early boot while the data cache is off. But x86 kernels are
-// booted with the data cache left on so this is a no-op.
+// These are placeholder on other architectures for preparing access to
+// address ranges in early boot while the data cache is off. But x86 kernels
+// are booted with the data cache left on so this is a no-op.
 inline void ArchEarlyBootSyncData(uintptr_t addr, size_t size) {}
+inline void ArchEarlyBootSyncAllocation(uintptr_t addr, size_t size) {}
 
 // Whether any early boot data access synchronization scheme is necessary,
-// equivalent to the above routine not being a no-op.
+// equivalent to the above routines not being a no-op.
 constexpr bool kArchEarlyBootDataSynchronization = false;
 
 #endif  // ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_EARLY_BOOT_H_

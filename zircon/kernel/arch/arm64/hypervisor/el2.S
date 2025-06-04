@@ -10,13 +10,6 @@
 #include <lib/arch/asm.h>
 #include <zircon/errors.h>
 
-#define CNTHCTL_EL2_EL1PCTEN            BIT_32(0)
-#define CNTHCTL_EL2_EL1PCEN             BIT_32(1)
-
-#define CPTR_EL2_TFP_SHIFT              10
-#define CPTR_EL2_TFP                    BIT_32(CPTR_EL2_TFP_SHIFT)
-#define CPTR_EL2_RES1                   0x33ff
-
 #define ESR_EL2_EC_FP                   0x07
 #define ESR_EL2_EC_HVC                  0x16
 #define ESR_EL2_EC_SHIFT                26
@@ -524,7 +517,7 @@ FUNCTION_LABEL(el2_guest_exit)
     host_state ldp, HS_XREGS
 
     mrs reg_xt, cptr_el2
-    tbnz reg_xt, CPTR_EL2_TFP_SHIFT, .Lfp_untrap
+    tbnz reg_xt, CPTR_EL2_TFP_BIT, .Lfp_untrap
 
     // Restore floating-point state if it was modified.
     fp_state stp, GS_FP_STATE
