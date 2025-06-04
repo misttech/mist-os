@@ -216,6 +216,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
         }
         fidl_wlanix::WifiChipRequest::TriggerSubsystemRestart { responder } => {
             info!("fidl_wlanix::WifiChipRequest::TriggerSubsystemRestart");
+            telemetry_sender.send(TelemetryEvent::RecoveryEvent);
             responder.send(Ok(())).context("send TriggerSubsystemRestart response")?;
         }
         fidl_wlanix::WifiChipRequest::_UnknownMethod { ordinal, .. } => {
@@ -2022,6 +2023,26 @@ mod tests {
             Poll::Ready(Ok(response)) => response,
         );
         assert_eq!(response.capabilities_mask, Some(0));
+    }
+
+    #[test]
+    fn test_wifi_chip_trigger_subsystem_restart() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+
+        let request_fut = test_helper.wifi_chip_proxy.trigger_subsystem_restart();
+        let mut request_fut = pin!(request_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut request_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_variant!(
+            test_helper.exec.run_until_stalled(&mut request_fut),
+            Poll::Ready(Ok(response)) => response,
+        );
+        assert_variant!(response, Ok(()));
+
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::RecoveryEvent)),
+        );
     }
 
     #[test]

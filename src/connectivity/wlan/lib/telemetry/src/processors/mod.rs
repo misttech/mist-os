@@ -5,5 +5,6 @@
 pub mod client_iface_counters;
 pub mod connect_disconnect;
 pub mod power;
+pub mod recovery;
 pub mod scan;
 pub mod toggle_events;

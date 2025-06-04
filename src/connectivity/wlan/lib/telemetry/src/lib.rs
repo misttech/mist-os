@@ -58,6 +58,7 @@ pub enum TelemetryEvent {
     /// Unclear power level requested by policy layer
     UnclearPowerDemand(UnclearPowerDemand),
     BatteryChargeStatus(fidl_battery::ChargeStatus),
+    RecoveryEvent,
 }
 
 /// Attempts to connect to the Cobalt service.
@@ -150,6 +151,7 @@ pub fn serve_telemetry(
         &time_matrix_client,
     );
     let power_logger = processors::power::PowerLogger::new(cobalt_proxy.clone(), &inspect_node);
+    let recovery_logger = processors::recovery::RecoveryLogger::new(cobalt_proxy.clone());
     let mut scan_logger = processors::scan::ScanLogger::new(cobalt_proxy.clone());
     let mut toggle_logger =
         processors::toggle_events::ToggleLogger::new(cobalt_proxy.clone(), &inspect_node);
@@ -217,6 +219,9 @@ pub fn serve_telemetry(
                         BatteryChargeStatus(charge_status) => {
                             scan_logger.handle_battery_charge_status(charge_status).await;
                             toggle_logger.handle_battery_charge_status(charge_status).await;
+                        }
+                        RecoveryEvent => {
+                            recovery_logger.handle_recovery_event().await;
                         }
                     }
                 }
