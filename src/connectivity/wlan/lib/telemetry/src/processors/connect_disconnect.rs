@@ -365,9 +365,7 @@ impl ConnectDisconnectLogger {
             }
         }
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_periodic_telemetry");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_periodic_telemetry");
     }
 
     pub async fn handle_suspend_imminent(&self) {
@@ -383,9 +381,7 @@ impl ConnectDisconnectLogger {
             });
         }
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_suspend_imminent");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_suspend_imminent");
     }
 }
 

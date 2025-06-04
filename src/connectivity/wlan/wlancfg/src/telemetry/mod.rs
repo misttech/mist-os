@@ -900,19 +900,23 @@ macro_rules! log_cobalt {
 
 macro_rules! log_cobalt_batch {
     ($cobalt_proxy:expr, $events:expr, $context:expr $(,)?) => {{
-        let status = $cobalt_proxy.log_metric_events($events).await;
-        match status {
-            Ok(Ok(())) => Ok(()),
-            Ok(Err(e)) => Err(format_err!(
-                "Failed logging batch metrics, context: {}, error: {:?}",
-                $context,
-                e
-            )),
-            Err(e) => Err(format_err!(
-                "Failed logging batch metrics, context: {}, error: {}",
-                $context,
-                e
-            )),
+        if $events.is_empty() {
+            Ok(())
+        } else {
+            let status = $cobalt_proxy.log_metric_events($events).await;
+            match status {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(e)) => Err(format_err!(
+                    "Failed logging batch metrics, context: {}, error: {:?}",
+                    $context,
+                    e
+                )),
+                Err(e) => Err(format_err!(
+                    "Failed logging batch metrics, context: {}, error: {}",
+                    $context,
+                    e
+                )),
+            }
         }
     }};
 }

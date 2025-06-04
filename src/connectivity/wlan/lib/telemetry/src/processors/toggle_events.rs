@@ -133,9 +133,7 @@ impl ToggleLogger {
         }
         self.current_state = Some(event_type);
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_toggle_events");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_toggle_events");
     }
 
     pub async fn handle_battery_charge_status(
@@ -171,9 +169,7 @@ impl ToggleLogger {
             _ => (),
         }
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_battery_charge_status");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_battery_charge_status");
     }
 }
 
