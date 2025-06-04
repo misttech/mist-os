@@ -1121,7 +1121,7 @@ mod tests {
     fn test_device_info() -> DeviceInfo {
         DeviceInfo::Partition(PartitionInfo {
             device_flags: fblock::Flag::READONLY,
-            max_transfer_blocks: None,
+            max_transfer_blocks: NonZero::new(10),
             block_range: Some(0..100),
             type_guid: [1; 16],
             instance_guid: [2; 16],
@@ -1155,7 +1155,7 @@ mod tests {
                 );
                 assert_eq!(block_info.flags, fblock::Flag::READONLY);
 
-                // TODO(https://fxbug.dev/348077960): Check max_transfer_size
+                assert_eq!(block_info.max_transfer_size, 10 * BLOCK_SIZE);
 
                 let (status, type_guid) = proxy.get_type_guid().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
