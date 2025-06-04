@@ -125,7 +125,7 @@ CRATE_ANNOTATIONS = {
     ],
     "zerocopy": [
         crate.annotation(
-            version = "0.8.25-alpha.2",
+            version = "0.8.26-alpha",
             rustc_flags = [
                 "--cfg=zerocopy_core_error_1_81_0",
                 "--cfg=zerocopy_diagnostic_on_unimplemented_1_78_0",
