@@ -9,7 +9,7 @@
 # This reduces disk consumption and speeds up builds.
 #
 # Usage:
-#   fx set --auto-dir fuchsia.arm64
+#   fx set fuchsia.arm64
 #   fx set-main-pb minimal.vim3
 #   fx build
 #   fx set-main-pb microfuchsia_eng.pkvm-arm64
