@@ -104,22 +104,10 @@ register_toolchains(
     "@fuchsia_prebuilt_rust//:rust_fuchsia_riscv64",
 )
 
-# com_google_absl is a dependency of com_google_googletest
-local_repository(
-    name = "abseil-cpp",
-    path = "third_party/abseil-cpp",
-)
-
 # buildifier: disable=load-on-top
 local_repository(
     name = "fuchsia_build_info",
     path = "%s/regenerator_outputs/fuchsia_build_info" % ninja_output_dir,
-)
-
-# com_googlesource_code_re2 is a dependency of com_google_googletest
-local_repository(
-    name = "re2",
-    path = "third_party/re2/src",
 )
 
 local_repository(

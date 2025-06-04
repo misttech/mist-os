@@ -27,6 +27,7 @@ fx-update-bazel-workspace
     --repo='@@bazel_features+' \
     --repo='@@bazel_skylib+' \
     --repo='@@platforms' \
+    --repo='@@re2+' \
     --repo='@@rules_cc+' \
     --repo='@@rules_go+' \
     --repo='@@rules_java+' \

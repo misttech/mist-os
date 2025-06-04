@@ -30,6 +30,12 @@ local_path_override(
     path = "third_party/protobuf",
 )
 
+bazel_dep(name = "abseil-cpp", version = "head")
+local_path_override(
+    module_name = "abseil-cpp",
+    path = "third_party/abseil-cpp",
+)
+
 # Create @fuchsia_build_config which contains host_prebuils/xxxx symlinks
 # to access host prebuilts without an explicit fuchsia_host_tag in their path.
 bazel_dep(name = "fuchsia_sdk_common", version = "")
@@ -37,6 +43,10 @@ local_path_override(
     module_name = "fuchsia_sdk_common",
     path = "build/bazel/local_repositories/fuchsia_sdk_common",
 )
+
+# TODO(https://fxbug.dev/131788): Use //third_party/re2 when it's upgraded to this version.
+bazel_dep(name = "re2", version = "2024-07-02.bcr.1")
+
 fuchsia_build_config_ext = use_extension("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
 use_repo(fuchsia_build_config_ext, "fuchsia_build_config")
 
