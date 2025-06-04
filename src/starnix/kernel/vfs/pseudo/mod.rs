@@ -4,6 +4,7 @@
 
 pub mod dynamic_file;
 pub mod pseudo_directory;
+pub mod pseudo_directory_builder;
 pub mod simple_file;
 pub mod static_directory;
 pub mod stub_bytes_file;

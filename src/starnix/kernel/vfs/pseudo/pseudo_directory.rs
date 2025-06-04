@@ -5,158 +5,15 @@
 use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
-    fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps, FsNode,
+    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
 };
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::{mode, FileMode};
+use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::ino_t;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{errno, ino_t};
-use std::collections::BTreeMap;
 use std::sync::Arc;
-
-type NodeOpsFactory = Arc<dyn Fn() -> Box<dyn FsNodeOps> + Send + Sync>;
-
-#[derive(Clone)]
-struct PseudoNodeEntry {
-    mode: FileMode,
-    creds: FsCred,
-    node_ops_factory: NodeOpsFactory,
-}
-
-enum PseudoEntry {
-    Node(PseudoNodeEntry),
-    Builder(PseudoDirectoryBuilder),
-}
-
-#[derive(Default)]
-pub struct PseudoDirectoryBuilder {
-    entries: BTreeMap<&'static FsStr, PseudoEntry>,
-}
-
-impl PseudoDirectoryBuilder {
-    pub fn node<F, O>(
-        &mut self,
-        name: impl Into<&'static FsStr>,
-        mode: FileMode,
-        creds: FsCred,
-        ops: F,
-    ) where
-        F: Send + Sync + Fn() -> O + 'static,
-        O: FsNodeOps,
-    {
-        let entry =
-            PseudoNodeEntry { mode, creds, node_ops_factory: Arc::new(move || Box::new(ops())) };
-        self.insert_node(name.into(), entry);
-    }
-
-    pub fn node_ops(
-        &mut self,
-        name: impl Into<&'static FsStr>,
-        mode: FileMode,
-        creds: FsCred,
-        ops: impl Fn() -> Box<dyn FsNodeOps> + Send + Sync + 'static,
-    ) {
-        let entry = PseudoNodeEntry { mode, creds, node_ops_factory: Arc::new(move || ops()) };
-        self.insert_node(name.into(), entry);
-    }
-
-    fn insert_node(&mut self, name: &'static FsStr, entry: PseudoNodeEntry) {
-        let existing_entry = self.entries.insert(name, PseudoEntry::Node(entry));
-        assert!(existing_entry.is_none());
-    }
-
-    pub fn subdir(&mut self, name: impl Into<&'static FsStr>) -> &mut PseudoDirectoryBuilder {
-        let name = name.into();
-        let entry = self
-            .entries
-            .entry(name)
-            .or_insert_with(|| PseudoEntry::Builder(PseudoDirectoryBuilder::default()));
-        if let PseudoEntry::Builder(ref mut builder) = entry {
-            builder
-        } else {
-            panic!("expected a registry with name {name}");
-        }
-    }
-
-    pub fn build(&self, fs: &FileSystem) -> Arc<PseudoDirectory> {
-        let entries = self
-            .entries
-            .iter()
-            .map(|(name, entry)| {
-                let ino = fs.allocate_ino();
-                match entry {
-                    PseudoEntry::Node(node) => (
-                        *name,
-                        PseudoDirectoryEntry {
-                            ino,
-                            mode: node.mode,
-                            creds: node.creds,
-                            node_ops_factory: node.node_ops_factory.clone(),
-                        },
-                    ),
-                    PseudoEntry::Builder(registry) => {
-                        let subdir = registry.build(fs);
-                        let node_ops_factory =
-                            Arc::new(move || -> Box<dyn FsNodeOps> { Box::new(subdir.clone()) });
-                        (
-                            *name,
-                            PseudoDirectoryEntry {
-                                ino,
-                                mode: mode!(IFDIR, 755),
-                                creds: FsCred::root(),
-                                node_ops_factory,
-                            },
-                        )
-                    }
-                }
-            })
-            .collect();
-        let ops = Arc::new(BtreePseudoDirectory { entries });
-        Arc::new(PseudoDirectory { ops })
-    }
-
-    pub fn build_root(&self, fs: &FileSystemHandle, mode: FileMode, creds: FsCred) {
-        assert!(mode.is_dir(), "root directory must be a directory");
-        let ops = self.build(fs);
-        let root_ino = fs.allocate_ino();
-        fs.create_root_with_info(root_ino, ops, FsNodeInfo::new(mode, creds));
-    }
-}
-
-struct PseudoDirectoryEntry {
-    ino: ino_t,
-    mode: FileMode,
-    creds: FsCred,
-    node_ops_factory: NodeOpsFactory,
-}
-
-struct BtreePseudoDirectory {
-    entries: BTreeMap<&'static FsStr, PseudoDirectoryEntry>,
-}
-
-impl PseudoDirectoryOps for BtreePseudoDirectory {
-    fn get_node(&self, name: &FsStr) -> Result<PseudoNode, Errno> {
-        let entry = self.entries.get(name).ok_or_else(|| errno!(ENOENT))?;
-        let ops = (entry.node_ops_factory)();
-        let ino = entry.ino;
-        let info = FsNodeInfo::new(entry.mode, entry.creds);
-        Ok(PseudoNode { ops, ino, info })
-    }
-
-    fn list_entries(&self) -> Vec<PseudoDirEntry> {
-        self.entries
-            .iter()
-            .map(|(name, entry)| PseudoDirEntry {
-                ino: entry.ino,
-                mode: entry.mode,
-                name: (*name).into(),
-            })
-            .collect()
-    }
-}
 
 pub struct PseudoDirEntry {
     pub ino: ino_t,
@@ -172,7 +29,6 @@ pub struct PseudoNode {
 
 pub trait PseudoDirectoryOps: Send + Sync + 'static {
     fn get_node(&self, name: &FsStr) -> Result<PseudoNode, Errno>;
-
     fn list_entries(&self) -> Vec<PseudoDirEntry>;
 }
 
