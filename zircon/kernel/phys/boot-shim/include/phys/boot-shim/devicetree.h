@@ -11,6 +11,7 @@
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
 #include <lib/boot-shim/pool-mem-config.h>
+#include <lib/boot-shim/reboot-reason.h>
 #include <lib/boot-shim/uart.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/memalloc/range.h>
@@ -73,6 +74,7 @@ using Arm64StandardBootShimItems =
                                      boot_shim::DevicetreeDtbItem,                        //
                                      boot_shim::GenericWatchdogItem<WatchdogMmioHelper>,  //
                                      boot_shim::ArmDevicetreeCpuTopologyItem,             //
+                                     boot_shim::RebootReasonItem,                         //
                                      boot_shim::ArmDevicetreeTimerItem>;
 
 // Accessor obtaining the boot hart ID, RISCV only.
@@ -228,6 +230,9 @@ class BootShimHelper {
           if (gDevicetreeBoot.nvram) {
             item.set_payload(*gDevicetreeBoot.nvram);
           }
+        },
+        [this](boot_shim::RebootReasonItem& item) {
+          item.Init(gDevicetreeBoot.cmdline, shim_.shim_name());
         },
         [](boot_shim::UartItem<>& item) { item.Init(GetUartDriver().config()); });
 
