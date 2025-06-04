@@ -165,7 +165,7 @@ if (toolchain_environment == "kernel.phys32" ||
       ]
     }
 
-    phys_executable("depthcharge-multiboot-shim") {
+    shim_executable("depthcharge-multiboot-shim") {
       sources = [ "depthcharge-multiboot-shim.cc" ]
       deps = [
         ":legacy-boot-shim",

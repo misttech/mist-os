@@ -4,6 +4,7 @@
 
 import("//build/assembly/assembly_input_bundle.gni")
 import("//build/assembly/developer_overrides.gni")
+import("//build/assembly/emulator_support_aib.gni")
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/kernel_aib.gni")
 import("//build/bazel/bazel_inputs.gni")
@@ -134,8 +135,14 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 #    kernel_aib_input: Performing a metadata walk with `kernel_aib_input` as data key
 #    and `kernel_aib_input_barrier` as walk key MUST yield exactly one entry. The entry
-#    contains a `zbi` member which is the relative path from `$root_out_dir`
+#    contains a `zbi` member which is the relative path from `$root_build_dir`
 #    to the kernel's ZBI.
+#
+#    emulator_support_aib: Performing a metadata walk with `emulator_support_aib_input`
+#    as data key and `emulator_support_aib_input_barrier` as walk key must yield exactly
+#    one entry. The entry contains a `path` which is the relative path to `$root_build_dir`
+#    of the `qemu_kernel` to used instead of the `qemu_kernel` provided by the default
+#    `emualtor_support` AIB.
 #
 template("assembled_system") {
   assert(current_toolchain == default_toolchain,
@@ -441,12 +448,12 @@ template("assembled_system") {
 
   # Create the AIB for a custom boot shim, if one was provided.
   if (defined(labels.custom_boot_shim_aib)) {
-    assembly_input_bundle(labels.custom_boot_shim_aib) {
-      forward_variables_from(invoker, [ "testonly" ])
-      deps = [ invoker.qemu_kernel ]
-      qemu_kernel = get_label_info("${deps[0]}", "root_out_dir") + "/" +
-                    get_label_info(deps[0], "name") + ".bin"
-
+    emulator_support_assembly_input_bundle(labels.custom_boot_shim_aib) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "qemu_kernel",
+                             ])
       bundles_dir = files.gendir
       bundle_name = "custom_boot_shim_aib"
     }
