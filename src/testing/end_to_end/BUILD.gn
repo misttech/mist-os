@@ -133,7 +133,7 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
   testonly = true
-  public_deps = []
+  public_deps = [ "honeydew/honeydew/affordances/ui/scenic/tests/functional_tests:scenic_test($host_toolchain)" ]
 }
 
 group("workbench_x64_staging_tests") {
@@ -211,6 +211,7 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
   public_deps = [
     "honeydew/honeydew/affordances/starnix/tests/functional_tests:starnix_test_on_non_starnix($host_toolchain)",
+    "honeydew/honeydew/affordances/ui/scenic/tests/functional_tests:scenic_test($host_toolchain)",
     "honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
 
     # Note - Intentionally not adding this hello_world_test across all the test groups

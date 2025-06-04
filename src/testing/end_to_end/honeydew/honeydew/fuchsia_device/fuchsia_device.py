@@ -24,6 +24,7 @@ from honeydew.affordances.rtc import rtc
 from honeydew.affordances.session import session
 from honeydew.affordances.starnix import starnix
 from honeydew.affordances.tracing import tracing
+from honeydew.affordances.ui.scenic import scenic
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
 from honeydew.affordances.virtual_audio import audio
@@ -226,6 +227,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             rtc.Rtc object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def scenic(self) -> scenic.Scenic:
+        """Returns a scenic affordance object.
+
+        Returns:
+            scenic.Scenic object
         """
 
     @properties.Affordance

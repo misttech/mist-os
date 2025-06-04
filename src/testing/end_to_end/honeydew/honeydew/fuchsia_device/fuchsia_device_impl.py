@@ -60,6 +60,7 @@ from honeydew.affordances.session import session, session_using_ffx
 from honeydew.affordances.starnix import errors as starnix_errors
 from honeydew.affordances.starnix import starnix, starnix_using_ffx
 from honeydew.affordances.tracing import tracing, tracing_using_fc
+from honeydew.affordances.ui.scenic import scenic, scenic_using_ffx
 from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input, user_input_using_fc
 from honeydew.affordances.virtual_audio import (
@@ -385,6 +386,15 @@ class FuchsiaDeviceImpl(
         return sl4f_obj
 
     # List all the affordances
+    @properties.Affordance
+    def scenic(self) -> scenic.Scenic:
+        """Returns a scenic affordance object.
+
+        Returns:
+            scenic.Scenic object
+        """
+        return scenic_using_ffx.ScenicUsingFfx(self.ffx)
+
     @properties.Affordance
     def session(self) -> session.Session:
         """Returns a session affordance object.
