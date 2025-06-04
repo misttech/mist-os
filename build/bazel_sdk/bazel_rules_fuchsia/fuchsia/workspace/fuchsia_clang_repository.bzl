@@ -5,7 +5,14 @@
 """Defines a WORKSPACE rule for loading a version of clang."""
 
 load("//common:toolchains/clang/repository_utils.bzl", "prepare_clang_repository")
-load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_arch", "normalize_os", "workspace_path")
+load(
+    "//fuchsia/workspace:utils.bzl",
+    "abspath_from_full_label_or_repo_relpath",
+    "fetch_cipd_contents",
+    "normalize_arch",
+    "normalize_os",
+    "workspace_path",
+)
 
 # Base URL for Fuchsia clang archives.
 _CLANG_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/third_party/clang/{os}-{arch}/+/{tag}"
@@ -95,8 +102,11 @@ def _fuchsia_clang_repository_impl(ctx):
     normalized_arch = normalize_arch(ctx)
 
     if ctx.attr.local_path:
-        local_clang = workspace_path(ctx, ctx.attr.local_path)
-        _instantiate_from_local_dir(ctx, local_clang)
+        _instantiate_from_local_dir(
+            ctx,
+            abspath_from_full_label_or_repo_relpath(ctx, ctx.attr.local_path),
+        )
+
     elif ctx.attr.from_workspace:
         # `$CWD` is `<output_base>/external/fuchsia_clang`, so make
         # `local_clang_workspace`
@@ -232,7 +242,7 @@ archive file.
             doc = "local clang archive file.",
         ),
         "local_path": attr.string(
-            doc = "local clang installation directory, relative to workspace root.",
+            doc = "local clang installation path, a full label, or relative to workspace dir",
         ),
         "from_workspace": attr.label(
             doc = "Any label to a bazel external workspace containing a clang installation.",
@@ -345,15 +355,19 @@ _cipd_tag = tag_class(
 )
 
 _archive_tag = tag_class(
-    attrs = {"local_archive": attr.string(
-        doc = "local clang archive file.",
-    )},
+    attrs = {
+        "local_archive": attr.string(
+            doc = "local clang archive file.",
+        ),
+    },
 )
 
 _local_tag = tag_class(
-    attrs = {"local_path": attr.string(
-        doc = "local clang installation path, relative to workspace_root.",
-    )},
+    attrs = {
+        "local_path": attr.string(
+            doc = "local clang installation path, a full label, or relative to workspace dir",
+        ),
+    },
 )
 
 fuchsia_clang_ext = module_extension(

@@ -261,8 +261,25 @@ platform(
     # Create symlinks used to locate host prebuilts without an explicit
     # fuchsia_host_tag in their path, making the top-level MODULE.bazel easier
     # to write.
-    prebuilt_host_subdirs = ["go", "clang", "rust"]
+    prebuilt_host_subdirs = ["go", "rust"]
     prebuilt_host_tools = ["ninja", "gn", "buildifier"]
+
+    # In case users set a custom clang prefix in GN, respect that config.
+    gn_args = json.decode(
+        repo_ctx.read("{}/fuchsia_build_generated/args.json".format(repo_ctx.workspace_root)),
+    )
+    if "clang_prefix" in gn_args:
+        clang_prefix = gn_args["clang_prefix"]
+
+        # GN clang_prefix can be GN labels, which are relative to workspace root.
+        if clang_prefix.startswith("//"):
+            clang_prefix = "{}/{}".format(repo_ctx.workspace_root, clang_prefix[2:])
+
+        # GN clang_prefix points to the `bin` directory under clang dir.
+        repo_ctx.symlink(repo_ctx.path(clang_prefix).dirname, "host_prebuilts/clang")
+    else:
+        prebuilt_host_subdirs.append("clang")
+
     for subdir in prebuilt_host_subdirs:
         repo_ctx.symlink("{}/prebuilt/third_party/{}/{}".format(repo_ctx.workspace_root, subdir, host_tag), "host_prebuilts/{}".format(subdir))
     for tool in prebuilt_host_tools:

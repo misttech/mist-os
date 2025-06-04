@@ -8,6 +8,10 @@ load(
     "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
     "prepare_clang_repository",
 )
+load(
+    "@rules_fuchsia//fuchsia/workspace:utils.bzl",
+    "abspath_from_full_label_or_repo_relpath",
+)
 
 # generate_prebuilt_clang_toolchain_repository() is used to generate
 # an external repository that contains a copy of the prebuilt
@@ -19,7 +23,10 @@ load(
 # the copy, possibly using hard links.
 #
 def _generate_prebuilt_clang_toolchain_impl(repo_ctx):
-    prepare_clang_repository(repo_ctx, repo_ctx.attr.clang_install_dir)
+    prepare_clang_repository(
+        repo_ctx,
+        abspath_from_full_label_or_repo_relpath(repo_ctx, repo_ctx.attr.clang_install_dir),
+    )
     workspace_dir = str(repo_ctx.workspace_root)
 
     if hasattr(repo_ctx.attr, "repository_version_file"):
@@ -45,7 +52,7 @@ generate_prebuilt_clang_toolchain_repository = repository_rule(
     implementation = _generate_prebuilt_clang_toolchain_impl,
     attrs = {
         "clang_install_dir": attr.string(
-            doc = "Clang installation directory, relative to workspace root.",
+            doc = "Clang installation directory, a full label, or path relative to workspace root.",
             mandatory = True,
         ),
         "repository_version_file": attr.string(
