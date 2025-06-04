@@ -56,6 +56,11 @@ pub struct Mapping {
     mlock: Option<Box<MlockMapping>>,
 }
 
+// The size of this type *heavily* influences Starnix's heap usage in common scenarios, please
+// think twice about increasing the size here.
+#[cfg(not(any(test, debug_assertions)))]
+static_assertions::assert_eq_size!(Mapping, [u8; 48]);
+
 impl Mapping {
     pub fn new(
         base: UserAddress,
