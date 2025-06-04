@@ -846,7 +846,7 @@ impl ThreadGroup {
 
             if let Some(parent) = parent {
                 let parent = parent.upgrade();
-                parent.check_orphans(locked);
+                parent.check_orphans(locked, pids);
             }
         }
     }
@@ -941,16 +941,14 @@ impl ThreadGroup {
     where
         L: LockBefore<ProcessGroupState>,
     {
-        {
-            let mut pids = self.kernel.pids.write();
-            if pids.get_process_group(self.leader).is_some() {
-                return error!(EPERM);
-            }
-            let process_group = ProcessGroup::new(self.leader, None);
-            pids.add_process_group(&process_group);
-            self.write().set_process_group(locked, process_group, &mut pids);
+        let mut pids = self.kernel.pids.write();
+        if pids.get_process_group(self.leader).is_some() {
+            return error!(EPERM);
         }
-        self.check_orphans(locked);
+        let process_group = ProcessGroup::new(self.leader, None);
+        pids.add_process_group(&process_group);
+        self.write().set_process_group(locked, process_group, &mut pids);
+        self.check_orphans(locked, &pids);
 
         Ok(())
     }
@@ -965,9 +963,9 @@ impl ThreadGroup {
     where
         L: LockBefore<ProcessGroupState>,
     {
-        {
-            let mut pids = self.kernel.pids.write();
+        let mut pids = self.kernel.pids.write();
 
+        {
             let current_process_group = Arc::clone(&self.read().process_group);
 
             // The target process must be either the current process of a child of the current process
@@ -1025,7 +1023,8 @@ impl ThreadGroup {
 
             target_thread_group.set_process_group(locked, new_process_group, &mut pids);
         }
-        target.thread_group().check_orphans(locked);
+
+        target.thread_group().check_orphans(locked, &pids);
 
         Ok(())
     }
@@ -1300,7 +1299,7 @@ impl ThreadGroup {
         Ok(())
     }
 
-    fn check_orphans<L>(&self, locked: &mut Locked<L>)
+    fn check_orphans<L>(&self, locked: &mut Locked<L>, pids: &PidTable)
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -1311,7 +1310,7 @@ impl ThreadGroup {
         let process_groups =
             thread_groups.iter().map(|tg| Arc::clone(&tg.read().process_group)).unique();
         for pg in process_groups {
-            pg.check_orphaned(locked);
+            pg.check_orphaned(locked, pids);
         }
     }
 
