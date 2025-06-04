@@ -8,7 +8,7 @@ use ffx_core::ffx_command;
 
 /// Create a Product Bundle using the outputs of Product Assembly.
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[derive(Clone, ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "create")]
 pub struct CreateCommand {
     /// product.board label. e.g. "workstation_eng.x64".

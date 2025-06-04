@@ -25,7 +25,7 @@ use fuchsia_pkg::PackageManifest;
 use fuchsia_repo::repo_builder::RepoBuilder;
 use fuchsia_repo::repo_keys::RepoKeys;
 use fuchsia_repo::repository::FileSystemRepository;
-use product_bundle::{ProductBundle, ProductBundleV2, Repository};
+use product_bundle::{ProductBundle, ProductBundleBuilder, ProductBundleV2, Repository};
 use sdk_metadata::{VirtualDevice, VirtualDeviceManifest};
 use std::fs::File;
 use tempfile::TempDir;
@@ -78,7 +78,7 @@ pub async fn pb_create_with_sdk_version(
             if cmd.tuf_keys.is_none() {
                 anyhow::bail!("TUF keys must be provided to build an update package");
             }
-            let version = cmd.update_package_version_file.ok_or_else(|| {
+            let version = cmd.update_package_version_file.clone().ok_or_else(|| {
                 anyhow::anyhow!("A version file must be provided to build an update package")
             })?;
             let epoch = cmd.update_package_epoch.ok_or_else(|| {
@@ -89,21 +89,91 @@ pub async fn pb_create_with_sdk_version(
             None
         };
 
-    // Make sure `out_dir` is created and empty.
-    if cmd.out_dir.exists() {
-        if cmd.out_dir == "" || cmd.out_dir == "/" {
-            anyhow::bail!("Avoiding deletion of an unsafe out directory: {}", &cmd.out_dir);
-        }
-        std::fs::remove_dir_all(&cmd.out_dir).context("Deleting the out_dir")?;
+    // Build a product bundle.
+    let mut pb_builder =
+        ProductBundleBuilder::new(cmd.product_name.clone(), cmd.product_version.clone())
+            .sdk_version(sdk_version.to_string());
+    if let Some(path) = &cmd.partitions {
+        let partitions = PartitionsConfig::from_dir(&path)
+            .with_context(|| format!("Parsing partitions config: {}", &path))?;
+        pb_builder = pb_builder.partitions(partitions);
     }
-    std::fs::create_dir_all(&cmd.out_dir).context("Creating the out_dir")?;
+    if let Some(system_path) = &cmd.system_a {
+        let system = AssembledSystem::from_dir(system_path)?;
+        pb_builder = pb_builder.system(system, PartitionSlot::A);
+    }
+    if let Some(system_path) = &cmd.system_b {
+        let system = AssembledSystem::from_dir(system_path)?;
+        pb_builder = pb_builder.system(system, PartitionSlot::B);
+    }
+    if let Some(system_path) = &cmd.system_r {
+        let system = AssembledSystem::from_dir(system_path)?;
+        pb_builder = pb_builder.system(system, PartitionSlot::R);
+    }
+    if let Some((version, epoch)) = &update_details {
+        pb_builder = pb_builder.update_package(version, *epoch);
+    }
+    if let Some(tuf_keys) = &cmd.tuf_keys {
+        let delivery_blob_type =
+            cmd.delivery_blob_type.unwrap_or(DEFAULT_DELIVERY_BLOB_TYPE).try_into()?;
+        pb_builder = pb_builder.repository(delivery_blob_type, tuf_keys);
+    }
+    for path in &cmd.virtual_device {
+        let device = VirtualDevice::try_load_from(&path)
+            .with_context(|| format!("Parsing file as virtual device: '{}'", path))?;
+        let name = path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path));
+        pb_builder = pb_builder.virtual_device(name, device);
+    }
+    if let Some(recommended_device) = &cmd.recommended_device {
+        pb_builder = pb_builder.recommended_virtual_device(recommended_device.clone());
+    }
+    if let Some(gerrit_size_report) = &cmd.gerrit_size_report {
+        pb_builder = pb_builder.gerrit_size_report(gerrit_size_report);
+    }
+    let product_bundle = pb_builder
+        .build(dyn_clone::clone_box(&*tools), &cmd.out_dir)
+        .await
+        .context("Building the product bundle")?;
 
-    let (system_a, packages_a) =
-        load_assembled_system(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
-    let (system_b, _packages_b) =
-        load_assembled_system(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
-    let (system_r, packages_r) =
-        load_assembled_system(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
+    // Create the old PB.
+    let tmp = TempDir::new().context("Creating tempdir for new product bundle")?;
+    let tmp_path = Utf8PathBuf::from_path_buf(tmp.path().to_path_buf()).unwrap();
+    let _ =
+        pb_create_old(cmd.clone(), sdk_version, tools, &tmp_path, update_details.clone()).await?;
+
+    // Assert the PB manifests are the same.
+    let old_pb_file = File::open(&tmp_path.join("product_bundle.json"))?;
+    let old_pb_manifest: serde_json::Value = serde_json::from_reader(old_pb_file)?;
+    let new_pb_file = File::open(&cmd.out_dir.join("product_bundle.json"))?;
+    let new_pb_manifest: serde_json::Value = serde_json::from_reader(new_pb_file)?;
+    ensure!(
+        old_pb_manifest == new_pb_manifest,
+        "New product bundle:\n{:#?}\n\ndoes not match what is expected:\n{:#?}",
+        &new_pb_manifest,
+        &old_pb_manifest,
+    );
+
+    if cmd.with_deprecated_flash_manifest {
+        let manifest_path = cmd.out_dir.join("flash.json");
+        let flash_manifest_file = File::create(&manifest_path)
+            .with_context(|| format!("Couldn't create flash.json '{}'", manifest_path))?;
+        FlashManifestVersion::from_product_bundle(&product_bundle)?.write(flash_manifest_file)?
+    }
+
+    Ok(())
+}
+
+async fn pb_create_old(
+    cmd: CreateCommand,
+    sdk_version: &str,
+    tools: Box<dyn ToolProvider>,
+    out_dir: impl AsRef<Utf8Path>,
+    update_details: Option<(Utf8PathBuf, u64)>,
+) -> Result<ProductBundle> {
+    let out_dir = out_dir.as_ref();
+    let (system_a, packages_a) = load_assembled_system(&cmd.system_a, &out_dir.join("system_a"))?;
+    let (system_b, _packages_b) = load_assembled_system(&cmd.system_b, &out_dir.join("system_b"))?;
+    let (system_r, packages_r) = load_assembled_system(&cmd.system_r, &out_dir.join("system_r"))?;
 
     // Load the partitions config from the boards and product bundle, and
     // ensure they are all identical.
@@ -146,8 +216,7 @@ pub async fn pb_create_with_sdk_version(
     maybe_add_partitions_config(partitions_from_system(system_r.as_ref()), false)?;
 
     let partitions = partitions.ok_or_else(|| anyhow!("Missing a partitions config"))?;
-    let partitions =
-        partitions.0.write_to_dir(&cmd.out_dir.join("partitions"), None::<Utf8PathBuf>)?;
+    let partitions = partitions.0.write_to_dir(&out_dir.join("partitions"), None::<Utf8PathBuf>)?;
 
     // We must assert that the board_name for the system of images matches the hardware_revision in
     // the partitions config, otherwise OTAs may not work.
@@ -220,7 +289,7 @@ pub async fn pb_create_with_sdk_version(
     // We always create a blobs directory even if there is no repository, because tools that read
     // the product bundle inadvertently creates the blobs directory, which dirties the product
     // bundle, causing hermeticity errors.
-    let repo_path = &cmd.out_dir;
+    let repo_path = &out_dir;
     let blobs_path = repo_path.join("blobs");
     std::fs::create_dir(&blobs_path).context("Creating blobs directory")?;
 
@@ -295,7 +364,7 @@ pub async fn pb_create_with_sdk_version(
         let mut manifest = VirtualDeviceManifest::default();
 
         // Create the virtual_devices directory.
-        let vd_dir = cmd.out_dir.join("virtual_devices");
+        let vd_dir = out_dir.join("virtual_devices");
         std::fs::create_dir_all(&vd_dir).context("Creating the virtual_devices directory.")?;
 
         for path in cmd.virtual_device {
@@ -343,16 +412,9 @@ pub async fn pb_create_with_sdk_version(
         virtual_devices_path,
     };
     let product_bundle = ProductBundle::V2(product_bundle);
-    product_bundle.write(&cmd.out_dir).context("writing product bundle")?;
+    product_bundle.write(&out_dir).context("writing product bundle")?;
 
-    if cmd.with_deprecated_flash_manifest {
-        let manifest_path = cmd.out_dir.join("flash.json");
-        let flash_manifest_file = File::create(&manifest_path)
-            .with_context(|| format!("Couldn't create flash.json '{}'", manifest_path))?;
-        FlashManifestVersion::from_product_bundle(&product_bundle)?.write(flash_manifest_file)?
-    }
-
-    Ok(())
+    Ok(product_bundle)
 }
 
 /// Open and parse an AssembledSystem from a path, copying the images into `out_dir`.
@@ -463,11 +525,15 @@ fn copy_file(source: impl AsRef<Utf8Path>, out_dir: impl AsRef<Utf8Path>) -> Res
 #[cfg(test)]
 mod test {
     use super::*;
+    use assembled_system::Image;
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
+    use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_repo::test_utils;
-    use sdk_metadata::VirtualDeviceV1;
+    use product_bundle::{ProductBundle, ProductBundleV2, Repository};
+    use sdk_metadata::{VirtualDeviceManifest, VirtualDeviceV1};
     use std::fs;
     use std::io::Write;
+    use tempfile::TempDir;
 
     const VIRTUAL_DEVICE_VALID: &str =
         include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");

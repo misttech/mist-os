@@ -8,7 +8,12 @@
 //! emulated, flashed, and OTA'd.
 
 mod product_bundle;
+mod product_bundle_builder;
 mod v2;
 
-pub use product_bundle::*;
+pub use product_bundle::{get_repositories, LoadedProductBundle, ProductBundle};
+pub use product_bundle_builder::ProductBundleBuilder;
 pub use v2::{ProductBundleV2, Repository, Type};
+
+// Re-export for convenience with the ProductBundleBuilder.
+pub use assembly_partitions_config::Slot;
