@@ -8084,7 +8084,7 @@ rustc_library("hyper-v0_14_19") {
   deps += [ ":tokio-v1_38_1" ]
   deps += [ ":tower-service-v0_3_0" ]
   deps += [ ":tracing-v0_1_40" ]
-  deps += [ ":want-v0_3_0" ]
+  deps += [ ":want-v0_3_1" ]
 
   rustenv = []
 
@@ -18634,15 +18634,15 @@ rustc_library("trust-dns-resolver-v0_22_0") {
   applicable_licenses = [ ":trust-dns-resolver-v0_22_0.license" ]
 }
 
-license("try-lock-v0_2_2.license") {
+license("try-lock-v0_2_5.license") {
   public_package_name = "try_lock"
-  license_files = [ "//third_party/rust_crates/vendor/try-lock-0.2.2/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/try-lock-0.2.5/LICENSE" ]
 }
 
-rustc_library("try-lock-v0_2_2") {
+rustc_library("try-lock-v0_2_5") {
   crate_name = "try_lock"
-  source_root = "//third_party/rust_crates/vendor/try-lock-0.2.2/src/lib.rs"
-  output_name = "try_lock-d2aa576612eef943"
+  source_root = "//third_party/rust_crates/vendor/try-lock-0.2.5/src/lib.rs"
+  output_name = "try_lock-a4f21a9542c1d391"
   edition = "2015"
   disable_clippy = true
   enforce_source_listing = false
@@ -18654,13 +18654,13 @@ rustc_library("try-lock-v0_2_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=d2aa576612eef943",
-    "-Cextra-filename=-d2aa576612eef943",
+    "-Cmetadata=a4f21a9542c1d391",
+    "-Cextra-filename=-a4f21a9542c1d391",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":try-lock-v0_2_2.license" ]
+  applicable_licenses = [ ":try-lock-v0_2_5.license" ]
 }
 
 license("ttf-parser-v0_10_1.license") {
@@ -20029,35 +20029,34 @@ rustc_library("walkdir-v2_5_0") {
   applicable_licenses = [ ":walkdir-v2_5_0.license" ]
 }
 
-license("want-v0_3_0.license") {
+license("want-v0_3_1.license") {
   public_package_name = "want"
-  license_files = [ "//third_party/rust_crates/vendor/want-0.3.0/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/want-0.3.1/LICENSE" ]
 }
 
-rustc_library("want-v0_3_0") {
+rustc_library("want-v0_3_1") {
   crate_name = "want"
-  source_root = "//third_party/rust_crates/vendor/want-0.3.0/src/lib.rs"
-  output_name = "want-7ea5f0f15ff169c0"
+  source_root = "//third_party/rust_crates/vendor/want-0.3.1/src/lib.rs"
+  output_name = "want-ffc1101182e7e5a7"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_22" ]
-  deps += [ ":try-lock-v0_2_2" ]
+  deps += [ ":try-lock-v0_2_5" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=7ea5f0f15ff169c0",
-    "-Cextra-filename=-7ea5f0f15ff169c0",
+    "-Cmetadata=ffc1101182e7e5a7",
+    "-Cextra-filename=-ffc1101182e7e5a7",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":want-v0_3_0.license" ]
+  applicable_licenses = [ ":want-v0_3_1.license" ]
 }
 
 rustc_library("wasi-v0_11_0+wasi-snapshot-preview1") {

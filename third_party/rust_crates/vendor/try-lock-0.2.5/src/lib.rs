@@ -1,7 +1,7 @@
-#![doc(html_root_url = "https://docs.rs/try-lock/0.2.2")]
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 #![deny(warnings)]
+#![cfg_attr(not(test), no_std)]
 
 //! A light-weight lock guarded by an atomic boolean.
 //!
@@ -43,10 +43,14 @@
 //! assert_eq!(locked2.name, "Spanner Bundle");
 //! ```
 
-use std::cell::UnsafeCell;
-use std::fmt;
-use std::ops::{Deref, DerefMut};
-use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(test)]
+extern crate core;
+
+use core::cell::UnsafeCell;
+use core::fmt;
+use core::ops::{Deref, DerefMut};
+use core::sync::atomic::{AtomicBool, Ordering};
+use core::marker::PhantomData;
 
 /// A light-weight lock guarded by an atomic boolean.
 ///
@@ -64,7 +68,7 @@ pub struct TryLock<T> {
 impl<T> TryLock<T> {
     /// Create a `TryLock` around the value.
     #[inline]
-    pub fn new(val: T) -> TryLock<T> {
+    pub const fn new(val: T) -> TryLock<T> {
         TryLock {
             is_locked: AtomicBool::new(false),
             value: UnsafeCell::new(val),
@@ -82,10 +86,13 @@ impl<T> TryLock<T> {
     ///
     /// The default memory ordering is to use `Acquire` to lock, and `Release`
     /// to unlock. If different ordering is required, use
-    /// [`try_lock_order`](TryLock::try_lock_order).
+    /// [`try_lock_explicit`](TryLock::try_lock_explicit) or
+    /// [`try_lock_explicit_unchecked`](TryLock::try_lock_explicit_unchecked).
     #[inline]
     pub fn try_lock(&self) -> Option<Locked<T>> {
-        self.try_lock_order(Ordering::Acquire, Ordering::Release)
+        unsafe {
+            self.try_lock_explicit_unchecked(Ordering::Acquire, Ordering::Release)
+        }
     }
 
     /// Try to acquire the lock of this value using the lock and unlock orderings.
@@ -95,11 +102,72 @@ impl<T> TryLock<T> {
     /// by spinning a few times, or by using some other means of
     /// notification.
     #[inline]
+    #[deprecated(
+        since = "0.2.3",
+        note = "This method is actually unsafe because it unsafely allows \
+        the use of weaker memory ordering. Please use try_lock_explicit instead"
+    )]
     pub fn try_lock_order(&self, lock_order: Ordering, unlock_order: Ordering) -> Option<Locked<T>> {
+        unsafe {
+            self.try_lock_explicit_unchecked(lock_order, unlock_order)
+        }
+    }
+
+    /// Try to acquire the lock of this value using the specified lock and
+    /// unlock orderings.
+    ///
+    /// If the lock is already acquired by someone else, this returns
+    /// `None`. You can try to acquire again whenever you want, perhaps
+    /// by spinning a few times, or by using some other means of
+    /// notification.
+    ///
+    /// # Panic
+    ///
+    /// This method panics if `lock_order` is not any of `Acquire`, `AcqRel`,
+    /// and `SeqCst`, or `unlock_order` is not any of `Release` and `SeqCst`.
+    #[inline]
+    pub fn try_lock_explicit(&self, lock_order: Ordering, unlock_order: Ordering) -> Option<Locked<T>> {
+        match lock_order {
+            Ordering::Acquire |
+            Ordering::AcqRel |
+            Ordering::SeqCst => {}
+            _ => panic!("lock ordering must be `Acquire`, `AcqRel`, or `SeqCst`"),
+        }
+
+        match unlock_order {
+            Ordering::Release |
+            Ordering::SeqCst => {}
+            _ => panic!("unlock ordering must be `Release` or `SeqCst`"),
+        }
+
+        unsafe {
+            self.try_lock_explicit_unchecked(lock_order, unlock_order)
+        }
+    }
+
+    /// Try to acquire the lock of this value using the specified lock and
+    /// unlock orderings without checking that the specified orderings are
+    /// strong enough to be safe.
+    ///
+    /// If the lock is already acquired by someone else, this returns
+    /// `None`. You can try to acquire again whenever you want, perhaps
+    /// by spinning a few times, or by using some other means of
+    /// notification.
+    ///
+    /// # Safety
+    ///
+    /// Unlike [`try_lock_explicit`], this method is unsafe because it does not
+    /// check that the given memory orderings are strong enough to prevent data
+    /// race.
+    ///
+    /// [`try_lock_explicit`]: Self::try_lock_explicit
+    #[inline]
+    pub unsafe fn try_lock_explicit_unchecked(&self, lock_order: Ordering, unlock_order: Ordering) -> Option<Locked<T>> {
         if !self.is_locked.swap(true, lock_order) {
             Some(Locked {
                 lock: self,
                 order: unlock_order,
+                _p: PhantomData,
             })
         } else {
             None
@@ -110,15 +178,7 @@ impl<T> TryLock<T> {
     #[inline]
     pub fn into_inner(self) -> T {
         debug_assert!(!self.is_locked.load(Ordering::Relaxed), "TryLock was mem::forgotten");
-        // Since the compiler can statically determine this is the only owner,
-        // it's safe to take the value out. In fact, in newer versions of Rust,
-        // `UnsafeCell::into_inner` has been marked safe.
-        //
-        // To support older version (1.21), the unsafe block is still here.
-        #[allow(unused_unsafe)]
-        unsafe {
-            self.value.into_inner()
-        }
+        self.value.into_inner()
     }
 }
 
@@ -157,6 +217,8 @@ impl<T: fmt::Debug> fmt::Debug for TryLock<T> {
 pub struct Locked<'a, T: 'a> {
     lock: &'a TryLock<T>,
     order: Ordering,
+    /// Suppresses Send and Sync autotraits for `struct Locked`.
+    _p: PhantomData<*mut T>,
 }
 
 impl<'a, T> Deref for Locked<'a, T> {
