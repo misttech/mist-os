@@ -1,12 +1,6 @@
 # DriverTestRealm
 
-Caution: This page may contain information that is specific to the legacy
-version of the driver framework (DFv1).
-
 *A driver integration testing framework*
-
-Note: The isolated-devmgr library has been deprecated. Please use the driver_test_realm
-instead. The DriverFramework team will organize a migration to driver_test_realm.
 
 Note: ***DriverTestRealm is for integration testing.***
 
@@ -18,7 +12,8 @@ APIs, and provides an environment that is nearly identical to a running system.
 
 DriverTestRealm is for integration testing. For a light weight unit testing
 framework, use
-[mock DDK](/docs/development/drivers/testing/mock_ddk.md) instead.
+[the unit testing library](/docs/development/sdk/driver-testing/driver-unit-testing-quick-start.md)
+instead.
 
 ## Overview of DriverTestRealm
 

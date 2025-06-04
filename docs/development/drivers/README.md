@@ -93,7 +93,6 @@ section.
 - Testing
 
   - [Driver testing][driver-testing-overview]
-  - [Mock DDK][mock-ddk]
 
 - Debugging
 
@@ -169,7 +168,6 @@ section.
 [lifecycle-of-a-usb-request]: driver_guides/usb/concepts/request-lifecycle.md
 [usb-mass-storage-driver]: driver_guides/usb/concepts/usb-mass-storage.md
 [driver-testing-overview]: testing/overview.md
-[mock-ddk]: testing/mock_ddk.md
 [driver-test-realm]: testing/driver_test_realm.md
 [threading-tips-in-tests]: testing/threading-tips-in-tests.md
 [using-inspect]: diagnostics/inspect.md

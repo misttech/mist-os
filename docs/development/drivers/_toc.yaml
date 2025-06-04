@@ -37,12 +37,6 @@ toc:
       path: /docs/development/drivers/developer_guide/troubleshoot-common-issues.md
     - title: "Driver utilities"
       path: /docs/development/drivers/diagnostics/driver-utils.md
-  - title: "Testing"
-    section:
-    - title: "DriverTestRealm"
-      path: /docs/development/drivers/testing/driver_test_realm.md
-    - title: "Threading tips in tests"
-      path: /docs/development/drivers/testing/threading-tips-in-tests.md
   - title: "Best practices"
     section:
     - title: "VMO registration pattern"
@@ -68,6 +62,9 @@ toc:
 - title: "Driver-specific guides"
   section:
   - include: /docs/development/drivers/driver_guides/_toc.yaml
+- title: "Testing"
+  section:
+  - include: /docs/development/drivers/testing/_toc.yaml
 - title: "Others"
   section:
   - title: "Deleting drivers"
