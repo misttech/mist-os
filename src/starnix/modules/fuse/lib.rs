@@ -483,7 +483,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
             ),
         );
 
-        Ok(dir.build(current_task))
+        Ok(dir.build())
     }
 }
 

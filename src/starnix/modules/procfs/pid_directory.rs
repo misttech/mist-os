@@ -150,7 +150,7 @@ impl FsNodeOps for TaskDirectoryNode {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let task_weak = self.task_weak.clone();
@@ -223,7 +223,6 @@ impl FsNodeOps for TaskDirectoryNode {
                     (security::ProcAttr::SockCreate, "sockcreate"),
                 ] {
                     subdir.entry_etc(
-                        current_task,
                         name,
                         AttrNode::new(task_weak.clone(), attr),
                         mode!(IFREG, 0o666),
@@ -232,7 +231,6 @@ impl FsNodeOps for TaskDirectoryNode {
                     );
                 }
                 subdir.entry_etc(
-                    current_task,
                     "prev",
                     AttrNode::new(task_weak, security::ProcAttr::Previous),
                     mode!(IFREG, 0o444),

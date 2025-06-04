@@ -100,7 +100,6 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "accept_redirects",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/conf/accept_redirects",
@@ -108,7 +107,7 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }
@@ -157,7 +156,6 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "ucast_solicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/ucast_solicit",
@@ -166,7 +164,6 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "retrans_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/retrans_time_ms",
@@ -175,7 +172,6 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "mcast_resolicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/mcast_resolicit",
@@ -184,7 +180,6 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "base_reachable_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/base_reachable_time_ms",
@@ -192,7 +187,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }
@@ -241,7 +236,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "accept_ra",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra",
@@ -250,7 +244,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_defrtr",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_defrtr",
@@ -259,7 +252,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_info_min_plen",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_info_min_plen",
@@ -268,7 +260,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_rt_info_min_plen",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_info_min_plen",
@@ -277,7 +268,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_rt_table",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_table",
@@ -286,7 +276,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_redirects",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_redirects",
@@ -295,7 +284,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "dad_transmits",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/dad_transmits",
@@ -304,7 +292,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "use_tempaddr",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_tempaddr",
@@ -313,7 +300,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "addr_gen_mode",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/addr_gen_mode",
@@ -322,7 +308,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "stable_secret",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/stable_secret",
@@ -331,16 +316,14 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "disable_ipv6",
                 StubBytesFile::new_node(
-                    "/proc/sys/net/ipv6/DEVICE/conf/disable_ip64",
+                    "/proc/sys/net/ipv6/DEVICE/conf/disable_ipv6",
                     bug_ref!("https://fxbug.dev/297439563"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "optimistic_dad",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/optimistic_dad",
@@ -349,7 +332,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "use_oif_addrs_only",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_oif_addrs_only",
@@ -358,7 +340,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "use_optimistic",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_optimistic",
@@ -367,7 +348,6 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "forwarding",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/forwarding",
@@ -375,7 +355,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }
@@ -424,7 +404,6 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "ucast_solicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/ucast_solicit",
@@ -433,7 +412,6 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "retrans_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/retrans_time_ms",
@@ -442,7 +420,6 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "mcast_resolicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/mcast_resolicit",
@@ -451,7 +428,6 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "base_reachable_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/base_reachable_time_ms",
@@ -459,7 +435,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }

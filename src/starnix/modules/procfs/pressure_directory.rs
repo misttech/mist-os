@@ -44,25 +44,10 @@ pub fn pressure_directory(
     };
 
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry(
-        current_task,
-        "memory",
-        MemoryPressureFile::new_node(psi_provider),
-        mode!(IFREG, 0o666),
-    );
-    dir.entry(
-        current_task,
-        "cpu",
-        StubPressureFile::new_node(StubPressureFileKind::CPU),
-        mode!(IFREG, 0o666),
-    );
-    dir.entry(
-        current_task,
-        "io",
-        StubPressureFile::new_node(StubPressureFileKind::IO),
-        mode!(IFREG, 0o666),
-    );
-    Some(dir.build(current_task))
+    dir.entry("memory", MemoryPressureFile::new_node(psi_provider), mode!(IFREG, 0o666));
+    dir.entry("cpu", StubPressureFile::new_node(StubPressureFileKind::CPU), mode!(IFREG, 0o666));
+    dir.entry("io", StubPressureFile::new_node(StubPressureFileKind::IO), mode!(IFREG, 0o666));
+    Some(dir.build())
 }
 
 struct PsiProvider {

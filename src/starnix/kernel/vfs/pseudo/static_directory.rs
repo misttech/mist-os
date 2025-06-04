@@ -36,18 +36,16 @@ impl<'a> StaticDirectoryBuilder<'a> {
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
     pub fn entry(
         &mut self,
-        current_task: &CurrentTask,
         name: &'static str,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
     ) {
-        self.entry_etc(current_task, name, ops, mode, DeviceType::NONE, FsCred::root());
+        self.entry_etc(name, ops, mode, DeviceType::NONE, FsCred::root());
     }
 
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
     pub fn entry_etc(
         &mut self,
-        _current_task: &CurrentTask,
         name: &'static str,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
@@ -61,17 +59,11 @@ impl<'a> StaticDirectoryBuilder<'a> {
         self.node(name, node);
     }
 
-    pub fn subdir(
-        &mut self,
-        current_task: &CurrentTask,
-        name: &'static str,
-        mode: u32,
-        build_subdir: impl Fn(&mut Self),
-    ) {
+    pub fn subdir(&mut self, name: &'static str, mode: u32, build_subdir: impl Fn(&mut Self)) {
         let mut subdir = Self::new(self.fs);
         build_subdir(&mut subdir);
         subdir.set_mode(mode!(IFDIR, mode));
-        self.node(name, subdir.build(current_task));
+        self.node(name, subdir.build());
     }
 
     /// Adds an [`FsNode`] entry to the directory, which already has an inode number and file mode.
@@ -94,7 +86,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     }
 
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
-    pub fn build(self, _current_task: &CurrentTask) -> FsNodeHandle {
+    pub fn build(self) -> FsNodeHandle {
         self.fs.create_node_and_allocate_node_id(
             Arc::new(StaticDirectory { entries: self.entries }),
             FsNodeInfo::new(self.mode, self.creds),

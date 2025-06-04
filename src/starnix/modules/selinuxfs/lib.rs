@@ -126,52 +126,37 @@ impl SeLinuxFs {
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         // Read-only files & directories, exposing SELinux internal state.
-        dir.subdir(current_task, "avc", 0o555, |dir| {
+        dir.subdir("avc", 0o555, |dir| {
             dir.entry(
-                current_task,
                 "cache_stats",
                 AvcCacheStatsFile::new_node(security_server.clone()),
                 mode!(IFREG, 0o444),
             );
         });
-        dir.entry(current_task, "checkreqprot", CheckReqProtApi::new_node(), mode!(IFREG, 0o644));
+        dir.entry("checkreqprot", CheckReqProtApi::new_node(), mode!(IFREG, 0o644));
+        dir.entry("class", ClassDirectory::new(security_server.clone()), mode!(IFDIR, 0o555));
         dir.entry(
-            current_task,
-            "class",
-            ClassDirectory::new(security_server.clone()),
-            mode!(IFDIR, 0o555),
-        );
-        dir.entry(
-            current_task,
             "deny_unknown",
             DenyUnknownFile::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
-            current_task,
             "reject_unknown",
             RejectUnknownFile::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
-        dir.subdir(current_task, "initial_contexts", 0o555, |dir| {
+        dir.subdir("initial_contexts", 0o555, |dir| {
             for initial_sid in InitialSid::all_variants().into_iter() {
                 dir.entry(
-                    current_task,
                     initial_sid.name(),
                     InitialContextFile::new_node(security_server.clone(), *initial_sid),
                     mode!(IFREG, 0o444),
                 );
             }
         });
-        dir.entry(current_task, "mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
+        dir.entry("mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
+        dir.entry("policy", PolicyFile::new_node(security_server.clone()), mode!(IFREG, 0o600));
         dir.entry(
-            current_task,
-            "policy",
-            PolicyFile::new_node(security_server.clone()),
-            mode!(IFREG, 0o600),
-        );
-        dir.entry(
-            current_task,
             "policyvers",
             BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).into_bytes()),
             mode!(IFREG, 0o444),
@@ -186,7 +171,6 @@ impl SeLinuxFs {
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .map_err(impossible_error)?;
         dir.entry(
-            current_task,
             "status",
             MemoryRegularNode::from_memory(Arc::new(MemoryObject::from(status_file))),
             mode!(IFREG, 0o444),
@@ -194,49 +178,23 @@ impl SeLinuxFs {
         security_server.set_status_publisher(Box::new(status_holder));
 
         // Write-only files used to configure and query SELinux.
-        dir.entry(current_task, "access", AccessApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("access", AccessApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("context", ContextApi::new_node(security_server.clone()), mode!(IFREG, 0o666));
+        dir.entry("create", CreateApi::new_node(security_server.clone()), mode!(IFREG, 0o666));
+        dir.entry("member", MemberApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("relabel", RelabelApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("user", UserApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("load", LoadApi::new_node(security_server.clone()), mode!(IFREG, 0o600));
         dir.entry(
-            current_task,
-            "context",
-            ContextApi::new_node(security_server.clone()),
-            mode!(IFREG, 0o666),
-        );
-        dir.entry(
-            current_task,
-            "create",
-            CreateApi::new_node(security_server.clone()),
-            mode!(IFREG, 0o666),
-        );
-        dir.entry(current_task, "member", MemberApi::new_node(), mode!(IFREG, 0o666));
-        dir.entry(current_task, "relabel", RelabelApi::new_node(), mode!(IFREG, 0o666));
-        dir.entry(current_task, "user", UserApi::new_node(), mode!(IFREG, 0o666));
-        dir.entry(
-            current_task,
-            "load",
-            LoadApi::new_node(security_server.clone()),
-            mode!(IFREG, 0o600),
-        );
-        dir.entry(
-            current_task,
             "commit_pending_bools",
             CommitBooleansApi::new_node(security_server.clone()),
             mode!(IFREG, 0o200),
         );
 
         // Read/write files allowing values to be queried or changed.
-        dir.entry(
-            current_task,
-            "booleans",
-            BooleansDirectory::new(security_server.clone()),
-            mode!(IFDIR, 0o555),
-        );
-        dir.entry(
-            current_task,
-            "enforce",
-            EnforceApi::new_node(security_server.clone()),
-            // TODO(b/297313229): Get mode from the container.
-            mode!(IFREG, 0o644),
-        );
+        dir.entry("booleans", BooleansDirectory::new(security_server.clone()), mode!(IFDIR, 0o555));
+        // TODO(b/297313229): Get mode from the container.
+        dir.entry("enforce", EnforceApi::new_node(security_server.clone()), mode!(IFREG, 0o644));
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
         let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
@@ -860,7 +818,7 @@ impl FsNodeOps for ClassDirectory {
         &self,
         _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         profile_duration!("selinuxfs.class.lookup");
@@ -873,14 +831,13 @@ impl FsNodeOps for ClassDirectory {
             .map_err(|_| errno!(EINVAL))?
             .into();
         let index_bytes = format!("{}", id).into_bytes();
-        dir.entry(current_task, "index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
+        dir.entry("index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
         dir.entry(
-            current_task,
             "perms",
             PermsDirectory::new(self.security_server.clone(), name.to_string()),
             mode!(IFDIR, 0o555),
         );
-        Ok(dir.build(current_task))
+        Ok(dir.build())
     }
 }
 

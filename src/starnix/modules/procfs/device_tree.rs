@@ -11,5 +11,5 @@ pub fn device_tree_directory(current_task: &CurrentTask, fs: &FileSystemHandle) 
     for setup_function in &current_task.kernel().procfs_device_tree_setup {
         setup_function(&mut directory, current_task);
     }
-    directory.build(current_task)
+    directory.build()
 }

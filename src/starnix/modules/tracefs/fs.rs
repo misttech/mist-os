@@ -73,13 +73,13 @@ impl TraceFs {
                 FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
-        dir.subdir(current_task, "per_cpu", 0o755, |dir| {
+        dir.subdir("per_cpu", 0o755, |dir| {
             /// A name for each cpu directory, cached to provide a 'static lifetime.
             static CPU_DIR_NAMES: LazyLock<Vec<String>> = LazyLock::new(|| {
                 (0..zx::system_get_num_cpus()).map(|cpu| format!("cpu{}", cpu)).collect()
             });
             for dir_name in CPU_DIR_NAMES.iter().map(|s| s.as_str()) {
-                dir.subdir(current_task, dir_name, 0o755, |dir| {
+                dir.subdir(dir_name, 0o755, |dir| {
                     // We're not able to detect which cpu events are coming from, so we push them
                     // all into the first cpu.
                     let ops: Box<dyn FsNodeOps> = if dir_name == "cpu0" {
@@ -98,25 +98,15 @@ impl TraceFs {
                             FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                         ),
                     );
-                    dir.entry(current_task, "trace", TraceFile::new_node(), mode!(IFREG, 0o444));
+                    dir.entry("trace", TraceFile::new_node(), mode!(IFREG, 0o444));
                 });
             }
         });
-        dir.subdir(current_task, "events", 0o755, |dir| {
-            dir.entry(
-                current_task,
-                "header_page",
-                EventsHeaderPage::new_node(),
-                mode!(IFREG, 0o444),
-            );
-            dir.subdir(current_task, "ftrace", 0o755, |dir| {
-                dir.subdir(current_task, "print", 0o755, |dir| {
-                    dir.entry(
-                        current_task,
-                        "format",
-                        FtracePrintFormatFile::new_node(),
-                        mode!(IFREG, 0o444),
-                    );
+        dir.subdir("events", 0o755, |dir| {
+            dir.entry("header_page", EventsHeaderPage::new_node(), mode!(IFREG, 0o444));
+            dir.subdir("ftrace", 0o755, |dir| {
+                dir.subdir("print", 0o755, |dir| {
+                    dir.entry("format", FtracePrintFormatFile::new_node(), mode!(IFREG, 0o444));
                 });
             });
             dir.node(
@@ -127,8 +117,8 @@ impl TraceFs {
                 ),
             );
         });
-        dir.subdir(current_task, "options", 0o755, |dir| {
-            dir.entry(current_task, "overwrite", TraceBytesFile::new_node(), mode!(IFREG, 0o444));
+        dir.subdir("options", 0o755, |dir| {
+            dir.entry("overwrite", TraceBytesFile::new_node(), mode!(IFREG, 0o444));
         });
         dir.node(
             "tracing_on",

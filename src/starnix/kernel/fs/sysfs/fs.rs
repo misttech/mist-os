@@ -60,13 +60,13 @@ impl SysFs {
         .expect("sysfs constructed with valid options");
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
-        dir.subdir(current_task, "fs", 0o755, |dir| {
-            dir.subdir(current_task, "selinux", 0o755, |_| ());
-            dir.subdir(current_task, "bpf", 0o755, |_| ());
-            dir.subdir(current_task, "cgroup", 0o755, |_| ());
-            dir.subdir(current_task, "fuse", 0o755, |dir| {
-                dir.subdir(current_task, "connections", 0o755, |_| ());
-                dir.subdir(current_task, "features", 0o755, |dir| {
+        dir.subdir("fs", 0o755, |dir| {
+            dir.subdir("selinux", 0o755, |_| ());
+            dir.subdir("bpf", 0o755, |_| ());
+            dir.subdir("cgroup", 0o755, |_| ());
+            dir.subdir("fuse", 0o755, |dir| {
+                dir.subdir("connections", 0o755, |_| ());
+                dir.subdir("features", 0o755, |dir| {
                     dir.node(
                         "fuse_bpf",
                         fs.create_node_and_allocate_node_id(
@@ -83,23 +83,22 @@ impl SysFs {
                     ),
                 );
             });
-            dir.subdir(current_task, "pstore", 0o755, |_| ());
+            dir.subdir("pstore", 0o755, |_| ());
         });
 
-        dir.entry(current_task, SYSFS_DEVICES, registry.objects.devices.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BUS, registry.objects.bus.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_BLOCK, registry.objects.block.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
-        dir.entry(current_task, SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
+        dir.entry(SYSFS_DEVICES, registry.objects.devices.ops(), dir_mode);
+        dir.entry(SYSFS_BUS, registry.objects.bus.ops(), dir_mode);
+        dir.entry(SYSFS_BLOCK, registry.objects.block.ops(), dir_mode);
+        dir.entry(SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
+        dir.entry(SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
 
         sysfs_kernel_directory(current_task, &mut dir);
         sysfs_power_directory(current_task, &mut dir);
 
-        dir.subdir(current_task, "module", 0o755, |dir| {
-            dir.subdir(current_task, "dm_verity", 0o755, |dir| {
-                dir.subdir(current_task, "parameters", 0o755, |dir| {
+        dir.subdir("module", 0o755, |dir| {
+            dir.subdir("dm_verity", 0o755, |dir| {
+                dir.subdir("parameters", 0o755, |dir| {
                     dir.entry(
-                        current_task,
                         "prefetch_cluster",
                         StubEmptyFile::new_node(
                             "/sys/module/dm_verity/paramters/prefetch_cluster",

@@ -102,18 +102,18 @@ impl ProcDirectory {
             // non-empty.
             "modules".into() => bytes_file(fs, b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
             "mounts".into() => symlink_file(fs, MountsSymlink::new_node()),
-            "net".into() => net_directory(current_task, fs),
+            "net".into() => net_directory(fs),
             "pagetypeinfo".into() => stub_file(fs, "/proc/pagetypeinfo", bug_ref!("https://fxbug.dev/322894315")),
             "self".into() => symlink_file(fs, SelfSymlink::new_node()),
             "slabinfo".into() => stub_file(fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
             "stat".into() => read_only_file(fs, StatFile::new_node(&kernel.stats)),
             "swaps".into() => read_only_file(fs, SwapsFile::new_node()),
-            "sys".into() => sysctl_directory(current_task, fs),
+            "sys".into() => sysctl_directory(fs),
             "sysrq-trigger".into() => root_writable_file(fs, SysRqNode::new()),
             "thread-self".into() => symlink_file(fs, ThreadSelfSymlink::new_node()),
-            "uid_cputime".into() => uid_cputime_directory(current_task, fs),
-            "uid_io".into() => uid_io_directory(current_task, fs),
-            "uid_procstat".into() => uid_procstat_directory(current_task, fs),
+            "uid_cputime".into() => uid_cputime_directory(fs),
+            "uid_io".into() => uid_io_directory(fs),
+            "uid_procstat".into() => uid_procstat_directory(fs),
             "uptime".into() => read_only_file(fs, UptimeFile::new_node(&kernel.stats)),
             "version".into() => {
                 let release = KERNEL_RELEASE;
