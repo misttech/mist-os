@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::sorted_vec_map::SortedVecMap;
+use flyweights::{FlyByteStr, FlyStr};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
 use thiserror::Error;
+
+mod sorted_vec_map;
 
 // This is deliberately the same as ext4.
 pub const ROOT_INODE_NUM: u64 = 2;
@@ -26,12 +31,12 @@ pub enum MetadataError {
 
 #[derive(Serialize, Deserialize)]
 pub struct Metadata {
-    nodes: BTreeMap<u64, Node>,
+    nodes: SortedVecMap<u64, Node>,
 }
 
 impl Metadata {
     pub fn new() -> Self {
-        Self { nodes: BTreeMap::new() }
+        Self { nodes: SortedVecMap::new() }
     }
 
     /// Finds the node with name `name` in directory with inode number `parent`.
@@ -42,7 +47,7 @@ impl Metadata {
             .directory()
             .ok_or(MetadataError::NotDir)?
             .children
-            .get(name)
+            .get(&FlyStr::from(name))
             .ok_or(MetadataError::NotFound)
             .cloned()
     }
@@ -54,7 +59,10 @@ impl Metadata {
 
     /// Deserializes the metadata.
     pub fn deserialize(bytes: &[u8]) -> Result<Self, MetadataError> {
-        bincode::deserialize(bytes).map_err(|_| MetadataError::FailedToDeserialize)
+        let mut metadata: Self =
+            bincode::deserialize(bytes).map_err(|_| MetadataError::FailedToDeserialize)?;
+        metadata.dedup_xattrs();
+        Ok(metadata)
     }
 
     /// Serializes the metadata.
@@ -75,12 +83,12 @@ impl Metadata {
 
         let mut node = self.nodes.get_mut(&ROOT_INODE_NUM).unwrap().directory_mut().unwrap();
         let mut iter = path.iter();
-        let name = iter.next_back().unwrap();
+        let name = *iter.next_back().unwrap();
         for component in iter {
-            let inode_num = *node.children.get_mut(*component).unwrap();
+            let inode_num = *node.children.get(&FlyStr::from(*component)).unwrap();
             node = self.nodes.get_mut(&inode_num).unwrap().directory_mut().unwrap();
         }
-        node.children.insert(name.to_string(), inode_num);
+        node.children.insert(name.into(), inode_num);
     }
 
     /// Inserts a directory node.  This will not add a child to a directory; see `add_child`.
@@ -96,7 +104,7 @@ impl Metadata {
         self.nodes.insert(
             inode_num,
             Node {
-                info: NodeInfo::Directory(Directory { children: BTreeMap::new() }),
+                info: NodeInfo::Directory(Directory { children: SortedVecMap::new() }),
                 mode,
                 uid,
                 gid,
@@ -135,7 +143,7 @@ impl Metadata {
         self.nodes.insert(
             inode_num,
             Node {
-                info: NodeInfo::Symlink(Symlink { target }),
+                info: NodeInfo::Symlink(Symlink { target: target.into() }),
                 mode,
                 uid,
                 gid,
@@ -143,9 +151,80 @@ impl Metadata {
             },
         );
     }
+
+    /// Nodes will often have the exact same set of extended attributes as other nodes. For this
+    /// reason, entire sets of extended attributes are reference counted and shared between nodes.
+    /// The serialized format of the metadata writes out the extended attributes along with each
+    /// node. After deserializing the metadata, each node will contain its own copy of the extended
+    /// attributes. This function scans all of the nodes and deduplicates the extended attributes to
+    /// save memory.
+    fn dedup_xattrs(&mut self) {
+        let mut xattrs: HashSet<Arc<SortedVecMap<FlyByteStr, FlyByteStr>>> = HashSet::new();
+        for node in self.nodes.values_mut() {
+            match xattrs.get(node.extended_attributes.0.as_ref()) {
+                Some(existing) => {
+                    node.extended_attributes.0 = existing.clone();
+                }
+                None => {
+                    xattrs.insert(node.extended_attributes.0.clone());
+                }
+            }
+        }
+    }
 }
 
-pub type ExtendedAttributes = BTreeMap<Box<[u8]>, Box<[u8]>>;
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
+pub struct ExtendedAttributes(Arc<SortedVecMap<FlyByteStr, FlyByteStr>>);
+
+impl<'de> serde::Deserialize<'de> for ExtendedAttributes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Self(Arc::new(SortedVecMap::deserialize(deserializer)?)))
+    }
+}
+
+impl serde::Serialize for ExtendedAttributes {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.0.as_ref().serialize(serializer)
+    }
+}
+
+impl FromIterator<(FlyByteStr, FlyByteStr)> for ExtendedAttributes {
+    fn from_iter<T: IntoIterator<Item = (FlyByteStr, FlyByteStr)>>(iter: T) -> Self {
+        ExtendedAttributes(Arc::new(SortedVecMap::from_iter(iter)))
+    }
+}
+
+impl<const N: usize> From<[(FlyByteStr, FlyByteStr); N]> for ExtendedAttributes {
+    fn from(value: [(FlyByteStr, FlyByteStr); N]) -> Self {
+        value.into_iter().collect()
+    }
+}
+
+impl From<BTreeMap<Box<[u8]>, Box<[u8]>>> for ExtendedAttributes {
+    fn from(value: BTreeMap<Box<[u8]>, Box<[u8]>>) -> Self {
+        value.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
+    }
+}
+
+impl ExtendedAttributes {
+    pub fn get(&self, key: &[u8]) -> Option<&FlyByteStr> {
+        self.0.get(&FlyByteStr::from(key))
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = &FlyByteStr> {
+        self.0.keys()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Node {
@@ -199,7 +278,7 @@ pub enum NodeInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Directory {
-    pub children: BTreeMap<String, u64>,
+    pub children: SortedVecMap<FlyStr, u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -207,19 +286,22 @@ pub struct File;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Symlink {
-    pub target: String,
+    pub target: FlyStr,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Metadata, NodeInfo, ROOT_INODE_NUM, S_IFDIR, S_IFLNK, S_IFREG};
+    use super::{
+        ExtendedAttributes, Metadata, NodeInfo, ROOT_INODE_NUM, S_IFDIR, S_IFLNK, S_IFREG,
+    };
     use assert_matches::assert_matches;
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     #[test]
     fn test_serialize_and_deserialize() {
         let mut m = Metadata::new();
-        let xattr: BTreeMap<_, _> =
+        let xattr: ExtendedAttributes =
             [((*b"a").into(), (*b"apple").into()), ((*b"b").into(), (*b"ball").into())].into();
         m.insert_directory(ROOT_INODE_NUM, S_IFDIR | 0o755, 2, 3, Default::default());
         m.insert_directory(3, S_IFDIR | 0o775, 2, 3, xattr.clone());
@@ -235,7 +317,7 @@ mod tests {
         assert_eq!(node.mode, S_IFDIR | 0o755);
         assert_eq!(node.uid, 2);
         assert_eq!(node.gid, 3);
-        assert_eq!(node.extended_attributes, [].into());
+        assert!(node.extended_attributes.is_empty());
 
         assert_eq!(m.lookup(ROOT_INODE_NUM, "foo").expect("foo not found"), 3);
         let node = m.get(3).expect("root not found");
@@ -267,7 +349,7 @@ mod tests {
         // Builds a Metadata instance with fixed contents.
         let build_fs = || {
             let mut m = Metadata::new();
-            let xattr: BTreeMap<_, _> =
+            let xattr: ExtendedAttributes =
                 [((*b"a").into(), (*b"apple").into()), ((*b"b").into(), (*b"ball").into())].into();
             m.insert_directory(ROOT_INODE_NUM, S_IFDIR | 0o755, 2, 3, Default::default());
             m.insert_directory(3, S_IFDIR | 0o775, 2, 3, xattr.clone());
@@ -283,5 +365,68 @@ mod tests {
         let data1 = build_fs().serialize();
         let data2 = build_fs().serialize();
         assert_eq!(data1, data2);
+    }
+
+    #[test]
+    fn test_dedup_extended_attributes() {
+        let mut m = Metadata::new();
+        m.insert_directory(ROOT_INODE_NUM, S_IFDIR | 0o755, 2, 3, Default::default());
+        m.insert_file(3, S_IFREG, 2, 3, [("a".into(), "b".into())].into());
+        m.add_child(&["foo"], 3);
+        m.insert_file(4, S_IFREG, 2, 3, [("a".into(), "b".into())].into());
+        m.add_child(&["bar"], 4);
+
+        // The extended attributes are equal but they haven't been deduplicated yet.
+        assert_eq!(
+            m.get(3).unwrap().extended_attributes.0,
+            m.get(4).unwrap().extended_attributes.0
+        );
+        assert!(!Arc::ptr_eq(
+            &m.get(3).unwrap().extended_attributes.0,
+            &m.get(4).unwrap().extended_attributes.0
+        ));
+
+        m.dedup_xattrs();
+        // The extended attributes are now deduplicated.
+        assert!(Arc::ptr_eq(
+            &m.get(3).unwrap().extended_attributes.0,
+            &m.get(4).unwrap().extended_attributes.0
+        ));
+
+        // The extended attributes are duplicated in the serialized data but get deduplicated again
+        // when being deserialized.
+        let m = Metadata::deserialize(&m.serialize()).unwrap();
+        assert!(Arc::ptr_eq(
+            &m.get(3).unwrap().extended_attributes.0,
+            &m.get(4).unwrap().extended_attributes.0
+        ));
+    }
+
+    #[test]
+    fn test_extended_attribute_serialization_backwards_compatibility() {
+        let xattrs = [(b"a", b"b"), (b"c", b"d"), (b"e", b"f")];
+        let btree_map: BTreeMap<Box<[u8]>, Box<[u8]>> =
+            xattrs.iter().map(|(&k, &v)| (k.into(), v.into())).collect();
+
+        let serialized = bincode::serialize(&btree_map).unwrap();
+
+        let extended_attributes: ExtendedAttributes = bincode::deserialize(&serialized).unwrap();
+        let expected_xattrs: ExtendedAttributes =
+            xattrs.iter().map(|(&k, &v)| (k.into(), v.into())).collect();
+        assert_eq!(extended_attributes, expected_xattrs);
+    }
+
+    #[test]
+    fn test_extended_attribute_serialization_forwards_compatibility() {
+        let xattrs = [(b"a", b"b"), (b"c", b"d"), (b"e", b"f")];
+        let extended_attributes: ExtendedAttributes =
+            xattrs.iter().map(|(&k, &v)| (k.into(), v.into())).collect();
+
+        let serialized = bincode::serialize(&extended_attributes).unwrap();
+
+        let btree_map: BTreeMap<Box<[u8]>, Box<[u8]>> = bincode::deserialize(&serialized).unwrap();
+        let expected_xattrs: BTreeMap<Box<[u8]>, Box<[u8]>> =
+            xattrs.iter().map(|(&k, &v)| (k.into(), v.into())).collect();
+        assert_eq!(btree_map, expected_xattrs);
     }
 }

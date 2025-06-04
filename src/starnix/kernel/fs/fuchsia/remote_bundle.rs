@@ -477,7 +477,7 @@ impl FsNodeOps for SymlinkObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let target = bundle.get_node(node.ino).symlink().ok_or_else(|| errno!(EIO))?.target.clone();
-        Ok(SymlinkTarget::Path(target.into()))
+        Ok(SymlinkTarget::Path(target.as_str().into()))
     }
 
     fn get_xattr(
