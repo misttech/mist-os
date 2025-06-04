@@ -119,6 +119,26 @@ static bool secure_mkdirs(fidl::WireSyncClient<fuchsia_io::Directory>& parent,
   return true;
 }
 */
+namespace {
+mode_t mode_from_attributes(const fuchsia_io::wire::NodeAttributes2& attr) {
+  if (attr.mutable_attributes.has_mode()) {
+    return attr.mutable_attributes.mode();
+  }
+  if (!attr.immutable_attributes.has_protocols()) {
+    return S_IFREG;
+  }
+  if (attr.immutable_attributes.protocols() == fuchsia_io::NodeProtocolKinds::kDirectory) {
+    return S_IFDIR;
+  }
+  if (attr.immutable_attributes.protocols() == fuchsia_io::NodeProtocolKinds::kFile) {
+    return S_IFREG;
+  }
+  if (attr.immutable_attributes.protocols() == fuchsia_io::NodeProtocolKinds::kSymlink) {
+    return S_IFLNK;
+  }
+  return S_IFREG;
+}
+}  // namespace
 
 static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path,
                         fidl::WireSyncClient<fuchsia_io::Directory>& component) {
@@ -136,7 +156,8 @@ static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path
   }
 
   fuchsia_io::wire::NodeAttributes2 attr;
-  fuchsia_io::NodeAttributesQuery query = fuchsia_io::NodeAttributesQuery::kMode |
+  fuchsia_io::NodeAttributesQuery query = fuchsia_io::NodeAttributesQuery::kProtocols |
+                                          fuchsia_io::NodeAttributesQuery::kMode |
                                           fuchsia_io::NodeAttributesQuery::kStorageSize |
                                           fuchsia_io::NodeAttributesQuery::kModificationTime;
 
@@ -155,9 +176,7 @@ static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path
   }
   attr = *response.value();
 
-  if (attr.mutable_attributes.has_mode()) {
-    msg.stat_v1.mode = attr.mutable_attributes.mode();
-  }
+  msg.stat_v1.mode = mode_from_attributes(attr);
 
   if (attr.immutable_attributes.has_storage_size()) {
     msg.stat_v1.size = static_cast<uint32_t>(attr.immutable_attributes.storage_size());
@@ -210,9 +229,7 @@ static bool do_stat_v2(zx::socket& socket, uint32_t id, const std::vector<std::s
       msg.stat_v2.dev = attr.mutable_attributes.rdev();
     }
 
-    if (attr.mutable_attributes.has_mode()) {
-      msg.stat_v2.mode = attr.mutable_attributes.mode();
-    }
+    msg.stat_v2.mode = mode_from_attributes(attr);
 
     if (attr.immutable_attributes.has_link_count()) {
       msg.stat_v2.nlink = static_cast<uint32_t>(attr.immutable_attributes.link_count());
@@ -306,7 +323,8 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
 
       auto [file_client, file_server] = fidl::Endpoints<fuchsia_io::File>::Create();
       fidl::WireSyncClient<fuchsia_io::File> file(std::move(file_client));
-      fuchsia_io::NodeAttributesQuery query = fuchsia_io::NodeAttributesQuery::kMode |
+      fuchsia_io::NodeAttributesQuery query = fuchsia_io::NodeAttributesQuery::kProtocols |
+                                              fuchsia_io::NodeAttributesQuery::kMode |
                                               fuchsia_io::NodeAttributesQuery::kStorageSize |
                                               fuchsia_io::NodeAttributesQuery::kModificationTime;
       if (auto open = dir_ptr->Open(fidl::StringView::FromExternal(name), fuchsia_io::kPermReadable,
@@ -325,9 +343,7 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
           FX_LOGS(ERROR) << "GetAttributes failed " << response.error_value();
           goto increment;
         }
-        if (response.value()->mutable_attributes.has_mode()) {
-          msg.dent.mode = response.value()->mutable_attributes.mode();
-        }
+        msg.dent.mode = mode_from_attributes(*response.value());
 
         if (response.value()->immutable_attributes.has_storage_size()) {
           msg.dent.size =
@@ -450,8 +466,11 @@ static bool handle_send_file(zx::socket& socket, const std::vector<std::string>&
       if (auto write = file->Write(
               fidl::VectorView<uint8_t>::FromExternal(buffer.data() + write_len, cur_len));
           !write.ok() || write->is_error()) {
-        FX_LOGS(ERROR) << "File Write failed "
-                       << (write.ok() ? write->error_value() : write.status());
+        if (write.ok()) {
+          FX_LOGS(ERROR) << "File Write failed: " << zx_status_get_string(write->error_value());
+        } else {
+          FX_LOGS(ERROR) << "Transport error on File Write: " << write.error();
+        }
         SendSyncFail(socket, "File Write failed");
         goto abort;
       }
@@ -459,7 +478,11 @@ static bool handle_send_file(zx::socket& socket, const std::vector<std::string>&
     }
   }
   if (auto close = file->Close(); !close.ok() || close->is_error()) {
-    FX_LOGS(ERROR) << "File Close failed " << (close.ok() ? close->error_value() : close.status());
+    if (close.ok()) {
+      FX_LOGS(ERROR) << "File Close failed: " << zx_status_get_string(close->error_value());
+    } else {
+      FX_LOGS(ERROR) << "Transport error on File Close: " << close.error();
+    }
   }
   // if (!update_capabilities(path, capabilities)) {
   //     SendSyncFailErrno(s, "update_capabilities failed");
@@ -501,9 +524,12 @@ fail:
       goto abort;
   }
 abort:
-  auto close = file->Close();
-  if (!close.ok() || close->is_error()) {
-    FX_LOGS(ERROR) << "File Close failed " << (close.ok() ? close->error_value() : close.status());
+  if (auto close = file->Close(); !close.ok() || close->is_error()) {
+    if (close.ok()) {
+      FX_LOGS(ERROR) << "File Close failed: " << zx_status_get_string(close->error_value());
+    } else {
+      FX_LOGS(ERROR) << "Transport error on File Close: " << close.error();
+    }
   }
   // TODO: Currently do not support links.
   // if (do_unlink) adb_unlink(path);
@@ -696,7 +722,7 @@ static bool handle_sync_command(void* ctx, zx::socket& socket, std::vector<uint8
   std::string id_name = sync_id_to_name(request.id);
   // std::string trace_name = StringPrintf("%s(%s)", id_name.c_str(), name);
   // ATRACE_NAME(trace_name.c_str());
-  FX_LOGS(DEBUG) << "sync: " << id_name.c_str() << "('" << name << "')";
+  FX_LOGS(INFO) << "sync: " << id_name.c_str() << "('" << name << "')";
   switch (request.id) {
     case ID_LSTAT_V1:
       if (!get_component(ctx, name) || !do_lstat_v1(socket, path, component))

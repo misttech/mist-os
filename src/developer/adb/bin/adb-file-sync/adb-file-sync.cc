@@ -118,12 +118,6 @@ zx::result<zx::channel> AdbFileSync::ConnectToComponent(std::string name,
   if (component_moniker[0] != '.') {
     component_moniker.insert(0, ".");
   }
-  // Parse path
-  *out_path = split_string(path, "/");
-  if (out_path->empty()) {
-    FX_LOGS(ERROR) << "Must have at least directory!";
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
 
   // Resolve component moniker
   auto resolve_result = lifecycle_->ResolveInstance(component_moniker);
@@ -148,14 +142,26 @@ zx::result<zx::channel> AdbFileSync::ConnectToComponent(std::string name,
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
+  if (!path.starts_with("/")) {
+    path = "/" + path;
+  }
   for (auto& entry : result->namespace_()) {
-    if ("/" + (*out_path)[0] == entry.path()) {
-      out_path->erase(out_path->begin());
+    // `entry.path()` might contain more than one "/", like "/config/data"
+    // `path` might include extra mode at the end like "/some/path,0755", and we should
+    // keep that in out_path->back()
+    if (entry.path().has_value() && path.starts_with(entry.path().value())) {
+      auto sub_path = path.substr(entry.path()->size());
+      // prevent matching if path is "/ab" and entry.path() is "/a"
+      if (sub_path != "" && sub_path[0] != '/' && sub_path[0] != ',') {
+        continue;
+      }
+
+      *out_path = split_string(sub_path, "/");
       return zx::success(entry.directory()->TakeChannel());
     }
   }
 
-  FX_LOGS(ERROR) << "Could not find directory " << (*out_path)[0];
+  FX_LOGS(ERROR) << "Could not find directory for " << path;
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
