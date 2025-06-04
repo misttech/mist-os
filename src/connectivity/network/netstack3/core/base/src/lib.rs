@@ -56,7 +56,7 @@ pub use error::{
     AddressResolutionFailed, ErrorAndSerializer, ExistsError, LocalAddressError, NotFoundError,
     NotSupportedError, RemoteAddressError, SocketError, ZonedAddressError,
 };
-pub use event::{CoreEventContext, EventContext};
+pub use event::EventContext;
 pub use frame::{
     CoreTxMetadataContext, FrameDestination, ReceivableFrameMeta, RecvFrameContext,
     RecvIpFrameMeta, SendFrameContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,

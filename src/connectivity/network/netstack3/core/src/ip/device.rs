@@ -16,9 +16,9 @@ use log::debug;
 use net_types::ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::{
-    AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    IpAddressId as _, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr,
-    NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext,
+    AnyDevice, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError, IpAddressId as _,
+    IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
+    RemoveResourceResultWithContext, ResourceCounterContext,
 };
 use netstack3_device::ethernet::EthernetDeviceId;
 use netstack3_device::{DeviceId, WeakDeviceId};
@@ -27,17 +27,16 @@ use netstack3_ip::device::{
     self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
     is_ip_device_enabled, is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled,
     join_ip_multicast_with_config, leave_ip_multicast_with_config, AddressRemovedReason,
-    DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadState, DadStateRef, DadTimerId,
+    DadAddressContext, DadAddressStateRef, DadContext, DadState, DadStateRef, DadTimerId,
     DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressData, IpAddressEntry,
-    IpAddressFlags, IpAddressState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent,
-    IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
-    IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId, Ipv4DadSendData,
-    Ipv4DeviceConfiguration, Ipv4DeviceTimerId, Ipv6AddrConfig, Ipv6AddrSlaacConfig,
-    Ipv6DadAddressContext, Ipv6DadSendData, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
-    Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
-    Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
-    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfigAndState, SlaacContext,
-    SlaacCounters, SlaacState, WeakAddressId,
+    IpAddressFlags, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags, IpDeviceIpExt,
+    IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext, IpDeviceStateIpExt,
+    IpDeviceTimerId, Ipv4DadSendData, Ipv4DeviceConfiguration, Ipv4DeviceTimerId, Ipv6AddrConfig,
+    Ipv6AddrSlaacConfig, Ipv6DadAddressContext, Ipv6DadSendData, Ipv6DeviceConfiguration,
+    Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
+    Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
+    RsState, RsTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
+    SlaacConfigAndState, SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
     GmpGroupState, GmpState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext,
@@ -902,24 +901,6 @@ impl<
             target_ip,
             target_link_addr,
         )
-    }
-}
-
-impl<'a, I: IpDeviceIpExt, Config, BC, L> CoreEventContext<DadEvent<I, DeviceId<BC>>>
-    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
-where
-    BC: BindingsContext,
-{
-    type OuterEvent = IpDeviceEvent<DeviceId<BC>, I, BC::Instant>;
-
-    fn convert_event(event: DadEvent<I, DeviceId<BC>>) -> Self::OuterEvent {
-        match event {
-            DadEvent::AddressAssigned { device, addr } => IpDeviceEvent::AddressStateChanged {
-                device,
-                addr: addr.into(),
-                state: IpAddressState::Assigned,
-            },
-        }
     }
 }
 

@@ -14,21 +14,6 @@ pub trait EventContext<T> {
     fn on_event(&mut self, event: T);
 }
 
-/// An event context implemented by core contexts to wrap event types that are
-/// not exposed to bindings.
-pub trait CoreEventContext<T> {
-    /// The outer event type.
-    type OuterEvent;
-    /// Converts the event to the outer event type.
-    fn convert_event(event: T) -> Self::OuterEvent;
-
-    /// A helper to emit an `event` through a bindings context that implements
-    /// [`EventContext`] on the [`OuterEvent`].
-    fn on_event<BC: EventContext<Self::OuterEvent>>(bindings_ctx: &mut BC, event: T) {
-        bindings_ctx.on_event(Self::convert_event(event))
-    }
-}
-
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
