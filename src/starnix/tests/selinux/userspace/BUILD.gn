@@ -120,6 +120,8 @@ test_names = [
 inherit_test_executable_names = [
   # keep-sorted start
   "is_selinux_null_inode",
+  "true",
+
   # keep-sorted end
 ]
 
