@@ -65,8 +65,8 @@ macro_rules! trace_header {
                 $(pub $field_ty, $getter, [<set_ $getter>]: $end_bit, $start_bit;)*
             }}
 
-            #[allow(unused, unused_mut)]
-            pub(crate) fn empty() -> Self {
+            #[allow(unused_mut)]
+            pub fn empty() -> Self {
                 let mut header = Self(0);
                 $(header.set_raw_type($header_ty);)?
                 header
@@ -124,7 +124,7 @@ macro_rules! trace_header {
     };
 }
 
-pub(crate) trait TraceHeader {
+pub trait TraceHeader {
     fn set_size_words(&mut self, n: u16);
     fn to_le_bytes(&self) -> [u8; 8];
 }

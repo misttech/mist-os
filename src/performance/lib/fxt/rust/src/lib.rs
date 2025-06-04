@@ -6,20 +6,20 @@
 #[macro_use]
 mod testing;
 
-mod args;
-mod blob;
-mod error;
-mod event;
-mod fxt_builder;
-mod header;
-mod init;
-mod log;
-mod metadata;
-mod objects;
-mod scheduling;
-mod session;
-mod string;
-mod thread;
+pub mod args;
+pub mod blob;
+pub mod error;
+pub mod event;
+pub mod fxt_builder;
+pub mod header;
+pub mod init;
+pub mod log;
+pub mod metadata;
+pub mod objects;
+pub mod scheduling;
+pub mod session;
+pub mod string;
+pub mod thread;
 
 pub use args::{Arg, ArgValue, RawArg, RawArgValue};
 pub use blob::{BlobRecord, BlobType, LargeBlobMetadata, LargeBlobRecord};
