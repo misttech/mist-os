@@ -7,7 +7,7 @@ use crate::task::CurrentTask;
 use crate::vfs::EpollKey;
 
 use std::cmp::min;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
@@ -19,6 +19,7 @@ use starnix_logging::{log_info, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
+use std::fmt;
 use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_power_observability as fobs, fidl_fuchsia_session_power as fpower,
@@ -43,7 +44,7 @@ pub struct SuspendResumeManagerInner {
 
     /// The currently active wake locks in the system. If non-empty, this prevents
     /// the container from suspending.
-    active_locks: HashSet<String>,
+    active_locks: HashMap<String, LockSource>,
     inactive_locks: HashSet<String>,
 
     /// The currently active EPOLLWAKEUPs in the system. If non-empty, this prevents
@@ -73,6 +74,12 @@ struct WakeLocksInspect {
 
     /// Parent node of the above properties.
     root: inspect::Node,
+}
+
+/// The source of a wake lock.
+pub enum LockSource {
+    WakeLockFile,
+    ContainerPowerController,
 }
 
 /// The inspect node ring buffer will keep at most this many entries.
@@ -122,8 +129,10 @@ impl SuspendResumeManagerInner {
         let len = min(active_locks.len(), INSPECT_MAX_WAKE_LOCK_NAMES);
         inspect.active_wake_locks =
             inspect.root.create_string_array(fobs::ACTIVE_WAKE_LOCK_NAMES, len);
-        for (i, name) in active_locks.iter().sorted().take(len).enumerate() {
-            inspect.active_wake_locks.set(i, name);
+        for (i, name) in active_locks.keys().sorted().take(len).enumerate() {
+            if let Some(src) = active_locks.get(name) {
+                inspect.active_wake_locks.set(i, format!("{} (source {})", name, src));
+            }
         }
     }
 
@@ -186,19 +195,19 @@ impl SuspendResumeManager {
     }
 
     /// Adds a wake lock `name` to the active wake locks.
-    pub fn add_lock(&self, name: &str) -> bool {
+    pub fn add_lock(&self, name: &str, src: LockSource) -> bool {
         let mut state = self.lock();
-        let res = state.active_locks.insert(String::from(name));
+        let res = state.active_locks.insert(String::from(name), src);
         state.signal_wake_events();
         state.record_active_locks();
-        res
+        res.is_none()
     }
 
     /// Removes a wake lock `name` from the active wake locks.
     pub fn remove_lock(&self, name: &str) -> bool {
         let mut state = self.lock();
         let res = state.active_locks.remove(name);
-        if !res {
+        if res.is_none() {
             return false;
         }
 
@@ -206,7 +215,7 @@ impl SuspendResumeManager {
         state.signal_wake_events();
         state.record_active_locks();
         state.record_inactive_locks();
-        res
+        true
     }
 
     /// Adds a wake lock `key` to the active epoll wake locks.
@@ -226,7 +235,7 @@ impl SuspendResumeManager {
     }
 
     pub fn active_wake_locks(&self) -> Vec<String> {
-        Vec::from_iter(self.lock().active_locks.clone())
+        Vec::from_iter(self.lock().active_locks.keys().cloned())
     }
 
     pub fn inactive_wake_locks(&self) -> Vec<String> {
@@ -383,6 +392,15 @@ impl WakeLocksInspect {
             inactive_wake_locks: root.create_string_array(fobs::INACTIVE_WAKE_LOCK_NAMES, 0),
             active_epolls_count: root.create_uint(fobs::ACTIVE_EPOLLS_COUNT, 0),
             root,
+        }
+    }
+}
+
+impl fmt::Display for LockSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LockSource::WakeLockFile => write!(f, "wake lock file"),
+            LockSource::ContainerPowerController => write!(f, "container power controller"),
         }
     }
 }

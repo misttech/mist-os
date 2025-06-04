@@ -14,7 +14,7 @@ use futures::{pin_mut, select, Future, Stream, StreamExt, TryStreamExt};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
-use starnix_core::power::mark_proxy_message_handled;
+use starnix_core::power::{mark_proxy_message_handled, LockSource};
 use starnix_core::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
@@ -626,7 +626,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             match event {
                 fbinder::ContainerPowerControllerRequest::Wake { payload, .. } => {
                     if let Some(wake_lock) = payload.wake_lock {
-                        kernel.suspend_resume_manager.add_lock(wake_lock_name);
+                        kernel
+                            .suspend_resume_manager
+                            .add_lock(wake_lock_name, LockSource::ContainerPowerController);
                         // The client is responsible for lowering this signal if it reuses the same
                         // event pair across calls.
                         let _ =
@@ -1161,6 +1163,7 @@ mod tests {
     use fidl::HandleBased;
     use rand::distributions::{Alphanumeric, DistString};
     use starnix_core::mm::MemoryAccessor;
+    use starnix_core::power::LockSource;
     use starnix_core::testing::*;
     use starnix_core::vfs::{FileSystemOptions, WhatToMount};
     use starnix_types::PAGE_SIZE;
@@ -1542,12 +1545,16 @@ mod tests {
             .unwrap();
 
         // Check that we already have the lock.
-        assert!(!kernel.suspend_resume_manager.add_lock("test"));
+        assert!(!kernel
+            .suspend_resume_manager
+            .add_lock("test", LockSource::ContainerPowerController));
 
         // Drop our lock, run the executor, and check that the lock dropped.
         drop(wake_lock);
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
-        assert!(kernel.suspend_resume_manager.add_lock("test"));
+        assert!(kernel
+            .suspend_resume_manager
+            .add_lock("test", LockSource::ContainerPowerController));
     }
 }
