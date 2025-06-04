@@ -6,7 +6,7 @@ use crate::fplugin::Vmo;
 use crate::{AttributionDataProvider, ResourcesVisitor, ZXName};
 use regex::bytes::Regex;
 use serde::de::Error;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::hash_map::Entry::Occupied;
 use std::collections::HashMap;
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
@@ -75,14 +75,14 @@ where
 }
 
 /// Aggregates bytes in categories with human readable names.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Bucket {
     pub name: String,
     pub size: u64,
 }
 /// Contains a view of the system's memory usage, aggregated in groups called buckets, which are
 /// configurable.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Digest {
     pub buckets: Vec<Bucket>,
 }

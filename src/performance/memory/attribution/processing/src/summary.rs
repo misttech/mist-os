@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::digest::Digest;
 use crate::kernel_statistics::KernelStatistics;
 use crate::{
     InflatedPrincipal, InflatedResource, PrincipalIdentifier, PrincipalType, ResourceReference,
@@ -23,7 +24,8 @@ pub struct ComponentProfileResult {
     pub kernel: KernelStatistics,
     pub principals: Vec<PrincipalSummary>,
     /// Amount, in bytes, of memory that is known but remained unclaimed. Should be equal to zero.
-    pub undigested: u64,
+    pub unclaimed: u64,
+    pub digest: Digest,
 }
 
 /// Summary view of the memory usage on a device.
@@ -35,7 +37,7 @@ pub struct ComponentProfileResult {
 pub struct MemorySummary {
     pub principals: Vec<PrincipalSummary>,
     /// Amount, in bytes, of memory that is known but remained unclaimed. Should be equal to zero.
-    pub undigested: u64,
+    pub unclaimed: u64,
 }
 
 impl MemorySummary {
@@ -44,7 +46,7 @@ impl MemorySummary {
         resources: &HashMap<u64, RefCell<InflatedResource>>,
         resource_names: &Vec<ZXName>,
     ) -> MemorySummary {
-        let mut output = MemorySummary { principals: Default::default(), undigested: 0 };
+        let mut output = MemorySummary { principals: Default::default(), unclaimed: 0 };
         for principal in principals.values() {
             output.principals.push(MemorySummary::build_one_principal(
                 &principal,
@@ -56,20 +58,20 @@ impl MemorySummary {
 
         output.principals.sort_unstable_by_key(|p| -(p.populated_total as i64));
 
-        let mut undigested = 0;
+        let mut unclaimed = 0;
         for (_, resource_ref) in resources {
             let resource = &resource_ref.borrow();
             if resource.claims.is_empty() {
                 match &resource.resource.resource_type {
                     fplugin::ResourceType::Job(_) | fplugin::ResourceType::Process(_) => {}
                     fplugin::ResourceType::Vmo(vmo) => {
-                        undigested += vmo.scaled_populated_bytes.unwrap();
+                        unclaimed += vmo.scaled_populated_bytes.unwrap();
                     }
                     _ => todo!(),
                 }
             }
         }
-        output.undigested = undigested;
+        output.unclaimed = unclaimed;
         output
     }
 

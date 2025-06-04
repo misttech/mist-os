@@ -92,9 +92,6 @@ impl FfxMain for MemoryTool {
                 if let Some(_) = self.cmd.interval {
                     ffx_bail!("`--interval` argument not supported by memory_monitor_2 backend.");
                 }
-                if self.cmd.buckets {
-                    ffx_bail!("`--buckets` argument not supported by memory_monitor_2 backend.");
-                }
 
                 if self.cmd.undigested {
                     ffx_bail!("`--undigested` argument not supported by memory_monitor_2 backend.");
@@ -109,6 +106,7 @@ impl FfxMain for MemoryTool {
                         stdin_input: self.cmd.stdin_input,
                         debug_json: self.cmd.debug_json,
                         csv: self.cmd.csv,
+                        buckets: self.cmd.buckets,
                     },
                     monitor_proxy: mm2,
                 };

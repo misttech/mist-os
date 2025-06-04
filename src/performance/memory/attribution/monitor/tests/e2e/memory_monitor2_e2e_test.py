@@ -188,6 +188,8 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         )
         # Assert that this is a ComponentDigest
         profile = json.loads(cmd_output)["ComponentDigest"]
+        asserts.assert_in("digest", set(profile.keys()))
+
         # Assert that is has a principal for memory monitor 2.
         (principal,) = [
             p
@@ -202,7 +204,6 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             ["--process_koids", "123"],
             ["--process_names", "123"],
             ["--interval", "123"],
-            ["--buckets"],
             ["--undigested"],
             ["--exact_sizes"],
         ]

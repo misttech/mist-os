@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use attribution_processing::kernel_statistics::{MemoryStatsCompressionDef, MemoryStatsDef};
+use attribution_processing::ZXName;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use zx_types::ZX_MAX_NAME_LEN;
 use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
 /// An object with this trait can be converted to, and from, JSON.
@@ -49,7 +51,7 @@ impl JsonConvertible for fplugin::Snapshot {
                 .flatten(),
             resource_names: obj
                 .get("resource_names")
-                .map(|o| Vec::<String>::from_json(o))
+                .map(|o| Vec::<[u8; ZX_MAX_NAME_LEN]>::from_json(o))
                 .flatten(),
             kernel_statistics: obj
                 .get("kernel_statistics")
@@ -410,6 +412,15 @@ impl JsonConvertible for fplugin::KernelStatistics {
     }
 }
 
+impl JsonConvertible for [u8; ZX_MAX_NAME_LEN] {
+    fn to_json(&self) -> Value {
+        serde_json::to_value(ZXName::from_bytes_lossy(self)).expect("invalid data")
+    }
+    fn from_json(value: &Value) -> Option<[u8; ZX_MAX_NAME_LEN]> {
+        Some(*ZXName::deserialize(value).unwrap().buffer())
+    }
+}
+
 impl JsonConvertible for fkernel::MemoryStats {
     fn to_json(&self) -> Value {
         #[derive(Serialize)]
@@ -677,17 +688,17 @@ mod tests {
                 },
             ]),
             resource_names: Some(vec![
-                "root_job".to_owned(),
-                "root_process".to_owned(),
-                "root_vmo".to_owned(),
-                "shared_vmo".to_owned(),
-                "runner_job".to_owned(),
-                "runner_process".to_owned(),
-                "runner_vmo".to_owned(),
-                "component_vmo".to_owned(),
-                "component_2_job".to_owned(),
-                "2_process".to_owned(),
-                "2_vmo".to_owned(),
+                *ZXName::from_string_lossy("root_job").buffer(),
+                *ZXName::from_string_lossy("root_process").buffer(),
+                *ZXName::from_string_lossy("root_vmo").buffer(),
+                *ZXName::from_string_lossy("shared_vmo").buffer(),
+                *ZXName::from_string_lossy("runner_job").buffer(),
+                *ZXName::from_string_lossy("runner_process").buffer(),
+                *ZXName::from_string_lossy("runner_vmo").buffer(),
+                *ZXName::from_string_lossy("component_vmo").buffer(),
+                *ZXName::from_string_lossy("component_2_job").buffer(),
+                *ZXName::from_string_lossy("2_process").buffer(),
+                *ZXName::from_string_lossy("2_vmo").buffer(),
             ]),
             kernel_statistics: Some(fplugin::KernelStatistics {
                 memory_stats: Some(fidl_fuchsia_kernel::MemoryStats {

@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use attribution_processing::digest::{self};
 use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{MemorySummary, PrincipalSummary, VmoSummary};
 use attribution_processing::ZXName;
-
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use prettytable::{row, table, Table};
+use std::cmp::Reverse;
 
 pub fn write_summary(
     f: &mut dyn std::io::Write,
@@ -15,6 +16,7 @@ pub fn write_summary(
     value: &MemorySummary,
     kernel_statistics: KernelStatistics,
     performance_metrics: fplugin::PerformanceImpactMetrics,
+    digest: &digest::Digest,
 ) -> std::io::Result<()> {
     if csv {
         let mut csv_writer = csv::Writer::from_writer(f);
@@ -34,11 +36,25 @@ pub fn write_summary(
         }
     } else {
         write_summary_kernel_stats(f, kernel_statistics, performance_metrics)?;
+        write_digest(f, digest)?;
         for principal in &value.principals {
             writeln!(f)?;
             writeln!(f)?;
             write_summary_principal(f, principal)?;
         }
+    }
+    Ok(())
+}
+
+fn write_digest(w: &mut dyn std::io::Write, digest: &digest::Digest) -> std::io::Result<()> {
+    if digest.buckets.len() > 0 {
+        writeln!(w, "")?;
+    }
+    let mut buckets: Vec<&digest::Bucket> = digest.buckets.iter().collect();
+    buckets.sort_by_key(|bucket| Reverse(bucket.size));
+
+    for bucket in buckets {
+        writeln!(w, "Bucket {}: {}", bucket.name, format_bytes(bucket.size as f64))?;
     }
     Ok(())
 }
@@ -313,12 +329,19 @@ mod tests {
                 },
             )]),
         };
-        let summary = MemorySummary { principals: vec![principal], undigested: 1 };
+        let summary = MemorySummary { principals: vec![principal], unclaimed: 1 };
 
         let actual_output = {
             let mut buf = BufWriter::new(Vec::new());
-            write_summary(&mut buf, true, &summary, Default::default(), Default::default())
-                .unwrap();
+            write_summary(
+                &mut buf,
+                true,
+                &summary,
+                Default::default(),
+                Default::default(),
+                &Default::default(),
+            )
+            .unwrap();
             let bytes = buf.into_inner().unwrap();
             String::from_utf8(bytes).unwrap()
         };
@@ -345,12 +368,19 @@ mod tests {
             processes: vec![],
             vmos: HashMap::from([]),
         };
-        let summary = MemorySummary { principals: vec![principal], undigested: 1 };
+        let summary = MemorySummary { principals: vec![principal], unclaimed: 1 };
 
         let actual_output = {
             let mut buf = BufWriter::new(Vec::new());
-            write_summary(&mut buf, true, &summary, Default::default(), Default::default())
-                .unwrap();
+            write_summary(
+                &mut buf,
+                true,
+                &summary,
+                Default::default(),
+                Default::default(),
+                &Default::default(),
+            )
+            .unwrap();
             let bytes = buf.into_inner().unwrap();
             String::from_utf8(bytes).unwrap()
         };

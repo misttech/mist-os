@@ -29,9 +29,8 @@ impl AttributionSnapshot {
                 attribution_data.principals_vec.into_iter().map(|p| p.into()).collect(),
             ),
             resources: Some(attribution_data.resources_vec.into_iter().map(|r| r.into()).collect()),
-            // TODO(b/411002259) change the protocol to avoid conversion.
             resource_names: Some(
-                attribution_data.resource_names.iter().map(|r| r.to_string()).collect(),
+                attribution_data.resource_names.iter().map(|n| *n.buffer()).collect(),
             ),
             kernel_statistics: Some(kernel_statistics.into()),
             performance_metrics: Some(fplugin::PerformanceImpactMetrics {

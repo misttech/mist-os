@@ -442,7 +442,7 @@ pub trait ResourcesVisitor {
     ) -> Result<(), zx_status::Status>;
 }
 
-pub trait AttributionDataProvider: Send + Sync + 'static {
+pub trait AttributionDataProvider: Send + Sync {
     /// Collects and returns a structure with all memory resources and attribution specifications.
     fn get_attribution_data(&self) -> BoxFuture<'_, Result<AttributionData, anyhow::Error>>;
     /// Enumerates Jobs, Processes and VMOs and call back the visitor.
@@ -1062,7 +1062,7 @@ mod tests {
         })
         .summary();
 
-        assert_eq!(output.undigested, 2048);
+        assert_eq!(output.unclaimed, 2048);
         assert_eq!(output.principals.len(), 4);
 
         let principals: HashMap<u64, PrincipalSummary> =
@@ -1384,7 +1384,7 @@ mod tests {
         })
         .summary();
 
-        assert_eq!(output.undigested, 0);
+        assert_eq!(output.unclaimed, 0);
         assert_eq!(output.principals.len(), 3);
 
         let principals: HashMap<u64, PrincipalSummary> =
@@ -1675,7 +1675,7 @@ mod tests {
         })
         .summary();
 
-        assert_eq!(output.undigested, 0);
+        assert_eq!(output.unclaimed, 0);
         assert_eq!(output.principals.len(), 2);
 
         let principals: HashMap<u64, PrincipalSummary> =

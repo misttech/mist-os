@@ -7,7 +7,8 @@ use serde::de::Visitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::fmt::Write;
-use zerocopy::{FromBytes, Immutable, KnownLayout};
+use std::ops::Deref;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use zx_types::ZX_MAX_NAME_LEN;
 
 // Performance note: rust string is made of a struct and a heap allocation which uses 3 and 2 64bit
@@ -18,7 +19,17 @@ use zx_types::ZX_MAX_NAME_LEN;
 
 /// Zircon resource name with a maximum length of `ZX_MAX_NAME_LEN - 1`.
 #[derive(
-    Default, Eq, Hash, FromBytes, Immutable, KnownLayout, PartialEq, PartialOrd, Ord, Clone,
+    Default,
+    Eq,
+    Hash,
+    FromBytes,
+    IntoBytes,
+    Immutable,
+    KnownLayout,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Clone,
 )]
 pub struct ZXName([u8; ZX_MAX_NAME_LEN]);
 
@@ -33,6 +44,10 @@ impl ZXName {
             Some(index) => &self.0[..index],
             None => &self.0[..],
         })
+    }
+
+    pub fn buffer(&self) -> &[u8; ZX_MAX_NAME_LEN] {
+        &self.0
     }
 
     pub const fn try_from_bytes(b: &[u8]) -> Result<Self, Error> {
@@ -93,6 +108,13 @@ impl std::fmt::Debug for ZXName {
 impl From<&ZXName> for ZXName {
     fn from(name_ref: &ZXName) -> Self {
         name_ref.clone()
+    }
+}
+
+impl Deref for ZXName {
+    type Target = [u8; ZX_MAX_NAME_LEN];
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -190,6 +212,8 @@ mod tests {
             assert_eq!(0, empty.as_bstr().len());
             assert_eq!(empty, empty);
             assert_eq!("", empty.to_string());
+            assert_eq!(&[0u8; ZX_MAX_NAME_LEN], empty.buffer());
+            assert_eq!(&[0u8; ZX_MAX_NAME_LEN], &**empty);
         }
     }
 
@@ -204,6 +228,8 @@ mod tests {
         ] {
             assert_eq!("abcdefghijklmnopqrstuvwxyz01234", name.to_string());
             assert_eq!(ZX_MAX_NAME_LEN - 1, name.to_string().len());
+            assert_eq!(b"abcdefghijklmnopqrstuvwxyz01234\0", name.buffer());
+            assert_eq!(b"abcdefghijklmnopqrstuvwxyz01234\0", &**name);
         }
     }
 

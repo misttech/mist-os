@@ -17,6 +17,7 @@ ffx_plugin("ffx_profile_memory_components") {
   deps = [
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
+    "//sdk/rust/zx-types",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
@@ -28,8 +29,10 @@ ffx_plugin("ffx_profile_memory_components") {
     "//third_party/rust_crates:csv",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:prettytable-rs",
+    "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [ "//third_party/rust_crates:pretty_assertions" ]

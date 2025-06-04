@@ -15,6 +15,8 @@ open protocol MemoryMonitor {
     });
 };
 
+alias ResourceName = array<uint8, zx.MAX_NAME_LEN>;
+
 /// Snapshot of the memory usage of the system, as seen by the server.
 type Snapshot = table {
     /// List of attribution claims.
@@ -27,7 +29,7 @@ type Snapshot = table {
     /// Map from the vector index to the name of kernel resources.
     /// Resource names are often repeated across many resources; using this indirection reduces the
     /// amount of duplication within a `Snapshot` object.
-    4: resource_names vector<string:MAX>:MAX;
+    4: resource_names vector<ResourceName>:MAX;
     /// System-wide memory statistics from the kernel.
     5: kernel_statistics KernelStatistics;
     /// Details of performance impact of memory usage (e.g. thrashing, stalling, etc)

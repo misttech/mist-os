@@ -30,7 +30,7 @@ pub struct ServiceTask {
 /// Begins to serve the inspect tree, and returns an object holding the server's resources.
 /// Dropping the `ServiceTask` stops the service.
 pub fn start_service(
-    attribution_data_service: Arc<impl AttributionDataProvider>,
+    attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
     memory_monitor2_config: Config,
