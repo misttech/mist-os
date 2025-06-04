@@ -67,9 +67,12 @@ template("efi_test") {
     if (defined(visibility)) {
       visibility += [ ":$main_target" ]
     }
+
     if (!defined(output_name)) {
       output_name = main_target
     }
+
+    emulator_support_aib = true
 
     metadata = {
       images_barrier = []
@@ -77,7 +80,7 @@ template("efi_test") {
         {
           label = efi_label
           name = output_name
-          path = rebase_path("$root_out_dir/$output_name.efi", root_build_dir)
+          path = rebase_path("$root_out_dir/$output_name", root_build_dir)
           type = "kernel"
           cpu = current_cpu
           testonly = true

@@ -28,53 +28,45 @@ template("devicetree_boot_test") {
     public_visibility = [ "*" ]
   }
 
-  if (toolchain_variant.base == phys_toolchain) {
-    executable_target = "_devicetree_phys_test.$test_target.executable"
+  executable_target = "_devicetree_phys_test.$test_target.executable"
+  phys_executable(executable_target) {
+    testonly = true
+    visibility = [ ":*" ]
 
-    phys_executable(executable_target) {
-      testonly = true
-      visibility = [ ":*" ]
-      output_name = test_target
-      deps = []
-      forward_variables_from(invoker,
-                             "*",
-                             [
-                               "initrd",
-                               "output_dir",
-                               "output_extension",
-                               "output_name",
-                               "tags",
-                               "target_name",
-                               "testonly",
-                               "timeout",
-                               "visibility",
-                             ])
-      deps += [
-        "//zircon/kernel/arch/$current_cpu/phys:linuxboot",
-        "//zircon/kernel/phys/test:devicetree-test-main",
-      ]
+    output_name = test_target
+    deps = []
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "initrd",
+                             "output_dir",
+                             "output_extension",
+                             "output_name",
+                             "tags",
+                             "target_name",
+                             "testonly",
+                             "timeout",
+                             "visibility",
+                           ])
+    deps += [
+      "//zircon/kernel/arch/$current_cpu/phys:linuxboot",
+      "//zircon/kernel/phys/test:devicetree-test-main",
+    ]
+    emulator_support_aib = true
+  }
+
+  boot_test(test_target) {
+    forward_variables_from(invoker, [ "timeout" ])
+    visibility = public_visibility
+
+    environments = [ qemu_env ]
+
+    # The only architecture that supports both linux-style devicetree booting
+    # and crosvm is arm64.
+    if (current_cpu == "arm64") {
+      environments += [ crosvm_env ]
     }
 
-    boot_test(test_target) {
-      forward_variables_from(invoker, [ "timeout" ])
-      visibility = public_visibility
-
-      environments = [ qemu_env ]
-
-      # The only architecture that supports both linux-style devicetree booting
-      # and crosvm is arm64.
-      if (current_cpu == "arm64") {
-        environments += [ crosvm_env ]
-      }
-
-      qemu_kernel = ":$executable_target"
-    }
-  } else {
-    group(test_target) {
-      visibility = public_visibility
-      testonly = true
-      public_deps = [ ":$test_target(${phys_toolchain})" ]
-    }
-    not_needed(invoker, "*")
+    qemu_kernel = ":$executable_target"
   }
 }

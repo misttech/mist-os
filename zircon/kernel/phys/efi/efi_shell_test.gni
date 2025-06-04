@@ -79,7 +79,7 @@ template("efi_shell_test") {
           label = get_label_info(":target_name", "label_with_toolchain")
           name = fs_target
           path = rebase_path(outputs[0], root_build_dir)
-          type = "fat"
+          type = "efi-shell"
         },
       ]
     }

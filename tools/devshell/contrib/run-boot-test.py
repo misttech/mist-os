@@ -114,20 +114,20 @@ class BootTest(object):
 
         product_bundle_dir = self._product_bundle["path"]
 
-        # If no "system A" contents are specified, then we assume that intended
-        # test logic is given by EFI partition contents.
-        if manifest.get("system_a", []) == []:
-            bootloader_partitions = manifest["partitions"][
-                "bootloader_partitions"
-            ]
-            assert (
-                len(bootloader_partitions) == 1
-            ), 'expected "bootloader_partitions" to specify precisely one EFI disk'
+        # Check the bootloader partitions for a `efi_shell` type.
+        bootloader_partitions = manifest["partitions"]["bootloader_partitions"]
+
+        # There is UEFI disk, and we should ignore `system_a``.
+        if (
+            len(bootloader_partitions) == 1
+            and bootloader_partitions[0]["type"] == "efi-shell"
+        ):
             self.efi_disk = os.path.join(
                 product_bundle_dir, bootloader_partitions[0]["image"]
             )
             return
 
+        # Normal QEMU Kernel handling a ZBI.
         for image in manifest["system_a"]:
             path = os.path.join(product_bundle_dir, image["path"])
             if image["type"] == "zbi":

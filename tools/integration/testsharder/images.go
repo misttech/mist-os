@@ -104,7 +104,7 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 	}
 	for _, a := range bootloaderArtifacts {
 		parts := strings.SplitN(a, ":", 2)
-		if parts[0] == "firmware_fat" {
+		if parts[0] == "firmware_efi-shell" {
 			imageDeps = append(imageDeps, filepath.Join(pbPath, parts[1]))
 		}
 	}

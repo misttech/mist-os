@@ -65,11 +65,10 @@ template("qemu_kernel_test") {
       public_visibility = [ "*" ]
     }
 
+    executable_target = "_qemu_phys_test.$test_target.executable"
     if (toolchain_variant.base == qemu.environment ||
         (defined(qemu.target_second_environment) &&
          toolchain_variant.base == qemu.target_second_environment)) {
-      executable_target = "_qemu_phys_test.$test_target.executable"
-
       if (defined(qemu.import)) {
         import(qemu.import)
       }
@@ -82,7 +81,6 @@ template("qemu_kernel_test") {
       shim_executable(executable_target) {
         testonly = true
         visibility = [ ":*" ]
-        output_name = test_target
         deps = []
 
         forward_variables_from(invoker,
@@ -110,34 +108,36 @@ template("qemu_kernel_test") {
           target_type = "phys_executable"
         }
       }
-
-      boot_test(test_target) {
-        visibility = public_visibility
-
-        # The special kernel is all that really matters for this test.
-        qemu_kernel = ":$executable_target"
-        if (defined(invoker.initrd)) {
-          zbi = invoker.initrd
-        }
-
-        if (defined(invoker.disabled)) {
-          disabled = invoker.disabled
-        } else {
-          forward_variables_from(qemu, [ "disabled" ])
-        }
-        if (defined(invoker.environments)) {
-          environments = invoker.environments
-        } else {
-          environments = qemu.supported_environments
-        }
-      }
     } else {
-      group(test_target) {
-        visibility = public_visibility
-        testonly = true
-        public_deps = [ ":$test_target(${qemu.environment})" ]
+      not_needed(invoker,
+                 "*",
+                 [
+                   "disabled",
+                   "environments",
+                   "initrd",
+                   "supported_environments",
+                 ])
+    }
+
+    boot_test(test_target) {
+      visibility = public_visibility
+
+      # The special kernel is all that really matters for this test.
+      qemu_kernel = ":$executable_target(${qemu.environment})"
+      if (defined(invoker.initrd)) {
+        zbi = invoker.initrd
       }
-      not_needed(invoker, "*")
+
+      if (defined(invoker.disabled)) {
+        disabled = invoker.disabled
+      } else {
+        forward_variables_from(qemu, [ "disabled" ])
+      }
+      if (defined(invoker.environments)) {
+        environments = invoker.environments
+      } else {
+        environments = qemu.supported_environments
+      }
     }
   }
 }

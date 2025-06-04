@@ -24,6 +24,13 @@ import("toolchain.gni")
 #     - Type: string
 #     - Default: "efi"
 #
+#   * emulator_support_aib
+#     - Optional: If true, will generate an `emulator_support_aib_input` metadata entry and barrier
+#       making this image findable as a QEMU Kernel by `assembled_system`.
+#       See `//build/assembly/assembled_system.gni` "Metadata Protocol" for more details.
+#     - Type: boolean
+#     - Default: false
+#
 # See executable() for other parameters.
 template("efi_executable") {
   if (!is_efi) {
@@ -54,7 +61,18 @@ template("efi_executable") {
       if (!defined(output_name)) {
         output_name = target_name
       }
+      emulator_support_aib = false
+      if (defined(invoker.emulator_support_aib)) {
+        emulator_support_aib = invoker.emulator_support_aib
+      }
 
+      output_path =
+          rebase_path("${root_out_dir}/${output_name}.${output_extension}",
+                      root_build_dir)
+      if (!defined(invoker.install_path) && !emulator_support_aib) {
+        not_needed([ "output_path" ])
+      }
+      target_label = get_label_info(":$target_name", "label_with_toolchain")
       metadata = {
         if (defined(invoker.metadata)) {
           forward_variables_from(invoker.metadata, "*")
@@ -66,11 +84,19 @@ template("efi_executable") {
           }
           distribution_entries += [
             {
-              source = rebase_path(
-                      "${root_out_dir}/${output_name}.${output_extension}",
-                      root_build_dir)
+              source = output_path
               destination = invoker.install_path
-              label = get_label_info(":$target_name", "label_with_toolchain")
+              label = target_label
+            },
+          ]
+        }
+
+        if (emulator_support_aib) {
+          emulator_support_aib_input_barrier = []
+          emulator_support_aib_input = [
+            {
+              path = output_path
+              label = target_label
             },
           ]
         }

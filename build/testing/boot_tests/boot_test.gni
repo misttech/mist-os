@@ -183,7 +183,8 @@ template("_boot_test") {
 #    - Optional: A label specifying a ZBI, QEMU kernel, VBMeta, dtbo, UEFI
 #      executable, or a bootable UEFI filesystem or disk image, respectively.
 #      At least one of these parameters must be set, but each on their own is
-#      optional.
+#      optional. `efi_disk` must provide `efi_input` metadata entry consisting
+#      of a `name`, `path` and `type`.
 #    - Type: label
 #
 #  * timeout
@@ -317,84 +318,7 @@ template("boot_test") {
     }
   }
 
-  # Non-zbi based test need to manually generate their image manifest.
-  if (!defined(invoker.zbi)) {
-    image_manifest = "${target_gen_dir}/${main_target}.images.json"
-    image_manifest_target = "_boot_test.${target_name}.image_manifest"
-    rebased_image_manifest_target =
-        "_boot_test.${target_name}.rebased_image_manifest"
-    generated_file(image_manifest_target) {
-      forward_variables_from(invoker,
-                             [
-                               "zbi",
-                               "qemu_kernel",
-                               "vbmeta",
-                               "dtbo",
-                             ])
-      testonly = true
-      data_keys = [ "images" ]
-      walk_keys = [ "images_barrier" ]
-      output_conversion = "json"
-
-      deps = []
-      if (defined(zbi)) {
-        deps += [ zbi ]
-      }
-      if (defined(vbmeta)) {
-        deps += [ vbmeta ]
-      }
-      if (defined(dtbo)) {
-        deps += [ dtbo ]
-      }
-
-      # For general QEMU support it is convenient to include the default QEMU boot
-      # shim when one is not explicitly specified, unless we expect to boot an EFI
-      # disk image.
-      if (defined(qemu_kernel)) {
-        deps += [ qemu_kernel ]
-      } else if (!defined(invoker.efi_disk)) {
-        deps += qemu_boot_shim.deps
-      }
-
-      outputs = [ image_manifest ]
-    }
-
-    # The above generated_file() contains path fields that are relative to the
-    # build directory. `ffx product create`, however, expects these paths to be
-    # relative to the manifest itself. To account for the mismatch we run the
-    # metadata through some simple post-processing.
-    system_out_dir = "${target_out_dir}/${main_target}"
-    rebased_image_manifest = "${system_out_dir}/assembled_system.json"
-    action(rebased_image_manifest_target) {
-      testonly = true
-
-      sources = [ image_manifest ]
-      outputs = [ rebased_image_manifest ]
-
-      script = "//build/testing/boot_tests/rebase_metadata_paths.py"
-      args = [
-        "--root-build-dir",
-        ".",
-        "--new-base",
-        rebase_path(get_path_info(outputs[0], "dir"), root_build_dir),
-        "--metadata",
-        rebase_path(sources[0], root_build_dir),
-        "--output",
-        rebase_path(outputs[0], root_build_dir),
-      ]
-      deps = [ ":$image_manifest_target" ]
-    }
-
-    product_bundle(product_bundle_target) {
-      testonly = true
-
-      name = main_target
-      system_a = system_out_dir
-      partitions = _partition_config_label
-
-      deps = [ ":$rebased_image_manifest_target" ]
-    }
-  } else if (current_toolchain == default_toolchain) {
+  if (current_toolchain == default_toolchain) {
     if (!has_board) {
       # Configurations that don't declare a board would fail to generate
       # a hybrid board below. Passing an invalid board to assembled_system
@@ -411,7 +335,11 @@ template("boot_test") {
     }
 
     assembled_system_target = "_$main_target.assembled_system"
-    assembled_system_kernel_zbi = invoker.zbi
+
+    assembled_system_kernel_zbi = "//build/testing/boot_tests:empty-zbi"
+    if (defined(invoker.zbi)) {
+      assembled_system_kernel_zbi = invoker.zbi
+    }
 
     assembled_system(assembled_system_target) {
       visibility = [ ":*" ]

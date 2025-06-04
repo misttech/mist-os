@@ -79,7 +79,7 @@ func (m *mockFFX) GetPBArtifacts(ctx context.Context, pbPath, group string) ([]s
 	var artifacts []string
 	if group == "bootloader" {
 		if strings.Contains(pbPath, "efi") {
-			artifacts = append(artifacts, "firmware_fat:efi")
+			artifacts = append(artifacts, "firmware_efi-shell:efi")
 		}
 	} else {
 		artifacts = append(artifacts, "zbi")
