@@ -593,7 +593,14 @@ impl Kernel {
 
         // Step 8: exiting this process.
         log_info!("All tasks killed, exiting Starnix kernel root process.");
-        std::process::exit(0);
+        // Normally a Rust program exits its process by calling `std::process::exit()` which goes
+        // through libc to exit the program. This runs drop impls on any thread-local variables
+        // which can cause issues during Starnix shutdown when we haven't yet integrated every
+        // subsystem with the shutdown flow. While those issues are indicative of underlying
+        // problems, we can't solve them without finishing the implementation of graceful shutdown.
+        // Instead, ask Zircon to exit our process directly, bypassing any libc atexit handlers.
+        // TODO(https://fxbug.dev/295073633) return from main instead of avoiding atexit handlers
+        zx::Process::exit(0);
     }
 
     pub fn is_shutting_down(&self) -> bool {
