@@ -64,6 +64,9 @@ class Engine {
   // Initialize all inspect::Nodes, so that the Engine state can be observed.
   void InitializeInspectObjects();
 
+  // Tally the frame result so that it can be displayed via Inspect.
+  void RecordFrameResult(DisplayCompositor::RenderFrameResult result);
+
   struct SceneState {
     UberStruct::InstanceMap snapshot;
     flatland::GlobalTopologyData topology_data;
@@ -91,6 +94,10 @@ class Engine {
 
   inspect::Node inspect_node_;
   inspect::LazyNode inspect_scene_dump_;
+  inspect::Node inspect_frame_results_;
+  inspect::UintProperty inspect_direct_display_frame_count_;
+  inspect::UintProperty inspect_gpu_composition_frame_count_;
+  inspect::UintProperty inspect_failed_frame_count_;
   GetRootTransformFunc get_root_transform_;
 };
 

@@ -168,7 +168,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
     // (1 for each render target).
     uint32_t vmo_count = 0;
 
-    // The current target that is being rendererd to by the software renderer.
+    // The current target that is being rendered to by the software renderer.
     uint32_t curr_vmo = 0;
 
     // The information used to create images for each render target from the vmo data.
