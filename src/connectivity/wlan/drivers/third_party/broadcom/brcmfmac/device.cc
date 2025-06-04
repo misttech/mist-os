@@ -270,6 +270,11 @@ const brcmf_pub* Device::drvr() const { return brcmf_pub_.get(); }
 void Device::GetSupportedMacRoles(fdf::Arena& arena,
                                   GetSupportedMacRolesCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Received request for supported MAC roles from SME dfv2");
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
   fuchsia_wlan_common::wire::WlanMacRole
       supported_mac_roles_list[fuchsia_wlan_common::wire::kMaxSupportedMacRoles] = {};
   uint8_t supported_mac_roles_count = 0;
@@ -303,7 +308,11 @@ void Device::GetSupportedMacRoles(fdf::Arena& arena,
 
 void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
                          CreateIfaceCompleter::Sync& completer) {
-  std::lock_guard<std::mutex> lock(lock_);
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
   BRCMF_INFO("Device::CreateIface() creating interface started dfv2");
 
   if (!request->has_role() || !request->has_mlme_channel()) {
@@ -405,6 +414,13 @@ void Device::DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& 
     on_complete(ZX_ERR_NOT_FOUND);
     return;
   }
+
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    on_complete(ZX_ERR_BAD_STATE);
+    return;
+  }
+
   InterfaceInfo info = GetInterfaceInfoForRole(GetMacRoleForInterfaceId(iface_id));
 
   WlanInterface* iface = iface_ptr->get();
@@ -439,6 +455,11 @@ void Device::DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& 
 void Device::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
                         SetCountryCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Setting country code dfv2");
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
   if (!request->is_alpha2()) {
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     BRCMF_ERR("Device::SetCountry() Invalid input format of country code.");
@@ -457,6 +478,11 @@ void Device::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
 
 void Device::ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Clearing country dfv2");
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
   zx_status_t status = WlanInterface::ClearCountry(brcmf_pub_.get());
   if (status != ZX_OK) {
     BRCMF_ERR("Device::ClearCountry() Failed Clear country : %s", zx_status_get_string(status));
@@ -469,6 +495,11 @@ void Device::ClearCountry(fdf::Arena& arena, ClearCountryCompleter::Sync& comple
 
 void Device::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Received request for country from SME dfv2");
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
   uint8_t cc_code[fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len];
 
   zx_status_t status = WlanInterface::GetCountry(brcmf_pub_.get(), cc_code);
@@ -486,6 +517,11 @@ void Device::GetCountry(fdf::Arena& arena, GetCountryCompleter::Sync& completer)
 void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& arena,
                               SetPowerSaveModeCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Setting power save mode dfv2");
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
   if (!request->has_ps_mode()) {
     BRCMF_ERR("Device::SetPowerSaveMode() invoked without ps_mode");
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
@@ -505,6 +541,11 @@ void Device::SetPowerSaveMode(SetPowerSaveModeRequestView request, fdf::Arena& a
 
 void Device::GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Received request for PS mode from SME dfv2");
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
   fuchsia_wlan_common_wire::PowerSaveType ps_mode;
   zx_status_t status = brcmf_get_power_save_mode(brcmf_pub_.get(), &ps_mode);
   if (status != ZX_OK) {
@@ -528,13 +569,34 @@ void Device::PowerUp(fdf::Arena& arena, PowerUpCompleter::Sync& completer) {
 }
 
 void Device::Reset(fdf::Arena& arena, ResetCompleter::Sync& completer) {
-  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off, possibly in the middle of Reset already?");
+    completer.buffer(arena).ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
+  device_powered_on_ = false;
+
+  DestroyAllIfaces([this, arena = std::move(arena), completer = completer.ToAsync()]() mutable {
+    zx_status_t status = brcmf_suspend_chip(brcmf_pub_.get());
+    if (status != ZX_OK) {
+      BRCMF_ERR("Suspend chip failed: %s", zx_status_get_string(status));
+      // Ignore the error and attempt to power up since it has reached a point of no return.
+    }
+    status = brcmf_resume_chip(brcmf_pub_.get());
+    if (status != ZX_OK) {
+      BRCMF_ERR("Powerup failed: %s", zx_status_get_string(status));
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+    device_powered_on_ = true;
+    completer.buffer(arena).ReplySuccess();
+  });
 }
 
 void Device::GetPowerState(fdf::Arena& arena, GetPowerStateCompleter::Sync& completer) {
   fidl::Arena fidl_arena;
   auto builder = fuchsia_wlan_phyimpl::wire::WlanPhyImplGetPowerStateResponse::Builder(fidl_arena);
-  builder.power_on(true);
+  builder.power_on(device_powered_on_);
   completer.buffer(arena).ReplySuccess(builder.Build());
 }
 

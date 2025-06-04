@@ -89,6 +89,8 @@ struct brcmf_bus_ops {
       cpp20::span<const fuchsia_hardware_network_driver::wire::RxSpaceBuffer> buffers,
       uint8_t* vmo_addrs[]);
   wlan::drivers::components::FrameContainer (*acquire_tx_space)(brcmf_bus* bus, size_t count);
+  zx_status_t (*suspend)(brcmf_bus* bus);
+  zx_status_t (*resume)(brcmf_bus* bus);
 };
 
 namespace wlan {
@@ -214,5 +216,11 @@ static inline wlan::drivers::components::FrameContainer brcmf_bus_acquire_tx_spa
     struct brcmf_bus* bus, size_t count) {
   return bus->ops->acquire_tx_space(bus, count);
 }
+
+static inline zx_status_t brcmf_bus_suspend(struct brcmf_bus* bus) {
+  return bus->ops->suspend(bus);
+}
+
+static inline zx_status_t brcmf_bus_resume(struct brcmf_bus* bus) { return bus->ops->resume(bus); }
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BUS_H_

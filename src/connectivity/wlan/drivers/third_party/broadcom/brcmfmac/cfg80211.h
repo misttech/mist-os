@@ -684,4 +684,6 @@ void brcmf_return_assoc_result(struct net_device* ndev, status_code_t status_cod
 std::vector<uint8_t> brcmf_find_ssid_in_ies(const uint8_t* ie, size_t ie_len);
 
 void brcmf_cfg80211_handle_eapol_frame(struct brcmf_if* ifp, const void* data, size_t size);
+zx_status_t brcmf_suspend_chip(brcmf_pub* drvr);
+zx_status_t brcmf_resume_chip(brcmf_pub* drvr);
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_CFG80211_H_

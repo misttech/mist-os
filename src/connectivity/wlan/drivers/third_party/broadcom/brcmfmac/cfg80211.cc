@@ -19,6 +19,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 
 #include <lib/ddk/metadata.h>
+#include <lib/fdf/dispatcher.h>
 #include <lib/zx/clock.h>
 #include <netinet/if_ether.h>
 #include <stdlib.h>
@@ -8188,4 +8189,31 @@ zx_status_t brcmf_clear_states(struct brcmf_cfg80211_info* cfg) {
 
   // Always return ZX_OK.
   return ZX_OK;
+}
+
+zx_status_t brcmf_suspend_chip(brcmf_pub* drvr) {
+  zx_status_t status;
+
+  if (status = brcmf_reset(drvr); status != ZX_OK) {
+    BRCMF_ERR("Reset cfg80211 layer failed -- error: %s", zx_status_get_string(status));
+    brcmf_detach(drvr);
+    return status;
+  }
+  if (status = brcmf_bus_suspend(drvr->bus_if); status != ZX_OK) {
+    // Log the error and proceed. This is more or less a point of no return scenario.
+    // Attempt to resume and see if it recovers.
+    BRCMF_ERR("Bus suspend failed: %s", zx_status_get_string(status));
+  }
+  return status;
+}
+
+zx_status_t brcmf_resume_chip(brcmf_pub* drvr) {
+  zx_status_t status;
+  status = brcmf_bus_resume(drvr->bus_if);
+  if (status == ZX_OK) {
+    BRCMF_INFO("Bus resumed successfully");
+  } else {
+    BRCMF_INFO("Bus resume failed: %s", zx_status_get_string(status));
+  }
+  return status;
 }

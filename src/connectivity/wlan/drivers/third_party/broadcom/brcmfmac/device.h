@@ -185,6 +185,7 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   driver_devfs::Connector<fuchsia_factory_wlan::Iovar> devfs_connector_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> factory_controller_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> factory_node_;
+  bool device_powered_on_ = true;
 };
 
 }  // namespace brcmfmac
