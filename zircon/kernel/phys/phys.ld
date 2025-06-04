@@ -156,11 +156,7 @@ SECTIONS {
    */
   __llvm_prf_data : { *(__llvm_prf_data) }
 
-  .data : {
-    PROVIDE_HIDDEN(__data_start = .);
-    *(.sdata*)
-    *(.data*)
-  }
+  .data : { *(.sdata*) *(.data*) }
 
   /*
    * Instrumentation data.  Orphans placement can put this in weird places,

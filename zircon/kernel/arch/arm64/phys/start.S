@@ -6,7 +6,6 @@
 
 #include <lib/arch/arm64/exception-asm.h>
 #include <lib/arch/arm64/feature-asm.h>
-#include <lib/arch/cache.h>
 #include <lib/arch/asm.h>
 #include <lib/arch/ticks.h>
 #include <zircon/tls.h>
@@ -44,34 +43,22 @@
   // almost certainly will be violating the assumptions of).
   msr_vbar_elx x16, xzr  // x16 is clobbered as a scratch register (CurrentEL).
 
-  bootloader_data .req x9
-  mov bootloader_data, x0
-
-  // Invalidate any data cache lines above writable segments. The ZBI protocol
-  // only guarantees that the memory image is cleaned; however, the presence of
-  // any retained cache lines would result in incoherence if we modify the
-  // corresponding data before re-enabling the data cache.
-  adr_global x0, __data_start
-  adr_global x11, _end
-  sub x1, x11, x0
-  data_cache_range_op ivac
-
-  // Now clear .bss.  Note this assumes it's aligned to 16, which is ensured
+  // Clear .bss.  Note this assumes it's aligned to 16, which is ensured
   // by BOOT_STACK_ALIGN (and other alignments in .bss) and the linker script.
-  // Note that x11 still holds _end.
-  adr_global x10, _edata
+  adr_global x9, _edata
+  adr_global x10, _end
 0:
-  stp xzr, xzr, [x10], #16
-  cmp x10, x11
+  stp xzr, xzr, [x9], #16
+  cmp x9, x10
   blt 0b
 
   // Set up the stacks and the thread pointer area.
-  tp .req x10
+  tp .req x9
   adr_global tp, boot_thread_pointer
   msr TPIDR_EL1, tp
 
   // Stack guard canary value.
-  boot_stack_guard .req x11
+  boot_stack_guard .req x10
 
   // If hardware random numbers are available, use them.
   .arch armv8.5-a+rng
@@ -92,7 +79,7 @@
 .Lstack_guard_done:
 
 #if __has_feature(safe_stack)
-  boot_unsafe_stack_ptr .req x12
+  boot_unsafe_stack_ptr .req x11
   adr_global boot_unsafe_stack_ptr, boot_unsafe_stack + BOOT_STACK_SIZE
 #else
   boot_unsafe_stack_ptr .req xzr
@@ -118,7 +105,6 @@
   // Now the full C++ ABI is available.  This could theoretically be a tail
   // call since it's obliged never to return, but it's nice to have the
   // caller in a backtrace.
-  mov x0, bootloader_data
   bl PhysMain
 
   // Trap forever just in case it does return.

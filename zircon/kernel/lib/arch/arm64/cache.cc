@@ -14,14 +14,14 @@ GlobalCacheConsistencyContext::~GlobalCacheConsistencyContext() {
   // is possible aliasing then we cannot rely on invalidation by virtual
   // address and must resort to invalidating the entirety of the instruction
   // cache.
-  if (!ArmCacheTypeEl0::Read().dic() && possible_aliasing_) {
+  if (!CacheTypeEl0::Read().dic() && possible_aliasing_) {
     InvalidateGlobalInstructionCache();
     __isb(ARM_MB_SY);
   }
 }
 
 void GlobalCacheConsistencyContext::SyncRange(uintptr_t vaddr, size_t size) {
-  const auto ctr = ArmCacheTypeEl0::Read();
+  const auto ctr = CacheTypeEl0::Read();
   // If CTR_EL0.IDC is unset, cleaning the data cache to the PoU is required
   // for instruction-to-data cache coherence.
   if (!ctr.idc()) {

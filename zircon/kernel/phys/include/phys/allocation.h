@@ -73,8 +73,8 @@ class Allocation {
   void Resize(fbl::AllocChecker& ac, size_t new_size);
 
   // This must be called exactly once before using GetPool or New.
-  static void Init(ktl::span<memalloc::Range> mem_ranges, ktl::span<memalloc::Range> special_ranges,
-                   memalloc::Pool::AccessCallback access_callback = {});
+  static void Init(ktl::span<memalloc::Range> mem_ranges,
+                   ktl::span<memalloc::Range> special_ranges);
 
   // Alternatively, this can be called instead of Init() to install a
   // previously-initialized memalloc::Pool that was handed off.

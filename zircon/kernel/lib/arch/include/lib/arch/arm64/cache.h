@@ -23,7 +23,7 @@ enum class ArmL1ICachePolicy : uint8_t {
 };
 
 // [arm/v8]: D13.2.33  CTR_EL0, Cache Type Register.
-struct ArmCacheTypeEl0 : public SysRegBase<ArmCacheTypeEl0> {
+struct CacheTypeEl0 : public SysRegBase<CacheTypeEl0> {
   DEF_RSVDZ_FIELD(63, 38);
   DEF_FIELD(37, 32, tmin_line);
   // Bit 31 is reserved as 1.
@@ -43,7 +43,7 @@ struct ArmCacheTypeEl0 : public SysRegBase<ArmCacheTypeEl0> {
   size_t icache_line_size() const { return (1 << imin_line()) * sizeof(uint32_t); }
 };
 
-ARCH_ARM64_SYSREG(ArmCacheTypeEl0, "ctr_el0");
+ARCH_ARM64_SYSREG(CacheTypeEl0, "ctr_el0");
 
 }  // namespace arch
 

@@ -4,14 +4,12 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/arch/arm64/cache.h>
 #include <lib/arch/arm64/system.h>
 
 #include <hwreg/asm.h>
 
 int main(int argc, char** argv) {
   return hwreg::AsmHeader()  //
-      .Register<arch::ArmCacheTypeEl0>("CTR_EL0_")
       .Register<arch::ArmCurrentEl>("CURRENT_EL_")
       .Register<arch::ArmDaif>("DAIF_")
       .Register<arch::ArmDaifSetClr>("DAIFSETCLR_")

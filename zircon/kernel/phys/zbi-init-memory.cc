@@ -15,7 +15,6 @@
 #include <ktl/limits.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
-#include <phys/early-boot.h>
 #include <phys/main.h>
 #include <phys/symbolize.h>
 
@@ -46,18 +45,7 @@ void ZbiInitMemory(const void* zbi_ptr, EarlyBootZbi zbi, ktl::span<zbi_mem_rang
     special_ranges = special_ranges.subspan(0, special_ranges.size() - 1);
   }
 
-  // If the data cache is disabled, its re-enabling will occur within
-  // ArchSetUpAddressSpace(), which is gated on providing a non-null
-  // AddressSpace. In the case where we intend to re-enable it, we must ensure
-  // the coherence of allocations made now with the re-enabled state.
-  memalloc::Pool::AccessCallback early_access;
-  if (aspace) {
-    early_access = [](uint64_t addr, uint64_t size) {
-      ArchEarlyBootSyncAllocation(reinterpret_cast<uintptr_t>(addr), static_cast<size_t>(size));
-    };
-  }
-
-  Allocation::Init(zbi_ranges, special_ranges, ktl::move(early_access));
+  Allocation::Init(zbi_ranges, special_ranges);
 
   // Now that memory is accounted for, truncate the address range before any
   // further allocations.
@@ -72,10 +60,6 @@ void ZbiInitMemory(const void* zbi_ptr, EarlyBootZbi zbi, ktl::span<zbi_mem_rang
   // Set up our own address space.
   if (aspace) {
     ArchSetUpAddressSpace(*aspace);
-
-    // Data cache is now re-enabled and all allocation access should be kosher
-    // again.
-    Allocation::GetPool().set_access_callback([](uint64_t addr, uint64_t size) {});
   }
 
   if (gBootOptions->phys_verbose) {

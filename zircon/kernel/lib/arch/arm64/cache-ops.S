@@ -13,34 +13,6 @@
 // Scratch register, not saved across function calls.
 tmp             .req x16
 
-.function CleanDataCacheRange, global
-  data_cache_range_op cvac
-
-  ret
-  speculation_postfence
-.end_function
-
-.function CleanInvalidateDataCacheRange, global
-  data_cache_range_op civac
-
-  ret
-  speculation_postfence
-.end_function
-
-.function InvalidateDataCacheRange, global
-  data_cache_range_op ivac
-
-  ret
-  speculation_postfence
-.end_function
-
-.function InvalidateInstructionCacheRange, global
-  instruction_cache_range_invalidate
-
-  ret
-  speculation_postfence
-.end_function
-
 // void InvalidateLocalCaches()
 .function InvalidateLocalCaches, global
    data_cache_way_set_op isw, invalidate
@@ -113,3 +85,4 @@ second_flush:
   ret
   speculation_postfence
 .end_function
+

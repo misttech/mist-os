@@ -14,19 +14,13 @@
 #include <ktl/enforce.h>
 
 void Allocation::Init(ktl::span<memalloc::Range> mem_ranges,
-                      ktl::span<memalloc::Range> special_ranges,
-                      memalloc::Pool::AccessCallback access_callback) {
+                      ktl::span<memalloc::Range> special_ranges) {
   // Use fbl::NoDestructor to avoid generation of static destructors,
   // which fails in the phys environment.
   static fbl::NoDestructor<memalloc::Pool> pool;
 
   constexpr uint64_t kMin = kArchAllocationMinAddr.value_or(memalloc::Pool::kDefaultMinAddr);
   constexpr uint64_t kMax = kArchAllocationMaxAddr.value_or(memalloc::Pool::kDefaultMaxAddr);
-
-  if (access_callback) {
-    pool->set_access_callback(ktl::move(access_callback));
-  }
-
   ktl::array ranges{mem_ranges, special_ranges};
   ZX_ASSERT(pool->Init(ranges, kMin, kMax).is_ok());
 
