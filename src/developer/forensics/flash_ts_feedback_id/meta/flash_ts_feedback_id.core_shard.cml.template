@@ -45,6 +45,13 @@
             to: [ "#flash_ts_feedback_id" ],
         },
         {
+            directory: "block",
+            from: "parent",
+            as: "block-fts",
+            to: "#flash_ts_feedback_id",
+            subdir: "fts",
+        },
+        {
             directory: "dev-class",
             from: "parent",
             as: "dev-class-block",

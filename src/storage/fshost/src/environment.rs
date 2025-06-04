@@ -367,6 +367,7 @@ impl FshostEnvironment {
         matcher_lock: Arc<Mutex<HashSet<String>>>,
         inspector: fuchsia_inspect::Inspector,
         watcher: Watcher,
+        registered_devices: Arc<RegisteredDevices>,
         device_publisher: DevicePublisher,
     ) -> Self {
         let corruption_events = inspector.root().create_child("corruption_events");
@@ -381,7 +382,7 @@ impl FshostEnvironment {
             matcher_lock,
             inspector,
             watcher,
-            registered_devices: Arc::new(RegisteredDevices::default()),
+            registered_devices,
             other_filesystems: Vec::new(),
             device_publisher,
         }
@@ -750,7 +751,7 @@ impl Environment for FshostEnvironment {
             .add_source(Box::new(DirSource::new(
                 partitions_dir,
                 filesystem.get_component_moniker().unwrap(),
-                /*is_managed=*/ true,
+                crate::device::Parent::SystemPartitionTable,
             )))
             .await
             .context("Failed to watch gpt partitions dir")?;

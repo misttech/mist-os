@@ -148,6 +148,7 @@
             directory: [
                 "base-bin",
                 "blob",
+                "block",
                 "boot-bin",
                 "build-info",
                 "config-data",

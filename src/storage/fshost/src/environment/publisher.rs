@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::Device;
-use anyhow::Error;
+use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_hardware_block_volume::VolumeMarker;
 use fs_management::filesystem::BlockConnector;
@@ -52,17 +52,26 @@ impl DevicePublisher {
     }
 
     pub fn publish(&self, volume: Box<dyn BlockConnector>, name: &str) -> Result<(), Error> {
-        self.block_dir.add_entry(
-            name,
-            vfs::pseudo_directory! {
-                VolumeMarker::PROTOCOL_NAME => endpoint(move |_scope, channel| {
-                    volume.connect_channel_to_volume(channel.into_zx_channel().into())
-                        .unwrap_or_else(|error| {
-                            log::error!(error:%; "failed to open volume");
-                        });
-                }),
-            },
-        )?;
+        let mut dir = self.block_dir.clone();
+        for entry in name.split("/") {
+            let child = dir
+                .get_or_insert(vfs::name::Name::from(entry).unwrap(), || vfs::pseudo_directory! {});
+            dir = child
+                .into_any()
+                .downcast()
+                .map_err(|_| anyhow!("failed to walk directories at {}", entry))?;
+        }
+        dir.add_entry(
+            VolumeMarker::PROTOCOL_NAME,
+            endpoint(move |_scope, channel| {
+                volume.connect_channel_to_volume(channel.into_zx_channel().into()).unwrap_or_else(
+                    |error| {
+                        log::error!(error:%; "failed to open volume");
+                    },
+                );
+            }),
+        )
+        .context("adding entry")?;
         Ok(())
     }
 }
