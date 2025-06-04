@@ -164,9 +164,13 @@ class BootShimHelper {
   // After calling the constructor, memory is fully initialized and `gDevicetreeBoot` is
   // initialized.
   explicit BootShimHelper(const char* shim_name, void* boot_payload)
+      : BootShimHelper(shim_name, boot_payload, []() {}) {}
+
+  // Same as above, but allows injecting custom code to execute before `InitMemory` or `ArchSetup`.
+  explicit BootShimHelper(const char* shim_name, void* boot_payload, auto&& after_relocs_cb)
       : symbolize_((
             // Must happen before initializing the symbolize object.
-            InitStdout(), ApplyRelocations(), shim_name)),
+            ApplyRelocations(), InitStdout(), after_relocs_cb(), shim_name)),
         shim_(shim_name, [this, boot_payload]() {
           // Will initialize `gDevicetreeBoot`.
           InitMemory(boot_payload, {}, maybe_aspace_.Get());
