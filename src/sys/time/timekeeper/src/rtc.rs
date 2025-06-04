@@ -19,10 +19,13 @@ use std::pin::pin;
 use std::rc::Rc;
 use thiserror::Error;
 use time_persistence::State;
-use {fidl_fuchsia_hardware_rtc as frtc, fidl_fuchsia_io as fio};
+use time_pretty::format_duration;
+use {
+    fidl_fuchsia_hardware_hrtimer as ffhh, fidl_fuchsia_hardware_rtc as frtc,
+    fidl_fuchsia_io as fio,
+};
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};
-use time_pretty::format_duration;
 
 static RTC_PATH: &str = "/dev/class/rtc";
 
@@ -74,6 +77,8 @@ where
     C: Fn() -> zx::BootInstant,
 {
     state: Rc<RefCell<State>>,
+    // Used to query for current time from a persistent timer.
+    proxy: Option<ffhh::DeviceProxy>,
     // Overridable for tests.
     writer_fn: F,
     clock_fn: C,
@@ -83,26 +88,26 @@ where
 /// storage.
 pub fn new_read_only_rtc(
     state: Rc<RefCell<State>>,
+    proxy: Option<ffhh::DeviceProxy>,
 ) -> ReadOnlyRtcImpl<impl Fn(&State) -> Result<()>, impl Fn() -> zx::BootInstant> {
-    new_read_only_rtc_with_dependencies(
-        state,
-        |s: &State| State::write(s),
-        || fasync::BootInstant::now().into(),
-    )
+    let func = |s: &State| State::write(s);
+    let now_fn = || fasync::BootInstant::now().into();
+    new_read_only_rtc_with_dependencies(state, proxy, func, now_fn)
 }
 
 // A factory method with an option to inject state. Intended to be called
 // directly in tests, and its non-test counterpart above.
 fn new_read_only_rtc_with_dependencies<F, C>(
     state: Rc<RefCell<State>>,
-    writer: F,
-    now_fn: C,
+    proxy: Option<ffhh::DeviceProxy>,
+    writer_fn: F,
+    clock_fn: C,
 ) -> ReadOnlyRtcImpl<F, C>
 where
     F: Fn(&State) -> Result<()>,
     C: Fn() -> zx::BootInstant,
 {
-    ReadOnlyRtcImpl { state, writer_fn: writer, clock_fn: now_fn }
+    ReadOnlyRtcImpl { state, proxy, writer_fn, clock_fn }
 }
 
 #[async_trait(?Send)]
@@ -114,7 +119,7 @@ where
     /// Returns a linear approximation of the UtcInstant based on a valid reading
     /// of the current boot clock, and assuming a valid persisted reference boot instant.
     async fn get(&self) -> Result<UtcInstant> {
-        let boot_now = (self.clock_fn)();
+        let boot_now = self.now().await;
         let (boot_reference, utc_reference) = self.state.borrow().get_rtc_reference();
         let diff = boot_now - boot_reference;
         if diff < zx::BootDuration::ZERO {
@@ -122,7 +127,10 @@ where
             // correct time estimates during suspend.  However, on reboot, we typically
             // restart the boot clock, leading to a negative offset adjustment, which is wrong.
             // To avoid incorrect UTC adjustments, we disallow negative offsets.
-            Err(anyhow!("negative offset adjustment for RTC is not allowed: {}", format_duration(diff)))
+            Err(anyhow!(
+                "negative offset adjustment for RTC is not allowed: {}",
+                format_duration(diff)
+            ))
         } else {
             let utc_now = utc_reference + UtcDuration::from_nanos(diff.into_nanos());
             Ok(utc_now)
@@ -132,9 +140,40 @@ where
     /// Sets a reference point based on the current reading of the boot clock,
     /// and a reference UTC instant.
     async fn set(&self, value: UtcInstant) -> Result<()> {
-        let boot_now = (self.clock_fn)();
+        let boot_now = self.now().await;
         self.state.borrow_mut().set_rtc_reference(boot_now.into(), value);
         (self.writer_fn)(&self.state.borrow())
+    }
+}
+impl<F, C> ReadOnlyRtcImpl<F, C>
+where
+    F: Fn(&State) -> Result<()>,
+    C: Fn() -> zx::BootInstant,
+{
+    async fn now(&self) -> zx::BootInstant {
+        const CLOCK_ID: u64 = 1;
+        let local_now = (self.clock_fn)();
+        if let Some(ref proxy) = self.proxy {
+            // This hard-coded resolution is appropriate for our device.
+            let resolution = ffhh::Resolution::Duration(NANOS_PER_SECOND);
+            proxy
+                .read_clock(CLOCK_ID, &resolution)
+                .await
+                .expect("FIDL call to a driver does not fail")
+                .map_err(|err| {
+                    error!("error while reading persistent clock: {err:?}");
+                    err
+                })
+                .map(|value| {
+                    zx::BootInstant::ZERO
+                        + zx::BootDuration::from_seconds(
+                            value.try_into().expect("ticks is convertible to i64"),
+                        )
+                })
+                .unwrap_or(local_now)
+        } else {
+            local_now
+        }
     }
 }
 
@@ -547,6 +586,7 @@ mod test {
             let p_clone = p.clone();
             let rtc = new_read_only_rtc_with_dependencies(
                 state,
+                /* proxy= */ None,
                 // Fake persistent state is stored in a tempfile.
                 |s| State::write_internal(&p_clone, s),
                 // Fake "now".
@@ -579,6 +619,7 @@ mod test {
             let state = Rc::new(RefCell::new(State::read_and_update_internal(p_clone).unwrap()));
             let rtc = new_read_only_rtc_with_dependencies(
                 state,
+                /* proxy= */ None,
                 |s| State::write_internal(&p, s),
                 || fake_boot_now.borrow().clone(),
             );
@@ -594,5 +635,41 @@ mod test {
             (*fake_boot_now.borrow_mut()) -= zx::BootDuration::from_nanos(500);
             assert_matches!(rtc.get().await, Err(_));
         }
+    }
+
+    #[fuchsia::test]
+    async fn read_time_from_proxy() {
+        let d = tempfile::TempDir::new().expect("tempdir created");
+        let p = d.path().join("file.json");
+        let state = Rc::new(RefCell::new(State::new(false)));
+
+        let fake_boot_now = Rc::new(RefCell::new(zx::BootInstant::from_nanos(100)));
+
+        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<ffhh::DeviceMarker>();
+
+        let _task = fasync::Task::local(async move {
+            while let Some(request) = stream.next().await {
+                match request {
+                    Ok(ffhh::DeviceRequest::ReadClock { responder, .. }) => {
+                        responder.send(Ok(42)).unwrap();
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        });
+
+        // Try initializing and moving the reference point as fake time passes.
+        let rtc = new_read_only_rtc_with_dependencies(
+            state,
+            Some(proxy),
+            |s| State::write_internal(&p, s),
+            // Fake "now".
+            || fake_boot_now.borrow().clone(),
+        );
+
+        assert_eq!(
+            rtc.now().await,
+            zx::BootInstant::ZERO + zx::BootDuration::from_nanos(42 * NANOS_PER_SECOND)
+        );
     }
 }

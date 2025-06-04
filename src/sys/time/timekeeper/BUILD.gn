@@ -33,6 +33,7 @@ timekeeper_deps = [
   ":timekeeper-config",
   "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
   "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+  "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
   "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",

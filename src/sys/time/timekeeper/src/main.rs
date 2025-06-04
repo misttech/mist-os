@@ -303,7 +303,13 @@ async fn main() -> Result<()> {
 
     if config.has_always_on_counter() {
         // A read only RTC implementation using an always-on counter.
-        let read_only_rtc = rtc::new_read_only_rtc(persistent_state.clone());
+        let hrtimer_proxy = alarms::connect_to_hrtimer_async()
+            .map_err(|err| {
+                warn!("could not connect to fuchsia.hardware.hrtimer/Device, falling back to non-persistent RTC: {err:?}");
+                err
+            })
+            .ok();
+        let read_only_rtc = rtc::new_read_only_rtc(persistent_state.clone(), hrtimer_proxy);
         fasync::Task::local(async move {
             maintain_utc(
                 primary_track,
