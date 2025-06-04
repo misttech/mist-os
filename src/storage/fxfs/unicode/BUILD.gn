@@ -21,7 +21,7 @@ rustc_library("unicode") {
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:serde",
   ]
-  visibility = [ "//src/storage/fxfs/*" ]
+  visibility = [ "//src/storage/*" ]
 }
 
 # We compile this file into its own crate to avoid gen/ path imports from rust.

@@ -728,9 +728,9 @@ pub struct FsverityMetadataV33 {
 
 pub type EncryptionKey = EncryptionKeyV47;
 impl From<EncryptionKey> for WrappedKey {
-    fn from(value: EncryptionKeyV47) -> Self {
+    fn from(value: EncryptionKey) -> Self {
         match value {
-            EncryptionKeyV47::Fxfs(key) => WrappedKey::Fxfs(key.into()),
+            EncryptionKey::Fxfs(key) => WrappedKey::Fxfs(key.into()),
         }
     }
 }
@@ -832,7 +832,6 @@ pub enum ObjectValueV47 {
     /// in bytes. |fsverity_metadata| holds the descriptor for the fsverity-enabled file.
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
-
 #[derive(Migrate, Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[migrate_to_version(ObjectValueV47)]
 pub enum ObjectValueV46 {

@@ -1160,7 +1160,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         offset: u64,
         buf: MutableBufferRef<'_>,
         key_id: Option<u64>,
-        device_offset: u64,
+        mut device_offset: u64,
     ) -> Result<MaybeChecksums, Error> {
         let mut transfer_buf;
         let block_size = self.block_size();
@@ -1170,6 +1170,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             } else {
                 let (range, buf) = self.align_buffer(attribute_id, offset, buf.as_ref()).await?;
                 transfer_buf = buf;
+                device_offset -= offset - range.start;
                 (range, transfer_buf.as_mut())
             };
 
@@ -1182,7 +1183,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             )?;
         }
 
-        self.write_aligned(transfer_buf_ref.as_ref(), device_offset - (offset - range.start)).await
+        self.write_aligned(transfer_buf_ref.as_ref(), device_offset).await
     }
 
     /// Writes to multiple ranges with data provided in `buf`.  The buffer can be modified in place
