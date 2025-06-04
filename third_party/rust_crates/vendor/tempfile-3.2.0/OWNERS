@@ -35,6 +35,7 @@ include /src/fonts/OWNERS
 include /src/intl/OWNERS
 include /src/lib/analytics/OWNERS
 include /src/lib/assembly/OWNERS
+include /src/lib/assembly/product_bundle/OWNERS
 include /src/lib/depfile/OWNERS
 include /src/lib/diagnostics/selectors/OWNERS
 include /src/lib/fdio/OWNERS

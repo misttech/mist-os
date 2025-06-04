@@ -13,5 +13,4 @@ include /src/power/OWNERS
 include /src/starnix/OWNERS
 include /src/storage/OWNERS
 include /src/sys/pkg/OWNERS
-include /src/testing/sl4f/audio_recording/OWNERS
 include /src/virtualization/OWNERS

@@ -17,6 +17,7 @@ include /src/developer/ffx/plugins/repository/OWNERS
 include /src/developer/ffx/plugins/target/repository/OWNERS
 include /src/developer/ffx/plugins/target/update/OWNERS
 include /src/lib/assembly/OWNERS
+include /src/lib/assembly/product_bundle/OWNERS
 include /src/lib/assembly/structured_config/OWNERS
 include /src/lib/depfile/OWNERS
 include /src/lib/transfer_manifest/OWNERS

@@ -3,8 +3,8 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /build/python/OWNERS
-include /build/sdk/meta/OWNERS
 include /src/developer/ffx/OWNERS
 include /src/developer/ffx/tools/triage/OWNERS
+include /src/lib/assembly/product_bundle/OWNERS
 include /src/security/OWNERS
 include /src/storage/OWNERS
