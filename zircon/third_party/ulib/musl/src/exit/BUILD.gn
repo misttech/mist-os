@@ -8,7 +8,6 @@ source_set("exit") {
     "assert.c",
     "at_quick_exit.c",
     "atexit.c",
-    "exit.c",
     "quick_exit.c",
   ]
   deps = [

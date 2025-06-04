@@ -7,7 +7,7 @@ import("../libc.gni")
 llvm_libc_group("stdlib") {
   deps = [ ":generic" ]
   if (is_fuchsia) {
-    deps += [ ":_Exit" ]
+    deps += [ ":exit" ]
   }
 }
 
@@ -44,6 +44,19 @@ llvm_libc_source_set("abort") {
 }
 
 if (is_fuchsia) {
+  llvm_libc_source_set("exit") {
+    functions = [ "exit" ]
+    os_functions = functions
+    no_test_functions = functions
+    local_deps = [
+      "..:weak",
+      "//src/zircon/lib/zircon",
+      "//zircon/third_party/ulib/musl:musl_internal",
+    ]
+
+    deps = [ ":_Exit" ]
+  }
+
   llvm_libc_source_set("_Exit") {
     functions = [ "_Exit" ]
     os_functions = functions
