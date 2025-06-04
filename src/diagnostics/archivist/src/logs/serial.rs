@@ -190,13 +190,18 @@ impl<'a, S: Write> SerialWriter<'a, S> {
 
 #[cfg(test)]
 mod tests {
+    use std::task::Poll;
+
     use super::*;
     use crate::identity::ComponentIdentity;
     use crate::logs::testing::make_message;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
+    use futures::future::poll_fn;
+    use futures::FutureExt;
     use moniker::ExtendedMoniker;
+    use std::pin::pin;
     use zx::BootInstant;
 
     struct TestSink {
@@ -320,15 +325,20 @@ mod tests {
         ));
         core_baz_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(2)));
         let (sink, rcv) = TestSink::new();
-        let _serial_task = fasync::Task::spawn(serial_config.write_logs(Arc::clone(&repo), sink));
+        let mut serial_task = pin!(serial_config.write_logs(Arc::clone(&repo), sink));
         bootstrap_bar_container.ingest_message(make_message(
             "b",
             Some("foo"),
             zx::BootInstant::from_nanos(3),
         ));
         core_foo_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(4)));
-
-        let received = rcv.take(2).collect::<Vec<_>>().await;
+        poll_fn(|context| loop {
+            if Poll::Pending == serial_task.poll_unpin(context) {
+                return Poll::Ready(());
+            }
+        })
+        .await;
+        let received = rcv.take(2).collect::<Vec<_>>().now_or_never().unwrap();
 
         // We must see the logs emitted before we installed the serial listener and after. We must
         // not see the log from /core/baz and we must not see the log from bootstrap/bar with tag
