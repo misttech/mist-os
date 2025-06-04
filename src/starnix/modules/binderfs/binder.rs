@@ -121,6 +121,11 @@ impl UserMemoryCursor {
         Ok(Self { buffer: buffer.into() })
     }
 
+    /// Increment the read position.
+    pub fn advance(&mut self, length: u64) -> Result<(), Errno> {
+        self.buffer.advance(length as usize)
+    }
+
     /// Read an object from userspace memory and increment the read position.
     pub fn read_object<T: FromBytes>(&mut self) -> Result<T, Errno> {
         self.buffer.read_object::<T>()
@@ -3718,59 +3723,64 @@ impl BinderDriver {
                     let mut input = resource_accessor.read_object(user_ref)?;
 
                     log_trace!("binder write/read request start {:?}", input);
+                    let mut has_consumed_write = false;
+                    let result = (|| {
+                        if input.write_size > input.write_consumed {
+                            // The calling thread wants to write some data to the binder driver.
+                            let mut cursor = UserMemoryCursor::new(
+                                resource_accessor.as_memory_accessor(),
+                                UserAddress::from(input.write_buffer),
+                                input.write_size,
+                            )?;
 
-                    // We will be writing this back to userspace, don't trust what the client gave us.
-                    input.write_consumed = 0;
-                    input.read_consumed = 0;
+                            // Skip already-consumed commands.
+                            cursor.advance(input.write_consumed)?;
 
-                    if input.write_size > 0 {
-                        // The calling thread wants to write some data to the binder driver.
-                        let mut cursor = UserMemoryCursor::new(
-                            resource_accessor.as_memory_accessor(),
-                            UserAddress::from(input.write_buffer),
-                            input.write_size,
-                        )?;
+                            // Handle all the data the calling thread sent, which may include
+                            // multiple commands.
+                            while cursor.bytes_read() < input.write_size as usize {
+                                self.handle_thread_write(
+                                    locked,
+                                    current_task,
+                                    binder_proc,
+                                    &binder_thread,
+                                    &mut cursor,
+                                )?;
+                                has_consumed_write = true;
+                                input.write_consumed = cursor.bytes_read() as u64;
+                            }
+                        }
 
-                        // Handle all the data the calling thread sent, which may include multiple
-                        // commands.
-                        while cursor.bytes_read() < input.write_size as usize {
-                            self.handle_thread_write(
-                                locked,
+                        if input.read_size > input.read_consumed {
+                            // The calling thread wants to read some data from the binder driver,
+                            // blocking if there is nothing immediately available.
+                            let mut read_buffer = UserBuffer {
+                                address: UserAddress::from(input.read_buffer),
+                                length: input.read_size as usize,
+                            };
+                            read_buffer.advance(input.read_consumed as usize)?;
+                            let read_result = match self.handle_thread_read(
                                 current_task,
                                 binder_proc,
                                 &binder_thread,
-                                &mut cursor,
-                            )?;
+                                &read_buffer,
+                            ) {
+                                // If the wait was interrupted and some command has been consumed,
+                                // return a success.
+                                Err(err) if err == EINTR && has_consumed_write => Ok(0),
+                                r => r,
+                            };
+                            input.read_consumed += read_result? as u64;
                         }
-                        input.write_consumed = cursor.bytes_read() as u64;
-                    }
 
-                    if input.read_size > 0 {
-                        // The calling thread wants to read some data from the binder driver, blocking
-                        // if there is nothing immediately available.
-                        let read_buffer = UserBuffer {
-                            address: UserAddress::from(input.read_buffer),
-                            length: input.read_size as usize,
-                        };
-                        let read_result = match self.handle_thread_read(
-                            current_task,
-                            binder_proc,
-                            &binder_thread,
-                            &read_buffer,
-                        ) {
-                            // If the wait was interrupted and some command has been consumed, return a
-                            // success.
-                            Err(err) if err == EINTR && input.write_consumed > 0 => Ok(0),
-                            r => r,
-                        };
-                        input.read_consumed = read_result? as u64;
-                    }
+                        log_trace!("binder write/read request end {:?}", input);
+                        Ok(SUCCESS)
+                    })();
 
-                    log_trace!("binder write/read request end {:?}", input);
-
-                    // Write back to the calling thread how much data was read/written.
+                    // Write back to the calling thread how much data was read/written, even when
+                    // returning an error.
                     resource_accessor.write_object(user_ref, &input)?;
-                    Ok(SUCCESS)
+                    result
                 }
                 uapi::BINDER_SET_MAX_THREADS => {
                     if user_arg.is_null() {
