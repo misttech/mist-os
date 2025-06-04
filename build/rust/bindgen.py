@@ -204,10 +204,14 @@ class Bindgen:
             return None
         type_name = split[2]
 
+        results = set()
         for t, traits in self.auto_derive_traits:
             if t.match(type_name):
-                return traits
-        return None
+                results.update(traits)
+        if len(results) == 0:
+            return None
+        else:
+            return sorted(results)
 
     def post_process_rust_file(self, rust_file_name):
         with open(rust_file_name, "r+") as source_file:

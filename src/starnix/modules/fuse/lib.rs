@@ -1239,9 +1239,12 @@ impl FsNodeOps for FuseNode {
         let FuseResponse::Open(open_out) = response else {
             return error!(EINVAL);
         };
-        let passthrough_file = if open_out.passthrough_fh != 0 {
+        // SAFETY: The data has been read with zerocopy which ensures every bits have been
+        // initialized.
+        let passthrough_fh = unsafe { open_out.__bindgen_anon_1.passthrough_fh };
+        let passthrough_file = if passthrough_fh != 0 {
             let mut connection = self.connection.lock();
-            let entry = connection.registered_passthrough.entry(open_out.passthrough_fh);
+            let entry = connection.registered_passthrough.entry(passthrough_fh);
             match entry {
                 Entry::Occupied(v) => v.remove(),
                 Entry::Vacant(_) => Default::default(),
@@ -2192,7 +2195,7 @@ impl FuseKernelMessage {
                 uid: creds.uid,
                 gid: creds.gid,
                 pid: current_task.get_tid() as u32,
-                error_in: 0,
+                __bindgen_anon_1: Default::default(),
             },
             operation,
         })
