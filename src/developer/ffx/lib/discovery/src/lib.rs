@@ -192,25 +192,6 @@ bitflags! {
     }
 }
 
-#[derive(Hash, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiscoveryOrigin {
-    Mdns,
-    Usb,
-    Manual,
-    Emulator,
-    FastbootTcp,
-    FastbootUdp,
-    FastbootUsb,
-    FastbootFile,
-    Unknown,
-}
-
-impl Default for DiscoveryOrigin {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
-
 impl Default for DiscoverySources {
     fn default() -> Self {
         DiscoverySources::all()
@@ -448,19 +429,16 @@ pub mod test {
                     node_name: Some("magnus".to_string()),
                     state: TargetState::Unknown,
                     manual: false,
-                    origin: DiscoveryOrigin::Unknown,
                 })),
                 Ok(TargetEvent::Added(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
                     manual: false,
-                    origin: DiscoveryOrigin::Unknown,
                 })),
                 Ok(TargetEvent::Removed(TargetHandle {
                     node_name: Some("abagail".to_string()),
                     state: TargetState::Unknown,
                     manual: false,
-                    origin: DiscoveryOrigin::Unknown,
                 })),
             ]))),
         };
@@ -564,14 +542,12 @@ pub mod test {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-            origin: DiscoveryOrigin::Unknown,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-            origin: DiscoveryOrigin::Unknown,
         })))?;
 
         assert_eq!(
@@ -580,7 +556,6 @@ pub mod test {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
                 manual: false,
-                origin: DiscoveryOrigin::Unknown,
             })
         );
 
@@ -590,7 +565,6 @@ pub mod test {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
                 manual: false,
-                origin: DiscoveryOrigin::Unknown,
             })
         );
 
@@ -618,14 +592,12 @@ pub mod test {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-            origin: DiscoveryOrigin::Unknown,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Removed(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-            origin: DiscoveryOrigin::Unknown,
         })))?;
 
         assert_eq!(
@@ -634,7 +606,6 @@ pub mod test {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
                 manual: false,
-                origin: DiscoveryOrigin::Unknown,
             })
         );
 
@@ -662,14 +633,12 @@ pub mod test {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-            origin: DiscoveryOrigin::Unknown,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-            origin: DiscoveryOrigin::Unknown,
         })))?;
 
         assert_eq!(
@@ -678,7 +647,6 @@ pub mod test {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
                 manual: false,
-                origin: DiscoveryOrigin::Unknown,
             })
         );
 
@@ -709,14 +677,12 @@ pub mod test {
             node_name: Some("Kelsier".to_string()),
             state: TargetState::Product { addrs: vec![addr], serial: None },
             manual: false,
-            origin: DiscoveryOrigin::Mdns,
         })))?;
 
         sender.unbounded_send(Ok(TargetEvent::Added(TargetHandle {
             node_name: Some("Vin".to_string()),
             state: TargetState::Zedboot,
             manual: false,
-            origin: DiscoveryOrigin::Unknown,
         })))?;
 
         assert_eq!(
@@ -725,7 +691,6 @@ pub mod test {
                 node_name: Some("Vin".to_string()),
                 state: TargetState::Zedboot,
                 manual: false,
-                origin: DiscoveryOrigin::Unknown,
             })
         );
 
@@ -812,7 +777,6 @@ pub mod test {
                     serial: None
                 },
                 manual: false,
-                origin: DiscoveryOrigin::Emulator,
             })
         );
 
@@ -838,7 +802,6 @@ pub mod test {
                     serial: None
                 },
                 manual: false,
-                origin: DiscoveryOrigin::Emulator,
             })
         );
 
