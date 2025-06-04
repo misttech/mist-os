@@ -455,9 +455,14 @@ TEST_F(FsverityTest, EnableVerity) {
 
   // Test FS_IOC_GETFLAGS for FS_VERITY_FL.
   {
-    __u32 flags = 0;
-    SAFE_SYSCALL(ioctl(fd, FS_IOC_GETFLAGS, &flags));
-    ASSERT_TRUE(flags | FS_VERITY_FL);
+    // Regression test for https://fxbug.dev/421907931
+    // FS_IOC_GETFLAGS should retrieve a 32 bit value in both 32 and 64 bit modes.
+    // Pass a pointer to the middle of an array to verify that this is true.
+    uint32_t flags[] = {0xabababab, 0xcdcdcdcd, 0xdededede};
+    SAFE_SYSCALL(ioctl(fd, FS_IOC_GETFLAGS, &flags[1]));
+    EXPECT_EQ(flags[0], 0xabababab);
+    ASSERT_TRUE(flags[1] | FS_VERITY_FL);
+    EXPECT_EQ(flags[2], 0xdededede);
   }
   close(fd);
 
