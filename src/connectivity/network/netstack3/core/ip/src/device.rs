@@ -48,7 +48,7 @@ use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
 use crate::internal::device::dad::{
-    DadHandler, DadIncomingPacketResult, DadIpExt, DadTimerId, Ipv6PacketResultMetadata,
+    DadHandler, DadIncomingPacketResult, DadIpExt, DadTimerId, Ipv6PacketResultMetadata, NeedsDad,
 };
 use crate::internal::device::nud::NudIpHandler;
 use crate::internal::device::route_discovery::{
@@ -1173,20 +1173,22 @@ fn enable_ipv6_device_with_config<
         .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
         .into_iter()
         .for_each(|addr_id| {
-            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
+            let needs_dad = DadHandler::initialize_duplicate_address_detection(
                 core_ctx,
                 bindings_ctx,
                 device_id,
                 &addr_id,
-            )
-            .into_address_state_and_start_dad();
-            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
-                device: device_id.clone(),
-                addr: addr_id.addr().into(),
-                state,
-            });
-            if let Some(token) = start_dad {
-                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                |state| IpDeviceEvent::AddressStateChanged {
+                    device: device_id.clone(),
+                    addr: addr_id.addr().into(),
+                    state,
+                },
+            );
+            match needs_dad {
+                NeedsDad::Yes(token) => {
+                    core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                }
+                NeedsDad::No => {}
             }
         });
 
@@ -1308,20 +1310,22 @@ fn enable_ipv4_device_with_config<
         .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
         .into_iter()
         .for_each(|addr_id| {
-            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
+            let needs_dad = DadHandler::initialize_duplicate_address_detection(
                 core_ctx,
                 bindings_ctx,
                 device_id,
                 &addr_id,
-            )
-            .into_address_state_and_start_dad();
-            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
-                device: device_id.clone(),
-                addr: addr_id.addr().into(),
-                state,
-            });
-            if let Some(token) = start_dad {
-                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                |state| IpDeviceEvent::AddressStateChanged {
+                    device: device_id.clone(),
+                    addr: addr_id.addr().into(),
+                    state,
+                },
+            );
+            match needs_dad {
+                NeedsDad::Yes(token) => {
+                    core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                }
+                NeedsDad::No => {}
             }
         })
 }
@@ -1546,30 +1550,42 @@ pub fn add_ip_addr_subnet_with_config<
     let ip_enabled =
         core_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
-    let (state, start_dad) = if ip_enabled {
+    let needs_dad = if ip_enabled {
         DadHandler::initialize_duplicate_address_detection(
             core_ctx,
             bindings_ctx,
             device_id,
             &addr_id,
+            |state| IpDeviceEvent::AddressAdded {
+                device: device_id.clone(),
+                addr: addr_sub.to_witness(),
+                state,
+                valid_until,
+                preferred_lifetime,
+            },
         )
-        .into_address_state_and_start_dad()
     } else {
         // NB: We don't start DAD if the device is disabled. DAD will be
         // performed when the device is enabled for all addresses.
-        (IpAddressState::Unavailable, None)
+        //
+        // Typically, the `AddressAdded` event would be dispatched by the DAD
+        // engine, but because we're not calling into the DAD engine we need
+        // to dispatch the event here.
+        bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
+            device: device_id.clone(),
+            addr: addr_sub.to_witness(),
+            state: IpAddressState::Unavailable,
+            valid_until,
+            preferred_lifetime,
+        });
+        NeedsDad::No
     };
 
-    bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
-        device: device_id.clone(),
-        addr: addr_sub.to_witness(),
-        state,
-        valid_until,
-        preferred_lifetime,
-    });
-
-    if let Some(token) = start_dad {
-        core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+    match needs_dad {
+        NeedsDad::Yes(token) => {
+            core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+        }
+        NeedsDad::No => {}
     }
 
     Ok(addr_id)
