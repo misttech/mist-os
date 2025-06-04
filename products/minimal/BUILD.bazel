@@ -2,46 +2,20 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
 load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
-    "ARCH",
-    "BUILD_TYPES",
-    "INPUT_DEVICE_TYPE",
     "fuchsia_elf_sizes",
     "fuchsia_product",
     "fuchsia_product_bundle",
     "fuchsia_product_configuration",
 )
-load("//build/info:info.bzl", "DEFAULT_PRODUCT_BUILD_INFO")
+load("//products/minimal:minimal.bzl", "MINIMAL_PLATFORM_BASE", "MINIMAL_PRODUCT_BASE")
 
 package(default_visibility = ["//visibility:public"])
 
 _PRODUCT_CONFIG_BASE_JSON = {
-    "platform": {
-        "build_type": BUILD_TYPES.ENG,
-        "development_support": {
-            "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
-        },
-        "fonts": {
-            "enabled": False,
-        },
-        "ui": {
-            "supported_input_devices": [
-                INPUT_DEVICE_TYPE.BUTTON,
-                INPUT_DEVICE_TYPE.TOUCHSCREEN,
-            ],
-        },
-        "power": {
-            "enable_non_hermetic_testing": True,
-        },
-        "storage": {
-            "storage_host_enabled": True,
-        },
-    },
-    "product": {
-        "build_info": DEFAULT_PRODUCT_BUILD_INFO,
-    },
+    "platform": MINIMAL_PLATFORM_BASE,
+    "product": MINIMAL_PRODUCT_BASE,
 }
 
 fuchsia_product_configuration(
