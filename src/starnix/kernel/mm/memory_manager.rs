@@ -4228,7 +4228,7 @@ impl MemoryManager {
 
     pub fn atomic_load_u32_acquire(&self, futex_addr: FutexAddress) -> Result<u32, Errno> {
         if let Some(usercopy) = usercopy() {
-            usercopy.atomic_load_u32_relaxed(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
+            usercopy.atomic_load_u32_acquire(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
         } else {
             unreachable!("can only control memory ordering of atomics with usercopy");
         }
