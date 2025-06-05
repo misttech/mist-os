@@ -1,4 +1,4 @@
-// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -23,6 +23,8 @@ use std::sync::Arc;
 mod dns_watcher;
 mod registry;
 mod socket_provider;
+
+pub use registry::{NetworkConversionError, NetworkExt};
 
 #[derive(Copy, Clone, Debug)]
 struct SocketMarks {
@@ -91,8 +93,7 @@ enum IncomingService {
 }
 
 /// Main entry point for the network socket proxy.
-#[fuchsia::main(logging_tags = ["network_socket_proxy"])]
-pub async fn main() -> Result<(), anyhow::Error> {
+pub async fn run() -> Result<(), anyhow::Error> {
     fuchsia_inspect::component::health().set_starting_up();
 
     let inspector = fuchsia_inspect::component::inspector();
