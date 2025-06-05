@@ -595,6 +595,17 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
     qualifier->b_reserved = 0;
     *out_actual = length;
     return ZX_OK;
+  } else if (desc_type == USB_DT_BOS) {
+    usb_bos_descriptor_t bos{
+      .b_length = sizeof(usb_bos_descriptor_t),
+      .b_descriptor_type = USB_DT_BOS,
+      .w_total_length = sizeof(usb_bos_descriptor_t),
+      .b_num_device_caps = 0,  // No device capabilities.
+    };
+    length = std::min(length, sizeof(usb_bos_descriptor_t));
+    memcpy(buffer, &bos, length);
+    *out_actual = length;
+    return ZX_OK;
   }
 
   fdf::error("Unsupported value: {:#x} index: {}", value, index);
