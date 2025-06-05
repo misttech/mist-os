@@ -173,6 +173,12 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
               *reinterpret_cast<const zbi_dcfg_arm_generic_timer_driver_t*>(payload.data());
           SaveForMexec(header, payload);
           break;
+        case ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER_MMIO:
+          ZX_ASSERT(payload.size() >= sizeof(zbi_dcfg_arm_generic_timer_mmio_driver_t));
+          arch_handoff.generic_timer_mmio_driver =
+              *reinterpret_cast<const zbi_dcfg_arm_generic_timer_mmio_driver_t*>(payload.data());
+          SaveForMexec(header, payload);
+          break;
         case ZBI_KERNEL_DRIVER_ARM_GIC_V2:
           // Defer to the newer hardware: v3 configs win out over v2.
           ZX_ASSERT(payload.size() >= sizeof(zbi_dcfg_arm_gic_v2_driver_t));
