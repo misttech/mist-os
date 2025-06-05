@@ -266,7 +266,7 @@ TEST(SchedGetPriorityMaxTest, NonRootCanGetMaximumPriorities) {
   });
 }
 
-TEST(GetPriorityTest, NonRootCanGetNicenessOfUnfriendlyProcess) {
+TEST(GetPriorityTest, NonRootCanGetNicenessOfEuidUnfriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -294,7 +294,7 @@ TEST(GetPriorityTest, NonRootCanGetNicenessOfUnfriendlyProcess) {
   });
 }
 
-TEST(SetPriorityTest, NonRootCanSetNicenessOfFriendlyProcess) {
+TEST(SetPriorityTest, NonRootCanSetNicenessOfEuidFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -334,6 +334,54 @@ TEST(SetPriorityTest, NonRootCanSetNicenessOfFriendlyProcess) {
       errno = 0;
       EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
       EXPECT_EQ(errno, 0);
+    }
+
+    complete.poke();
+  });
+}
+
+TEST(SetPriorityTest, NonRootCannotSetNicenessOfEuidUnfriendlyProcess) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  constexpr int target_niceness = 19;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        // Remove rlimits from consideration in this test.
+        struct rlimit limit = {
+            .rlim_cur = RLIM_INFINITY,
+            .rlim_max = RLIM_INFINITY,
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+
+        EXPECT_EQ(setpriority(PRIO_PROCESS, 0, target_niceness), 0);
+
+        Become(kUser2Uid, kUser2Uid);
+      });
+
+  fork_helper.RunInForkedProcess([target_niceness, ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    // A niceness-setting-attempting process with the same UID as the
+    // target process but a different effective UID than the target
+    // process will not be able to succeed in its attempts without the
+    // CAP_SYS_NICE capability (which this process does not have).
+    //
+    // See "Linux 2.6.12 and later require the effective user ID of
+    // the caller to match the real or effective user ID of the process
+    // who" at setpriority(2).
+    Become(kUser2Uid, kUser1Uid);
+
+    ready.hold();
+
+    for (int niceness = 19; niceness >= -20; niceness--) {
+      EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), -1);
+      EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), target_niceness);
     }
 
     complete.poke();
@@ -393,7 +441,7 @@ TEST(SetPriorityTest, RootCanExceedRLimits) {
   complete.poker.poke();
 }
 
-TEST(SetPriorityTest, RLimitedAndUnfriendly) {
+TEST(SetPriorityTest, RLimitedAndEuidUnfriendly) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -493,7 +541,7 @@ TEST(SchedGetSchedulerTest, NonRootCanGetOwnScheduler) {
   });
 }
 
-TEST(SchedGetSchedulerTest, NonRootCanGetSchedulerOfFriendlyProcess) {
+TEST(SchedGetSchedulerTest, NonRootCanGetSchedulerOfEuidFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -513,7 +561,7 @@ TEST(SchedGetSchedulerTest, NonRootCanGetSchedulerOfFriendlyProcess) {
   });
 }
 
-TEST(SchedGetSchedulerTest, NonRootCanGetSchedulerOfUnfriendlyProcess) {
+TEST(SchedGetSchedulerTest, NonRootCanGetSchedulerOfEuidUnfriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -787,7 +835,7 @@ TEST(SchedSetSchedulerTest, NonRootCanSetOwnScheduler) {
   });
 }
 
-TEST(SchedSetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
+TEST(SchedSetSchedulerTest, NonRootCanSetSchedulerOfEuidFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -815,6 +863,141 @@ TEST(SchedSetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
     ready.hold();
 
     EXPECT_TRUE(SetScheduler(target_pid));
+
+    complete.poke();
+  });
+}
+
+TEST(SchedSetSchedulerTest, NonRootCannotSetSchedulerOfEuidUnfriendlyProcess) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        // Remove rlimits from consideration in this test.
+        struct rlimit limit = {
+            .rlim_cur = RLIM_INFINITY,
+            .rlim_max = RLIM_INFINITY,
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+
+        Become(kUser2Uid, kUser2Uid);
+      });
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    sched_param param;
+
+    errno = 0;
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_OTHER, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+
+    int min_fifo_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_FIFO));
+    int max_fifo_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_FIFO));
+    for (auto priority = min_fifo_priority; priority <= max_fifo_priority; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+    }
+
+    int min_rr_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_RR));
+    int max_rr_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_RR));
+    for (auto priority = min_rr_priority; priority <= max_rr_priority; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+    }
+
+    errno = 0;
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_BATCH, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+
+    errno = 0;
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+
+    complete.poke();
+  });
+}
+
+TEST(SchedSetSchedulerTest, RLimitedAndEuidUnfriendly) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int rtpriority_rlimit_cur = 47;
+  constexpr int rtpriority_rlimit_max = rtpriority_rlimit_cur + 4;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        struct rlimit limit = {
+            .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+
+        Become(kUser2Uid, kUser2Uid);
+      });
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    sched_param param;
+
+    errno = 0;
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_OTHER, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+
+    int min_fifo_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_FIFO));
+    int max_fifo_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_FIFO));
+    for (auto priority = min_fifo_priority; priority <= max_fifo_priority; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+    }
+
+    int min_rr_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_RR));
+    int max_rr_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_RR));
+    for (auto priority = min_rr_priority; priority <= max_rr_priority; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+    }
+
+    errno = 0;
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_BATCH, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+
+    errno = 0;
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), -1);
+    EXPECT_EQ(errno, EPERM);
 
     complete.poke();
   });
@@ -978,7 +1161,7 @@ TEST(SchedGetParamTest, NonRootCanGetOwnScheduler) {
   });
 }
 
-TEST(SchedGetParamTest, NonRootCanGetParamOfFriendlyProcess) {
+TEST(SchedGetParamTest, NonRootCanGetParamOfEuidFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1002,7 +1185,7 @@ TEST(SchedGetParamTest, NonRootCanGetParamOfFriendlyProcess) {
   });
 }
 
-TEST(SchedGetParamTest, NonRootCanGetParamOfUnfriendlyProcess) {
+TEST(SchedGetParamTest, NonRootCanGetParamOfEuidUnfriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1230,7 +1413,7 @@ TEST(SchedSetParamTest, NonRootCanSetOwnParam) {
   });
 }
 
-TEST(SchedSetParamTest, NonRootCanSetParamOfFriendlyProcess) {
+TEST(SchedSetParamTest, NonRootCanSetParamOfEuidFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1258,6 +1441,56 @@ TEST(SchedSetParamTest, NonRootCanSetParamOfFriendlyProcess) {
     ready.hold();
 
     EXPECT_TRUE(SetParam(target_pid));
+
+    complete.poke();
+  });
+}
+
+TEST(SchedSetParamTest, NonRootCannotSetParamOfEuidUnfriendlyProcess) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  constexpr int policy = SCHED_FIFO;
+
+  int min_priority = SAFE_SYSCALL(sched_get_priority_min(policy));
+  int max_priority = SAFE_SYSCALL(sched_get_priority_max(policy));
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
+                                 [min_priority]() {
+                                   // Remove rlimits from consideration in this test.
+                                   struct rlimit limit = {
+                                       .rlim_cur = RLIM_INFINITY,
+                                       .rlim_max = RLIM_INFINITY,
+                                   };
+                                   SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+
+                                   sched_param param = {.sched_priority = min_priority};
+                                   SAFE_SYSCALL(sched_setscheduler(0, policy, &param));
+
+                                   Become(kUser2Uid, kUser2Uid);
+                                 });
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid, min_priority,
+                                  max_priority]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    for (int priority = min_priority; priority <= max_priority; priority++) {
+      errno = 0;
+      sched_param param = {.sched_priority = priority};
+      EXPECT_EQ(sched_setparam(target_pid, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+      sched_param observed_param = {.sched_priority = -1};
+      SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+      EXPECT_EQ(observed_param.sched_priority, min_priority);
+    }
 
     complete.poke();
   });

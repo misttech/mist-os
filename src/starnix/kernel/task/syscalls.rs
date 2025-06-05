@@ -437,6 +437,23 @@ pub fn sys_setpgid(
     Ok(())
 }
 
+impl CurrentTask {
+    /// Returns true if the `current_task`'s effective user ID (EUID) is the same as the
+    /// EUID or UID of the `target_task`. We describe this as the current task being
+    /// "EUID-friendly" to the target and it enables actions to be performed that would
+    /// otherwise require additional privileges.
+    ///
+    /// See "The caller needs an effective user ID equal to the real user ID or effective
+    /// user ID of the [target]" at sched_setaffinity(2), comparable language at
+    /// setpriority(2), more ambiguous language at sched_setscheduler(2), and no
+    /// particular specification at sched_setparam(2).
+    fn is_euid_friendly_with(&self, target_task: &Task) -> bool {
+        let self_creds = self.creds();
+        let target_task_creds = target_task.creds();
+        self_creds.euid == target_task_creds.uid || self_creds.euid == target_task_creds.euid
+    }
+}
+
 // A non-root process is allowed to set any of its three uids to the value of any other. The
 // CAP_SETUID capability bypasses these checks and allows setting any uid to any integer. Likewise
 // for gids.
@@ -758,10 +775,12 @@ pub fn sys_sched_setscheduler(
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
     let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
-
-    security::check_setsched_access(current_task, &target_task)?;
     let param = current_task.read_object(param)?;
     let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
+    if !current_task.is_euid_friendly_with(&target_task) {
+        security::check_task_capable(current_task, CAP_SYS_NICE)?;
+    }
+    security::check_setsched_access(current_task, &target_task)?;
     target_task.set_scheduler_policy(policy)?;
 
     Ok(())
@@ -862,9 +881,7 @@ pub fn sys_sched_setaffinity(
         return error!(EINVAL);
     }
 
-    let friendly = current_task.creds().euid == target_task.creds().euid
-        || current_task.creds().euid == target_task.creds().uid;
-    if !friendly {
+    if !current_task.is_euid_friendly_with(&target_task) {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
 
@@ -910,6 +927,10 @@ pub fn sys_sched_setparam(
 
     let policy =
         SchedulerPolicy::from_sched_params(current_policy.raw_policy(), new_params, rlimit)?;
+    if !current_task.is_euid_friendly_with(&target_task) {
+        security::check_task_capable(current_task, CAP_SYS_NICE)?;
+    }
+    security::check_setsched_access(current_task, &target_task)?;
     target_task.set_scheduler_policy(policy)?;
 
     Ok(())
@@ -1666,19 +1687,13 @@ pub fn sys_setpriority(
     const MAX_RAW_PRIORITY: i32 = 40;
     let new_raw_priority =
         (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
-    let friendly = current_task.creds().euid == target_task.creds().euid
-        || current_task.creds().euid == target_task.creds().uid;
     let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
     let allowed_so_far_as_rlimit_is_concerned = !strengthening
         || new_raw_priority as u64 <= target_task.thread_group().get_rlimit(Resource::NICE);
-    if !(friendly && allowed_so_far_as_rlimit_is_concerned) {
+    if !(current_task.is_euid_friendly_with(&target_task) && allowed_so_far_as_rlimit_is_concerned)
+    {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
-
-    // TODO: https://fxbug.dev/392615438 - this check_setsched_access is probably partially-correct
-    // for now; for the SELinux story we probably want to be more sure about the sys_nice capability
-    // check and also condition this setsched check on only happening for cross-process calls. See
-    // https://fxbug.dev/322894197#comment2.
     security::check_setsched_access(current_task, &target_task)?;
 
     target_task.update_scheduler_nice(new_raw_priority)?;
