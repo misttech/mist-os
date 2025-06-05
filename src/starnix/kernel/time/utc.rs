@@ -3,16 +3,14 @@
 // found in the LICENSE file.
 
 use crate::vdso::vdso_loader::MemoryMappedVvar;
-use fuchsia_runtime::{zx_utc_reference_get, UtcTimeline};
+use fuchsia_runtime::{
+    zx_utc_reference_get, UtcClock as UtcClockHandle, UtcClockTransform, UtcInstant,
+};
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::Mutex;
 use std::sync::LazyLock;
 use zx::{self as zx, AsHandleRef, Unowned};
 
-// TODO(https://fxbug.dev/356911500): Use types below from fuchsia_runtime
-type UtcInstant = zx::Instant<UtcTimeline>;
-type UtcClockHandle = zx::Clock<zx::BootTimeline, UtcTimeline>;
-type UtcClockTransform = zx::ClockTransformation<zx::BootTimeline, UtcTimeline>;
 fn utc_clock() -> Unowned<'static, UtcClockHandle> {
     // SAFETY: basic FFI call which returns either a valid handle or ZX_HANDLE_INVALID.
     unsafe {
