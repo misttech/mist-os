@@ -1084,7 +1084,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1801,7 +1801,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.lsan.a"
