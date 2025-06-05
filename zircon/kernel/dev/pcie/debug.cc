@@ -820,7 +820,7 @@ STATIC_COMMAND("pcireset", "Initiate a Function Level Reset of the specified dev
                &PcieDebugConsole::CmdPciReset)
 STATIC_COMMAND("pcirescan",
                "Force a rescan of the PCIe configuration space, matching drivers to unclaimed "
-               "devices as we go.  Then attempt to start all newly claimed devices.",
+               "devices as we go.\n\t\t\t  Then attempt to start all newly claimed devices.",
                &PcieDebugConsole::CmdPciRescan)
 STATIC_COMMAND("pciregions", "Dump information on present PCI address region allocations",
                &PcieDebugConsole::CmdPciRegionDump)
