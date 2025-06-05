@@ -38,7 +38,6 @@ class VersionTest(unittest.TestCase):
             generate_platform_artifacts.main()
 
             expected = {
-                "release_version": "fake_version_123",
                 "release_info": {
                     "name": "fuchsia_platform_artifacts",
                     "repository": "fake_repository",
@@ -79,7 +78,6 @@ class VersionTest(unittest.TestCase):
             generate_platform_artifacts.main()
 
             expected = {
-                "release_version": "unversioned",
                 "release_info": {
                     "name": "fuchsia_platform_artifacts",
                     "repository": "fake_repository",

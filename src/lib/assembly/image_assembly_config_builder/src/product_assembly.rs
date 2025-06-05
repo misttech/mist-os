@@ -7,6 +7,7 @@ use crate::image_assembly_config_builder::ImageAssemblyConfigBuilder;
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
 use assembly_config_schema::{AssemblyConfig, BoardInformation, BoardInputBundle, FeatureSetLevel};
+use assembly_platform_artifacts::PlatformArtifacts;
 
 use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
@@ -20,7 +21,7 @@ use image_assembly_config::ImageAssemblyConfig;
 
 pub struct ProductAssembly {
     builder: ImageAssemblyConfigBuilder,
-    platform_artifacts_dir: Utf8PathBuf,
+    platform_artifacts: PlatformArtifacts,
     product_config: AssemblyConfig,
     board_config: BoardInformation,
     developer_only_options: Option<DeveloperOnlyOptions>,
@@ -31,7 +32,7 @@ pub struct ProductAssembly {
 
 impl ProductAssembly {
     pub fn new(
-        platform_artifacts_dir: Utf8PathBuf,
+        platform_artifacts: PlatformArtifacts,
         product_config: AssemblyConfig,
         board_config: BoardInformation,
     ) -> Result<Self> {
@@ -44,17 +45,17 @@ impl ProductAssembly {
             product_config.platform.feature_set_level,
         );
 
-        let kernel_aib = make_bundle_path(&platform_artifacts_dir, "zircon");
+        let kernel_aib = platform_artifacts.get_bundle("zircon");
         // The emulator support bundle is always added, even to an empty build.
         // The emulator support bundle contains only a QEMU boot shim.
         // Kernel tests can customize this bundle to provide an alternate boot shim.
         //
         // TODO(https://fxbug.dev/408223995): Determine whether we want to expose alternate boot shims via the platform
         // and refactor this if we decide to.
-        let boot_shim_aib = make_bundle_path(&platform_artifacts_dir, "emulator_support");
+        let boot_shim_aib = platform_artifacts.get_bundle("emulator_support");
         Ok(Self {
             builder,
-            platform_artifacts_dir,
+            platform_artifacts,
             product_config,
             board_config,
             developer_only_options: None,
@@ -65,7 +66,7 @@ impl ProductAssembly {
     }
 
     pub fn add_developer_overrides(self, developer_overrides: DeveloperOverrides) -> Result<Self> {
-        let Self { mut builder, platform_artifacts_dir, product_config, board_config, .. } = self;
+        let Self { mut builder, platform_artifacts, product_config, board_config, .. } = self;
 
         // Apply the platform and product overrides.
         let product_config_overrides = serde_json::json!({
@@ -103,7 +104,7 @@ impl ProductAssembly {
 
         Ok(Self {
             builder,
-            platform_artifacts_dir,
+            platform_artifacts,
             product_config,
             board_config,
             developer_only_options,
@@ -207,7 +208,7 @@ impl ProductAssembly {
             BoardInformation { configuration: board_provided_config, ..board_config };
 
         // Get platform configuration based on the AssemblyConfig and the BoardInformation.
-        let resource_dir = self.platform_artifacts_dir.join("resources");
+        let resource_dir = self.platform_artifacts.get_resources();
         let configuration = assembly_platform_configuration::define_configuration(
             &platform,
             &product,
@@ -255,8 +256,7 @@ impl ProductAssembly {
 
         // Add the platform Assembly Input Bundles that were chosen by the configuration.
         for platform_bundle_name in &configuration.bundles {
-            let platform_bundle_path =
-                make_bundle_path(&self.platform_artifacts_dir, platform_bundle_name);
+            let platform_bundle_path = self.platform_artifacts.get_bundle(platform_bundle_name);
             builder.add_bundle(&platform_bundle_path).with_context(|| {
                 format!("Adding platform bundle {platform_bundle_name} ({platform_bundle_path})")
             })?;
@@ -352,8 +352,4 @@ impl ProductAssembly {
         }
         Ok(image_assembly_config)
     }
-}
-
-fn make_bundle_path(bundles_dir: &Utf8PathBuf, name: &str) -> Utf8PathBuf {
-    bundles_dir.join(name).join("assembly_config.json")
 }

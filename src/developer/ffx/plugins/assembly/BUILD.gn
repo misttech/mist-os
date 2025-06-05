@@ -75,6 +75,7 @@ rustc_library("ffx_assembly") {
     "//src/lib/assembly/image_assembly_config",
     "//src/lib/assembly/image_assembly_config_builder",
     "//src/lib/assembly/partitions_config",
+    "//src/lib/assembly/platform_artifacts",
     "//src/lib/assembly/sdk",
     "//src/lib/assembly/subpackage_blobs_package",
     "//src/lib/assembly/tool",

@@ -7,6 +7,7 @@ use assembly_config_schema::developer_overrides::DeveloperOverrides;
 use assembly_config_schema::{AssemblyConfig, BoardInformation};
 use assembly_container::AssemblyContainer;
 use assembly_file_relative_path::SupportsFileRelativePaths;
+use assembly_platform_artifacts::PlatformArtifacts;
 use assembly_sdk::SdkToolProvider;
 use assembly_util::read_config;
 use camino::Utf8PathBuf;
@@ -44,6 +45,8 @@ Resulting product is not supported and may misbehave!
     }
 
     // Parse the input configs.
+    let platform_artifacts = Some(PlatformArtifacts::from_dir_with_path(&input_bundles_dir)?)
+        .context("Reading platform artifacts")?;
     let product_config =
         AssemblyConfig::from_dir(&product).context("Reading product configuration")?;
     let board_config =
@@ -68,7 +71,7 @@ Resulting product is not supported and may misbehave!
     };
 
     // Prepare product assembly.
-    let mut pa = ProductAssembly::new(input_bundles_dir, product_config, board_config)?;
+    let mut pa = ProductAssembly::new(platform_artifacts, product_config, board_config)?;
     if let Some(developer_overrides) = developer_overrides {
         pa = pa.add_developer_overrides(developer_overrides)?;
     }

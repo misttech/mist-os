@@ -53,7 +53,6 @@ def main() -> int:
 
     version = args.version if args.version else "unversioned"
     config_data = {
-        "release_version": version,
         "release_info": {
             "name": "fuchsia_platform_artifacts",
             "repository": args.repo,
