@@ -12,7 +12,7 @@ use netext::{get_mcast_interfaces, IsLocalAddr};
 use netsvc_proto::netboot::{
     NetbootPacket, NetbootPacketBuilder, Opcode, ADVERT_PORT, SERVER_PORT,
 };
-use packet::{Buf, FragmentedBuffer, InnerPacketBuilder, ParseBuffer, Serializer};
+use packet::{Buf, FragmentedBuffer, InnerPacketBuilder, PacketBuilder, ParseBuffer, Serializer};
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::num::NonZeroU16;
@@ -249,9 +249,8 @@ async fn send(opcode: Opcode, body: &str, to_sock: TargetIpAddr) -> Result<()> {
     const BUFFER_SIZE: usize = 512;
     const COOKIE: u32 = 1;
     const ARG: u32 = 0;
-    let msg = (body.as_bytes())
-        .into_serializer_with(Buf::new([0u8; BUFFER_SIZE], ..))
-        .encapsulate(NetbootPacketBuilder::new(opcode.into(), COOKIE, ARG))
+    let msg = NetbootPacketBuilder::new(opcode.into(), COOKIE, ARG)
+        .wrap_body((body.as_bytes()).into_serializer_with(Buf::new([0u8; BUFFER_SIZE], ..)))
         .serialize_no_alloc_outer()
         .expect("failed to serialize");
     let mut to_sock: SocketAddr = to_sock.into();
