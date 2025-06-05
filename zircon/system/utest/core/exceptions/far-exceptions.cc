@@ -67,13 +67,7 @@ void CatchCrash(uintptr_t pc, uintptr_t sp, uintptr_t arg1, zx_exception_report_
   ASSERT_OK(exc.set_property(ZX_PROP_EXCEPTION_STATE, &kExceptionState, sizeof(kExceptionState)));
 }
 
-#ifdef __clang__
-[[clang::no_sanitize("all")]]
-#endif
-[[noreturn]] void
-DoNothing() {
-  zx_thread_exit();
-}
+[[gnu::no_sanitize("all")]] [[noreturn]] void DoNothing() { zx_thread_exit(); }
 
 arch::ArmExceptionSyndromeRegister::ExceptionClass GetEC(uint64_t esr) {
   return arch::ArmExceptionSyndromeRegister::Get().FromValue(esr).ec();
@@ -117,11 +111,7 @@ TEST(ExceptionsTest, InstructionAbort) {
   ASSERT_NE(report.context.arch.u.arm_64.far, 0);
 }
 
-#ifdef __clang__
-[[clang::no_sanitize("all")]]
-#endif
-[[noreturn]] void
-BadAccess(uintptr_t arg1) {
+[[gnu::no_sanitize("all")]] [[noreturn]] void BadAccess(uintptr_t arg1) {
   *(reinterpret_cast<uint8_t*>(arg1)) = 1;
   zx_thread_exit();
 }

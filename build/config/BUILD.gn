@@ -781,6 +781,12 @@ config("default_warnings") {
   }
 
   if (is_gcc) {
+    # Just elide any [[clang::...]] attributes when compiling with GCC, so they
+    # don't have to be guarded with `#ifdef __clang__`.  Cases where the GCC
+    # version should do something other will still need an `#ifdef` but that
+    # won't be necessarily flagged by seeing compilation errors under GCC.
+    cflags_cc += [ "-Wno-attributes=clang::" ]
+
     # GCC is pedantic about which flags apply to which language.
     cflags -= [
       "-Wstrict-prototypes",

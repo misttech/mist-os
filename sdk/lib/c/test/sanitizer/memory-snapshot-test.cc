@@ -564,9 +564,7 @@ using StartArgClearedSearchType = ThreadArgs;
 // For the `StartArgCleared`, we want to iterate over the stack to search for a specific pointer. If
 // this code was ASan-instrumented, then it's possible for this to iterate over redzones which ASan
 // will report. We can ignore these reports while searching for the pointer.
-#ifdef __clang__
-[[clang::no_sanitize("address")]]
-#endif
+[[gnu::no_sanitize("address")]]
 void StartArgClearedUnsanitizedStackCallback(void* mem, size_t len, void* arg) {
   auto args = static_cast<CallbackArgs*>(arg);
   if (args->found_in_stack)
@@ -579,8 +577,8 @@ void StartArgClearedUnsanitizedStackCallback(void* mem, size_t len, void* arg) {
   // When HWASan is enabled, `data_ptr` can be tagged since it points to a local variable in the
   // `StartArgCleared` test. However, the underlying stack base will not be tagged if came from
   // regions allocated by syscalls (zx_vmar_allocate + zx_vmar_map). Even if the pointer is
-  // instrumented to include a tag, the addressing bits should still point to something on this stack
-  // if the thing it points to is actually on this stack.
+  // instrumented to include a tag, the addressing bits should still point to something on this
+  // stack if the thing it points to is actually on this stack.
   data_ptr &= ADDR_MASK;
   args->found_in_stack = (stack_begin <= data_ptr && data_ptr < stack_end);
 }

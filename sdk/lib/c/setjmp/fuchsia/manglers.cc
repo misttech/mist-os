@@ -13,9 +13,7 @@ namespace LIBC_NAMESPACE_DECL {
 // doesn't de-tag from an hwasan-adjusted symbol address.  Since there really
 // aren't any other accesses that would check a tag, nothing is lost by not
 // using a tagged pointer to access it in that one place.
-#if __has_feature(hwaddress_sanitizer)
 [[clang::no_sanitize("hwaddress")]]
-#endif
 LIBC_STARTUP_RANDOM_VAR decltype(gJmpBufManglers) gJmpBufManglers;
 
 }  // namespace LIBC_NAMESPACE_DECL

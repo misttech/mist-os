@@ -65,12 +65,7 @@ constexpr uint32_t kNoncanonicalException = ZX_EXCP_GENERAL;
 // as the thread pointer in the normal Fuchsia compiler ABI, the code for this
 // thread disables all compiler features that depend on it (e.g. SafeStack) and
 // avoids standard runtime code that uses the full ABI.
-
-#ifdef __clang__
 #define BARE_FUNCTION [[clang::no_sanitize("all")]]
-#else
-#define BARE_FUNCTION
-#endif
 
 // When rdfsbase/rdgsbase are not available, there is no way for user code to
 // retrieve the %fs.base and %gs.base values directly from the CPU.  Only
@@ -147,7 +142,7 @@ __asm__(
 // parameterized by the WhichRegister data structure.
 
 struct WhichRegister {
-  uint64_t zx_thread_state_general_regs_t::*member;
+  uint64_t zx_thread_state_general_regs_t::* member;
   uint32_t property;
   void (*write_insn)(uint64_t);
   void (*after_write_insn)();

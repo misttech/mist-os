@@ -1030,10 +1030,10 @@ TEST(ChannelTest, CallHandleAndBytesFitsIsOk) {
 // accept null arguments. This is what this specific test is checking though, so
 // we can just wrap the call to zx_channel_call() in a function that disables
 // this UBSan check.
-#ifdef __clang__
-[[clang::no_sanitize("undefined")]]
-#else
-// Inline this so GCC doesn't see there is only one caller and it uses nullptr.
+[[gnu::no_sanitize("undefined")]]
+#ifndef __clang__
+// Don't inline this so GCC doesn't see there is only one caller and it uses
+// nullptr.
 [[gnu::noinline]]
 #endif
 zx_status_t
