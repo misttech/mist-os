@@ -150,15 +150,14 @@ def main() -> int:
         _expected_idk_dir, output_idk_dir
     )
 
+    non_symlink_files: list[str] = []
+
     errors: list[str] = []
     if left_only:
-        errors.append(
-            "Missing files from the output IDK:\n  %s\n"
-            % ("\n  ".join(sorted(left_only)))
-        )
+        errors.append("Missing files from the output IDK:")
+        errors.extend(f"    {left}" for left in sorted(left_only))
     if right_only:
         # For now, ignore symlinks that are only in the output directory.
-        non_symlink_files = []
         for f in right_only:
             if not (output_idk_dir / f).is_symlink():
                 non_symlink_files.append(f)
@@ -181,18 +180,31 @@ def main() -> int:
             if not right_file.exists():
                 errors.append(f"> INVALID SYMLINK {right_file}")
             if left_file.exists() and right_file.exists():
+                # Ensure the the difference is reported even if the real and
+                # symlinked files are identical.
+                if left_file.is_symlink() != right_file.is_symlink():
+                    errors.append(
+                        f"   ### {file_name}: Only one of the files is a symlink."
+                    )
+
                 diff_lines = difflib.unified_diff(
                     left_file.read_text().splitlines(),
                     right_file.read_text().splitlines(),
-                    f"_expected_idk_dir/{file_name}",
+                    f"expected_idk_dir/{file_name}",
                     f"output_idk_dir/{file_name}",
                     lineterm="",
                 )
                 for line in diff_lines:
                     errors.append("   " + line)
 
+    assert (errors != []) == (
+        diff_files != []
+        or left_only != []
+        or (right_only != [] and non_symlink_files != [])
+    ), "There should be error lines if compare_directories() reported differences."
+
     if errors:
-        print("ERRORS:\n" + "\n".join(errors), file=sys.stderr)
+        print("ERRORS:\n    " + "\n    ".join(errors), file=sys.stderr)
         return 1
 
     if args.stamp_file:
