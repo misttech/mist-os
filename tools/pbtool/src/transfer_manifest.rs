@@ -256,6 +256,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: Some(vd_manifest_path),
+            release_info: None,
         });
         pb.write(&pb_path).unwrap();
 

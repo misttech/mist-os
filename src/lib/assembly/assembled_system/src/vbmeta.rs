@@ -132,6 +132,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         let vbmeta_path =
             construct_vbmeta(&mut assembled_system, dir, &vbmeta_config, zbi_path).unwrap();

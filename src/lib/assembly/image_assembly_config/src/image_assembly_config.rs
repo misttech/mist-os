@@ -1,9 +1,9 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 use assembly_constants::FileEntry;
 use assembly_images_config::{FilesystemImageMode, ImagesConfig};
+use assembly_release_info::SystemReleaseInfo;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 
@@ -81,6 +81,12 @@ pub struct ImageAssemblyConfig {
     /// How to generate the filesystem image.
     #[serde(default)]
     pub image_mode: FilesystemImageMode,
+
+    /// Release information about the assembly inputs contributing to this image.
+    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
+    /// once these changes have rolled into all downstream repositories.
+    #[serde(default)]
+    pub system_release_info: Option<SystemReleaseInfo>,
 }
 
 impl ImageAssemblyConfig {
@@ -104,6 +110,7 @@ impl ImageAssemblyConfig {
             devicetree: Some("path/to/devicetree/binary".into()),
             devicetree_overlay: Some("path/to/devicetree/binary/overlay".into()),
             image_mode: Default::default(),
+            system_release_info: None,
         }
     }
 }

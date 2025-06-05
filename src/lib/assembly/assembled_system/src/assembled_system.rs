@@ -14,6 +14,7 @@ use assembly_container::{
     assembly_container, AssemblyContainer, DirectoryPathBuf, FileType, WalkPaths,
 };
 use assembly_images_config::{FilesystemImageMode, Fvm, Fxfs, VBMeta, Zbi};
+use assembly_release_info::SystemReleaseInfo;
 use assembly_tool::ToolProvider;
 use camino::{Utf8Path, Utf8PathBuf};
 use image_assembly_config::ImageAssemblyConfig;
@@ -60,6 +61,9 @@ pub struct AssembledSystem {
     /// The partitions these images can be flashed to.
     #[walk_paths]
     pub partitions_config: Option<DirectoryPathBuf>,
+
+    /// Release information for all input artifacts that contributed to this system.
+    pub system_release_info: Option<SystemReleaseInfo>,
 }
 
 impl AssembledSystem {
@@ -78,6 +82,7 @@ impl AssembledSystem {
                 .partitions_config
                 .as_ref()
                 .map(|p| DirectoryPathBuf::new(p.clone())),
+            system_release_info: image_assembly_config.system_release_info.clone(),
         };
 
         let base_package_name =
@@ -306,6 +311,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         let expected_manifest = AssembledSystem {
             images: vec![
@@ -323,6 +329,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
 
         let manifest = manifest.relativize(Utf8PathBuf::from("path/to")).unwrap();

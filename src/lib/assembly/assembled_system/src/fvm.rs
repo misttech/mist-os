@@ -354,6 +354,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
@@ -390,6 +391,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
@@ -444,6 +446,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         let base_package =
             BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
@@ -555,6 +558,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
 
         let base_package_path = dir.join("base.far");
@@ -657,6 +661,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
 
         let base_package_path = dir.join("base.far");

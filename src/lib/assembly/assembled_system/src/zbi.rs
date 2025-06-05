@@ -253,6 +253,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         construct_zbi(
             zbi_tool,
@@ -282,6 +283,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         construct_zbi(
             zbi_tool,
@@ -358,6 +360,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         let signed_zbi_path =
             vendor_sign_zbi(signing_tool, &mut assembled_system, dir, &zbi, &zbi_path).unwrap();

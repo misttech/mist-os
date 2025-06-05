@@ -16,6 +16,7 @@ rustc_library("product_bundle") {
     "//src/lib/assembly/assembled_system",
     "//src/lib/assembly/container",
     "//src/lib/assembly/partitions_config",
+    "//src/lib/assembly/release_info",
     "//src/lib/assembly/tool",
     "//src/lib/assembly/update_package",
     "//src/lib/assembly/update_packages_manifest",
@@ -36,6 +37,7 @@ rustc_library("product_bundle") {
   test_deps = [
     "//src/developer/ffx/lib/pkg:empty-repo-keys",
     "//src/developer/ffx/lib/pkg:empty-repo-metadata",
+    "//src/lib/assembly/release_info",
     "//src/lib/fuchsia",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:pretty_assertions",

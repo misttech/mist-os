@@ -205,6 +205,7 @@ impl GenerateBuildArchive {
             images,
             board_name: product_bundle.partitions.hardware_revision.clone(),
             partitions_config: None,
+            system_release_info: None,
         };
         let images_manifest_path = self.out_dir.join("images.json");
         images_manifest.write_old(images_manifest_path).context("Writing images manifest")?;
@@ -362,6 +363,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let pb_path = tempdir.join("product_bundle");
         std::fs::create_dir_all(&pb_path).unwrap();

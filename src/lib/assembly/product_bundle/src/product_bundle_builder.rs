@@ -9,6 +9,7 @@ use anyhow::{anyhow, ensure, Context, Result};
 use assembled_system::{AssembledSystem, BlobfsContents, Image, PackagesMetadata};
 use assembly_container::AssemblyContainer;
 use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
+use assembly_release_info::ProductBundleReleaseInfo;
 use assembly_tool::ToolProvider;
 use assembly_update_package::{Slot, UpdatePackage, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
@@ -245,6 +246,16 @@ impl ProductBundleBuilder {
             None
         };
 
+        // Collect the release information.
+        let release_info = Some(ProductBundleReleaseInfo {
+            name: product_bundle_name.clone(),
+            version: product_bundle_version.clone(),
+            sdk_version: sdk_version.clone(),
+            system_a: system_a.as_ref().and_then(|s| s.system_release_info.clone()),
+            system_b: system_b.as_ref().and_then(|s| s.system_release_info.clone()),
+            system_r: system_r.as_ref().and_then(|s| s.system_release_info.clone()),
+        });
+
         // Construct the product bundle.
         let product_bundle = ProductBundle::V2(ProductBundleV2 {
             product_name: product_bundle_name,
@@ -257,6 +268,7 @@ impl ProductBundleBuilder {
             repositories,
             update_package_hash,
             virtual_devices_path,
+            release_info,
         });
         product_bundle
             .write(out_dir)
@@ -594,6 +606,7 @@ mod test {
     use assembled_system::{AssembledSystem, Image};
     use assembly_container::{AssemblyContainer, DirectoryPathBuf};
     use assembly_partitions_config::{Partition, PartitionsConfig, Slot};
+    use assembly_release_info::ProductBundleReleaseInfo;
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_repo::test_utils;
@@ -616,6 +629,7 @@ mod test {
             images: vec![],
             board_name: "board_name".into(),
             partitions_config: Some(DirectoryPathBuf::new(partitions_path)),
+            system_release_info: None,
         };
 
         let product_bundle_path = tempdir.join("pb");
@@ -636,6 +650,14 @@ mod test {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: Some(ProductBundleReleaseInfo {
+                name: "name".to_string(),
+                version: "version".to_string(),
+                sdk_version: "not_built_from_sdk".to_string(),
+                system_a: None,
+                system_b: None,
+                system_r: None,
+            }),
         });
         assert_eq!(expected, product_bundle);
     }
@@ -678,6 +700,7 @@ mod test {
             images: vec![Image::ZBI { path: zbi_path, signed: false }],
             board_name: "board_name".into(),
             partitions_config: Some(DirectoryPathBuf::new(partitions_path)),
+            system_release_info: None,
         };
 
         // Construct the PB.
@@ -732,6 +755,14 @@ mod test {
                 "4198e7b88cc98aa87b16afa134e1f1ec8580fd9105f7db399adf6ff65426b49c".parse().unwrap(),
             ),
             virtual_devices_path: Some(product_bundle_path.join("virtual_devices/manifest.json")),
+            release_info: Some(ProductBundleReleaseInfo {
+                name: "name".to_string(),
+                version: "version".to_string(),
+                sdk_version: "custom_sdk_version".to_string(),
+                system_a: None,
+                system_b: None,
+                system_r: None,
+            }),
         });
         assert_eq!(expected, product_bundle);
 

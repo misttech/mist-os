@@ -737,6 +737,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: Some(dev_manifest.to_str().unwrap().into()),
+            release_info: None,
         })
     }
 

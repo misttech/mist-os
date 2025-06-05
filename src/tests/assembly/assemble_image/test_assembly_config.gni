@@ -150,6 +150,7 @@ template("test_assembly_config") {
     # host toolchain.
     stamp = "$target_out_dir/test_assembled_config.passed"
     platform_bundles_target = "//bundles/assembly:eng($default_toolchain)"
+
     platform_bundles_dir =
         get_label_info(platform_bundles_target, "target_out_dir") + "/" +
         get_label_info(platform_bundles_target, "name") + "/platform_artifacts"

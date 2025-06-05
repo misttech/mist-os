@@ -342,6 +342,7 @@ mod test {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let manifest = match FlashManifestVersion::from_product_bundle(&pb).unwrap() {
             FlashManifestVersion::V3(manifest) => manifest,

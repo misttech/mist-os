@@ -147,6 +147,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let mut device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),
@@ -291,6 +292,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let mut device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),
@@ -367,6 +369,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),
@@ -425,6 +428,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),

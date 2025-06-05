@@ -338,6 +338,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
@@ -441,6 +442,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: Some(virtual_device.clone()),
+            release_info: None,
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
@@ -516,6 +518,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
@@ -589,6 +592,7 @@ mod tests {
             virtual_devices_path: Some(
                 Utf8Path::from_path(&virtual_device).expect("utf8 path").into(),
             ),
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");
@@ -702,6 +706,7 @@ mod tests {
             virtual_devices_path: Some(
                 Utf8Path::from_path(&virtual_device).expect("utf8 path").into(),
             ),
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");

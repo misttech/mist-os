@@ -216,6 +216,7 @@ mod tests {
             images: vec![Image::VBMeta("a/b/c".into()), Image::FVM("x/y/z".into())],
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         assert_eq!(extract_blob_contents(&assembled_system), None);
         assembled_system

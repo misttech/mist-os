@@ -33,6 +33,7 @@ use assembly_package_utils::PackageInternalPathBuf;
 use assembly_platform_configuration::{
     DomainConfig, DomainConfigs, PackageConfigs, PackageConfiguration,
 };
+use assembly_release_info::SystemReleaseInfo;
 use assembly_shell_commands::ShellCommandsBuilder;
 use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
@@ -119,6 +120,10 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// The feature set that this product supports.
     feature_set_level: FeatureSetLevel,
+
+    /// Optional version information for all input artifacts.
+    /// TODO(https://fxbug.dev/416239346): Make this a required field.
+    system_release_info: Option<SystemReleaseInfo>,
 }
 
 impl ImageAssemblyConfigBuilder {
@@ -128,6 +133,7 @@ impl ImageAssemblyConfigBuilder {
         partitions_config: Option<Utf8PathBuf>,
         image_mode: FilesystemImageMode,
         feature_set_level: FeatureSetLevel,
+        system_release_info: Option<SystemReleaseInfo>,
     ) -> Self {
         Self {
             build_type,
@@ -155,6 +161,7 @@ impl ImageAssemblyConfigBuilder {
             devicetree_overlay: None,
             developer_only_options: None,
             images_config: None,
+            system_release_info,
             feature_set_level,
         }
     }
@@ -886,6 +893,7 @@ impl ImageAssemblyConfigBuilder {
             devicetree_overlay,
             developer_only_options: _,
             images_config,
+            system_release_info,
             feature_set_level,
         } = self;
 
@@ -1130,6 +1138,7 @@ impl ImageAssemblyConfigBuilder {
             board_driver_arguments,
             devicetree,
             devicetree_overlay,
+            system_release_info,
             image_mode,
         };
 
@@ -1671,6 +1680,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder.add_parsed_bundle(outdir.as_ref().join("minimum_bundle"), minimum_bundle).unwrap();
         builder
@@ -1687,6 +1697,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder
             .add_parsed_bundle(
@@ -1745,6 +1756,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder
             .add_parsed_bundle(
@@ -1798,6 +1810,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder
             .add_parsed_bundle(
@@ -1850,6 +1863,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
 
         // Write a file to the temp dir for use with config_data.
@@ -2297,6 +2311,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         assert!(builder.add_parsed_bundle(root, aib).is_err());
     }
@@ -2327,6 +2342,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder.add_parsed_bundle(outdir, aib).unwrap();
         assert!(builder.add_parsed_bundle(outdir.join("second"), second_aib).is_err());
@@ -2367,6 +2383,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         assert!(builder.add_parsed_bundle(outdir, aib).is_err());
     }
@@ -2413,6 +2430,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder.add_parsed_bundle(outdir, aib).ok();
         builder.add_parsed_bundle(outdir, aib2).ok();
@@ -2459,6 +2477,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder.add_parsed_bundle(outdir, aib).ok();
         assert!(builder.add_parsed_bundle(outdir, aib2).is_err());
@@ -2495,6 +2514,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
         builder.add_parsed_bundle(root, first_aib).unwrap();
         assert!(builder.add_parsed_bundle(root.join("second"), second_aib).is_err());
@@ -2510,6 +2530,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
 
         let board_package_path = root.join("board");
@@ -2557,6 +2578,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
 
         builder.add_kernel_args(vec!["arg1=value1".to_owned()]).unwrap();
@@ -2575,6 +2597,7 @@ mod tests {
             None::<Utf8PathBuf>,
             FilesystemImageMode::default(),
             FeatureSetLevel::Standard,
+            None,
         );
 
         // Provide developer overrides for kernel commandline args

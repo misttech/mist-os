@@ -134,6 +134,7 @@ pub async fn pb_create_with_sdk_version(
 mod test {
     use super::*;
     use assembled_system::Image;
+    use assembly_release_info::ProductBundleReleaseInfo;
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_repo::test_utils;
@@ -198,6 +199,14 @@ mod test {
                 repositories: vec![],
                 update_package_hash: None,
                 virtual_devices_path: None,
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                })
             })
         );
     }
@@ -220,6 +229,7 @@ mod test {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         }
         .write_to_dir(&system_dir, None::<Utf8PathBuf>)
         .unwrap();
@@ -264,6 +274,14 @@ mod test {
                 repositories: vec![],
                 update_package_hash: None,
                 virtual_devices_path: None,
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                }),
             })
         );
     }
@@ -286,6 +304,7 @@ mod test {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         manifest.images = vec![
             Image::ZBI { path: tempdir.join("path1"), signed: false },
@@ -340,6 +359,7 @@ mod test {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         }
         .write_to_dir(&system_dir, None::<Utf8PathBuf>)
         .unwrap();
@@ -396,6 +416,14 @@ mod test {
                 }],
                 update_package_hash: None,
                 virtual_devices_path: None,
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                }),
             })
         );
     }
@@ -461,6 +489,7 @@ mod test {
                 repositories,
                 update_package_hash: Some(_),
                 virtual_devices_path: None,
+                release_info: Some(_)
             }) if partitions == Default::default() && repositories == &[Repository {
                 name: "fuchsia.com".into(),
                 metadata_path: pb_dir.join("repository"),
@@ -535,6 +564,14 @@ mod test {
                 repositories: vec![],
                 update_package_hash: None,
                 virtual_devices_path: Some(pb_dir.join("virtual_devices/manifest.json")),
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                }),
             })
         );
 

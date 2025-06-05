@@ -99,6 +99,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(&pb_path).unwrap();
 

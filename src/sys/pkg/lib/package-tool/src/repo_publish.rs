@@ -1399,6 +1399,7 @@ mod tests {
             ],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(&src_repo_path).unwrap();
 
@@ -1473,6 +1474,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(&pb_dir).unwrap();
 
@@ -1559,6 +1561,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(wrkdir).unwrap();
 
@@ -1626,6 +1629,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(&pb_dir).unwrap();
 
@@ -1682,6 +1686,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(&pb_dir).unwrap();
 

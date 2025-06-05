@@ -100,6 +100,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
             .unwrap();
@@ -138,6 +139,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
         construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
             .unwrap();

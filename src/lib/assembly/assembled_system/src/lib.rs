@@ -19,4 +19,5 @@ pub mod vfs;
 mod zbi;
 
 pub use assembled_system::AssembledSystem;
+pub use assembly_release_info::ProductBundleReleaseInfo;
 pub use image::{BlobfsContents, Image, PackageMetadata, PackageSetMetadata, PackagesMetadata};

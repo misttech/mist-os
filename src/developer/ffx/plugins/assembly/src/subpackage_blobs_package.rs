@@ -136,6 +136,7 @@ mod tests {
             }],
             board_name: "my_board".into(),
             partitions_config: None,
+            system_release_info: None,
         };
 
         // Construct the subpackage blobs package.

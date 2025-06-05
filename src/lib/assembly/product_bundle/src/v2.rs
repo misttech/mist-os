@@ -22,6 +22,7 @@
 use anyhow::{anyhow, Context, Result};
 use assembled_system::Image;
 use assembly_partitions_config::PartitionsConfig;
+use assembly_release_info::ProductBundleReleaseInfo;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_merkle::Hash;
 use fuchsia_repo::repo_client::RepoClient;
@@ -37,15 +38,21 @@ use std::str::FromStr;
 #[serde(deny_unknown_fields)]
 pub struct ProductBundleV2 {
     /// The <product>.<board> for the product bundle.
+    /// TODO(https://fxbug.dev/418775628): Remove this field in
+    /// favor of the name field in release_info.
     pub product_name: String,
 
     /// Unique version of this <product>.<board>.
+    /// TODO(https://fxbug.dev/418775628): Remove this field in
+    /// favor of the version field in release_info.
     pub product_version: String,
 
     /// The physical partitions of the target to place images into.
     pub partitions: PartitionsConfig,
 
     /// Fuchsia SDK version used to build this product bundle.
+    /// TODO(https://fxbug.dev/418775628): Remove this field in
+    /// favor of the sdk_version field in release_info.
     pub sdk_version: String,
 
     /// An assembled system that should be placed in slot A on the target.
@@ -59,6 +66,10 @@ pub struct ProductBundleV2 {
     /// An assembled system that should be placed in slot R on the target.
     #[serde(default)]
     pub system_r: Option<Vec<Image>>,
+
+    /// Version information for this product bundle.
+    #[serde(default)]
+    pub release_info: Option<ProductBundleReleaseInfo>,
 
     /// The repositories that hold the TUF metadata, packages, and blobs.
     #[serde(default)]
@@ -475,6 +486,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let result = pb.canonicalize_paths(&Utf8PathBuf::from("path/to/product_bundle"));
         assert!(result.is_ok(), "{:?}", result.unwrap_err());
@@ -532,6 +544,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: Some("device".into()),
+            release_info: None,
         };
         let result = pb.canonicalize_paths(&tempdir);
         assert!(result.is_ok());
@@ -572,6 +585,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let result = pb.relativize_paths(&Utf8PathBuf::from("path/to/product_bundle"));
         assert!(result.is_ok());
@@ -617,6 +631,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: Some(vd_manifest),
+            release_info: None,
         };
         let result = pb.relativize_paths(tempdir);
         assert!(result.is_ok());
@@ -648,6 +663,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
 
         let expected = HashSet::from([
@@ -685,6 +701,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         assert_eq!("repository/targets.json", pb.repositories[0].targets_path());
     }

@@ -107,6 +107,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
 
         let cmd = GetRepositoryCommand { product_bundle: product_bundle_dir };

@@ -254,6 +254,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
 
         // Each test case is in its own scope
@@ -382,6 +383,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let tool = PbGetImagePathTool {
             cmd: GetImagePathCommand {
@@ -425,6 +427,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");
@@ -493,6 +496,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");
@@ -567,6 +571,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");
