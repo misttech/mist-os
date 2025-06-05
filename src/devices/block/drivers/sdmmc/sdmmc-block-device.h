@@ -310,6 +310,10 @@ class SdmmcBlockDevice {
   std::vector<std::unique_ptr<PartitionDevice>> child_partition_devices_;
   std::unique_ptr<RpmbDevice> child_rpmb_device_;
   EmmcPartition current_partition_ TA_GUARDED(worker_lock_) = EmmcPartition::USER_DATA_PARTITION;
+
+  // This value comes from metadata. If true, the device must be re-initialized after leaving the
+  // OFF state, and we cannot use the MMC sleep state.
+  bool vccq_off_with_controller_off_ = false;
 };
 
 }  // namespace sdmmc

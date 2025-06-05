@@ -1159,15 +1159,20 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     return status;
   }
 
-  if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",
-             zx_status_get_string(status));
-    return status;
-  }
+  if (vccq_off_with_controller_off_) {
+    // TODO(388815124): We can't use the sleep state in this case, send a power off notification
+    // instead.
+  } else {
+    if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",
+               zx_status_get_string(status));
+      return status;
+    }
 
-  if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/true); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to sleep: %s", zx_status_get_string(status));
-    return status;
+    if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/true); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to sleep: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   trace_async_id_ = TRACE_NONCE();
@@ -1183,14 +1188,19 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     return ZX_OK;
   }
 
-  if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
-    return status;
-  }
+  if (vccq_off_with_controller_off_) {
+    // TODO(388815124): Re-initialize the device.
+  } else {
+    if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
+      return status;
+    }
 
-  if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/true); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to SelectCard after awake: %s", zx_status_get_string(status));
-    return status;
+    if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/true); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to SelectCard after awake: %s",
+               zx_status_get_string(status));
+      return status;
+    }
   }
 
   TRACE_ASYNC_END("sdmmc", "suspend", trace_async_id_);

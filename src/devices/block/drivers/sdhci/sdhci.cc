@@ -1233,6 +1233,7 @@ zx_status_t Sdhci::Init() {
     metadata.enable_cache() = existing_metadata->enable_cache();
     metadata.removable() = existing_metadata->removable();
     metadata.max_command_packing() = existing_metadata->max_command_packing();
+    metadata.vccq_off_with_controller_off() = existing_metadata->vccq_off_with_controller_off();
 
     const auto& speed_capabilities = existing_metadata->speed_capabilities();
     if (speed_capabilities.has_value()) {

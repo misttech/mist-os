@@ -523,6 +523,10 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
     }
   }
 
+  if (metadata.vccq_off_with_controller_off()) {
+    vccq_off_with_controller_off_ = *metadata.vccq_off_with_controller_off();
+  }
+
   return ZX_OK;
 }
 
