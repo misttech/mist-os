@@ -43,9 +43,10 @@ impl DeviceHandle {
     /// returns `true` will be opened and returned.
     pub fn scan_interfaces(
         &self,
+        urb_pool_size: usize,
         f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
     ) -> Result<Interface> {
-        self.0.scan_interfaces(f)
+        self.0.scan_interfaces(urb_pool_size, f)
     }
 }
 

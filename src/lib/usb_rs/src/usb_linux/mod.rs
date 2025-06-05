@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod usbdevice_fs;
+use futures::lock::Mutex as AsyncMutex;
 use usbdevice_fs::*;
 mod discovery;
 pub use discovery::wait_for_devices;
@@ -12,6 +13,7 @@ use futures::task::AtomicWaker;
 use std::cell::UnsafeCell;
 use std::collections::VecDeque;
 use std::fs::{File, OpenOptions};
+use std::future::Future;
 use std::io::Read;
 use std::os::fd::{AsRawFd, RawFd};
 use std::pin::Pin;
@@ -40,6 +42,7 @@ impl DeviceHandleInner {
 
     pub fn scan_interfaces(
         &self,
+        urb_pool_size: usize,
         f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
     ) -> Result<Interface> {
         // The endpoint descriptor comes in two lengths. We only have the struct for the larger one, and
@@ -112,7 +115,7 @@ impl DeviceHandleInner {
 
                 if let Some(iface) = iface.replace(InterfaceDescriptor::from_ch9(&*descriptor)) {
                     if f(&device, &iface) {
-                        return Interface::new(file, iface, None);
+                        return Interface::new(file, iface, None, urb_pool_size);
                     }
                 }
             }
@@ -123,7 +126,7 @@ impl DeviceHandleInner {
         if let Some(iface) = iface {
             let device = device.as_ref().ok_or(Error::MalformedDescriptor)?;
             if f(&device, &iface) {
-                return Interface::new(file, iface, None);
+                return Interface::new(file, iface, None, urb_pool_size);
             }
         }
 
@@ -175,7 +178,7 @@ impl Urb {
     /// This mutates the buffer geometry in place without additional
     /// synchronization. It is generally only safe to call when the buffer is
     /// not in use, i.e. when it has just been allocated from the free pool.
-    unsafe fn fill_buffer(&self, action: &BufferAction<'_>) -> Result<()> {
+    unsafe fn fill_buffer(&self, action: &BufferAction<'_, '_>) -> Result<()> {
         let mtu = action.mtu();
         let urb = self.urb.get().as_mut().unwrap();
         let buf = self.buf.get().as_mut().unwrap();
@@ -263,14 +266,14 @@ impl std::ops::Deref for UrbRef<'_> {
 }
 
 /// What to do with the buffer associated with a URB when submitting.
-enum BufferAction<'a> {
+enum BufferAction<'i, 'o> {
     /// Copy data into the buffer before submission
-    CopyIn(&'a [u8]),
+    CopyIn(&'i [u8]),
     /// Copy data out of the buffer after submission
-    CopyOut(&'a mut [u8]),
+    CopyOut(&'o mut [u8]),
 }
 
-impl BufferAction<'_> {
+impl BufferAction<'_, '_> {
     /// What size of buffer should we allocate for this URB.
     fn mtu(&self) -> usize {
         match self {
@@ -330,7 +333,7 @@ pub struct InterfaceInner {
 
 impl InterfaceInner {
     /// Allocate a Urb from the pool.
-    async fn alloc_urb(&self, action: &BufferAction<'_>) -> Result<UrbRef<'_>> {
+    async fn alloc_urb<'a>(&'a self, action: &BufferAction<'_, '_>) -> Result<UrbRef<'a>> {
         poll_fn(move |ctx| {
             let mut queue = self.urb_queue.lock().unwrap();
 
@@ -370,14 +373,22 @@ impl InterfaceInner {
         }
     }
 
-    /// Submit a Urb transaction
-    async fn submit_urb(
-        self: &Arc<Self>,
+    /// Submit a Urb transaction.
+    ///
+    /// This method is async *and* returns a future. The semantics are as follows:
+    ///
+    /// * After first await: URB is allocated and submitted to the kernel. Data
+    /// may not have come back yet. Buffer may not yet be written.
+    /// * After second await: Kernel has finished with URB. Data has been
+    /// written back to the buffer if applicable.
+    async fn submit_urb<'a>(
+        self: &'a Arc<Self>,
         address: u8,
         ty: u8,
-        buffer_action: BufferAction<'_>,
-    ) -> Result<usize> {
+        buffer_action: BufferAction<'_, 'a>,
+    ) -> Result<impl Future<Output = Result<usize>> + use<'a>> {
         let urb = self.alloc_urb(&buffer_action).await?;
+        let out = if let BufferAction::CopyOut(o) = buffer_action { Some(o) } else { None };
 
         {
             // SAFETY: The allocation semantics should guarantee we're the only holder of this Urb,
@@ -409,35 +420,37 @@ impl InterfaceInner {
             }
         }
 
-        poll_fn(|ctx| {
-            urb.waker.register(ctx.waker());
-            if urb.refs.load(Ordering::Relaxed) != 1 {
-                Poll::Pending
+        Ok(async move {
+            poll_fn(|ctx| {
+                urb.waker.register(ctx.waker());
+                if urb.refs.load(Ordering::Relaxed) != 1 {
+                    Poll::Pending
+                } else {
+                    Poll::Ready(())
+                }
+            })
+            .await;
+
+            // SAFETY: As above. We should have the Urb back from the kernel and it is ours alone by
+            // allocation.
+            let (status, actual_length) = unsafe {
+                let urb_linux = &*urb.urb.get();
+                (urb_linux.status, urb_linux.actual_length as usize)
+            };
+
+            if let Some(buf) = out {
+                // SAFETY: As above.
+                unsafe {
+                    buf[..actual_length].copy_from_slice(&(&(*urb.buf.get()))[..actual_length]);
+                }
+            }
+
+            if status == 0 {
+                Ok(actual_length as usize)
             } else {
-                Poll::Ready(())
+                Err(std::io::Error::from_raw_os_error(-status).into())
             }
         })
-        .await;
-
-        // SAFETY: As above. We should have the Urb back from the kernel and it is ours alone by
-        // allocation.
-        let (status, actual_length) = unsafe {
-            let urb_linux = &*urb.urb.get();
-            (urb_linux.status, urb_linux.actual_length as usize)
-        };
-
-        if let BufferAction::CopyOut(buf) = buffer_action {
-            // SAFETY: As above.
-            unsafe {
-                buf[..actual_length].copy_from_slice(&(&(*urb.buf.get()))[..actual_length]);
-            }
-        }
-
-        if status == 0 {
-            Ok(actual_length as usize)
-        } else {
-            Err(std::io::Error::from_raw_os_error(-status).into())
-        }
     }
 }
 
@@ -458,6 +471,7 @@ impl Interface {
         file: File,
         descriptor: InterfaceDescriptor,
         stubs: Option<Arc<dyn IoctlStub>>,
+        urb_pool_size: usize,
     ) -> Result<Self> {
         let fd = file.as_raw_fd();
 
@@ -479,16 +493,9 @@ impl Interface {
             }
         }
 
-        let urbs = Box::pin([
-            Urb::new(),
-            Urb::new(),
-            Urb::new(),
-            Urb::new(),
-            Urb::new(),
-            Urb::new(),
-            Urb::new(),
-            Urb::new(),
-        ]);
+        let urbs = Pin::new(
+            std::iter::from_fn(|| Some(Urb::new())).take(urb_pool_size).collect::<Box<[_]>>(),
+        );
         let urb_queue = Mutex::new(UrbQueue::new(&*urbs));
         let pending_urbs = AtomicU8::new(0);
         let (sender, receiver) = std::sync::mpsc::sync_channel(0);
@@ -591,13 +598,97 @@ pub struct BulkInEndpoint {
 
 impl BulkInEndpoint {
     pub async fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        let fut = self.inner.submit_urb(
-            self.descriptor.address,
-            USBDEVFS_URB_TYPE_BULK as u8,
-            BufferAction::CopyOut(buf),
-        );
+        let fut = self
+            .inner
+            .submit_urb(
+                self.descriptor.address,
+                USBDEVFS_URB_TYPE_BULK as u8,
+                BufferAction::CopyOut(buf),
+            )
+            .await?;
 
         fut.await
+    }
+
+    /// Stream data from this endpoint. This will be considerably more efficient
+    /// than reading single transactions with `read`.
+    ///
+    /// `buffer_size` is the maximum transaction the reader should prepare for.
+    /// A transaction larger than this will cause an error.
+    ///
+    /// `buffer_count` is how many buffers we should offer to the kernel at once
+    /// for receiving transactions. Larger is faster but increases memory
+    /// consumpton.
+    pub fn to_stream(
+        self,
+        buffer_size: usize,
+        buffer_count: usize,
+    ) -> impl futures::Stream<Item = Result<Vec<u8>>> {
+        let mut workers = Vec::with_capacity(buffer_count);
+        let out = Arc::new(Mutex::new(VecDeque::with_capacity(buffer_count)));
+        // We assign each worker a number, and the order of the numbers
+        // indicates the order the URBs were submitted in. We then enforce that
+        // we deliver the results of the reads to the user in that order.
+        //
+        // It might be possible to prove this is unnecessary given the order we
+        // poll in and the semantics of Rust futures but it would be brittle to
+        // rely on those things for correctness.
+        let sequence_counter = Arc::new(AsyncMutex::new(0usize));
+        let mut next_expected = 0usize;
+        let this = Arc::new(self);
+        futures::stream::poll_fn(move |ctx| {
+            if workers.is_empty() {
+                for _ in 0..buffer_count {
+                    let this = Arc::clone(&this);
+                    let sequence_counter = Arc::clone(&sequence_counter);
+                    let out = Arc::clone(&out);
+                    workers.push(Box::pin(async move {
+                        let mut buf = vec![0u8; buffer_size];
+                        loop {
+                            let (fut, sequence_number) = {
+                                let mut sequence_counter = sequence_counter.lock().await;
+                                let fut = this
+                                    .inner
+                                    .submit_urb(
+                                        this.descriptor.address,
+                                        USBDEVFS_URB_TYPE_BULK as u8,
+                                        BufferAction::CopyOut(&mut buf),
+                                    )
+                                    .await?;
+                                let sequence_number = *sequence_counter;
+                                *sequence_counter = sequence_counter.wrapping_add(1);
+                                (fut, sequence_number)
+                            };
+
+                            let size = fut.await?;
+
+                            out.lock().unwrap().push_back((buf[..size].to_vec(), sequence_number));
+                        }
+                    }));
+                }
+            }
+
+            for worker in &mut workers {
+                let res: Poll<Result<std::convert::Infallible>> = worker.as_mut().poll(ctx);
+                let Poll::Pending = res?;
+            }
+
+            let got = {
+                let mut out = out.lock().unwrap();
+                let idx = out.iter().enumerate().find(|x| x.1 .1 == next_expected).map(|x| x.0);
+
+                idx.and_then(|idx| out.remove(idx))
+            };
+
+            if let Some(got) = got {
+                next_expected = next_expected.wrapping_add(1);
+                Poll::Ready(Some(Ok(got.0)))
+            } else {
+                // One of the workers *must* have registered a waker, so we can
+                // just return pending.
+                Poll::Pending
+            }
+        })
     }
 }
 
@@ -611,19 +702,32 @@ pub struct BulkOutEndpoint {
 }
 
 impl BulkOutEndpoint {
+    /// Write data to this endpoint.
     pub async fn write(&self, buf: &[u8]) -> Result<()> {
-        let fut = self.inner.submit_urb(
-            self.descriptor.address,
-            USBDEVFS_URB_TYPE_BULK as u8,
-            BufferAction::CopyIn(buf),
-        );
+        self.write_defer_wait(buf).await?.await
+    }
 
-        fut.await.and_then(|x| {
-            if x == buf.len() {
-                Ok(())
-            } else {
-                Err(Error::ShortWrite(buf.len(), x))
-            }
+    /// Submit a write request but don't wait for the response right away. This
+    /// function is async *and* returns a future, so the full return value is
+    /// produced by awaiting *twice*. The first await submits the request to the
+    /// USB stack, the second waits for acknowledgement that the request has
+    /// been sent.
+    pub async fn write_defer_wait<'s>(
+        &'s self,
+        buf: &[u8],
+    ) -> Result<impl Future<Output = Result<()>> + use<'s>> {
+        let fut = self
+            .inner
+            .submit_urb(
+                self.descriptor.address,
+                USBDEVFS_URB_TYPE_BULK as u8,
+                BufferAction::CopyIn(buf),
+            )
+            .await?;
+        let len = buf.len();
+
+        Ok(async move {
+            fut.await.and_then(|x| if x == len { Ok(()) } else { Err(Error::ShortWrite(len, x)) })
         })
     }
 }
@@ -689,6 +793,7 @@ impl InterfaceDescriptor {
 mod test {
     use super::*;
     use crate::USB_ENDPOINT_DIR_MASK;
+    use futures::StreamExt;
     use std::collections::HashMap;
     use std::sync::mpsc::{channel, Receiver, Sender};
 
@@ -802,6 +907,7 @@ mod test {
                 self.new_fake_dev_file(descriptor.clone()),
                 descriptor,
                 Some(Arc::clone(self) as Arc<dyn IoctlStub>),
+                8,
             )
             .unwrap()
         }
@@ -1053,6 +1159,54 @@ mod test {
         let len = i.read(&mut buf).await.unwrap();
         assert_eq!(b"Wango!".len(), len);
         assert_eq!(b"Wango!", &buf[..len]);
+
+        assert_eq!(1, env.get_dev(fd).unwrap().times_claimed());
+        assert_eq!(1, env.get_dev(fd).unwrap().times_interface_set());
+    }
+
+    #[fuchsia::test]
+    async fn stream_bulk() {
+        let env = FakeUSBEnv::new();
+        let descriptor = InterfaceDescriptor {
+            id: 0,
+            class: 0xff,
+            subclass: 0x42,
+            protocol: 22,
+            alternate: 64,
+            endpoints: vec![
+                EndpointDescriptor { ty: EndpointType::Bulk, address: 0 | USB_ENDPOINT_DIR_MASK },
+                EndpointDescriptor { ty: EndpointType::Bulk, address: 1 },
+            ],
+        };
+        let iface = env.new_fake_dev(descriptor);
+        let fd = iface.inner.file.as_raw_fd();
+        assert_eq!(1, env.get_dev(fd).unwrap().times_claimed());
+        assert_eq!(1, env.get_dev(fd).unwrap().times_interface_set());
+
+        let mut eps = iface.endpoints().collect::<Vec<_>>();
+        assert_eq!(2, eps.len());
+        let a = eps.pop().unwrap();
+        let b = eps.pop().unwrap();
+
+        let (i, o) = match (a, b) {
+            (Endpoint::BulkIn(a), Endpoint::BulkOut(b)) => (a, b),
+            (Endpoint::BulkOut(a), Endpoint::BulkIn(b)) => (b, a),
+            _ => panic!("Wrong endpoint types!"),
+        };
+
+        assert_eq!(0 | USB_ENDPOINT_DIR_MASK, i.descriptor.address);
+        assert_eq!(1, o.descriptor.address);
+
+        let i = i.to_stream(8, 8);
+
+        env.get_dev(fd).unwrap().endpoint_write_from_target(0 | USB_ENDPOINT_DIR_MASK, b"Wango!");
+        env.get_dev(fd).unwrap().endpoint_write_from_target(0 | USB_ENDPOINT_DIR_MASK, b"Bango!");
+
+        let results = i.take(2).collect::<Vec<_>>().await;
+        let results = results.into_iter().collect::<Result<Vec<_>>>().unwrap();
+        assert_eq!(2, results.len());
+        assert_eq!(b"Wango!", results[0].as_slice());
+        assert_eq!(b"Bango!", results[1].as_slice());
 
         assert_eq!(1, env.get_dev(fd).unwrap().times_claimed());
         assert_eq!(1, env.get_dev(fd).unwrap().times_interface_set());

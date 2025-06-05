@@ -34,6 +34,9 @@ const MTU: usize = 1024;
 /// Deliberately non-inclusive as (u32)-1 is a reserved value in the VSOCK spec.
 const RANDOM_PORT_RANGE: std::ops::Range<u32> = 32768..u32::MAX;
 
+/// How many URBs to allocate for each device we communicate with.
+const URB_POOL_SIZE: usize = 32;
+
 /// Watches the usb devfs for new devices.
 async fn listen_for_usb_devices(host: Weak<UsbVsockHost>) -> Result<(), usb_rs::Error> {
     log::info!("Listening for USB devices");
@@ -272,23 +275,42 @@ async fn run_usb_link(
 
     let tx_conn = connection.clone();
     let tx = async move {
-        let mut builder = UsbPacketBuilder::new(vec![0u8; MTU]);
-        loop {
-            builder = tx_conn.fill_usb_packet(builder).await;
-            out_ep.write(builder.take_usb_packet().unwrap()).await.map_err(LinkError::Send)?;
+        let (tx_err_sender, tx_errs) = mpsc::unbounded();
+
+        let tx_main = pin!(async {
+            let mut builder = UsbPacketBuilder::new(vec![0u8; MTU]);
+            loop {
+                builder = tx_conn.fill_usb_packet(builder).await;
+                let err_fut = out_ep
+                    .write_defer_wait(builder.take_usb_packet().unwrap())
+                    .await
+                    .map_err(LinkError::Send)?;
+                if tx_err_sender.unbounded_send(err_fut).is_err() {
+                    break Ok(());
+                }
+            }
+        });
+
+        let mut tx_errs = pin!(tx_errs.filter_map(|x| async move { x.await.err() }));
+        let tx_errs = tx_errs.next();
+
+        match select(tx_main, tx_errs).await {
+            Either::Left((main_result, _)) => main_result,
+            Either::Right((Some(tx_error), _)) => Err(LinkError::Send(tx_error)),
+            Either::Right((None, tx_main)) => tx_main.await,
         }
     };
     let rx_conn = connection.clone();
     let rx = async move {
-        let mut data = [0; MTU];
-        loop {
-            let size = in_ep.read(&mut data).await.map_err(LinkError::Recv)?;
+        let mut stream = in_ep.to_stream(MTU, URB_POOL_SIZE / 2);
+        while let Some(res) = stream.next().await {
+            let data = res.map_err(LinkError::Recv)?;
 
-            if size == 0 {
+            if data.is_empty() {
                 continue;
             }
 
-            let mut packets = VsockPacketIterator::new(&data[..size]);
+            let mut packets = VsockPacketIterator::new(&data);
             while let Some(packet) = packets.next() {
                 rx_conn
                     .handle_vsock_packet(packet.map_err(LinkError::PacketDecode)?)
@@ -296,6 +318,7 @@ async fn run_usb_link(
                     .map_err(LinkError::PacketHandle)?;
             }
         }
+        Ok(())
     };
 
     let tx = pin!(tx);
@@ -655,7 +678,7 @@ impl UsbVsockHost {
     /// Establish a connection with a USB device and assign it a CID. Returns
     /// true if the device was added (see `add_path`).
     fn add_device(self: &Arc<Self>, device: usb_rs::DeviceHandle) -> bool {
-        let interface = match device.scan_interfaces(|device, interface| {
+        let interface = match device.scan_interfaces(URB_POOL_SIZE, |device, interface| {
             let subclass_match = u32::from(device.vendor) == BIND_USB_VID_GOOGLE
                 && u32::from(interface.class) == BIND_USB_CLASS_VENDOR_SPECIFIC
                 && u32::from(interface.subclass) == BIND_USB_SUBCLASS_VSOCK_BRIDGE;
