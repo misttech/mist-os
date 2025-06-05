@@ -2537,9 +2537,9 @@ version = "0.3.7"
 
 [[package]]
 name = "mock-omaha-server"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b3102212924ba4d2bd0ec4525301dbdbbdaaa5c52d95e183534876675450275"
+checksum = "e49045fa49f17e681f48000e5b72137079421c2e5704fa0859acbd370b17eacd"
 dependencies = [
  "anyhow",
  "argh",
@@ -2547,13 +2547,13 @@ dependencies = [
  "futures",
  "hex",
  "hyper",
+ "log",
  "omaha_client",
  "p256",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 1.0.69",
- "tracing",
  "url 1.7.2",
 ]
 

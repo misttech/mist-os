@@ -555,7 +555,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("mock-omaha-server") {
-  public_deps = [ ":mock-omaha-server-v0_3_4" ]
+  public_deps = [ ":mock-omaha-server-v0_3_5" ]
 }
 
 group("mockall") {
@@ -9829,20 +9829,20 @@ rustc_library("miow-v0_3_7") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("mock-omaha-server-v0_3_4.license") {
+license("mock-omaha-server-v0_3_5.license") {
   public_package_name = "mock_omaha_server"
   license_files = [
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.5/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.5/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.5/LICENSE-MIT",
   ]
 }
 
-rustc_library("mock-omaha-server-v0_3_4") {
+rustc_library("mock-omaha-server-v0_3_5") {
   crate_name = "mock_omaha_server"
   source_root =
-      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.4/src/lib.rs"
-  output_name = "mock_omaha_server-14dc45907f853546"
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.5/src/lib.rs"
+  output_name = "mock_omaha_server-23f57be10551b77"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
@@ -9855,13 +9855,13 @@ rustc_library("mock-omaha-server-v0_3_4") {
   deps += [ ":futures-v0_3_30" ]
   deps += [ ":hex-v0_4_3" ]
   deps += [ ":hyper-v0_14_19" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":omaha_client-v0_2_2" ]
   deps += [ ":p256-v0_11_1" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_128" ]
   deps += [ ":sha2-v0_10_8" ]
   deps += [ ":thiserror-v1_0_69" ]
-  deps += [ ":tracing-v0_1_40" ]
   deps += [ ":url-v1_7_2" ]
   deps += [ "//src/lib/fuchsia-async" ]
   deps += [ "//src/lib/fuchsia-hyper" ]
@@ -9875,14 +9875,14 @@ rustc_library("mock-omaha-server-v0_3_4") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=14dc45907f853546",
-    "-Cextra-filename=-14dc45907f853546",
+    "-Cmetadata=23f57be10551b77",
+    "-Cextra-filename=-23f57be10551b77",
     "--cfg=fasync",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":mock-omaha-server-v0_3_4.license" ]
+  applicable_licenses = [ ":mock-omaha-server-v0_3_5.license" ]
 }
 
 license("mockall-v0_9_0.license") {
