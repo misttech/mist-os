@@ -127,6 +127,8 @@ fn generate_container(input: syn::ItemStruct) -> syn::Result<TokenStream> {
                 pub fn #setter_name(&mut self, new: #field_ty) {
                     use split_enum_storage::SplitStorage;
                     let (disc, payload) = new.decompose();
+                    // SAFETY: generated code keeps the discriminant and payload in sync.
+                    unsafe { self.#payload_field_name.free(self.#disc_field_name) };
                     self.#disc_field_name = disc;
                     self.#payload_field_name = payload;
                 }
@@ -389,8 +391,8 @@ fn generate_split_storage_impl_inner(input: syn::DeriveInput) -> syn::Result<Tok
             ///
             /// The provided `disc` must be equal to the type that was returned with this value's
             /// creation.
-            unsafe fn clone(&self, disc: #discriminant_name) -> ManuallyDrop<Self> {
-                ManuallyDrop::new(match disc {
+            unsafe fn clone(&self, disc: #discriminant_name) -> std::mem::ManuallyDrop<Self> {
+                std::mem::ManuallyDrop::new(match disc {
                     #(#clone_arms),*
                 })
             }

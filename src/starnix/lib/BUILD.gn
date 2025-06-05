@@ -30,6 +30,7 @@ group("tests") {
     "kernel_manager:tests",
     "range_map:tests",
     "selinux:tests",
+    "split_enum_storage:tests",
     "starnix_lifecycle:tests",
     "starnix_sync:tests",
     "starnix_types:tests",

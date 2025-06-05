@@ -2,8 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_macro.gni")
+import("//build/rust/rustc_test.gni")
 
 rustc_library("split_enum_storage") {
   edition = "2021"
@@ -19,5 +21,27 @@ rustc_macro("split_enum_storage_macro") {
     "//third_party/rust_crates:proc-macro2",
     "//third_party/rust_crates:quote",
     "//third_party/rust_crates:syn",
+  ]
+}
+
+rustc_test("split_enum_storage_test") {
+  edition = "2021"
+  source_root = "src/test.rs"
+  sources = [ source_root ]
+  deps = [
+    ":split_enum_storage",
+    "//src/lib/fuchsia",
+  ]
+}
+
+fuchsia_unittest_package("split_enum_storage_unittests") {
+  deps = [ ":split_enum_storage_test" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":split_enum_storage_test($host_toolchain)",
+    ":split_enum_storage_unittests",
   ]
 }

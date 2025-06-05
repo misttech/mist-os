@@ -18,7 +18,7 @@ use starnix_uapi::file_mode::Access;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{errno, PROT_EXEC, PROT_READ, PROT_WRITE};
 use static_assertions::const_assert_eq;
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::ops::Range;
 use std::sync::{Arc, Weak};
 
