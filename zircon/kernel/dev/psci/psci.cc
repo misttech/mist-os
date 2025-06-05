@@ -254,10 +254,10 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     psci_cpu_suspend_supported = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND").has_value();
     probe_feature(PSCI64_CPU_OFF, "CPU_OFF");
     probe_feature(PSCI64_CPU_ON, "CPU_ON");
-    probe_feature(PSCI64_AFFINITY_INFO, "CPU_AFFINITY_INFO");
-    probe_feature(PSCI64_MIGRATE, "CPU_MIGRATE");
-    probe_feature(PSCI64_MIGRATE_INFO_TYPE, "CPU_MIGRATE_INFO_TYPE");
-    probe_feature(PSCI64_MIGRATE_INFO_UP_CPU, "CPU_MIGRATE_INFO_UP_CPU");
+    probe_feature(PSCI64_AFFINITY_INFO, "AFFINITY_INFO");
+    probe_feature(PSCI64_MIGRATE, "MIGRATE");
+    probe_feature(PSCI64_MIGRATE_INFO_TYPE, "MIGRATE_INFO_TYPE");
+    probe_feature(PSCI64_MIGRATE_INFO_UP_CPU, "MIGRATE_INFO_UP_CPU");
     probe_feature(PSCI64_SYSTEM_OFF, "SYSTEM_OFF");
     probe_feature(PSCI64_SYSTEM_RESET, "SYSTEM_RESET");
     if (probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2").has_value()) {
@@ -267,14 +267,14 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     }
     probe_feature(PSCI64_CPU_FREEZE, "CPU_FREEZE");
     probe_feature(PSCI64_CPU_DEFAULT_SUSPEND, "CPU_DEFAULT_SUSPEND");
-    probe_feature(PSCI64_NODE_HW_STATE, "CPU_NODE_HW_STATE");
-    probe_feature(PSCI64_SYSTEM_SUSPEND, "CPU_SYSTEM_SUSPEND");
+    probe_feature(PSCI64_NODE_HW_STATE, "NODE_HW_STATE");
+    probe_feature(PSCI64_SYSTEM_SUSPEND, "SYSTEM_SUSPEND");
     psci_set_suspend_mode_supported =
-        probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "CPU_PSCI_SET_SUSPEND_MODE").has_value();
-    probe_feature(PSCI64_PSCI_STAT_RESIDENCY, "CPU_PSCI_STAT_RESIDENCY");
-    probe_feature(PSCI64_PSCI_STAT_COUNT, "CPU_PSCI_STAT_COUNT");
-    probe_feature(PSCI64_MEM_PROTECT, "CPU_MEM_PROTECT");
-    probe_feature(PSCI64_MEM_PROTECT_RANGE, "CPU_MEM_PROTECT_RANGE");
+        probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "PSCI_SET_SUSPEND_MODE").has_value();
+    probe_feature(PSCI64_PSCI_STAT_RESIDENCY, "PSCI_STAT_RESIDENCY");
+    probe_feature(PSCI64_PSCI_STAT_COUNT, "PSCI_STAT_COUNT");
+    probe_feature(PSCI64_MEM_PROTECT, "MEM_PROTECT");
+    probe_feature(PSCI64_MEM_PROTECT_RANGE, "MEM_PROTECT_RANGE");
 
     probe_feature(PSCI64_SMCCC_VERSION, "PSCI64_SMCCC_VERSION");
   }
