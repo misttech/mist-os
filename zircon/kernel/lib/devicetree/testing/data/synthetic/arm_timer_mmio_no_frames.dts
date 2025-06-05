@@ -1,4 +1,4 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -6,8 +6,8 @@
 
 / {
     interrupt-parent = <0x8001>;
-    #size-cells = <0x02>;
-    #address-cells = <0x02>;
+    #size-cells = <0x01>;
+    #address-cells = <0x01>;
     some-interrupt-controller {
         #address-cells = <0x02>;
         #size-cells = <0x02>;
@@ -16,11 +16,12 @@
         phandle = <0x8001>;
         interrupt-controller;
     };
-    timer {
-        compatible = "arm,armv7-timer\0arm,armv8-timer";
-        interrupts = <1 10 0xF08>,
-                     <1 11 0xF08>,
-                     <1 12 0xF08>,
-                     <1 13 0xF08>;
+    timer@12340000 {
+        #address-cells = <0x01>;
+        #size-cells = <0x01>;
+        ranges;
+        compatible = "arm,armv7-timer-mem";
+        reg = <0x12340000 0x1000>;
+        phandle = <0x192>;
     };
 };
