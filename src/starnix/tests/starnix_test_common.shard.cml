@@ -41,12 +41,10 @@
         },
         {
             name: "fake-hrtimer",
-            url: "fake-hrtimer#meta/fake-hrtimer.cm",
+            url: "fake-hrtimer#meta/default.cm",
         },
         {
             name: "timekeeper",
-
-            // This is the timekeeper subset of functionality used in this test.
             url: "wake-alarms#meta/default.cm",
         },
     ],
