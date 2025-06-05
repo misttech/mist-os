@@ -339,6 +339,11 @@ pub struct LogCommand {
     #[cfg(target_os = "fuchsia")]
     #[argh(switch)]
     pub json: bool,
+
+    /// disable automatic reconnect
+    #[cfg(not(target_os = "fuchsia"))]
+    #[argh(switch)]
+    pub disable_reconnect: bool,
 }
 
 impl Default for LogCommand {
@@ -370,6 +375,8 @@ impl Default for LogCommand {
             tid: None,
             #[cfg(target_os = "fuchsia")]
             json: false,
+            #[cfg(not(target_os = "fuchsia"))]
+            disable_reconnect: false,
             #[cfg(not(target_os = "fuchsia"))]
             symbolize: SymbolizeMode::Pretty,
         }
