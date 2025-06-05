@@ -16,6 +16,11 @@
                 // demonstrated in this test.
                 "InheritTest.ExecutableFdRemappedToNull",
 
+                // TODO: https://fxbug.dev/322843830 - Make (SE)Starnix match the (SE)Linux behavior
+                // demonstrated in this test; i.e., during exec, check FsNode permissions on files
+                // corresponding to any open file descriptors.
+                "InheritTest.FsNodePermissionDeniedFdRemappedToNull",
+
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of extra whitespace.
                 "SeLinuxFsCreate.ExtraWhitespace",
 
