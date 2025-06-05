@@ -358,8 +358,7 @@ if (!is_host) {
   }
 
   # In-tree, ffx plugins/tools and tests depend on the existence of a
-  # collection (not IDK) manifest at "$OUT_DIR/sdk/manifest/core" and/or
-  # associated directory at "$OUT_DIR/sdk/exported/core" to determine the
+  # collection (not IDK) at "$OUT_DIR/sdk/exported/core" to determine the
   # location of tools. Create a collection that generates a manifest with the
   # necessary paths.
   # TODO(https://fxbug.dev/317385989): Remove once these legacy dependencies

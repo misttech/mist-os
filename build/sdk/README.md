@@ -145,8 +145,7 @@ rely on:
 
 - `foo_final_manifest`: Creates a internal JSON manifest at
   `$OUTPUT_DIR/sdk/manifest/<name>`. This is seldom used by
-  other parts of the build systems, or tools like `fx` or `ffx`
-  when it runs from a Fuchsia checkout.
+  other parts of the build systems.
 
 - `foo_export`: Creates the collection's export directory under
   `$OUTPUT_DIR/sdk/exported/<name>`. This contains files that

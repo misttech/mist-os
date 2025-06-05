@@ -94,7 +94,7 @@ template("sdk_collection") {
     exported_collection_dir = "${root_out_dir}/sdk/exported/${collection_name}"
 
     # Internal manifests.
-    # TODO(https://fxbug.dev/317385989): Eliminate `final_manifest` once ffx
+    # TODO(https://fxbug.dev/407083737): Eliminate `final_manifest` once clidoc
     # no longer depends on a manifest at that location.
     final_manifest = "${root_out_dir}/sdk/manifest/${collection_name}"
     local_manifest = "${target_gen_dir}/${targets.main}.sdk"
@@ -340,10 +340,6 @@ template("sdk_collection") {
 
     # The build manifest is only needed by legacy use cases.
     _collections_needing_build_manifest = [
-      # TODO(https://fxbug.dev/317385989): Remove when ffx no longer depends on
-      # the core manifest.
-      "core",
-
       # TODO(https://fxbug.dev/407083737): Remove when clidoc_run.py no longer
       # uses this format.
       "idk_host_tools_collection",
