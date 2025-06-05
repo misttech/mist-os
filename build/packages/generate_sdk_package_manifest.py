@@ -53,11 +53,11 @@ def handle_package_manifest(
     input_manifest_path: Path,
     sdk_file_map: Set[str],
     sdk_metadata: Dict[str, Any],
-    depfile_collection: Dict[Path, Path],
+    depfile_collection: Dict[Path, list[Path]],
     inputs: Dict[str, str],
     visited_subpackages: Set[Path],
-    is_subpackage=False,
-) -> Path:
+    is_subpackage: bool = False,
+) -> str:
     """
     For the given `input_manifest_path`, does the following:
     * Re-writes all source paths to be relative to SDK location,
@@ -193,12 +193,14 @@ def handle_package_manifest(
     # Write altered manifest to build output location.
     with open(build_output_manifest_path, "w") as manifest_file:
         json.dump(input_manifest, manifest_file, indent=2)
-        depfile_collection[build_output_manifest_path] = [input_manifest_path]
+        depfile_collection[Path(build_output_manifest_path)] = [
+            input_manifest_path
+        ]
 
     return sdk_output_manifest_path
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument(
@@ -210,7 +212,10 @@ def main():
         "--manifest", help="Path to the package manifest.", required=True
     )
     parser.add_argument(
-        "--output", help="Directory to write SDK objects to.", required=True
+        "--output",
+        type=Path,
+        help="Directory to write SDK objects to.",
+        required=True,
     )
     parser.add_argument("--api-level", help="Target API level.", required=True)
     parser.add_argument(
@@ -225,7 +230,7 @@ def main():
     # File containing file mappings. Each line in the file should contain a
     # "dest=source" mapping, similarly to file scopes.
     # See `sdk_atom` template definition of `file_list`.
-    sdk_file_map = set()
+    sdk_file_map: Set[str] = set()
 
     # Inputs used for directory naming.
     api_level, arch, distribution_name = (
@@ -246,8 +251,8 @@ def main():
         "type": "package",
     }
 
-    depfile_collection = {}
-    visited_subpackages = set()
+    depfile_collection: Dict[Path, list[Path]] = {}
+    visited_subpackages: Set[Path] = set()
 
     handle_package_manifest(
         args.output,
@@ -282,9 +287,11 @@ def main():
     if args.depfile:
         os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
         with open(args.depfile, "w") as f:
-            for out_file in sorted(depfile_collection.keys()):
-                in_file_list = sorted(depfile_collection[out_file])
-                f.write(f"{out_file}: {' '.join(in_file_list)}")
+            for output_file in sorted(depfile_collection.keys()):
+                in_file_list = sorted(depfile_collection[output_file])
+                f.write(
+                    f"{output_file}: {' '.join(list(map(str, in_file_list)))}"
+                )
 
     return 0
 
