@@ -131,10 +131,10 @@ template("platform_artifacts") {
                              "visibility",
                            ])
 
-    deps = [
-      ":${labels.bazel_inputs}",
-      ":${labels.platform_artifacts}",
-    ]
+    deps = [ ":${labels.bazel_inputs}" ]
+
+    # Make the platform artifacts available to upstream dependencies.
+    public_deps = [ ":${labels.platform_artifacts}" ]
 
     if (_check_production_eligibility) {
       assert_no_deps = [ "//build/validate:non_production_tag" ]
