@@ -9,10 +9,10 @@ use super::{
 };
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
-    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol,
+    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketFile, SocketPeer, SocketProtocol,
     SocketShutdownFlags, SocketType,
 };
-use crate::vfs::{Anon, FileSystemHandle, FsNode};
+use crate::vfs::{Anon, DowncastedFile, FileSystemHandle, FsNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
@@ -243,19 +243,11 @@ pub(in crate::security) fn check_socket_bind_access(
 pub(in crate::security) fn check_socket_connect_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-    socket: &Socket,
+    socket: DowncastedFile<'_, SocketFile>,
     _socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
-    let Some(socket_node) = socket.fs_node() else {
-        track_stub!(
-            TODO("https://fxbug.dev/414583985"),
-            "check_socket_connect_access without FsNode"
-        );
-        return Ok(());
-    };
-
     let current_sid = task_effective_sid(current_task);
-    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+    let FsNodeClass::Socket(socket_class) = socket.file().node().security_state.lock().class else {
         panic!("check_socket_connect_access called for non-Socket class")
     };
 
@@ -265,7 +257,7 @@ pub(in crate::security) fn check_socket_connect_access(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
-        &socket_node,
+        &socket.file().node(),
         CommonSocketPermission::Connect.for_class(socket_class),
         current_task.into(),
     )

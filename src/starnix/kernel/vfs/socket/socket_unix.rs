@@ -1126,7 +1126,13 @@ mod tests {
         )
         .expect("Failed to connect socket.");
         connecting_socket
-            .connect(&mut locked, &current_task, SocketPeer::Handle(socket.clone()))
+            .ops
+            .connect(
+                &mut locked.cast_locked(),
+                &connecting_socket,
+                &current_task,
+                SocketPeer::Handle(socket.clone()),
+            )
             .expect("Failed to connect socket.");
         assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(&mut locked, &current_task));
         let server_socket = socket.accept(&mut locked).unwrap();

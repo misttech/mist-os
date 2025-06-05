@@ -13,12 +13,12 @@ use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::socket::{
-    Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol, SocketShutdownFlags,
-    SocketType,
+    Socket, SocketAddress, SocketDomain, SocketFile, SocketPeer, SocketProtocol,
+    SocketShutdownFlags, SocketType,
 };
 use crate::vfs::{
-    Anon, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
-    FsString, Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
+    Anon, DirEntryHandle, DowncastedFile, FileHandle, FileObject, FileSystem, FileSystemHandle,
+    FsNode, FsStr, FsString, Mount, NamespaceNode, OutputBuffer, ValueOrSize, XattrOp,
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
@@ -974,7 +974,7 @@ pub fn check_socket_bind_access(
 /// Corresponds to the `socket_connect()` LSM hook.
 pub fn check_socket_connect_access(
     current_task: &CurrentTask,
-    socket: &Socket,
+    socket: DowncastedFile<'_, SocketFile>,
     socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_socket_connect_access");

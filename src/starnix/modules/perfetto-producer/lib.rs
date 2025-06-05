@@ -12,8 +12,7 @@ use perfetto_protos::perfetto::protos::{
 };
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::socket::{
-    resolve_unix_socket_address, Socket, SocketDomain, SocketFile, SocketPeer, SocketProtocol,
-    SocketType,
+    resolve_unix_socket_address, SocketDomain, SocketFile, SocketPeer, SocketProtocol, SocketType,
 };
 use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, log_info, track_stub};
@@ -196,7 +195,7 @@ where
         ) else {
             continue;
         };
-        let Ok(conn_socket) = Socket::get_from_file(&conn_file) else {
+        let Ok(conn_socket) = SocketFile::get_from_file(&conn_file) else {
             continue;
         };
         let Ok(peer_handle) =

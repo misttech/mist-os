@@ -347,8 +347,8 @@ pub fn sys_connect(
     user_socket_address: UserAddress,
     user_address_length: usize,
 ) -> Result<(), Errno> {
-    let client_file = current_task.files.get(fd)?;
-    let client_socket = Socket::get_from_file(&client_file)?;
+    let client = current_task.files.get(fd)?;
+    let client = SocketFile::get_from_file(&client)?;
     let address = parse_socket_address(current_task, user_socket_address, user_address_length)?;
     let peer = match address {
         SocketAddress::Unspecified => return error!(EAFNOSUPPORT),
@@ -371,9 +371,9 @@ pub fn sys_connect(
             SocketPeer::Address(address)
         }
     };
-    let result = client_socket.connect(locked, current_task, peer.clone());
+    let result = client.connect(locked, current_task, peer.clone());
 
-    if client_file.is_non_blocking() {
+    if client.file().is_non_blocking() {
         return result;
     }
 
@@ -382,17 +382,17 @@ pub fn sys_connect(
         // asynchronously.
         Err(errno) if errno.code == EINPROGRESS => {
             let waiter = Waiter::new();
-            client_socket.wait_async(
+            client.file().wait_async(
                 locked,
                 current_task,
                 &waiter,
                 FdEvents::POLLOUT,
                 WaitCallback::none(),
             );
-            if !client_socket.query_events(locked, current_task)?.contains(FdEvents::POLLOUT) {
+            if !client.file().query_events(locked, current_task)?.contains(FdEvents::POLLOUT) {
                 waiter.wait(locked, current_task)?;
             }
-            client_socket.connect(locked, current_task, peer)
+            client.connect(locked, current_task, peer)
         }
         // TODO(tbodt): Support blocking when the UNIX domain socket queue fills up. This one's
         // weird because as far as I can tell, removing a socket from the queue does not actually

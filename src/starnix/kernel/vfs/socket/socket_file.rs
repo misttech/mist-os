@@ -11,19 +11,19 @@ use crate::vfs::socket::{
     SocketType,
 };
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
-    FsNodeInfo,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, DowncastedFile, FileHandle, FileObject,
+    FileOps, FsNodeInfo,
 };
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
-use starnix_uapi::errors::Errno;
+use starnix_uapi::errors::{errno, Errno};
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use zx::HandleBased;
 
-use super::socket_fs;
+use super::{socket_fs, SocketPeer};
 
 pub struct SocketFile {
     pub(super) socket: SocketHandle,
@@ -90,6 +90,10 @@ impl SocketFile {
             open_flags,
             kernel_private,
         )
+    }
+
+    pub fn get_from_file(file: &FileHandle) -> Result<DowncastedFile<'_, Self>, Errno> {
+        file.downcast_file::<SocketFile>().ok_or_else(|| errno!(ENOTSOCK))
     }
 }
 
@@ -312,5 +316,20 @@ impl SocketFile {
             result?;
         }
         Ok(read_info)
+    }
+}
+
+impl DowncastedFile<'_, SocketFile> {
+    pub fn connect<L>(
+        self,
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        security::check_socket_connect_access(current_task, self, &peer)?;
+        self.socket.ops.connect(&mut locked.cast_locked(), &self.socket, current_task, peer)
     }
 }

@@ -12,8 +12,7 @@ use prost::Message;
 use starnix_core::task::{CurrentTask, EventHandler, Waiter};
 use starnix_core::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use starnix_core::vfs::socket::{
-    resolve_unix_socket_address, Socket, SocketDomain, SocketFile, SocketPeer, SocketProtocol,
-    SocketType,
+    resolve_unix_socket_address, SocketDomain, SocketFile, SocketPeer, SocketProtocol, SocketType,
 };
 use starnix_core::vfs::{FileHandle, FsStr};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
@@ -267,10 +266,10 @@ impl Consumer {
             SocketProtocol::from_raw(0),
             /* kernel_private=*/ false,
         )?;
-        let conn_socket = Socket::get_from_file(&conn_file)?;
+        let conn = SocketFile::get_from_file(&conn_file)?;
         let peer =
             SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, socket_path)?);
-        conn_socket.connect(locked, current_task, peer)?;
+        conn.connect(locked, current_task, peer)?;
         let mut frame_reader = FrameReader::new(conn_file.clone());
         let mut request_id = 1;
 
@@ -289,7 +288,7 @@ impl Consumer {
         );
         bind_service_message.encode(&mut bind_service_bytes)?;
         let mut bind_service_buffer: VecInputBuffer = bind_service_bytes.into();
-        conn_file.write(locked, current_task, &mut bind_service_buffer)?;
+        conn.file().write(locked, current_task, &mut bind_service_buffer)?;
 
         let reply_frame = frame_reader.next_frame_blocking(locked, current_task)?;
 

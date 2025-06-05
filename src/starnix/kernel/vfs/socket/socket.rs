@@ -340,7 +340,7 @@ pub trait SocketOps: Send + Sync + AsAny {
 
 /// A `Socket` represents one endpoint of a bidirectional communication channel.
 pub struct Socket {
-    ops: Box<dyn SocketOps>,
+    pub(super) ops: Box<dyn SocketOps>,
 
     /// The domain of this socket.
     pub domain: SocketDomain,
@@ -1053,19 +1053,6 @@ impl Socket {
         self.ops.bind(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, socket_address)
     }
 
-    pub fn connect<L>(
-        self: &SocketHandle,
-        locked: &mut Locked<L>,
-        current_task: &CurrentTask,
-        peer: SocketPeer,
-    ) -> Result<(), Errno>
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
-        security::check_socket_connect_access(current_task, self, &peer)?;
-        self.ops.connect(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, peer)
-    }
-
     pub fn listen<L>(
         &self,
         locked: &mut Locked<L>,
@@ -1461,7 +1448,14 @@ mod tests {
             SocketProtocol::default(),
         )
         .expect("Failed to connect socket.");
-        send.connect(&mut locked, &current_task, SocketPeer::Handle(rec_dgram.clone())).unwrap();
+        send.ops
+            .connect(
+                &mut locked.cast_locked(),
+                &send,
+                &current_task,
+                SocketPeer::Handle(rec_dgram.clone()),
+            )
+            .unwrap();
         let mut source_iter = VecInputBuffer::new(&xfer_bytes);
         send.write(&mut locked, &current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
         assert_eq!(source_iter.available(), 0);
