@@ -15,23 +15,22 @@ CPPFLAGS_ADDITIONAL=""
 LDFLAGS_ADDITIONAL=""
 LINUX_LIBRARY=""
 
-for ARGUMENT in "$@"
-do
-    KEY=$(echo "$ARGUMENT" | cut -f1 -d=)
-    VALUE=$(echo "$ARGUMENT" | cut -f2- -d=)
+for ARGUMENT in "$@"; do
+  KEY=$(echo "$ARGUMENT" | cut -f1 -d=)
+  VALUE=$(echo "$ARGUMENT" | cut -f2- -d=)
 
-    case "$KEY" in
-      FUCHSIA_OUT_CONFIG_H) FUCHSIA_OUT_CONFIG_H="$VALUE" ;;
-      LINUX_OUT_CONFIG_H) LINUX_OUT_CONFIG_H="$VALUE" ;;
-      FXSET_WITH_ADDITIONAL) FXSET_WITH_ADDITIONAL="$VALUE" ;;
-      FXBUILD_WITH_ADDITIONAL) FXBUILD_WITH_ADDITIONAL="$VALUE" ;;
-      CPPFLAGS_ADDITIONAL) CPPFLAGS_ADDITIONAL="$VALUE" ;;
-      LDFLAGS_ADDITIONAL) LDFLAGS_ADDITIONAL="$VALUE" ;;
-      LINUX_LIBRARY) LINUX_LIBRARY="$VALUE" ;;
-      REPO_ZIP_URL) REPO_URL="$VALUE" ;;
-      REPO_EXTRACTED_FOLDER) REPO_EXTRACTED_FOLDER="$VALUE" ;;
-      *)
-        cat <<EOF
+  case "$KEY" in
+  FUCHSIA_OUT_CONFIG_H) FUCHSIA_OUT_CONFIG_H="$VALUE" ;;
+  LINUX_OUT_CONFIG_H) LINUX_OUT_CONFIG_H="$VALUE" ;;
+  FXSET_WITH_ADDITIONAL) FXSET_WITH_ADDITIONAL="$VALUE" ;;
+  FXBUILD_WITH_ADDITIONAL) FXBUILD_WITH_ADDITIONAL="$VALUE" ;;
+  CPPFLAGS_ADDITIONAL) CPPFLAGS_ADDITIONAL="$VALUE" ;;
+  LDFLAGS_ADDITIONAL) LDFLAGS_ADDITIONAL="$VALUE" ;;
+  LINUX_LIBRARY) LINUX_LIBRARY="$VALUE" ;;
+  REPO_ZIP_URL) REPO_URL="$VALUE" ;;
+  REPO_EXTRACTED_FOLDER) REPO_EXTRACTED_FOLDER="$VALUE" ;;
+  *)
+    cat <<EOF
 Variables:
 
   FUCHSIA_OUT_CONFIG_H        Path to the generated config.h for fuchsia (required)
@@ -44,11 +43,12 @@ Variables:
   REPO_ZIP_URL                The URL for the upstream repo (required)
   REPO_EXTRACTED_FOLDER       The folder that the repo unzips to (required)
 EOF
-        exit 1
-    esac
+    exit 1
+    ;;
+  esac
 done
 
-fx set core.x64 --auto-dir $FXSET_WITH_ADDITIONAL
+fx set core.x64 $FXSET_WITH_ADDITIONAL
 fx build sdk:zircon_sysroot $FXBUILD_WITH_ADDITIONAL
 
 readonly BUILD_DIR="$FUCHSIA_OUT_DIR/core.x64"
@@ -85,11 +85,10 @@ COPYRIGHT="// Copyright $(date +"%Y") The Fuchsia Authors. All rights reserved.
 // found in the LICENSE file.
 "
 
-cat <(echo "$COPYRIGHT") "$TMP_REPO_EXTRACTED/config.h" > "$FUCHSIA_OUT_CONFIG_H"
+cat <(echo "$COPYRIGHT") "$TMP_REPO_EXTRACTED/config.h" >"$FUCHSIA_OUT_CONFIG_H"
 
 LDFLAGS="$LDFLAGS_ADDITIONAL"
-if [ "$LINUX_LIBRARY" ]
-then
+if [ "$LINUX_LIBRARY" ]; then
   LDFLAGS="-L$BUILD_DIR/host_x64/obj/$LINUX_LIBRARY $LDFLAGS"
 fi
 ./configure \
@@ -98,4 +97,4 @@ fi
   CPPFLAGS="$CPPFLAGS_ADDITIONAL" \
   LDFLAGS="$LDFLAGS"
 
-cat <(echo "$COPYRIGHT") "$TMP_REPO_EXTRACTED/config.h" > "$LINUX_OUT_CONFIG_H"
+cat <(echo "$COPYRIGHT") "$TMP_REPO_EXTRACTED/config.h" >"$LINUX_OUT_CONFIG_H"
