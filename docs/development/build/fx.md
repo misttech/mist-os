@@ -228,12 +228,6 @@ problem and any diagnostics such as build logs. Then use these commands to recov
 * `fx clean-build` is equivalent to `fx clean`, then `fx build`.
 * `fx cleandead-build` is equivalent to `fx cleandead`, then `fx build`
 
-If you find yourself changing configurations and cleaning your output directory
-often then consider using `fx set --auto-dir` instead. In this mode, `fx set` will
-choose different output directories for different configurations. Note that this
-will increase your disk usage and you may need to delete old output directories
-that are no longer needed.
-
 ### Enabling incremental package rebuilds
 
 By default, `fx build` builds all packages for the specified product configuration.

@@ -11,7 +11,7 @@ fuchsia-controller. You can build and run the program with the following
 commands:
 
 ```sh
-fx set --auto-dir minimal.x64 --with-host "//src/developer/ffx/lib/fuchsia-controller:example"
+fx set minimal.x64 --with-host "//src/developer/ffx/lib/fuchsia-controller:example"
 fx build
 ffx emu start -H --net user --name 'emulator-a'
 ffx emu start -H --net user --name 'emulator-b'

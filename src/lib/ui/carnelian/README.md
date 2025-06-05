@@ -20,7 +20,6 @@ with Scenic.
         --with //src/lib/ui/carnelian:carnelian-tests \
         --with //src/lib/ui/carnelian:carnelian-layout-tests \
         --release \
-        --auto-dir \
         --args=rust_cap_lints='"warn"' \
         --cargo-toml-gen
 ```

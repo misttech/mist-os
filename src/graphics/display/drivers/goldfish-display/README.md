@@ -45,7 +45,7 @@ These instructions will work with a `workbench_eng.x64` build that includes the
 target is also recommended, as it builds the automated unit tests.
 
 ```posix-terminal
-fx set --auto-dir workbench_eng.x64 --with //src/graphics/display:tools \
+fx set workbench_eng.x64 --with //src/graphics/display:tools \
     --with //src/graphics/display:tests
 ```
 

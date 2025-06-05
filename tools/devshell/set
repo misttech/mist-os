@@ -7,7 +7,7 @@
 ### set up a build directory
 
 ## usage: fx set PRODUCT.BOARD [--with GNLABEL1,GNLABEL2,...]
-##               [--release] [--auto-dir] [--args ARG] [--variant VARIANT]
+##               [--release] [--args ARG] [--variant VARIANT]
 ##               [--with-test GNLABEL1,GNLABEL2,...]
 ##
 ## where PRODUCT is an entry from `//products` or `//vendor/*/products` and
