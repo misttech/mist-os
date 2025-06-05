@@ -293,9 +293,8 @@ mod tests {
     #[test]
     fn test_parse_serialize() {
         const PAYLOAD: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let mut pkt = (&PAYLOAD[..])
-            .into_serializer()
-            .encapsulate(NetbootPacketBuilder::new(Opcode::Ack.into(), 3, 4))
+        let mut pkt = NetbootPacketBuilder::new(Opcode::Ack.into(), 3, 4)
+            .wrap_body((&PAYLOAD[..]).into_serializer())
             .serialize_vec_outer()
             .expect("failed to serialize");
         let parsed = pkt.parse::<NetbootPacket<_>>().expect("failed to parse");

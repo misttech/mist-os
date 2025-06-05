@@ -349,19 +349,19 @@ async fn bridged_packet_test(name: &str) {
             let net_types_mac = |fnet::MacAddress { octets }| net_types::ethernet::Mac::new(octets);
 
             let bytes = Buf::new(&mut [0; 8][..], ..)
-                .encapsulate(UdpPacketBuilder::new(
+                .wrap_in(UdpPacketBuilder::new(
                     remote_addr,
                     local_addr,
                     Some(NonZeroU16::new(2342).expect("non zero value should be valid")),
                     NonZeroU16::new(9876).expect("non zero value should be valid"),
                 ))
-                .encapsulate(Ipv4PacketBuilder::new(
+                .wrap_in(Ipv4PacketBuilder::new(
                     remote_addr,
                     local_addr,
                     64, /* ttl */
                     Ipv4Proto::Proto(IpProto::Udp),
                 ))
-                .encapsulate(EthernetFrameBuilder::new(
+                .wrap_in(EthernetFrameBuilder::new(
                     net_types_mac(REMOTE_MAC),
                     net_types_mac(*local_mac),
                     EtherType::Ipv4,

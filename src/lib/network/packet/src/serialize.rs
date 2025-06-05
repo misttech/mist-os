@@ -818,13 +818,6 @@ pub struct Nested<I, O> {
 }
 
 impl<I, O> Nested<I, O> {
-    /// Creates a new `Nestable` instance with the `outer` wrapping the
-    /// `inner`. Normally `outer` should be a `PacketBuilder` and `inner`
-    /// should implement either `Serializer` or `PartialSerializer`.
-    pub fn new(inner: I, outer: O) -> Nested<I, O> {
-        Nested { inner, outer }
-    }
-
     /// Consumes this `Nested` and returns the inner object, discarding the
     /// outer one.
     #[inline]
@@ -1547,13 +1540,6 @@ pub trait Serializer: Sized {
     #[inline]
     fn wrap_in<B: PacketBuilder>(self, outer: B) -> Nested<Self, B> {
         outer.wrap_body(self)
-    }
-
-    /// DEPRECATED. [`PacketBuilder::wrap_body()`] or [`Serializer::wrap_in()`]
-    /// should be used instead of this method.
-    #[inline]
-    fn encapsulate<B>(self, outer: B) -> Nested<Self, B> {
-        Nested { inner: self, outer }
     }
 
     /// Creates a new `Serializer` which will enforce a size limit.

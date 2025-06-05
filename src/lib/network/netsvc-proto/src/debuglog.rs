@@ -161,10 +161,9 @@ mod tests {
     fn test_log_packet() {
         const LOG_DATA: &'static str = "some log data";
         const NODENAME: &'static str = "my node";
-        let mut log = LOG_DATA
-            .as_bytes()
-            .into_serializer()
-            .encapsulate(LogPacketBuilder::new(3, NODENAME).unwrap())
+        let mut log = LogPacketBuilder::new(3, NODENAME)
+            .unwrap()
+            .wrap_body(LOG_DATA.as_bytes().into_serializer())
             .serialize_vec_outer()
             .unwrap_or_else(|_| panic!("Failed to serialize"));
         let packet = log.parse::<DebugLogPacket<_>>().expect("Failed to parse");

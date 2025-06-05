@@ -49,7 +49,7 @@ use netstack3_ip::testutil::IpCounterExpectations;
 use netstack3_ip::{
     AddableEntry, AddableEntryEither, AddableMetric, ResolveRouteError, RouteResolveOptions,
 };
-use packet::{Buf, Serializer};
+use packet::{Buf, PacketBuilder, Serializer};
 use packet_formats::ip::IpProto;
 use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::testutil::ArpPacketInfo;
@@ -1007,16 +1007,16 @@ fn notify_on_dad_failure_ipv4(case: Ipv4DadFailureTestCase, expect_conflict: boo
 }
 
 fn receive_ipv4_packet(ctx: &mut FakeCtx, device_id: &DeviceId<FakeBindingsCtx>) {
-    let buf = Buf::new(vec![0; 10], ..)
-        .encapsulate(Ipv4PacketBuilder::new(
-            Ipv4::TEST_ADDRS.remote_ip,
-            Ipv4::TEST_ADDRS.local_ip,
-            64,
-            IpProto::Udp.into(),
-        ))
-        .serialize_vec_outer()
-        .unwrap()
-        .into_inner();
+    let buf = Ipv4PacketBuilder::new(
+        Ipv4::TEST_ADDRS.remote_ip,
+        Ipv4::TEST_ADDRS.local_ip,
+        64,
+        IpProto::Udp.into(),
+    )
+    .wrap_body(Buf::new(vec![0; 10], ..))
+    .serialize_vec_outer()
+    .unwrap()
+    .into_inner();
 
     ctx.test_api().receive_ip_packet::<Ipv4, _>(
         &device_id,
