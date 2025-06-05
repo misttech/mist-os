@@ -1129,7 +1129,8 @@ zx_status_t VmObjectPaged::ZeroPartialPage(uint64_t page_base_offset, uint64_t z
                              // but we don't expect to be doing this very often.
                              memset(dst, 0, len);
                              return UserCopyCaptureFaultsResult{ZX_OK};
-                           });
+                           })
+      .first;
 }
 
 zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track) {
@@ -1274,13 +1275,15 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
 // routine. The copy routine has the expected type signature of: (void *ptr, uint64_t offset,
 //  uint64_t len) -> UserCopyCaptureFaultsResult.
 template <typename T>
-zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool write,
-                                             VmObjectReadWriteOptions options, T copyfunc) {
+ktl::pair<zx_status_t, size_t> VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len,
+                                                                bool write,
+                                                                VmObjectReadWriteOptions options,
+                                                                T copyfunc) {
   canary_.Assert();
 
   uint64_t end_offset;
   if (add_overflow(offset, len, &end_offset)) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return {ZX_ERR_OUT_OF_RANGE, 0};
   }
 
   // Track our two offsets.
@@ -1302,19 +1305,19 @@ zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool w
       __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_pages_.get());
       Guard<CriticalMutex> guard{AssertOrderedLock, lock(), cow_pages_->lock_order()};
       if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
-        return ZX_ERR_BAD_STATE;
+        return {ZX_ERR_BAD_STATE, src_offset - offset};
       }
       if (end_offset > size_locked()) {
         if (!!(options & VmObjectReadWriteOptions::TrimLength)) {
           if (src_offset >= size_locked()) {
-            return ZX_OK;
+            return {ZX_OK, src_offset - offset};
           }
           end_offset = size_locked();
         } else {
-          return ZX_ERR_OUT_OF_RANGE;
+          return {ZX_ERR_OUT_OF_RANGE, src_offset - offset};
         }
       } else if (src_offset >= end_offset) {
-        return ZX_OK;
+        return {ZX_OK, src_offset - offset};
       }
 
       const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
@@ -1326,7 +1329,7 @@ zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool w
       __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
           GetLookupCursorLocked(first_page_offset, remaining_pages * PAGE_SIZE);
       if (cursor.is_error()) {
-        return cursor.status_value();
+        return {cursor.status_value(), src_offset - offset};
       }
       // Performing explicit accesses by request of the user, so disable zero forking.
       cursor->DisableZeroFork();
@@ -1413,11 +1416,11 @@ zx_status_t VmObjectPaged::ReadWriteInternal(uint64_t offset, size_t len, bool w
       }
     }
     if (status != ZX_OK) {
-      return status;
+      return {status, src_offset - offset};
     }
   } while (src_offset < end_offset);
 
-  return ZX_OK;
+  return {ZX_OK, src_offset - offset};
 }
 
 zx_status_t VmObjectPaged::Read(void* _ptr, uint64_t offset, size_t len) {
@@ -1440,7 +1443,7 @@ zx_status_t VmObjectPaged::Read(void* _ptr, uint64_t offset, size_t len) {
     lockdep::AssertNoLocksHeld();
   }
 
-  return ReadWriteInternal(offset, len, false, VmObjectReadWriteOptions::None, read_routine);
+  return ReadWriteInternal(offset, len, false, VmObjectReadWriteOptions::None, read_routine).first;
 }
 
 zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) {
@@ -1462,7 +1465,7 @@ zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) 
     lockdep::AssertNoLocksHeld();
   }
 
-  return ReadWriteInternal(offset, len, true, VmObjectReadWriteOptions::None, write_routine);
+  return ReadWriteInternal(offset, len, true, VmObjectReadWriteOptions::None, write_routine).first;
 }
 
 zx_status_t VmObjectPaged::CacheOp(uint64_t offset, uint64_t len, CacheOpType type) {
@@ -1579,24 +1582,15 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
   return ZX_OK;
 }
 
-zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, size_t len,
-                                    VmObjectReadWriteOptions options, size_t* out_actual) {
+ktl::pair<zx_status_t, size_t> VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset,
+                                                       size_t len,
+                                                       VmObjectReadWriteOptions options) {
   canary_.Assert();
 
-  if (out_actual != nullptr) {
-    *out_actual = 0;
-  }
-
   // read routine that uses copy_to_user
-  auto read_routine = [ptr, out_actual](const char* src, size_t offset,
-                                        size_t len) -> UserCopyCaptureFaultsResult {
-    __UNINITIALIZED auto copy_result =
-        ptr.byte_offset(offset).copy_array_to_user_capture_faults(src, len);
-
-    if (copy_result.status == ZX_OK && out_actual) {
-      *out_actual += len;
-    }
-    return copy_result;
+  auto read_routine = [ptr](const char* src, size_t offset,
+                            size_t len) -> UserCopyCaptureFaultsResult {
+    return ptr.byte_offset(offset).copy_array_to_user_capture_faults(src, len);
   };
 
   if (can_block_on_page_requests()) {
@@ -1606,26 +1600,18 @@ zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, siz
   return ReadWriteInternal(offset, len, false, options, read_routine);
 }
 
-zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offset, size_t len,
-                                     VmObjectReadWriteOptions options, size_t* out_actual,
-                                     const OnWriteBytesTransferredCallback& on_bytes_transferred) {
+ktl::pair<zx_status_t, size_t> VmObjectPaged::WriteUser(
+    user_in_ptr<const char> ptr, uint64_t offset, size_t len, VmObjectReadWriteOptions options,
+    const OnWriteBytesTransferredCallback& on_bytes_transferred) {
   canary_.Assert();
 
-  if (out_actual != nullptr) {
-    *out_actual = 0;
-  }
-
   // write routine that uses copy_from_user
-  auto write_routine = [ptr, base_vmo_offset = offset, out_actual, &on_bytes_transferred](
+  auto write_routine = [ptr, base_vmo_offset = offset, &on_bytes_transferred](
                            char* dst, size_t offset, size_t len) -> UserCopyCaptureFaultsResult {
     __UNINITIALIZED auto copy_result =
         ptr.byte_offset(offset).copy_array_from_user_capture_faults(dst, len);
 
     if (copy_result.status == ZX_OK) {
-      if (out_actual != nullptr) {
-        *out_actual += len;
-      }
-
       if (on_bytes_transferred) {
         on_bytes_transferred(base_vmo_offset + offset, len);
       }
@@ -1640,30 +1626,28 @@ zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offse
   return ReadWriteInternal(offset, len, true, options, write_routine);
 }
 
-zx_status_t VmObjectPaged::ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len,
-                                          size_t* out_actual) {
+ktl::pair<zx_status_t, size_t> VmObjectPaged::ReadUserVector(user_out_iovec_t vec, uint64_t offset,
+                                                             size_t len) {
   if (len == 0u) {
-    return ZX_OK;
+    return {ZX_OK, 0};
   }
   if (len > UINT64_MAX - offset) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return {ZX_ERR_OUT_OF_RANGE, 0};
   }
 
+  size_t total = 0;
   zx_status_t status = vec.ForEach([&](user_out_ptr<char> ptr, size_t capacity) {
     if (capacity > len) {
       capacity = len;
     }
 
-    size_t chunk_actual = 0;
-    zx_status_t status =
-        ReadUser(ptr, offset, capacity, VmObjectReadWriteOptions::None, &chunk_actual);
+    auto [read_status, chunk_actual] =
+        ReadUser(ptr, offset, capacity, VmObjectReadWriteOptions::None);
 
     // Always add |chunk_actual| since some bytes may have been transferred, even on error
-    if (out_actual != nullptr) {
-      *out_actual += chunk_actual;
-    }
-    if (status != ZX_OK) {
-      return status;
+    total += chunk_actual;
+    if (read_status != ZX_OK) {
+      return read_status;
     }
 
     DEBUG_ASSERT(chunk_actual == capacity);
@@ -1674,34 +1658,33 @@ zx_status_t VmObjectPaged::ReadUserVector(user_out_iovec_t vec, uint64_t offset,
   });
 
   // Return |ZX_ERR_BUFFER_TOO_SMALL| if all of |len| was not transferred.
-  return (status == ZX_OK && len > 0) ? ZX_ERR_BUFFER_TOO_SMALL : status;
+  status = (status == ZX_OK && len > 0) ? ZX_ERR_BUFFER_TOO_SMALL : status;
+  return {status, total};
 }
 
-zx_status_t VmObjectPaged::WriteUserVector(
-    user_in_iovec_t vec, uint64_t offset, size_t len, size_t* out_actual,
+ktl::pair<zx_status_t, size_t> VmObjectPaged::WriteUserVector(
+    user_in_iovec_t vec, uint64_t offset, size_t len,
     const OnWriteBytesTransferredCallback& on_bytes_transferred) {
   if (len == 0u) {
-    return ZX_OK;
+    return {ZX_OK, 0};
   }
   if (len > UINT64_MAX - offset) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return {ZX_ERR_OUT_OF_RANGE, 0};
   }
 
+  size_t total = 0;
   zx_status_t status = vec.ForEach([&](user_in_ptr<const char> ptr, size_t capacity) {
     if (capacity > len) {
       capacity = len;
     }
 
-    size_t chunk_actual = 0;
-    zx_status_t status = WriteUser(ptr, offset, capacity, VmObjectReadWriteOptions::None,
-                                   &chunk_actual, on_bytes_transferred);
+    auto [write_status, chunk_actual] =
+        WriteUser(ptr, offset, capacity, VmObjectReadWriteOptions::None, on_bytes_transferred);
 
     // Always add |chunk_actual| since some bytes may have been transferred, even on error
-    if (out_actual != nullptr) {
-      *out_actual += chunk_actual;
-    }
-    if (status != ZX_OK) {
-      return status;
+    total += chunk_actual;
+    if (write_status != ZX_OK) {
+      return write_status;
     }
 
     DEBUG_ASSERT(chunk_actual == capacity);
@@ -1712,7 +1695,8 @@ zx_status_t VmObjectPaged::WriteUserVector(
   });
 
   // Return |ZX_ERR_BUFFER_TOO_SMALL| if all of |len| was not transferred.
-  return (status == ZX_OK && len > 0) ? ZX_ERR_BUFFER_TOO_SMALL : status;
+  status = (status == ZX_OK && len > 0) ? ZX_ERR_BUFFER_TOO_SMALL : status;
+  return {status, total};
 }
 
 zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {

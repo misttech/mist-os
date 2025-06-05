@@ -91,18 +91,17 @@ zx_status_t sys_stream_writev(zx_handle_t handle, uint32_t options,
 
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<StreamDispatcher> stream;
-  zx_status_t status =
-      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &stream);
-  if (status != ZX_OK) {
-    return status;
+  {
+    zx_status_t status =
+        up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &stream);
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
-  size_t actual = 0;
-  if (options & ZX_STREAM_APPEND) {
-    status = stream->AppendVector(make_user_in_iovec(vector, vector_count), &actual);
-  } else {
-    status = stream->WriteVector(make_user_in_iovec(vector, vector_count), &actual);
-  }
+  auto [status, actual] = options & ZX_STREAM_APPEND
+                              ? stream->AppendVector(make_user_in_iovec(vector, vector_count))
+                              : stream->WriteVector(make_user_in_iovec(vector, vector_count));
 
   if (status == ZX_OK && out_actual) {
     status = out_actual.copy_to_user(actual);
@@ -127,14 +126,15 @@ zx_status_t sys_stream_writev_at(zx_handle_t handle, uint32_t options, zx_off_t 
 
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<StreamDispatcher> stream;
-  zx_status_t status =
-      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &stream);
-  if (status != ZX_OK) {
-    return status;
+  {
+    zx_status_t status =
+        up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_WRITE, &stream);
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
-  size_t actual = 0;
-  status = stream->WriteVectorAt(make_user_in_iovec(vector, vector_count), offset, &actual);
+  auto [status, actual] = stream->WriteVectorAt(make_user_in_iovec(vector, vector_count), offset);
 
   if (status == ZX_OK && out_actual) {
     status = out_actual.copy_to_user(actual);
@@ -158,14 +158,15 @@ zx_status_t sys_stream_readv(zx_handle_t handle, uint32_t options, user_out_ptr<
 
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<StreamDispatcher> stream;
-  zx_status_t status =
-      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_READ, &stream);
-  if (status != ZX_OK) {
-    return status;
+  {
+    zx_status_t status =
+        up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_READ, &stream);
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
-  size_t actual = 0;
-  status = stream->ReadVector(make_user_out_iovec(vector, vector_count), &actual);
+  auto [status, actual] = stream->ReadVector(make_user_out_iovec(vector, vector_count));
 
   if (status == ZX_OK && out_actual) {
     status = out_actual.copy_to_user(actual);
@@ -190,14 +191,15 @@ zx_status_t sys_stream_readv_at(zx_handle_t handle, uint32_t options, zx_off_t o
 
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<StreamDispatcher> stream;
-  zx_status_t status =
-      up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_READ, &stream);
-  if (status != ZX_OK) {
-    return status;
+  {
+    zx_status_t status =
+        up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_READ, &stream);
+    if (status != ZX_OK) {
+      return status;
+    }
   }
 
-  size_t actual = 0;
-  status = stream->ReadVectorAt(make_user_out_iovec(vector, vector_count), offset, &actual);
+  auto [status, actual] = stream->ReadVectorAt(make_user_out_iovec(vector, vector_count), offset);
 
   if (status == ZX_OK && out_actual) {
     status = out_actual.copy_to_user(actual);

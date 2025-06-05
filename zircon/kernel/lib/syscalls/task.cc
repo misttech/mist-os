@@ -455,9 +455,8 @@ zx_status_t sys_process_read_memory(zx_handle_t handle, zx_vaddr_t vaddr, user_o
     buffer_size =
         ktl::min(buffer_size, vm_mapping->size_locked() - (vaddr - vm_mapping->base_locked()));
   }
-  size_t out_actual = 0;
-  zx_status_t st = vmo->ReadUser(buffer.reinterpret<char>(), offset, buffer_size,
-                                 VmObjectReadWriteOptions::TrimLength, &out_actual);
+  auto [st, out_actual] = vmo->ReadUser(buffer.reinterpret<char>(), offset, buffer_size,
+                                        VmObjectReadWriteOptions::TrimLength);
   if (st != ZX_OK) {
     // Do not write |out_actual| to |actual| on error
     return st;
@@ -533,10 +532,9 @@ zx_status_t sys_process_write_memory(zx_handle_t handle, zx_vaddr_t vaddr,
     buffer_size =
         ktl::min(buffer_size, vm_mapping->size_locked() - (vaddr - vm_mapping->base_locked()));
   }
-  size_t out_actual = 0;
-  zx_status_t st = vmo->WriteUser(buffer.reinterpret<const char>(), offset, buffer_size,
-                                  VmObjectReadWriteOptions::TrimLength, &out_actual,
-                                  /*on_bytes_transferred=*/nullptr);
+  auto [st, out_actual] = vmo->WriteUser(buffer.reinterpret<const char>(), offset, buffer_size,
+                                         VmObjectReadWriteOptions::TrimLength,
+                                         /*on_bytes_transferred=*/nullptr);
   if (st != ZX_OK) {
     // Do not write |out_actual| to |actual| on error~
     return st;

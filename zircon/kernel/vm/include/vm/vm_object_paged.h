@@ -216,14 +216,15 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   zx_status_t Lookup(uint64_t offset, uint64_t len, VmObject::LookupFunction lookup_fn) override;
   zx_status_t LookupContiguous(uint64_t offset, uint64_t len, paddr_t* out_paddr) override;
 
-  zx_status_t ReadUser(user_out_ptr<char> ptr, uint64_t offset, size_t len,
-                       VmObjectReadWriteOptions options, size_t* out_actual) override;
-  zx_status_t WriteUser(user_in_ptr<const char> ptr, uint64_t offset, size_t len,
-                        VmObjectReadWriteOptions options, size_t* out_actual,
-                        const OnWriteBytesTransferredCallback& on_bytes_transferred) override;
-  zx_status_t ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len, size_t* out_actual);
-  zx_status_t WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len, size_t* out_actual,
-                              const OnWriteBytesTransferredCallback& on_bytes_transferred);
+  ktl::pair<zx_status_t, size_t> ReadUser(user_out_ptr<char> ptr, uint64_t offset, size_t len,
+                                          VmObjectReadWriteOptions options) override;
+  ktl::pair<zx_status_t, size_t> WriteUser(
+      user_in_ptr<const char> ptr, uint64_t offset, size_t len, VmObjectReadWriteOptions options,
+      const OnWriteBytesTransferredCallback& on_bytes_transferred) override;
+  ktl::pair<zx_status_t, size_t> ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len);
+  ktl::pair<zx_status_t, size_t> WriteUserVector(
+      user_in_iovec_t vec, uint64_t offset, size_t len,
+      const OnWriteBytesTransferredCallback& on_bytes_transferred);
 
   zx_status_t TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) override;
   zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
@@ -407,8 +408,8 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   // internal read/write routine that takes a templated copy function to help share some code
   template <typename T>
-  zx_status_t ReadWriteInternal(uint64_t offset, size_t len, bool write,
-                                VmObjectReadWriteOptions options, T copyfunc);
+  ktl::pair<zx_status_t, size_t> ReadWriteInternal(uint64_t offset, size_t len, bool write,
+                                                   VmObjectReadWriteOptions options, T copyfunc);
 
   // Zeroes a partial range in a page. The page to zero is looked up using page_base_offset, and
   // will be committed if needed. The range of [zero_start_offset, zero_end_offset) is relative to

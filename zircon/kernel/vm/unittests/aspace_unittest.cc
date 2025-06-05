@@ -382,10 +382,9 @@ static bool vmaspace_usercopy_accessed_fault_test() {
                       VmAspace::TerminalAction::UpdateAgeAndHarvest);
 
   // Read from the VMO into the mapping that has been harvested.
-  size_t read_actual = 0;
-  status = vmo->ReadUser(mem->user_out<char>(), 0, sizeof(char), VmObjectReadWriteOptions::None,
-                         &read_actual);
-  ASSERT_EQ(status, ZX_OK);
+  auto [read_status, read_actual] =
+      vmo->ReadUser(mem->user_out<char>(), 0, sizeof(char), VmObjectReadWriteOptions::None);
+  ASSERT_EQ(read_status, ZX_OK);
   ASSERT_EQ(read_actual, sizeof(char));
 
   END_TEST;
@@ -1905,9 +1904,8 @@ static bool vm_mapping_page_fault_range_test() {
 
     ASSERT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
 
-    size_t read_actual = 0;
-    zx_status_t status = vmo->ReadUser(mapping->user_out<char>(), 0, sizeof(char[PAGE_SIZE * 2]),
-                                       VmObjectReadWriteOptions::None, &read_actual);
+    auto [status, read_actual] = vmo->ReadUser(
+        mapping->user_out<char>(), 0, sizeof(char[PAGE_SIZE * 2]), VmObjectReadWriteOptions::None);
     ASSERT_EQ(status, ZX_OK);
     ASSERT_EQ(read_actual, sizeof(char[PAGE_SIZE * 2]));
 
