@@ -6,16 +6,13 @@ use crate::device::constants::{
     BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
     LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
 };
-use crate::device::{Device, DeviceTag, Parent};
+use crate::device::{Device, DeviceTag};
 use crate::environment::Environment;
 use anyhow::{bail, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_block::Flag as BlockFlag;
 use fs_management::format::constants::ALL_FVM_LABELS;
 use fs_management::format::DiskFormat;
-
-mod config_matcher;
-pub use config_matcher::get_config_matchers;
 
 #[async_trait]
 pub trait Matcher: Send {
@@ -40,21 +37,7 @@ pub struct Matchers {
 impl Matchers {
     /// Create a new set of matchers. This essentially describes the expected partition layout for
     /// a device.
-    #[cfg(test)]
     pub fn new(config: &fshost_config::Config) -> Self {
-        Self::new_with_extra_matchers(config, Vec::new())
-    }
-
-    /// The extra matchers here get added _almost_ at the end - the publisher matcher is always
-    /// last since it catches anything that isn't matched by anything else.
-    /// TODO(https://fxbug.dev/417772609): There is likely a better way to do this, but I think the
-    /// exact strategy will be informed by how test usage of semantic labels turns out. It's
-    /// possible we will want to add these matchers dynamically for tests, which will change how
-    /// this is done, otherwise it should probably all be wrapped up in a unified config struct.
-    pub fn new_with_extra_matchers(
-        config: &fshost_config::Config,
-        mut extra_matchers: Vec<Box<dyn Matcher>>,
-    ) -> Self {
         let mut matchers = Vec::<Box<dyn Matcher>>::new();
 
         // NB: Order is important here!
@@ -115,8 +98,6 @@ impl Matchers {
             )));
         }
 
-        matchers.append(&mut extra_matchers);
-
         matchers.push(Box::new(PublisherMatcher::new()));
 
         Matchers { matchers }
@@ -174,7 +155,7 @@ impl PublisherMatcher {
 #[async_trait]
 impl Matcher for PublisherMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
-        device.parent() == Parent::Dev
+        !device.is_managed()
     }
 
     async fn process_device(
@@ -613,9 +594,8 @@ mod tests {
         BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
         LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
-    use crate::device::{DeviceTag, Parent, RegisteredDevices};
+    use crate::device::{DeviceTag, RegisteredDevices};
     use crate::environment::Filesystem;
-    use crate::matcher::config_matcher::ConfigMatcher;
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
     use fidl_fuchsia_device::ControllerProxy;
@@ -634,10 +614,10 @@ mod tests {
         is_nand: bool,
         content_format: DiskFormat,
         topological_path: String,
+        is_managed: bool,
         partition_label: Option<String>,
         partition_type: Option<[u8; 16]>,
         is_fshost_ramdisk: bool,
-        parent: Parent,
     }
 
     impl MockDevice {
@@ -647,12 +627,11 @@ mod tests {
                 is_nand: false,
                 content_format: DiskFormat::Unknown,
                 topological_path: "mock_device".to_string(),
+                // default to true to skip the publisher matcher when it's unrelated to the test.
+                is_managed: true,
                 partition_label: None,
                 partition_type: None,
                 is_fshost_ramdisk: false,
-                // Default to system partition table here mostly so we don't trip the publisher
-                // matcher unless we are testing it.
-                parent: Parent::SystemPartitionTable,
             }
         }
         fn set_block_flags(mut self, flags: Flag) -> Self {
@@ -671,6 +650,10 @@ mod tests {
             self.topological_path = path.to_string().into();
             self
         }
+        fn set_managed(mut self, managed: bool) -> Self {
+            self.is_managed = managed;
+            self
+        }
         fn set_partition_label(mut self, label: impl ToString) -> Self {
             self.partition_label = Some(label.to_string());
             self
@@ -681,10 +664,6 @@ mod tests {
         }
         fn set_fshost_ramdisk(mut self) -> Self {
             self.is_fshost_ramdisk = true;
-            self
-        }
-        fn set_parent(mut self, parent: Parent) -> Self {
-            self.parent = parent;
             self
         }
     }
@@ -703,6 +682,9 @@ mod tests {
                 })
             }
         }
+        fn is_managed(&self) -> bool {
+            self.is_managed
+        }
         fn is_nand(&self) -> bool {
             self.is_nand
         }
@@ -717,9 +699,6 @@ mod tests {
         }
         fn source(&self) -> &str {
             &self.topological_path
-        }
-        fn parent(&self) -> Parent {
-            self.parent
         }
         async fn partition_label(&mut self) -> Result<&str, Error> {
             match self.partition_label.as_ref() {
@@ -1644,12 +1623,11 @@ mod tests {
     async fn test_publisher_matcher() {
         let mut matchers = Matchers::new(&default_config());
 
-        // First unmanaged device should match and be published as "000". Devices are unmanaged if
-        // the come from Dev, instead of Fshost or SystemPartitionTable.
+        // First unmanaged device should match and be published as "000".
         let device1 = MockDevice::new()
             .set_topological_path("dev1")
             .set_partition_type([0x01; 16])
-            .set_parent(Parent::Dev);
+            .set_managed(false);
         let mut env1 = MockEnv::new().expect_publish_device("000");
         assert!(matchers
             .match_device(Box::new(device1), &mut env1)
@@ -1660,82 +1638,20 @@ mod tests {
         let device2 = MockDevice::new()
             .set_topological_path("dev2")
             .set_partition_type([0x01; 16])
-            .set_parent(Parent::Dev);
+            .set_managed(false);
         let mut env2 = MockEnv::new().expect_publish_device("001");
         assert!(matchers
             .match_device(Box::new(device2), &mut env2)
             .await
             .expect("match_device failed for device 2"));
 
-        // A device in the SystemPartitionTable should not match.
-        let managed_device = MockDevice::new()
-            .set_topological_path("managed")
-            .set_partition_type([0x01; 16])
-            .set_parent(Parent::SystemPartitionTable);
+        // A managed device should not match.
+        let managed_device =
+            MockDevice::new().set_topological_path("managed").set_partition_type([0x01; 16]);
         let mut env3 = MockEnv::new(); // No expectations
         assert!(!matchers
             .match_device(Box::new(managed_device), &mut env3)
             .await
             .expect("match_device failed for managed device"));
-    }
-
-    #[fuchsia::test]
-    async fn test_config_matcher() {
-        let mut matchers = Matchers::new_with_extra_matchers(
-            &default_config(),
-            vec![ConfigMatcher::new(
-                String::from("fts-semantic"),
-                String::from("fts-partition"),
-                Parent::SystemPartitionTable,
-            )],
-        );
-
-        // Wrong label doesn't match.
-        let device1 = MockDevice::new()
-            .set_topological_path("dev1")
-            .set_partition_type([0x01; 16])
-            .set_partition_label("not-the-right-label")
-            .set_parent(Parent::SystemPartitionTable);
-        let mut env1 = MockEnv::new(); // No expectations
-        assert!(!matchers
-            .match_device(Box::new(device1), &mut env1)
-            .await
-            .expect("match_device failed for device 1"));
-
-        // Wrong parent doesn't match.
-        let device2 = MockDevice::new()
-            .set_topological_path("dev1")
-            .set_partition_type([0x01; 16])
-            .set_partition_label("fts-partition")
-            .set_parent(Parent::Fshost);
-        let mut env2 = MockEnv::new(); // No expectations
-        assert!(!matchers
-            .match_device(Box::new(device2), &mut env2)
-            .await
-            .expect("match_device failed for device 2"));
-
-        // Matching device gets published.
-        let device3 = MockDevice::new()
-            .set_topological_path("dev1")
-            .set_partition_type([0x01; 16])
-            .set_partition_label("fts-partition")
-            .set_parent(Parent::SystemPartitionTable);
-        let mut env3 = MockEnv::new().expect_publish_device("fts-semantic");
-        assert!(matchers
-            .match_device(Box::new(device3), &mut env3)
-            .await
-            .expect("match_device failed for device 2"));
-
-        // The matcher is fused after it finds a matching device. No further devices are published.
-        let device4 = MockDevice::new()
-            .set_topological_path("dev1")
-            .set_partition_type([0x01; 16])
-            .set_partition_label("fts-partition")
-            .set_parent(Parent::SystemPartitionTable);
-        let mut env4 = MockEnv::new(); // No expectations
-        assert!(!matchers
-            .match_device(Box::new(device4), &mut env4)
-            .await
-            .expect("match_device failed for device 2"));
     }
 }
